@@ -50,7 +50,7 @@ contract CTMDomainImplStub {
 }
 
 /// @notice The one-time ServerNotifier handover the registry bootstrap requires (see
-///         {docs/upgrade-stage-lifecycle.md}): the bootstrap prepare RENDERS the ChainAdmin's half
+///         {docs/upgrade-operations.md}): the bootstrap prepare RENDERS the ChainAdmin's half
 ///         from live state — move the proxy under the CTM-domain ProxyAdmin, nominate the CTM
 ///         executor — and governance completes it through the executor's `forward`. A recurring
 ///         prepare has nothing to hand over.

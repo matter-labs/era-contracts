@@ -30,7 +30,6 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
 
     function setUp() public {
         deploy();
-        _mockMigrationPausedFromBridgehub();
     }
 
     /// @dev A stand-in transition answering exactly the reads `setNewVersionUpgradeFromTransition`

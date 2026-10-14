@@ -2,15 +2,14 @@
 
 - The protocol itself — flows, motivations, security arguments — is documented once in
   [`protocol-docs/`](../protocol-docs/README.md); code comments reference those pages instead of restating them.
-  The upgrade coordinator's stage semantics are one of those pages:
+  The upgrade coordinator's execution semantics are one of those pages:
   [ecosystem-upgrade-coordination.md](../protocol-docs/ecosystem-upgrade-coordination.md).
 - This folder holds design documents for the repository's own machinery:
   - [registry-driven-upgrades.md](./registry-driven-upgrades.md) — the canonical upgrade architecture: write-once
     release / transition / registry / operation objects, the coordinator and domain executors, provenance and
     validation, the bootstrap edge.
-  - [upgrade-stage-lifecycle.md](./upgrade-stage-lifecycle.md) — operational policies of the on-chain lifecycle:
-    pause composition, the ServerNotifier handover, the upgrade timer and stage timing, coordinator succession,
-    monitoring, recovery.
+  - [upgrade-operations.md](./upgrade-operations.md) — operational policies around upgrade execution: the
+    ServerNotifier handover, coordinator succession, monitoring, recovery, the incident-only migration pauses.
   - [upgrade-script-retirement.md](./upgrade-script-retirement.md) — the temporary plan for moving what the prepare
     scripts still decide on-chain.
   - [governance-self-migration.md](./governance-self-migration.md) — how the governance layer upgrades itself.

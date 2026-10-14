@@ -24,7 +24,6 @@ import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpg
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
@@ -59,18 +58,15 @@ import {
     BootstrapNotYetExecuted,
     BootstrapServerNotifierNotBound,
     BootstrapServerNotifierRowMissing,
-    DeadlineNotYetPassed,
     L2BytecodeNotPublished,
     L2BytecodeInfoLength,
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps,
-    MigrationPaused,
     PatchCannotCarryL2Upgrade,
     ProxyUpgradeRowMismatch,
     RegistryEmptySelectors,
     RegistryTargetHasNoCode,
     RegistryDuplicateProxyRow,
-    TimerNotStarted,
     TransitionDeadlineBeforeUpgrade,
     TransitionDeadlineZero,
     ZeroAddress
@@ -136,14 +132,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     ProxyAdmin internal ecosystemProxyAdmin;
 
     CTMRelease internal genesisRelease;
-    GovernanceUpgradeTimer internal upgradeTimer;
     TransparentUpgradeableProxy internal ctmDomainProxy;
     address internal implV31;
     address internal implV32;
     address internal implUnknown;
     // The pre-bootstrap ServerNotifier shape: a real notifier proxy under its OWN ProxyAdmin, both
     // owned by the chain admin. Its one-time handover to the CTM domain is a precondition of the
-    // edge ({docs/upgrade-stage-lifecycle.md}); the fixture performs it in `setUp`.
+    // edge ({docs/upgrade-operations.md}); the fixture performs it in `setUp`.
     address internal chainAdmin;
     ProxyAdmin internal notifierAdmin;
     TransparentUpgradeableProxy internal notifierProxy;
@@ -172,9 +167,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     function setUp() public {
         deploy();
-        // `setNewVersionUpgrade` requires migrations paused — the window stage 0 opens and stage 2
-        // closes. The bootstrap edge replaces stage 1, so it runs inside that same window.
-        _mockMigrationPausedFromBridgehub();
 
         implV31 = address(new ImplV31());
         implV32 = address(new ImplV32());
@@ -206,7 +198,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             address(coordinator)
         );
 
-        // Stage 1's bindings and ecosystem handover, which precede `migrate()` in the same
+        // The bundle's bindings and ecosystem handover, which precede `migrate()` in the same
         // transaction; the suites that drop one of them undo it explicitly.
         vm.startPrank(governor);
         coreExecutor.setCoordinator(address(coordinator));
@@ -216,11 +208,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         _handOverNotifier(notifierProxy);
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        // The pinned timer gates `migrate()`: stage 0 starts it, the edge runs after its window.
-        // Zero delays make the window pass immediately in the fixture.
-        upgradeTimer = new GovernanceUpgradeTimer(0, 0, governor, governor);
-        vm.prank(governor);
-        upgradeTimer.startTimer();
         // The release constructor reads each facet's self-description (see the shared fixture).
         _mockFacetSelfDescriptions(facetCuts);
         // An empty L2 table: the default edge derives no L2 deployments.
@@ -229,16 +216,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     // ─────────────────────────────── fixtures ───────────────────────────────
-
-    /// @dev Stage 2's unpause, as the fixture's mocked ChainAssetHandler sees it (the fixture
-    ///      mocks the handler paused for the whole edge; see `_mockMigrationPausedFromBridgehub`).
-    function _mockMigrationsUnpaused() internal {
-        vm.mockCall(
-            makeAddr("mockChainAssetHandler"),
-            abi.encodeWithSignature("migrationPausedFor(address)"),
-            abi.encode(false)
-        );
-    }
 
     /// @dev A release pinning the fixture's facets, verifier and (ZKsync OS) DiamondInit over
     ///      `_l2BytecodeInfos`, behind the fixture's system-proxy shell.
@@ -335,8 +312,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 ctmExecutor: address(ctmExecutor),
                 coreExecutor: address(coreExecutor),
                 governance: governor,
-                coordinator: address(coordinator),
-                upgradeTimer: address(upgradeTimer)
+                coordinator: address(coordinator)
             });
     }
 
@@ -399,8 +375,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         return abi.decode(_data[4:], (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
     }
 
-    /// @dev The governance bundle this object replaces stage 1 with: nominate the CTM, hand over
-    ///      the ProxyAdmin, migrate. Three calls instead of ~15.
+    /// @dev The CTM half of the governance bundle: nominate the CTM, hand over the ProxyAdmin (the
+    ///      test then calls `migrate`).
     function _handOverAuthority() internal {
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(migration));
@@ -520,7 +496,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         // The object's own post-state check covers the whole edge (version, release pin, authority
         // landing); the granular asserts below then pin the exact expected values.
-        _mockMigrationsUnpaused();
         migration.validateApplied();
 
         // The ecosystem proxy moved to the implementation the row names.
@@ -661,7 +636,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
         assertEq(chainContractAddress.currentRelease(), address(tableRelease), "the table release is pinned");
         assertEq(chainContractAddress.protocolVersion(), newVersion);
-        _mockMigrationsUnpaused();
         composed.validateApplied();
     }
 
@@ -832,36 +806,21 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertTrue(gated.executed(), "the same edge applies once the bytecode is published");
         assertEq(chainContractAddress.protocolVersion(), newVersion);
         assertEq(chainContractAddress.upgradeCutHash(oldVersion), composedCutHash, "publication changes no bytes");
-        _mockMigrationsUnpaused();
         gated.validateApplied();
     }
 
     // ─────────────────────────── post-state verification ───────────────────────────
 
-    /// @dev The completion check runs as its own call after stage 2: before the edge it must fail
-    ///      loudly, so an incorrectly sequenced bundle cannot report success on an unapplied bootstrap.
+    /// @dev The completion check closes the bundle: before the edge it must fail loudly, so an
+    ///      incorrectly sequenced bundle cannot report success on an unapplied bootstrap.
     function test_revertWhen_validateAppliedBeforeMigrate() public {
         vm.expectRevert(BootstrapNotYetExecuted.selector);
-        migration.validateApplied();
-    }
-
-    /// @dev Completion includes the operational restrictions being lifted: the stage-0 pause the
-    ///      edge ran under must have been released, or stage 2 does not pass.
-    function test_revertWhen_validateAppliedWhileMigrationsStillPaused() public {
-        _handOverAuthority();
-        migration.migrate();
-
-        vm.expectRevert(MigrationPaused.selector);
-        migration.validateApplied();
-
-        _mockMigrationsUnpaused();
         migration.validateApplied();
     }
 
     function test_validateAppliedRequiresCoordinatorToNameTheBootstrappedExecutor() public {
         _handOverAuthority();
         migration.migrate();
-        _mockMigrationsUnpaused();
         CTMUpgradeExecutor replacement = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
@@ -899,7 +858,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_revertWhen_validateAppliedWithANominationPendingOnAnAuthority() public {
         _handOverAuthority();
         migration.migrate();
-        _mockMigrationsUnpaused();
         migration.validateApplied();
         address attacker = makeAddr("attacker");
 
@@ -959,41 +917,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         vm.prank(governor);
         ctmExecutor.forward(calls);
         migration.validateApplied();
-    }
-
-    // ─────────────────────────── timer gating ───────────────────────────
-
-    /// @dev The timer proves stage 0 ran: an edge whose timer was never started must not
-    ///      execute, regardless of authority.
-    function test_revertWhen_timerNeverStarted() public {
-        GovernanceUpgradeTimer unstarted = new GovernanceUpgradeTimer(0, 0, governor, governor);
-        BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeTimer = address(unstarted);
-        RegistryBootstrapMigration gated = new RegistryBootstrapMigration(manifest);
-
-        vm.prank(governor);
-        chainContractAddress.transferOwnership(address(gated));
-        ctmProxyAdmin.transferOwnership(address(gated));
-
-        vm.expectRevert(TimerNotStarted.selector);
-        gated.migrate();
-    }
-
-    function test_revertWhen_timerDeadlineNotYetPassed() public {
-        GovernanceUpgradeTimer pending = new GovernanceUpgradeTimer(1000, 0, governor, governor);
-        vm.prank(governor);
-        pending.startTimer();
-        BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeTimer = address(pending);
-        RegistryBootstrapMigration gated = new RegistryBootstrapMigration(manifest);
-
-        vm.prank(governor);
-        chainContractAddress.transferOwnership(address(gated));
-        ctmProxyAdmin.transferOwnership(address(gated));
-
-        // The window has not passed (no warp), so the edge is not yet executable.
-        vm.expectRevert(DeadlineNotYetPassed.selector);
-        gated.migrate();
     }
 
     // ─────────────────────────── source checks ───────────────────────────
@@ -1168,7 +1091,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         ctmExecutor.acceptOwnership();
         migration.migrate();
         assertTrue(migration.executed(), "the corrected edge must run");
-        _mockMigrationsUnpaused();
         migration.validateApplied();
     }
 
@@ -1402,14 +1324,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implV32);
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the edge must otherwise complete");
-        _mockMigrationsUnpaused();
         migration.validateApplied();
     }
 
     // ─────────────────────────── the core side of the handover ───────────────────────────
 
-    /// @dev The ecosystem `ProxyAdmin` is handed to the core executor earlier in stage 1; the edge
-    ///      refuses unless that handover happened, which reverts the handover with it.
+    /// @dev The ecosystem `ProxyAdmin` is handed to the core executor earlier in the bundle; the
+    ///      edge refuses unless that handover happened, which reverts the handover with it.
     function test_revertWhen_ecosystemProxyAdminNotHandedToTheCoreExecutor() public {
         _forwardFromCoreExecutor(
             address(ecosystemProxyAdmin),
@@ -1466,7 +1387,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     /// @dev A core executor answering to the coordinator is not enough: the coordinator must name
-    ///      it as its `CORE_EXECUTOR`, or its stages would drive another one.
+    ///      it as its `CORE_EXECUTOR`, or its `execute` would drive another one.
     function test_revertWhen_theCoordinatorNamesAnotherCoreExecutor() public {
         ProxyAdmin otherAdmin = new ProxyAdmin();
         CoreUpgradeExecutor otherCore = new CoreUpgradeExecutor(governor, otherAdmin);
@@ -1539,7 +1460,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_revertWhen_validateAppliedAfterAnExecutorChangedOwner() public {
         _handOverAuthority();
         migration.migrate();
-        _mockMigrationsUnpaused();
         migration.validateApplied();
         address stranger = makeAddr("stranger");
 
@@ -1575,7 +1495,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_revertWhen_validateAppliedAfterTheCoreSideMoved() public {
         _handOverAuthority();
         migration.migrate();
-        _mockMigrationsUnpaused();
         migration.validateApplied();
 
         vm.prank(governor);
@@ -1724,7 +1643,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_validateApplied_passesAfterAnInfrastructureRepatch() public {
         _handOverAuthority();
         migration.migrate();
-        _mockMigrationsUnpaused();
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -1742,33 +1660,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.validateApplied();
     }
 
-    /// @dev The timer is re-checked at completion: an extension made after `migrate()` defers the
-    ///      completion check until it passes.
-    function test_revertWhen_validateAppliedBeforeAnExtendedTimerDeadline() public {
-        GovernanceUpgradeTimer extendable = new GovernanceUpgradeTimer(0, 100, governor, governor);
-        vm.prank(governor);
-        extendable.startTimer();
-        BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeTimer = address(extendable);
-        RegistryBootstrapMigration timed = _deployAndAuthorize(manifest);
-        timed.migrate();
-        _mockMigrationsUnpaused();
-        timed.validateApplied();
-
-        vm.prank(governor);
-        extendable.changeDeadline(block.timestamp + 50);
-        vm.expectRevert(DeadlineNotYetPassed.selector);
-        timed.validateApplied();
-
-        vm.warp(block.timestamp + 50);
-        timed.validateApplied();
-    }
-
     /// @dev The notifier must stay the CTM executor's: the gate refuses once its ownership left.
     function test_revertWhen_validateAppliedAfterTheNotifierLeftTheExecutor() public {
         _handOverAuthority();
         migration.migrate();
-        _mockMigrationsUnpaused();
         address stranger = makeAddr("stranger");
         Call[] memory calls = new Call[](1);
         calls[0] = Call({

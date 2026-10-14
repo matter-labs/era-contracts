@@ -13,7 +13,6 @@ import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {ICommittedUpgrade} from "../objects/ICommittedUpgrade.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
-import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {VersionEdgeLib} from "../libraries/VersionEdgeLib.sol";
@@ -77,7 +76,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             _manifest.coreExecutor == address(0) ||
             _manifest.governance == address(0) ||
             _manifest.coordinator == address(0) ||
-            _manifest.upgradeTimer == address(0) ||
             _manifest.upgradeEngine == address(0)
         ) {
             revert ZeroAddress();
@@ -174,22 +172,14 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     }
 
     /// @notice Reverts unless the live ecosystem is exactly the starting state the manifest names
-    ///         AND the edge is executable now: the named timer's operational window has passed
-    ///         (which also proves stage 0 started it — `checkDeadline` rejects an unstarted timer),
-    ///         both domains' executors are governed and bound as the manifest names (the ecosystem
-    ///         `ProxyAdmin` already handed to the core executor earlier in the same stage-1
-    ///         transaction), and the one-time ServerNotifier handover to the CTM domain has
-    ///         completed.
+    ///         AND the edge is executable now: both domains' executors are governed and bound as the
+    ///         manifest names (the ecosystem `ProxyAdmin` already handed to the core executor earlier
+    ///         in the same governance bundle), and the one-time ServerNotifier handover to the CTM
+    ///         domain has completed.
     /// @dev Runs on the execution path, so a drifted ecosystem cannot be migrated by accident and
-    ///      the stage sequencing is enforced by the object itself, not by call order in a bundle.
-    /// @dev NOT a complete precondition oracle: `setNewVersionUpgrade` additionally requires chain
-    ///      migrations to be paused — ecosystem-domain state governance pauses in stage 0, enforced
-    ///      on-chain by the CTM's own version-edge commit rather than pinned here.
+    ///      the preconditions are enforced by the object itself, not by call order in a bundle.
     function validate() public view {
         BootstrapManifest memory m = getManifest();
-
-        ObjectAnchorLib.requireCode(m.upgradeTimer);
-        GovernanceUpgradeTimer(m.upgradeTimer).checkDeadline();
 
         // Authority must already rest here, or `migrate` could not perform any of the work.
         address ctmOwner = Ownable2Step(m.ctm).owner();
@@ -242,13 +232,12 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         ICTMRelease(m.currentRelease).validate();
     }
 
-    /// @notice Reverts unless the edge COMPLETED: `migrate()` ran, the timer still permits
-    ///         completion, the CTM sits at the new version with the named release installed, the
-    ///         whole CTM domain — the ServerNotifier included — is held by the CTM executor, both
-    ///         domains' executors are governed and bound as the manifest names with no ownership
-    ///         nomination outstanding on any authority the edge hands over or drives, and the CTM's
-    ///         chain migrations are no longer paused. Run as its own call after stage 2, so it can
-    ///         never hold back the stage-2 unpause.
+    /// @notice Reverts unless the edge COMPLETED: `migrate()` ran, the CTM sits at the new version
+    ///         with the named release installed, the whole CTM domain — the ServerNotifier
+    ///         included — is held by the CTM executor, and both domains' executors are governed and
+    ///         bound as the manifest names with no ownership nomination outstanding on any authority
+    ///         the edge hands over or drives. The last call of the bootstrap bundle, so a failing
+    ///         check reverts the whole edge.
     /// @dev The proxy rows are not re-read: `migrate()` verified them in the transaction that
     ///      applied them. The version/release check does describe this one edge: a later
     ///      transition moves the CTM on, after which this reverts by design.
@@ -257,7 +246,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             revert BootstrapNotYetExecuted();
         }
         BootstrapManifest memory m = getManifest();
-        GovernanceUpgradeTimer(m.upgradeTimer).checkDeadline();
 
         IChainTypeManager ctm = IChainTypeManager(m.ctm);
         uint256 liveVersion = ctm.protocolVersion();

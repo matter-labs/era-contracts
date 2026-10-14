@@ -23,7 +23,6 @@ import {
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-import {OperationCarriesNoTransition} from "contracts/common/L1ContractErrors.sol";
 import {
     AuthoredL2Plan,
     ProxyUpgradeRow,
@@ -35,8 +34,8 @@ import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 /// @notice Individual-contract upgrades through the registry model, end to end on a real ZKsync OS
 ///         chain: a facet-only edge, a verifier-only edge and a ValidatorTimelock-only SemVer
-///         patch. Each is ONE release (or none) and ONE transition, run through the executor's
-///         three stages exactly like a full minor upgrade — and each proves that everything it
+///         patch. Each is ONE release (or none) and ONE transition, executed through the
+///         coordinator exactly like a full minor upgrade — and each proves that everything it
 ///         does not name stays as it was: the other facets, the verifier, the CTM implementation,
 ///         the L2 side (no transaction is committed) and the release the CTM is on.
 /// @dev Departs from the state the base fixture's first hop leaves behind (0.32.0 on the v32
@@ -195,26 +194,14 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
             ProxyUpgradeRow[] memory rows
         ) = _timelockRowFixture();
         assertEq(_liveImpl(timelock), implOld, "fixture: the proxy starts at the old implementation");
-        EcosystemUpgradeOperation operation = _deployOperation(address(0), rows, address(0), _newOperationTimer());
+        EcosystemUpgradeOperation operation = _deployOperation(address(0), rows, address(0));
         assertEq(operation.ctmTransition(), address(0), "an infrastructure-only operation carries no transition");
 
-        vm.startPrank(governor);
-        coordinator.stage0(operation);
-        // Migrations are paused for an infrastructure-only operation too (the conservative
-        // policy): implementations move under chains that could otherwise be migrating.
-        assertTrue(
-            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
-            "stage 0 must pause migrations even without a transition"
-        );
-        coordinator.stage1(operation);
-        coordinator.stage2(operation);
-        vm.stopPrank();
+        vm.prank(governor);
+        coordinator.execute(operation);
 
         // The one thing that changed.
         assertEq(_liveImpl(timelock), implNew, "the timelock proxy points at the new implementation");
-        // No transition, so there is no applied state for the post-state check to read back.
-        vm.expectRevert(abi.encodeWithSelector(OperationCarriesNoTransition.selector, address(operation)));
-        ctmExecutor.validateOperationApplied(operation);
 
         // Everything a chain-version edge would have moved, unmoved.
         assertEq(chainContractAddress.protocolVersion(), ctmVersionBefore, "the CTM version must not move");
@@ -236,14 +223,13 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         _assertFacetsUnchanged(before);
         assertEq(address(IGetters(chainAddress).getVerifier()), before.verifier, "the verifier is untouched");
         assertEq(vm.load(address(chainContractAddress), EIP1967_IMPLEMENTATION_SLOT), before.ctmImplementationSlot);
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "no migration pause is taken");
 
-        // The lifecycle ended cleanly: nothing reserved, migrations resumed.
-        assertEq(address(coordinator.pendingOperation()), address(0), "the lifecycle slot must be free");
-        assertEq(address(ctmExecutor.activeOperation()), address(0), "the reservation must be released");
-        assertFalse(
-            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
-            "stage 2 must release the pause"
-        );
+        // Re-executing it changes nothing: every row already sits at its target.
+        vm.prank(governor);
+        coordinator.execute(operation);
+        assertEq(_liveImpl(timelock), implNew, "a re-execution leaves the row where it is");
+        assertEq(chainContractAddress.protocolVersion(), ctmVersionBefore, "and moves no version");
     }
 
     /// @dev A VERIFIER replacement as a SemVer PATCH. The release is the immutable snapshot of the

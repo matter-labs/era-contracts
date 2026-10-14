@@ -9,7 +9,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::governance_calls::decode_calls;
+use crate::common::governance_calls::{decode_calls, GovernanceCallsTable};
 use crate::common::logger;
 
 /// Optional human-description registry. Loaded from a TOML at
@@ -22,7 +22,7 @@ use crate::common::logger;
 /// - `arg0_address`: the first 32-byte word after the selector, decoded as
 ///   an address. Disambiguates same-`(target, selector)` calls with
 ///   different first args (e.g. `TPA.upgrade(<proxy>, <impl>)` across
-///   multiple proxies in stage 1).
+///   multiple proxies in one governance bundle).
 /// - `inner_target` + `inner_selector`: for *wrapper* selectors
 ///   (`ChainAdmin.multicall`, legacy `Governance.scheduleTransparent` /
 ///   `executeInstant`), match against the FIRST inner call's target and/or
@@ -418,7 +418,7 @@ struct CtmFlavorSection {
 
 #[derive(Debug, Deserialize)]
 struct GovernanceCallsToml {
-    governance_calls: GovernanceCalls,
+    governance_calls: GovernanceCallsTable,
     #[serde(default)]
     test_upgrade_calls: BTreeMap<String, String>,
     /// Per-CTM flavor sections — only `ctm_admin_calls.chain_admin` is consumed
@@ -448,13 +448,6 @@ fn build_ctm_admin_calls_tag_map(parsed: &GovernanceCallsToml) -> HashMap<Addres
     map
 }
 
-#[derive(Debug, Deserialize)]
-struct GovernanceCalls {
-    stage0_calls: String,
-    stage1_calls: String,
-    stage2_calls: String,
-}
-
 #[derive(Debug, Serialize)]
 struct SimulatorTransaction {
     description: String,
@@ -465,21 +458,12 @@ struct SimulatorTransaction {
     value: String,
     #[serde(rename = "valueToMint", skip_serializing_if = "Option::is_none")]
     value_to_mint: Option<String>,
-    /// Seconds the local fork should advance via `evm_increaseTime` before
-    /// this tx fires. Used for timer-protected gates like
-    /// `GovernanceUpgradeTimer.checkDeadline()` — without it the local sim
-    /// reverts with `DeadlineNotYetPassed()` because no wall time elapses
-    /// between stage0's `startTimer(...)` and stage1's `checkDeadline()`.
-    /// Picked up by the simulator at scripts/simulate.ts; see the
-    /// `tx.timeIncrease` branch there.
-    #[serde(rename = "timeIncrease", skip_serializing_if = "Option::is_none")]
-    time_increase: Option<u64>,
     /// Transaction-simulator-only escape hatch for per-chain upgrade tests.
     /// When set, the simulator mutates the forked chain diamond storage so
     /// `totalBatchesExecuted == totalBatchesVerified == totalBatchesCommitted`
     /// before sending the tx. This must stay limited to `test_upgrade_*`
     /// transactions; it is not a real proposal action and must not be used for
-    /// stage/bundle/create-chain calls.
+    /// governance/bundle/create-chain calls.
     #[serde(
         rename = "emulateAllBatchesExecuted",
         skip_serializing_if = "Option::is_none"
@@ -488,28 +472,22 @@ struct SimulatorTransaction {
     tag: String,
 }
 
-/// Selector → time-advance map. When a sim tx targets one of these,
-/// emit a `timeIncrease` so the local fork's `block.timestamp` clears
-/// the gate the call enforces.
-const CHECK_DEADLINE_SELECTOR: &str = "0x43bf9936";
-
-/// `governance_upgrade_timer_initial_delay` is env-specific (stage: 1200s,
-/// mainnet: 172800s). Use a value comfortably larger than every env's delay
-/// so the local fork always clears the gate.
-const CHECK_DEADLINE_TIME_INCREASE_SECS: u64 = 200_000;
-
 /// Canonical Arachnid CREATE2 factory — same on every chain. A bundle whose
 /// signer issues even one call to this address is a deployer ("Camp-A")
 /// bundle; its signer is presumed to be an EOA we hold a key for and
 /// belongs to phase 2 (real-chain broadcast), not the sim.
 const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
 
-/// ETH (wei) minted to the governance sender (PUH) at the first stage-2 call
-/// so the `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}`
-/// priority requests have msg.value coverage. 10 ETH is well above the
+/// ETH (wei) minted to the governance sender (PUH) with the bundle's first call:
+/// it creates the impersonated account on the fork and covers the `value` of
+/// any call in the bundle, such as a `requestL2TransactionDirect{value: y}` /
+/// `...TwoBridges{value: y}` priority request. 10 ETH is well above the
 /// aggregate `priority_txs_l2_gas_limit * max_expected_l1_gas_price` budget
-/// across the v31 stage's stage-2 L1→L2 chain.
-const STAGE2_PUH_FUND_WEI: &str = "10000000000000000000";
+/// of the L1→L2 requests a v31-shaped governance bundle carries.
+const GOVERNANCE_SENDER_FUND_WEI: &str = "10000000000000000000";
+
+/// Simulator tag of the governance bundle's transactions.
+const GOVERNANCE_TAG: &str = "governance";
 
 /// Subset of `prepare/manifest.json` needed to walk every Safe bundle.
 #[derive(Debug, Deserialize)]
@@ -635,7 +613,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     };
 
     // Manifest bundles come FIRST (Camp-B setup the sim impersonates), then
-    // governance stages 0/1/2. Order matters: setup writes the state
+    // the governance bundle. Order matters: setup writes the state
     // (pendingOwner, verifier registry, etc.) that the gov calls then read.
     let mut transactions = Vec::new();
     if let Some(ref manifest) = manifest_path {
@@ -901,7 +879,6 @@ fn manifest_to_simulator_transactions(
                 data: tx.data.clone(),
                 value: tx.value.clone().unwrap_or_else(|| "0".to_string()),
                 value_to_mint,
-                time_increase: None,
                 emulate_all_batches_executed: None,
                 tag: ctm_admin_calls_tags
                     .get(&tx.to)
@@ -924,71 +901,47 @@ fn governance_toml_to_simulator_transactions(
     let parsed: GovernanceCallsToml =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path.display()))?;
 
-    let stages = [
-        (0u8, parsed.governance_calls.stage0_calls.as_str()),
-        (1u8, parsed.governance_calls.stage1_calls.as_str()),
-        (2u8, parsed.governance_calls.stage2_calls.as_str()),
-    ];
-    let mut out = Vec::new();
-    let mut should_fund_sender = true;
-    let mut stage2_topup_pending = true;
-    for (stage, encoded_calls) in stages {
-        let calls = decode_calls(encoded_calls)
-            .with_context(|| format!("failed to decode stage{stage}_calls"))?;
-        for (idx, call) in calls.into_iter().enumerate() {
-            let data_hex = format!("0x{}", hex::encode(&call.data));
-            // Mint logic:
-            //   - First stage-2 call → top up PUH with `STAGE2_PUH_FUND_WEI`
-            //     so subsequent L1→L2 priority requests have msg.value.
-            //   - Otherwise, first-ever call → seed PUH with 1 wei so the
-            //     anvil account exists.
-            //   - All later calls → no mint.
-            let value_to_mint = if stage == 2 && stage2_topup_pending {
-                stage2_topup_pending = false;
-                should_fund_sender = false;
-                Some(STAGE2_PUH_FUND_WEI.to_string())
-            } else if should_fund_sender {
-                should_fund_sender = false;
-                Some("1".to_string())
-            } else {
-                None
-            };
-            let time_increase = if data_hex
-                .get(..CHECK_DEADLINE_SELECTOR.len())
-                .map(|prefix| prefix.eq_ignore_ascii_case(CHECK_DEADLINE_SELECTOR))
-                .unwrap_or(false)
-            {
-                Some(CHECK_DEADLINE_TIME_INCREASE_SECS)
-            } else {
-                None
-            };
-            let description = descriptions
-                .lookup(call.target, &data_hex)
-                .unwrap_or_else(|| {
-                    let selector = data_hex.get(..10).unwrap_or("0x");
-                    format!(
-                        "[unlabelled] stage{stage} call {} to={:#x} sel={selector}",
-                        idx + 1,
-                        call.target
-                    )
-                });
-            out.push(SimulatorTransaction {
-                description,
-                network: network.to_string(),
-                from: format!("{from:#x}"),
-                to: format!("{:#x}", call.target),
-                data: data_hex,
-                value: call.value.to_string(),
-                value_to_mint,
-                time_increase,
-                emulate_all_batches_executed: None,
-                tag: format!("stage{stage}"),
-            });
-        }
-    }
-
+    let mut out =
+        governance_bundle_transactions(&parsed.governance_calls, network, from, descriptions)?;
     append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
+    Ok(out)
+}
 
+/// One simulator transaction per call of the governance bundle, sent by `from`. The first one
+/// mints [`GOVERNANCE_SENDER_FUND_WEI`] to the sender; no other mints.
+fn governance_bundle_transactions(
+    governance_calls: &GovernanceCallsTable,
+    network: &str,
+    from: Address,
+    descriptions: &SimDescriptionRegistry,
+) -> anyhow::Result<Vec<SimulatorTransaction>> {
+    let calls = decode_calls(&governance_calls.calls)
+        .context("failed to decode [governance_calls] calls")?;
+    let mut out = Vec::with_capacity(calls.len());
+    for (idx, call) in calls.into_iter().enumerate() {
+        let data_hex = format!("0x{}", hex::encode(&call.data));
+        let description = descriptions
+            .lookup(call.target, &data_hex)
+            .unwrap_or_else(|| {
+                let selector = data_hex.get(..10).unwrap_or("0x");
+                format!(
+                    "[unlabelled] {GOVERNANCE_TAG} call {} to={:#x} sel={selector}",
+                    idx + 1,
+                    call.target
+                )
+            });
+        out.push(SimulatorTransaction {
+            description,
+            network: network.to_string(),
+            from: format!("{from:#x}"),
+            to: format!("{:#x}", call.target),
+            data: data_hex,
+            value: call.value.to_string(),
+            value_to_mint: (idx == 0).then(|| GOVERNANCE_SENDER_FUND_WEI.to_string()),
+            emulate_all_batches_executed: None,
+            tag: GOVERNANCE_TAG.to_string(),
+        });
+    }
     Ok(out)
 }
 
@@ -1033,7 +986,6 @@ fn append_test_upgrade_calls(
                 data: data_hex,
                 value: call.value.to_string(),
                 value_to_mint: Some("1".to_string()),
-                time_increase: None,
                 emulate_all_batches_executed,
                 tag: tag.to_string(),
             });
@@ -1048,6 +1000,46 @@ mod tests {
     use super::*;
     use crate::common::governance_calls::{encode_calls, GovernanceCall};
     use alloy::primitives::U256;
+
+    /// The one bundle becomes one transaction per call, all tagged `governance` and sent by the
+    /// governance sender, with the sender funded once — on the first call — for the bundle's
+    /// value-bearing calls. No time warps: nothing in the bundle waits on a deadline.
+    #[test]
+    fn the_governance_bundle_is_one_tagged_run_funded_once() {
+        let from = Address::repeat_byte(0x99);
+        let calls = [
+            GovernanceCall {
+                target: Address::repeat_byte(0x22),
+                value: U256::ZERO,
+                data: vec![0xde, 0xad, 0xbe, 0xef],
+            },
+            GovernanceCall {
+                target: Address::repeat_byte(0x33),
+                value: U256::from(7),
+                data: vec![0x01, 0x02, 0x03, 0x04],
+            },
+        ];
+        let table = GovernanceCallsTable {
+            calls: format!("0x{}", hex::encode(encode_calls(&calls))),
+        };
+        let txs =
+            governance_bundle_transactions(&table, "l1", from, &SimDescriptionRegistry::default())
+                .unwrap();
+        assert_eq!(txs.len(), 2);
+        for (tx, call) in txs.iter().zip(&calls) {
+            assert_eq!(tx.tag, GOVERNANCE_TAG);
+            assert_eq!(tx.from, format!("{from:#x}"));
+            assert_eq!(tx.to, format!("{:#x}", call.target));
+            assert_eq!(tx.value, call.value.to_string());
+        }
+        assert_eq!(
+            txs[0].value_to_mint.as_deref(),
+            Some(GOVERNANCE_SENDER_FUND_WEI)
+        );
+        assert_eq!(txs[1].value_to_mint, None);
+        let json = serde_json::to_string(&txs).unwrap();
+        assert!(!json.contains("timeIncrease"), "{json}");
+    }
 
     #[test]
     fn separately_generated_probes_preserve_simulation_actions() {

@@ -3,11 +3,8 @@ pragma solidity ^0.8.24;
 
 // solhint-disable gas-custom-errors
 
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {DeadlineNotYetPassed} from "contracts/common/L1ContractErrors.sol";
-
-import {EmergencyStageUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol";
-import {VerifyStage1Pause} from "deploy-scripts/upgrade/VerifyStage1Pause.s.sol";
+import {EmergencyUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol";
+import {VerifyEmergencyUpgrade} from "deploy-scripts/upgrade/VerifyEmergencyUpgrade.s.sol";
 import {VerifyEmergencyApproveHash} from "deploy-scripts/upgrade/VerifyEmergencyApproveHash.s.sol";
 import {SecurityCouncilEmergencyStageUpgrade} from "deploy-scripts/upgrade/SecurityCouncilEmergencyStageUpgrade.s.sol";
 import {SecurityCouncilApproveStageUpgrade} from "deploy-scripts/upgrade/SecurityCouncilApproveStageUpgrade.s.sol";
@@ -19,6 +16,7 @@ import {
 } from "deploy-scripts/utils/Utils.sol";
 
 import {
+    CallRecorderDouble,
     EmergencyUpgradeFixture,
     GUARDIANS_EIP1271_THRESHOLD,
     OneOwnerSafeDouble,
@@ -26,25 +24,22 @@ import {
     SECURITY_COUNCIL_EIP1271_THRESHOLD
 } from "./_EmergencyGovernanceDoubles.sol";
 
-/// @notice The emergency-upgrade tooling against packages in the shape the `upgrade-prepare-all`
-///         merge writes, executed through test doubles of the zk-governance handler, board,
-///         multisigs and Safes (`_EmergencyGovernanceDoubles.sol` says why doubles). These packages
-///         are BOOTSTRAP-shaped: the first bundle starts a `GovernanceUpgradeTimer` itself and the
-///         later ones check it, as the one-time edge's declared bundles do. A registry operation,
-///         through the real prepare pipeline, is `RegistryUpgradeAsEmergency.t.sol`.
+/// @notice The emergency-upgrade tooling against packages in the layout the `upgrade-prepare-all`
+///         merge writes — one `[governance_calls] calls` bundle — executed through test doubles of
+///         the zk-governance handler, board, multisigs and Safes (`_EmergencyGovernanceDoubles.sol`
+///         says why doubles). The bundles here are synthetic calls to a recorder; a registry
+///         operation through the real prepare pipeline is `RegistryUpgradeAsEmergency.t.sol`.
 contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
-    /// @dev A stage-1 hold one block cannot pass.
-    uint256 internal constant TIMER_DELAY = 1200;
-    /// @dev The `MAX_ADDITIONAL_DELAY` the CTM prepare deploys every timer with.
-    uint256 internal constant TIMER_MAX_ADDITIONAL_DELAY = 2 weeks;
     /// @dev A double quote, for hand-written TOML.
     string internal constant QUOTE = hex"22";
 
-    VerifyStage1Pause internal dryRun;
+    VerifyEmergencyUpgrade internal dryRun;
+    CallRecorderDouble internal recorder;
 
     function setUp() public {
         _deployEmergencyGovernance(safeOwner.addr);
-        dryRun = new VerifyStage1Pause();
+        dryRun = new VerifyEmergencyUpgrade();
+        recorder = new CallRecorderDouble();
     }
 
     // ───────────────────────────── digests ─────────────────────────────
@@ -53,9 +48,9 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
     ///         recomputes over its own EIP-712 domain (OpenZeppelin's `_hashTypedDataV4`, not the
     ///         tool's `EIP712Utils`), wrapped in each Safe's message hash, for the first
     ///         `EIP1271_THRESHOLD` members of each multisig in member order and the ZK Foundation.
-    function test_proposal_approvesTheDigestsTheBoardChecks() public {
-        (, IProtocolUpgradeHandler.Call[] memory calls) = _startTimerCall(0);
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory proposal = _build(calls);
+    function test_proposal_approvesTheDigestsTheBoardChecks() public view {
+        IProtocolUpgradeHandler.Call[] memory calls = _recordCalls(1);
+        EmergencyUpgradeCalldata.EmergencyProposal memory proposal = _build(calls);
 
         assertEq(address(proposal.board), address(board), "the handler's board executes the proposal");
         assertEq(proposal.owner, safeOwner.addr, "the ZK Foundation Safe's owner approves");
@@ -114,30 +109,20 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
 
     // ───────────────────────────── the one proposal ─────────────────────────────
 
-    /// @notice A package's governance calls, every `[governance_calls]` entry in key order whatever
-    ///         order the file lists them in, are ONE proposal: emitted, approved by the owner and
-    ///         executed by anyone. With a zero timer delay the check of the timer passes in the block
-    ///         that started it.
-    function test_package_executesAsOneProposalInKeyOrder() public {
-        (GovernanceUpgradeTimer timer, IProtocolUpgradeHandler.Call[] memory start) = _startTimerCall(0);
-        // Written by hand: forge's TOML writer would sort the keys itself.
-        string memory package = string.concat(vm.projectRoot(), "/script-out/emergency-upgrade/key-order.toml");
-        vm.writeFile(
-            package,
-            string.concat(
-                string.concat("[governance_calls]\n", _tomlEntry("stage2_calls", _checkDeadlineCalls(timer, 2))),
-                _tomlEntry("stage0_calls", start),
-                _tomlEntry("stage1_calls", _checkDeadlineCalls(timer, 1))
-            )
-        );
+    /// @notice A package's governance bundle is ONE proposal: emitted, approved by the owner and
+    ///         executed by anyone, every call in the bundle's order.
+    function test_package_executesAsOneProposal() public {
+        IProtocolUpgradeHandler.Call[] memory bundle = _recordCalls(3);
+        string memory package = _writeBundlePackage("one-bundle", bundle);
 
         tool.run(address(handler), package);
         IProtocolUpgradeHandler.Call[] memory calls = tool.loadGovernanceCalls(package);
-        assertEq(calls.length, 4, "every entry, concatenated");
-        assertEq(calls[0].data, abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()), "stage0_calls first");
-        assertEq(calls[1].data, abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ()), "then the rest");
+        assertEq(calls.length, 3, "the bundle's calls");
+        for (uint256 i = 0; i < calls.length; ++i) {
+            assertEq(calls[i].data, bundle[i].data, "in the bundle's order");
+        }
 
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory proposal = _build(calls);
+        EmergencyUpgradeCalldata.EmergencyProposal memory proposal = _build(calls);
         _approve(proposal, type(uint256).max);
         bytes memory executeCalldata = tool.executeCalldata(proposal);
         vm.expectEmit(true, false, false, false, address(handler));
@@ -145,7 +130,10 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
         _send(proposal, executeCalldata);
 
         assertTrue(handler.emergencyUpgradeExecuted(proposal.id), "the handler recorded the proposal");
-        assertEq(timer.deadline(), block.timestamp, "the timer started and was checked in one block");
+        assertEq(recorder.recordedCount(), 3, "every call ran");
+        for (uint256 i = 0; i < 3; ++i) {
+            assertEq(recorder.recorded(i), i + 1, "in order");
+        }
         for (uint256 i = 0; i < proposal.approvals.length; ++i) {
             assertEq(
                 OneOwnerSafeDouble(proposal.approvals[i].safe).approvedHashes(
@@ -158,47 +146,25 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
         }
     }
 
-    /// @notice A package whose governance calls are ONE list is read and dry-run the same way.
-    function test_package_aSingleListIsOneProposal() public {
-        (GovernanceUpgradeTimer timer, IProtocolUpgradeHandler.Call[] memory start) = _startTimerCall(0);
-        IProtocolUpgradeHandler.Call[] memory all = new IProtocolUpgradeHandler.Call[](2);
-        all[0] = start[0];
-        all[1] = _checkDeadlineCalls(timer, 1)[0];
-        string[] memory keys = new string[](1);
-        keys[0] = "calls";
-        IProtocolUpgradeHandler.Call[][] memory lists = new IProtocolUpgradeHandler.Call[][](1);
-        lists[0] = all;
-        string memory package = _writePackage("single-list", keys, lists);
+    /// @notice The dry run executes the bundle as the board would, so a bundle that would revert
+    ///         fails before any approval is collected — and a sound one runs through.
+    function test_dryRun_executesTheBundleAsTheBoardWould() public {
+        IProtocolUpgradeHandler.Call[] memory failing = new IProtocolUpgradeHandler.Call[](2);
+        failing[0] = _recordCalls(1)[0];
+        failing[1] = IProtocolUpgradeHandler.Call({
+            target: address(recorder),
+            value: 0,
+            data: abi.encodeCall(CallRecorderDouble.fail, ())
+        });
+        string memory failingPackage = _writeBundlePackage("failing-bundle", failing);
+        vm.expectRevert("recorder: failing call");
+        dryRun.verify(address(handler), failingPackage);
+        assertEq(recorder.recordedCount(), 0, "the bundle reverted as a whole");
 
-        assertEq(tool.proposalId(_board(), tool.loadGovernanceCalls(package)), tool.proposalId(_board(), all));
-        dryRun.verify(address(handler), package);
-        assertTrue(handler.emergencyUpgradeExecuted(tool.proposalId(_board(), all)), "the dry run executed it");
-        assertEq(timer.deadline(), block.timestamp);
-    }
-
-    /// @notice A timer the proposal starts with a delay would revert the later check of it after
-    ///         every approval was collected, so emission and the dry run both refuse the package.
-    function test_package_refusedWhileATimerItStartsHoldsTheRest() public {
-        (GovernanceUpgradeTimer timer, string memory package) = _bootstrapShapedPackage("held", TIMER_DELAY);
-        bytes memory refusal = bytes(
-            string.concat(
-                "upgrade timer ",
-                vm.toString(address(timer)),
-                " holds the rest of the upgrade for 1200s, so it cannot execute as one proposal: prepare it with a zero governance_upgrade_timer_initial_delay"
-            )
-        );
-        vm.expectRevert(refusal);
-        tool.run(address(handler), package);
-        vm.expectRevert(refusal);
-        dryRun.verify(address(handler), package);
-
-        // The refusal is not caution: the handler itself would revert on the timer check.
-        IProtocolUpgradeHandler.Call[] memory calls = tool.loadGovernanceCalls(package);
-        vm.prank(address(board));
-        vm.expectRevert(DeadlineNotYetPassed.selector);
-        handler.executeEmergencyUpgrade(
-            IProtocolUpgradeHandler.UpgradeProposal({calls: calls, executor: address(board), salt: bytes32(0)})
-        );
+        IProtocolUpgradeHandler.Call[] memory sound = _recordCalls(2);
+        dryRun.verify(address(handler), _writeBundlePackage("sound-bundle", sound));
+        assertTrue(handler.emergencyUpgradeExecuted(tool.proposalId(_board(), sound)), "the dry run executed it");
+        assertEq(recorder.recordedCount(), 2);
     }
 
     // ───────────────────────────── the board's checks ─────────────────────────────
@@ -206,29 +172,29 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
     /// @notice The approvals bind the exact calls and are needed in full: the same signatures over
     ///         another call list, a proposal missing one approval of any signer, and a replay all fail.
     function test_approvals_bindTheProposalAndAreNeededInFull() public {
-        (GovernanceUpgradeTimer timer, IProtocolUpgradeHandler.Call[] memory calls) = _startTimerCall(0);
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory proposal = _build(calls);
+        IProtocolUpgradeHandler.Call[] memory calls = _recordCalls(1);
+        EmergencyUpgradeCalldata.EmergencyProposal memory proposal = _build(calls);
         _approve(proposal, type(uint256).max);
 
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory swapped = _build(calls);
-        swapped.calls = _checkDeadlineCalls(timer, 1);
+        EmergencyUpgradeCalldata.EmergencyProposal memory swapped = _build(calls);
+        swapped.calls = _recordCalls(2);
         bytes memory swappedCalldata = tool.executeCalldata(swapped);
         vm.expectRevert("Invalid guardians signatures");
         _send(swapped, swappedCalldata);
 
         bytes memory executeCalldata = tool.executeCalldata(proposal);
         _send(proposal, executeCalldata);
-        assertEq(timer.deadline(), block.timestamp, "the approved calls ran");
+        assertEq(recorder.recordedCount(), 1, "the approved calls ran");
         vm.expectRevert("Upgrade already exists");
         _send(proposal, executeCalldata);
 
-        _assertOneApprovalShort(_build(_checkDeadlineCalls(timer, 1)), 0, "Invalid guardians signatures");
+        _assertOneApprovalShort(_build(_recordCalls(2)), 0, "Invalid guardians signatures");
         _assertOneApprovalShort(
-            _build(_checkDeadlineCalls(timer, 2)),
+            _build(_recordCalls(3)),
             GUARDIANS_EIP1271_THRESHOLD,
             "Invalid Security Council signatures"
         );
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory lastOne = _build(_checkDeadlineCalls(timer, 3));
+        EmergencyUpgradeCalldata.EmergencyProposal memory lastOne = _build(_recordCalls(4));
         _assertOneApprovalShort(lastOne, lastOne.approvals.length - 1, "Invalid ZK Foundation signatures");
     }
 
@@ -236,7 +202,7 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
     ///         board whose member Safes belong to someone else is refused at emission.
     function test_proposal_refusesASafeTheOwnerDoesNotSolelyOwn() public {
         _deployEmergencyGovernance(makeAddr("stranger"));
-        (, IProtocolUpgradeHandler.Call[] memory calls) = _startTimerCall(0);
+        IProtocolUpgradeHandler.Call[] memory calls = _recordCalls(1);
 
         vm.expectRevert(
             bytes(
@@ -253,26 +219,32 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
 
     // ───────────────────────────── reading the package ─────────────────────────────
 
-    /// @notice An empty entry — the merge's `abi.encode` of no calls, or a bare `"0x"` as
-    ///         protocol-ops' own fixtures write it — contributes no calls, and a package with no calls
-    ///         at all is not emitted.
-    function test_package_emptyEntriesContributeNothing() public {
-        (, IProtocolUpgradeHandler.Call[] memory calls) = _startTimerCall(0);
-        string memory package = _writeStagedPackage("empty-entry", calls, new IProtocolUpgradeHandler.Call[](0), calls);
-        assertEq(tool.loadGovernanceCalls(package).length, 2, "the empty entry adds nothing");
+    /// @notice An empty bundle — the merge's `abi.encode` of no calls, or a bare `"0x"` — decodes to
+    ///         no calls, and a package with no calls is not emitted.
+    function test_package_anEmptyBundleIsNotEmitted() public {
+        string memory encodedEmpty = _writeBundlePackage("empty-bundle", new IProtocolUpgradeHandler.Call[](0));
+        assertEq(tool.loadGovernanceCalls(encodedEmpty).length, 0, "an encoded empty list has no calls");
+        vm.expectRevert("the package carries no governance calls");
+        tool.run(address(handler), encodedEmpty);
 
         string memory barePackage = string.concat(vm.projectRoot(), "/script-out/emergency-upgrade/bare.toml");
-        vm.writeFile(
-            barePackage,
-            string.concat(
-                "[governance_calls]\n",
-                string.concat(_tomlEntry("stage0_calls", ""), _tomlEntry("stage1_calls", "")),
-                _tomlEntry("stage2_calls", "")
-            )
-        );
-        assertEq(tool.loadGovernanceCalls(barePackage).length, 0, "bare 0x entries decode to no calls");
+        vm.writeFile(barePackage, string.concat("[governance_calls]\n", _tomlEntry("calls", "")));
+        assertEq(tool.loadGovernanceCalls(barePackage).length, 0, "a bare 0x bundle decodes to no calls");
         vm.expectRevert("the package carries no governance calls");
         tool.run(address(handler), barePackage);
+    }
+
+    /// @notice A package in the retired per-stage layout has no `calls` bundle and is refused rather
+    ///         than read as an empty or partial proposal.
+    function test_package_refusesTheRetiredPerStageLayout() public {
+        vm.createDir(string.concat(vm.projectRoot(), "/script-out/emergency-upgrade"), true);
+        string memory staged = string.concat(vm.projectRoot(), "/script-out/emergency-upgrade/staged.toml");
+        vm.writeFile(
+            staged,
+            string.concat("[governance_calls]\n", _tomlEntry("stage0_calls", abi.encode(_recordCalls(1))))
+        );
+        vm.expectRevert();
+        tool.loadGovernanceCalls(staged);
     }
 
     // ───────────────────────────── the other restored scripts ─────────────────────────────
@@ -318,59 +290,21 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
 
     function _build(
         IProtocolUpgradeHandler.Call[] memory _calls
-    ) internal view returns (EmergencyStageUpgradeCalldata.EmergencyProposal memory) {
+    ) internal view returns (EmergencyUpgradeCalldata.EmergencyProposal memory) {
         return tool.buildEmergencyProposal(IProtocolUpgradeHandler(address(handler)), _calls);
     }
 
-    /// @dev A timer the handler starts, and the call that starts it.
-    function _startTimerCall(
-        uint256 _delay
-    ) internal returns (GovernanceUpgradeTimer timer, IProtocolUpgradeHandler.Call[] memory calls) {
-        timer = new GovernanceUpgradeTimer({
-            _initialDelay: _delay,
-            _maxAdditionalDelay: TIMER_MAX_ADDITIONAL_DELAY,
-            _timerGovernance: address(handler),
-            _initialOwner: address(handler)
-        });
-        calls = new IProtocolUpgradeHandler.Call[](1);
-        calls[0] = IProtocolUpgradeHandler.Call({
-            target: address(timer),
-            value: 0,
-            data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ())
-        });
-    }
-
-    /// @dev `_count` deadline checks: call lists that differ only in length have distinct proposal ids.
-    function _checkDeadlineCalls(
-        GovernanceUpgradeTimer _timer,
-        uint256 _count
-    ) internal pure returns (IProtocolUpgradeHandler.Call[] memory calls) {
+    /// @dev `_count` calls recording tags `1.._count`: call lists that differ in length have distinct
+    ///      proposal ids.
+    function _recordCalls(uint256 _count) internal view returns (IProtocolUpgradeHandler.Call[] memory calls) {
         calls = new IProtocolUpgradeHandler.Call[](_count);
         for (uint256 i = 0; i < _count; ++i) {
             calls[i] = IProtocolUpgradeHandler.Call({
-                target: address(_timer),
+                target: address(recorder),
                 value: 0,
-                data: abi.encodeCall(GovernanceUpgradeTimer.checkDeadline, ())
+                data: abi.encodeCall(CallRecorderDouble.record, (i + 1))
             });
         }
-    }
-
-    /// @dev The bootstrap edge's timing: stage 0 starts the timer, stages 1 and 2 check it.
-    function _bootstrapShapedPackage(
-        string memory _name,
-        uint256 _delay
-    ) internal returns (GovernanceUpgradeTimer timer, string memory package) {
-        IProtocolUpgradeHandler.Call[] memory stage0;
-        (timer, stage0) = _startTimerCall(_delay);
-        package = _writeStagedPackage(_name, stage0, _checkDeadlineCalls(timer, 1), _checkDeadlineCalls(timer, 1));
-    }
-
-    /// @dev One `key = "0x<abi.encode(calls)>"` line of a hand-written `[governance_calls]` table.
-    function _tomlEntry(
-        string memory _key,
-        IProtocolUpgradeHandler.Call[] memory _calls
-    ) internal pure returns (string memory) {
-        return _tomlEntry(_key, abi.encode(_calls));
     }
 
     /// @dev One `key = "<hex>"` line of a hand-written `[governance_calls]` table.
@@ -379,7 +313,7 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
     }
 
     function _assertOneApprovalShort(
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory _proposal,
+        EmergencyUpgradeCalldata.EmergencyProposal memory _proposal,
         uint256 _skippedApproval,
         string memory _expectedRevert
     ) internal {
@@ -390,7 +324,7 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
     }
 
     function _assertApproval(
-        EmergencyStageUpgradeCalldata.SafeApproval memory _approval,
+        EmergencyUpgradeCalldata.SafeApproval memory _approval,
         address _safe,
         bytes32 _digest
     ) internal view {

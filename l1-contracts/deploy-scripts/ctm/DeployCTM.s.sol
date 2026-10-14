@@ -626,7 +626,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     /// @dev Under the CTM-domain ProxyAdmin like every other per-CTM proxy, so its implementation
-    ///      swaps ride the same operation rows (see {docs/upgrade-stage-lifecycle.md}).
+    ///      swaps ride the same operation rows (see {docs/upgrade-operations.md}).
     function deployServerNotifier() internal returns (address implementation, address proxy) {
         (implementation, proxy) = deployTuppWithContract("ServerNotifier");
     }

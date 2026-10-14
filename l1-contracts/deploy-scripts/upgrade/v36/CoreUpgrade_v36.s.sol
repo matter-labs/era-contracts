@@ -9,7 +9,7 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 ///         v35 bootstrap, and deliberately a small one: `L1MessageRoot` is the one ecosystem
 ///         implementation it changes. The base pipeline deploys it (when its code differs from the
 ///         live one) and pins it in a `CoreTransition`; the operation the CTM prepare deploys names
-///         that registry and the coordinator's stage 1 applies it through the `CoreUpgradeExecutor`.
+///         that registry and the coordinator's `execute` applies it through the `CoreUpgradeExecutor`.
 ///         This prepare emits no governance call of its own.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgrade_v36 is DefaultCoreUpgrade {

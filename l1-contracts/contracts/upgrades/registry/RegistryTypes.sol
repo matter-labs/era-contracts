@@ -130,8 +130,8 @@ struct AuthoredL2Plan {
 
 /// @notice What chains upgrade FROM and TO, and by when — nothing else. The version edge is not a
 ///         field: it is the two releases' own versions ({ReleaseManifest.protocolVersion}).
-///         Infrastructure changes and the operation's execution delay live on {OperationManifest};
-///         see {protocol-docs/ecosystem-upgrade-coordination.md}.
+///         Infrastructure changes live on {OperationManifest}; see
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @param upgradeEngine The diamond cut's init delegatecall target implementing
 ///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
 ///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
@@ -163,7 +163,7 @@ struct TransitionManifest {
 ///        arguments into it.
 /// @dev No admin field: a row is always applied through the applying contract's bound
 ///      `ProxyAdmin`, which administers every proxy of its domain — the `ServerNotifier` included
-///      (see {docs/upgrade-stage-lifecycle.md}).
+///      (see {docs/upgrade-operations.md}).
 // solhint-disable-next-line gas-struct-packing
 struct ProxyUpgradeRow {
     address proxy;
@@ -172,9 +172,9 @@ struct ProxyUpgradeRow {
     bool callInitializeUpgrade;
 }
 
-/// @notice One ecosystem upgrade: what changes, and when governance may execute it. Each of the
-///         three changes is OPTIONAL, but an operation that changes nothing is refused at
-///         construction — see {protocol-docs/ecosystem-upgrade-coordination.md}.
+/// @notice One ecosystem upgrade: what changes. Each of the three changes is OPTIONAL, but an
+///         operation that changes nothing is refused at construction — see
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @param coreTransition The ecosystem leg's `CoreTransition`; zero when no shared singleton changes.
 /// @param ctmInfrastructure The CTM-DOMAIN inventory, indexed by {CTMContract} (same slot
 ///        semantics and construction-time length check — `CTM_CONTRACT_COUNT` — as
@@ -187,17 +187,12 @@ struct ProxyUpgradeRow {
 ///        not change.
 /// @param ctmTransition The `CTMTransition` applied to the coordinator's bound CTM; zero when the
 ///        operation moves no chain version.
-/// @param timer The `GovernanceUpgradeTimer` gating stage 1: stage 0 starts it, stage 1 requires
-///        its deadline. Bound to the coordinating `EcosystemUpgradeExecutor`
-///        (`TIMER_GOVERNANCE`), so nobody else can start it; its `owner` keeps the bounded
-///        extension right. Mandatory — every operation has an execution delay.
 // Multi-CTM extension: protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension
 // solhint-disable-next-line gas-struct-packing
 struct OperationManifest {
     address coreTransition;
     ProxyUpgradeRow[] ctmInfrastructure;
     address ctmTransition;
-    address timer;
 }
 
 /// @notice Everything a core transition instance pins, set exactly once at construction.
@@ -222,7 +217,7 @@ struct CoreTransitionManifest {
 ///        currently points at `expectedOldImpl`. The CTM's own implementation swap is one of
 ///        these slots, and the `ServerNotifier` slot is mandatory: its proxy is the notifier whose
 ///        administration and ownership must already have been handed to the CTM domain (see
-///        {docs/upgrade-stage-lifecycle.md}).
+///        {docs/upgrade-operations.md}).
 /// @param currentRelease The genesis release the edge installs as the CTM's `currentRelease`. The
 ///        version the CTM moves to is this release's own ({ReleaseManifest.protocolVersion}).
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
@@ -243,8 +238,8 @@ struct CoreTransitionManifest {
 ///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
 ///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
 ///        drive what it is handed.
-/// @param coreExecutor The `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` is handed to in the
-///        same stage-1 transaction; it must be the coordinator's `CORE_EXECUTOR` and answer to it.
+/// @param coreExecutor The `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` is handed to earlier in
+///        the same governance bundle; it must be the coordinator's `CORE_EXECUTOR` and answer to it.
 /// @param governance The governance every executor the edge binds (the CTM executor, the core
 ///        executor and the coordinator) must ALREADY answer to: an executor whose ownership moved
 ///        between deployment and `migrate()` would receive its domain on behalf of whoever owns
@@ -253,12 +248,8 @@ struct CoreTransitionManifest {
 ///        domain right after.
 /// @param coordinator The `EcosystemUpgradeExecutor` both domain executors must answer to
 ///        (`coordinator()`), and which must name both of them — the only address that can drive
-///        their lifecycle callbacks afterwards. These bindings are storage, so the edge checks
-///        them by value.
-/// @param upgradeTimer The `GovernanceUpgradeTimer` whose `checkDeadline()` gates the
-///        edge: stage 0 starts the timer, and `migrate()` refuses to run until the operational
-///        window has passed — the stage sequencing is enforced by the object itself, not by the
-///        order of calls in a reviewed bundle.
+///        their apply callbacks afterwards. These bindings are storage, so the edge checks them
+///        by value.
 struct BootstrapManifest {
     address ctm;
     uint256 expectedProtocolVersion;
@@ -273,5 +264,4 @@ struct BootstrapManifest {
     address coreExecutor;
     address governance;
     address coordinator;
-    address upgradeTimer;
 }

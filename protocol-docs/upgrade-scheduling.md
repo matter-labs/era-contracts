@@ -26,5 +26,5 @@ implementation, deployment and end-to-end validation belong to the release that 
 
 Scheduling is a per-chain operational decision and not part of upgrade composition. The
 notifier's own implementation swap in an upgrade is an ordinary CTM-domain inventory row (its
-authority is the CTM domain's, see `docs/upgrade-stage-lifecycle.md`); the chain crossing it
+authority is the CTM domain's, see `docs/upgrade-operations.md`); the chain crossing it
 schedules is `CTMUpgradeExecutor.upgradeChain` (`docs/registry-driven-upgrades.md`).

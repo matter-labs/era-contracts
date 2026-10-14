@@ -5,26 +5,26 @@
 //!
 //! **What does this upgrade do?** is answered by REVIEWING THE OBJECTS, not by reconstructing
 //! them from calldata. An `EcosystemUpgradeOperation` pins the ecosystem inventory, the CTM-domain
-//! infrastructure rows, the chain-version edge and the timer; a `CTMTransition` pins the release
+//! infrastructure rows and the chain-version edge; a `CTMTransition` pins the release
 //! pair and derives the facet cuts and the L2 plan from it. This module reads those objects live
 //! and holds each against [`construction`](super::construction) — the reviewed creation code, run
 //! on the manifest the object itself serves, must land at the object's address. That covers the
 //! object's WHOLE state, so it keeps covering it when someone adds a derived field.
 //!
 //! **Does the signed transaction invoke the reviewed upgrade at the intended address?** is
-//! answered by [`verify_stage_calls`] and is deliberately the whole of it: each stage must call
-//! `EcosystemUpgradeExecutor.stageN(operation)` on the reviewed coordinator with the reviewed
-//! operation. The operation's INTERNAL calls are NOT re-derived here — the coordinator and the
-//! domain executors derive them on chain from the same pinned object, from audited code, and a
-//! second derivation in this tool would be a second implementation to keep in sync. That
-//! reconstruction is exactly what the registry model set out to remove.
+//! answered by [`verify_execute_call`] and is deliberately the whole of it: the bundle must call
+//! `EcosystemUpgradeExecutor.execute(operation)` on the reviewed coordinator with the reviewed
+//! operation, exactly once. The operation's INTERNAL calls are NOT re-derived here — the
+//! coordinator and the domain executors derive them on chain from the same pinned object, from
+//! audited code, and a second derivation in this tool would be a second implementation to keep in
+//! sync. That reconstruction is exactly what the registry model set out to remove.
 //!
 //! Everything else this module does is the part the objects cannot answer for themselves: that
-//! the lifecycle objects the upgrade runs through — the coordinator, both domain executors, the
-//! timer — are the reviewed ones (their construction, [`super::lifecycle`]; they set immutables,
-//! so no codehash identifies them), that authority is bound where the review says, that the live
-//! state the upgrade departs from is the state it claims, and that the ecosystem is READY for it
-//! (the L2 bytecodes published, the timer startable, no lifecycle already in flight).
+//! the lifecycle objects the upgrade runs through — the coordinator and both domain executors —
+//! are the reviewed ones (their construction, [`super::lifecycle`]; they set immutables, so no
+//! codehash identifies them), that authority is bound where the review says, that the live state
+//! the upgrade departs from is the state it claims, and that the ecosystem is READY for it (the L2
+//! bytecodes published).
 
 use std::collections::BTreeMap;
 
@@ -32,22 +32,19 @@ use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::{SolCall, SolValue};
 
-use crate::common::governance_calls::GovernanceCall;
+use crate::common::external_actions::GOVERNANCE_PHASE;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{expect_canonical_construction, ReviewedBuild};
 use super::genesis::{judge_release_genesis, ReviewedGenesis};
-use super::lifecycle::{
-    verify_lifecycle_construction, verify_timer_construction, LifecycleReview, TimerReview,
-};
+use super::lifecycle::{verify_lifecycle_construction, LifecycleReview};
 use super::package::OperationPackage;
 use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
 use super::rows::verify_rows;
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView,
     CommittedUpgradeView, CoreTransitionView, CoreUpgradeExecutorView, CtmView,
-    EcosystemUpgradeExecutorView, EcosystemUpgradeOperationView, GovernanceUpgradeTimerView,
-    ProxyAdminView, ProxyUpgradeRow,
+    EcosystemUpgradeExecutorView, EcosystemUpgradeOperationView, ProxyAdminView, ProxyUpgradeRow,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -213,8 +210,8 @@ pub(crate) async fn verify<P: Provider>(
     };
     if ctm_executor_addr.is_zero() {
         result.report_error(
-            "the coordinator has no bound CTM executor: `stage0` reverts before it reserves \
-             anything, so this upgrade could not start",
+            "the coordinator has no bound CTM executor: `execute` reverts before it applies \
+             anything, so this upgrade could not run",
         );
         return Ok(());
     }
@@ -288,8 +285,6 @@ pub(crate) async fn verify<P: Provider>(
     result.report_ok(&format!(
         "the upgrade lands on CTM {ctm_addr}, under ProxyAdmin {ctm_admin_addr}"
     ));
-    let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, provider);
-
     expect_domains_answer_to(
         provider,
         result,
@@ -353,46 +348,6 @@ pub(crate) async fn verify<P: Provider>(
             "the CTM has a pending owner {ctm_pending_owner}: a nomination is outstanding that \
              could take the CTM out from under the executor this upgrade runs through"
         ));
-    }
-
-    // No lifecycle in flight, on the coordinator or on either domain: `stage0` refuses over a
-    // reservation, so an upgrade prepared on top of one could never execute.
-    for (label, reserved) in [
-        (
-            "the coordinator",
-            tolerate(
-                coordinator.pendingOperation().call().await,
-                result,
-                "the coordinator's pendingOperation()",
-            ),
-        ),
-        (
-            "the CTM executor",
-            tolerate(
-                ctm_executor.activeOperation().call().await,
-                result,
-                "the CTM executor's activeOperation()",
-            ),
-        ),
-        (
-            "the core executor",
-            tolerate(
-                core_executor.activeOperation().call().await,
-                result,
-                "the core executor's activeOperation()",
-            ),
-        ),
-    ] {
-        match reserved {
-            Some(reserved) if reserved.is_zero() => {
-                result.report_ok(&format!("{label} holds no reservation"))
-            }
-            Some(reserved) => result.report_error(&format!(
-                "{label} is already reserved for operation {reserved}: this upgrade's stage 0 \
-                 would revert, and the ecosystem is mid-lifecycle"
-            )),
-            None => {}
-        }
     }
 
     // ── 3. The state the upgrade departs from ──
@@ -461,38 +416,17 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await?;
 
-    // ── 4. Readiness: the things stage 0 and stage 1 require that no object can assert ──
+    // ── 4. Readiness: what `execute` requires that no object can assert ──
     result.print_info("\n== Readiness ==");
-    cross_check(
-        result,
-        "upgrade_timer_addr",
-        package.reported_timer,
-        Some(manifest.timer),
-        "the timer",
-    );
-    verify_timer_construction(
-        provider,
-        build,
-        result,
-        &TimerReview {
-            address: manifest.timer,
-            initial_delay: package.lifecycle.timer_initial_delay,
-            governance: package.coordinator,
-            reported_governance: package.lifecycle.timer_governance,
-            owner: package.lifecycle.timer_owner,
-        },
-        salts,
-        &mut reviewed,
-    )
-    .await?;
-    verify_timer(provider, result, manifest.timer, package.coordinator).await?;
     if let Some(transition_addr) = transition {
         verify_bytecodes_published(provider, result, &ctm, transition_addr).await?;
+    } else {
+        result.report_ok("no transition: no L2 bytecodes need to be published");
     }
 
     // ── 5. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
-    verify_stage_calls(package, result);
+    verify_execute_call(package, result);
 
     // ── 6. The calls no object describes ──
     if package.external_actions.is_empty() {
@@ -515,73 +449,61 @@ pub(crate) async fn verify<P: Provider>(
 
 /// THE question about the signed transaction, and the whole of it.
 ///
-/// Governance signs three calls and nothing derived: `coordinator.stageN(operation)` for
-/// N in 0..=2. Each is re-ENCODED here from the reviewed coordinator and the reviewed operation
-/// and compared byte for byte, so a bundle naming a different operation, a different coordinator,
-/// or the stages out of order is a finding rather than a passing shape check.
+/// Governance signs one derived call: `coordinator.execute(operation)`. It is re-ENCODED here from
+/// the reviewed coordinator and the reviewed operation and compared byte for byte, so a bundle
+/// naming a different operation or a different coordinator is a finding rather than a passing
+/// shape check.
 ///
-/// Every other call in a stage must be a declared external action. Those carry authority the
-/// upgrade objects do not describe, so they are the reviewer's to read — but a call that is
-/// neither the stage call nor a declared action is an ERROR: it is how a bundle would smuggle an
-/// unreviewed instruction past a reviewer reading only the operation.
-fn verify_stage_calls(package: &OperationPackage, result: &mut VerificationResult) {
-    let expected = [
-        EcosystemUpgradeExecutorView::stage0Call {
-            _operation: package.operation,
-        }
-        .abi_encode(),
-        EcosystemUpgradeExecutorView::stage1Call {
-            _operation: package.operation,
-        }
-        .abi_encode(),
-        EcosystemUpgradeExecutorView::stage2Call {
-            _operation: package.operation,
-        }
-        .abi_encode(),
-    ];
-    let stages = [&package.stage0, &package.stage1, &package.stage2];
+/// Every other call in the bundle must be a declared governance external action. Those carry
+/// authority the upgrade objects do not describe, so they are the reviewer's to read — but a call
+/// that is neither the executor call nor a declared action is an ERROR: it is how a bundle would
+/// smuggle an unreviewed instruction past a reviewer reading only the operation.
+fn verify_execute_call(package: &OperationPackage, result: &mut VerificationResult) {
+    let expected = EcosystemUpgradeExecutorView::executeCall {
+        _operation: package.operation,
+    }
+    .abi_encode();
 
-    for (stage, (calls, expected)) in stages.iter().zip(expected.iter()).enumerate() {
-        let matches: Vec<&GovernanceCall> = calls
+    let matches = package
+        .calls
+        .iter()
+        .filter(|call| {
+            call.target == package.coordinator && call.value.is_zero() && call.data == expected
+        })
+        .count();
+    match matches {
+        1 => result.report_ok(&format!(
+            "the bundle calls execute({}) on the reviewed coordinator {} exactly once",
+            package.operation, package.coordinator
+        )),
+        0 => result.report_error(&format!(
+            "the bundle never calls execute({}) on the reviewed coordinator {}: the bundle \
+             governance would sign does not drive the reviewed upgrade",
+            package.operation, package.coordinator
+        )),
+        n => result.report_error(&format!(
+            "the bundle calls execute({}) {n} times: the second would revert, and a duplicated \
+             executor call is not a bundle the prepare produces",
+            package.operation
+        )),
+    }
+
+    for call in &package.calls {
+        if call.target == package.coordinator && call.data == expected {
+            continue;
+        }
+        let declared = package
+            .external_actions
             .iter()
-            .filter(|call| {
-                call.target == package.coordinator && call.value.is_zero() && call.data == *expected
-            })
-            .collect();
-        match matches.len() {
-            1 => result.report_ok(&format!(
-                "stage {stage} calls stage{stage}({}) on the reviewed coordinator {}",
-                package.operation, package.coordinator
-            )),
-            0 => result.report_error(&format!(
-                "stage {stage} never calls stage{stage}({}) on the reviewed coordinator {}: the \
-                 bundle governance would sign does not drive the reviewed upgrade",
-                package.operation, package.coordinator
-            )),
-            n => result.report_error(&format!(
-                "stage {stage} calls stage{stage}({}) {n} times: the second would revert, and a \
-                 duplicated lifecycle call is not a bundle the prepare produces",
-                package.operation
-            )),
-        }
-
-        for call in calls.iter() {
-            if call.target == package.coordinator && call.data == *expected {
-                continue;
-            }
-            let declared = package
-                .external_actions
-                .iter()
-                .any(|action| action.phase == stage.to_string() && action.is_call(call));
-            if !declared {
-                result.report_error(&format!(
-                    "stage {stage} calls {} (selector 0x{}), which is neither this upgrade's \
-                     lifecycle call nor a declared external action: the bundle carries an \
-                     instruction no part of this review accounts for",
-                    call.target,
-                    alloy::hex::encode(call.data.get(..4).unwrap_or_default())
-                ));
-            }
+            .any(|action| action.phase == GOVERNANCE_PHASE && action.is_call(call));
+        if !declared {
+            result.report_error(&format!(
+                "the bundle calls {} (selector 0x{}), which is neither this upgrade's executor \
+                 call nor a declared governance external action: the bundle carries an \
+                 instruction no part of this review accounts for",
+                call.target,
+                alloy::hex::encode(call.data.get(..4).unwrap_or_default())
+            ));
         }
     }
 }
@@ -839,52 +761,6 @@ async fn verify_core_transition<P: Provider>(
         .collect())
 }
 
-/// The timer gating stage 1, as a readiness matter (its identity is its construction, checked
-/// before this runs).
-///
-/// For a recurring upgrade `TIMER_GOVERNANCE` must be the COORDINATOR:
-/// `EcosystemUpgradeExecutor.stage0` starts the timer itself, and `startTimer` is
-/// `onlyTimerAdmin`. (A bootstrap's timer is governed by governance instead, because at that
-/// point no executor holds the domain yet.)
-async fn verify_timer<P: Provider>(
-    provider: &P,
-    result: &mut VerificationResult,
-    timer: Address,
-    coordinator: Address,
-) -> anyhow::Result<()> {
-    let view = GovernanceUpgradeTimerView::new(timer, provider);
-    let Some(timer_governance) = tolerate(
-        view.TIMER_GOVERNANCE().call().await,
-        result,
-        "the timer's TIMER_GOVERNANCE()",
-    ) else {
-        return Ok(());
-    };
-    if timer_governance != coordinator {
-        result.report_error(&format!(
-            "the timer is governed by {timer_governance}, not the coordinator {coordinator} that \
-             starts it: stage 0 would revert in `startTimer`"
-        ));
-    }
-
-    let Some(deadline) = tolerate(
-        view.deadline().call().await,
-        result,
-        "the timer's deadline()",
-    ) else {
-        return Ok(());
-    };
-    if deadline.is_zero() {
-        result.report_ok("the timer is un-started, so stage 0 can start it");
-    } else {
-        result.report_error(&format!(
-            "the timer is already started (deadline {deadline}): `startTimer` refuses a second \
-             start, so this upgrade's stage 0 would revert"
-        ));
-    }
-    Ok(())
-}
-
 /// Every bytecode the transition's L2 transaction depends on must ALREADY be published on the
 /// CTM's supplier: `applyOperation` requires it, and an unpublished dependency fails the committed
 /// edge on every chain's L2 leg rather than on L1.
@@ -961,7 +837,7 @@ pub(super) fn judge_bytecode_publication(
 }
 
 /// Both domain executors' LIVE `coordinator()` — `setCoordinator` moves it after construction —
-/// against the reviewed coordinator: a domain answering to another one reverts its callbacks.
+/// against the reviewed coordinator: a domain answering to another one reverts `applyOperation`.
 pub(super) async fn expect_domains_answer_to<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
@@ -999,7 +875,7 @@ pub(super) async fn expect_domains_answer_to<P: Provider>(
             }
             Some(bound) => result.report_error(&format!(
                 "{label} answers to coordinator {bound}, not the reviewed {coordinator}: its \
-                 lifecycle callbacks would revert"
+                 `applyOperation` would revert"
             )),
             None => {}
         }
@@ -1090,8 +966,8 @@ pub(super) async fn verify_governance_owner<P: Provider>(
         expect_no_nomination(result, label, pending);
     }
 
-    // The coordinator's owner is the address that signs all three stages, so every domain must
-    // answer to it: one lifecycle under two owners cannot complete.
+    // The coordinator's owner is the address that signs the bundle, so every domain must answer
+    // to it: one lifecycle under two owners cannot complete.
     let Some(Some(governance)) = owners.first().map(|(_, owner)| *owner) else {
         return;
     };
@@ -1246,36 +1122,24 @@ mod tests {
     use super::super::package::RegistryPackage;
 
     use crate::common::external_actions::ExternalAction;
+    use crate::common::governance_calls::GovernanceCall;
 
     const OPERATION: Address = Address::repeat_byte(0xA0);
     const COORDINATOR: Address = Address::repeat_byte(0xC0);
 
-    fn stage_call(stage: u8, coordinator: Address, operation: Address) -> GovernanceCall {
-        let data = match stage {
-            0 => EcosystemUpgradeExecutorView::stage0Call {
-                _operation: operation,
-            }
-            .abi_encode(),
-            1 => EcosystemUpgradeExecutorView::stage1Call {
-                _operation: operation,
-            }
-            .abi_encode(),
-            _ => EcosystemUpgradeExecutorView::stage2Call {
-                _operation: operation,
-            }
-            .abi_encode(),
-        };
+    fn execute_call(coordinator: Address, operation: Address) -> GovernanceCall {
         GovernanceCall {
             target: coordinator,
             value: U256::ZERO,
-            data,
+            data: EcosystemUpgradeExecutorView::executeCall {
+                _operation: operation,
+            }
+            .abi_encode(),
         }
     }
 
     fn package(
-        stage0: Vec<GovernanceCall>,
-        stage1: Vec<GovernanceCall>,
-        stage2: Vec<GovernanceCall>,
+        calls: Vec<GovernanceCall>,
         external_actions: Vec<ExternalAction>,
     ) -> OperationPackage {
         OperationPackage {
@@ -1285,12 +1149,9 @@ mod tests {
             reported_ctm_transition: None,
             reported_core_transition: None,
             reported_ctm_executor: None,
-            reported_timer: None,
             reported_ctm: None,
             reported_ctm_proxy_admin: None,
-            stage0,
-            stage1,
-            stage2,
+            calls,
             external_actions,
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
@@ -1300,12 +1161,15 @@ mod tests {
     }
 
     fn well_formed() -> OperationPackage {
-        package(
-            vec![stage_call(0, COORDINATOR, OPERATION)],
-            vec![stage_call(1, COORDINATOR, OPERATION)],
-            vec![stage_call(2, COORDINATOR, OPERATION)],
-            Vec::new(),
-        )
+        package(vec![execute_call(COORDINATOR, OPERATION)], Vec::new())
+    }
+
+    fn extra() -> GovernanceCall {
+        GovernanceCall {
+            target: Address::repeat_byte(0xEE),
+            value: U256::ZERO,
+            data: vec![0xde, 0xad, 0xbe, 0xef],
+        }
     }
 
     /// The current-owner half of the lifecycle check: an outstanding nomination on any lifecycle
@@ -1326,29 +1190,24 @@ mod tests {
     }
 
     #[test]
-    fn the_three_lifecycle_calls_pass() {
+    fn the_execute_call_passes() {
         let mut result = VerificationResult::default();
-        verify_stage_calls(&well_formed(), &mut result);
+        verify_execute_call(&well_formed(), &mut result);
         assert_eq!(result.errors, 0);
         assert_eq!(result.warnings, 0);
     }
 
-    /// The selectors the check rests on must be the coordinator's real ones, so a signature
-    /// change is caught here rather than by a package that silently stops matching.
+    /// The selector the check rests on must be the coordinator's real one, so a signature change
+    /// is caught here rather than by a package that silently stops matching. Transcribed as well
+    /// as derived, so the `sol!` mirror cannot drift with it.
     #[test]
-    fn the_stage_selectors_are_the_coordinators() {
-        for (stage, sig) in [
-            (0u8, &b"stage0(address)"[..]),
-            (1, &b"stage1(address)"[..]),
-            (2, &b"stage2(address)"[..]),
-        ] {
-            let call = stage_call(stage, COORDINATOR, OPERATION);
-            assert_eq!(
-                &call.data[..4],
-                &alloy::primitives::keccak256(sig)[..4],
-                "selector drifted for stage {stage}"
-            );
-        }
+    fn the_execute_selector_is_the_coordinators() {
+        let call = execute_call(COORDINATOR, OPERATION);
+        assert_eq!(&call.data[..4], &[0x4b, 0x64, 0xe4, 0x92]);
+        assert_eq!(
+            &call.data[..4],
+            &alloy::primitives::keccak256(b"execute(address)")[..4]
+        );
     }
 
     /// THE substitution this check exists to catch: a bundle that drives a DIFFERENT operation
@@ -1358,17 +1217,12 @@ mod tests {
     fn a_bundle_driving_a_different_operation_fails() {
         let impostor = Address::repeat_byte(0xBB);
         let mut result = VerificationResult::default();
-        verify_stage_calls(
-            &package(
-                vec![stage_call(0, COORDINATOR, impostor)],
-                vec![stage_call(1, COORDINATOR, impostor)],
-                vec![stage_call(2, COORDINATOR, impostor)],
-                Vec::new(),
-            ),
+        verify_execute_call(
+            &package(vec![execute_call(COORDINATOR, impostor)], Vec::new()),
             &mut result,
         );
-        // Three stages, each missing its lifecycle call and carrying an undeclared one.
-        assert_eq!(result.errors, 6);
+        // The reviewed call is missing, and the impostor call is undeclared.
+        assert_eq!(result.errors, 2);
         assert!(result.ensure_success().is_err());
     }
 
@@ -1378,124 +1232,88 @@ mod tests {
     fn a_bundle_driving_the_operation_through_another_coordinator_fails() {
         let impostor = Address::repeat_byte(0xDD);
         let mut result = VerificationResult::default();
-        verify_stage_calls(
-            &package(
-                vec![stage_call(0, impostor, OPERATION)],
-                vec![stage_call(1, impostor, OPERATION)],
-                vec![stage_call(2, impostor, OPERATION)],
-                Vec::new(),
-            ),
+        verify_execute_call(
+            &package(vec![execute_call(impostor, OPERATION)], Vec::new()),
             &mut result,
         );
-        assert_eq!(result.errors, 6);
+        assert_eq!(result.errors, 2);
     }
 
-    /// Stages out of order: each stage must carry ITS OWN lifecycle call, or the coordinator's
-    /// `_requirePending` gate would refuse the bundle mid-flight.
-    #[test]
-    fn stages_out_of_order_fail() {
-        let mut result = VerificationResult::default();
-        verify_stage_calls(
-            &package(
-                vec![stage_call(1, COORDINATOR, OPERATION)],
-                vec![stage_call(0, COORDINATOR, OPERATION)],
-                vec![stage_call(2, COORDINATOR, OPERATION)],
-                Vec::new(),
-            ),
-            &mut result,
-        );
-        // Stages 0 and 1 each miss their own call and carry an unaccounted one.
-        assert_eq!(result.errors, 4);
-    }
-
-    /// An extra call nobody declared rides along with three perfectly good lifecycle calls. It
-    /// must fail the run, not be reported as a note beside a successful review.
+    /// An extra call nobody declared rides along with a perfectly good executor call. It must fail
+    /// the run, not be reported as a note beside a successful review.
     #[test]
     fn an_undeclared_extra_call_fails_the_run() {
         let mut pkg = well_formed();
-        pkg.stage1.push(GovernanceCall {
-            target: Address::repeat_byte(0xEE),
-            value: U256::ZERO,
-            data: vec![0xde, 0xad, 0xbe, 0xef],
-        });
+        pkg.calls.push(extra());
         let mut result = VerificationResult::default();
-        verify_stage_calls(&pkg, &mut result);
+        verify_execute_call(&pkg, &mut result);
         assert_eq!(result.errors, 1);
         assert!(result.ensure_success().is_err());
     }
 
     /// The same extra call, DECLARED: an independently authorized action rides along and is the
-    /// reviewer's to read, so it passes the calldata check and is printed rather than flagged.
+    /// reviewer's to read, so it passes the calldata check and is printed rather than flagged —
+    /// before the executor call (the merger's extras) as well as after it (a CTM prepare's own).
     #[test]
     fn a_declared_external_action_rides_along() {
-        let extra = GovernanceCall {
-            target: Address::repeat_byte(0xEE),
-            value: U256::ZERO,
-            data: vec![0xde, 0xad, 0xbe, 0xef],
-        };
-        let mut pkg = well_formed();
-        pkg.stage1.push(extra.clone());
-        pkg.external_actions.push(ExternalAction::for_stage(
-            1,
-            "an admin hop",
-            "governance",
-            &extra,
-        ));
-        let mut result = VerificationResult::default();
-        verify_stage_calls(&pkg, &mut result);
-        assert_eq!(result.errors, 0);
+        for at_front in [true, false] {
+            let mut pkg = well_formed();
+            if at_front {
+                pkg.calls.insert(0, extra());
+            } else {
+                pkg.calls.push(extra());
+            }
+            pkg.external_actions.push(ExternalAction::governance(
+                "an admin hop",
+                "governance",
+                &extra(),
+            ));
+            let mut result = VerificationResult::default();
+            verify_execute_call(&pkg, &mut result);
+            assert_eq!(result.errors, 0);
+        }
     }
 
-    /// A declared action counts only for the phase it was declared in: a stage-2 declaration
-    /// must not excuse the same call appearing in stage 1.
+    /// An `admin` declaration rides no governance bundle, so it does not excuse the same call
+    /// appearing in it.
     #[test]
-    fn a_declaration_does_not_carry_across_stages() {
-        let extra = GovernanceCall {
-            target: Address::repeat_byte(0xEE),
-            value: U256::ZERO,
-            data: vec![0xde, 0xad, 0xbe, 0xef],
-        };
+    fn an_admin_declaration_does_not_account_for_a_bundle_call() {
         let mut pkg = well_formed();
-        pkg.stage1.push(extra.clone());
-        pkg.external_actions.push(ExternalAction::for_stage(
-            2,
-            "an admin hop",
-            "governance",
-            &extra,
-        ));
+        pkg.calls.push(extra());
+        let mut declared = ExternalAction::governance("an admin hop", "governance", &extra());
+        declared.phase = "admin".to_string();
+        pkg.external_actions.push(declared);
         let mut result = VerificationResult::default();
-        verify_stage_calls(&pkg, &mut result);
+        verify_execute_call(&pkg, &mut result);
         assert_eq!(result.errors, 1);
     }
 
-    /// A stage that drives the reviewed upgrade TWICE: the second call reverts on chain, so a
+    /// A bundle that drives the reviewed upgrade TWICE: the second call reverts on chain, so a
     /// bundle carrying it is not one the prepare produced.
     #[test]
-    fn a_duplicated_lifecycle_call_fails() {
+    fn a_duplicated_execute_call_fails() {
         let mut pkg = well_formed();
-        pkg.stage0.push(stage_call(0, COORDINATOR, OPERATION));
+        pkg.calls.push(execute_call(COORDINATOR, OPERATION));
         let mut result = VerificationResult::default();
-        verify_stage_calls(&pkg, &mut result);
+        verify_execute_call(&pkg, &mut result);
         assert_eq!(result.errors, 1);
     }
 
-    /// A lifecycle call carrying value is not the call the merge derives, and the coordinator's
-    /// stages are not payable.
+    /// An executor call carrying value is not the call the merge derives, and `execute` is not
+    /// payable.
     #[test]
-    fn a_lifecycle_call_carrying_value_is_not_the_reviewed_call() {
+    fn an_execute_call_carrying_value_is_not_the_reviewed_call() {
         let mut pkg = well_formed();
-        pkg.stage0[0].value = U256::from(1);
+        pkg.calls[0].value = U256::from(1);
         let mut result = VerificationResult::default();
-        verify_stage_calls(&pkg, &mut result);
+        verify_execute_call(&pkg, &mut result);
         assert_eq!(result.errors, 1);
     }
 
     #[test]
-    fn a_missing_stage_is_reported_per_stage() {
-        let mut pkg = well_formed();
-        pkg.stage2.clear();
+    fn an_empty_bundle_fails() {
         let mut result = VerificationResult::default();
-        verify_stage_calls(&pkg, &mut result);
+        verify_execute_call(&package(Vec::new(), Vec::new()), &mut result);
         assert_eq!(result.errors, 1);
     }
 
@@ -1550,7 +1368,7 @@ mod tests {
         RegistryPackage::load(&path).expect("a prepared release package must load")
     }
 
-    fn stage_hex(call: &GovernanceCall) -> String {
+    fn bundle_hex(call: &GovernanceCall) -> String {
         format!(
             "0x{}",
             alloy::hex::encode(crate::common::governance_calls::encode_calls(
@@ -1559,8 +1377,8 @@ mod tests {
         )
     }
 
-    /// The merged prepare output of an ordinary release, with the three lifecycle calls the merge
-    /// DERIVES from the operation's address — real ABI-encoded `Call[]` hex, not a placeholder.
+    /// The merged prepare output of an ordinary release, with the executor call the merge DERIVES
+    /// from the operation's address — real ABI-encoded `Call[]` hex, not a placeholder.
     fn prepared_release_package() -> String {
         format!(
             "[operation]\n\
@@ -1572,12 +1390,8 @@ mod tests {
              [core.registry]\n\
              core_transition_addr = \"0x00000000000000000000000000000000000000ee\"\n\
              [governance_calls]\n\
-             stage0_calls = \"{}\"\n\
-             stage1_calls = \"{}\"\n\
-             stage2_calls = \"{}\"\n",
-            stage_hex(&stage_call(0, COORDINATOR, OPERATION)),
-            stage_hex(&stage_call(1, COORDINATOR, OPERATION)),
-            stage_hex(&stage_call(2, COORDINATOR, OPERATION)),
+             calls = \"{}\"\n",
+            bundle_hex(&execute_call(COORDINATOR, OPERATION)),
         )
     }
 
@@ -1594,7 +1408,7 @@ mod tests {
         assert_eq!(package.coordinator, COORDINATOR);
 
         let mut result = VerificationResult::default();
-        verify_stage_calls(&package, &mut result);
+        verify_execute_call(&package, &mut result);
         assert_eq!(
             result.errors, 0,
             "a prepared release must pass the calldata check"
@@ -1610,14 +1424,14 @@ mod tests {
     fn the_general_path_still_rejects_a_substituted_operation() {
         let impostor = Address::repeat_byte(0x9E);
         let body = prepared_release_package().replace(
-            &stage_hex(&stage_call(1, COORDINATOR, OPERATION)),
-            &stage_hex(&stage_call(1, COORDINATOR, impostor)),
+            &bundle_hex(&execute_call(COORDINATOR, OPERATION)),
+            &bundle_hex(&execute_call(COORDINATOR, impostor)),
         );
         let RegistryPackage::Operation(package) = load_package(&body) else {
             panic!("still an operation package");
         };
         let mut result = VerificationResult::default();
-        verify_stage_calls(&package, &mut result);
+        verify_execute_call(&package, &mut result);
         assert!(
             result.errors > 0,
             "a substituted operation must fail the run"

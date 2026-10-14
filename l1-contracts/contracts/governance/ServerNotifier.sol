@@ -24,7 +24,7 @@ import {ChainNotReadyForMigration} from "../core/bridgehub/L1BridgehubErrors.sol
 /// @notice This contract enables chain admins to emit migration events for the server.
 /// @dev The proxy sits under the CTM-domain `ProxyAdmin`, and its `owner` is the CTM's governing
 ///      authority: the bound `CTMUpgradeExecutor` once the registry bootstrap ran (see
-///      {docs/upgrade-stage-lifecycle.md}).
+///      {docs/upgrade-operations.md}).
 contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServerNotifier {
     /// @notice The chainTypeManager, which is used to retrieve chain administrator addresses.
     IChainTypeManager public chainTypeManager;

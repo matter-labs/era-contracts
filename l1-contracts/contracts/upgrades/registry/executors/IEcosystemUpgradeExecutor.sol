@@ -8,43 +8,27 @@ import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.
 /// @title IEcosystemUpgradeExecutor
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The lifecycle surface of the coordinating `EcosystemUpgradeExecutor` other contracts
-///         and tooling read: the operation mid-lifecycle and its stage. See
+/// @notice The surface of the coordinating `EcosystemUpgradeExecutor` governance and tooling use:
+///         the bound CTM executor and the one call that executes an operation. See
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 interface IEcosystemUpgradeExecutor {
-    /// @notice Where the pending operation is in the three-stage lifecycle.
-    /// @dev `None` means no operation is pending (stage 2 and abandonment clear the slot).
-    enum UpgradeStage {
-        None,
-        Prepared,
-        Executed
-    }
-
     /// @notice Emitted when the owner binds the CTM executor or replaces it with a successor.
     event CTMExecutorChanged(address indexed previousExecutor, address indexed newExecutor);
 
-    /// @notice Emitted by `stage0`: every participant is reserved, migrations are paused and the
-    ///         operation's timer is running.
-    event OperationPrepared(address indexed operation);
-
-    /// @notice Emitted by `stage1` after the core leg and the operation's CTM leg were applied.
+    /// @notice Emitted by `execute` after every leg of the operation was applied and verified.
     event OperationExecuted(address indexed operation);
-
-    /// @notice Emitted by `stage2` after every reservation and the migration pause were released.
-    event OperationCompleted(address indexed operation);
-
-    /// @notice Emitted when governance abandons the pending operation.
-    event OperationAbandoned(address indexed operation, UpgradeStage stage);
 
     /// @notice The executor of the single CTM coordinated by this contract.
     function ctmExecutor() external view returns (ICTMUpgradeExecutor);
 
-    /// @notice The operation governance prepared with `stage0` and has not completed yet.
-    function pendingOperation() external view returns (IEcosystemUpgradeOperation);
+    /// @notice Binds the CTM executor, or replaces it with a successor governing the same CTM.
+    /// @param _executor The executor; it must already name this coordinator.
+    function setCTMExecutor(ICTMUpgradeExecutor _executor) external;
 
-    function pendingStage() external view returns (UpgradeStage);
-
-    /// @notice The pending operation's `manifestHash()`, pinned by `stage0`: stages 1 and 2 refuse
-    ///         an operation that no longer serves it.
-    function pendingManifestHash() external view returns (bytes32);
+    /// @notice Executes an operation atomically: validates it, applies the core leg when it names a
+    ///         core transition, then the CTM leg (infrastructure rows, then the transition commit),
+    ///         each leg verifying what it applied before it returns. Any failure reverts the whole
+    ///         call.
+    /// @param _operation The write-once operation approved by governance.
+    function execute(IEcosystemUpgradeOperation _operation) external;
 }

@@ -21,8 +21,8 @@ import { join, relative } from "path";
 //   1. `configs/genesis/zksync-os/latest.json` `protocol_semantic_version`: minor + 1, patch 0. The default
 //      upgrade scripts read their target version from it, and the upgrade tests assert it.
 //   2. `l1-contracts/upgrade-envs/v0.<minor>.0-<name>/`: the local upgrade input and every per-environment
-//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's: owner, era_chain_id and the
-//      upgrade timer carry over, and every CREATE2 and legacy-Gov salt is regenerated, so the new release's
+//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's: owner and era_chain_id
+//      carry over, and every CREATE2 and legacy-Gov salt is regenerated, so the new release's
 //      deployments do not resolve to the previous release's addresses.
 //   3. protocol-ops' current upgrade-env dir (`current_upgrade_env_dir!` in
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.

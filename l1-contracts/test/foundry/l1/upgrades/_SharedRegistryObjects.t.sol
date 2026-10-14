@@ -49,7 +49,7 @@ import {Bytes32MetadataToken, NoMetadataToken} from "./_NonStandardBaseTokens.so
 ///         differ in one facet and their verifier, the transition between them, and a bootstrap
 ///         manifest toward one of them. Everything an engine reads at execution is a real
 ///         write-once object; only the CTM-side authorities a manifest has to name (CTM, admins,
-///         executors, timer) are labelled stand-ins the engine never touches.
+///         executors) are labelled stand-ins the engine never touches.
 abstract contract RegistryObjectsFixture is Test {
     // Real self-describing facets — the routing the registry objects read and the engines apply.
     address internal facetShared; // in both releases
@@ -58,7 +58,6 @@ abstract contract RegistryObjectsFixture is Test {
     /// @dev A real DiamondInit, the one every fixture release names.
     address internal diamondInit;
     address internal genesisUpgradeStub;
-    address internal upgradeTimerStub;
     address internal ctmStub;
     /// @dev Returns `fixtureDelegateCalldata` regardless of its inputs — the stand-in for a
     ///      version-specific composer, so plans can name a real composer without an L2 migration.
@@ -120,7 +119,6 @@ abstract contract RegistryObjectsFixture is Test {
         facetArriving = address(new MockSelfDescribingFacet(_selectors1(SEL_ARRIVING)));
         diamondInit = address(new DiamondInit());
         genesisUpgradeStub = _deployedStub("genesisUpgrade");
-        upgradeTimerStub = _deployedStub("upgradeTimer");
         ctmStub = makeAddr("ctm");
         delegateComposer = new FixedDelegateCalldataComposer(_delegateCalldata);
         defaultComposer = new L2DefaultDelegateCalldataComposer();
@@ -325,8 +323,7 @@ abstract contract RegistryObjectsFixture is Test {
                 ctmExecutor: _deployedStub("ctmExecutor"),
                 coreExecutor: _deployedStub("coreExecutor"),
                 governance: makeAddr("governor"),
-                coordinator: makeAddr("coordinator"),
-                upgradeTimer: upgradeTimerStub
+                coordinator: makeAddr("coordinator")
             });
     }
 

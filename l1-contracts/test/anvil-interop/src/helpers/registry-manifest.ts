@@ -220,12 +220,6 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
 }
 
 /**
- * `EcosystemUpgradeOperation.OperationManifest` initialize argument. The CTM-domain inventory
- * (indexed by `CTMContract`) and the stage-1 timer are the OPERATION's, not the transition's; the
- * local hop upgrades chain state only, so the manifest carries no infrastructure slots and every
- * one encodes as the explicit zero ("not upgraded") row.
- */
-/**
  * A genesis force-deployments blob for a release whose L2 table is empty: `CTMRelease` requires each
  * table member's bytecode-info field to match its row, so every such field is empty here.
  */
@@ -258,11 +252,16 @@ export function emptyTableForceDeploymentsData(): string {
   );
 }
 
-export function operationInitArgs(ctm: any, coreTransition: string, ctmTransition: string, timer: string): any {
+/**
+ * `EcosystemUpgradeOperation.OperationManifest` constructor argument. The CTM-domain inventory
+ * (indexed by `CTMContract`) is the OPERATION's, not the transition's; the local hop upgrades
+ * chain state only, so the manifest carries no infrastructure slots and every one encodes as the
+ * explicit zero ("not upgraded") row.
+ */
+export function operationInitArgs(ctm: any, coreTransition: string, ctmTransition: string): any {
   return {
     coreTransition,
     ctmInfrastructure: proxyUpgradeSlots("CTMContract", ctm.transition?.proxyUpgrades ?? {}),
     ctmTransition,
-    timer,
   };
 }

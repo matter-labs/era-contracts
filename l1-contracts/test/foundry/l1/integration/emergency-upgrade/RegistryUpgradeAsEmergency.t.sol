@@ -15,8 +15,8 @@ import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IE
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 
-import {EmergencyStageUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol";
-import {VerifyStage1Pause} from "deploy-scripts/upgrade/VerifyStage1Pause.s.sol";
+import {EmergencyUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol";
+import {VerifyEmergencyUpgrade} from "deploy-scripts/upgrade/VerifyEmergencyUpgrade.s.sol";
 import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
 import {Utils as DeployScriptUtils} from "deploy-scripts/utils/Utils.sol";
 
@@ -31,12 +31,12 @@ import {EmergencyUpgradeFixture, ProtocolUpgradeHandlerDouble} from "./_Emergenc
 
 /// @notice A RECURRING registry-driven upgrade, prepared by the real pipeline on the ecosystem the v35
 ///         bootstrap fixture leaves behind, executed as ONE emergency proposal through the
-///         EmergencyUpgradeBoard and ProtocolUpgradeHandler — the route stage upgrades take. The
-///         handler, board, multisigs and Safes are doubles (`_EmergencyGovernanceDoubles.sol`); the
-///         prepare, the package and every contract the calls reach are real.
+///         EmergencyUpgradeBoard and ProtocolUpgradeHandler. The handler, board, multisigs and Safes
+///         are doubles (`_EmergencyGovernanceDoubles.sol`); the prepare, the package and every
+///         contract the calls reach are real.
 /// @dev The package is written as the protocol-ops merge writes it (`upgrade.rs::write_merged_ecosystem_toml`):
-///      per stage, the core prepare's bundle, the coordinator's `stageN(operation)`, then the CTM
-///      prepare's bundle. The coordinator is handed to the handler with a real two-step ownership
+///      one bundle of the core prepare's calls, the coordinator's `execute(operation)`, then the CTM
+///      prepare's calls. The coordinator is handed to the handler with a real two-step ownership
 ///      transfer, the acceptance being the handler's first emergency proposal.
 contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, EmergencyUpgradeFixture {
     using stdToml for string;
@@ -52,12 +52,12 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
     address internal governance;
     address internal eip7702Checker;
     EcosystemUpgradeExecutor internal coordinator;
-    VerifyStage1Pause internal dryRun;
+    VerifyEmergencyUpgrade internal dryRun;
 
     function setUp() public override {
         super.setUp();
         _deployEmergencyGovernance(safeOwner.addr);
-        dryRun = new VerifyStage1Pause();
+        dryRun = new VerifyEmergencyUpgrade();
 
         string memory root = vm.projectRoot();
         string memory deployL1 = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
@@ -94,30 +94,30 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
 
         tool.run(address(handler), package);
         IProtocolUpgradeHandler.Call[] memory calls = tool.loadGovernanceCalls(package);
-        assertEq(calls.length, 3, "a registry-driven upgrade carries the three coordinator calls only");
-        assertEq(calls[0].data, abi.encodeCall(EcosystemUpgradeExecutor.stage0, (operation)));
-        assertEq(calls[2].data, abi.encodeCall(EcosystemUpgradeExecutor.stage2, (operation)));
+        assertEq(calls.length, 1, "a registry-driven upgrade carries the one coordinator call only");
+        assertEq(calls[0].target, address(coordinator));
+        assertEq(calls[0].data, abi.encodeCall(EcosystemUpgradeExecutor.execute, (operation)));
 
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory proposal = tool.buildEmergencyProposal(
+        EmergencyUpgradeCalldata.EmergencyProposal memory proposal = tool.buildEmergencyProposal(
             IProtocolUpgradeHandler(address(handler)),
             calls
         );
         _approve(proposal, type(uint256).max);
         bytes memory executeCalldata = tool.executeCalldata(proposal);
         vm.expectEmit(true, false, false, false, address(coordinator));
-        emit IEcosystemUpgradeExecutor.OperationCompleted(address(operation));
+        emit IEcosystemUpgradeExecutor.OperationExecuted(address(operation));
         vm.expectEmit(true, false, false, false, address(handler));
         emit ProtocolUpgradeHandlerDouble.EmergencyUpgradeExecuted(proposal.id);
         _send(proposal, executeCalldata);
 
         assertEq(IChainTypeManager(ctm).protocolVersion(), nextVersion, "the CTM committed the edge");
         assertEq(IChainTypeManager(ctm).currentRelease(), transition.newRelease(), "and installed the release");
-        _assertLifecycleClosed();
+        _assertNoMigrationPause();
     }
 
-    /// @notice An infrastructure-only upgrade dry-run through `VerifyStage1Pause`: the package's
-    ///         calls, executed by the handler as its board would call it, swap the timelock and close
-    ///         the lifecycle.
+    /// @notice An infrastructure-only upgrade dry-run through `VerifyEmergencyUpgrade`: the
+    ///         package's call, executed by the handler as its board would call it, swaps the
+    ///         timelock.
     function test_infrastructureOnly_dryRunExecutesThePackage() public {
         RecurringCTMUpgradeForTests hop = new CTMUpgradeValidatorTimelockOnly();
         string memory package = _prepareAndMerge(hop, SAME_VERSION_INPUT, "emergency-infra");
@@ -135,17 +135,15 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
             handler.emergencyUpgradeExecuted(tool.proposalId(_board(), tool.loadGovernanceCalls(package))),
             "the handler recorded the proposal"
         );
-        _assertLifecycleClosed();
+        _assertNoMigrationPause();
     }
 
     // ───────────────────────────── helpers ─────────────────────────────
 
-    function _assertLifecycleClosed() internal view {
-        assertEq(address(coordinator.pendingOperation()), address(0), "the lifecycle slot is free");
-        assertEq(uint256(coordinator.pendingStage()), uint256(IEcosystemUpgradeExecutor.UpgradeStage.None));
+    function _assertNoMigrationPause() internal view {
         assertFalse(
             IChainAssetHandlerBase(IBridgehubBase(bridgehub).chainAssetHandler()).migrationPausedFor(ctm),
-            "stage 2 released the migration pause"
+            "the upgrade takes no migration pause"
         );
     }
 
@@ -178,18 +176,16 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
         _hop.setCoreTransition(address(core.coreTransition()));
         _hop.prepareCTMUpgrade();
 
-        (Call[] memory core0, Call[] memory core1, Call[] memory core2) = core.prepareDefaultGovernanceCalls();
-        (Call[] memory ctm0, Call[] memory ctm1, Call[] memory ctm2) = _hop.prepareDefaultGovernanceCalls();
+        Call[] memory coreCalls = core.prepareDefaultGovernanceCalls();
+        Call[] memory ctmCalls = _hop.prepareDefaultGovernanceCalls();
         IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(_hop.preparedOperation());
-        package = _writeStagedPackage(
+        package = _writeBundlePackage(
             _name,
-            _merge(core0, abi.encodeCall(EcosystemUpgradeExecutor.stage0, (operation)), ctm0),
-            _merge(core1, abi.encodeCall(EcosystemUpgradeExecutor.stage1, (operation)), ctm1),
-            _merge(core2, abi.encodeCall(EcosystemUpgradeExecutor.stage2, (operation)), ctm2)
+            _merge(coreCalls, abi.encodeCall(EcosystemUpgradeExecutor.execute, (operation)), ctmCalls)
         );
     }
 
-    /// @dev One stage of the merge: the core bundle, the coordinator call, the CTM bundle.
+    /// @dev The merge: the core bundle, the coordinator call, the CTM bundle.
     function _merge(
         Call[] memory _core,
         bytes memory _coordinatorCall,

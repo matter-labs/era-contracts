@@ -12,7 +12,6 @@ import {IUpgradeExecutorBase} from "contracts/governance/IUpgradeExecutorBase.so
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {AcceptingVerifier} from "contracts/dev-contracts/test/AcceptingVerifier.sol";
@@ -125,12 +124,9 @@ contract TransitionReplacementTest is ChainTypeManagerTest, RegistryDrivenUpgrad
             address(new CTMRelease(_releaseManifest(address(0), address(new AcceptingVerifier()), _protocolVersion)));
     }
 
-    /// @dev A hop committed and completed on L1; the chain stays where it is.
+    /// @dev A hop executed on L1; the chain stays where it is.
     function _commitAndComplete(CTMTransition _transitionToCommit) internal {
         _commitHop(_transitionToCommit);
-        EcosystemUpgradeOperation operation = _operationFor(_transitionToCommit);
-        vm.prank(governor);
-        coordinator.stage2(operation);
     }
 
     function _replaceCall(

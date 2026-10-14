@@ -37,7 +37,6 @@ import {
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {
     ChainAlreadyLive,
-    MigrationsNotPaused,
     NoCommittedUpgradeCutForVersion,
     ReleaseProtocolVersionMismatch,
     TransitionNotCommitted,
@@ -47,7 +46,6 @@ import {
 } from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
@@ -395,9 +393,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @inheritdoc IChainTypeManager
     /// @dev The recovery invariant this preserves is stated once in
     ///      {protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition}.
-    ///      Unlike a commit it moves neither `protocolVersion` nor `currentRelease`, so it needs no
-    ///      migration pause. The bytecode publication the executor checks before a commit is checked
-    ///      here, because this path is reached through the executor's `forward`.
+    ///      Unlike a commit it moves neither `protocolVersion` nor `currentRelease`. The bytecode
+    ///      publication the executor checks before a commit is checked here, because this path is
+    ///      reached through the executor's `forward`.
     function replaceUpgradeTransition(
         ICTMTransition _expectedTransition,
         ICTMTransition _replacement
@@ -488,12 +486,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      `protocolVersion` forward.
     /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
     function _commitVersionEdge(uint256 _oldProtocolVersion, uint256 _newProtocolVersion) internal {
-        // This CTM's migrations must be paused before its version moves: a chain crossing
-        // settlement layers mid-edge would land with an inconsistent version. Asked per-CTM —
-        // another CTM's upgrade is no reason to block this one, and vice versa.
-        if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPausedFor(address(this))) {
-            revert MigrationsNotPaused();
-        }
         uint256 previousProtocolVersion = protocolVersion;
         // Explicitly verify that _oldProtocolVersion matches the current one.
         if (previousProtocolVersion != _oldProtocolVersion) {

@@ -11,7 +11,7 @@ import {SignatureChecker} from "@openzeppelin/contracts-v4/utils/cryptography/Si
 import {IERC1271} from "@openzeppelin/contracts-v4/interfaces/IERC1271.sol";
 import {Address} from "@openzeppelin/contracts-v4/utils/Address.sol";
 
-import {EmergencyStageUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol";
+import {EmergencyUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol";
 import {IEmergencyUpgrageBoard} from "deploy-scripts/interfaces/IEmergencyUpgrageBoard.sol";
 import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
 import {ISafe} from "deploy-scripts/interfaces/ISafe.sol";
@@ -234,7 +234,7 @@ contract EmergencyUpgradeBoardDouble is EIP712 {
 /// @notice zk-governance `ProtocolUpgradeHandler`, reduced to its emergency execution and the
 ///         Security Council's approval record. Not modelled: the freeze bookkeeping and the
 ///         `_unfreeze` pre-step of `executeEmergencyUpgrade`, which only lifts ecosystem-wide
-///         pauses (a registry operation holds a per-CTM migration pause).
+///         pauses no upgrade relies on.
 contract ProtocolUpgradeHandlerDouble {
     event EmergencyUpgradeExecuted(bytes32 indexed _id);
     event UpgradeApprovedBySecurityCouncil(bytes32 indexed _id);
@@ -293,6 +293,24 @@ contract ProtocolUpgradeHandlerDouble {
     }
 }
 
+/// @notice The call target of the synthetic packages: records every tag it is called with, in
+///         order, so a test can see which calls of a proposal ran; `fail` is a call that reverts.
+contract CallRecorderDouble {
+    uint256[] public recorded;
+
+    function record(uint256 _tag) external {
+        recorded.push(_tag);
+    }
+
+    function fail() external pure {
+        revert("recorder: failing call");
+    }
+
+    function recordedCount() external view returns (uint256) {
+        return recorded.length;
+    }
+}
+
 /// @notice Deploys a handler, its board and multisigs, every approving Safe a 1-of-1 Safe of one
 ///         owner EOA — the shape of the staging governance the approved-hash route is built for —
 ///         and sends what an operator sends for an emitted proposal.
@@ -305,7 +323,7 @@ abstract contract EmergencyUpgradeFixture is Test {
     SecurityCouncilDouble internal securityCouncil;
     OneOwnerSafeDouble internal zkFoundation;
     /// @dev The restored calldata tool, deployed as a contract.
-    EmergencyStageUpgradeCalldata internal tool;
+    EmergencyUpgradeCalldata internal tool;
     /// @dev Whoever sends the board call: anyone may.
     address internal relayer = makeAddr("relayer");
 
@@ -323,7 +341,7 @@ abstract contract EmergencyUpgradeFixture is Test {
             _zkFoundation: address(zkFoundation)
         });
         handler.wire(address(guardians), address(securityCouncil), address(board));
-        tool = new EmergencyStageUpgradeCalldata();
+        tool = new EmergencyUpgradeCalldata();
     }
 
     /// @notice Writes a package's `[governance_calls]` table — entry `_keys[i]` the
@@ -345,21 +363,15 @@ abstract contract EmergencyUpgradeFixture is Test {
         vm.writeToml(root, path);
     }
 
-    /// @notice {_writePackage} under today's per-stage keys, in stage order.
-    function _writeStagedPackage(
+    /// @notice {_writePackage} in the merge's layout: one `[governance_calls] calls` bundle.
+    function _writeBundlePackage(
         string memory _name,
-        IProtocolUpgradeHandler.Call[] memory _stage0,
-        IProtocolUpgradeHandler.Call[] memory _stage1,
-        IProtocolUpgradeHandler.Call[] memory _stage2
+        IProtocolUpgradeHandler.Call[] memory _calls
     ) internal returns (string memory) {
-        string[] memory keys = new string[](3);
-        keys[0] = "stage0_calls";
-        keys[1] = "stage1_calls";
-        keys[2] = "stage2_calls";
-        IProtocolUpgradeHandler.Call[][] memory lists = new IProtocolUpgradeHandler.Call[][](3);
-        lists[0] = _stage0;
-        lists[1] = _stage1;
-        lists[2] = _stage2;
+        string[] memory keys = new string[](1);
+        keys[0] = "calls";
+        IProtocolUpgradeHandler.Call[][] memory lists = new IProtocolUpgradeHandler.Call[][](1);
+        lists[0] = _calls;
         return _writePackage(_name, keys, lists);
     }
 
@@ -369,10 +381,7 @@ abstract contract EmergencyUpgradeFixture is Test {
     }
 
     /// @notice The owner's approveHash transactions, as emitted, except `_skippedApproval`.
-    function _approve(
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory _proposal,
-        uint256 _skippedApproval
-    ) internal {
+    function _approve(EmergencyUpgradeCalldata.EmergencyProposal memory _proposal, uint256 _skippedApproval) internal {
         for (uint256 i = 0; i < _proposal.approvals.length; ++i) {
             if (i == _skippedApproval) {
                 continue;
@@ -386,7 +395,7 @@ abstract contract EmergencyUpgradeFixture is Test {
     }
 
     /// @notice The board call, as emitted, sent by an arbitrary account.
-    function _execute(EmergencyStageUpgradeCalldata.EmergencyProposal memory _proposal) internal {
+    function _execute(EmergencyUpgradeCalldata.EmergencyProposal memory _proposal) internal {
         _send(_proposal, tool.executeCalldata(_proposal));
     }
 
@@ -394,7 +403,7 @@ abstract contract EmergencyUpgradeFixture is Test {
     ///         fetch the calldata from the tool BEFORE it arms `expectRevert`/`expectEmit`, which would
     ///         otherwise apply to that fetch.
     function _send(
-        EmergencyStageUpgradeCalldata.EmergencyProposal memory _proposal,
+        EmergencyUpgradeCalldata.EmergencyProposal memory _proposal,
         bytes memory _executeCalldata
     ) internal {
         vm.prank(relayer);
@@ -402,7 +411,7 @@ abstract contract EmergencyUpgradeFixture is Test {
     }
 
     /// @notice Every approval, then the board call.
-    function _approveAndExecute(EmergencyStageUpgradeCalldata.EmergencyProposal memory _proposal) internal {
+    function _approveAndExecute(EmergencyUpgradeCalldata.EmergencyProposal memory _proposal) internal {
         _approve(_proposal, type(uint256).max);
         _execute(_proposal);
     }

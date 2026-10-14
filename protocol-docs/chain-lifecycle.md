@@ -116,8 +116,8 @@ The chain asset handler treats chains themselves as bridgeable assets of their C
 on the source settlement layer collects the chain's migration data (protocol version, batch
 number, base-token bridging data, etc.) and de-registers it locally; `bridgeMint` on the
 destination layer deploys/re-registers the chain there. Both are callable only via the asset
-router, and both are guarded by the runtime `migrationPaused` flag (a governance pause used for
-upgrades) **and** the release-level migrations ban below. On migration to a settlement layer,
+router, and both are guarded by the runtime `migrationPaused` flag (a governance pause for
+incident response) **and** the release-level migrations ban below. On migration to a settlement layer,
 `bridgeBurn` also fills `originToken`/`originChainId` of the base-token bridging data, which the
 destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's base token.
 
@@ -187,7 +187,7 @@ An in-place upgrade has to reach the same state a from-scratch deployment produc
 not follow from swapping implementations are:
 
 - **`L1InteropHandler`** is new in this release, so the upgrade deploys it (proxy included) and wires it
-  into `L1Nullifier` and `L1AssetRouter` with governance calls in stage 1. Without it every interop
+  into `L1Nullifier` and `L1AssetRouter` with governance calls. Without it every interop
   withdrawal finalization on L1 reverts, since the asset router only accepts calls from the configured
   handler. Both setters are one-shot, so the upgrade emits them only for an ecosystem that has no handler.
 - **`Bridgehub.chainRegistrationSender`** is only written by `setAddresses` on a fresh deployment, so an

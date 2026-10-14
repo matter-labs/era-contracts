@@ -403,16 +403,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.getZKChain, chainId), abi.encode(_chainAddress));
     }
 
-    function _mockMigrationPausedFromBridgehub() internal {
-        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSignature("chainAssetHandler()"),
-            abi.encode(mockChainAssetHandler)
-        );
-        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPausedFor(address)"), abi.encode(true));
-    }
-
     ////////////////////////////////////////////////////////////////////////////////////////////
     // Functions that have been migrated from the erstwhile StateTransitionManager to Bridgehub
     ////////////////////////////////////////////////////////////////////////////////////////////

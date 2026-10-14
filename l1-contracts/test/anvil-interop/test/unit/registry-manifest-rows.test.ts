@@ -66,15 +66,15 @@ test("a core manifest entry encodes exactly the Solidity row's fields, in its ow
 });
 
 test("the operation manifest carries exactly the Solidity struct's fields, every CTM-domain slot inert", () => {
-  const args = operationInitArgs({ transition: {} }, address(1), address(2), address(3));
+  const args = operationInitArgs({ transition: {} }, address(1), address(2));
   assert.deepEqual(
     Object.keys(args).sort(),
     solidityStructFields("OperationManifest").sort(),
     "operation init args: fields differ from the Solidity OperationManifest"
   );
   assert.deepEqual(
-    [args.coreTransition, args.ctmTransition, args.timer],
-    [address(1), address(2), address(3)],
+    [args.coreTransition, args.ctmTransition],
+    [address(1), address(2)],
     "operation init args name the objects they were given"
   );
   assert.equal(args.ctmInfrastructure.length, proxyUpgradeSlots("CTMContract", {}).length);

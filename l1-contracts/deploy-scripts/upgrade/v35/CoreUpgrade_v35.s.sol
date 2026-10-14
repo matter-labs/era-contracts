@@ -71,7 +71,7 @@ contract CoreUpgrade_v35 is DefaultCoreUpgrade {
     ///         is derived from `RegistryBootstrapSequence`, which the CTM prepare deploys once the
     ///         migration exists and reads every call off (see {CTMUpgrade_v35}).
     /// @dev All ride the CREATE2 factory: the Safe bundle replays factory transactions only, so
-    ///      a plain CREATE would leave the stage-1 calls pointing at codeless addresses.
+    ///      a plain CREATE would leave the bundle's calls pointing at codeless addresses.
     function deployEcosystemUpgradeObjects() public virtual override {
         deployCoreTransition();
         require(address(coreTransition) != address(0), "the bootstrap edge needs an ecosystem leg");

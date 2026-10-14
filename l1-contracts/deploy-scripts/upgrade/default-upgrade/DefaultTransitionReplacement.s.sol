@@ -27,8 +27,8 @@ import {UpgradeKind} from "./UpgradeParams.sol";
 ///      the replaced transition in `[transition_replacement] replaced_transition` and may set
 ///      `[transition_replacement] protocol_version_deadline`. A version script overrides
 ///      {authorL2Side}, {deployUsedUpgradeContract} or {replacementTargetVersion} to say what the
-///      replacement repairs. No release, operation or timer is deployed: nothing about the CTM's own
-///      version or release moves.
+///      replacement repairs. No release or operation is deployed: nothing about the CTM's own version
+///      or release moves.
 contract DefaultTransitionReplacement is DefaultCTMUpgrade {
     using stdToml for string;
 
@@ -120,7 +120,7 @@ contract DefaultTransitionReplacement is DefaultCTMUpgrade {
         ctmAddresses.stateTransition.currentRelease = manifest.newRelease;
     }
 
-    /// @dev Declares the single stage-1 call; the governance bundles are rendered from it.
+    /// @dev Declares the single governance call; the governance bundle is rendered from it.
     function _declareReplacementCall() private {
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         uint256 departing = replacedTransition.oldProtocolVersion();
@@ -144,7 +144,7 @@ contract DefaultTransitionReplacement is DefaultCTMUpgrade {
             });
         }
         declareExternalAction(
-            ExternalActionsLib.PHASE_STAGE_1,
+            ExternalActionsLib.PHASE_GOVERNANCE,
             string.concat("replace the committed transition departing ", vm.toString(departing)),
             "CTM executor owner (governance)",
             Call({

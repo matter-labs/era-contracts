@@ -26,7 +26,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
         address newRelease = _releaseAt(newProtocolVersionSemVer);
 
         _mockGetZKChainFromBridgehub(chainAddress);
-        _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
         chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), oldProtocolVersion, 1000, newRelease);
@@ -57,7 +56,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(chainContractAddress.protocolVersionIsActive(0), true);
 
         _mockGetZKChainFromBridgehub(chainAddress);
-        _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
         chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, _releaseAt(1));
@@ -83,7 +81,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
     function test_SuccessfulSetProtocolVersionDeadline() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
         _mockGetZKChainFromBridgehub(chainAddress);
-        _mockMigrationPausedFromBridgehub();
 
         vm.prank(governor);
         chainContractAddress.setNewVersionUpgrade(
@@ -142,7 +139,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
         });
 
         _mockGetZKChainFromBridgehub(chainAddress);
-        _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
         chainContractAddress.setNewVersionUpgrade(

@@ -8,9 +8,9 @@ import { packProtocolVersion, readGenesisSemVer } from "./src/helpers/upgrade-te
 // current release's scripts), applied to the previous release's ecosystem (`upgradeSourceStateVersion` in
 // config/anvil-config.json). On this release that is the BOOTSTRAP edge into registry-driven upgrades: the
 // prepare deploys the `CTMUpgradeExecutor` + `RegistryBootstrapMigration`, the governance replay executes the
-// bootstrap's stages (stage 1 ending in `migrate()`), and the chains cross via the legacy handed-cut entrypoint,
-// the production shape for pre-registry chains. See docs/registry-driven-upgrades.md (Bootstrap). The target
-// version is the one in the ZKsync OS genesis config.
+// bootstrap's one bundle (`migrate()`, then the completion check), and the chains cross via the legacy handed-cut
+// entrypoint, the production shape for pre-registry chains. See docs/registry-driven-upgrades.md (Bootstrap).
+// The target version is the one in the ZKsync OS genesis config.
 const genesis = readGenesisSemVer();
 
 runPipelineUpgradeScenario({
@@ -25,9 +25,6 @@ runPipelineUpgradeScenario({
   // deployed at a derived address); the anvil L2s cannot force-deploy, so the harness places
   // this bytecode at the decoded delegate target.
   l2DelegateBytecodeName: "L2DefaultUpgrade",
-  // The fixture leaves the ChainAssetHandler with the deployer as owner; governance has to own
-  // it to run the stage-0 `pauseMigration()` call.
-  transferL1ChainAssetHandlerOwnership: true,
   // The fixture's chains still carry the genesis-upgrade tx hash from their creation, which
   // blocks a new upgrade (`PreviousUpgradeNotFinalized`).
   clearGenesisUpgradeTxHash: true,
@@ -39,8 +36,8 @@ runPipelineUpgradeScenario({
   // (the gateway itself, which settles on L1) are the supported shapes.
   targetRoles: ["directSettled", "gateway"],
   // Then two registry-driven hops on the bootstrapped ecosystem, each departing from the state the
-  // previous one left, both driven by the base prepare pipeline and both emitting exactly three
-  // governance calls.
+  // previous one left, both driven by the base prepare pipeline and both emitting exactly one
+  // governance call, `execute(operation)`.
   followUps: [
     // A same-minor PATCH first: one fresh verifier, published as a release that copies the
     // bootstrap's except that member. It runs while the bootstrap's L2 upgrade transaction is

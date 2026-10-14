@@ -8,7 +8,7 @@ import {Call} from "../../../governance/Common.sol";
 ///         reads it under.
 /// @param label What the call does, in the runbook's words.
 /// @param authority Who has to send it.
-/// @param call The call itself, in the shape the governance bundles carry.
+/// @param call The call itself, in the shape the governance bundle carries.
 struct BootstrapAction {
     string label;
     string authority;
@@ -18,7 +18,7 @@ struct BootstrapAction {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The read surface of the bootstrap edge's call sequence: the ordered governance calls of
-///         each stage, and the completion check run as its own call after stage 2.
+///         its one bundle, ending in the edge's completion check.
 interface IRegistryBootstrapSequence {
     /// @notice The edge this sequence describes.
     function MIGRATION() external view returns (address);
@@ -26,17 +26,8 @@ interface IRegistryBootstrapSequence {
     /// @notice The ecosystem inventory the edge's core leg applies.
     function CORE_TRANSITION() external view returns (address);
 
-    /// @notice The stage-0 calls, in execution order.
-    function stage0Actions() external view returns (BootstrapAction[] memory);
-
-    /// @notice The stage-1 calls, in execution order.
-    function stage1Actions() external view returns (BootstrapAction[] memory);
-
-    /// @notice The stage-2 calls, in execution order.
-    function stage2Actions() external view returns (BootstrapAction[] memory);
-
-    /// @notice The edge's completion check (`RegistryBootstrapMigration.validateApplied`), run as
-    ///         its own call after stage 2 rather than inside any stage bundle, so a failing check
-    ///         can never hold back the stage-2 unpause.
-    function validateApplied() external view;
+    /// @notice The bootstrap bundle's calls, in execution order. Governance executes them as one
+    ///         bundle, so any failing call — the closing completion check included — reverts the
+    ///         whole edge.
+    function actions() external view returns (BootstrapAction[] memory);
 }

@@ -11,7 +11,7 @@ import {
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
-import {LifecycleImplNew, LifecycleImplOld} from "./CTMUpgradeLifecycle.t.sol";
+import {ExecutionImplNew, ExecutionImplOld} from "./OperationExecution.t.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
@@ -20,7 +20,6 @@ import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/Eco
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
@@ -33,12 +32,8 @@ import {
     L2BytecodeNotPublished,
     CoordinatorCTMMismatch,
     ExecutorCoordinatorMismatch,
-    UpgradeLifecycleBusy,
     RegistryTargetHasNoCode,
     OperationChangesNothing,
-    OperationNotPending,
-    ProxyUpgradeRowMismatch,
-    Unauthorized,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {
@@ -63,8 +58,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         super.setUp();
 
         // The second CTM: same implementation and genesis shape as the fixture's, registered on
-        // the Bridgehub (the ChainAssetHandler derives pause authority from registration plus
-        // ownership), handed to its own executor, and initialized on the same real release.
+        // the Bridgehub, handed to its own executor, and initialized on the same real release.
         ctm2 = ChainTypeManager(
             address(
                 new TransparentUpgradeableProxy(
@@ -98,8 +92,8 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         assertEq(ctm2.currentRelease(), address(fromRelease));
 
         // The shared ecosystem change: one proxy under the core executor's admin.
-        implOld = address(new LifecycleImplOld());
-        implNew = address(new LifecycleImplNew());
+        implOld = address(new ExecutionImplOld());
+        implNew = address(new ExecutionImplNew());
         ecosystemProxy = new TransparentUpgradeableProxy(implOld, address(ecosystemProxyAdmin), hex"");
         CoreTransitionManifest memory manifest;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
@@ -158,18 +152,6 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
     }
 
-    function test_revertWhen_rebindingPendingOperation() public {
-        EcosystemUpgradeOperation operation = _operationFor(transition);
-        _stage0(transition);
-        CTMUpgradeExecutor replacement = _replacement(address(coordinator));
-        vm.expectRevert(abi.encodeWithSelector(UpgradeLifecycleBusy.selector, address(operation)));
-        vm.prank(governor);
-        coordinator.setCTMExecutor(replacement);
-        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
-        assertEq(address(coordinator.pendingOperation()), address(operation));
-        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
-    }
-
     function test_sameCTMExecutorReplacementCanRunAnUpgrade() public {
         CTMUpgradeExecutor previous = ctmExecutor;
         CTMUpgradeExecutor replacement = _replacement(address(coordinator));
@@ -195,14 +177,13 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
         assertEq(address(coordinator.ctmExecutor()), address(replacement));
         assertEq(ctmProxyAdmin.owner(), address(replacement));
         assertEq(chainContractAddress.owner(), address(replacement));
-        _stage0(transition);
-        _stage1(transition);
-        _stage2(transition);
+        _execute(transition);
         assertEq(chainContractAddress.protocolVersion(), newVersion);
-        assertEq(address(coordinator.pendingOperation()), address(0));
-        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
+        assertEq(chainContractAddress.upgradeTransition(0), address(transition));
     }
 
+    /// @dev The core leg and the CTM leg are one call: a CTM-leg failure rolls the applied core
+    ///      leg back, and the same operation executes once the cause is fixed.
     function test_ctmFailureRollsBackCoreUpgrade() public {
         bytes memory unpublished = hex"de1f";
         CTMTransition target = _deployTransitionWithDelegate(778, address(fromRelease), unpublished);
@@ -210,67 +191,48 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
             ICTMTransition(address(target)),
             address(coreTransition)
         );
-        vm.prank(governor);
-        coordinator.stage0(operation);
         vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(unpublished)));
         vm.prank(governor);
-        coordinator.stage1(operation);
+        coordinator.execute(operation);
         assertEq(
             ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
             implOld
         );
         assertEq(chainContractAddress.protocolVersion(), 0);
-        assertEq(address(coreExecutor.activeOperation()), address(operation));
-        assertEq(address(ctmExecutor.activeOperation()), address(operation));
-        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
+
         L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(unpublished));
-        vm.startPrank(governor);
-        coordinator.stage1(operation);
-        coordinator.stage2(operation);
-        vm.stopPrank();
+        vm.prank(governor);
+        coordinator.execute(operation);
         assertEq(
             ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
             implNew
         );
         assertEq(chainContractAddress.protocolVersion(), newVersion);
-        assertEq(address(coreExecutor.activeOperation()), address(0));
-        assertEq(address(ctmExecutor.activeOperation()), address(0));
-        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
-    /// @dev A core-only operation needs no chain-version edge, and the CTM domain is STILL
-    ///      reserved and its migrations paused for it — the conservative pause policy of
-    ///      {protocol-docs/ecosystem-upgrade-coordination.md}: whether a CTM change rides along is
-    ///      not something the coordinator infers a safe migration window from.
-    function test_coreOnlyOperation_stillReservesTheCTMAndPausesMigrations() public {
+    /// @dev A core-only operation needs no chain-version edge: the ecosystem leg applies and the
+    ///      CTM leg has nothing to do.
+    function test_coreOnlyOperation_appliesTheEcosystemLegAndMovesNoVersion() public {
         EcosystemUpgradeOperation operation = _deployOperation(address(coreTransition), address(0));
         uint256 ctmVersionBefore = chainContractAddress.protocolVersion();
+        address releaseBefore = chainContractAddress.currentRelease();
 
+        vm.expectEmit(true, true, true, true, address(coordinator));
+        emit IEcosystemUpgradeExecutor.OperationExecuted(address(operation));
         vm.prank(governor);
-        coordinator.stage0(operation);
-        assertEq(address(ctmExecutor.activeOperation()), address(operation), "the CTM domain is reserved");
-        assertEq(address(ctmExecutor.reservedTransition()), address(0), "with no transition of its own");
-        assertTrue(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations are paused");
-
-        vm.prank(governor);
-        coordinator.stage1(operation);
+        coordinator.execute(operation);
         assertEq(
             ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(ecosystemProxy))),
             implNew,
             "the ecosystem leg applied"
         );
         assertEq(chainContractAddress.protocolVersion(), ctmVersionBefore, "no chain-version edge was bought");
-
-        vm.prank(governor);
-        coordinator.stage2(operation);
-        assertEq(address(ctmExecutor.activeOperation()), address(0), "the reservation is released");
-        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations resume");
+        assertEq(chainContractAddress.currentRelease(), releaseBefore, "nor a release");
     }
 
     function test_revertWhen_operationChangesNothing() public {
-        // The timer is deployed first: `expectRevert` applies to the very next call.
-        address timer = _newOperationTimer();
+        ProxyUpgradeRow[] memory inertInventory = _emptyInventory();
         vm.expectRevert(OperationChangesNothing.selector);
-        _deployOperation(address(0), _emptyInventory(), address(0), timer);
+        _deployOperation(address(0), inertInventory, address(0));
     }
 }

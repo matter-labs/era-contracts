@@ -41,7 +41,7 @@ import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ChainRouting} from "test-utils/ChainRouting.sol";
 import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
-import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
+import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {BootstrapManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
@@ -65,7 +65,7 @@ contract LegacyGenesisEngineForLocalTest {
 
 /// @notice Test-only v35 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
-///         the migration deploy, the four-call stage-1 leg, the legacy cut-taking commit — runs
+///         the migration deploy, the one governance bundle, the legacy cut-taking commit — runs
 ///         UNMOCKED: that is what this file exists to test.
 contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
@@ -130,9 +130,10 @@ contract ChainUpgradeForLocalTest is DefaultChainUpgrade {
 
 /// @notice The fixture the v35 BOOTSTRAP edge leaves behind, built through the real prepare
 ///         pipeline: a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v35`
-///         deploying the executor + `RegistryBootstrapMigration`, and the collapsed three-call
-///         stage-1 leg (nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself
-///         completes the executor's accept) performing the whole edge.
+///         deploying the executor + `RegistryBootstrapMigration`, and the one governance bundle
+///         `RegistryBootstrapSequence` derives (bindings, the ecosystem handover and core leg,
+///         nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes the
+///         executor's accept — and the completion check) performing the whole edge.
 /// @dev Abstract so the post-bootstrap state can be reused: it is the only in-forge fixture whose
 ///      ecosystem is registry-driven, which is what a RECURRING prepare needs to run against (see
 ///      `UpgradeTestRecurring_Local.t.sol`). Heavy execution + event assertions run in
@@ -328,14 +329,12 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertEq(coreOutput.readAddress("$.registry.ecosystem_upgrade_executor_addr"), manifest.coordinator);
         assertEq(ctmOutput.readAddress("$.registry.coordinator_addr"), manifest.coordinator);
         assertEq(ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr"), manifest.ctmExecutor);
-        assertEq(ctmOutput.readAddress("$.registry.upgrade_timer_addr"), manifest.upgradeTimer);
         assertEq(ctmOutput.readAddress("$.registry.bootstrap_migration_addr"), address(bootstrap.bootstrapMigration()));
         assertEq(ctmOutput.readAddress("$.state_transition.chain_type_manager_proxy"), manifest.ctm);
         assertEq(
             ctmOutput.readAddress("$.deployed_addresses.transparent_proxy_admin"),
             address(manifest.ctmProxyAdmin)
         );
-        assertEq(ctmOutput.readAddress("$.admin.timer_governance_addr"), manifest.governance);
 
         // The executors' construction record (`[upgrade_executors]`), which protocol-ops re-derives each
         // executor from after its owner or coordinator moves: the ORIGINAL constructor arguments and salt.
@@ -395,20 +394,6 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             ),
             manifest.ctmExecutor,
             "the CTM executor re-derives from the manifest's owner and bindings"
-        );
-        assertEq(
-            DeployScriptUtils.canonicalCreate2Address(
-                ctmSalt,
-                vm.getCode("GovernanceUpgradeTimer.sol:GovernanceUpgradeTimer"),
-                abi.encode(
-                    ctmOutput.readUint("$.contracts_config.governance_upgrade_timer_initial_delay"),
-                    2 weeks,
-                    manifest.governance,
-                    ctmOutput.readAddress("$.admin.ecosystem_admin_addr")
-                )
-            ),
-            manifest.upgradeTimer,
-            "the timer re-derives from the package's delay and owner, the prepare's 2 weeks and the reviewed governance"
         );
         assertEq(
             DeployScriptUtils.canonicalCreate2Address(
@@ -542,16 +527,16 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "the new chain carries the release engine's genesis transaction"
         );
 
-        _assertBootstrapJoinsTheLifecycle(bootstrap, ctm, bridgehub, executor);
+        _assertBootstrapJoinsTheRegistryModel(bootstrap, ctm, bridgehub, executor);
     }
 
     /// @dev The whole bootstrap edge — both domains — is DERIVED from `RegistryBootstrapSequence`
     ///      and declared by the CTM prepare; the core prepare of this edge declares nothing, so the
-    ///      merged bundles are exactly the object's. The harness already executed them green in
-    ///      `internalTest`; this asserts the emitted shape, that both bindings landed in stage 1,
-    ///      that the completion check — its own call, outside every bundle — holds, and the
-    ///      notifier handover.
-    function _assertBootstrapJoinsTheLifecycle(
+    ///      merged bundle is exactly the object's. The harness already executed it green in
+    ///      `internalTest`; this asserts the emitted shape (the notifier accept first, the bindings
+    ///      ahead of every handover, the completion check last), that the completion check holds,
+    ///      and the notifier handover.
+    function _assertBootstrapJoinsTheRegistryModel(
         CTMUpgradeForLocalTest _bootstrap,
         address _ctm,
         address _bridgehub,
@@ -559,23 +544,25 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     ) private {
         address chainAssetHandler = IBridgehubBase(_bridgehub).chainAssetHandler();
         EcosystemUpgradeExecutor coordinator = _bootstrap.ecosystemUpgradeExecutor();
-        Call[] memory stage1 = _bootstrap.prepareStage1GovernanceCalls();
-        Call[] memory stage2 = _bootstrap.prepareStage2GovernanceCalls();
-        assertEq(stage1.length, 8, "v35 stage 1: pause, two bindings, the core leg and the CTM handover");
-        assertEq(stage1[1].target, address(coreUpgrade.getCoreUpgradeExecutor()), "the core binding rides stage 1");
-        assertEq(stage1[2].target, address(coordinator), "the coordinator binding rides stage 1");
-        assertEq(stage2.length, 1, "v35 stage 2: the unpause alone");
-        assertEq(stage2[0].target, chainAssetHandler, "stage 2 lifts the migration pause");
+        RegistryBootstrapMigration migration = _bootstrap.bootstrapMigration();
+        Call[] memory bundle = _bootstrap.prepareGovernanceCalls();
+        assertEq(bundle.length, 9, "v35 bundle: the notifier accept, two bindings, the core leg, the CTM handover");
+        assertEq(bundle[0].target, _executor, "the notifier accept opens the bundle");
+        assertEq(bundle[1].target, address(coreUpgrade.getCoreUpgradeExecutor()), "then the core binding");
+        assertEq(bundle[2].target, address(coordinator), "then the coordinator binding");
+        assertEq(bundle[7].target, address(migration), "then the edge itself");
+        assertEq(bundle[7].data, abi.encodeCall(RegistryBootstrapMigration.migrate, ()), "migrate()");
+        assertEq(bundle[8].target, address(migration), "and the completion check closes it");
+        assertEq(bundle[8].data, abi.encodeCall(RegistryBootstrapMigration.validateApplied, ()), "validateApplied()");
         assertEq(
             _bootstrap.externalActionEntries().length,
-            14,
-            "the CTM prepare declares the 3 + 8 + 1 derived governance calls and the 2 handover admin calls"
+            11,
+            "the CTM prepare declares the 9 derived governance calls and the 2 handover admin calls"
         );
         assertEq(coreUpgrade.externalActionEntries().length, 0, "the core prepare of a derived edge authors nothing");
         assertEq(address(coordinator.ctmExecutor()), _executor, "coordinator CTM binding");
-        RegistryBootstrapSequence sequence = _bootstrap.bootstrapSequence();
-        sequence.validateApplied();
-        assertEq(sequence.MIGRATION(), address(_bootstrap.bootstrapMigration()), "the check names this edge");
+        migration.validateApplied();
+        assertEq(_bootstrap.bootstrapSequence().MIGRATION(), address(migration), "the sequence names this edge");
         assertEq(
             CTMUpgradeExecutor(payable(_executor)).coordinator(),
             address(coordinator),
@@ -584,24 +571,20 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertEq(
             coreUpgrade.getCoreUpgradeExecutor().coordinator(),
             address(coordinator),
-            "stage 1 must bind the core executor to the coordinator"
+            "the bundle must bind the core executor to the coordinator"
         );
         assertEq(
             address(coordinator.CORE_EXECUTOR()),
             address(coreUpgrade.getCoreUpgradeExecutor()),
             "the coordinator drives the executor the ecosystem ProxyAdmin landed under"
         );
-        // No pauser registration to assert: the ChainAssetHandler derives the authority from CTM
-        // ownership, which `migrate()` already handed to the executor. What the join must leave is
-        // an UNPAUSED CTM — nothing pauses until a transition's stage 0.
-        assertEq(
-            IOwnable(_ctm).owner(),
-            _executor,
-            "the executor owns the CTM, which is what lets it pause that CTM's migrations"
+        assertEq(IOwnable(_ctm).owner(), _executor, "the executor owns the CTM");
+        assertFalse(
+            IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(_ctm),
+            "the bootstrap takes no migration pause"
         );
-        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(_ctm), "no pause before stage 0");
 
-        // The ChainAdmin handed the notifier over (`ctm_admin_calls`), stage 0 accepted it, and
+        // The ChainAdmin handed the notifier over (`ctm_admin_calls`), the bundle accepted it, and
         // `migrate()` swapped it through the CTM-domain ProxyAdmin like the CTM's own row.
         address notifierProxy = _bootstrap.getAddresses().stateTransition.proxies.serverNotifier;
         assertEq(

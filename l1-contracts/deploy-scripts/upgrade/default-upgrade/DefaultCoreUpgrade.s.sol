@@ -34,7 +34,7 @@ import {Utils} from "../../utils/Utils.sol";
 ///         prepare: deploys every ecosystem implementation whose code differs from the live one
 ///         (and reuses the rest) and pins the swaps in a write-once `CoreTransition`. It emits NO
 ///         governance calls of its own — the operation the CTM prepare deploys names the core
-///         transition, and the coordinator's stage 1 applies it through the `CoreUpgradeExecutor`.
+///         transition, and the coordinator's `execute` applies it through the `CoreUpgradeExecutor`.
 ///         Anything a version script still needs governance to do is declared as an external
 ///         action and listed in the output.
 /// @dev Version scripts inherit and declare what they change ({changedEcosystemImplementations});
@@ -279,8 +279,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do
-    ///         not describe. Everything a version script adds to a stage goes through here, so
-    ///         the output lists it (see {ExternalActionsLib}).
+    ///         not describe. Everything a version script adds to the governance bundle goes through
+    ///         here, so the output lists it (see {ExternalActionsLib}).
     function declareExternalAction(
         string memory _phase,
         string memory _label,
@@ -411,8 +411,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The ecosystem's lifecycle coordinator (`EcosystemUpgradeExecutor`), read from the
     ///         core executor once the bootstrap edge has bound them: the operation naming this
-    ///         upgrade's transitions is driven through it, and every transition's timer is bound
-    ///         to it. The bootstrap prepare overrides this with the coordinator it deploys.
+    ///         upgrade's transitions is executed through it. The bootstrap prepare overrides this
+    ///         with the coordinator it deploys.
     function getEcosystemUpgradeExecutor() public view virtual returns (address) {
         address coordinator = getCoreUpgradeExecutor().coordinator();
         require(coordinator != address(0), "core executor is not bound to a coordinator: run the bootstrap edge first");
@@ -623,24 +623,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     ////////////////////////////// Preparing calls /////////////////////////////////
 
-    function prepareDefaultGovernanceCalls()
-        public
-        virtual
-        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
-    {
-        // The ecosystem side emits only what a version script declared as external actions: the
-        // recurring ecosystem leg rides the coordinator's stage calls.
-        stage0Calls = prepareStage0GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
-        stage1Calls = prepareStage1GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
-        stage2Calls = prepareStage2GovernanceCalls();
-
-        string memory governanceCallsSerialized = vm.serializeBytes(
-            "governance_calls",
-            "stage2_calls",
-            abi.encode(stage2Calls)
-        );
+    /// @notice Writes this prepare's `[governance_calls] calls`: only what a version script declared
+    ///         as governance external actions. The ecosystem leg — the core transition applied
+    ///         through the `CoreUpgradeExecutor` — rides the coordinator's `execute` call.
+    function prepareDefaultGovernanceCalls() public virtual returns (Call[] memory calls) {
+        calls = prepareGovernanceCalls();
+        string memory governanceCallsSerialized = vm.serializeBytes("governance_calls", "calls", abi.encode(calls));
 
         // Upstream forge's keyed `vm.writeToml(json, path, key)` silently no-ops when the key
         // does not exist in the file yet, so append sections by re-serializing into the same
@@ -650,20 +638,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
-    /// @notice The governance stages of the ecosystem side: nothing but the declared external
-    ///         actions of each phase. The recurring ecosystem leg — the core transition applied through
-    ///         the `CoreUpgradeExecutor` — is the coordinator's stage-1 job, ordered and enforced
-    ///         on-chain.
-    function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_0);
-    }
-
-    function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_1);
-    }
-
-    function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        return externalActions.callsForPhase(ExternalActionsLib.PHASE_STAGE_2);
+    /// @notice The governance bundle of the ecosystem side: nothing but the declared governance
+    ///         external actions.
+    function prepareGovernanceCalls() public virtual returns (Call[] memory calls) {
+        return externalActions.callsForPhase(ExternalActionsLib.PHASE_GOVERNANCE);
     }
 
     // add this to be excluded from coverage report

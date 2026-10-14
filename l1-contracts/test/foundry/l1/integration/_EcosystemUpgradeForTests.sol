@@ -11,7 +11,6 @@ library TrimmedUpgradeOutput {
         address ctmTransition;
         address ctmUpgradeExecutor;
         address ctmRelease;
-        address upgradeTimer;
         address bootstrapMigration;
         address operation;
         address coordinator;
@@ -40,11 +39,10 @@ library TrimmedUpgradeOutput {
         // The trimmed writer replaces the heavy `state_transition` section, NOT the registry
         // block: every object the production output names has to survive here too, or a package
         // verified from the harness is not the shape a package verified in production is.
-        _vm.serializeAddress("registry", "upgrade_timer_addr", _registry.upgradeTimer);
         _vm.serializeAddress("registry", "bootstrap_migration_addr", _registry.bootstrapMigration);
         _vm.serializeAddress("registry", "ctm_upgrade_executor_addr", _registry.ctmUpgradeExecutor);
-        // The merge derives this upgrade's three lifecycle calls from exactly these two addresses,
-        // so a trimmed output that omitted them would produce a package with no stage calls at all.
+        // The merge derives this upgrade's `execute` call from exactly these two addresses, so a
+        // trimmed output that omitted them would produce a package with no executor call at all.
         _vm.serializeAddress("registry", "coordinator_addr", _registry.coordinator);
         string memory registry = _vm.serializeAddress("registry", "operation_addr", _registry.operation);
         _vm.serializeBytes("root", "chain_upgrade_diamond_cut", _upgradeCutData);

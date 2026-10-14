@@ -65,9 +65,9 @@ impl<'a> UpgradeFull<'a> {
     }
 
     /// Pre-step hook: ensure governance owns each registered CTM + ProxyAdmin
-    /// before the prepare deploys run. The downstream stage-1 governance
-    /// calls (e.g. CTM ProxyAdmin upgradeAndCall) assume governance ownership;
-    /// this is a no-op when ownership is already correct.
+    /// before the prepare deploys run. The downstream governance bundle
+    /// (e.g. the bootstrap's CTM and ProxyAdmin handovers) assumes governance
+    /// ownership; this is a no-op when ownership is already correct.
     ///
     /// The outer call has no permission gating — the deployer signs it. Inner
     /// `vm.startBroadcast(<owner>)` blocks emit the actual `transferOwnership`
@@ -104,8 +104,9 @@ impl<'a> UpgradeFull<'a> {
 
     /// Execute the per-CTM admin calls the CTM upgrade script emitted under
     /// `[ctm_admin_calls] server_notifier_handover`: the ChainAdmin's half of
-    /// the bootstrap's one-time ServerNotifier handover (see
-    /// `docs/upgrade-stage-lifecycle.md`), empty on a recurring upgrade.
+    /// the bootstrap's one-time ServerNotifier handover (see "ServerNotifier: a
+    /// one-time handover, then an ordinary CTM-domain proxy" in
+    /// `docs/upgrade-operations.md`), empty on a recurring upgrade.
     /// `AdminFunctions` resolves each call target's current owner and routes
     /// through the configured owner wrapper when the owner is itself a
     /// contract.

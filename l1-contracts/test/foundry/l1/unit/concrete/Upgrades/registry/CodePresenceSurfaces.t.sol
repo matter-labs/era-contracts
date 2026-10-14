@@ -110,15 +110,10 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         uncomposed.validate();
     }
 
-    /// @dev Same for the operation: an all-inert infrastructure inventory leaves only the timer to
-    ///      check, and that operation still validates.
+    /// @dev Same for the operation: an all-inert infrastructure inventory leaves only the core
+    ///      transition to check, and that operation still validates.
     function test_operationWithoutInfrastructureValidates() public {
-        EcosystemUpgradeOperation bare = _deployOperation(
-            address(coreTransition),
-            _emptyInventory(),
-            address(0),
-            _newOperationTimer()
-        );
+        EcosystemUpgradeOperation bare = _deployOperation(address(coreTransition), _emptyInventory(), address(0));
         bare.validate();
     }
 
@@ -153,24 +148,22 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         }
     }
 
-    /// @dev An operation validates in one call: its own members (the timer and every participating
+    /// @dev An operation validates in one call: its own members (every participating
     ///      infrastructure row's implementation), the core transition and its rows, and the CTM
     ///      transition with both of its releases.
     function test_everyOperationMemberIsRequiredToHaveCode() public {
         EcosystemUpgradeOperation complete = _deployOperation(
             address(coreTransition),
             operation.getManifest().ctmInfrastructure,
-            address(fullTransition),
-            _newOperationTimer()
+            address(fullTransition)
         );
         ProxyUpgradeRow[] memory rows = complete.ctmInfrastructureRows();
         assertEq(rows.length, 1, "one participating infrastructure row");
         ProxyUpgradeRow[] memory coreRows = coreTransition.ecosystemRows();
         address[] memory transitionMembers = _transitionMembers(fullTransition.getManifest());
 
-        address[] memory members = new address[](3 + rows.length + coreRows.length + transitionMembers.length);
+        address[] memory members = new address[](2 + rows.length + coreRows.length + transitionMembers.length);
         uint256 next = 0;
-        members[next++] = complete.getManifest().timer;
         for (uint256 i = 0; i < rows.length; ++i) {
             members[next++] = rows[i].implNew;
         }

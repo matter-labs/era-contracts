@@ -18,9 +18,9 @@
  *      live deployment fails), or with `REGEN_REGISTRIES=1` EMIT it from the live deployment; then
  *      deploy the `CTMRelease` / `CoreTransition` / `CTMTransition` from it and `validate()` them.
  *      The transition departs from the CTM's live `currentRelease`.
- *   5. Drive the operation through the existing coordinator's `stage0/1/2` and each chain through
- *      the CTM executor's `upgradeChain`, every call sent by the executor's live owner
- *      (impersonated).
+ *   5. Execute the operation through the existing coordinator's `execute(operation)` and upgrade
+ *      each chain through the CTM executor's `upgradeChain`, every call sent by the executor's live
+ *      owner (impersonated).
  *   6. Assert the L1 end state, then relay each chain's transition-composed L2 upgrade transaction
  *      through the real `L2ComplexUpgrader`.
  *
@@ -188,6 +188,18 @@ async function sendAndCheck(
   return receipt;
 }
 
+/** The `name` events `contract` emitted in `receipt`, decoded. */
+function eventsIn(
+  receipt: ethers.providers.TransactionReceipt,
+  contract: ethers.Contract,
+  name: string
+): ethers.utils.LogDescription[] {
+  return receipt.logs
+    .filter((log) => log.address.toLowerCase() === contract.address.toLowerCase())
+    .map((log) => contract.interface.parseLog(log))
+    .filter((event) => event.name === name);
+}
+
 /** Sends `send(contract)` from `contract`'s live `owner()`, impersonated. */
 async function sendAsOwner(
   provider: ethers.providers.JsonRpcProvider,
@@ -275,7 +287,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       assertCommittedManifestMatchesLiveDeployment(manifestPath, live, deployed, ctmAddresses.chainTypeManager);
     }
     const manifestJson = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-    const objects = await deployUpgradeObjectsFromManifest(deployer, manifestJson, deployed, executors.coordinator);
+    const objects = await deployUpgradeObjectsFromManifest(deployer, manifestJson, deployed);
     console.log(`  CTM release:     ${objects.release}`);
     console.log(`  CTM transition:  ${objects.transition}`);
     console.log(`  core transition: ${objects.coreTransition}`);
@@ -307,7 +319,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     // ── 5. Execute the operation through the coordinator ──
     console.log("\n── Executing the registry-driven upgrade via the coordinator ──");
-    const cah = new ethers.Contract(live.chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
     const operationFactory = new ethers.ContractFactory(
       getAbi("EcosystemUpgradeOperation"),
       getDeterministicCreationBytecode("EcosystemUpgradeOperation"),
@@ -317,34 +328,30 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       operationInitArgs(
         (manifestJson.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME),
         objects.coreTransition,
-        objects.transition,
-        objects.upgradeTimer
+        objects.transition
       )
     );
     await operationContract.deployed();
     const operation: string = operationContract.address;
     console.log(`  operation: ${operation}`);
 
-    await sendAsOwner(
+    const executeReceipt = await sendAsOwner(
       l1Provider,
       coordinator,
-      (c) => c.stage0(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "coordinator.stage0(operation)"
+      (c) => c.execute(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
+      "coordinator.execute(operation)"
     );
-    assertTrue(await cah.migrationPausedFor(ctm.address), "stage 0 leaves THIS CTM's migrations paused");
-    assertEq(await ctmExecutor.reservedTransition(), objects.transition, "stage 0 reserved the CTM executor");
-    assertEq(
-      await coordinator.pendingManifestHash(),
-      await operationContract.manifestHash(),
-      "stage 0 pinned the operation's manifest hash"
-    );
-    await sendAsOwner(
-      l1Provider,
-      coordinator,
-      (c) => c.stage1(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "coordinator.stage1(operation)"
-    );
-    console.log("  ✓ stage1 executed (ecosystem rows, CTM leg, version commit, release pin)");
+    const executed = eventsIn(executeReceipt, coordinator, "OperationExecuted");
+    assertEq(executed.length, 1, "execute emitted OperationExecuted once");
+    assertEq(executed[0].args.operation, operation, "OperationExecuted names the operation");
+    const coreApplied = eventsIn(executeReceipt, coreExecutor, "L1UpgradeApplied");
+    assertEq(coreApplied.length, 1, "the core leg ran inside execute (one L1UpgradeApplied)");
+    assertEq(coreApplied[0].args.coreTransition, objects.coreTransition, "L1UpgradeApplied names the core transition");
+    const ctmApplied = eventsIn(executeReceipt, ctmExecutor, "CTMUpgradeApplied");
+    assertEq(ctmApplied.length, 1, "the CTM leg ran inside execute (one CTMUpgradeApplied)");
+    assertEq(ctmApplied[0].args.transition, objects.transition, "CTMUpgradeApplied names the transition");
+    await ctmExecutor.validateTransitionApplied(objects.transition);
+    console.log("  ✓ validateTransitionApplied(transition) holds after execute");
 
     // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains (see
     // module docs); cleared once, before the first bump.
@@ -358,22 +365,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       );
       console.log(`  ✓ chain ${chain.chainId} upgraded`);
     }
-
-    await sendAsOwner(
-      l1Provider,
-      coordinator,
-      (c) => c.stage2(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "coordinator.stage2(operation)"
-    );
-    assertTrue(!(await cah.migrationPausedFor(ctm.address)), "stage 2 unpaused this CTM's migrations");
-    assertEq(await coordinator.pendingOperation(), ethers.constants.AddressZero, "stage 2 cleared the lifecycle slot");
-    assertEq(await coordinator.pendingManifestHash(), ethers.constants.HashZero, "stage 2 cleared the pinned hash");
-    assertEq(await ctmExecutor.activeOperation(), ethers.constants.AddressZero, "stage 2 released the CTM reservation");
-    assertEq(
-      await coreExecutor.activeOperation(),
-      ethers.constants.AddressZero,
-      "stage 2 released the core reservation"
-    );
 
     // ── 6. L1 end state ──
     console.log("\n── Verifying L1 end state ──");
@@ -966,17 +957,14 @@ function assertCommittedManifestMatchesLiveDeployment(
 /**
  * Deploy the release / core transition / CTM transition from the manifest — each takes its manifest
  * as a constructor argument. The release deploys first: the transition's constructor validates its
- * target release and derives the facet/L2 delta from the release pair. The operation's timer is
- * bound to the coordinator (only it can start it); zero delays make the stage-1 window pass
- * immediately, and the deployer keeps the (unused) extension right.
+ * target release and derives the facet/L2 delta from the release pair.
  */
 async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   manifest: any,
-  deployed: DeployedImplementations,
-  coordinator: string
-): Promise<{ release: string; transition: string; coreTransition: string; upgradeTimer: string }> {
+  deployed: DeployedImplementations
+): Promise<{ release: string; transition: string; coreTransition: string }> {
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
   if (!ctm) {
     throw new Error(`manifest has no "${CTM_REGISTRY_NAME}" CTM entry`);
@@ -994,13 +982,6 @@ async function deployUpgradeObjectsFromManifest(
 
   const release = await deployObject("CTMRelease", releaseInitArgs(manifest, ctm));
   const coreTransition = await deployObject("CoreTransition", coreInitArgs(manifest));
-  const timerFactory = new ethers.ContractFactory(
-    getAbi("GovernanceUpgradeTimer"),
-    getCreationBytecode("GovernanceUpgradeTimer"),
-    deployer
-  );
-  const upgradeTimer = await timerFactory.deploy(0, 0, coordinator, deployer.address);
-  await upgradeTimer.deployed();
   return {
     release,
     transition: await deployObject(
@@ -1008,7 +989,6 @@ async function deployUpgradeObjectsFromManifest(
       transitionInitArgs(manifest, ctm, release, deployed.delegateComposer)
     ),
     coreTransition,
-    upgradeTimer: upgradeTimer.address,
   };
 }
 

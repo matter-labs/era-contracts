@@ -4,11 +4,6 @@ pragma solidity ^0.8.21;
 import {Script, console2} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Bytes} from "contracts/vendor/Bytes.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
-
 import {EIP712Utils} from "../utils/EIP712Utils.sol";
 import {
     EMERGENCY_UPGRADE_SALT,
@@ -25,11 +20,11 @@ import {ISafe} from "../interfaces/ISafe.sol";
 ///         (`EmergencyUpgradeBoard.executeEmergencyUpgrade` -> `ProtocolUpgradeHandler.executeEmergencyUpgrade`)
 ///         with no private key and no off-chain signing: one owner EOA pre-approves each Safe message
 ///         hash on-chain (`approveHash`), and the board call carries Gnosis "approved hash" markers.
-///         The proposal's calls are every governance call of the merged package
+///         The proposal's calls are the governance bundle of the merged package
 ///         `protocol-ops ecosystem upgrade-prepare-all` writes ({loadGovernanceCalls}). Usage and
 ///         inputs: "Emergency execution" in `deploy-scripts/upgrade/README.md`.
 /// @dev Read-only; it reads the board, its multisigs and the Safes' message hashes from L1.
-contract EmergencyStageUpgradeCalldata is Script {
+contract EmergencyUpgradeCalldata is Script {
     using stdToml for string;
 
     /// @notice A Safe message hash the owner pre-approves on one approving Safe.
@@ -51,83 +46,27 @@ contract EmergencyStageUpgradeCalldata is Script {
         bytes zkFoundationSignatures;
     }
 
-    /// @notice Emits the ONE emergency proposal carrying every governance call of a prepared package.
+    /// @notice Emits the ONE emergency proposal carrying the governance bundle of a prepared package.
     /// @param _protocolUpgradeHandler The handler that executes the package's governance calls.
     /// @param _ecosystemToml The merged package (`upgrade-envs/<version>/output/<env>/ecosystem.toml`).
     function run(address _protocolUpgradeHandler, string memory _ecosystemToml) external view {
         IProtocolUpgradeHandler.Call[] memory calls = loadGovernanceCalls(_ecosystemToml);
         require(calls.length != 0, "the package carries no governance calls");
-        requireZeroTimerDelay(calls);
         _print(buildEmergencyProposal(IProtocolUpgradeHandler(_protocolUpgradeHandler), calls), _ecosystemToml);
     }
 
-    /// @notice Every governance call of a prepared package, in execution order: each entry of its
-    ///         `[governance_calls]` table is an `abi.encode(Call[])`, and the entries are taken in key
-    ///         order (`stage0_calls`, `stage1_calls`, `stage2_calls` today) and concatenated.
+    /// @notice The governance bundle of a prepared package, in execution order: its
+    ///         `[governance_calls] calls`, an `abi.encode(Call[])` — for a recurring upgrade the
+    ///         coordinator's `execute(operation)` among the declared actions, for the bootstrap the
+    ///         one bundle `RegistryBootstrapSequence` derives.
     /// @param _ecosystemToml The merged package.
     function loadGovernanceCalls(
         string memory _ecosystemToml
     ) public view returns (IProtocolUpgradeHandler.Call[] memory calls) {
-        string memory toml = vm.readFile(_ecosystemToml);
-        string[] memory keys = _sortedKeys(vm.parseTomlKeys(toml, ".governance_calls"));
-        IProtocolUpgradeHandler.Call[][] memory lists = new IProtocolUpgradeHandler.Call[][](keys.length);
-        uint256 total;
-        for (uint256 i = 0; i < keys.length; ++i) {
-            bytes memory encoded = toml.readBytes(string.concat(".governance_calls.", keys[i]));
-            if (encoded.length != 0) {
-                lists[i] = abi.decode(encoded, (IProtocolUpgradeHandler.Call[]));
-            }
-            total += lists[i].length;
+        bytes memory encoded = vm.readFile(_ecosystemToml).readBytes(".governance_calls.calls");
+        if (encoded.length != 0) {
+            calls = abi.decode(encoded, (IProtocolUpgradeHandler.Call[]));
         }
-        calls = new IProtocolUpgradeHandler.Call[](total);
-        uint256 next;
-        for (uint256 i = 0; i < lists.length; ++i) {
-            for (uint256 j = 0; j < lists[i].length; ++j) {
-                calls[next++] = lists[i][j];
-            }
-        }
-    }
-
-    /// @notice Refuses unless every `GovernanceUpgradeTimer` the calls start has a zero
-    ///         `INITIAL_DELAY`: one proposal runs in one block, so a later call that checks the timer
-    ///         (the coordinator's `stage1`, the bootstrap's `migrate()`) would revert after every
-    ///         approval was collected. See "The upgrade timer and stage timing" in
-    ///         {docs/upgrade-stage-lifecycle.md}.
-    /// @param _calls The proposal's calls.
-    function requireZeroTimerDelay(IProtocolUpgradeHandler.Call[] memory _calls) public view {
-        for (uint256 i = 0; i < _calls.length; ++i) {
-            address timer = startedTimer(_calls[i]);
-            if (timer == address(0)) {
-                continue;
-            }
-            uint256 delay = GovernanceUpgradeTimer(timer).INITIAL_DELAY();
-            require(
-                delay == 0,
-                string.concat(
-                    string.concat("upgrade timer ", vm.toString(timer), " holds the rest of the upgrade for "),
-                    vm.toString(delay),
-                    "s, so it cannot execute as one proposal: prepare it with a zero governance_upgrade_timer_initial_delay"
-                )
-            );
-        }
-    }
-
-    /// @notice The `GovernanceUpgradeTimer` a governance call starts, or zero: the coordinator's
-    ///         `stage0(operation)` starts the operation's timer, and the bootstrap edge calls
-    ///         `startTimer()` on its own.
-    /// @param _call One governance call.
-    function startedTimer(IProtocolUpgradeHandler.Call memory _call) public view returns (address) {
-        if (_call.data.length < 4) {
-            return address(0);
-        }
-        bytes4 selector = bytes4(_call.data);
-        if (selector == EcosystemUpgradeExecutor.stage0.selector) {
-            return IEcosystemUpgradeOperation(abi.decode(Bytes.slice(_call.data, 4), (address))).timer();
-        }
-        if (selector == GovernanceUpgradeTimer.startTimer.selector) {
-            return _call.target;
-        }
-        return address(0);
     }
 
     /// @notice Builds the proposal the handler's board executes `_calls` under, and the approvals
@@ -292,31 +231,6 @@ contract EmergencyStageUpgradeCalldata is Script {
                 safe: _safe,
                 safeMessageHash: ISafe(_safe).getMessageHash(abi.encode(_digest))
             });
-    }
-
-    function _sortedKeys(string[] memory _keys) private pure returns (string[] memory) {
-        for (uint256 i = 1; i < _keys.length; ++i) {
-            string memory current = _keys[i];
-            uint256 j = i;
-            while (j > 0 && _precedes(current, _keys[j - 1])) {
-                _keys[j] = _keys[j - 1];
-                --j;
-            }
-            _keys[j] = current;
-        }
-        return _keys;
-    }
-
-    function _precedes(string memory _a, string memory _b) private pure returns (bool) {
-        bytes memory a = bytes(_a);
-        bytes memory b = bytes(_b);
-        uint256 length = a.length < b.length ? a.length : b.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (a[i] != b[i]) {
-                return a[i] < b[i];
-            }
-        }
-        return a.length < b.length;
     }
 
     /// @dev Gnosis Safe "pre-approved hash" signature: r = owner, s = 0, v = 1.

@@ -12,8 +12,8 @@
 //!   3. `PUH.updateGuardians(newGuardians)` — point at the new Guardians
 //!   4. `PUH.updateEmergencyUpgradeBoard(newEmergencyUpgradeBoard)` — point at the new board
 //!
-//! These land in **stage 0** so the new PUH governance set is wired before the
-//! v31 ecosystem proxy upgrades execute.
+//! The merge puts these FIRST in the governance bundle, so the new PUH governance
+//! set is wired before the ecosystem proxy upgrades execute.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -108,11 +108,11 @@ impl<'a> ZkGovernanceInputs<'a> {
     }
 }
 
-/// Outcome of the redeploy: the two governance calls to add to stage 0, plus
-/// addresses surfaced for diagnostics / output payloads.
+/// Outcome of the redeploy: the wiring calls the merge prepends to the governance
+/// bundle, plus addresses surfaced for diagnostics / output payloads.
 #[derive(Debug)]
 pub struct ZkGovernanceOutcome {
-    pub stage0_calls: Vec<GovernanceCall>,
+    pub wiring_calls: Vec<GovernanceCall>,
     pub puh_proxy: Address,
     pub proxy_admin: Address,
     pub new_puh_impl: Address,
@@ -122,7 +122,7 @@ pub struct ZkGovernanceOutcome {
 }
 
 /// Run `DeployPUHAndGuardians.s.sol` against the supplied runner (same anvil
-/// fork as the surrounding prepare phase) and return the stage-0 governance
+/// fork as the surrounding prepare phase) and return the governance wiring
 /// calls. Reuses `deployer` for the broadcast.
 pub async fn deploy_puh_guardians(
     runner: &mut ForgeRunner,
@@ -270,12 +270,12 @@ pub async fn deploy_puh_guardians(
         "New EmergencyBoard:   {new_emergency_upgrade_board:#x}"
     ));
 
-    // Stage-0 wiring, executed as the PUH via governance. The impl swap goes
+    // The wiring, executed as the PUH via governance. The impl swap goes
     // first; then the three `onlySelf` setters repoint the proxy at the freshly
     // deployed SecurityCouncil, Guardians and EmergencyUpgradeBoard. The board
     // already embeds the new SC + Guardians as immutables (set at deploy), so
     // pointing the PUH at the new board completes a consistent set.
-    let stage0_calls = vec![
+    let wiring_calls = vec![
         GovernanceCall {
             target: proxy_admin,
             value: U256::ZERO,
@@ -299,7 +299,7 @@ pub async fn deploy_puh_guardians(
     ];
 
     Ok(ZkGovernanceOutcome {
-        stage0_calls,
+        wiring_calls,
         puh_proxy,
         proxy_admin,
         new_puh_impl,

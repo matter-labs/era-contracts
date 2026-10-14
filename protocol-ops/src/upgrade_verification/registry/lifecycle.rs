@@ -1,7 +1,7 @@
-//! The lifecycle objects a package names — the coordinator, the two domain executors and the
-//! timer — and the one identity check they can have.
+//! The lifecycle objects a package names — the coordinator and the two domain executors — and the
+//! one identity check they can have.
 //!
-//! All four set their bindings as constructor immutables, so none of them can hash to its
+//! All three set their bindings as constructor immutables, so none of them can hash to its
 //! artifact and [`super::provenance`] has nothing to say about them. What identifies each is its
 //! CONSTRUCTION ([`super::construction`]): the reviewed creation code run on its constructor
 //! arguments must land at its address. Nothing is taken from the object's own answers: a genuine
@@ -13,8 +13,7 @@
 //! unverified. The recorded immutable bindings (the CTM, the ProxyAdmins, `CORE_EXECUTOR`) are
 //! held against the reviewed package values; the initial owner and the CTM executor's
 //! constructor coordinator are only reported, since both may legitimately differ from today's (a
-//! fresh ecosystem constructs for its deployer and nominates governance). The timer has no record
-//! and is re-derived from the reviewed values.
+//! fresh ecosystem constructs for its deployer and nominates governance).
 //!
 //! What construction does not cover is the storage that moves afterwards — an executor's current
 //! `owner()`, `pendingOwner()` and `coordinator()`. Those are live checks the verifiers keep beside
@@ -22,19 +21,15 @@
 
 use std::collections::BTreeMap;
 
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{Address, B256};
 use alloy::providers::Provider;
 
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
-use crate::upgrade_verification::constants::GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{constructor_args, expect_canonical_construction, ReviewedBuild};
 use super::provenance::{expect_code_present, tolerate};
-use super::views::{
-    CTMUpgradeExecutorView, CoreUpgradeExecutorView, EcosystemUpgradeExecutorView,
-    GovernanceUpgradeTimerView,
-};
+use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView, EcosystemUpgradeExecutorView};
 
 /// The three executors' records and the reviewed values their recorded bindings are held against.
 ///
@@ -403,133 +398,6 @@ fn missing_record(label: &str, address: Address) -> String {
     )
 }
 
-/// The reviewed values a timer is re-derived from.
-pub(super) struct TimerReview {
-    pub(super) address: Address,
-    /// Package `governance_upgrade_timer_initial_delay`.
-    pub(super) initial_delay: Option<U256>,
-    /// Who starts the timer: governance for the bootstrap edge, the coordinator for every later
-    /// upgrade. A reviewed value, not the package's — the package's own statement is
-    /// `reported_governance`, cross-checked against it.
-    pub(super) governance: Address,
-    /// Package `timer_governance_addr`.
-    pub(super) reported_governance: Option<Address>,
-    /// Package `ecosystem_admin_addr` — the timer's initial owner, who may extend its deadline.
-    pub(super) owner: Option<Address>,
-}
-
-/// Verifies the timer's construction from `review` and the prepare's `2 weeks` maximal
-/// extension ([`GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS`]).
-///
-/// Reads, in order: the timer's code, `INITIAL_DELAY()`, `MAX_ADDITIONAL_DELAY()`,
-/// `TIMER_GOVERNANCE()` and `owner()`.
-pub(super) async fn verify_timer_construction<P: Provider>(
-    provider: &P,
-    build: &ReviewedBuild,
-    result: &mut VerificationResult,
-    review: &TimerReview,
-    salts: &[B256],
-    reviewed: &mut BTreeMap<Address, String>,
-) -> anyhow::Result<()> {
-    let label = "the upgrade timer";
-    if !expect_code_present(provider, result, label, review.address).await? {
-        return Ok(());
-    }
-    match review.reported_governance {
-        Some(reported) if reported == review.governance => result.report_ok(&format!(
-            "the package's timer_governance_addr is the reviewed timer governance {reported}"
-        )),
-        Some(reported) => result.report_error(&format!(
-            "the package reports timer_governance_addr {reported} but the reviewed timer \
-             governance is {}: the prepare built the timer for someone else to start",
-            review.governance
-        )),
-        None => result.report_warn(
-            "the package does not report timer_governance_addr, so the timer governance is \
-             taken from the review alone",
-        ),
-    }
-
-    let timer = GovernanceUpgradeTimerView::new(review.address, provider);
-    let max_additional_delay = U256::from(GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS);
-    let live_initial_delay = tolerate(
-        timer.INITIAL_DELAY().call().await,
-        result,
-        "the timer's INITIAL_DELAY",
-    );
-    binding_check(
-        result,
-        label,
-        "INITIAL_DELAY",
-        live_initial_delay,
-        review.initial_delay,
-        "governance_upgrade_timer_initial_delay",
-    );
-    let live_max_additional_delay = tolerate(
-        timer.MAX_ADDITIONAL_DELAY().call().await,
-        result,
-        "the timer's MAX_ADDITIONAL_DELAY",
-    );
-    binding_check(
-        result,
-        label,
-        "MAX_ADDITIONAL_DELAY",
-        live_max_additional_delay,
-        Some(max_additional_delay),
-        "the prepare's `2 weeks`",
-    );
-    let live_governance = tolerate(
-        timer.TIMER_GOVERNANCE().call().await,
-        result,
-        "the timer's TIMER_GOVERNANCE",
-    );
-    binding_check(
-        result,
-        label,
-        "TIMER_GOVERNANCE",
-        live_governance,
-        Some(review.governance),
-        "the reviewed timer governance",
-    );
-    let live_owner = tolerate(timer.owner().call().await, result, "the timer's owner");
-    binding_check(
-        result,
-        label,
-        "owner",
-        live_owner,
-        review.owner,
-        "ecosystem_admin_addr",
-    );
-
-    match (review.initial_delay, review.owner) {
-        (Some(initial_delay), Some(owner)) => {
-            construct(
-                build,
-                result,
-                label,
-                review.address,
-                "GovernanceUpgradeTimer",
-                constructor_args::governance_upgrade_timer(
-                    initial_delay,
-                    max_additional_delay,
-                    review.governance,
-                    owner,
-                ),
-                salts,
-                reviewed,
-            );
-        }
-        _ => unverifiable(
-            result,
-            label,
-            review.address,
-            "its initial delay (`governance_upgrade_timer_initial_delay`) and its owner \
-             (`ecosystem_admin_addr`)",
-        ),
-    }
-    Ok(())
-}
-
 /// One immutable as the object answers it, against the reviewed value the construction uses.
 ///
 /// Diagnostic only — the construction check is what decides. A reviewed value the package lacks
@@ -553,29 +421,6 @@ fn binding_check<T: PartialEq + std::fmt::Display>(
         )),
         _ => {}
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn construct(
-    build: &ReviewedBuild,
-    result: &mut VerificationResult,
-    label: &str,
-    address: Address,
-    short_name: &str,
-    args: Vec<u8>,
-    salts: &[B256],
-    reviewed: &mut BTreeMap<Address, String>,
-) {
-    if expect_canonical_construction(build, result, label, address, short_name, &args, salts) {
-        reviewed.insert(address, label.to_string());
-    }
-}
-
-fn unverifiable(result: &mut VerificationResult, label: &str, address: Address, needs: &str) {
-    result.report_error(&format!(
-        "{label} at {address}: its construction cannot be re-derived because the review lacks \
-         {needs}. An immutable-bearing object has no other identity check, so it is unverified"
-    ));
 }
 
 #[cfg(test)]
@@ -615,11 +460,6 @@ mod tests {
                 "CTMUpgradeExecutor.sol",
                 "CTMUpgradeExecutor",
                 code("CTMUpgradeExecutor"),
-            ),
-            (
-                "GovernanceUpgradeTimer.sol",
-                "GovernanceUpgradeTimer",
-                code("GovernanceUpgradeTimer"),
             ),
         ])
     }
@@ -1018,125 +858,5 @@ mod tests {
             "the live CHAIN_TYPE_MANAGER and the recorded one both disagree with the review"
         );
         assert_eq!(reviewed, 2);
-    }
-
-    fn queue_timer_answers(
-        asserter: &Asserter,
-        initial_delay: U256,
-        max_delay: U256,
-        governance: Address,
-        owner: Address,
-    ) {
-        asserter.push_success(&Bytes::from_static(&[0x60, 0x00]));
-        asserter.push_success(&Bytes::from(initial_delay.abi_encode()));
-        asserter.push_success(&Bytes::from(max_delay.abi_encode()));
-        asserter.push_success(&Bytes::from(governance.abi_encode()));
-        asserter.push_success(&Bytes::from(owner.abi_encode()));
-    }
-
-    async fn run_timer(review: &TimerReview, live_governance: Address) -> VerificationResult {
-        let asserter = Asserter::new();
-        queue_timer_answers(
-            &asserter,
-            review.initial_delay.unwrap_or_default(),
-            U256::from(GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS),
-            live_governance,
-            review.owner.unwrap_or_default(),
-        );
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        let mut result = VerificationResult::default();
-        let mut reviewed = BTreeMap::new();
-        verify_timer_construction(
-            &provider,
-            &build(),
-            &mut result,
-            review,
-            &[SALT],
-            &mut reviewed,
-        )
-        .await
-        .unwrap();
-        assert!(asserter.read_q().is_empty());
-        result
-    }
-
-    fn genuine_timer(initial_delay: U256, governance: Address, owner: Address) -> Address {
-        canonical_create2_address(
-            SALT,
-            &code("GovernanceUpgradeTimer"),
-            &constructor_args::governance_upgrade_timer(
-                initial_delay,
-                U256::from(GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS),
-                governance,
-                owner,
-            ),
-        )
-    }
-
-    #[tokio::test]
-    async fn a_genuine_timer_verifies_clean() {
-        let delay = U256::from(172_800u64);
-        let review = TimerReview {
-            address: genuine_timer(delay, OWNER, ECO_ADMIN),
-            initial_delay: Some(delay),
-            governance: OWNER,
-            reported_governance: Some(OWNER),
-            owner: Some(ECO_ADMIN),
-        };
-        let result = run_timer(&review, OWNER).await;
-        assert_eq!(result.errors, 0);
-        assert_eq!(result.warnings, 0);
-    }
-
-    /// A counterfeit timer answering the reviewed governance — the one value the retired check
-    /// looked at — is rejected on construction.
-    #[tokio::test]
-    async fn a_counterfeit_timer_answering_the_reviewed_governance_is_rejected() {
-        let delay = U256::from(172_800u64);
-        let review = TimerReview {
-            address: Address::repeat_byte(0x7E),
-            initial_delay: Some(delay),
-            governance: OWNER,
-            reported_governance: Some(OWNER),
-            owner: Some(ECO_ADMIN),
-        };
-        let result = run_timer(&review, OWNER).await;
-        assert_eq!(result.errors, 1);
-        assert!(result.ensure_success().is_err());
-    }
-
-    /// A timer built for a governance other than the reviewed one — one the reviewed starter
-    /// could never start — fails on the binding and on construction.
-    #[tokio::test]
-    async fn a_timer_built_for_another_governance_is_rejected() {
-        let delay = U256::from(1_200u64);
-        let review = TimerReview {
-            address: genuine_timer(delay, ATTACKER, ECO_ADMIN),
-            initial_delay: Some(delay),
-            governance: OWNER,
-            reported_governance: Some(OWNER),
-            owner: Some(ECO_ADMIN),
-        };
-        let result = run_timer(&review, ATTACKER).await;
-        assert_eq!(
-            result.errors, 2,
-            "the binding disagrees and the derivation misses"
-        );
-    }
-
-    /// A package that does not record the delay leaves the timer unverifiable — an error, not a
-    /// skipped check.
-    #[tokio::test]
-    async fn a_timer_without_a_recorded_delay_is_unverifiable() {
-        let review = TimerReview {
-            address: genuine_timer(U256::ZERO, OWNER, ECO_ADMIN),
-            initial_delay: None,
-            governance: OWNER,
-            reported_governance: Some(OWNER),
-            owner: Some(ECO_ADMIN),
-        };
-        let result = run_timer(&review, OWNER).await;
-        assert_eq!(result.errors, 1);
-        assert!(result.ensure_success().is_err());
     }
 }

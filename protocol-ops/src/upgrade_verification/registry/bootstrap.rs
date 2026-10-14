@@ -7,10 +7,12 @@
 //!
 //! Two things follow from an edge having no executor to invoke yet:
 //!
-//! * governance executes a LIST of ordinary calls rather than `stageN(operation)`, so the list has
+//! * governance executes a LIST of ordinary calls rather than `execute(operation)`, so the list has
 //!   to be compared against the one `RegistryBootstrapSequence` derives — see
 //!   [`verify_derived_sequence`], which says why that comparison is transitional scaffolding and
-//!   must not be generalised;
+//!   must not be generalised. The list is ONE bundle ending in the edge's completion check
+//!   (`RegistryBootstrapMigration.validateApplied()`), so an edge that does not complete reverts
+//!   the whole bundle;
 //! * the objects it names (`RegistryBootstrapMigration`, the bootstrap sequence) exist only for
 //!   this edge, and so do the views and checks below.
 //!
@@ -26,7 +28,7 @@ use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::{SolCall, SolValue};
 
-use crate::common::external_actions::ExternalAction;
+use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::constants::{
@@ -38,18 +40,15 @@ use super::construction::{
     canonical_create2_address, constructor_args, expect_canonical_construction, ReviewedBuild,
 };
 use super::genesis::{judge_release_genesis, ReviewedGenesis};
-use super::lifecycle::{
-    verify_lifecycle_construction, verify_timer_construction, LifecycleBindings, LifecycleReview,
-    TimerReview,
-};
+use super::lifecycle::{verify_lifecycle_construction, LifecycleBindings, LifecycleReview};
 use super::operation::cross_check;
 use super::package::BootstrapPackage;
 use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
 use super::rows::verify_rows;
 use super::views::{
     self, BootstrapCall, BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CoreTransitionView,
-    CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
-    ProxyUpgradeRow, RegistryBootstrapMigrationView, ServerNotifierView,
+    CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView, ProxyUpgradeRow,
+    RegistryBootstrapMigrationView, ServerNotifierView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -73,7 +72,7 @@ pub(crate) async fn verify<P: Provider>(
 
     result.print_info("== Package ==");
     result.report_ok(&format!(
-        "bootstrap edge on CTM section [{}]: migration {} (from the stage-1 `migrate()` call)",
+        "bootstrap edge on CTM section [{}]: migration {} (from the bundle's `migrate()` call)",
         package.ctm_key, package.migration
     ));
     match package.reported_migration {
@@ -81,13 +80,13 @@ pub(crate) async fn verify<P: Provider>(
             result.report_ok("the reported bootstrap_migration_addr matches the executable calls")
         }
         Some(reported) => result.report_error(&format!(
-            "the package reports bootstrap_migration_addr {reported} but stage 1 calls \
+            "the package reports bootstrap_migration_addr {reported} but the bundle calls \
              `migrate()` on {}: the summary and the executable calls describe different edges",
             package.migration
         )),
         None => result.report_warn(
             "the package does not report bootstrap_migration_addr, so the migration is known \
-             only from the stage-1 calldata",
+             only from the bundle's calldata",
         ),
     }
 
@@ -155,12 +154,6 @@ pub(crate) async fn verify<P: Provider>(
             package.reported_ctm_proxy_admin,
             manifest.ctmProxyAdmin,
             "the CTM-domain ProxyAdmin",
-        ),
-        (
-            "upgrade_timer_addr",
-            package.upgrade_timer,
-            manifest.upgradeTimer,
-            "the timer",
         ),
     ] {
         cross_check(result, field, reported, Some(actual), what);
@@ -230,24 +223,6 @@ pub(crate) async fn verify<P: Provider>(
             ctm_proxy_admin: Some(manifest.ctmProxyAdmin),
             records: package.executor_records.clone(),
         },
-        &mut reviewed,
-    )
-    .await?;
-    // GOVERNANCE starts the bootstrap's timer, not an executor: at stage 0 the executor does
-    // not hold the CTM domain yet (`CTMUpgrade_v35.timerGovernance`). Only every LATER upgrade
-    // binds its timer to the coordinator.
-    verify_timer_construction(
-        provider,
-        build,
-        result,
-        &TimerReview {
-            address: manifest.upgradeTimer,
-            initial_delay: package.lifecycle.timer_initial_delay,
-            governance: manifest.governance,
-            reported_governance: package.lifecycle.timer_governance,
-            owner: package.lifecycle.timer_owner,
-        },
-        salts,
         &mut reviewed,
     )
     .await?;
@@ -326,24 +301,9 @@ pub(crate) async fn verify<P: Provider>(
             manifest.coordinator
         ));
     }
-    let Some(reserved) = tolerate(
-        executor.activeOperation().call().await,
-        result,
-        "the executor's activeOperation()",
-    ) else {
-        return Ok(());
-    };
-    if reserved.is_zero() {
-        result.report_ok("the executor holds no reservation");
-    } else {
-        result.report_error(&format!(
-            "the executor is already reserved for operation {reserved}: the bootstrap edge hands \
-             a domain over that is mid-lifecycle"
-        ));
-    }
 
     // Every executor the edge binds answers to the manifest's governance with no nomination
-    // outstanding (`migrate()` refuses anything else), and the two bindings stage 1 sets are
+    // outstanding (`migrate()` refuses anything else), and the two bindings the bundle sets are
     // still unset or already the manifest's.
     let coordinator = EcosystemUpgradeExecutorView::new(manifest.coordinator, provider);
     let coordinator_owner = tolerate(
@@ -449,7 +409,7 @@ pub(crate) async fn verify<P: Provider>(
     // ── 4. The one-time ServerNotifier handover: a precondition of the edge, half of which
     //    governance cannot perform ──
     result.print_info("\n== Prerequisite: ServerNotifier handover ==");
-    let handover = verify_notifier_handover(provider, result, &manifest, &package.stage0).await?;
+    let handover = verify_notifier_handover(provider, result, &manifest, &package.calls).await?;
 
     // ── 5. The departing state the manifest asserts ──
     result.print_info("\n== Departing state ==");
@@ -495,8 +455,8 @@ pub(crate) async fn verify<P: Provider>(
         ));
     }
 
-    // Stage 1 nominates the migration as CTM owner; before the bundle nobody may be nominated,
-    // or the edge's own handover would be racing an outstanding one.
+    // The bundle nominates the migration as CTM owner; before it nobody may be nominated, or the
+    // edge's own handover would be racing an outstanding one.
     let Some(ctm_pending_owner) = tolerate(
         ctm.pendingOwner().call().await,
         result,
@@ -514,7 +474,7 @@ pub(crate) async fn verify<P: Provider>(
     }
 
     // Each CTM-domain row must depart from the implementation that is LIVE, not from whatever
-    // the prepare saw: a row at an unexpected implementation reverts stage 1 wholesale.
+    // the prepare saw: a row at an unexpected implementation reverts the bundle wholesale.
     let ctm_rows =
         participating_ctm_rows(&manifest.ctmProxyUpgrades, handover.under_ctm_proxy_admin);
     if ctm_rows.len() < participating_ctm_rows(&manifest.ctmProxyUpgrades, true).len() {
@@ -575,74 +535,25 @@ pub(crate) async fn verify<P: Provider>(
         result.report_ok("no core transition: this edge upgrades no shared singletons");
     }
 
-    // ── 8. The timer that gates the edge ──
-    result.print_info("\n== Stage sequencing ==");
-    let timer = GovernanceUpgradeTimerView::new(manifest.upgradeTimer, provider);
-    let Some(timer_governance) = tolerate(
-        timer.TIMER_GOVERNANCE().call().await,
-        result,
-        "the timer's TIMER_GOVERNANCE()",
-    ) else {
-        return Ok(());
-    };
-    if timer_governance == manifest.governance {
-        result.report_ok(
-            "the timer is governed by the manifest's governance, which owns the executors, so it \
-             can start the timer at stage 0",
-        );
-    } else if timer_governance == manifest.ctmExecutor {
-        result.report_error(
-            "the timer is governed by the bound executor: correct for a recurring upgrade, but \
-             at bootstrap stage 0 the executor does not hold the domain yet, so nobody can \
-             start this timer",
-        );
-    } else {
-        result.report_error(&format!(
-            "the timer is governed by {timer_governance}, which is neither the manifest's \
-             governance ({}) nor the executor itself: stage 0 could not start it",
-            manifest.governance
-        ));
-    }
-
-    // ── 9. The calldata governance will actually sign ──
+    // ── 8. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
-    // The pause/unpause calls land on the CTM's own ChainAssetHandler, which no manifest names;
-    // it is derived from the CTM's Bridgehub so a call to it counts as that contract rather than
-    // as an unexplained address. An unreadable hop is not silently tolerated: it just leaves the
-    // handler out of the edge's authorities, and the pause call then reports as undeclared —
-    // which is the honest outcome.
-    let chain_asset_handler = match ctm.BRIDGE_HUB().call().await {
-        Ok(bridgehub) => BridgehubView::new(bridgehub, provider)
-            .chainAssetHandler()
-            .call()
-            .await
-            .ok(),
-        Err(_) => None,
-    };
     let authorities = edge_authorities(
         &manifest,
         &bindings,
-        chain_asset_handler,
         sequence,
         package.core_transition,
         &reviewed,
     );
     verify_derived_sequence(provider, result, package, sequence, &authorities).await;
-    if let Some(sequence) = sequence {
-        result.print_info(&format!(
-            "  completion is not part of any stage bundle: `validateApplied()` on the sequence \
-             {sequence} is its own call after stage 2"
-        ));
-    }
 
     // A bootstrap edge legitimately declares external actions — the derived sequence itself
-    // rides as declared actions, and so do the merge's appends. They are the reviewable list,
-    // so they are PRINTED rather than flagged; what the stage check above flags is anything
+    // rides as declared actions, and so do the merge's extras. They are the reviewable list,
+    // so they are PRINTED rather than flagged; what the bundle check above flags is anything
     // that is neither derived nor declared, or that reaches an authority outside the sequence.
     if package.external_actions.is_empty() {
         result.report_warn(
             "the prepare declared NO external actions, which a bootstrap edge cannot be: its \
-             handovers and pause window are not describable by any object",
+             handovers are not describable by any object",
         );
     } else {
         result.print_info(&format!(
@@ -865,12 +776,13 @@ struct NotifierFacts {
 }
 
 /// The one-time ServerNotifier handover `RegistryBootstrapMigration.validate()` requires complete
-/// before stage 1 can run (see `docs/upgrade-stage-lifecycle.md`), read live.
+/// before `migrate()` can run (see "ServerNotifier: a one-time handover, then an ordinary
+/// CTM-domain proxy" in `docs/upgrade-operations.md`), read live.
 async fn verify_notifier_handover<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
     manifest: &views::BootstrapManifest,
-    stage0: &[GovernanceCall],
+    bundle: &[GovernanceCall],
 ) -> anyhow::Result<NotifierHandover> {
     let Some(row) = manifest
         .ctmProxyUpgrades
@@ -920,21 +832,22 @@ async fn verify_notifier_handover<P: Provider>(
             "the ServerNotifier's pending owner",
         ),
     };
-    Ok(judge_notifier_handover(result, &facts, manifest, stage0))
+    Ok(judge_notifier_handover(result, &facts, manifest, bundle))
 }
 
 /// The handover verdict over the live facts: anything short of a completed handover — or a
-/// nomination the derived stage 0 accepts — is an ERROR, because `migrate()` refuses it.
+/// nomination the bundle's derived first call accepts — is an ERROR, because `migrate()` refuses
+/// it.
 fn judge_notifier_handover(
     result: &mut VerificationResult,
     facts: &NotifierFacts,
     manifest: &views::BootstrapManifest,
-    stage0: &[GovernanceCall],
+    bundle: &[GovernanceCall],
 ) -> NotifierHandover {
     const MISSING: &str = "the ChainAdmin half of the ServerNotifier handover is missing: the \
                            prepare's `[ctm_admin_calls] server_notifier_handover` calls must be \
-                           executed by their live owners before the bundle, or stage 1's \
-                           `migrate()` refuses";
+                           executed by their live owners before the bundle, or its `migrate()` \
+                           refuses";
     let notifier = facts.notifier;
     let executor = manifest.ctmExecutor;
 
@@ -975,7 +888,7 @@ fn judge_notifier_handover(
     }
 
     let acceptance = notifier_acceptance(executor, notifier);
-    let stage0_accepts = stage0.iter().any(|call| {
+    let bundle_accepts = bundle.iter().any(|call| {
         call.target == acceptance.target
             && call.value == acceptance.value
             && call.data == acceptance.data
@@ -993,11 +906,12 @@ fn judge_notifier_handover(
                 )),
                 None => {}
             }
-            if stage0_accepts {
+            if bundle_accepts {
                 result.report_error(
-                    "stage 0 accepts the ServerNotifier ownership, which the CTM executor already \
-                     holds: `acceptOwnership` reverts for a caller that is not the pending owner, \
-                     so the bundle was prepared against an earlier state and stage 0 would fail",
+                    "the bundle accepts the ServerNotifier ownership, which the CTM executor \
+                     already holds: `acceptOwnership` reverts for a caller that is not the \
+                     pending owner, so the bundle was prepared against an earlier state and would \
+                     fail",
                 );
             }
         }
@@ -1006,16 +920,16 @@ fn judge_notifier_handover(
                 "the ServerNotifier's owner {owner} has nominated the CTM executor {executor}: the \
                  ChainAdmin half of the ownership handover is done"
             ));
-            if stage0_accepts {
+            if bundle_accepts {
                 result.report_ok(
-                    "stage 0 carries governance's acceptance of that nomination (`forward` on the \
-                     CTM executor)",
+                    "the bundle carries governance's acceptance of that nomination (`forward` on \
+                     the CTM executor)",
                 );
             } else {
                 result.report_error(
-                    "stage 0 does not carry governance's acceptance of the ServerNotifier \
+                    "the bundle does not carry governance's acceptance of the ServerNotifier \
                      nomination (`forward([acceptOwnership()])` on the CTM executor): the \
-                     nomination would stay unaccepted, and stage 1's `migrate()` refuses",
+                     nomination would stay unaccepted, and its `migrate()` refuses",
                 );
             }
         }
@@ -1031,7 +945,7 @@ fn judge_notifier_handover(
     }
 }
 
-/// The stage-0 call through which governance accepts the ServerNotifier ownership the ChainAdmin
+/// The bundle call through which governance accepts the ServerNotifier ownership the ChainAdmin
 /// nominated the CTM executor for: `ctmExecutor.forward([notifier.acceptOwnership()])`.
 fn notifier_acceptance(ctm_executor: Address, notifier: Address) -> GovernanceCall {
     let accept = BootstrapCall {
@@ -1138,8 +1052,8 @@ async fn verify_core_transition_construction<P: Provider>(
 
 /// The bootstrap sequence over this edge, DERIVED rather than read from the package: the address
 /// the deterministic factory gives the reviewed creation code over the migration (recovered from
-/// stage 1's `migrate()`) and the package's core transition, under a reviewed salt. Code there is
-/// the reviewed constructor having run on exactly those arguments, so the package has no say in
+/// the bundle's `migrate()`) and the package's core transition, under a reviewed salt. Code there
+/// is the reviewed constructor having run on exactly those arguments, so the package has no say in
 /// which oracle its bundle is compared against.
 ///
 /// Returns the first derived address that holds code, and nothing when none does.
@@ -1155,8 +1069,8 @@ async fn locate_sequence<P: Provider>(
     let Some(core_transition) = package.core_transition else {
         result.report_error(&format!(
             "{label}: the package names no core transition, but the sequence is constructed over \
-             the edge's core transition, so its address cannot be derived and the stage lists it \
-             derives cannot be read"
+             the edge's core transition, so its address cannot be derived and the list it derives \
+             cannot be read"
         ));
         return Ok(None);
     };
@@ -1191,15 +1105,15 @@ async fn locate_sequence<P: Provider>(
     }
     result.report_error(&format!(
         "{label} is not deployed: the reviewed RegistryBootstrapSequence over migration {} and \
-         core transition {core_transition} lands at {}, and none of them holds code — the stage \
-         lists cannot be read, so the bundle cannot be held against anything",
+         core transition {core_transition} lands at {}, and none of them holds code — the list it \
+         derives cannot be read, so the bundle cannot be held against anything",
         package.migration,
         derived.join("; ")
     ));
     Ok(None)
 }
 
-/// A storage binding stage 1 sets through `setter`: unset, or already the manifest's.
+/// A storage binding the bundle sets through `setter`: unset, or already the manifest's.
 fn expect_bound_or_unset(
     result: &mut VerificationResult,
     label: &str,
@@ -1212,12 +1126,13 @@ fn expect_bound_or_unset(
             result.report_ok(&format!("{label} is already the manifest's {expected}"))
         }
         Some(bound) if bound.is_zero() => result.report_ok(&format!(
-            "{label} is unset: stage 1 sets it to {expected} ({setter}, in the derived sequence)"
+            "{label} is unset: the bundle sets it to {expected} ({setter}, in the derived \
+             sequence)"
         )),
         Some(bound) => result.report_error(&format!(
             "{label} is {bound}, not the manifest's {expected}: the objects this edge binds are \
-             fresh, so the binding means one of them is already in use elsewhere — stage 1 would \
-             re-point it ({setter}) or revert"
+             fresh, so the binding means one of them is already in use elsewhere — the bundle \
+             would re-point it ({setter}) or revert"
         )),
         None => {}
     }
@@ -1259,15 +1174,14 @@ fn expect_owner_and_no_nomination(
 
 /// Every address the edge's calls may legitimately reach, each with the role a reviewer reads
 /// it under: the objects this run established, the live contracts the manifest names, and the
-/// two derived from them (the ecosystem `ProxyAdmin`, the chain asset handler).
+/// ecosystem `ProxyAdmin` derived from them.
 ///
 /// The derived sequence is the complete list of what the edge needs from these; a call to any
-/// of them outside that list is authority the review never saw, so
-/// [`verify_stage`] refuses it whether the package declares it or not.
+/// of them outside that list is authority the review never saw, so [`verify_bundle`] refuses it
+/// whether the package declares it or not.
 fn edge_authorities(
     manifest: &views::BootstrapManifest,
     bindings: &LifecycleBindings,
-    chain_asset_handler: Option<Address>,
     sequence: Option<Address>,
     core_transition: Option<Address>,
     reviewed: &BTreeMap<Address, String>,
@@ -1291,7 +1205,6 @@ fn edge_authorities(
         Some(manifest.coordinator),
         "the coordinator the manifest names",
     );
-    note(Some(manifest.upgradeTimer), "the timer the manifest names");
     note(
         Some(manifest.currentRelease),
         "the release the manifest names",
@@ -1305,15 +1218,11 @@ fn edge_authorities(
         "the ecosystem ProxyAdmin the core executor names",
     );
     note(core_transition, "the core transition");
-    note(
-        chain_asset_handler,
-        "the ChainAssetHandler the CTM's Bridgehub names",
-    );
     note(sequence, "the bootstrap sequence over this edge");
     authorities
 }
 
-/// Compares each stage of the bundle against the list `RegistryBootstrapSequence` derives.
+/// Compares the bundle against the list `RegistryBootstrapSequence.actions()` derives.
 ///
 /// # This comparison is TRANSITIONAL SCAFFOLDING, and must not be generalised
 ///
@@ -1323,10 +1232,10 @@ fn edge_authorities(
 /// only comparing them does.
 ///
 /// Every LATER upgrade is a recurring operation, where governance signs
-/// `coordinator.stageN(operation)` and the executors derive everything else on chain. That path
+/// `coordinator.execute(operation)` and the executors derive everything else on chain. That path
 /// needs no list comparison and must not grow one: see
-/// [`operation::verify_stage_calls`](super::operation). Do not build new machinery on top of this
-/// function — when the bootstrap edge is behind us, it goes.
+/// [`operation::verify_execute_call`](super::operation). Do not build new machinery on top of
+/// this function — when the bootstrap edge is behind us, it goes.
 ///
 /// `sequence` is the address [`locate_sequence`] derived from the reviewed migration and core
 /// transition; with none, no list is consulted.
@@ -1340,70 +1249,77 @@ async fn verify_derived_sequence<P: Provider>(
     let Some(sequence_addr) = sequence else {
         result.report_error(
             "the bootstrap sequence over this edge is not established, so the calls it derives \
-             are not consulted and the submitted stage calls cannot be held against anything: \
-             the bundle is unreviewed",
+             are not consulted and the submitted bundle cannot be held against anything: the \
+             bundle is unreviewed",
         );
         return;
     };
-    let sequence = views::RegistryBootstrapSequenceView::new(sequence_addr, provider);
-    for (stage, submitted) in [
-        (0usize, &package.stage0),
-        (1, &package.stage1),
-        (2, &package.stage2),
-    ] {
-        let derived = match stage {
-            0 => sequence.stage0Actions().call().await,
-            1 => sequence.stage1Actions().call().await,
-            _ => sequence.stage2Actions().call().await,
-        };
-        let derived = match derived {
-            Ok(actions) => actions,
-            Err(e) => {
-                result.report_error(&format!(
-                    "the sequence at {sequence_addr} does not answer `stage{stage}Actions()` \
-                     ({e}): the submitted stage-{stage} calls cannot be held against the list it \
-                     derives"
-                ));
-                continue;
-            }
-        };
-        verify_stage(
-            stage,
-            submitted,
-            &derived,
-            &package.external_actions,
-            authorities,
-            result,
-        );
-    }
+    let derived = match views::RegistryBootstrapSequenceView::new(sequence_addr, provider)
+        .actions()
+        .call()
+        .await
+    {
+        Ok(actions) => actions,
+        Err(e) => {
+            result.report_error(&format!(
+                "the sequence at {sequence_addr} does not answer `actions()` ({e}): the submitted \
+                 bundle cannot be held against the list it derives"
+            ));
+            return;
+        }
+    };
+    verify_bundle(
+        &package.calls,
+        &derived,
+        &package.external_actions,
+        authorities,
+        package.migration,
+        result,
+    );
 }
 
-/// One stage of the bundle against the list the (construction-verified) sequence derives for it.
+/// The bundle against the list the (construction-verified) sequence derives.
 ///
-/// The derived calls must appear as one contiguous run, in order and one-for-one: the edge's
-/// own steps depend on each other (the pause before the version commit, the handovers before
-/// `migrate()`). Around that run the merge may append — the governance-set wiring, a Gateway
-/// bring-up — and every such call is held to the rule the recurring path enforces: it must be a
-/// declared external action of this phase, or it is an ERROR. One rule is stricter here. The
-/// derived run is the COMPLETE list of what the edge needs from its authorities (the CTM, both
-/// ProxyAdmins, the executors, the timer, the objects), so a call to any of them outside the run
-/// is an ERROR whether declared or not: a `transferOwnership` nomination, a `setCoordinator`, a
-/// `forward` appended after the legitimate calls is exactly how a bundle would carry authority
-/// governance never reviewed, and `validateApplied()` on chain now refuses a pending nomination
-/// for the same reason.
-fn verify_stage(
-    stage: usize,
+/// The derived calls must appear as one contiguous run, in order and one-for-one, that ENDS the
+/// bundle: the edge's own steps depend on each other (the handovers before `migrate()`), and its
+/// last call is the completion check `validateApplied()` on the migration, so nothing may follow
+/// it. Ahead of that run the merge may prepend its extras — the governance-set wiring, the CTM
+/// `acceptOwnership()` normalization — and every such call is held to the rule the recurring path
+/// enforces: it must be a declared governance external action, or it is an ERROR. One rule is
+/// stricter here. The derived run is the COMPLETE list of what the edge needs from its
+/// authorities (the CTM, both ProxyAdmins, the executors, the objects), so a call to any of them
+/// outside the run is an ERROR whether declared or not: a `transferOwnership` nomination, a
+/// `setCoordinator`, a `forward` added beside the legitimate calls is exactly how a bundle would
+/// carry authority governance never reviewed, and `validateApplied()` on chain refuses a pending
+/// nomination for the same reason.
+fn verify_bundle(
     submitted: &[GovernanceCall],
     derived: &[views::BootstrapAction],
     declared: &[ExternalAction],
     authorities: &BTreeMap<Address, String>,
+    migration: Address,
     result: &mut VerificationResult,
 ) {
+    let completion = RegistryBootstrapMigrationView::validateAppliedCall {}.abi_encode();
+    match derived.last() {
+        Some(last) if last.call.target == migration && last.call.data[..] == completion[..] => {
+            result.report_ok(&format!(
+                "the derived sequence ends with `validateApplied()` on the migration {migration}: \
+                 a failing completion check reverts the whole bootstrap bundle"
+            ))
+        }
+        Some(_) => result.report_error(&format!(
+            "the derived sequence does not end with `validateApplied()` on the migration \
+             {migration}, which every bootstrap bundle does: the sequence is not describing this \
+             edge"
+        )),
+        None => result.report_error(
+            "the sequence derives no calls, which no bootstrap edge does: the sequence is not \
+             describing this edge",
+        ),
+    }
+
     let run = if derived.is_empty() {
-        result.report_error(&format!(
-            "the sequence derives no calls for stage {stage}, which no bootstrap edge does: the \
-             sequence is not describing this edge"
-        ));
         None
     } else {
         submitted.windows(derived.len()).position(|window| {
@@ -1417,8 +1333,8 @@ fn verify_stage(
     match run {
         Some(at) => {
             result.report_ok(&format!(
-                "stage {stage} carries the {} call(s) the sequence derives, in order (at offset \
-                 {at} of {} submitted)",
+                "the bundle carries the {} call(s) the sequence derives, in order (at offset {at} \
+                 of {} submitted)",
                 derived.len(),
                 submitted.len()
             ));
@@ -1428,9 +1344,16 @@ fn verify_stage(
                     action.label, action.call.target, action.authority
                 ));
             }
+            let trailing = submitted.len() - (at + derived.len());
+            if trailing > 0 {
+                result.report_error(&format!(
+                    "{trailing} call(s) follow the derived run: the run must end the bundle, \
+                     whose last call is the completion check"
+                ));
+            }
         }
         None if !derived.is_empty() => result.report_error(&format!(
-            "stage {stage}'s {} submitted call(s) do not contain the {} call(s) the sequence \
+            "the bundle's {} submitted call(s) do not contain the {} call(s) the sequence \
              derives, in order: governance would sign a bundle the reviewed edge does not describe",
             submitted.len(),
             derived.len()
@@ -1440,7 +1363,6 @@ fn verify_stage(
 
     let in_run = |index: usize| run.is_some_and(|at| (at..at + derived.len()).contains(&index));
     let mut extras = 0usize;
-    let phase = stage.to_string();
     for (index, call) in submitted.iter().enumerate() {
         if in_run(index) {
             continue;
@@ -1449,7 +1371,7 @@ fn verify_stage(
         if let Some(what) = authorities.get(&call.target) {
             extras += 1;
             result.report_error(&format!(
-                "stage {stage} calls {what} ({}) with selector 0x{selector} outside the derived \
+                "the bundle calls {what} ({}) with selector 0x{selector} outside the derived \
                  sequence: the edge's authorities take exactly the derived calls, so an extra \
                  one — a `transferOwnership` nomination, a `setCoordinator`, a `forward` — is \
                  authority the review never saw, whether or not the package declares it",
@@ -1459,17 +1381,17 @@ fn verify_stage(
         }
         match declared
             .iter()
-            .find(|action| action.phase == phase && action.is_call(call))
+            .find(|action| action.phase == GOVERNANCE_PHASE && action.is_call(call))
         {
             Some(action) => result.print_info(&format!(
-                "  stage {stage} -> declared external action `{}` on {} (selector 0x{selector})",
+                "  bundle -> declared external action `{}` on {} (selector 0x{selector})",
                 action.label, call.target
             )),
             None => {
                 extras += 1;
                 result.report_error(&format!(
-                    "stage {stage} calls {} (selector 0x{selector}), which is neither derived by \
-                     the sequence nor a declared external action: the bundle carries an \
+                    "the bundle calls {} (selector 0x{selector}), which is neither derived by the \
+                     sequence nor a declared governance external action: the bundle carries an \
                      instruction no part of this review accounts for",
                     call.target
                 ));
@@ -1477,10 +1399,10 @@ fn verify_stage(
         }
     }
     if extras == 0 && run.is_some() {
-        result.report_ok(&format!(
-            "stage {stage}: every submitted call is derived by the sequence or a declared \
-             external action to a target outside the edge's authorities"
-        ));
+        result.report_ok(
+            "every submitted call is derived by the sequence or a declared external action to a \
+             target outside the edge's authorities",
+        );
     }
 }
 
@@ -1515,7 +1437,6 @@ mod tests {
             coreExecutor: Address::repeat_byte(0x67),
             governance: Address::repeat_byte(0x66),
             coordinator: Address::repeat_byte(0x77),
-            upgradeTimer: Address::repeat_byte(0x88),
         };
         let encoded = manifest.abi_encode();
         assert_eq!(
@@ -1530,18 +1451,17 @@ mod tests {
         );
     }
 
-    // ───────────────────────── the stage rule ─────────────────────────
+    // ───────────────────────── the bundle rule ─────────────────────────
     //
-    // A stage-1 bundle shaped like the one `RegistryBootstrapSequence.stage1Actions` derives,
-    // over synthetic addresses, so the rule can be driven without a chain: the derived run, the
-    // authorities it touches, and what may or may not sit beside it.
+    // A bundle shaped like the one `RegistryBootstrapSequence.actions()` derives, over synthetic
+    // addresses, so the rule can be driven without a chain: the derived run, the authorities it
+    // touches, and what may or may not sit beside it.
 
     const CTM: Address = Address::repeat_byte(0x01);
     const CTM_ADMIN: Address = Address::repeat_byte(0x02);
     const ECO_ADMIN: Address = Address::repeat_byte(0x03);
     const CORE_EXECUTOR: Address = Address::repeat_byte(0x04);
     const MIGRATION: Address = Address::repeat_byte(0x05);
-    const CAH: Address = Address::repeat_byte(0x06);
     const PUH: Address = Address::repeat_byte(0x07);
     const COORDINATOR: Address = Address::repeat_byte(0x0C);
     const ATTACKER: Address = Address::repeat_byte(0xBA);
@@ -1573,15 +1493,14 @@ mod tests {
         }
     }
 
-    fn derived_stage1() -> Vec<views::BootstrapAction> {
+    fn completion_check() -> Vec<u8> {
+        views::RegistryBootstrapMigrationView::validateAppliedCall {}.abi_encode()
+    }
+
+    fn derived_bundle() -> Vec<views::BootstrapAction> {
         vec![
             action(
-                "re-assert the migration pause",
-                CAH,
-                vec![0xaa, 0xbb, 0xcc, 0xdd],
-            ),
-            action(
-                "bind the core executor to the lifecycle coordinator",
+                "bind the core executor to the coordinator",
                 CORE_EXECUTOR,
                 vec![0x55, 0x66, 0x77, 0x88],
             ),
@@ -1615,6 +1534,7 @@ mod tests {
                 MIGRATION,
                 super::super::package::MIGRATE_SELECTOR.to_vec(),
             ),
+            action("check the edge completed", MIGRATION, completion_check()),
         ]
     }
 
@@ -1630,8 +1550,7 @@ mod tests {
         derived
             .iter()
             .map(|a| {
-                ExternalAction::for_stage(
-                    1,
+                ExternalAction::governance(
                     a.label.clone(),
                     a.authority.clone(),
                     &call(a.call.target, a.call.data.to_vec()),
@@ -1648,29 +1567,36 @@ mod tests {
             (CORE_EXECUTOR, "the core executor"),
             (COORDINATOR, "the coordinator"),
             (MIGRATION, "the bootstrap migration"),
-            (CAH, "the ChainAssetHandler"),
         ]
         .into_iter()
         .map(|(a, s)| (a, s.to_string()))
         .collect()
     }
 
-    fn run(submitted: &[GovernanceCall], declared: &[ExternalAction]) -> VerificationResult {
+    fn run_with(
+        submitted: &[GovernanceCall],
+        derived: &[views::BootstrapAction],
+        declared: &[ExternalAction],
+    ) -> VerificationResult {
         let mut result = VerificationResult::default();
-        verify_stage(
-            1,
+        verify_bundle(
             submitted,
-            &derived_stage1(),
+            derived,
             declared,
             &authorities(),
+            MIGRATION,
             &mut result,
         );
         result
     }
 
+    fn run(submitted: &[GovernanceCall], declared: &[ExternalAction]) -> VerificationResult {
+        run_with(submitted, &derived_bundle(), declared)
+    }
+
     #[test]
     fn the_derived_run_alone_passes() {
-        let derived = derived_stage1();
+        let derived = derived_bundle();
         let result = run(&submitted_from(&derived), &declared_from(&derived));
         assert_eq!(result.errors, 0);
         assert_eq!(result.warnings, 0);
@@ -1678,30 +1604,29 @@ mod tests {
 
     /// THE finding: `coreExecutor.transferOwnership(attacker)` appended after the legitimate
     /// run. The address is known (it takes two derived calls earlier in the run), the selector
-    /// is one the run itself uses, and on chain `validateApplied()` never looked at
-    /// `pendingOwner()` — the nominee accepts after the bundle and owns the ecosystem domain.
+    /// is one the run itself uses, and the nominee would accept after the bundle and own the
+    /// ecosystem domain. It also sits after the completion check, which must end the bundle.
     #[test]
     fn a_nomination_appended_after_the_run_fails() {
-        let derived = derived_stage1();
+        let derived = derived_bundle();
         let mut submitted = submitted_from(&derived);
         submitted.push(call(CORE_EXECUTOR, transfer_ownership(ATTACKER)));
         let result = run(&submitted, &declared_from(&derived));
-        assert_eq!(result.errors, 1);
+        assert_eq!(result.errors, 2);
         assert!(result.ensure_success().is_err());
     }
 
-    /// Declaring the appended nomination does not launder it: an authority takes exactly the
-    /// derived calls, and the package author controls the declarations.
+    /// Declaring the nomination does not launder it: an authority takes exactly the derived
+    /// calls, and the package author controls the declarations.
     #[test]
     fn a_declared_nomination_on_an_authority_still_fails() {
-        let derived = derived_stage1();
+        let derived = derived_bundle();
         let extra = call(CORE_EXECUTOR, transfer_ownership(ATTACKER));
-        let mut submitted = submitted_from(&derived);
-        submitted.push(extra.clone());
+        let mut submitted = vec![extra.clone()];
+        submitted.extend(submitted_from(&derived));
         let mut declared = declared_from(&derived);
-        declared.push(ExternalAction::for_stage(
-            1,
-            "re-assert the migration pause",
+        declared.push(ExternalAction::governance(
+            "bind the core executor",
             "governance",
             &extra,
         ));
@@ -1714,12 +1639,12 @@ mod tests {
     /// not benign for being aimed at a known address.
     #[test]
     fn any_extra_call_to_an_authority_fails() {
-        let derived = derived_stage1();
+        let derived = derived_bundle();
         for (target, data) in [
             (CTM, transfer_ownership(ATTACKER)),
             (CTM_ADMIN, vec![0xde, 0xad, 0xbe, 0xef]),
             (MIGRATION, vec![0x01, 0x02, 0x03, 0x04]),
-            (CAH, vec![0xaa, 0xbb, 0xcc, 0xdd]),
+            (COORDINATOR, vec![0xaa, 0xbb, 0xcc, 0xdd]),
         ] {
             let mut submitted = submitted_from(&derived);
             submitted.insert(0, call(target, data));
@@ -1728,17 +1653,16 @@ mod tests {
         }
     }
 
-    /// What the merge legitimately appends — the governance-set wiring on the PUH — is a
+    /// What the merge legitimately prepends — the governance-set wiring on the PUH — is a
     /// declared action to a target outside the edge's authorities, and rides along.
     #[test]
-    fn a_declared_append_outside_the_authorities_rides_along() {
-        let derived = derived_stage1();
+    fn a_declared_prefix_outside_the_authorities_rides_along() {
+        let derived = derived_bundle();
         let wiring = call(PUH, vec![0x99, 0x88, 0x77, 0x66]);
         let mut submitted = vec![wiring.clone()];
         submitted.extend(submitted_from(&derived));
         let mut declared = declared_from(&derived);
-        declared.push(ExternalAction::for_stage(
-            1,
+        declared.push(ExternalAction::governance(
             "wire the new governance set",
             "governance",
             &wiring,
@@ -1747,30 +1671,42 @@ mod tests {
         assert_eq!(result.errors, 0);
     }
 
-    /// The same append UNDECLARED is the recurring path's rule, applied here too.
+    /// The same prefix UNDECLARED is the recurring path's rule, applied here too.
     #[test]
-    fn an_undeclared_append_outside_the_authorities_fails() {
-        let derived = derived_stage1();
-        let mut submitted = submitted_from(&derived);
-        submitted.push(call(PUH, vec![0x99, 0x88, 0x77, 0x66]));
+    fn an_undeclared_prefix_outside_the_authorities_fails() {
+        let derived = derived_bundle();
+        let mut submitted = vec![call(PUH, vec![0x99, 0x88, 0x77, 0x66])];
+        submitted.extend(submitted_from(&derived));
         let result = run(&submitted, &declared_from(&derived));
         assert_eq!(result.errors, 1);
     }
 
-    /// A declaration counts for its own phase only.
+    /// Nothing may follow the completion check, not even a declared call outside the
+    /// authorities: the check is the bundle's last word on whether the edge completed.
     #[test]
-    fn a_declaration_from_another_phase_does_not_count() {
-        let derived = derived_stage1();
+    fn a_declared_call_after_the_completion_check_fails() {
+        let derived = derived_bundle();
         let wiring = call(PUH, vec![0x99, 0x88, 0x77, 0x66]);
         let mut submitted = submitted_from(&derived);
         submitted.push(wiring.clone());
         let mut declared = declared_from(&derived);
-        declared.push(ExternalAction::for_stage(
-            0,
-            "wiring",
-            "governance",
-            &wiring,
-        ));
+        declared.push(ExternalAction::governance("wiring", "governance", &wiring));
+        let result = run(&submitted, &declared);
+        assert_eq!(result.errors, 1);
+    }
+
+    /// An `admin` declaration rides no governance bundle, so it does not account for a call in
+    /// one.
+    #[test]
+    fn an_admin_declaration_does_not_count() {
+        let derived = derived_bundle();
+        let wiring = call(PUH, vec![0x99, 0x88, 0x77, 0x66]);
+        let mut submitted = vec![wiring.clone()];
+        submitted.extend(submitted_from(&derived));
+        let mut declared = declared_from(&derived);
+        let mut admin = ExternalAction::governance("wiring", "governance", &wiring);
+        admin.phase = "admin".to_string();
+        declared.push(admin);
         let result = run(&submitted, &declared);
         assert_eq!(result.errors, 1);
     }
@@ -1778,22 +1714,48 @@ mod tests {
     /// The run must be contiguous and in order: the handovers before `migrate()`.
     #[test]
     fn a_reordered_run_fails() {
-        let derived = derived_stage1();
+        let derived = derived_bundle();
         let mut submitted = submitted_from(&derived);
-        submitted.swap(6, 7);
+        submitted.swap(5, 6);
         let result = run(&submitted, &declared_from(&derived));
         assert!(result.errors >= 1);
         assert!(result.ensure_success().is_err());
     }
 
-    /// A derived call missing from the bundle is not a run at all.
+    /// A derived call missing from the bundle is not a run at all — the completion check
+    /// included.
     #[test]
     fn a_dropped_derived_call_fails() {
-        let derived = derived_stage1();
-        let mut submitted = submitted_from(&derived);
-        submitted.remove(2);
-        let result = run(&submitted, &declared_from(&derived));
-        assert!(result.errors >= 1);
+        let derived = derived_bundle();
+        for dropped in [2, derived.len() - 1] {
+            let mut submitted = submitted_from(&derived);
+            submitted.remove(dropped);
+            let result = run(&submitted, &declared_from(&derived));
+            assert!(result.errors >= 1, "dropping call {dropped} must fail");
+        }
+    }
+
+    /// A sequence whose list does not end in `validateApplied()` on the migration is not the
+    /// reviewed bootstrap sequence describing this edge, even when the bundle matches it.
+    #[test]
+    fn a_sequence_not_ending_in_the_completion_check_fails() {
+        let mut derived = derived_bundle();
+        derived.pop();
+        let result = run_with(
+            &submitted_from(&derived),
+            &derived,
+            &declared_from(&derived),
+        );
+        assert_eq!(result.errors, 1);
+
+        let mut elsewhere = derived_bundle();
+        elsewhere.last_mut().unwrap().call.target = ATTACKER;
+        let result = run_with(
+            &submitted_from(&elsewhere),
+            &elsewhere,
+            &declared_from(&elsewhere),
+        );
+        assert_eq!(result.errors, 1);
     }
 
     // ───────────────────────── the sequence as an oracle ─────────────────────────
@@ -1821,7 +1783,6 @@ mod tests {
         BootstrapPackage {
             core_transition: Some(CORE_TRANSITION),
             release: Address::repeat_byte(0x09),
-            upgrade_timer: None,
             migration: MIGRATION,
             reported_migration: None,
             reported_coordinator: None,
@@ -1829,9 +1790,7 @@ mod tests {
             reported_ctm: None,
             reported_ctm_proxy_admin: None,
             ctm_key: "zksync_os".to_string(),
-            stage0: Vec::new(),
-            stage1: Vec::new(),
-            stage2: Vec::new(),
+            calls: Vec::new(),
             external_actions: Vec::new(),
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
@@ -1875,25 +1834,18 @@ mod tests {
 
     /// The oracle the bundle is compared against is DERIVED from the reviewed creation code over
     /// the migration and core transition, never read from the package — so it is established by
-    /// construction, and only then are its lists read and the bundle held against them.
+    /// construction, and only then is its list read and the bundle held against it.
     #[tokio::test]
     async fn the_derived_sequence_is_established_and_then_consulted() {
         let genuine = genuine_sequence(SALT);
         let mut package = package();
-        let derived = [
-            vec![action("pause", CAH, vec![0xaa, 0xbb, 0xcc, 0xdd])],
-            derived_stage1(),
-            vec![action("unpause", CAH, vec![0xdd, 0xcc, 0xbb, 0xaa])],
-        ];
-        package.stage0 = submitted_from(&derived[0]);
-        package.stage1 = submitted_from(&derived[1]);
-        package.stage2 = submitted_from(&derived[2]);
+        let derived = derived_bundle();
+        package.calls = submitted_from(&derived);
+        package.external_actions = declared_from(&derived);
 
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from_static(&[0x60, 0x00])); // code at the derived address
-        for stage in &derived {
-            asserter.push_success(&Bytes::from(stage.abi_encode()));
-        }
+        asserter.push_success(&Bytes::from(derived.abi_encode()));
         let (sequence, mut result, reviewed) = locate(&asserter, &package, &[SALT]).await;
         assert_eq!(sequence, Some(genuine));
         assert_eq!(reviewed.len(), 1);
@@ -1902,7 +1854,7 @@ mod tests {
         let mut authorities = authorities();
         authorities.insert(genuine, "the bootstrap sequence".to_string());
         verify_derived_sequence(&provider, &mut result, &package, sequence, &authorities).await;
-        assert!(asserter.read_q().is_empty(), "all three lists were read");
+        assert!(asserter.read_q().is_empty(), "the list was read");
         assert_eq!(
             result.errors, 0,
             "a bundle that IS the derived sequence passes"
@@ -1922,16 +1874,14 @@ mod tests {
     }
 
     /// Nothing deployed at the derived address: an error, and no list is ever read — the queued
-    /// stage-list answers stay unconsumed.
+    /// list answer stays unconsumed.
     #[tokio::test]
     async fn an_undeployed_sequence_is_never_consulted() {
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::new());
-        for _ in 0..3 {
-            asserter.push_success(&Bytes::from(
-                Vec::<views::BootstrapAction>::new().abi_encode(),
-            ));
-        }
+        asserter.push_success(&Bytes::from(
+            Vec::<views::BootstrapAction>::new().abi_encode(),
+        ));
         let package = package();
         let (sequence, mut result, reviewed) = locate(&asserter, &package, &[SALT]).await;
         assert_eq!(sequence, None);
@@ -1940,7 +1890,7 @@ mod tests {
 
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         verify_derived_sequence(&provider, &mut result, &package, sequence, &BTreeMap::new()).await;
-        assert_eq!(asserter.read_q().len(), 3, "no stage list may be read");
+        assert_eq!(asserter.read_q().len(), 1, "no list may be read");
         assert_eq!(result.errors, 2);
     }
 
@@ -1955,29 +1905,11 @@ mod tests {
         assert_eq!(result.errors, 1);
     }
 
-    /// The completion check is its own call after stage 2. A bundle still carrying it as a
-    /// stage-2 call (the old terminal gate) calls the sequence outside the derived run.
-    #[test]
-    fn a_completion_check_inside_stage_two_is_an_extra_authority_call() {
-        let sequence = genuine_sequence(SALT);
-        let unpause = action("unpause", CAH, vec![0xdd, 0xcc, 0xbb, 0xaa]);
-        let mut submitted = submitted_from(std::slice::from_ref(&unpause));
-        submitted.push(call(
-            sequence,
-            views::RegistryBootstrapMigrationView::validateAppliedCall {}.abi_encode(),
-        ));
-        let mut authorities = authorities();
-        authorities.insert(sequence, "the bootstrap sequence".to_string());
-        let mut result = VerificationResult::default();
-        verify_stage(2, &submitted, &[unpause], &[], &authorities, &mut result);
-        assert_eq!(result.errors, 1);
-    }
-
     // ───────────────────────── the ServerNotifier handover ─────────────────────────
     //
     // The facts as the chain reports them at review time, judged against a manifest whose
     // mandatory notifier row names NOTIFIER. Every state short of "complete", or "nominated and
-    // accepted by the derived stage 0", must be an error: `migrate()` refuses it.
+    // accepted by the bundle's derived first call", must be an error: `migrate()` refuses it.
 
     const NOTIFIER: Address = Address::repeat_byte(0x2A);
     const CTM_EXECUTOR: Address = Address::repeat_byte(0x2B);
@@ -2024,7 +1956,6 @@ mod tests {
             coreExecutor: Address::repeat_byte(0x67),
             governance: Address::repeat_byte(0x66),
             coordinator: Address::repeat_byte(0x77),
-            upgradeTimer: Address::repeat_byte(0x88),
         }
     }
 
@@ -2044,14 +1975,14 @@ mod tests {
         }
     }
 
-    fn judge(facts: &NotifierFacts, stage0: &[GovernanceCall]) -> (VerificationResult, bool) {
+    fn judge(facts: &NotifierFacts, bundle: &[GovernanceCall]) -> (VerificationResult, bool) {
         let mut result = VerificationResult::default();
         let verdict =
-            judge_notifier_handover(&mut result, facts, &manifest_with(notifier_row()), stage0);
+            judge_notifier_handover(&mut result, facts, &manifest_with(notifier_row()), bundle);
         (result, verdict.under_ctm_proxy_admin)
     }
 
-    fn accepting_stage0() -> Vec<GovernanceCall> {
+    fn accepting_bundle() -> Vec<GovernanceCall> {
         vec![notifier_acceptance(CTM_EXECUTOR, NOTIFIER)]
     }
 
@@ -2064,11 +1995,11 @@ mod tests {
     }
 
     /// The ChainAdmin moved the proxy and nominated the executor; governance's acceptance is the
-    /// first derived stage-0 call, and the bundle carries it.
+    /// bundle's first derived call, and the bundle carries it.
     #[test]
     fn a_nomination_the_bundle_accepts_passes() {
         let facts = notifier_facts(CHAIN_ADMIN, CTM_EXECUTOR, CTM_ADMIN);
-        let (result, readable) = judge(&facts, &accepting_stage0());
+        let (result, readable) = judge(&facts, &accepting_bundle());
         assert_eq!(result.errors, 0);
         assert!(readable);
     }
@@ -2087,18 +2018,18 @@ mod tests {
     #[test]
     fn the_untouched_v34_notifier_is_the_missing_chain_admin_half() {
         let facts = notifier_facts(DEPLOYER, CHAIN_ADMIN, OLD_NOTIFIER_ADMIN);
-        let (result, readable) = judge(&facts, &accepting_stage0());
+        let (result, readable) = judge(&facts, &accepting_bundle());
         assert_eq!(result.errors, 2);
         assert!(!readable);
         assert!(result.ensure_success().is_err());
     }
 
     /// The bundle was prepared while the nomination was pending, and governance accepted
-    /// outside it since: stage 0 would revert on its own first call.
+    /// outside it since: the bundle would revert on its own first derived call.
     #[test]
     fn an_acceptance_of_an_already_accepted_ownership_fails() {
         let facts = notifier_facts(CTM_EXECUTOR, Address::ZERO, CTM_ADMIN);
-        let (result, _) = judge(&facts, &accepting_stage0());
+        let (result, _) = judge(&facts, &accepting_bundle());
         assert_eq!(result.errors, 1);
     }
 
@@ -2118,8 +2049,8 @@ mod tests {
         assert_eq!(result.errors, 2);
     }
 
-    /// The acceptance is `RegistryBootstrapSequence.stage0Actions`' first call:
-    /// `forward(Call[])` on the executor wrapping `acceptOwnership()` on the notifier.
+    /// The acceptance is `RegistryBootstrapSequence.actions()`' first call while the handover is
+    /// pending: `forward(Call[])` on the executor wrapping `acceptOwnership()` on the notifier.
     #[test]
     fn the_acceptance_forwards_accept_ownership_to_the_notifier() {
         let call = notifier_acceptance(CTM_EXECUTOR, NOTIFIER);

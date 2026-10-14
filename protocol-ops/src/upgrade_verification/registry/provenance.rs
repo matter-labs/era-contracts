@@ -12,7 +12,7 @@
 //! `AllContractsHashes.json` records the ARTIFACT's deployed bytecode, whose immutable slots
 //! are zero. A contract that sets immutables in its constructor therefore never hashes to its
 //! own artifact once deployed, and a hash lookup for it misses by construction. Such a contract
-//! — the executors, the timer, the bootstrap sequence — gets NO identity check from this module:
+//! — the executors and the bootstrap sequence — gets NO identity check from this module:
 //! it is identified by its construction alone (`construction::expect_canonical_construction`
 //! from its reviewed constructor arguments), which covers its immutables and its storage at
 //! once. An earlier primitive accepted such an object on its getters answering the reviewed

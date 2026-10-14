@@ -50,13 +50,11 @@ pub struct PrepareInputs {
     /// Optional CREATE2 salt for the Core prepare; random if `None`.
     pub create2_factory_salt: Option<B256>,
     /// Optional per-CTM CREATE2 salts. Keyed by CTM proxy address. Each CTM
-    /// prepare must use a distinct salt because the contracts it deploys
-    /// (notably `GovernanceUpgradeTimer`) have env-wide identical constructor
-    /// args — same salt + same factory + same init code → same address →
-    /// gov-replay's second `startTimer()` would revert. Supplied via the
-    /// `[create2_factory_salts]` table in `upgrade-envs/<release-env-dir>/
-    /// <env>.toml`; missing entries fall back to a random salt (legacy
-    /// local-fixture path).
+    /// prepare must use a distinct salt so that two CTMs prepared in one
+    /// ecosystem never land a contract with env-wide identical constructor
+    /// args at the same address. Supplied via the `[create2_factory_salts]`
+    /// table in `upgrade-envs/<release-env-dir>/<env>.toml`; missing entries
+    /// fall back to a random salt (legacy local-fixture path).
     pub create2_factory_salt_per_ctm: Option<HashMap<Address, B256>>,
     /// Upgrade config TOML path relative to `l1-contracts/`.
     pub upgrade_input_path: String,
@@ -306,13 +304,9 @@ impl<'a> UpgradeInner<'a> {
         logger::info(format!(
             "CoreTransition (core prepare): {core_transition:#x}"
         ));
-        // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts whose
-        // constructor args are env-wide constants — notably
-        // `GovernanceUpgradeTimer(initialDelay, 2 weeks, ownerAddress,
-        // ecosystemAdminAddress)` — so two CTMs prepared in one ecosystem would
-        // land them at the same address without per-CTM differentiation, and the
-        // downstream gov-replay's second `startTimer()` on that contract would
-        // revert. Named environments keep CREATE2 salts keyed by registered CTM
+        // Per-CTM CREATE2 salt, so two CTMs prepared in one ecosystem never land a
+        // contract with env-wide constant constructor args at the same address.
+        // Named environments keep CREATE2 salts keyed by registered CTM
         // (`upgrade-envs/v0.35.0-upgrade-system/<env>.toml [create2_salts.per_ctm]`);
         // legacy local fixtures fall back to a fresh random salt.
         let create2_salt = inputs
@@ -443,8 +437,8 @@ fn read_core_transition(core_toml: &Path) -> anyhow::Result<Address> {
 }
 
 /// The `[registry].ecosystem_upgrade_executor_addr` the core prepare wrote — the coordinator
-/// (`EcosystemUpgradeExecutor`) the CTM prepare's executor and timers answer to, and the target
-/// of the derived coordinator stage calls.
+/// (`EcosystemUpgradeExecutor`) the CTM prepare's executor answers to, and the target of the
+/// derived `execute(operation)` call.
 fn read_ecosystem_upgrade_executor(core_toml: &Path) -> anyhow::Result<Address> {
     let raw =
         fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;

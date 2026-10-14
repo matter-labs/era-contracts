@@ -55,7 +55,6 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
                 ctmTransition: upgradeAddresses.ctmTransition,
                 ctmUpgradeExecutor: boundCTMUpgradeExecutor(),
                 ctmRelease: getAddresses().stateTransition.currentRelease,
-                upgradeTimer: upgradeAddresses.upgradeTimer,
                 // Not a bootstrap: no migration to name.
                 bootstrapMigration: address(0),
                 operation: upgradeAddresses.ecosystemUpgradeOperation,

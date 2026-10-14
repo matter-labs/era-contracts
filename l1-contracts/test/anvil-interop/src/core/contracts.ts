@@ -49,7 +49,6 @@ const ARTIFACTS = {
   CTMRelease: "CTMRelease.sol/CTMRelease.json",
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
   CoreTransition: "CoreTransition.sol/CoreTransition.json",
-  GovernanceUpgradeTimer: "GovernanceUpgradeTimer.sol/GovernanceUpgradeTimer.json",
   ServerNotifier: "ServerNotifier.sol/ServerNotifier.json",
   // Bootstrap edge (see bootstrap-upgrade-stage.ts): the one-time entry into the registry-driven
   // model, plus the legacy cut-taking entrypoint a fixture may need installed.

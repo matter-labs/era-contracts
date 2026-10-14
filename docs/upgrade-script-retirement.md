@@ -30,15 +30,13 @@ to keep one.
 
 Finished, and described where it now lives:
 
-- **The stage machine is on-chain.** The scripted stage-0/1/2 bundles became
-  `EcosystemUpgradeExecutor.stage0/1/2(operation)` over a write-once
-  `EcosystemUpgradeOperation`; the domain executors (`CoreUpgradeExecutor`, `CTMUpgradeExecutor`)
-  only answer the coordinator's callbacks. The three calls are derived from the operation; the Rust merger
-  copies bundles and composes nothing. Spec: `protocol-docs/ecosystem-upgrade-coordination.md`.
-- **`UpgradeStageValidator` is retired from the v35 path.** Its checks are absorbed: `migrate()`
-  checks the timer's deadline, the CTM's version-edge commit refuses to run unpaused, and
-  `validateApplied()` refuses while the CTM's migrations are still paused. The contract remains
-  only because the v31 verifier reads its deployment.
+- **Execution is on-chain.** An upgrade is one `EcosystemUpgradeExecutor.execute(operation)` over a
+  write-once `EcosystemUpgradeOperation`; the domain executors (`CoreUpgradeExecutor`,
+  `CTMUpgradeExecutor`) only answer the coordinator's `applyOperation`. The call is derived from the
+  operation; the Rust merger copies bundles and composes nothing. Spec:
+  `protocol-docs/ecosystem-upgrade-coordination.md`.
+- **`UpgradeStageValidator` and `GovernanceUpgradeTimer` are deleted.** The bootstrap's
+  `migrate()` and `validateApplied()` check its preconditions and completion themselves.
 - **The ServerNotifier is an ordinary CTM-domain row.** After the bootstrap's one-time handover
   (rendered from live state, `CTMUpgrade_v35.serverNotifierHandoverCalls`;
   `ServerNotifierHandover.t.sol`) no prepare emits an admin call for it.
@@ -152,7 +150,7 @@ allowlisted description does not grant execution rights.
 
 Gate: a representative multi-contract upgrade with real authorization. A failed follow-up must
 revert the atomic leg; skipped or incorrectly applied work must prevent normal completion. Test
-unauthorized targets, replay and abandonment after stage 1.
+unauthorized targets and replay.
 
 ## Batch 4: establish deployment wiring and authority on-chain
 
@@ -185,19 +183,19 @@ unchanged members and derived payloads from the authoritative objects. A new ver
 custom code only for new protocol behavior, not another version-specific prepare hierarchy.
 
 The recurring output should identify source/target objects, implementation/codehash changes,
-required authorities, stage transactions and unresolved external actions. Reporting may format
+required authorities, the governance call and unresolved external actions. Reporting may format
 on-chain facts; it must not decide execution order or recreate the payload.
 
 Keep the pre-registry entry edge in a small named legacy adapter. Do not delete its cut-taking
 ABI, handovers or frozen tests while supported chains still require them.
 
 Delete or shrink: the `DefaultCTMUpgrade` / `DefaultCoreUpgrade` inheritance layers, empty version
-subclasses, `UpgradeHelperLib` and stage-merging helpers with no consumers. Keep generic Safe
+subclasses, `UpgradeHelperLib` and bundle-merging helpers with no consumers. Keep generic Safe
 serialization, signer handling and simulation.
 
 Gate: production preparation must demonstrate bootstrap, recurring no-Gateway, individual-member,
-L1-only and mixed L1/L2 flows. Assert that every submitted call is a coordinator stage call or an
-explicitly required external action.
+L1-only and mixed L1/L2 flows. Assert that every submitted call is the coordinator's `execute` call
+or an explicitly required external action.
 
 ## Delivery order and review discipline
 
@@ -213,4 +211,4 @@ separate enough to review; update the architecture document and the PR descripti
 
 Completion means an upgrade can be understood and executed from its on-chain objects plus the
 identified approvals, and scripts contain no independent selector lists, payload composition,
-protocol-wiring decisions or stage semantics.
+protocol-wiring decisions or execution semantics.

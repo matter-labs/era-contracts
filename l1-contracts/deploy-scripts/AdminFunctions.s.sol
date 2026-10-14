@@ -202,8 +202,8 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// CTM (Ownable2Step) and its EIP-1967 ProxyAdmin (single-step Ownable) are
     /// owned by `_governance`. Each individual transfer is conditional, so
     /// re-running this against an already-correct ecosystem is a no-op. Intended
-    /// for upgrade pre-stages where governance must own these contracts before
-    /// stage 1 governance calls (e.g. ProxyAdmin.upgradeAndCall) execute.
+    /// for upgrade preparation where governance must own these contracts before
+    /// the governance bundle (e.g. ProxyAdmin.upgradeAndCall) executes.
     ///
     /// Requires anvil `--auto-impersonate` (or a runner that has unlocked the
     /// resolved owner addresses) — broadcasts switch sender per-step.
@@ -235,7 +235,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         // `acceptOwnership()` on each Ownable2Step CTM whose pendingOwner is
         // `_governance` must execute as PUH on real chain — which means going
         // through PUH's governance flow, not impersonation. We collect these
-        // calls here and persist them so protocol-ops folds them into stage 0
+        // calls here and persist them so protocol-ops folds them into the front
         // of governance_calls in the merged ecosystem.toml. Sized to
         // chainIds.length (max possible), trimmed before serialization.
         Call[] memory acceptCalls = new Call[](chainIds.length);
@@ -280,7 +280,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
         // by `governanceAcceptOwnerAggregated`, since the same ProxyAdmins gate
-        // their `upgradeAndCall` invocations during stage 1 governance calls.
+        // their `upgradeAndCall` invocations during the governance bundle.
         address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
         address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
@@ -356,7 +356,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Persist the trimmed `acceptOwnership()` Call list to a TOML so
-    /// `protocol_ops ecosystem upgrade-prepare-all` can fold it into stage 0
+    /// `protocol_ops ecosystem upgrade-prepare-all` can fold it into the front
     /// of the merged governance_calls. Always written (even when empty) so
     /// the Rust side can `vm.readFile` unconditionally.
     function _savePreGovernanceAcceptOwnershipCalls(Call[] memory _calls, uint256 _count) private {

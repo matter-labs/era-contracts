@@ -36,11 +36,10 @@ pub enum EcosystemCommands {
     /// Phase 2 to replay.
     #[command(name = "upgrade-prepare-all")]
     UpgradePrepareAll(UpgradePrepareAllArgs),
-    /// Phase 2 of the ecosystem upgrade: replays governance stages 0+1+2 on
-    /// a single anvil fork (governance owner signs). Emits one Safe bundle
-    /// containing all three governance calls. Auto-discovers
-    /// `<env-out>/ecosystem.toml` when `--env` is set, or pass
-    /// `--governance-toml` explicitly.
+    /// Phase 2 of the ecosystem upgrade: replays the package's one governance
+    /// bundle on an anvil fork (governance owner signs) and emits one Safe
+    /// bundle carrying it. Auto-discovers `<env-out>/ecosystem.toml` when
+    /// `--env` is set, or pass `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
     /// Verify a v35 registry-driven upgrade package — a recurring operation or the one-time

@@ -15,7 +15,7 @@ use super::views::{ProxyAdminView, ProxyUpgradeRow};
 
 /// What a row's live implementation says about it — the on-chain row semantics
 /// (`ProxyUpgradeRowLib`): a proxy at `expectedOldImpl` is upgraded, one already at `implNew` is
-/// skipped, anything else reverts the whole stage.
+/// skipped, anything else reverts the whole governance bundle.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum RowVerdict {
     Departs,
@@ -36,7 +36,7 @@ pub(super) fn classify_row(live_impl: Address, row: &ProxyUpgradeRow) -> RowVerd
 /// Each participating row must depart from the implementation that is LIVE, read through
 /// `domain_admin`.
 ///
-/// A row at an unexpected implementation reverts the whole stage on chain, so a mismatch here is
+/// A row at an unexpected implementation reverts the whole bundle on chain, so a mismatch here is
 /// an upgrade that cannot execute, not a cosmetic drift. A row already at `implNew` is accepted
 /// as the contracts accept it, with a warning: part of the upgrade has already happened.
 pub(super) async fn verify_rows<P: Provider>(

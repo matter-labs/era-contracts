@@ -15,18 +15,18 @@ import {MigrationPaused, ChainTypeManagerNotRegistered, NotCTMOwner} from "contr
 ///         - the ECOSYSTEM pause (`pauseMigration`/`unpauseMigration`, owner only) — incident
 ///           control that stops every chain regardless of its CTM;
 ///         - a PER-CTM pause (`pauseCTMMigration`/`unpauseCTMMigration`) written by that CTM's
-///           own owner, which during an upgrade is its bound `CTMUpgradeExecutor`.
+///           own owner, its bound `CTMUpgradeExecutor` (governance reaches it through `forward`).
 ///
 ///         `migrationPausedFor(ctm)` is the OR of the two, and the gate on `bridgeBurn`/
 ///         `bridgeMint` asks it about the CTM the migrating chain belongs to. Splitting the state
-///         this way means one CTM's upgrade neither blocks nor unblocks another's chains — the
+///         this way means one CTM's pause neither blocks nor unblocks another's chains — the
 ///         reason a chain may only migrate between settlement layers under its own CTM
 ///         (`SLHasDifferentCTM`) is the same reason the pause is keyed by CTM.
 ///
 /// @dev Authority is DERIVED, not stored: a caller qualifies by being the current owner of a CTM
 ///      this ecosystem registered. There is no allowlist to maintain, so replacing an executor
-///      cannot strand the ability to pause. See "Migration pause: two pauses, on two authorities"
-///      in {docs/upgrade-stage-lifecycle.md}.
+///      cannot strand the ability to pause. See "Migration pauses are incident control" in
+///      {docs/upgrade-operations.md}.
 /// @dev Runs against a real `L1ChainAssetHandler` deployed directly (its constructor sets the
 ///      owner). The Bridgehub is mocked for the two lookups the pause surface makes —
 ///      `chainTypeManagerIsRegistered` and `ctmAssetIdToAddress` — because the pause logic

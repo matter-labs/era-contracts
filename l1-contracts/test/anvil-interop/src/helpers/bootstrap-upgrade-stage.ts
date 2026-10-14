@@ -8,13 +8,18 @@
  *   bootstrap cut removes it again.
  * - `crossBootstrapEdgeOnChains`: each chain's admin crosses the edge through the legacy 3-arg
  *   `upgradeChainFromVersion`, handing the committed cut.
- * - `assertBootstrapCompleted`: the edge's completion check, run as its own call after stage 2.
+ * - `assertBootstrapBundle`: the merged prepare's governance bundle is the one
+ *   `RegistryBootstrapSequence.actions()` derives, ending in the completion check.
+ * - `assertBootstrapCompleted`: the completion check re-run read-only after the governance replay.
  * - `assertServerNotifierState`: the ServerNotifier's custody (also used by the recurring runner).
  */
 
 import { ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
+import type { ExpectedCall, MergedGovernanceOutput } from "./governance-bundle";
+import { assertBundleIs, governanceCallsOf } from "./governance-bundle";
+import { proxyUpgradeSlotIndex } from "./registry-manifest";
 import { readProxyAdmin, readProxyImplementation } from "./upgrade-test-utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -74,8 +79,115 @@ export async function installLegacyFacet(
 }
 
 /**
- * The edge's completion check, `RegistryBootstrapMigration.validateApplied()`, as its own call
- * after stage 2; a revert is rethrown with the decoded error.
+ * The bootstrap bundle `RegistryBootstrapSequence.actions()` derives, re-derived from the
+ * migration's manifest and live state so the prepare output is checked against an independent
+ * derivation. Read after the prepare: whether the bundle opens with the ServerNotifier accept
+ * depends on the notifier's live owner.
+ * @param coreTransition The core transition the core prepare pinned (the sequence's
+ *        `CORE_TRANSITION`, which the migration's manifest does not name).
+ */
+export async function deriveBootstrapBundle(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  migrationAddr: string,
+  coreTransition: string
+): Promise<ExpectedCall[]> {
+  const migration = new ethers.Contract(migrationAddr, getAbi("RegistryBootstrapMigration"), l1Provider);
+  const m = await migration.getManifest();
+  const coreExecutor = new ethers.Contract(m.coreExecutor, getAbi("CoreUpgradeExecutor"), l1Provider);
+  const notifier: string = m.ctmProxyUpgrades[proxyUpgradeSlotIndex("CTMContract", "ServerNotifier")].proxy;
+  const notifierOwner: string = await new ethers.Contract(notifier, getAbi("Ownable2Step"), l1Provider).owner();
+  const ownable = new ethers.utils.Interface(getAbi("Ownable2Step"));
+  const proxyAdmin = new ethers.utils.Interface(getAbi("ProxyAdmin"));
+  const ctmExecutor = new ethers.utils.Interface(getAbi("CTMUpgradeExecutor"));
+  const coordinator = new ethers.utils.Interface(getAbi("EcosystemUpgradeExecutor"));
+
+  const bundle: ExpectedCall[] = [];
+  if (notifierOwner.toLowerCase() !== m.ctmExecutor.toLowerCase()) {
+    const accept = { target: notifier, value: 0, data: ownable.encodeFunctionData("acceptOwnership") };
+    bundle.push({
+      label: "ctmExecutor.forward([ServerNotifier.acceptOwnership()])",
+      target: m.ctmExecutor,
+      data: ctmExecutor.encodeFunctionData("forward", [[accept]]),
+    });
+  }
+  bundle.push(
+    {
+      label: "coreExecutor.setCoordinator(coordinator)",
+      target: m.coreExecutor,
+      data: coreExecutor.interface.encodeFunctionData("setCoordinator", [m.coordinator]),
+    },
+    {
+      label: "coordinator.setCTMExecutor(ctmExecutor)",
+      target: m.coordinator,
+      data: coordinator.encodeFunctionData("setCTMExecutor", [m.ctmExecutor]),
+    },
+    {
+      label: "ecosystem ProxyAdmin.transferOwnership(coreExecutor)",
+      target: await coreExecutor.PROXY_ADMIN(),
+      data: proxyAdmin.encodeFunctionData("transferOwnership", [m.coreExecutor]),
+    },
+    {
+      label: "coreExecutor.applyL1Upgrade(coreTransition)",
+      target: m.coreExecutor,
+      data: coreExecutor.interface.encodeFunctionData("applyL1Upgrade", [coreTransition]),
+    },
+    {
+      label: "CTM.transferOwnership(migration)",
+      target: m.ctm,
+      data: ownable.encodeFunctionData("transferOwnership", [migrationAddr]),
+    },
+    {
+      label: "CTM-domain ProxyAdmin.transferOwnership(migration)",
+      target: m.ctmProxyAdmin,
+      data: proxyAdmin.encodeFunctionData("transferOwnership", [migrationAddr]),
+    },
+    {
+      label: "migration.migrate()",
+      target: migrationAddr,
+      data: migration.interface.encodeFunctionData("migrate"),
+    },
+    {
+      label: "migration.validateApplied()",
+      target: migrationAddr,
+      data: migration.interface.encodeFunctionData("validateApplied"),
+    }
+  );
+  return bundle;
+}
+
+/**
+ * Throws unless the merged prepare output's governance bundle is exactly the derived bootstrap
+ * bundle ({@link deriveBootstrapBundle}) — in particular, that it closes with the migration's
+ * `validateApplied()`.
+ */
+export async function assertBootstrapBundle(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  merged: MergedGovernanceOutput,
+  migrationAddr: string,
+  coreTransition: string
+): Promise<void> {
+  const bundle = governanceCallsOf(merged);
+  const closing = bundle[bundle.length - 1];
+  const validateApplied = new ethers.utils.Interface(getAbi("RegistryBootstrapMigration")).encodeFunctionData(
+    "validateApplied"
+  );
+  if (
+    !closing ||
+    closing.target.toLowerCase() !== migrationAddr.toLowerCase() ||
+    closing.data.toLowerCase() !== validateApplied.toLowerCase()
+  ) {
+    throw new Error(`the bootstrap bundle does not close with ${migrationAddr}.validateApplied()`);
+  }
+  const expected = await deriveBootstrapBundle(l1Provider, migrationAddr, coreTransition);
+  assertBundleIs(bundle, expected, "the bootstrap governance bundle");
+  console.log(`  ✓ the governance bundle is the derived bootstrap sequence (${bundle.length} calls)`);
+}
+
+/**
+ * Re-runs the edge's completion check, `RegistryBootstrapMigration.validateApplied()`, read-only
+ * after the governance replay. The bundle's last call already enforces it, but the harness executes
+ * the Safe bundles protocol-ops builds from the merged TOML, not the TOML whose shape it asserted;
+ * this checks the state those left. A revert is rethrown with the decoded error.
  */
 export async function assertBootstrapCompleted(
   l1Provider: ethers.providers.JsonRpcProvider,

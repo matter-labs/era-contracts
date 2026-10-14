@@ -130,7 +130,6 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
     /// @dev Pins the registry fields' slots, so a declaration added above them fails here rather
     ///      than on a live CTM.
     function test_registryFieldsSitPastTheV34Layout() public {
-        _mockMigrationPausedFromBridgehub();
         address newRelease = _releaseAt(NEW_VERSION);
         ICTMTransition transition = ICTMTransition(makeAddr("transition"));
         vm.etch(address(transition), hex"00");

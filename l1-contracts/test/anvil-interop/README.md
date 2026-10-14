@@ -78,9 +78,9 @@ the ServerNotifier to the `CTMUpgradeExecutor`, and `RegisterCTM` binds it to th
 (`EcosystemUpgradeExecutor`). Governance is only nominated on the three executors, and anvil never
 accepts, so they stay owned by the deployer; anything needing the CTM, ServerNotifier or a ProxyAdmin
 owner must go through that executor's `forward`. `run-recurring-upgrade-test.ts` discovers the executors
-from chain and drives the hop through the existing coordinator, with no bootstrap. It builds its
-objects from the committed manifest `scripts/registry-manifests/v35-local.json` and fails on any
-drift; `yarn regen:registry-manifest` (`REGEN_REGISTRIES=1`) rewrites it from the live deployment.
+from chain and drives the hop through the existing coordinator's one `execute(operation)` call, with no
+bootstrap. It builds its objects from the committed manifest `scripts/registry-manifests/v35-local.json`
+and fails on any drift; `yarn regen:registry-manifest` (`REGEN_REGISTRIES=1`) rewrites it from the live deployment.
 `ANVIL_INTEROP_FRESH_DEPLOY=1` runs it against a fresh deployment instead of the chain states. The
 committed manifest describes the chain states, which are built with the `anvil-interop` profile, so a
 fresh deployment from the default build only matches in emit mode — restore the manifest afterwards.

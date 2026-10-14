@@ -10,7 +10,6 @@ import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpg
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {OperationFixtures} from "./OperationFixtures.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {ChainRouting} from "test-utils/ChainRouting.sol";
@@ -69,12 +68,10 @@ import {
 /// @dev The registry is a storage-backed double (fixture addresses are dynamic), but everything
 ///      it pins here is real: live facet addresses/selectors, a real replacement `AdminFacet`,
 ///      the real `DefaultUpgrade`, real verifier contracts.
-/// @dev Each hop rides a one-leg operation through the coordinator's full three-stage lifecycle
-///      ({protocol-docs/ecosystem-upgrade-coordination.md}) against the fixture's REAL
-///      `L1ChainAssetHandler`: stage 0 reserves the executor and pauses its CTM's migrations,
-///      stage 1 commits, `upgradeChain` crosses the chain, stage 2 releases the pause. No
-///      ecosystem leg is named (the hops are CTM-only). The lifecycle's own rules are covered in
-///      CTMUpgradeLifecycle.t.sol.
+/// @dev Each hop rides a one-leg operation through the coordinator's `execute`
+///      ({protocol-docs/ecosystem-upgrade-coordination.md}), which commits it; `upgradeChain`
+///      then crosses the chain. No ecosystem leg is named (the hops are CTM-only). The
+///      coordinator's own rules are covered in OperationExecution.t.sol.
 abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, OperationFixtures {
     CTMUpgradeExecutor internal ctmExecutor;
     CoreUpgradeExecutor internal coreExecutor;
@@ -122,7 +119,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     function _l2DeploymentType() internal pure virtual returns (IComplexUpgrader.ContractUpgradeType);
 
     /// @dev The `genesisBatchCommitment` the registry pins in its genesis params — the release
-    ///      the stage-1 commit installs feeds it to chain creation, which ZKsyncOS CTMs only
+    ///      the commit installs feeds it to chain creation, which ZKsyncOS CTMs only
     ///      accept as exactly `bytes32(uint256(1))`.
     function _registryGenesisBatchCommitment() internal pure virtual returns (bytes32);
 
@@ -144,8 +141,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         _mockGetZKChainFromBridgehub(chainAddress);
 
         // The coordinator over the ecosystem domain, and the CTM executor constructed answering
-        // to it — the shape the v35 bootstrap leaves behind. Pausing its own CTM's migrations
-        // needs no registration: the ChainAssetHandler derives that from CTM ownership.
+        // to it — the shape the v35 bootstrap leaves behind.
         coreExecutor = new CoreUpgradeExecutor(governor, new ProxyAdmin());
         coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
         vm.prank(governor);
@@ -191,7 +187,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         UtilsFacet(chainAddress).util_setL2SystemContractsUpgradeTxHash(bytes32(0));
 
         // Every bytecode the v33 hop installs must be published on the CTM's supplier before
-        // stage 1 commits the edge — the prepare pipeline's publish step.
+        // the operation commits the edge — the prepare pipeline's publish step.
         assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
         L2PlanFixtures.publish(
             bytecodesSupplier,
@@ -304,44 +300,28 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         );
     }
 
-    /// @inheritdoc OperationFixtures
-    /// @dev One timer per hop: a timer starts exactly once, and each hop runs its own lifecycle.
-    function _newOperationTimer() internal override returns (address) {
-        return address(new GovernanceUpgradeTimer(0, 0, address(coordinator), governor));
-    }
-
     /// @dev The one-leg operation a hop rides.
     function _operationFor(CTMTransition _transition) internal returns (EcosystemUpgradeOperation) {
         return _cachedOperationFor(ICTMTransition(address(_transition)));
     }
 
-    /// @dev Stages 0 and 1: the hop is committed on the CTM and the lifecycle is still open.
+    /// @dev The coordinator executes the hop's operation: the hop is committed on the CTM.
     function _commitHop(CTMTransition _transition) internal {
         EcosystemUpgradeOperation operation = _operationFor(_transition);
-        vm.startPrank(governor);
-        coordinator.stage0(operation);
-        coordinator.stage1(operation);
-        vm.stopPrank();
-        assertTrue(
-            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
-            "stage 0 must pause its own CTM's migrations"
+        vm.prank(governor);
+        coordinator.execute(operation);
+        assertEq(
+            chainContractAddress.upgradeTransition(_transition.oldProtocolVersion()),
+            address(_transition),
+            "the operation must commit the hop"
         );
     }
 
-    /// @dev The whole hop: commit, cross the chain, complete (the pause is released again).
+    /// @dev The whole hop: commit, then cross the chain.
     function _runHop(CTMTransition _transition) internal {
         _commitHop(_transition);
-        EcosystemUpgradeOperation operation = _operationFor(_transition);
-        vm.startPrank(governor);
+        vm.prank(governor);
         ctmExecutor.upgradeChain(ICTMTransition(address(_transition)), chainId);
-        coordinator.stage2(operation);
-        vm.stopPrank();
-        assertEq(address(coordinator.pendingOperation()), address(0), "completion must free the lifecycle slot");
-        assertEq(address(ctmExecutor.activeOperation()), address(0), "completion must release the reservation");
-        assertFalse(
-            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
-            "completion must release the CTM's pause"
-        );
     }
 
     function test_registryDrivenUpgrade_v32ThenV33_endToEnd() public {

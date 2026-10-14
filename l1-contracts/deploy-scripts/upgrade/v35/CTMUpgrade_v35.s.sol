@@ -37,28 +37,26 @@ import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/Upgrade
 ///         Bootstrap section of {docs/registry-driven-upgrades.md}). Chains crossing this edge
 ///         run pre-v35 facets and take the committed cut by hand, but the cut itself already
 ///         has the registry shape: NO facet cuts, just the `BootstrapUpgrade` init,
-///         which derives the facet reinstall on-chain from the pinned genesis release. The
-///         stage-1 CTM call soup is GONE too: everything the CTM must do (its own
-///         implementation swap, the version commit, the provenance anchors, the authority
-///         handover) is pinned in a write-once `RegistryBootstrapMigration` deployed at prepare
-///         time, and executed by its single `migrate()` call. Governance reviews a manifest and
-///         FOUR calls — nominate the CTM, hand over its ProxyAdmin, migrate, accept — and every
-///         later upgrade is a `CTMTransition` under the bound `CTMUpgradeExecutor`. Before any of
-///         it, the ChainAdmin hands the ServerNotifier to the CTM domain
-///         ({serverNotifierHandoverCalls}); the edge refuses to run until it has.
+///         which derives the facet reinstall on-chain from the pinned genesis release. The CTM
+///         call soup is GONE too: everything the CTM must do (its own implementation swap, the
+///         version commit, the authority handover) is pinned in a write-once
+///         `RegistryBootstrapMigration` deployed at prepare time, and executed by its single
+///         `migrate()` call inside the one governance bundle `RegistryBootstrapSequence` derives;
+///         every later upgrade is an operation under the bound executors. Before any of it, the
+///         ChainAdmin hands the ServerNotifier to the CTM domain ({serverNotifierHandoverCalls});
+///         the edge refuses to run until it has.
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     /// @notice The bound executor the whole CTM domain lands under. Deployed by this prepare
     ///         run; its address rides the bootstrap manifest (pinned + binding-checked there).
     CTMUpgradeExecutor public ctmUpgradeExecutor;
 
-    /// @notice The write-once edge object. Its manifest pins everything the stage-1 calls used
+    /// @notice The write-once edge object. Its manifest pins everything the governance calls used
     ///         to spell out.
     RegistryBootstrapMigration public bootstrapMigration;
 
-    /// @notice The object the edge's whole governance call sequence is READ from. Deployed over
-    ///         the migration and the core prepare's inventory; nothing about the sequence is
-    ///         authored here.
+    /// @notice The object the edge's governance bundle is READ from. Deployed over the migration
+    ///         and the core prepare's inventory; nothing about the bundle is authored here.
     RegistryBootstrapSequence public bootstrapSequence;
 
     /// @notice The delegate-calldata composer the bootstrap manifest pins: the CODE that
@@ -120,7 +118,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade
     /// @dev Rendered from live state, so a half already done is not repeated: the notifier proxy
     ///      moves from its own ProxyAdmin to the CTM-domain one, then its current owner nominates the
-    ///      bound executor, whose acceptance is the first stage-0 call of the bootstrap sequence.
+    ///      bound executor, whose acceptance is the first call of the bootstrap bundle.
     function serverNotifierHandoverCalls() public view override returns (Call[] memory calls) {
         address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
         address ctmProxyAdmin = Utils.getProxyAdminAddress(ctmAddresses.stateTransition.proxies.chainTypeManager);
@@ -160,12 +158,6 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     function boundCTMUpgradeExecutor() public view virtual override returns (address) {
         require(address(ctmUpgradeExecutor) != address(0), "CTM executor not deployed");
         return address(ctmUpgradeExecutor);
-    }
-
-    /// @notice Governance starts the bootstrap's timer itself (stage 0): the executor that starts
-    ///         every later upgrade's timer does not hold the domain yet.
-    function timerGovernance() internal view virtual override returns (address) {
-        return config.ownerAddress;
     }
 
     /// @notice Before the bootstrap edge, governance owns the CTM directly.
@@ -228,7 +220,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(ctmProxy));
         // The two-executor model hands the CTM domain's admin to the CTM executor and the
         // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
-        // the collision would only surface as a stage-1 revert. ZKsyncOS CTMs (the only ones
+        // the collision would only surface as a bundle revert. ZKsyncOS CTMs (the only ones
         // this release upgrades) are deployed with their own admin; Era CTMs on old ecosystems
         // share the ecosystem's and would need an admin split first.
         require(
@@ -238,8 +230,8 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
 
         // Both go through the CREATE2 factory like every other prepare deployment: the Safe
         // bundle replays only factory transactions, so a plain CREATE here would leave the
-        // stage-1 `migrate()`/`acceptCTMOwnership()` calls pointing at codeless addresses on
-        // the real chain (a call to code-less address is a silent success).
+        // bundle's `migrate()` call pointing at a codeless address on the real chain (a call to a
+        // code-less address is a silent success).
         (, bytes32 salt) = getCreate2FactoryParams();
         ctmExecutorDeployment = CTMExecutorDeployment({
             ctmExecutor: address(0),
@@ -313,7 +305,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             callInitializeUpgrade: false
         });
         // The mandatory notifier row, applied by `migrate()` through `ctmProxyAdmin` like the
-        // CTM's own: the ChainAdmin's handover moves the proxy under that admin before stage 1.
+        // CTM's own: the ChainAdmin's handover moves the proxy under that admin before the bundle.
         address notifierProxy = ctmAddresses.stateTransition.proxies.serverNotifier;
         address notifierImplNew = ctmAddresses.stateTransition.implementations.serverNotifier;
         require(notifierImplNew != address(0), "new ServerNotifier implementation not deployed");
@@ -341,35 +333,29 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             // The executors' ownership and bindings are storage, so the edge names them here and
             // refuses to hand either domain over if any moved after the prepares deployed them.
             governance: getOwnerAddress(),
-            coordinator: address(ecosystemUpgradeExecutor()),
-            upgradeTimer: upgradeAddresses.upgradeTimer
+            coordinator: address(ecosystemUpgradeExecutor())
         });
     }
 
-    /// @notice Declares every governance call of the bootstrap edge — BOTH domains — by reading
-    ///         them off the sequence object this prepare deployed. Nothing here is authored: the
-    ///         phase, order, target and calldata all come from the object, and the label and
-    ///         authority ride along with each call.
+    /// @notice Declares every governance call of the bootstrap edge — BOTH domains, ending in the
+    ///         completion check — by reading them off the sequence object this prepare deployed.
+    ///         Nothing here is authored: the order, target and calldata all come from the object,
+    ///         and the label and authority ride along with each call.
     /// @dev The whole edge is declared from the CTM prepare rather than split across the two
     ///      prepares, because the object derives both legs and only exists once the migration
-    ///      does — which is after the core prepare has run. The merged bundles are unchanged:
-    ///      the merge concatenates the core prepare's calls ahead of this one's, and the core
-    ///      prepare of this edge now contributes none.
-    /// @dev The edge's completion check (`bootstrapSequence.validateApplied()`) is not declared:
-    ///      it is run as its own call after stage 2, never inside a bundle.
+    ///      does — which is after the core prepare has run. The merge concatenates the core
+    ///      prepare's calls ahead of this one's, and the core prepare of this edge contributes none.
     function _declareBootstrapActions() internal virtual {
         require(address(bootstrapSequence) != address(0), "bootstrap sequence not deployed");
-        _declarePhase(ExternalActionsLib.PHASE_STAGE_0, bootstrapSequence.stage0Actions());
-        _declarePhase(ExternalActionsLib.PHASE_STAGE_1, bootstrapSequence.stage1Actions());
-        _declarePhase(ExternalActionsLib.PHASE_STAGE_2, bootstrapSequence.stage2Actions());
-    }
-
-    /// @param _phase The bundle these actions ride.
-    /// @param _actions The derived actions of that phase, in execution order.
-    function _declarePhase(string memory _phase, BootstrapAction[] memory _actions) private {
-        uint256 length = _actions.length;
+        BootstrapAction[] memory actions = bootstrapSequence.actions();
+        uint256 length = actions.length;
         for (uint256 i = 0; i < length; ++i) {
-            declareExternalAction(_phase, _actions[i].label, _actions[i].authority, _actions[i].call);
+            declareExternalAction(
+                ExternalActionsLib.PHASE_GOVERNANCE,
+                actions[i].label,
+                actions[i].authority,
+                actions[i].call
+            );
         }
     }
 

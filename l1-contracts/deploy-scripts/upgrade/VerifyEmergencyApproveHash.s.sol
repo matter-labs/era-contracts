@@ -3,16 +3,16 @@ pragma solidity ^0.8.21;
 
 import {console2} from "forge-std/Script.sol";
 
-import {EmergencyStageUpgradeCalldata} from "./EmergencyStageUpgradeCalldata.s.sol";
+import {EmergencyUpgradeCalldata} from "./EmergencyUpgradeCalldata.s.sol";
 import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol";
 import {ISafe} from "../interfaces/ISafe.sol";
 import {EMERGENCY_UPGRADE_SALT} from "../utils/Utils.sol";
 
 /// @notice FORK-ONLY proof that the handler's EmergencyUpgradeBoard accepts the approved-hash route
-///         {EmergencyStageUpgradeCalldata} emits: the owner EOA pre-approves every Safe message hash
+///         {EmergencyUpgradeCalldata} emits: the owner EOA pre-approves every Safe message hash
 ///         (`vm.prank` stands in for it), then the board executes a proposal with an EMPTY call list,
 ///         which isolates the signature path from any upgrade's calls.
-contract VerifyEmergencyApproveHash is EmergencyStageUpgradeCalldata {
+contract VerifyEmergencyApproveHash is EmergencyUpgradeCalldata {
     /// @param _protocolUpgradeHandler The handler whose board is checked.
     function run(address _protocolUpgradeHandler) external {
         EmergencyProposal memory proposal = buildEmergencyProposal(

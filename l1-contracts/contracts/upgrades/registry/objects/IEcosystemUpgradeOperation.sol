@@ -7,12 +7,10 @@ import {OperationManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 /// @title IEcosystemUpgradeOperation
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Immutable description of one ecosystem upgrade: its three optional changes and the
-///         delay before governance may execute them. See
+/// @notice Immutable description of one ecosystem upgrade: its three optional changes. See
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @dev The coordinator is its only reader: it reads `getManifest()` alone, held to the
-///      `manifestHash()` it pinned at stage 0; the per-field getters are for tooling and never steer
-///      a stage.
+/// @dev The coordinator is its only reader: it reads `getManifest()` once, held to
+///      `manifestHash()`; the per-field getters are for tooling and never steer an execution.
 interface IEcosystemUpgradeOperation {
     /// @notice `keccak256(abi.encode(manifest))` — the commitment governance reviews.
     function manifestHash() external view returns (bytes32);
@@ -32,13 +30,9 @@ interface IEcosystemUpgradeOperation {
     ///         moves no chain version.
     function ctmTransition() external view returns (address);
 
-    /// @notice The `GovernanceUpgradeTimer` gating stage 1. Never zero.
-    function timer() external view returns (address);
-
-    /// @notice Reverts unless the timer and every participating infrastructure row's
-    ///         implementation is deployed code, and the core transition and CTM transition it names
-    ///         (when it names them) are deployed and pass their own `validate()` — the whole
-    ///         operation validated in one call.
+    /// @notice Reverts unless every participating infrastructure row's implementation is deployed
+    ///         code, and the core transition and CTM transition it names (when it names them) are
+    ///         deployed and pass their own `validate()` — the whole operation validated in one call.
     /// @dev It does NOT attest that the code is the reviewed code — that is governance's approval
     ///      of this object's member ADDRESSES, established off-chain before approval (see
     ///      {docs/registry-driven-upgrades.md}).

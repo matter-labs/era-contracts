@@ -14,11 +14,9 @@
  *      production pre-v35 chains.
  *   4. `protocol-ops ecosystem upgrade-prepare-all` with the scenario's core/CTM script paths
  *      (deployer Safe bundles replayed onto the harness anvil, the ChainAdmin's half of the one-time
- *      ServerNotifier handover included), then
- *      `protocol-ops ecosystem upgrade-governance` (stage 0/1/2 bundles replayed) — for the v35
- *      edge, stage 0 opens with governance's notifier accept, stage 1 binds the executors, hands
- *      over the ecosystem and CTM-domain authority and runs `migrate()`, and the edge's
- *      completion check runs as its own call after stage 2.
+ *      ServerNotifier handover included); the merged governance bundle is asserted to be exactly
+ *      the one `RegistryBootstrapSequence.actions()` derives, closing with the edge's completion
+ *      check. Then `protocol-ops ecosystem upgrade-governance` replays that one bundle.
  *   5. Per-chain legacy handed-cut crossing, recorded-L2-tx verification, and the L2 relay of
  *      the proposed upgrade transaction on each chain's anvil fork.
  *   6. Final protocol-version verification on every upgraded chain.
@@ -69,13 +67,22 @@ import {
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
-import { clearGenesisUpgradeTxHash, readProxyAdmin, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
 import {
+  clearGenesisUpgradeTxHash,
+  readProxyAdmin,
+  readProxyImplementation,
+  selectUpgradeChains,
+  traceFailedTx,
+} from "./upgrade-test-utils";
+import {
+  assertBootstrapBundle,
   assertBootstrapCompleted,
   assertServerNotifierState,
   installLegacyFacet,
   crossBootstrapEdgeOnChains,
 } from "./bootstrap-upgrade-stage";
+import type { MergedGovernanceOutput } from "./governance-bundle";
+import { assertRegistryHopBundle } from "./governance-bundle";
 import { proxyUpgradeSlotIndex } from "./registry-manifest";
 import { createProvider, impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
@@ -124,7 +131,6 @@ export type PipelineUpgradeScenario = {
    */
   l2DelegateBytecodeName: ContractName;
   clearGenesisUpgradeTxHash?: boolean;
-  transferL1ChainAssetHandlerOwnership?: boolean;
   /**
    * Install `LegacyTestAdminFacet` before governance. Needed ONLY for fixtures whose Admin
    * facet is the cut-READING (v35+) variant; a fixture with the real pre-v35 cut-taking facet
@@ -133,8 +139,8 @@ export type PipelineUpgradeScenario = {
   installLegacyCutTakingFacet?: boolean;
   /**
    * A REGISTRY-DRIVEN hop run on the same chains right after this scenario: the base prepare
-   * pipeline deploys a fresh release + `CTMTransition`, governance executes exactly the three
-   * `EcosystemUpgradeExecutor.stageN(operation)` calls, and every chain crosses through the
+   * pipeline deploys a fresh release + `CTMTransition`, governance executes exactly one
+   * `EcosystemUpgradeExecutor.execute(operation)` call, and every chain crosses through the
    * cut-READING `upgradeChainFromVersion` (see runRecurringHop).
    */
   followUps?: RecurringUpgradeHop[];
@@ -203,7 +209,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
 
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
-    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses, scenario);
+    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses);
 
     // ── Deploy ChainAdmin for each upgrade target ──
     console.log("\n── Deploying temporary ChainAdminOwnable contracts ──");
@@ -239,11 +245,14 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
 
     // `upgrade-prepare-all` writes a single merged `ecosystem.toml` at the canonical tracked
-    // path, containing stage-0/1/2 calls from core + every CTM concatenated in source order.
+    // path, carrying the one governance bundle of the core and CTM prepares.
     const mergedEcosystemToml = path.join(upgradeHarnessInputs.protocolOpsOutDir, "ecosystem.toml");
     if (!fs.existsSync(mergedEcosystemToml)) {
       throw new Error(`Merged ecosystem TOML not emitted by upgrade-prepare-all: ${mergedEcosystemToml}`);
     }
+    const mergedBootstrap = parseToml(fs.readFileSync(mergedEcosystemToml, "utf8")) as MergedGovernanceOutput & {
+      core?: { registry?: { core_transition_addr?: string } };
+    };
 
     // The cut comes from the per-CTM prepare output (`chain_upgrade_diamond_cut`); the file name
     // is protocol-ops' convention (`upgrade_inner.rs`). The L2 leg is read from the migration
@@ -256,7 +265,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     const { cut, migrationAddr, ctmExecutor } = readBootstrapPrepareOutput(ctmTomlPath);
 
     // The ChainAdmin's half of the one-time ServerNotifier handover rode the prepare (protocol-ops'
-    // CTM admin calls); governance's accept is still to come, as stage 0's first action.
+    // CTM admin calls); governance's accept is still to come, as the bundle's first call.
     const ctmProxyAdmin = await readProxyAdmin(l1Provider, ctmAddresses.chainTypeManager);
     await assertServerNotifierState(
       l1Provider,
@@ -265,8 +274,16 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       "under the CTM ProxyAdmin and nominating the CTM executor after the prepare"
     );
 
-    // ── Execute governance calls (stages 0-2) via protocol-ops bundle ──
-    console.log("\n── Replaying governance upgrade bundles ──");
+    // The merge adds no extras here: governance owns the CTM outright (no pending accept) and the
+    // upgrade input does not redeploy the zk governance set, so the bundle is the derived sequence.
+    const bootstrapCoreTransition = mergedBootstrap.core?.registry?.core_transition_addr;
+    if (!bootstrapCoreTransition || bootstrapCoreTransition === ethers.constants.AddressZero) {
+      throw new Error("the core prepare did not report the bootstrap's core transition");
+    }
+    await assertBootstrapBundle(l1Provider, mergedBootstrap, migrationAddr, bootstrapCoreTransition);
+
+    // ── Execute the governance bundle via protocol-ops ──
+    console.log("\n── Replaying the governance bundle ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
       bridgehubAddress: upgradeHarnessInputs.bridgehubAddress,
@@ -378,6 +395,29 @@ async function describeReleaseDifference(
 }
 
 /**
+ * Throws unless every row the operation names — its CTM-domain rows and its core transition's
+ * ecosystem rows — reads back at its `implNew`. Returns the number of rows checked.
+ */
+async function verifyOperationRowsApplied(
+  provider: ethers.providers.JsonRpcProvider,
+  operation: ethers.Contract
+): Promise<number> {
+  const rows: Array<{ proxy: string; implNew: string }> = [...(await operation.ctmInfrastructureRows())];
+  const coreTransitionAddr: string = await operation.coreTransition();
+  if (coreTransitionAddr !== ethers.constants.AddressZero) {
+    const coreTransition = new ethers.Contract(coreTransitionAddr, getAbi("ICoreTransition"), provider);
+    rows.push(...(await coreTransition.ecosystemRows()));
+  }
+  for (const row of rows) {
+    const live = await readProxyImplementation(provider, row.proxy);
+    if (live.toLowerCase() !== row.implNew.toLowerCase()) {
+      throw new Error(`proxy ${row.proxy} runs ${live}, but the operation's row installs ${row.implNew}`);
+    }
+  }
+  return rows.length;
+}
+
+/**
  * The CTM domain's EIP-7702 checker as the previous prepare reported it. Production carries this
  * forward through the next upgrade's env input for a reason: the `MailboxFacet` pins it as an
  * immutable and nothing on-chain exposes it, so a prepare that is not told the live one deploys a
@@ -391,36 +431,21 @@ function readReportedEip7702Checker(mergedEcosystemTomlPath: string): string | u
   return reported && reported !== ethers.constants.AddressZero ? reported : undefined;
 }
 
-/** `abi.decode(Call[])` of a governance bundle's hex. */
-function decodeGovernanceCalls(hex: string): Array<{ target: string; value: ethers.BigNumber; data: string }> {
-  if (hex === "0x" || hex === "") {
-    return [];
-  }
-  const [calls] = ethers.utils.defaultAbiCoder.decode(["tuple(address target,uint256 value,bytes data)[]"], hex);
-  return calls.map((c: { target: string; value: ethers.BigNumber; data: string }) => ({
-    target: c.target,
-    value: c.value,
-    data: c.data,
-  }));
-}
-
 /**
  * The registry-driven hop that follows the bootstrap on the same chains — the production shape
  * of every upgrade after v35, driven by the real toolchain end to end:
  *
  *   1. protocol-ops `upgrade-prepare-all` runs the (trimmed) v36 prepares: the core prepare
  *      deploys one ecosystem implementation and pins it in a `CoreTransition`; the CTM prepare
- *      deploys the release and the `CTMTransition`, with its timer bound to the coordinator; the
- *      compose step then deploys the `EcosystemUpgradeOperation` naming the registry and the
- *      (executor, transition) leg and emits exactly `stage0/1/2(operation)` on the coordinator.
- *   2. The merged `ecosystem.toml` is asserted to carry ONLY those three calls (one per stage,
- *      all on the coordinator) and no `external_actions` at all — the tooling claim, checked on
- *      the artifact.
- *   3. The governance replay executes the three stages; each chain then crosses through the
- *      cut-READING `upgradeChainFromVersion` as its own admin (no cut is handed over).
- *   4. End state: chains and CTM at the new version, the transition committed for the departing
- *      version, the CTM on the transition's release, the MessageRoot proxy re-pointed through the
- *      ecosystem executor, the lifecycle slot cleared and the migration pause released.
+ *      deploys the release, the `CTMTransition` and the `EcosystemUpgradeOperation` naming both.
+ *   2. The merged `ecosystem.toml` is asserted to carry exactly one call, the derived
+ *      `execute(operation)` on the coordinator, and no `external_actions` at all — the tooling
+ *      claim, checked on the artifact.
+ *   3. The governance replay executes it; each chain then crosses through the cut-READING
+ *      `upgradeChainFromVersion` as its own admin (no cut is handed over).
+ *   4. End state: `OperationExecuted(operation)` emitted once, chains and CTM at the new version,
+ *      the transition committed for the departing version, the CTM on the transition's release,
+ *      and every row the operation names (core and CTM-domain) at its `implNew`.
  */
 async function runRecurringHop(
   scenario: PipelineUpgradeScenario,
@@ -485,16 +510,20 @@ async function runRecurringHop(
     if (!fs.existsSync(mergedEcosystemToml)) {
       throw new Error(`Merged ecosystem TOML not emitted by upgrade-prepare-all: ${mergedEcosystemToml}`);
     }
-    const merged = parseToml(fs.readFileSync(mergedEcosystemToml, "utf8")) as {
-      external_actions?: string[];
-      governance_calls: { stage0_calls: string; stage1_calls: string; stage2_calls: string };
+    const merged = parseToml(fs.readFileSync(mergedEcosystemToml, "utf8")) as MergedGovernanceOutput & {
       core: {
         registry?: { core_transition_addr?: string };
         upgrade_addresses?: { bridgehub?: { message_root_implementation_addr?: string } };
       };
       ctms: {
         zksync_os: {
-          registry?: { ctm_transition_addr?: string; ctm_upgrade_executor_addr?: string; ctm_release_addr?: string };
+          registry?: {
+            ctm_transition_addr?: string;
+            ctm_upgrade_executor_addr?: string;
+            ctm_release_addr?: string;
+            operation_addr?: string;
+            coordinator_addr?: string;
+          };
         };
       };
       operation?: { operation_addr?: string; coordinator_addr?: string };
@@ -505,10 +534,18 @@ async function runRecurringHop(
     if (!transitionAddr || !executorAddr || transitionAddr === ethers.constants.AddressZero) {
       throw new Error("the CTM prepare did not report its transition and bound executor");
     }
-    const operationAddr = merged.operation?.operation_addr;
-    const coordinatorAddr = merged.operation?.coordinator_addr;
+    const operationAddr = registry.operation_addr;
+    const coordinatorAddr = registry.coordinator_addr;
     if (!operationAddr || !coordinatorAddr || operationAddr === ethers.constants.AddressZero) {
-      throw new Error("the compose step did not report the operation and its coordinator");
+      throw new Error("the CTM prepare did not report the operation and its coordinator");
+    }
+    // The merge may restate them in its own `[operation]` table; it must name the same pair.
+    if (
+      merged.operation &&
+      (merged.operation.operation_addr?.toLowerCase() !== operationAddr.toLowerCase() ||
+        merged.operation.coordinator_addr?.toLowerCase() !== coordinatorAddr.toLowerCase())
+    ) {
+      throw new Error("the merged [operation] table names a different operation or coordinator than the CTM prepare");
     }
     console.log(
       `  transition:  ${transitionAddr}\n  executor:    ${executorAddr}\n  operation:   ${operationAddr}\n  coordinator: ${coordinatorAddr}`
@@ -516,19 +553,10 @@ async function runRecurringHop(
 
     // ── The tooling claim, checked on the artifact ──
     const coordinatorIface = new ethers.utils.Interface(getAbi("EcosystemUpgradeExecutor"));
-    (["stage0", "stage1", "stage2"] as const).forEach((stage, n) => {
-      const key = `stage${n}_calls` as "stage0_calls" | "stage1_calls" | "stage2_calls";
-      const calls = decodeGovernanceCalls(merged.governance_calls[key]);
-      if (calls.length !== 1) {
-        throw new Error(`stage ${n} must be exactly one coordinator call, got ${calls.length}`);
-      }
-      const expected = coordinatorIface.encodeFunctionData(stage, [operationAddr]);
-      if (
-        calls[0].target.toLowerCase() !== coordinatorAddr.toLowerCase() ||
-        calls[0].data.toLowerCase() !== expected.toLowerCase()
-      ) {
-        throw new Error(`stage ${n} is not EcosystemUpgradeExecutor.${stage}(operation) on the coordinator`);
-      }
+    assertRegistryHopBundle(merged, {
+      label: "coordinator.execute(operation)",
+      target: coordinatorAddr,
+      data: coordinatorIface.encodeFunctionData("execute", [operationAddr]),
     });
     // The operation names the transition; the coordinator binds the CTM executor.
     const operation = new ethers.Contract(operationAddr, getAbi("EcosystemUpgradeOperation"), l1Provider);
@@ -548,18 +576,11 @@ async function runRecurringHop(
         `the operation names core transition ${namedCoreTransition}, the core prepare pinned ${preparedCoreTransition}`
       );
     }
-    // After the bootstrap the whole CTM domain, the ServerNotifier included, is governance's: no
-    // call is left to any other authority, admin phase included.
-    const externalActions = merged.external_actions ?? [];
-    if (externalActions.length !== 0) {
-      throw new Error(
-        `a registry-driven prepare declared external actions; after the bootstrap it must declare none:\n${externalActions.join("\n")}`
-      );
-    }
-    console.log("  ✓ merged bundles are exactly stage0/1/2(operation), with no external actions");
+    console.log("  ✓ the merged bundle is exactly execute(operation), with no external actions");
 
-    // ── Governance executes the three stages ──
-    console.log("\n── Replaying the three coordinator calls via protocol-ops ──");
+    // ── Governance executes the operation ──
+    console.log("\n── Replaying the coordinator call via protocol-ops ──");
+    const replayFromBlock = await l1Provider.getBlockNumber();
     await runEcosystemGovernanceUpgrade({
       rpcUrl: ctx.rpcUrl,
       bridgehubAddress: inputs.bridgehubAddress,
@@ -587,6 +608,15 @@ async function runRecurringHop(
 
     // ── End state ──
     console.log("\n── Verifying the registry-driven end state ──");
+    const executed = await coordinator.queryFilter(
+      coordinator.filters.OperationExecuted(operationAddr),
+      replayFromBlock
+    );
+    if (executed.length !== 1) {
+      throw new Error(
+        `the replay emitted OperationExecuted(${operationAddr}) ${executed.length} time(s), expected once`
+      );
+    }
     await verifyProtocolVersions(l1Provider, upgradeChainAddresses, hop.expectedProtocolVersion);
     const version: ethers.BigNumber = await ctm.protocolVersion();
     if (!version.eq(ethers.BigNumber.from(hop.expectedProtocolVersion))) {
@@ -596,6 +626,8 @@ async function runRecurringHop(
     if (committed.toLowerCase() !== transitionAddr.toLowerCase()) {
       throw new Error(`CTM committed transition ${committed} for the departing version, expected ${transitionAddr}`);
     }
+    const executor = new ethers.Contract(executorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
+    await executor.validateTransitionApplied(transitionAddr);
     const transition = new ethers.Contract(transitionAddr, getAbi("ICTMTransition"), l1Provider);
     const newRelease: string = await transition.newRelease();
     const currentRelease: string = await ctm.currentRelease();
@@ -626,21 +658,8 @@ async function runRecurringHop(
       }
       console.log("  ✓ identical routing on both edges derived an empty facet delta");
     }
-    const pending: string = await coordinator.pendingOperation();
-    if (pending !== ethers.constants.AddressZero) {
-      throw new Error(`stage 2 did not clear the lifecycle slot (pending ${pending})`);
-    }
-    const executor = new ethers.Contract(executorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
-    const reserved: string = await executor.activeOperation();
-    if (reserved !== ethers.constants.AddressZero) {
-      throw new Error(`stage 2 did not release the CTM executor's reservation (${reserved})`);
-    }
-    const bridgehub = new ethers.Contract(ctx.l1Addresses.bridgehub, getAbi("IL1Bridgehub"), l1Provider);
-    const chainAssetHandler: string = await bridgehub.chainAssetHandler();
-    const cah = new ethers.Contract(chainAssetHandler, getAbi("L1ChainAssetHandler"), l1Provider);
-    if (await cah.migrationPausedFor(ctx.ctmAddresses.chainTypeManager)) {
-      throw new Error("stage 2 did not release the CTM's migration pause");
-    }
+    const appliedRows = await verifyOperationRowsApplied(l1Provider, operation);
+    console.log(`  ✓ OperationExecuted emitted once; transition committed; ${appliedRows} row(s) at implNew`);
     if (hop.expectsFreshMessageRoot) {
       const expectedMessageRootImpl = merged.core.upgrade_addresses?.bridgehub?.message_root_implementation_addr;
       if (!expectedMessageRootImpl) {
@@ -676,7 +695,7 @@ async function runRecurringHop(
       console.log("  ✓ the pending L2 upgrade transaction survived the patch untouched");
     }
     console.log(
-      `✅ Registry-driven hop ${hop.label} verified: three calls, one transition, chains at ${hop.expectedProtocolVersion}\n`
+      `✅ Registry-driven hop ${hop.label} verified: one call, one transition, chains at ${hop.expectedProtocolVersion}\n`
     );
     return readReportedEip7702Checker(mergedEcosystemToml) ?? ctx.eip7702Checker;
   } finally {
@@ -719,8 +738,7 @@ async function transferL1Ownership(
     l1NativeTokenVault: string;
     l1NullifierProxy?: string;
   },
-  ctmAddresses: { chainTypeManager: string },
-  scenario: PipelineUpgradeScenario
+  ctmAddresses: { chainTypeManager: string }
 ): Promise<void> {
   const gov = l1Addresses.governance;
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.bridgehub);
@@ -732,15 +750,6 @@ async function transferL1Ownership(
   if (l1Addresses.l1NullifierProxy) {
     await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NullifierProxy);
   }
-  // The fixture leaves the ChainAssetHandler owned by its deployer. Governance must own it to
-  // run the stage-0 pauseMigration() governance call. Resolved live — frozen fixtures predate
-  // the ChainAssetHandler appearing in addresses.json.
-  if (scenario.transferL1ChainAssetHandlerOwnership) {
-    const bridgehub = new ethers.Contract(l1Addresses.bridgehub, getAbi("IL1Bridgehub"), provider);
-    const chainAssetHandler: string = await bridgehub.chainAssetHandler();
-    console.log(`   Transferring ChainAssetHandler ${chainAssetHandler} ownership to governance`);
-    await transferOwnership2Step(provider, defaultSigner, gov, chainAssetHandler);
-  }
   await normalizeProxyAdminOwnerToEoa(provider, defaultSigner, ctmAddresses.chainTypeManager);
 }
 
@@ -748,8 +757,8 @@ async function transferL1Ownership(
  * Hand the CTM's ProxyAdmin to governance when a contract owns it.
  *
  * The fixture's CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol`
- * instance; the v35 stage-1 handover (`ProxyAdmin.transferOwnership(migration)`) is emitted as
- * a plain governance call, so governance itself has to be the owner.
+ * instance; the bootstrap bundle's handover (`ProxyAdmin.transferOwnership(migration)`) is a
+ * plain governance call, so governance itself has to be the owner.
  */
 async function normalizeProxyAdminOwnerToEoa(
   provider: ethers.providers.JsonRpcProvider,

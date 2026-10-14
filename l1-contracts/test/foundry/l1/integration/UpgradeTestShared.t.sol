@@ -181,36 +181,28 @@ abstract contract UpgradeIntegrationTestBase is Test {
         console.log("internalTest: Starting");
         vm.recordLogs();
 
-        console.log("internalTest: Preparing core + CTM governance calls and merging by stage");
-        (
-            Call[] memory upgradeStage0Calls,
-            Call[] memory upgradeStage1Calls,
-            Call[] memory upgradeStage2Calls
-        ) = _mergeCoreAndCTMGovernanceCalls();
+        console.log("internalTest: Preparing core + CTM governance calls and merging them into one bundle");
+        Call[] memory upgradeCalls = _mergeCoreAndCTMGovernanceCalls();
 
-        // Cached for migration-pause outcome checks across stages 0..2.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
+        address ctm = ctmUpgrade.getCTMAddress();
+        bool pausedBefore = IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm);
 
         console.log("Executing CTM admin calls through the current operational owner");
         executeCTMAdminCalls();
 
-        console.log("Starting upgrade stage 0 (core + CTM merged)!");
-        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage0Calls);
-        // Stage 0 must pause migrations so setNewVersionUpgrade in stage 1 can run.
-        assertTrue(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "Stage 0 should pause migrations");
-
-        console.log("Starting upgrade stage 1 (core + CTM merged)!");
-        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage1Calls);
-
-        console.log("Starting upgrade stage 2 (core + CTM merged)!");
-        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage2Calls);
-        // Stage 2 must unpause migrations on L1 (DefaultCoreUpgrade.prepareUnpauseGatewayMigrationsCall).
-        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "Stage 2 should unpause migrations");
+        console.log("Executing the governance bundle (core + CTM merged)!");
+        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeCalls);
+        assertEq(
+            IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm),
+            pausedBefore,
+            "the upgrade neither takes nor lifts a migration pause"
+        );
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 
-        // Capture stage 0..2 events for assertion below.
+        // Capture the bundle's events for assertion below.
         Vm.Log[] memory ecosystemLogs = vm.getRecordedLogs();
 
         Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(
@@ -246,7 +238,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
         vm.stopPrank();
         Vm.Log[] memory chainOpsLogs = vm.getRecordedLogs();
 
-        // Stage 0..2 ecosystem events
+        // The bundle's ecosystem events
         Vm.Log memory npv = ecosystemLogs.requireOneFrom(
             "NewProtocolVersion(uint256,uint256)",
             ctmUpgrade.getCTMAddress()
@@ -311,33 +303,13 @@ abstract contract UpgradeIntegrationTestBase is Test {
         // so it was tested in e2e local environment.
     }
 
-    /// @dev Merges per-stage governance calls from core and CTM. Inlines the orchestration that
-    ///      `DefaultEcosystemUpgrade.prepareDefaultGovernanceCalls` used to do; no merged TOML is
-    ///      written because production callers now pass the per-script TOMLs to
-    ///      `protocol-ops upgrade-governance` separately.
-    function _mergeCoreAndCTMGovernanceCalls()
-        internal
-        returns (Call[] memory stage0, Call[] memory stage1, Call[] memory stage2)
-    {
-        (Call[] memory coreStage0, Call[] memory coreStage1, Call[] memory coreStage2) = coreUpgrade
-            .prepareDefaultGovernanceCalls();
-        (Call[] memory ctmStage0, Call[] memory ctmStage1, Call[] memory ctmStage2) = ctmUpgrade
-            .prepareDefaultGovernanceCalls();
-
-        Call[][] memory s0 = new Call[][](2);
-        s0[0] = coreStage0;
-        s0[1] = ctmStage0;
-        stage0 = UpgradeUtils.mergeCallsArray(s0);
-
-        Call[][] memory s1 = new Call[][](2);
-        s1[0] = coreStage1;
-        s1[1] = ctmStage1;
-        stage1 = UpgradeUtils.mergeCallsArray(s1);
-
-        Call[][] memory s2 = new Call[][](2);
-        s2[0] = coreStage2;
-        s2[1] = ctmStage2;
-        stage2 = UpgradeUtils.mergeCallsArray(s2);
+    /// @dev Merges the core and CTM prepares' governance calls into one bundle, core first — what
+    ///      the protocol-ops merge does with the per-script TOMLs.
+    function _mergeCoreAndCTMGovernanceCalls() internal returns (Call[] memory calls) {
+        Call[][] memory parts = new Call[][](2);
+        parts[0] = coreUpgrade.prepareDefaultGovernanceCalls();
+        parts[1] = ctmUpgrade.prepareDefaultGovernanceCalls();
+        calls = UpgradeUtils.mergeCallsArray(parts);
     }
 
     function executeCTMAdminCalls() internal virtual {

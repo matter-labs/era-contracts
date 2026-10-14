@@ -16,7 +16,6 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
@@ -55,14 +54,9 @@ abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
         return upgradeAddresses.ctmTransition;
     }
 
-    /// @notice The operation this prepare deployed — what the three coordinator calls name.
+    /// @notice The operation this prepare deployed — what the coordinator's `execute` call names.
     function preparedOperation() external view returns (address) {
         return upgradeAddresses.ecosystemUpgradeOperation;
-    }
-
-    /// @notice The `GovernanceUpgradeTimer` this prepare deployed.
-    function preparedTimer() external view returns (address) {
-        return upgradeAddresses.upgradeTimer;
     }
 
     /// @notice The engine this prepare DEPLOYED, before any object pinned it — zero when the hop
@@ -242,8 +236,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
     /// @dev Fresh per release, as production rotates the CREATE2 salt every release — without which
     ///      a redeployment of unchanged code lands back on the live address.
     bytes32 internal constant HOP_SALT = keccak256("recurring-hop");
-    /// @dev The salt of a SECOND hop in one test: it must not land on the first hop's (already
-    ///      started) timer.
+    /// @dev The salt of a SECOND hop in one test, rotated like `HOP_SALT` between releases.
     bytes32 internal constant SECOND_HOP_SALT = keccak256("recurring-hop-2");
 
     /// @dev Everything an infrastructure-only operation must leave exactly as it found it.
@@ -299,8 +292,8 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
     /// @notice THE gap this file closes: production preparation emits an operation with an
     ///         infrastructure row and NO transition, so a `ValidatorTimelock` swap costs no
     ///         protocol version. Proves, on the prepared package and then on chain: no transition
-    ///         and no engine were deployed, the operation carries the row and its timer, and after
-    ///         the three coordinator stages nothing chain-facing has moved.
+    ///         and no engine were deployed, the operation carries the row and nothing else, and
+    ///         after the coordinator's `execute` nothing chain-facing has moved.
     function test_infrastructureOnlyPrepare_swapsOneProxyAndMovesNoVersion() public {
         CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
         RecurringCTMUpgradeForTests hop = new CTMUpgradeValidatorTimelockOnly();
@@ -323,13 +316,11 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
             "the prepare's own view of the edge moves no version"
         );
 
-        // ── The operation carries the row and its timer, and nothing else ──
+        // ── The operation carries the row, and nothing else ──
         IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
         assertTrue(address(operation).code.length != 0, "the prepare must deploy an operation");
         assertEq(operation.ctmTransition(), address(0), "the operation names no transition");
         assertEq(operation.coreTransition(), address(0), "the operation names no core transition");
-        assertEq(operation.timer(), hop.preparedTimer(), "the operation names this prepare's timer");
-        assertTrue(operation.timer().code.length != 0, "the named timer must be deployed");
 
         ProxyUpgradeRow[] memory rows = operation.ctmInfrastructureRows();
         assertEq(rows.length, 1, "exactly one participating row");
@@ -353,10 +344,6 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
             "the timelock proxy points at the new implementation"
         );
         _assertChainFacingUnchanged(before);
-        assertFalse(
-            IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(inputs.ctm),
-            "stage 2 must release the migration pause"
-        );
     }
 
     /// @notice A chain-release hop through the same pipeline still works: a fresh verifier is
@@ -511,7 +498,8 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
 
     /// @notice `L1InteropHandler` and `ChainRegistrationSender` are installable like every other
     ///         ecosystem singleton: declared and differing, each is deployed, pinned as a row departing
-    ///         from its live implementation, and swapped by the core executor in stage 1.
+    ///         from its live implementation, and swapped by the core executor when the operation
+    ///         executes.
     function test_corePrepare_installsTheInteropHandlerAndRegistrationSender() public {
         CoreUpgradeDeclaredInteropAndRegistration core = new CoreUpgradeDeclaredInteropAndRegistration();
         RecurringCTMUpgradeForTests hop = new CTMUpgradeEmpty();
@@ -593,11 +581,6 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         _finishPrepare(core, hop);
 
         assertEq(hop.upgradeCoordinator(), coordinator, "the coordinator the CTM's executor answers to");
-        assertEq(
-            GovernanceUpgradeTimer(hop.preparedTimer()).TIMER_GOVERNANCE(),
-            coordinator,
-            "the timer is bound to it"
-        );
         string memory output = vm.readFile(
             string.concat(vm.projectRoot(), "/script-out/foundry-upgrade/recurring-derived-coordinator-ctm.toml")
         );
@@ -783,22 +766,16 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         _hop.prepareCTMUpgrade();
     }
 
-    /// @dev The three governance calls a registry-driven upgrade emits, and nothing else.
+    /// @dev The one governance call a registry-driven upgrade emits, and nothing else.
     function _runOperation(IEcosystemUpgradeOperation _operation) internal {
-        EcosystemUpgradeExecutor executor = EcosystemUpgradeExecutor(payable(coordinator));
-        vm.startPrank(governanceOwner);
-        executor.stage0(_operation);
-        assertTrue(
+        bool pausedBefore = IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(inputs.ctm);
+        vm.prank(governanceOwner);
+        EcosystemUpgradeExecutor(payable(coordinator)).execute(_operation);
+        assertEq(
             IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(inputs.ctm),
-            "stage 0 pauses migrations for every operation"
+            pausedBefore,
+            "an operation neither takes nor lifts a migration pause"
         );
-        // The timer's initial delay is zero in this fixture; move past it regardless so the
-        // deadline check is exercised rather than skirted.
-        vm.warp(block.timestamp + 1);
-        executor.stage1(_operation);
-        executor.stage2(_operation);
-        vm.stopPrank();
-        assertEq(address(executor.pendingOperation()), address(0), "the lifecycle slot must be free");
     }
 
     function _snapshotChainFacing() internal view returns (ChainFacingState memory state) {

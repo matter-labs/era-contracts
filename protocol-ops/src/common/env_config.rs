@@ -159,7 +159,7 @@ pub struct UpgradeInputs {
     pub era_chain_id: Option<u64>,
     /// Whether THIS release replaces the ecosystem's governance set (a new
     /// `ProtocolUpgradeHandler` implementation plus Guardians / SecurityCouncil /
-    /// EmergencyUpgradeBoard, wired in by four stage-0 calls — see
+    /// EmergencyUpgradeBoard, wired in by four governance calls — see
     /// [`crate::commands::ecosystem::zk_governance`]).
     ///
     /// Absent (the default) means no. `governance_kind = "puh"` is NOT this statement:
@@ -677,9 +677,8 @@ mod tests {
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the
     /// `[create2_factory_salts]` table and `[contracts] create2_factory_salt`
-    /// — gov-replay relies on distinct per-CTM salts to keep
-    /// `GovernanceUpgradeTimer` deploys at different CREATE2 addresses
-    /// across Era and ZKsyncOS CTMs.
+    /// — the prepare relies on distinct per-CTM salts to keep each CTM's
+    /// deployments at different CREATE2 addresses across Era and ZKsyncOS CTMs.
     #[test]
     fn stage_env_config_reads_create2_salts() {
         let cfg = load_current("stage");

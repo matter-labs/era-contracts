@@ -4,7 +4,7 @@
 //!
 //! The pre-registry verifier had one module per release, because the reviewable artifact WAS the
 //! calldata: every release produced different calls, so every release needed its own re-derivation
-//! of them. A registry-driven package inverts that. Governance signs three calls naming one
+//! of them. A registry-driven package inverts that. Governance signs one call naming one
 //! write-once object, and everything executable is derived on-chain from that object at execution
 //! time. What a reviewer checks is therefore the same for v36 as for v37 — the objects, and that
 //! the signed transaction invokes them — so there is one verifier, not one per release.
@@ -18,8 +18,8 @@
 //!
 //!   1. Was every object PRODUCED by the reviewed code's constructor from its reviewed
 //!      arguments? ([`construction`]) — the manifest a write-once object serves, an executor's
-//!      deploy-time record ([`lifecycle`]), or the reviewed owner and bindings the timer or the
-//!      bootstrap sequence was built over. The question a runtime codehash cannot answer, and
+//!      deploy-time record ([`lifecycle`]), or the migration and core transition the bootstrap
+//!      sequence was built over. The question a runtime codehash cannot answer, and
 //!      the reason the chain no longer pretends to answer it. Every object a package names gets
 //!      this check, on both paths.
 //!   2. Does every immutable-free object run the code the reviewed commit produces?
@@ -32,7 +32,7 @@
 //!      no nomination outstanding on any authority the upgrade drives?
 //!   6. Does every proxy row depart from the implementation that is actually live, read through
 //!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — completion does not
-//!      re-read implementations ("Stages" in `protocol-docs/ecosystem-upgrade-coordination.md`).
+//!      re-read implementations (`protocol-docs/ecosystem-upgrade-coordination.md`).
 //!   7. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
 //!      address — and nothing else?
 //!

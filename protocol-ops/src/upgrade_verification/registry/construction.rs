@@ -22,7 +22,7 @@
 //!
 //! The arguments are a manifest for the write-once objects (read off the object itself, which
 //! the match then proves it was built from) and the binding values for the lifecycle objects —
-//! the executors, the timer, the bootstrap sequence — whose constructors set immutables. Those
+//! the executors and the bootstrap sequence — whose constructors set immutables. Those
 //! are the objects a runtime codehash cannot identify at all (the artifact's immutable slots are
 //! zero), so construction is the ONLY identity check they get, and its arguments come from the
 //! reviewed package and manifest — for an executor, from the record of the run that deployed it,
@@ -57,7 +57,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy::primitives::{keccak256, Address, Bytes, B256};
 use alloy::sol_types::SolValue;
 
 use crate::upgrade_verification::constants::ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR;
@@ -117,7 +117,6 @@ impl ReviewedBuild {
             ("EcosystemUpgradeExecutor.sol", "EcosystemUpgradeExecutor"),
             ("CoreUpgradeExecutor.sol", "CoreUpgradeExecutor"),
             ("CTMUpgradeExecutor.sol", "CTMUpgradeExecutor"),
-            ("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer"),
         ];
         let mut loaded = HashMap::new();
         for (file, name) in OBJECT_TYPES {
@@ -352,23 +351,6 @@ pub(crate) mod constructor_args {
         coordinator: Address,
     ) -> Vec<u8> {
         (initial_owner, ctm, ctm_proxy_admin, coordinator).abi_encode_params()
-    }
-
-    /// `GovernanceUpgradeTimer(uint256 _initialDelay, uint256 _maxAdditionalDelay, address
-    /// _timerGovernance, address _initialOwner)`.
-    pub(crate) fn governance_upgrade_timer(
-        initial_delay: U256,
-        max_additional_delay: U256,
-        timer_governance: Address,
-        initial_owner: Address,
-    ) -> Vec<u8> {
-        (
-            initial_delay,
-            max_additional_delay,
-            timer_governance,
-            initial_owner,
-        )
-            .abi_encode_params()
     }
 
     /// `RegistryBootstrapSequence(RegistryBootstrapMigration _migration, ICoreTransition _coreTransition)`.
@@ -771,26 +753,6 @@ mod tests {
         assert_eq!(encoded.len(), 64);
         assert_eq!(word_of_address(&encoded, 0), migration);
         assert_eq!(word_of_address(&encoded, 1), registry);
-    }
-
-    #[test]
-    fn timer_arguments_encode_delays_as_full_words() {
-        let governance = Address::repeat_byte(0x08);
-        let owner = Address::repeat_byte(0x09);
-        let encoded = constructor_args::governance_upgrade_timer(
-            U256::from(172_800u64),
-            U256::from(1_209_600u64),
-            governance,
-            owner,
-        );
-        assert_eq!(encoded.len(), 128);
-        assert_eq!(U256::from_be_slice(&encoded[..32]), U256::from(172_800u64));
-        assert_eq!(
-            U256::from_be_slice(&encoded[32..64]),
-            U256::from(1_209_600u64)
-        );
-        assert_eq!(word_of_address(&encoded, 2), governance);
-        assert_eq!(word_of_address(&encoded, 3), owner);
     }
 
     /// The owner is an argument like any other: a genuine executor built for a different owner

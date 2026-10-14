@@ -26,7 +26,7 @@ import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2
 
 /// @notice The default delegate-calldata composer: the pinned code that DEFINES what `L2DefaultUpgrade`
 ///         is called with, from the target release, the ecosystem's Bridgehub and the chain the
-///         transaction is composed for — see "L2 delegate composition" in {docs/upgrade-stage-lifecycle.md}.
+///         transaction is composed for — see "Flow: upgrading" in {docs/registry-driven-upgrades.md}.
 /// @dev The releases are real write-once `CTMRelease` objects. The ecosystem behind the Bridgehub
 ///      (its CTM deployer, asset router and native token vault) is mocked by the shared fixture,
 ///      which has no live vault; the ERC20 base token IS real, since its metadata is what the

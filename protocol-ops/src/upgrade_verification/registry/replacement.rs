@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 
-use crate::common::external_actions::ExternalAction;
+use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::report::VerificationResult;
 
@@ -27,9 +27,7 @@ use super::operation::{
 };
 use super::package::{DeadlineChange, RecoveredReplacement, ReplacementPackage};
 use super::provenance::{expect_code_present, tolerate, CodeIdentity};
-use super::views::{
-    CTMTransitionView, CTMUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView,
-};
+use super::views::{CTMTransitionView, CtmView, EcosystemUpgradeExecutorView};
 
 /// Verify a transition replacement against the live L1 it targets.
 pub(crate) async fn verify<P: Provider>(
@@ -47,13 +45,12 @@ pub(crate) async fn verify<P: Provider>(
     result.print_info("== Package ==");
     result.report_ok(&format!(
         "a transition replacement on CTM section [{}]: replaces {} with {} on CTM {}, forwarded \
-         by {} (stage {} call {})",
+         by {} (bundle call {})",
         package.ctm_key,
         forward.expected,
         forward.replacement,
         forward.ctm,
         forward.executor,
-        forward.stage,
         forward.index
     ));
     for (field, reported, actual, what) in [
@@ -232,24 +229,6 @@ pub(crate) async fn verify<P: Provider>(
              held against the review",
         ),
     }
-    // A replacement needs no reservation and may land mid-operation (an operation whose
-    // transition is replaced still completes), so a reservation is reported, not refused.
-    if let Some(reserved) = tolerate(
-        CTMUpgradeExecutorView::new(forward.executor, provider)
-            .activeOperation()
-            .call()
-            .await,
-        result,
-        "the CTM executor's activeOperation()",
-    ) {
-        if !reserved.is_zero() {
-            result.print_info(&format!(
-                "  the CTM executor is reserved for operation {reserved}: it still completes \
-                 after the replacement, since its departure stays committed"
-            ));
-        }
-    }
-
     // ── 3. The commitment being replaced, and where the replacement lands ──
     result.print_info("\n== Departing state ==");
     if let (Some(expected), Some(replacement)) = (expected, replacement) {
@@ -276,7 +255,7 @@ pub(crate) async fn verify<P: Provider>(
     judge_replacement_calls(
         result,
         forward,
-        [&package.stage0, &package.stage1, &package.stage2],
+        &package.calls,
         &package.external_actions,
         ctm_owner,
     );
@@ -480,26 +459,17 @@ pub(super) fn judge_replacement_state(result: &mut VerificationResult, facts: &R
     }
 }
 
-/// The calldata verdict: the forward runs through the executor that owns the CTM, in stage 1, and
-/// every other call is a declared external action reaching neither of them.
+/// The calldata verdict: the forward runs through the executor that owns the CTM, and every other
+/// call of the bundle is a declared governance external action reaching neither of them.
 ///
 /// `ctm_owner` is the CTM's live owner (`None` when unreadable, already reported).
 pub(super) fn judge_replacement_calls(
     result: &mut VerificationResult,
     forward: &RecoveredReplacement,
-    stages: [&[GovernanceCall]; 3],
+    calls: &[GovernanceCall],
     declared: &[ExternalAction],
     ctm_owner: Option<Address>,
 ) {
-    if forward.stage == 1 {
-        result.report_ok("the forward is a stage-1 call");
-    } else {
-        result.report_error(&format!(
-            "the forward sits in stage {}: a replacement's prepare emits it in stage 1, so the \
-             bundle is not one the prepare produced",
-            forward.stage
-        ));
-    }
     match ctm_owner {
         Some(owner) if owner == forward.executor => result.report_ok(&format!(
             "the forward targets {owner}, the CTM executor that owns the CTM"
@@ -514,41 +484,37 @@ pub(super) fn judge_replacement_calls(
     }
 
     let mut extras = 0usize;
-    for (stage, calls) in stages.iter().enumerate() {
-        let phase = stage.to_string();
-        for (index, call) in calls.iter().enumerate() {
-            if (stage, index) == (forward.stage, forward.index) {
-                continue;
-            }
-            let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
-            if call.target == forward.executor || call.target == forward.ctm {
+    for (index, call) in calls.iter().enumerate() {
+        if index == forward.index {
+            continue;
+        }
+        let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
+        if call.target == forward.executor || call.target == forward.ctm {
+            extras += 1;
+            result.report_error(&format!(
+                "the bundle calls {} (selector 0x{selector}) besides the replacement's forward: \
+                 the CTM and its executor take exactly the reviewed forward, so an extra call to \
+                 either is authority the review never saw, declared or not",
+                call.target
+            ));
+            continue;
+        }
+        match declared
+            .iter()
+            .find(|action| action.phase == GOVERNANCE_PHASE && action.is_call(call))
+        {
+            Some(action) => result.print_info(&format!(
+                "  bundle -> declared external action `{}` on {} (selector 0x{selector})",
+                action.label, call.target
+            )),
+            None => {
                 extras += 1;
                 result.report_error(&format!(
-                    "stage {stage} calls {} (selector 0x{selector}) besides the replacement's \
-                     forward: the CTM and its executor take exactly the reviewed forward, so an \
-                     extra call to either is authority the review never saw, declared or not",
+                    "the bundle calls {} (selector 0x{selector}), which is neither the \
+                     replacement's forward nor a declared governance external action: the bundle \
+                     carries an instruction no part of this review accounts for",
                     call.target
                 ));
-                continue;
-            }
-            match declared
-                .iter()
-                .find(|action| action.phase == phase && action.is_call(call))
-            {
-                Some(action) => result.print_info(&format!(
-                    "  stage {stage} -> declared external action `{}` on {} (selector \
-                     0x{selector})",
-                    action.label, call.target
-                )),
-                None => {
-                    extras += 1;
-                    result.report_error(&format!(
-                        "stage {stage} calls {} (selector 0x{selector}), which is neither the \
-                         replacement's forward nor a declared external action: the bundle carries \
-                         an instruction no part of this review accounts for",
-                        call.target
-                    ));
-                }
             }
         }
     }
@@ -926,9 +892,8 @@ mod tests {
     const CTM: Address = Address::repeat_byte(0xC7);
     const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
 
-    fn recovered(stage: usize, index: usize) -> RecoveredReplacement {
+    fn recovered(index: usize) -> RecoveredReplacement {
         RecoveredReplacement {
-            stage,
             index,
             executor: CTM_EXECUTOR,
             ctm: CTM,
@@ -957,24 +922,17 @@ mod tests {
 
     fn judge_calls(
         forward: &RecoveredReplacement,
-        stages: [Vec<GovernanceCall>; 3],
+        calls: Vec<GovernanceCall>,
         declared: &[ExternalAction],
         ctm_owner: Option<Address>,
     ) -> VerificationResult {
         let mut result = VerificationResult::default();
-        judge_replacement_calls(
-            &mut result,
-            forward,
-            [&stages[0], &stages[1], &stages[2]],
-            declared,
-            ctm_owner,
-        );
+        judge_replacement_calls(&mut result, forward, &calls, declared, ctm_owner);
         result
     }
 
     fn declared_forward() -> Vec<ExternalAction> {
-        vec![ExternalAction::for_stage(
-            1,
+        vec![ExternalAction::governance(
             "replace the committed transition",
             "CTM executor owner (governance)",
             &the_forward(),
@@ -984,8 +942,8 @@ mod tests {
     #[test]
     fn the_single_forward_through_the_ctms_executor_passes() {
         let result = judge_calls(
-            &recovered(1, 0),
-            [Vec::new(), vec![the_forward()], Vec::new()],
+            &recovered(0),
+            vec![the_forward()],
             &declared_forward(),
             Some(CTM_EXECUTOR),
         );
@@ -996,8 +954,8 @@ mod tests {
     #[test]
     fn a_forward_to_a_non_executor_fails() {
         let result = judge_calls(
-            &recovered(1, 0),
-            [Vec::new(), vec![the_forward()], Vec::new()],
+            &recovered(0),
+            vec![the_forward()],
             &declared_forward(),
             Some(STRANGER),
         );
@@ -1005,21 +963,10 @@ mod tests {
     }
 
     #[test]
-    fn a_forward_outside_stage_one_fails() {
-        let result = judge_calls(
-            &recovered(0, 0),
-            [vec![the_forward()], Vec::new(), Vec::new()],
-            &declared_forward(),
-            Some(CTM_EXECUTOR),
-        );
-        assert_eq!(result.errors, 1);
-    }
-
-    #[test]
     fn an_extra_undeclared_call_fails() {
         let result = judge_calls(
-            &recovered(1, 0),
-            [Vec::new(), vec![the_forward()], vec![other(STRANGER)]],
+            &recovered(0),
+            vec![the_forward(), other(STRANGER)],
             &declared_forward(),
             Some(CTM_EXECUTOR),
         );
@@ -1029,19 +976,35 @@ mod tests {
     #[test]
     fn a_declared_call_outside_the_ctm_domain_rides_along() {
         let mut declared = declared_forward();
-        declared.push(ExternalAction::for_stage(
-            2,
+        declared.push(ExternalAction::governance(
             "an unrelated wiring",
             "governance",
             &other(STRANGER),
         ));
         let result = judge_calls(
-            &recovered(1, 0),
-            [Vec::new(), vec![the_forward()], vec![other(STRANGER)]],
+            &recovered(1),
+            vec![other(STRANGER), the_forward()],
             &declared,
             Some(CTM_EXECUTOR),
         );
         assert_eq!(result.errors, 0);
+    }
+
+    /// An `admin` declaration rides no governance bundle, so it does not excuse a bundle call.
+    #[test]
+    fn an_admin_declaration_does_not_account_for_a_bundle_call() {
+        let mut declared = declared_forward();
+        let mut wiring =
+            ExternalAction::governance("an unrelated wiring", "governance", &other(STRANGER));
+        wiring.phase = "admin".to_string();
+        declared.push(wiring);
+        let result = judge_calls(
+            &recovered(0),
+            vec![the_forward(), other(STRANGER)],
+            &declared,
+            Some(CTM_EXECUTOR),
+        );
+        assert_eq!(result.errors, 1);
     }
 
     /// A second call to the executor or the CTM is authority the review never saw — declaring it
@@ -1050,15 +1013,14 @@ mod tests {
     fn a_declared_extra_call_into_the_ctm_domain_fails() {
         for target in [CTM_EXECUTOR, CTM] {
             let mut declared = declared_forward();
-            declared.push(ExternalAction::for_stage(
-                1,
+            declared.push(ExternalAction::governance(
                 "extra",
                 "governance",
                 &other(target),
             ));
             let result = judge_calls(
-                &recovered(1, 0),
-                [Vec::new(), vec![the_forward(), other(target)], Vec::new()],
+                &recovered(0),
+                vec![the_forward(), other(target)],
                 &declared,
                 Some(CTM_EXECUTOR),
             );

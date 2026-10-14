@@ -12,15 +12,12 @@ import {CoreUpgradeExecutor} from "../executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
-import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {
     BootstrapAuthorityNotHeld,
     BootstrapExecutorNotBound,
     BootstrapExecutorOwnerMismatch,
     BootstrapNominationPending,
-    BootstrapServerNotifierNotBound,
-    MigrationPaused
+    BootstrapServerNotifierNotBound
 } from "../../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -51,8 +48,8 @@ library RegistryAuthorityLib {
 
     /// @notice Reverts unless the whole shape holds: the CTM and its `ProxyAdmin` are the CTM
     ///         executor's with no nomination outstanding on the CTM, the executors are governed and
-    ///         bound ({requireExecutorsBound}), the ServerNotifier is the CTM domain's
-    ///         ({requireNotifierHandedOver}), and the CTM's chain migrations are not paused.
+    ///         bound ({requireExecutorsBound}), and the ServerNotifier is the CTM domain's
+    ///         ({requireNotifierHandedOver}).
     /// @param _a The authority shape to check.
     function requireRegistryAuthority(Authority memory _a) internal view {
         address ctmOwner = Ownable2Step(_a.ctm).owner();
@@ -66,12 +63,6 @@ library RegistryAuthorityLib {
         }
         requireExecutorsBound(_a);
         requireNotifierHandedOver(_a);
-        IChainAssetHandlerBase chainAssetHandler = IChainAssetHandlerBase(
-            IBridgehubBase(IChainTypeManager(_a.ctm).BRIDGE_HUB()).chainAssetHandler()
-        );
-        if (chainAssetHandler.migrationPausedFor(_a.ctm)) {
-            revert MigrationPaused();
-        }
     }
 
     /// @notice Reverts unless every executor is checked BY VALUE against what it is handed: each is

@@ -58,6 +58,15 @@ under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge on
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 
+The merged package `<env-out>/ecosystem.toml` carries ONE governance bundle, `[governance_calls] calls`, in this
+order: the merge's own extras (the PUH/Guardians wiring when the release redeploys the governance set, then any CTM
+`acceptOwnership()` normalization), the core prepare's declared calls, the derived
+`EcosystemUpgradeExecutor.execute(operation)` (recurring upgrades only), then the CTM prepare's declared calls.
+Every call but `execute` is declared in `external_actions`. A recurring upgrade's bundle is therefore one call
+when nothing else is declared; the bootstrap edge's is the list `RegistryBootstrapSequence.actions()` derives,
+ending in the edge's completion check `validateApplied()`, so an edge that does not complete reverts the whole
+bundle. `ecosystem upgrade-governance` replays that bundle on a fork as the governance owner.
+
 A fresh ecosystem (`ecosystem init`, or `hub init` + `ctm init`) is born into the registry model: the
 deployer creates the core executor, the coordinator and the CTM executor, hands them the ProxyAdmins, the CTM
 and the ServerNotifier, and nominates the ecosystem governance, which `hub init` / `ctm init` accept. Its first
@@ -92,10 +101,10 @@ cargo run --release --bin protocol_ops -- ecosystem upgrade-prepare-all --env <e
 ```
 
 The prepare deploys only the replacement `CTMTransition` (under the CTM salt), landing on an existing release,
-and emits one stage-1 governance call, `CTMUpgradeExecutor.forward([replaceUpgradeTransition(expected,
+and emits one governance call, `CTMUpgradeExecutor.forward([replaceUpgradeTransition(expected,
 replacement)])`, optionally followed in the same `forward` by `setProtocolVersionDeadline`. The merged package
-has no `[operation]`; `upgrade-governance` replays it like any other (empty stages are skipped). Verify it with
-`verify-package` before it is signed (see below).
+has no `[operation]`; `upgrade-governance` replays it like any other. Verify it with `verify-package` before it
+is signed (see below).
 
 ## Environment inputs
 
@@ -103,8 +112,7 @@ has no `[operation]`; `upgrade-governance` replays it like any other (empty stag
 `<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`, `era_chain_id`
 and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
 `[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
-reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set) for protocol-ops,
-and `governance_upgrade_timer_initial_delay` for `DefaultCTMUpgrade`. The old
+reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set). The old
 protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (`current_upgrade_env_dir!` in
 `src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another (on the commands built on the
 shared `--env` topology args; `ecosystem init` / `ctm init` always use the current release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
@@ -145,16 +153,16 @@ It answers two questions and keeps them apart.
 
 **What does this upgrade do?** is answered by reviewing the objects the package names — the
 operation, the transition it may carry, the release pair, the core registry, and the lifecycle
-objects it runs through (the coordinator, both domain executors, the timer; for the bootstrap edge
-also the migration and the sequence its calls are derived from). Each is held against its own
+objects it runs through (the coordinator and both domain executors; for the bootstrap edge also the
+migration and the sequence its calls are derived from). Each is held against its own
 construction: the reviewed creation code, run on that object's reviewed constructor arguments,
 must land at the object's address. For a write-once object those arguments are the manifest it
-serves; for an executor they are the ones its record states (below), and for the timer and the
-bootstrap sequence the reviewed governance owner and the bindings the package records — never the
-object's own getters, since a genuine executor built for an attacker's owner answers them exactly
-like the reviewed one. That is what establishes the audited CONSTRUCTOR
-produced it, which a runtime codehash cannot (and the lifecycle objects set immutables, so no
-codehash identifies them at all) — so it needs the reviewed commit built locally
+serves; for an executor they are the ones its record states (below), and for the bootstrap
+sequence the migration and core transition the package names — never the object's own getters,
+since a genuine executor built for an attacker's owner answers them exactly like the reviewed one.
+That is what establishes the audited CONSTRUCTOR produced it, which a runtime codehash cannot (and
+the lifecycle objects set immutables, so no codehash identifies them at all) — so it needs the
+reviewed commit built locally
 (`cd l1-contracts && forge build`) for the creation code BYTES, and the reviewed CREATE2 salts:
 the core prepare's `[contracts] create2_factory_salt` and the CTM prepare's
 `[create2_factory_salts]` entry, both passed as `--create2-salt` (a package records neither).
@@ -187,20 +195,21 @@ and any `setProtocolVersionDeadline` riding the `forward` are reported. The dest
 existing release, so no genesis is judged on this path.
 
 **Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
-`EcosystemUpgradeExecutor.stage0/1/2(operation)` on the reviewed coordinator and comparing byte
-for byte. The operation's internal calls are deliberately not re-derived — the executors derive
-them on chain from the same pinned object. Any call that is neither a lifecycle call nor a
-declared external action fails the run. For the bootstrap edge each stage must carry the run the
-construction-verified sequence derives, in order, and every other call must be a declared external
-action to a target outside the edge's authorities — an extra call to the CTM, a `ProxyAdmin`, an
-executor, the timer or an object is an error whether declared or not. A replacement's stage 1 must
-carry the one `forward`, sent to the executor that owns the CTM, and nothing else may reach the CTM
-or its executor.
+`EcosystemUpgradeExecutor.execute(operation)` on the reviewed coordinator and comparing byte for
+byte; the bundle must carry it exactly once. The operation's internal calls are deliberately not
+re-derived — the executors derive them on chain from the same pinned object. Any call that is
+neither the executor call nor a declared governance external action fails the run. For the
+bootstrap edge the bundle must END with the run `actions()` of the construction-verified sequence
+derives, in order — whose last call is `validateApplied()` on the migration, so a failing completion
+check reverts the whole bootstrap — and every call before it must be a declared external action to
+a target outside the edge's authorities: an extra call to the CTM, a `ProxyAdmin`, an executor or an
+object is an error whether declared or not. A replacement's bundle must carry the one `forward`,
+sent to the executor that owns the CTM, and nothing else may reach the CTM or its executor.
 
 Around those it checks what the objects cannot answer for themselves: authority bound where the
 review says (governance, coordinator, both domain executors, the CTM and both ProxyAdmins), the
 live state the upgrade departs from, and readiness — the L2 factory dependencies published on the
-CTM's supplier, the timer startable, no lifecycle already in flight. Readiness is reported apart
+CTM's supplier. Readiness is reported apart
 from anything about value. For the bootstrap edge it also lists, as warnings, every chain on the
 CTM still below the departing version: those chains keep upgrading along the pre-registry edges
 through the CTM's legacy `protocolVersionVerifier` getter.

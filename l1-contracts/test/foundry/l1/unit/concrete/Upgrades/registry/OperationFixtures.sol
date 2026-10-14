@@ -5,16 +5,10 @@ import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition
 import {OperationManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {CTM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
-/// @dev Builders for the write-once operations the coordinator's stages take. The timer is
-///      operation state now, and a `GovernanceUpgradeTimer` starts exactly once, so every
-///      operation gets its own — `_newOperationTimer` is the fixture's factory for a zero-delay
-///      one bound to its coordinator.
+/// @dev Builders for the write-once operations the coordinator's `execute` takes, cached per
+///      transition so drivers keyed on the transition pick up the operation built over it.
 abstract contract OperationFixtures {
     mapping(address transition => EcosystemUpgradeOperation operation) internal operationOf;
-
-    /// @dev A fresh zero-delay timer bound to the fixture's coordinator, so stage 1 is admissible
-    ///      in the block stage 0 ran in.
-    function _newOperationTimer() internal virtual returns (address);
 
     function _cachedOperationFor(ICTMTransition _transition) internal returns (EcosystemUpgradeOperation operation) {
         operation = operationOf[address(_transition)];
@@ -23,13 +17,13 @@ abstract contract OperationFixtures {
         }
     }
 
-    /// @dev The operation over `_transition` carrying `_ctmInfrastructure`, cached so the stage
+    /// @dev The operation over `_transition` carrying `_ctmInfrastructure`, cached so the
     ///      drivers keyed on the transition pick it up.
     function _operationWithInfrastructure(
         ICTMTransition _transition,
         ProxyUpgradeRow[] memory _ctmInfrastructure
     ) internal returns (EcosystemUpgradeOperation operation) {
-        operation = _deployOperation(address(0), _ctmInfrastructure, address(_transition), _newOperationTimer());
+        operation = _deployOperation(address(0), _ctmInfrastructure, address(_transition));
         operationOf[address(_transition)] = operation;
     }
 
@@ -45,22 +39,20 @@ abstract contract OperationFixtures {
         address _coreTransition,
         address _transition
     ) internal returns (EcosystemUpgradeOperation) {
-        return _deployOperation(_coreTransition, _emptyInventory(), _transition, _newOperationTimer());
+        return _deployOperation(_coreTransition, _emptyInventory(), _transition);
     }
 
     function _deployOperation(
         address _coreTransition,
         ProxyUpgradeRow[] memory _ctmInfrastructure,
-        address _transition,
-        address _timer
+        address _transition
     ) internal returns (EcosystemUpgradeOperation) {
         return
             new EcosystemUpgradeOperation(
                 OperationManifest({
                     coreTransition: _coreTransition,
                     ctmInfrastructure: _ctmInfrastructure,
-                    ctmTransition: _transition,
-                    timer: _timer
+                    ctmTransition: _transition
                 })
             );
     }

@@ -17,6 +17,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
@@ -58,7 +59,7 @@ contract FreshVerifierReleaseHop is DefaultCTMUpgrade {
         return upgradeAddresses.ctmTransition;
     }
 
-    /// @notice The operation the coordinator's three stage calls name.
+    /// @notice The operation the coordinator's `execute` call names.
     function preparedOperation() external view returns (address) {
         return upgradeAddresses.ecosystemUpgradeOperation;
     }
@@ -165,8 +166,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         replacement.setReplacedTransition(address(replaced));
         replacement.prepareCTMUpgrade();
         replacement.prepareDefaultCTMAdminCalls();
-        (Call[] memory stage0, Call[] memory stage1, Call[] memory stage2) = replacement
-            .prepareDefaultGovernanceCalls();
+        Call[] memory bundle = replacement.prepareDefaultGovernanceCalls();
 
         // ── The replacement departs exactly where the replaced edge does, onto the release a chain continues from ──
         ICTMTransition repaired = ICTMTransition(replacement.preparedReplacement());
@@ -178,17 +178,15 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         assertTrue(repaired.upgradeEngine() != replaced.upgradeEngine(), "this run's engine is the repair");
 
         // ── One call, and nothing else ──
-        assertEq(stage0.length, 0, "nothing in stage 0");
-        assertEq(stage2.length, 0, "nothing in stage 2");
-        assertEq(stage1.length, 1, "the single forward");
+        assertEq(bundle.length, 1, "the single forward");
         Call[] memory inner = new Call[](1);
         inner[0] = Call({
             target: ctm,
             value: 0,
             data: abi.encodeCall(IChainTypeManager.replaceUpgradeTransition, (replaced, repaired))
         });
-        assertEq(stage1[0].target, upgradeExecutors.ctmExecutor, "sent to the CTM executor");
-        assertEq(stage1[0].data, abi.encodeCall(IUpgradeExecutorBase.forward, (inner)), "forwarding the replacement");
+        assertEq(bundle[0].target, upgradeExecutors.ctmExecutor, "sent to the CTM executor");
+        assertEq(bundle[0].data, abi.encodeCall(IUpgradeExecutorBase.forward, (inner)), "forwarding the replacement");
         assertEq(replacement.externalActionEntries().length, 1, "declared as the prepare's one external action");
 
         string memory output = vm.readFile(
@@ -203,7 +201,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         // ── Governance executes it ──
         vm.expectEmit(true, true, true, true, ctm);
         emit IChainTypeManager.UpgradeTransitionReplaced(departing, address(replaced), address(repaired));
-        _executeAsGovernance(stage1[0]);
+        _executeAsGovernance(bundle[0]);
         assertEq(IChainTypeManager(ctm).upgradeTransition(departing), address(repaired), "the departure is repaired");
         assertEq(
             IChainTypeManager(ctm).protocolVersionDeadline(departing),
@@ -234,7 +232,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         replacement.setReplacedTransition(address(replaced));
         replacement.setReplacementDeadline(REPLACEMENT_DEADLINE);
         replacement.prepareCTMUpgrade();
-        (, Call[] memory stage1, ) = replacement.prepareDefaultGovernanceCalls();
+        Call[] memory bundle = replacement.prepareDefaultGovernanceCalls();
 
         Call[] memory inner = new Call[](2);
         inner[0] = Call({
@@ -250,10 +248,10 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
             value: 0,
             data: abi.encodeCall(IChainTypeManager.setProtocolVersionDeadline, (departing, REPLACEMENT_DEADLINE))
         });
-        assertEq(stage1.length, 1);
-        assertEq(stage1[0].data, abi.encodeCall(IUpgradeExecutorBase.forward, (inner)), "both calls in one forward");
+        assertEq(bundle.length, 1);
+        assertEq(bundle[0].data, abi.encodeCall(IUpgradeExecutorBase.forward, (inner)), "both calls in one forward");
 
-        _executeAsGovernance(stage1[0]);
+        _executeAsGovernance(bundle[0]);
         assertEq(IChainTypeManager(ctm).upgradeTransition(departing), replacement.preparedReplacement());
         assertEq(IChainTypeManager(ctm).protocolVersionDeadline(departing), REPLACEMENT_DEADLINE, "deadline moved");
     }
@@ -265,8 +263,8 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         FreshTransitionReplacement first = _initReplacement(REPLACEMENT_SALT, "fresh-replacement-first");
         first.setReplacedTransition(address(replaced));
         first.prepareCTMUpgrade();
-        (, Call[] memory stage1, ) = first.prepareDefaultGovernanceCalls();
-        _executeAsGovernance(stage1[0]);
+        Call[] memory bundle = first.prepareDefaultGovernanceCalls();
+        _executeAsGovernance(bundle[0]);
 
         FreshTransitionReplacement stale = _initReplacement(keccak256("stale"), "fresh-replacement-stale");
         stale.setReplacedTransition(address(replaced));
@@ -333,16 +331,13 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         _prepare.setEIP7702Checker(ctmAddresses.admin.eip7702Checker);
     }
 
-    /// @dev The three governance calls of a registry-driven upgrade.
+    /// @dev The one governance call of a registry-driven upgrade.
     function _runOperation(IEcosystemUpgradeOperation _operation) internal {
         EcosystemUpgradeExecutor coordinator = EcosystemUpgradeExecutor(payable(upgradeExecutors.coordinator));
-        vm.startPrank(governance);
-        coordinator.stage0(_operation);
-        vm.warp(block.timestamp + 1);
-        coordinator.stage1(_operation);
-        coordinator.stage2(_operation);
-        vm.stopPrank();
-        assertEq(address(coordinator.pendingOperation()), address(0), "the lifecycle slot is free");
+        vm.expectEmit(true, true, true, true, address(coordinator));
+        emit IEcosystemUpgradeExecutor.OperationExecuted(address(_operation));
+        vm.prank(governance);
+        coordinator.execute(_operation);
     }
 
     function _executeAsGovernance(Call memory _call) internal {

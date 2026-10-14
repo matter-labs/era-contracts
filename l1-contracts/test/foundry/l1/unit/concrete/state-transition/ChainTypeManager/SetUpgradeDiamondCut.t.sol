@@ -12,7 +12,6 @@ import {NoCommittedUpgradeCutForVersion} from "contracts/common/L1ContractErrors
 contract SetUpgradeDiamondCutTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
-        _mockMigrationPausedFromBridgehub();
     }
 
     function test_SettingUpgradeDiamondCutForALegacyCommittedVersion() public {

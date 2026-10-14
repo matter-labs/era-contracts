@@ -103,7 +103,6 @@ contract StorageRegistriesTest is Test {
     address internal genesisUpgrade;
     address internal verifier;
     address internal upgradeEngine;
-    address internal upgradeTimer;
     address internal coreImplNew;
     /// @dev The pinned delegate-calldata composer of the default transition: a test-only stand-in
     ///      returning `DELEGATE_CALLDATA` regardless of its inputs, so this suite can pin a real
@@ -144,9 +143,6 @@ contract StorageRegistriesTest is Test {
         genesisUpgrade = _deployedStub("genesisUpgrade");
         verifier = _deployedStub("verifier");
         upgradeEngine = _deployedStub("upgradeEngine");
-        // The transition only pins the timer (the executor checks its binding), so a stand-in
-        // with real code is all this suite needs.
-        upgradeTimer = _deployedStub("upgradeTimer");
         coreImplNew = _deployedStub("coreImplNew");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         bridgehub = makeAddr("bridgehub");
@@ -608,7 +604,7 @@ contract StorageRegistriesTest is Test {
 
     /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
     ///      execution (`BaseZkSyncUpgrade._setNewProtocolVersion`). Otherwise the transition pins,
-    ///      stage 1 bumps the CTM, and every per-chain upgrade then reverts.
+    ///      the operation bumps the CTM, and every per-chain upgrade then reverts.
     function test_revertWhen_transitionUsesNonzeroMajorVersion() public {
         TransitionManifest memory manifest = _transitionManifest();
         // major = 1 — rejected per-chain, so it must be rejected at pin time too.
@@ -635,8 +631,8 @@ contract StorageRegistriesTest is Test {
     }
 
     /// @dev Regression: a plan whose CONSTRUCTED factory dependencies exceed what
-    ///      `BaseZkSyncUpgrade` accepts must be rejected at pin time. Otherwise stage 1 bumps the
-    ///      CTM version and every per-chain upgrade then reverts, stranding chains on an
+    ///      `BaseZkSyncUpgrade` accepts must be rejected at pin time. Otherwise the operation bumps
+    ///      the CTM version and every per-chain upgrade then reverts, stranding chains on an
     ///      unexecutable transition. The delegate plus `MAX_NEW_FACTORY_DEPS` distinct extras is
     ///      one dependency past the cap; one extra fewer constructs.
     function test_revertWhen_transitionExceedsFactoryDepCap() public {
@@ -716,26 +712,6 @@ contract StorageRegistriesTest is Test {
     }
 
     // ─────────────────────────── operation shape ───────────────────────────
-
-    function test_revertWhen_operationTimerZero() public {
-        // Stage 1 is gated on the timer's deadline, so an operation without one cannot exist.
-        OperationManifest memory manifest = _operationManifest();
-        manifest.timer = address(0);
-
-        vm.expectRevert(ZeroAddress.selector);
-        new EcosystemUpgradeOperation(manifest);
-    }
-
-    function test_revertWhen_operationTimerHasNoCode() public {
-        // Stage 1 calls `checkDeadline()` on the timer, and a call to a codeless address returning
-        // nothing would SUCCEED silently — so the operation's check surface refuses it.
-        EcosystemUpgradeOperation committed = new EcosystemUpgradeOperation(_operationManifest());
-        assertEq(committed.timer(), upgradeTimer, "the timer is served like every other member");
-
-        vm.etch(upgradeTimer, "");
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeTimer));
-        committed.validate();
-    }
 
     /// @dev An operation that changes nothing is a mistake, not an upgrade — and the mere presence
     ///      of an all-inert inventory must not make it look like one that changes something.
@@ -1548,8 +1524,7 @@ contract StorageRegistriesTest is Test {
             OperationManifest({
                 coreTransition: address(0),
                 ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
-                ctmTransition: address(transition),
-                timer: upgradeTimer
+                ctmTransition: address(transition)
             });
     }
 

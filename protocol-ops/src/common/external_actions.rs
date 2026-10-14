@@ -2,13 +2,13 @@
 //! objects do NOT describe, declared by the script that emits it.
 //!
 //! The Solidity side keeps these as structs (`ExternalActionsLib.Ledger`) and derives both halves
-//! of its output from that one ledger — the executable stage bundles via `callsForPhase`, and this
-//! list via `ExternalActionsLib.serialize`:
+//! of its output from that one ledger — the executable governance bundle via `callsForPhase`, and
+//! this list via `ExternalActionsLib.serialize`:
 //!
 //! ```toml
 //! [[external_actions]]
-//! phase = "0"                 # "0" / "1" / "2" for the governance stages, "admin" for admin ones
-//! label = "pause chain migrations"
+//! phase = "governance"        # "governance" for the governance bundle, "admin" for admin ones
+//! label = "bind the coordinator to the CTM executor"
 //! authority = "protocol governance"
 //! target = "0x…"
 //! value = "0"                 # decimal: the field is a uint256
@@ -16,14 +16,17 @@
 //! ```
 //!
 //! Carrying the call itself rather than a rendering of it is what lets the merge check provenance
-//! by identity (see `check_bundle_provenance`): every call of a stage bundle must BE one of that
-//! phase's declared actions. The one-line renderings reviewers read are produced by
+//! by identity (see `check_bundle_provenance`): every call of the governance bundle must BE one of
+//! the governance phase's declared actions. The one-line renderings reviewers read are produced by
 //! [`ExternalAction::describe`] at the point of display.
 
 use alloy::primitives::{Address, Bytes, U256};
 use serde::{Deserialize, Serialize};
 
 use crate::common::governance_calls::GovernanceCall;
+
+/// The phase of an action riding the governance bundle (`ExternalActionsLib.PHASE_GOVERNANCE`).
+pub const GOVERNANCE_PHASE: &str = "governance";
 
 /// One declared external action.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -38,15 +41,14 @@ pub struct ExternalAction {
 }
 
 impl ExternalAction {
-    /// One action of governance stage `stage`.
-    pub fn for_stage(
-        stage: u8,
+    /// One action of the governance bundle.
+    pub fn governance(
         label: impl Into<String>,
         authority: impl Into<String>,
         call: &GovernanceCall,
     ) -> Self {
         Self {
-            phase: stage.to_string(),
+            phase: GOVERNANCE_PHASE.to_string(),
             label: label.into(),
             authority: authority.into(),
             target: call.target,
@@ -107,9 +109,8 @@ mod tests {
 
     #[test]
     fn round_trips_through_toml() {
-        let actions = vec![ExternalAction::for_stage(
-            0,
-            "pause chain migrations",
+        let actions = vec![ExternalAction::governance(
+            "bind the coordinator to the CTM executor",
             "protocol governance",
             &call(0x11, 7, &[0xde, 0xad, 0xbe, 0xef, 0x01]),
         )];
@@ -117,7 +118,7 @@ mod tests {
         let decoded: Vec<ExternalAction> = encoded.try_into().expect("deserialize");
         assert_eq!(decoded.len(), 1);
         assert!(decoded[0].is_call(&call(0x11, 7, &[0xde, 0xad, 0xbe, 0xef, 0x01])));
-        assert_eq!(decoded[0].phase, "0");
+        assert_eq!(decoded[0].phase, GOVERNANCE_PHASE);
     }
 
     /// The Solidity side writes `value` as a decimal string; a `0x`-prefixed one (what this
@@ -125,7 +126,7 @@ mod tests {
     #[test]
     fn parses_decimal_and_hex_values() {
         let table = r#"
-            phase = "1"
+            phase = "governance"
             label = "l"
             authority = "a"
             target = "0x0000000000000000000000000000000000000001"
@@ -141,16 +142,16 @@ mod tests {
 
     #[test]
     fn describe_renders_the_selector_only() {
-        let action = ExternalAction::for_stage(
-            2,
-            "unpause",
+        let action = ExternalAction::governance(
+            "accept ownership",
             "protocol governance",
             &call(0x22, 0, &[0x01, 0x02, 0x03, 0x04, 0xff]),
         );
         assert_eq!(
             action.describe(),
-            "phase 2 | unpause | target 0x2222222222222222222222222222222222222222 | \
-             selector 0x01020304 | authority: protocol governance"
+            "phase governance | accept ownership | target \
+             0x2222222222222222222222222222222222222222 | selector 0x01020304 | authority: \
+             protocol governance"
         );
     }
 
@@ -158,7 +159,7 @@ mod tests {
     /// merge's provenance check rests on.
     #[test]
     fn identity_is_target_value_and_calldata() {
-        let action = ExternalAction::for_stage(0, "l", "a", &call(0x11, 1, &[0xaa]));
+        let action = ExternalAction::governance("l", "a", &call(0x11, 1, &[0xaa]));
         assert!(action.is_call(&call(0x11, 1, &[0xaa])));
         assert!(!action.is_call(&call(0x11, 1, &[0xab])));
         assert!(!action.is_call(&call(0x11, 2, &[0xaa])));
