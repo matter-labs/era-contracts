@@ -48,6 +48,7 @@ import {
     RegistryInventoryLengthMismatch,
     RegistryMemberHasNoFixedAddress,
     RegistryTargetHasNoCode,
+    ReleaseForceDeploymentMismatch,
     OperationChangesNothing,
     RegistryUnknownKey,
     TransitionDeadlineBeforeUpgrade,
@@ -59,6 +60,7 @@ import {
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {
     AuthoredL2Plan,
     CoreTransitionManifest,
@@ -195,7 +197,7 @@ contract StorageRegistriesTest is Test {
                 genesisUpgrade: genesisUpgrade,
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
-                    fixedForceDeploymentsData: hex"f1f2",
+                    fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
@@ -299,7 +301,7 @@ contract StorageRegistriesTest is Test {
         assertEq(transition.newProtocolVersion(), NEW_VERSION);
         assertEq(newRelease.verifier(), verifier);
         assertEq(newRelease.diamondInit(), diamondInit);
-        assertEq(newRelease.fixedForceDeploymentsData(), hex"f1f2");
+        assertEq(newRelease.fixedForceDeploymentsData(), L2PlanFixtures.emptyTableForceDeploymentsData());
         Diamond.FacetCut[] memory installations = ReleaseFacetReader.newChainInstallations(
             ICTMRelease(address(newRelease))
         );
@@ -484,7 +486,11 @@ contract StorageRegistriesTest is Test {
     ///      list does not cover this — only the tables agree there.
     function test_revertWhen_patchTargetsAReleaseWithDifferentGenesisState() public {
         ReleaseManifest memory releaseManifest = _patchReleaseManifest();
-        releaseManifest.genesis.fixedForceDeploymentsData = hex"f1f3";
+        releaseManifest.genesis.fixedForceDeploymentsData = L2PlanFixtures.forceDeploymentsData(
+            releaseManifest.l2BytecodeInfos,
+            releaseManifest.l2SystemProxyBytecodeInfo,
+            2
+        );
         CTMRelease genesisRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _patchManifest();
@@ -735,7 +741,7 @@ contract StorageRegistriesTest is Test {
     ///      of an all-inert inventory must not make it look like one that changes something.
     function test_revertWhen_operationChangesNothing() public {
         OperationManifest memory manifest = _operationManifest();
-        manifest.transition = address(0);
+        manifest.ctmTransition = address(0);
 
         vm.expectRevert(OperationChangesNothing.selector);
         new EcosystemUpgradeOperation(manifest);
@@ -744,24 +750,24 @@ contract StorageRegistriesTest is Test {
     /// @dev Each change on its own is a complete operation.
     function test_operationWithOnlyACoreChange() public {
         OperationManifest memory manifest = _operationManifest();
-        manifest.transition = address(0);
+        manifest.ctmTransition = address(0);
         manifest.coreTransition = address(coreTransition);
 
         EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
         assertEq(operation.coreTransition(), address(coreTransition));
-        assertEq(operation.transition(), address(0));
+        assertEq(operation.ctmTransition(), address(0));
         assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
         assertEq(operation.manifestHash(), keccak256(abi.encode(manifest)));
     }
 
     function test_operationWithOnlyInfrastructure() public {
         OperationManifest memory manifest = _operationManifest();
-        manifest.transition = address(0);
+        manifest.ctmTransition = address(0);
         manifest.ctmInfrastructure = _ctmInventoryWithTwoRows();
 
         EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
         assertEq(operation.coreTransition(), address(0));
-        assertEq(operation.transition(), address(0), "no chain-version edge is bought for an infrastructure change");
+        assertEq(operation.ctmTransition(), address(0), "no chain-version edge is bought for an infrastructure change");
         assertEq(operation.ctmInfrastructureRows().length, 2, "both participating slots become rows");
         operation.validate();
     }
@@ -769,7 +775,7 @@ contract StorageRegistriesTest is Test {
     function test_operationWithOnlyATransition() public {
         EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(_operationManifest());
         assertEq(operation.coreTransition(), address(0));
-        assertEq(operation.transition(), address(transition));
+        assertEq(operation.ctmTransition(), address(transition));
         assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
     }
 
@@ -870,6 +876,7 @@ contract StorageRegistriesTest is Test {
         manifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(
             SYSTEM_CONTEXT_IMPL_CODE
         );
+        L2PlanFixtures.syncForceDeployments(manifest);
     }
 
     function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public {
@@ -922,6 +929,122 @@ contract StorageRegistriesTest is Test {
             abi.encodeWithSelector(RegistryMemberHasNoFixedAddress.selector, uint256(L2EcosystemContract.BeaconProxy))
         );
         new CTMTransition(manifest);
+    }
+
+    /// @dev The `L2DefaultUpgrade` delegate is force-deployed at the address its bytecode info
+    ///      derives (`AuthoredL2Plan.delegateBytecodeInfo`), so it has no fixed address either: a
+    ///      table row in its slot is refused like any other bytecode-identity member.
+    function test_revertWhen_transitionDerivesRowForTheDelegate() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2DefaultUpgrade)] = hex"dd04";
+        CTMRelease rowRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(rowRelease);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryMemberHasNoFixedAddress.selector,
+                uint256(L2EcosystemContract.L2DefaultUpgrade)
+            )
+        );
+        new CTMTransition(manifest);
+    }
+
+    /// @dev A release names each table member's implementation twice — its table row and its field
+    ///      of the genesis force-deployments blob — and the constructor refuses any disagreement.
+    ///      Every compared field is corrupted in turn; each refusal names the member.
+    function test_revertWhen_forceDeploymentsDisagreeWithTheTable() public {
+        ReleaseManifest memory manifest = _tableReleaseManifest();
+        // Fill every compared member so each field has a row to disagree with.
+        L2EcosystemContract[9] memory members = [
+            L2EcosystemContract.L2Bridgehub,
+            L2EcosystemContract.L2AssetRouter,
+            L2EcosystemContract.L2NativeTokenVault,
+            L2EcosystemContract.L2MessageRoot,
+            L2EcosystemContract.L2ChainAssetHandler,
+            L2EcosystemContract.InteropCenter,
+            L2EcosystemContract.L2InteropHandler,
+            L2EcosystemContract.L2AssetTracker,
+            L2EcosystemContract.BaseTokenHolder
+        ];
+        for (uint256 i = 0; i < members.length; ++i) {
+            manifest.l2BytecodeInfos[uint256(members[i])] = L2PlanFixtures.bytecodeInfo(abi.encodePacked(hex"ee", i));
+        }
+        L2PlanFixtures.syncForceDeployments(manifest);
+        new CTMRelease(manifest);
+
+        bytes memory consistent = manifest.genesis.fixedForceDeploymentsData;
+        for (uint256 i = 0; i < members.length; ++i) {
+            FixedForceDeploymentsData memory data = abi.decode(consistent, (FixedForceDeploymentsData));
+            _corruptField(data, i);
+            manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+            vm.expectRevert(abi.encodeWithSelector(ReleaseForceDeploymentMismatch.selector, uint256(members[i])));
+            new CTMRelease(manifest);
+        }
+    }
+
+    /// @dev A row the blob omits, or a blob field for a member the table leaves empty, is a
+    ///      disagreement too; the beacon deployer has no table member and is not compared.
+    function test_forceDeploymentsMatchEmptyRowsAndIgnoreTheBeaconDeployer() public {
+        ReleaseManifest memory manifest = _tableReleaseManifest();
+        FixedForceDeploymentsData memory data = abi.decode(
+            manifest.genesis.fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
+        data.beaconDeployerInfo = hex"beac";
+        manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+        CTMRelease release = new CTMRelease(manifest);
+        assertEq(release.fixedForceDeploymentsData(), abi.encode(data), "the blob is pinned as given");
+
+        data.l2NtvBytecodeInfo = abi.encode(L2PlanFixtures.bytecodeInfo(hex"ee"), manifest.l2SystemProxyBytecodeInfo);
+        manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ReleaseForceDeploymentMismatch.selector,
+                uint256(L2EcosystemContract.L2NativeTokenVault)
+            )
+        );
+        new CTMRelease(manifest);
+
+        data.l2NtvBytecodeInfo = "";
+        data.bridgehubBytecodeInfo = "";
+        manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+        vm.expectRevert(
+            abi.encodeWithSelector(ReleaseForceDeploymentMismatch.selector, uint256(L2EcosystemContract.L2Bridgehub))
+        );
+        new CTMRelease(manifest);
+    }
+
+    /// @dev A blob that is not a `FixedForceDeploymentsData` encoding cannot be compared at all.
+    function test_revertWhen_forceDeploymentsAreNotTheGenesisStruct() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesis.fixedForceDeploymentsData = hex"f1f2";
+        vm.expectRevert();
+        new CTMRelease(manifest);
+    }
+
+    function _corruptField(FixedForceDeploymentsData memory _data, uint256 _index) internal pure {
+        bytes memory other = hex"0bad";
+        if (_index == 0) {
+            _data.bridgehubBytecodeInfo = other;
+        } else if (_index == 1) {
+            _data.l2AssetRouterBytecodeInfo = other;
+        } else if (_index == 2) {
+            _data.l2NtvBytecodeInfo = other;
+        } else if (_index == 3) {
+            _data.messageRootBytecodeInfo = other;
+        } else if (_index == 4) {
+            _data.chainAssetHandlerBytecodeInfo = other;
+        } else if (_index == 5) {
+            _data.interopCenterBytecodeInfo = other;
+        } else if (_index == 6) {
+            _data.interopHandlerBytecodeInfo = other;
+        } else if (_index == 7) {
+            _data.assetTrackerBytecodeInfo = other;
+        } else {
+            _data.baseTokenHolderBytecodeInfo = other;
+        }
     }
 
     function test_transitionL2PlanIsDerivedPlusConstructedAuthored() public {
@@ -1001,6 +1124,7 @@ contract StorageRegistriesTest is Test {
         targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2AssetRouter)] = L2PlanFixtures.bytecodeInfo(
             ASSET_ROUTER_IMPL_CODE
         );
+        L2PlanFixtures.syncForceDeployments(targetManifest);
         CTMRelease target = new CTMRelease(targetManifest);
         TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(departing);
@@ -1049,6 +1173,7 @@ contract StorageRegistriesTest is Test {
         CTMRelease departing = _tableReleaseAt(OLD_VERSION);
         ReleaseManifest memory targetManifest = _tableReleaseManifest();
         targetManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        L2PlanFixtures.syncForceDeployments(targetManifest);
         CTMRelease target = new CTMRelease(targetManifest);
         TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(departing);
@@ -1423,7 +1548,7 @@ contract StorageRegistriesTest is Test {
             OperationManifest({
                 coreTransition: address(0),
                 ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
-                transition: address(transition),
+                ctmTransition: address(transition),
                 timer: upgradeTimer
             });
     }

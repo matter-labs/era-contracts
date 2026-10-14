@@ -6,7 +6,12 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {AuthoredL2Plan} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {AuthoredL2Plan, ReleaseManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {
+    L2EcosystemContract,
+    L2_ECOSYSTEM_CONTRACT_COUNT
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 /// @notice Builds the L2-plan fixtures the registry suites use. A short dummy EVM bytecode stands
 ///         in for each real artifact; every descriptor (bytecode info, system-proxy row, factory
@@ -146,5 +151,55 @@ library L2PlanFixtures {
         list[2] = _c;
         list[3] = _d;
         list[4] = _e;
+    }
+
+    /// @notice A genesis force-deployments blob `CTMRelease` accepts for the table `_table` behind
+    ///         `_shell`: each table member's field is its row behind the shell (empty for an empty
+    ///         row). `_l1ChainId` tells otherwise identical blobs apart.
+    function forceDeploymentsData(
+        bytes[] memory _table,
+        bytes memory _shell,
+        uint256 _l1ChainId
+    ) internal pure returns (bytes memory) {
+        FixedForceDeploymentsData memory data;
+        data.l1ChainId = _l1ChainId;
+        data.bridgehubBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.L2Bridgehub);
+        data.l2AssetRouterBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.L2AssetRouter);
+        data.l2NtvBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.L2NativeTokenVault);
+        data.messageRootBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.L2MessageRoot);
+        data.chainAssetHandlerBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.L2ChainAssetHandler);
+        data.interopCenterBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.InteropCenter);
+        data.interopHandlerBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.L2InteropHandler);
+        data.assetTrackerBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.L2AssetTracker);
+        data.baseTokenHolderBytecodeInfo = _descriptor(_table, _shell, L2EcosystemContract.BaseTokenHolder);
+        return abi.encode(data);
+    }
+
+    /// @notice {forceDeploymentsData} for `_table` behind `_shell`, with the default chain id.
+    function forceDeploymentsData(bytes[] memory _table, bytes memory _shell) internal pure returns (bytes memory) {
+        return forceDeploymentsData(_table, _shell, 1);
+    }
+
+    /// @notice {forceDeploymentsData} for a release with an empty L2 table.
+    function emptyTableForceDeploymentsData() internal pure returns (bytes memory) {
+        return forceDeploymentsData(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT), "", 1);
+    }
+
+    /// @notice Re-derives `_manifest`'s force-deployments blob from its own table, for fixtures
+    ///         that edit the table after building the manifest.
+    function syncForceDeployments(ReleaseManifest memory _manifest) internal pure {
+        _manifest.genesis.fixedForceDeploymentsData = forceDeploymentsData(
+            _manifest.l2BytecodeInfos,
+            _manifest.l2SystemProxyBytecodeInfo
+        );
+    }
+
+    function _descriptor(
+        bytes[] memory _table,
+        bytes memory _shell,
+        L2EcosystemContract _member
+    ) private pure returns (bytes memory) {
+        bytes memory row = _table[uint256(_member)];
+        return row.length == 0 ? bytes("") : abi.encode(row, _shell);
     }
 }

@@ -428,6 +428,8 @@ error RegistryMemberHasNoFixedAddress(uint256 member);
 error RegistryTargetHasNoCode(address target);
 // 0x1f20dafa
 error RegistryUnknownKey();
+// 0xfad1d610
+error ReleaseForceDeploymentMismatch(uint256 member);
 // 0xc99ade52
 error ReleaseProtocolVersionMismatch(uint256 protocolVersion, uint256 releaseProtocolVersion);
 // 0x667d17de

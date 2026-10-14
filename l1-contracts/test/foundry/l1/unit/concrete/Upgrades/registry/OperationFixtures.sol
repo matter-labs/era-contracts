@@ -59,7 +59,7 @@ abstract contract OperationFixtures {
                 OperationManifest({
                     coreTransition: _coreTransition,
                     ctmInfrastructure: _ctmInfrastructure,
-                    transition: _transition,
+                    ctmTransition: _transition,
                     timer: _timer
                 })
             );

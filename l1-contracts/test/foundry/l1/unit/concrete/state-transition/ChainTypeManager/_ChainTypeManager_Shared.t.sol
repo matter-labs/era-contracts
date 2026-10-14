@@ -127,7 +127,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
             address(bridgehub),
             interopCenterAddress,
             address(bytecodesSupplier),
-            address(0)
+            address(permissionlessValidator)
         );
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();

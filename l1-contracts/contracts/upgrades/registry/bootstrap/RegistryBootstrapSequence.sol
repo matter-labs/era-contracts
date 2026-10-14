@@ -12,6 +12,7 @@ import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol
 import {ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {CoreUpgradeExecutor} from "../executors/CoreUpgradeExecutor.sol";
+import {IDomainUpgradeExecutor} from "../executors/IDomainUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
 import {ICTMUpgradeExecutor} from "../executors/ICTMUpgradeExecutor.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
@@ -72,7 +73,7 @@ contract RegistryBootstrapSequence is IRegistryBootstrapSequence {
     ///      stage reverts until that half is done.
     function stage0Actions() external view returns (BootstrapAction[] memory actions) {
         BootstrapManifest memory m = _manifest();
-        address notifier = m.proxyUpgrades[uint256(CTMContract.ServerNotifier)].proxy;
+        address notifier = m.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)].proxy;
         bool acceptNotifier = Ownable2Step(notifier).owner() != m.ctmExecutor;
         actions = new BootstrapAction[](acceptNotifier ? 3 : 2);
         uint256 next = 0;
@@ -115,7 +116,7 @@ contract RegistryBootstrapSequence is IRegistryBootstrapSequence {
             call: Call({
                 target: address(coreExecutor),
                 value: 0,
-                data: abi.encodeCall(CoreUpgradeExecutor.setCoordinator, (m.coordinator))
+                data: abi.encodeCall(IDomainUpgradeExecutor.setCoordinator, (m.coordinator))
             })
         });
         actions[2] = BootstrapAction({

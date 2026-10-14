@@ -121,7 +121,13 @@ codehash identifies them at all) — so it needs the reviewed commit built local
 (`cd l1-contracts && forge build`) for the creation code BYTES, and the reviewed CREATE2 salts:
 the core prepare's `[contracts] create2_factory_salt` and the CTM prepare's
 `[create2_factory_salts]` entry, both passed as `--create2-salt` (a package records neither).
-The immutable-free objects are additionally identified against `AllContractsHashes.json`.
+A recurring package records no constructor arguments for the executors either, which predate it:
+they are re-derived from the current reviewed owner and coordinator, under the salts they were
+deployed under, which must be passed too. The immutable-free objects are additionally identified
+against `AllContractsHashes.json`. Every release the package installs is held against the reviewed
+genesis: `genesisBatchHash` against the `genesis_root` of `configs/genesis/zksync-os/latest.json`,
+`genesisIndexRepeatedStorageChanges` against zero, and `fixedForceDeploymentsData` against the
+package's `force_deployments_data`.
 
 **Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
 `EcosystemUpgradeExecutor.stage0/1/2(operation)` on the reviewed coordinator and comparing byte
@@ -136,7 +142,9 @@ Around those it checks what the objects cannot answer for themselves: authority 
 review says (governance, coordinator, both domain executors, the CTM and both ProxyAdmins), the
 live state the upgrade departs from, and readiness — the L2 factory dependencies published on the
 CTM's supplier, the timer startable, no lifecycle already in flight. Readiness is reported apart
-from anything about value.
+from anything about value. For the bootstrap edge it also lists, as warnings, every chain on the
+CTM still below the departing version: those chains keep upgrading along the pre-registry edges
+through the CTM's legacy `protocolVersionVerifier` getter.
 
 Anything a reviewer could not establish is an ERROR, never a warning: warnings do not fail a run,
 so an unverifiable input reported as one reads, afterwards, exactly like a check that passed.

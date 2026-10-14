@@ -180,7 +180,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                     genesisUpgrade: genesisUpgradeAddr,
                     genesisFacets: genesisFacets,
                     genesis: ReleaseGenesisData({
-                        fixedForceDeploymentsData: hex"f1f2",
+                        fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                         genesisBatchHash: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 54
                     }),
@@ -223,7 +223,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                 ctm: address(chainContractAddress),
                 expectedProtocolVersion: chainContractAddress.protocolVersion(),
                 ctmProxyAdmin: ctmProxyAdmin,
-                proxyUpgrades: upgrades,
+                ctmProxyUpgrades: upgrades,
                 currentRelease: address(genesisRelease),
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeEngine: upgradeEngine,

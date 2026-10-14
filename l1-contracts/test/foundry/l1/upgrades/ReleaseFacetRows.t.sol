@@ -11,6 +11,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {RegistryDuplicateFacetRow} from "contracts/common/L1ContractErrors.sol";
 import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 
 /// @notice Exposes the internal comparison so it can be driven with rows no live object would
 ///         serve — which is the point: the comparison must be correct even for rows read off an
@@ -168,7 +169,7 @@ contract ReleaseFacetRowsTest is Test {
                 genesisUpgrade: _stub("genesisUpgrade"),
                 genesisFacets: _rows,
                 genesis: ReleaseGenesisData({
-                    fixedForceDeploymentsData: hex"f1",
+                    fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 1
                 }),

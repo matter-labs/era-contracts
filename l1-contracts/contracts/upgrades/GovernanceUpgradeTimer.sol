@@ -15,12 +15,11 @@ import {
 /// @title Governance Upgrade Timer
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This contract will be used by the governance to ensure that the chains have enough time
-/// to upgrade their implementation before finalizing the upgrade on L1.
-/// @notice The `startTimer` function should be called once the new version is published. It starts the
-/// timer and gives at least `INITIAL_DELAY` for the chains to upgrade. In case for any reason the timeline has to
-/// be extended, the owner of this contract can increase the timeline, but only the maximum of `MAX_ADDITIONAL_DELAY`
-/// is allowed.
+/// @notice The delay before governance may execute an upgrade it started: `startTimer` sets the
+/// deadline `INITIAL_DELAY` ahead, `checkDeadline` reverts until it has passed, and the owner may
+/// extend it, at most `MAX_ADDITIONAL_DELAY` past the initial deadline. It gates governance's own
+/// execution on L1, not the chains' upgrade window. See "The upgrade timer and stage timing" in
+/// {docs/upgrade-stage-lifecycle.md}.
 contract GovernanceUpgradeTimer is Ownable2Step {
     /// @notice The initial delay to be used.
     uint256 public immutable INITIAL_DELAY;
@@ -84,9 +83,8 @@ contract GovernanceUpgradeTimer is Ownable2Step {
         emit TimerStarted(deadline, maxDeadline);
     }
 
-    /// @dev Checks if the current `deadline` has passed. Reverts if the deadline has already passed.
-    ///
-    /// Reverts with {DeadlineNotYetPassed} error if the current block timestamp is less than `deadline`.
+    /// @dev Reverts with {TimerNotStarted} before `startTimer`, and with {DeadlineNotYetPassed} while
+    /// the current block timestamp is less than `deadline`.
     function checkDeadline() external view {
         if (deadline == 0) {
             revert TimerNotStarted();

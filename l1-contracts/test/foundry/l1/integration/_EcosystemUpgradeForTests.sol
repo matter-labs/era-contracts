@@ -2,85 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
 
-import {CoreUpgrade_v35} from "deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
-import {CTMUpgrade_v35} from "deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
-
-/// @notice Memory-trimmed test variants of the CURRENT version's Core/CTM upgrade scripts,
-///         driven by the anvil-interop pipeline upgrade runner through protocol-ops
-///         (`--core-script-path` / `--ctm-script-path` overrides). Repoint the parents when the
-///         next version's scripts land — the runner itself is version-independent.
-
-/// @dev CTM upgrade for the harness: publishes the factory dependencies for real (the
-///      bootstrap object refuses a plan whose bytecodes are not on the CTM's supplier — the
-///      anvil L2 stand-ins get theirs via `anvil_setCode`, but the L1 record must exist), reads
-///      the upgrade target version from the upgrade input (the production flow reads it from
-///      the genesis config, which pins the release this branch is built against; a harness
-///      scenario upgrading an older fixture onto this release has to say where it is going),
-///      and writes only the minimal output the runner needs so accumulated `vm.serialize*`
-///      JSON does not blow forge's EVM memory.
-contract CTMUpgradeForTests is CTMUpgrade_v35 {
-    using stdToml for string;
-
-    // solhint-disable-next-line func-named-parameters
-    function initializeWithArgs(
-        address _ctmProxy,
-        address _rollupDAManager,
-        bytes32 _create2FactorySalt,
-        string memory _newConfigPath,
-        string memory _outputPath,
-        address _governance,
-        bytes32 _zkTokenAssetId,
-        bool _testnetVerifier
-    ) public virtual override {
-        // solhint-disable-next-line func-named-parameters
-        super.initializeWithArgs(
-            _ctmProxy,
-            _rollupDAManager,
-            _create2FactorySalt,
-            _newConfigPath,
-            _outputPath,
-            _governance,
-            _zkTokenAssetId,
-            _testnetVerifier
-        );
-
-        string memory upgradeToml = vm.readFile(string.concat(vm.projectRoot(), _newConfigPath));
-        if (upgradeToml.keyExists("$.contracts.new_protocol_version")) {
-            setNewProtocolVersion(upgradeToml.readUint("$.contracts.new_protocol_version"));
-        }
-    }
-
-    /// @dev Replaces the heavy state_transition section with the fields the anvil-interop runner
-    ///      and the protocol-ops merger actually read: the committed diamond cut, the engine
-    ///      address and the `[registry]` objects (the merger recognizes executor stage calls by the
-    ///      executor address written there).
-    function saveOutput(string memory outputPath) internal override {
-        TrimmedUpgradeOutput.write(
-            vm,
-            outputPath,
-            getChainUpgradeDiamondCutData(),
-            committedUpgradeEngine(),
-            getAddresses().admin.eip7702Checker,
-            TrimmedUpgradeOutput.Registry({
-                // A bootstrap edge has no transition, so this prepare deploys no operation;
-                // the executor it hands the domain to is still named.
-                ctmTransition: address(0),
-                ctmUpgradeExecutor: boundCTMUpgradeExecutor(),
-                ctmRelease: getAddresses().stateTransition.currentRelease,
-                upgradeTimer: upgradeAddresses.upgradeTimer,
-                bootstrapMigration: bootstrapMigrationAddress(),
-                // A bootstrap edge composes no operation: it has no transition, and its own
-                // sequence object carries every call.
-                operation: address(0),
-                coordinator: address(0)
-            })
-        );
-    }
-}
-
-/// @dev The trimmed per-CTM output both harness variants write.
+/// @dev The trimmed per-CTM output the memory-trimmed upgrade harnesses (`_EcosystemUpgradeForTests_v36*.sol`)
+///      write instead of the full prepare output, so accumulated `vm.serialize*` JSON does not blow
+///      forge's EVM memory.
 library TrimmedUpgradeOutput {
     struct Registry {
         address ctmTransition;
@@ -128,6 +53,3 @@ library TrimmedUpgradeOutput {
         _vm.writeToml(toml, _outputPath);
     }
 }
-
-/// @dev Core upgrade for the harness; the version script needs no trimming on the core side.
-contract CoreUpgradeForTests is CoreUpgrade_v35 {}

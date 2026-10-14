@@ -49,16 +49,15 @@ enum L2EcosystemContract {
 
 /// @notice Canonical identifier for CTM / state-transition contracts.
 ///         The enum value is VM-neutral; `DeployCTML1OrGateway.resolve` maps it to
-///         the correct Era or ZKsyncOS contract / artifact name, and per-CTM
-///         registries map it to the deployed address per protocol version.
-///         Also the index space of the CTM-domain upgrade inventory: transition and bootstrap
-///         manifests carry `ProxyUpgradeRow[CTM_CONTRACT_COUNT]` fixed arrays indexed by this
-///         enum (same slot semantics as `L1EcosystemContract`). Only the members that are
+///         the correct Era or ZKsyncOS contract / artifact name.
+///         Also the index space of the CTM-domain upgrade inventory: operation
+///         (`ctmInfrastructure`) and bootstrap (`ctmProxyUpgrades`) manifests carry
+///         `ProxyUpgradeRow[]` inventories of length `CTM_CONTRACT_COUNT` indexed by this enum (same slot semantics as `L1EcosystemContract`). Only the members that are
 ///         TUPPs under the CTM-domain `ProxyAdmin` can meaningfully participate
 ///         (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator,
 ///         ServerNotifier), applied through the executor's bound admin. A row in a facet or
 ///         verifier slot can never apply.
-/// @dev APPEND-ONLY (see `L1EcosystemContract`).
+/// @dev APPEND-ONLY once a manifest indexed by it is deployed (see `L1EcosystemContract`).
 enum CTMContract {
     // ---- Diamond facets ----
     AdminFacet,
@@ -71,7 +70,6 @@ enum CTMContract {
     ValidatorTimelock,
     ChainTypeManager,
     // ---- Verifiers ----
-    VerifierFflonk,
     VerifierPlonk,
     DualVerifier,
     TestnetVerifier,
@@ -106,8 +104,9 @@ enum ZKsyncOSUpgradeType {
 ///         it does not guarantee that preparation wrote every intended change into one, since an
 ///         inert slot and a row that was never built are the same bytes (see
 ///         {ProxyUpgradeRowLib.toRows}).
-/// @dev APPEND-ONLY: numeric values are stable identifiers — never reorder or remove members.
-///      Appending one grows the manifest array, which the next release's objects pick up.
+/// @dev APPEND-ONLY once a manifest indexed by it is deployed: numeric values are then stable
+///      identifiers — never reorder or remove members. Appending one grows the manifest array,
+///      which the next release's objects pick up.
 enum L1EcosystemContract {
     L1Bridgehub,
     L1ChainAssetHandler,

@@ -26,7 +26,7 @@ avoid `ZKsyncOSUnsafeForceDeployment` as much as possible and prefer the
 
 ### Upgrade process
 
-The fixed force deployments data as well as factory dependencies for the upgrades are defined inside the deployment and upgrade preparation scripts and then the hash of the actual upgrade transaction to execute is read from `DefaultUpgrade`.
+A release carries the L2 implementations twice — its `l2BytecodeInfos` table, from which an upgrade's L2 deployments and factory dependencies are derived, and the genesis `fixedForceDeploymentsData` — and refuses at construction unless the two agree. The per-chain L2 upgrade transaction is composed on-chain and read through `ICTMTransition.l2UpgradeTx`.
 
 ### Consistency between genesis and upgrade
 
@@ -36,11 +36,11 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 
 ### V35 upgrade
 
-The incoming upgrade is v35 (the bootstrap edge into the registry-driven model; only ZKsync OS
-chains are supported). Its per-chain upgrade contract is:
+The incoming upgrade is v35 (the v34 -> v35 bootstrap edge into the registry-driven model; only
+ZKsync OS chains are supported). Its per-chain upgrade contract is:
 
-- DefaultUpgrade.sol (composes the per-chain L2 upgrade transaction once, from the transition's
-  pinned delegate composer with the executing chain's ID and Bridgehub)
+- DefaultUpgrade.sol (composes the per-chain L2 upgrade transaction once, from the delegate
+  composer the transition names, with the executing chain's ID and Bridgehub)
 
 And the corresponding L2 upgrade contract that should be used is the release-agnostic:
 

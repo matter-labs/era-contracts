@@ -19,9 +19,9 @@ import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
+import {IDomainUpgradeExecutor} from "contracts/upgrades/registry/executors/IDomainUpgradeExecutor.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
-import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
@@ -261,11 +261,11 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         // Stage 0: the core leg is reserved, then the CTM leg — its migrations pause and its timer
         // starts — and the operation is recorded.
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationReserved(address(operation), address(coreTransition));
+        emit IDomainUpgradeExecutor.OperationReserved(address(operation), address(coreTransition));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.PausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit ICTMUpgradeExecutor.OperationReserved(address(operation), address(full));
+        emit IDomainUpgradeExecutor.OperationReserved(address(operation), address(full));
         vm.expectEmit(true, true, true, true, address(timer));
         emit GovernanceUpgradeTimer.TimerStarted(block.timestamp, block.timestamp);
         vm.expectEmit(true, true, true, true, address(coordinator));
@@ -305,11 +305,11 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
         // Stage 2: each domain releases its reservation (the CTM executor its pause), core first.
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
+        emit IDomainUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit ICTMUpgradeExecutor.OperationCompleted(address(operation));
+        emit IDomainUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(coordinator));
         emit IEcosystemUpgradeExecutor.OperationCompleted(address(operation));
         _stage2(full);
@@ -325,7 +325,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);
         assertEq(operation.coreTransition(), address(coreTransition));
-        assertEq(operation.transition(), address(full));
+        assertEq(operation.ctmTransition(), address(full));
         assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
         assertEq(operation.manifestHash(), keccak256(abi.encode(operation.getManifest())));
     }
@@ -336,10 +336,10 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         EcosystemUpgradeExecutor successor = new EcosystemUpgradeExecutor(governor, coreExecutor);
         vm.startPrank(governor);
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
+        emit IDomainUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
         coreExecutor.setCoordinator(address(successor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit ICTMUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
+        emit IDomainUpgradeExecutor.CoordinatorChanged(address(coordinator), address(successor));
         ctmExecutor.setCoordinator(address(successor));
         successor.setCTMExecutor(ctmExecutor);
         vm.stopPrank();
@@ -542,52 +542,72 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         foreign.stage0(ctmOnly);
 
         // And the callbacks themselves refuse it outright.
+        OperationManifest memory ctmOnlyManifest = ctmOnly.getManifest();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(foreign)));
         vm.prank(address(foreign));
-        ctmExecutor.beginOperation(ctmOnly);
+        ctmExecutor.beginOperation(ctmOnly, ctmOnlyManifest);
         _assertLifecycleIdle();
         assertEq(address(foreign.pendingOperation()), address(0), "a refused stage 0 records nothing");
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
     }
 
-    /// @dev The callbacks after `beginOperation` carry no leg to name, so the coordinator can only
-    ///      drive the executor's OWN reservation — here through its escape hatch, which is the
-    ///      only way to reach a callback out of stage order (the executor sees the coordinator as
-    ///      the caller). `other` is an equally genuine transition that was never reserved: there is
-    ///      no argument that could aim a callback at it.
+    /// @dev The coordinator can only drive the executor's OWN reservation — here through its
+    ///      escape hatch, which is the only way to reach a callback out of stage order (the executor
+    ///      sees the coordinator as the caller). `applyOperation` takes the manifest `beginOperation`
+    ///      reserved and no other, and applies the transition reserved with it: `other` is an equally
+    ///      genuine transition that was never reserved, and no argument can aim a callback at it.
     function test_coordinatorCallbacksActOnTheReservedLegOnly() public {
         CTMTransition other = _deployTransition(778);
         _stage0(transition);
+        OperationManifest memory reserved = coordinator.pendingOperation().getManifest();
+
+        OperationManifest memory foreignManifest = coordinator.pendingOperation().getManifest();
+        foreignManifest.ctmTransition = address(other);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OperationManifestChanged.selector,
+                keccak256(abi.encode(reserved)),
+                keccak256(abi.encode(foreignManifest))
+            )
+        );
+        vm.prank(governor);
+        coordinator.forward(
+            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyOperation, (foreignManifest)))
+        );
 
         vm.prank(governor);
-        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyOperation, ())));
+        coordinator.forward(
+            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyOperation, (reserved)))
+        );
 
         assertEq(chainContractAddress.upgradeTransition(0), address(transition), "the reserved leg is the one applied");
         assertTrue(chainContractAddress.upgradeTransition(0) != address(other), "never the unreserved one");
         _assertPendingAndPaused(transition, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
 
-    /// @dev A free executor has no reservation for a callback to act on — the state the removed
-    ///      leg argument used to be checked against.
+    /// @dev A free executor has no reservation for a callback to act on.
     function test_revertWhen_coordinatorDrivesCallbacksWithNothingReserved() public {
+        OperationManifest memory manifest = _operationFor(transition).getManifest();
         vm.startPrank(governor);
         vm.expectRevert(NoPendingOperation.selector);
-        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyOperation, ())));
-        vm.expectRevert(NoPendingOperation.selector);
         coordinator.forward(
-            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.completeOperation, ()))
+            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.applyOperation, (manifest)))
         );
         vm.expectRevert(NoPendingOperation.selector);
         coordinator.forward(
-            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.abandonOperation, (false)))
+            _singleCall(address(ctmExecutor), abi.encodeCall(IDomainUpgradeExecutor.completeOperation, ()))
         );
         vm.expectRevert(NoPendingOperation.selector);
         coordinator.forward(
-            _singleCall(address(coreExecutor), abi.encodeCall(CoreUpgradeExecutor.completeOperation, ()))
+            _singleCall(address(ctmExecutor), abi.encodeCall(IDomainUpgradeExecutor.abandonOperation, ()))
         );
         vm.expectRevert(NoPendingOperation.selector);
         coordinator.forward(
-            _singleCall(address(coreExecutor), abi.encodeCall(CoreUpgradeExecutor.abandonOperation, ()))
+            _singleCall(address(coreExecutor), abi.encodeCall(IDomainUpgradeExecutor.completeOperation, ()))
+        );
+        vm.expectRevert(NoPendingOperation.selector);
+        coordinator.forward(
+            _singleCall(address(coreExecutor), abi.encodeCall(IDomainUpgradeExecutor.abandonOperation, ()))
         );
         vm.stopPrank();
         _assertCtmUntouched();
@@ -613,9 +633,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         coordinator.stage1(operation);
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationAbandoned(address(operation));
+        emit IDomainUpgradeExecutor.OperationAbandoned(address(operation));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit ICTMUpgradeExecutor.OperationAbandoned(address(operation));
+        emit IDomainUpgradeExecutor.OperationAbandoned(address(operation));
         vm.expectEmit(true, true, true, true, address(coordinator));
         emit IEcosystemUpgradeExecutor.OperationAbandoned(
             address(operation),
@@ -693,10 +713,11 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _stage0(transition);
         assertTrue(chainAssetHandler.ctmMigrationPaused(address(chainContractAddress)), "stage 0 paused the CTM");
 
+        // The reservation is released first, then the coordinator lifts the pause.
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit IDomainUpgradeExecutor.OperationAbandoned(address(operation));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
-        vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit ICTMUpgradeExecutor.OperationAbandoned(address(operation));
         vm.prank(governor);
         coordinator.abandonPendingOperation(true);
 
@@ -1120,6 +1141,69 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(_liveImpl(ecosystemProxyAdmin, otherEcosystemProxy), implOld, "the swapped-in leg never runs");
     }
 
+    /// @dev The operation's per-field getters never steer a stage: the coordinator reads the pinned
+    ///      manifest alone and hands each domain its leg. Here every getter names a decoy (another
+    ///      core transition, another CTM transition, a foreign row, a foreign timer); all three
+    ///      stages run the manifest's objects, and none calls a getter. A manifest that changes
+    ///      between stages is refused by the pin (the tests above).
+    function test_stagesReadTheManifestNeverTheGetters() public {
+        CTMTransition full = _deployFullTransition();
+        EcosystemUpgradeOperation operation = _operationFor(full);
+        CTMTransition decoyTransition = _deployTransition(779);
+        ProxyUpgradeRow[] memory decoyRows = new ProxyUpgradeRow[](1);
+        decoyRows[0] = _row(address(otherEcosystemProxy), implOld, implOther);
+        vm.mockCall(
+            address(operation),
+            abi.encodeCall(EcosystemUpgradeOperation.coreTransition, ()),
+            abi.encode(address(otherCoreTransition))
+        );
+        vm.mockCall(
+            address(operation),
+            abi.encodeCall(EcosystemUpgradeOperation.ctmTransition, ()),
+            abi.encode(address(decoyTransition))
+        );
+        vm.mockCall(
+            address(operation),
+            abi.encodeCall(EcosystemUpgradeOperation.ctmInfrastructureRows, ()),
+            abi.encode(decoyRows)
+        );
+        vm.mockCall(
+            address(operation),
+            abi.encodeCall(EcosystemUpgradeOperation.timer, ()),
+            abi.encode(makeAddr("decoyTimer"))
+        );
+        vm.expectCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.coreTransition, ()), 0);
+        vm.expectCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.ctmTransition, ()), 0);
+        vm.expectCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.ctmInfrastructureRows, ()), 0);
+        vm.expectCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.timer, ()), 0);
+
+        _stage0(full);
+        assertEq(address(coreExecutor.reservedCoreTransition()), address(coreTransition), "the manifest's core leg");
+        assertEq(address(ctmExecutor.reservedTransition()), address(full), "the manifest's CTM transition");
+
+        _stage1(full);
+        assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implNew, "the manifest's core row applied");
+        assertEq(_liveImpl(ecosystemProxyAdmin, otherEcosystemProxy), implOld, "the decoy core leg never ran");
+        assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implNew, "the manifest's CTM row applied");
+        assertEq(chainContractAddress.upgradeTransition(0), address(full), "the manifest's transition committed");
+
+        _stage2(full);
+        _assertLifecycleIdle();
+    }
+
+    /// @dev The coordinator's pause release refuses to run under a reservation: it would let stage 1
+    ///      run unpaused.
+    function test_revertWhen_releaseMigrationPauseWhileReserved() public {
+        EcosystemUpgradeOperation operation = _operationFor(transition);
+        _stage0(transition);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeLifecycleBusy.selector, address(operation)));
+        vm.prank(governor);
+        coordinator.forward(
+            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.releaseMigrationPause, ()))
+        );
+        _assertPendingAndPaused(transition, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
+    }
+
     /// @dev Stage 0 refuses an operation whose decoded manifest is not the one its hash commits to.
     function test_revertWhen_stage0OperationHashDoesNotCommitToItsManifest() public {
         CTMTransition full = _deployFullTransition();
@@ -1157,11 +1241,11 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         vm.stopPrank();
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
+        emit IDomainUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
         emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit ICTMUpgradeExecutor.OperationCompleted(address(operation));
+        emit IDomainUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(coordinator));
         emit IEcosystemUpgradeExecutor.OperationCompleted(address(operation));
         _stage2(full);
@@ -1224,7 +1308,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.upgradeTransition(0), address(repaired));
 
         vm.expectEmit(true, true, true, true, address(ctmExecutor));
-        emit ICTMUpgradeExecutor.OperationCompleted(address(operation));
+        emit IDomainUpgradeExecutor.OperationCompleted(address(operation));
         _stage2(transition);
 
         _assertLifecycleIdle();

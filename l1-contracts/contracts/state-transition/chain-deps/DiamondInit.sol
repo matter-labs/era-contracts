@@ -22,7 +22,7 @@ import {ReleaseFacetReader} from "../../upgrades/registry/libraries/ReleaseFacet
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
-import {EmptyAssetId, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyAssetId, GenesisBatchHashZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -43,9 +43,10 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     ///      `msg.sender`: the CTM is the one deploying the diamond proxy (`_deployNewChain`, for
     ///      both chain creation and migration mint), and the proxy constructor delegatecalls
     ///      into this init, preserving the sender. Everything else — bridgehub, protocol
-    ///      version, validator timelock, genesis batch hash, base token asset id, facet set,
-    ///      verifier and base system contract hashes — is read from the CTM and the genesis
-    ///      registry / bridgehub it points at.
+    ///      version, validator timelock, genesis batch hash, base token asset id, facet set and
+    ///      verifier — is read from the CTM, its current release and the bridgehub.
+    /// @dev Every address and hash read from the CTM, the release, the bridgehub and the asset
+    ///      router is zero-checked (the permissionless validator on L1 only: priority mode is L1-only).
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
     function initialize(uint256 _chainId, address _admin) public virtual reentrancyGuardInitializer returns (bytes32) {
@@ -72,8 +73,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
 
         // Everything chain-independent is read from the current release the CTM pins — the
         // committed chain-creation cut carries no init payload. Facets are installed here, by the
-        // init itself, from the release's EXPLICIT routing (selector lists are pinned in the
-        // release manifest, not read back out of facet bytecode at execution time).
+        // init itself, from the release's facet rows and each facet's own self-description.
         address currentRelease = ctm.currentRelease();
         if (currentRelease == address(0)) {
             revert ZeroAddress();
@@ -90,12 +90,22 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.chainId = _chainId;
         s.bridgehub = bridgehub;
         s.chainTypeManager = msg.sender;
+        address permissionlessValidator = ctm.PERMISSIONLESS_VALIDATOR();
         if (bridgehub == L2_BRIDGEHUB_ADDR) {
             s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
         } else {
-            s.nativeTokenVault = address(
-                IL1AssetRouter(address(IBridgehubBase(bridgehub).assetRouter())).nativeTokenVault()
-            );
+            address assetRouter = address(IBridgehubBase(bridgehub).assetRouter());
+            if (assetRouter == address(0)) {
+                revert ZeroAddress();
+            }
+            address nativeTokenVault = address(IL1AssetRouter(assetRouter).nativeTokenVault());
+            if (nativeTokenVault == address(0)) {
+                revert ZeroAddress();
+            }
+            if (permissionlessValidator == address(0)) {
+                revert ZeroAddress();
+            }
+            s.nativeTokenVault = nativeTokenVault;
         }
         s.baseTokenAssetId = baseTokenAssetId;
         s.protocolVersion = protocolVersion;
@@ -110,9 +120,13 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.admin = _admin;
         s.validators[validatorTimelock] = true;
 
-        s.storedBatchHashes[0] = ctm.storedBatchZero();
+        bytes32 storedBatchZero = ctm.storedBatchZero();
+        if (storedBatchZero == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        s.storedBatchHashes[0] = storedBatchZero;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
-        s.priorityModeInfo.permissionlessValidator = ctm.PERMISSIONLESS_VALIDATOR();
+        s.priorityModeInfo.permissionlessValidator = permissionlessValidator;
         s.feeParams = FeeParams({
             pubdataPricingMode: DEFAULT_PUBDATA_PRICING_MODE,
             batchOverheadL1Gas: DEFAULT_BATCH_OVERHEAD_L1_GAS,

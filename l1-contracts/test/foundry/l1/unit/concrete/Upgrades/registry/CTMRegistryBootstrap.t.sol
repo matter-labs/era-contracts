@@ -22,6 +22,7 @@ import {
     ReleaseGenesisData,
     ReleaseManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 /// @notice Unit tests for `CTMRelease` in its BOOTSTRAP (genesis) role: a freshly deployed CTM
 ///         (L1 deploy scripts or the Gateway CTM deployer) points at one so `DiamondInit`
@@ -73,7 +74,7 @@ contract CTMRegistryBootstrapTest is Test {
                 genesisUpgrade: (GENESIS_UPGRADE),
                 genesisFacets: rows,
                 genesis: ReleaseGenesisData({
-                    fixedForceDeploymentsData: bytes(""),
+                    fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 1
                 }),
@@ -172,6 +173,7 @@ contract CTMRegistryBootstrapTest is Test {
         ReleaseManifest memory manifest = _genesisManifest();
         manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = hex"beef";
         manifest.l2SystemProxyBytecodeInfo = hex"5e11";
+        L2PlanFixtures.syncForceDeployments(manifest);
         CTMRelease release = new CTMRelease(manifest);
 
         bytes[] memory rows = release.l2BytecodeInfos();

@@ -26,6 +26,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
+import { FIXED_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE } from "../core/const";
 
 const l1ContractsDir = path.resolve(__dirname, "../../../..");
 
@@ -224,11 +225,44 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
  * local hop upgrades chain state only, so the manifest carries no infrastructure slots and every
  * one encodes as the explicit zero ("not upgraded") row.
  */
-export function operationInitArgs(ctm: any, coreTransition: string, transition: string, timer: string): any {
+/**
+ * A genesis force-deployments blob for a release whose L2 table is empty: `CTMRelease` requires each
+ * table member's bytecode-info field to match its row, so every such field is empty here.
+ */
+export function emptyTableForceDeploymentsData(): string {
+  return ethers.utils.defaultAbiCoder.encode(
+    [FIXED_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE],
+    [
+      {
+        l1ChainId: 1,
+        l1AssetRouter: ethers.constants.AddressZero,
+        aliasedL1Governance: ethers.constants.AddressZero,
+        maxNumberOfZKChains: 0,
+        bridgehubBytecodeInfo: "0x",
+        l2AssetRouterBytecodeInfo: "0x",
+        l2NtvBytecodeInfo: "0x",
+        messageRootBytecodeInfo: "0x",
+        chainAssetHandlerBytecodeInfo: "0x",
+        interopCenterBytecodeInfo: "0x",
+        interopHandlerBytecodeInfo: "0x",
+        assetTrackerBytecodeInfo: "0x",
+        beaconDeployerInfo: "0x",
+        baseTokenHolderBytecodeInfo: "0x",
+        l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
+        l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
+        aliasedChainRegistrationSender: ethers.constants.AddressZero,
+        dangerousTestOnlyForcedBeacon: ethers.constants.AddressZero,
+        zkTokenAssetId: ethers.constants.HashZero,
+      },
+    ]
+  );
+}
+
+export function operationInitArgs(ctm: any, coreTransition: string, ctmTransition: string, timer: string): any {
   return {
     coreTransition,
     ctmInfrastructure: proxyUpgradeSlots("CTMContract", ctm.transition?.proxyUpgrades ?? {}),
-    transition,
+    ctmTransition,
     timer,
   };
 }

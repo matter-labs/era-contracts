@@ -10,6 +10,9 @@ import {OperationManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 /// @notice Immutable description of one ecosystem upgrade: its three optional changes and the
 ///         delay before governance may execute them. See
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
+/// @dev The coordinator is its only reader: it reads `getManifest()` alone, held to the
+///      `manifestHash()` it pinned at stage 0; the per-field getters are for tooling and never steer
+///      a stage.
 interface IEcosystemUpgradeOperation {
     /// @notice `keccak256(abi.encode(manifest))` — the commitment governance reviews.
     function manifestHash() external view returns (bytes32);
@@ -25,15 +28,17 @@ interface IEcosystemUpgradeOperation {
     ///         changes no CTM-domain implementation.
     function ctmInfrastructureRows() external view returns (ProxyUpgradeRow[] memory);
 
-    /// @notice The transition applied to the coordinator's bound CTM, zero when the operation
+    /// @notice The `CTMTransition` applied to the coordinator's bound CTM, zero when the operation
     ///         moves no chain version.
-    function transition() external view returns (address);
+    function ctmTransition() external view returns (address);
 
     /// @notice The `GovernanceUpgradeTimer` gating stage 1. Never zero.
     function timer() external view returns (address);
 
     /// @notice Reverts unless the timer and every participating infrastructure row's
-    ///         implementation is deployed code.
+    ///         implementation is deployed code, and the core transition and CTM transition it names
+    ///         (when it names them) are deployed and pass their own `validate()` — the whole
+    ///         operation validated in one call.
     /// @dev It does NOT attest that the code is the reviewed code — that is governance's approval
     ///      of this object's member ADDRESSES, established off-chain before approval (see
     ///      {docs/registry-driven-upgrades.md}).

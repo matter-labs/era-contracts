@@ -12,6 +12,7 @@ import {
 import {Call} from "contracts/governance/Common.sol";
 
 import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
+import {IDomainUpgradeExecutor} from "contracts/upgrades/registry/executors/IDomainUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
@@ -60,8 +61,9 @@ contract DummyImplB {
 ///      doubles: the rows the executor applies are the rows a governance-reviewed object serves.
 /// @dev The COORDINATOR IS A PLAIN ADDRESS here, pranked: this suite isolates the executor's own
 ///      rules (who may reserve, apply and release, and for which registry) from the coordinator's
-///      stage logic. Operations are REAL write-once `EcosystemUpgradeOperation` objects — the
-///      executor reads its leg from them — with an inert transition address; the real
+///      stage logic. Operations are REAL write-once `EcosystemUpgradeOperation` objects with an
+///      inert transition address, and each reservation hands in the operation's manifest as the
+///      coordinator would; the real
 ///      coordinator drives the same callbacks end to end in CTMUpgradeLifecycle.t.sol and
 ///      EcosystemUpgradeCoordination.t.sol.
 contract CoreUpgradeExecutorTest is Test {
@@ -117,7 +119,7 @@ contract CoreUpgradeExecutorTest is Test {
                 OperationManifest({
                     coreTransition: _coreTransition,
                     ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
-                    transition: makeAddr("transition"),
+                    ctmTransition: makeAddr("transition"),
                     timer: makeAddr("timer")
                 })
             );
@@ -162,8 +164,9 @@ contract CoreUpgradeExecutorTest is Test {
     }
 
     function _reserve(IEcosystemUpgradeOperation _operation) internal {
+        OperationManifest memory manifest = _operation.getManifest();
         vm.prank(coordinator);
-        coreExecutor.beginOperation(_operation);
+        coreExecutor.beginOperation(_operation, manifest);
     }
 
     // ─────────────────────────── the owner path ───────────────────────────
@@ -266,15 +269,16 @@ contract CoreUpgradeExecutorTest is Test {
     function test_setCoordinator_rebindsAndEmits() public {
         address successor = makeAddr("successor");
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.CoordinatorChanged(coordinator, successor);
+        emit IDomainUpgradeExecutor.CoordinatorChanged(coordinator, successor);
         vm.prank(ecosystemGovernor);
         coreExecutor.setCoordinator(successor);
         assertEq(coreExecutor.coordinator(), successor, "the binding must be recorded");
 
         // The old coordinator has lost its standing.
+        OperationManifest memory operationManifest = operation.getManifest();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, coordinator));
         vm.prank(coordinator);
-        coreExecutor.beginOperation(operation);
+        coreExecutor.beginOperation(operation, operationManifest);
     }
 
     function test_revertWhen_setCoordinatorByStranger() public {
@@ -296,9 +300,11 @@ contract CoreUpgradeExecutorTest is Test {
     // ─────────────────────────── the reservation protocol ───────────────────────────
 
     function test_beginOperation_reservesTheRegistryTheOperationNames() public {
+        OperationManifest memory manifest = operation.getManifest();
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationReserved(address(operation), address(coreTransition));
-        _reserve(operation);
+        emit IDomainUpgradeExecutor.OperationReserved(address(operation), address(coreTransition));
+        vm.prank(coordinator);
+        coreExecutor.beginOperation(operation, manifest);
 
         assertEq(address(coreExecutor.activeOperation()), address(operation), "the operation must be recorded");
         assertEq(
@@ -311,31 +317,33 @@ contract CoreUpgradeExecutorTest is Test {
 
     function test_revertWhen_beginOperationByNonCoordinator() public {
         // The owner included: reservations are the coordinator's, and only the coordinator's.
+        OperationManifest memory operationManifest = operation.getManifest();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ecosystemGovernor));
         vm.prank(ecosystemGovernor);
-        coreExecutor.beginOperation(operation);
+        coreExecutor.beginOperation(operation, operationManifest);
         assertEq(address(coreExecutor.activeOperation()), address(0));
     }
 
     function test_revertWhen_beginOperationWhileReserved() public {
         _reserve(operation);
         IEcosystemUpgradeOperation other = _operationNaming(address(coreTransition));
+        OperationManifest memory otherManifest = other.getManifest();
         vm.expectRevert(abi.encodeWithSelector(UpgradeLifecycleBusy.selector, address(operation)));
         vm.prank(coordinator);
-        coreExecutor.beginOperation(other);
+        coreExecutor.beginOperation(other, otherManifest);
         assertEq(address(coreExecutor.activeOperation()), address(operation), "the first reservation stands");
     }
 
-    /// @dev Retargeted from the removed codehash anchor: the reservation is still where the named
-    ///      leg is checked — before anything is paused or applied anywhere — and what it checks is
-    ///      that the address the operation names is deployed at all.
+    /// @dev The reservation is where the named leg is checked — before anything is paused or
+    ///      applied anywhere — and what it checks is that the address is deployed at all.
     function test_revertWhen_beginOperationWithAnUndeployedRegistry() public {
         // The operation names whatever address it is given.
         address codeless = makeAddr("codelessRegistry");
         IEcosystemUpgradeOperation misnamed = _operationNaming(codeless);
+        OperationManifest memory misnamedManifest = misnamed.getManifest();
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(coordinator);
-        coreExecutor.beginOperation(misnamed);
+        coreExecutor.beginOperation(misnamed, misnamedManifest);
         assertEq(address(coreExecutor.activeOperation()), address(0), "a refused leg occupies nothing");
     }
 
@@ -343,9 +351,10 @@ contract CoreUpgradeExecutorTest is Test {
     ///      never calls in for one, and a raw call gets a clear refusal.
     function test_revertWhen_beginOperationWithoutACoreLeg() public {
         IEcosystemUpgradeOperation ctmOnly = _operationNaming(address(0));
+        OperationManifest memory ctmOnlyManifest = ctmOnly.getManifest();
         vm.expectRevert(ZeroAddress.selector);
         vm.prank(coordinator);
-        coreExecutor.beginOperation(ctmOnly);
+        coreExecutor.beginOperation(ctmOnly, ctmOnlyManifest);
     }
 
     function test_coordinatorAppliesTheReservedRegistry() public {
@@ -416,7 +425,7 @@ contract CoreUpgradeExecutorTest is Test {
         assertEq(_liveImpl(bridgehubProxy), address(implOld), "fixture: the proxy moved off the row's target");
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
+        emit IDomainUpgradeExecutor.OperationCompleted(address(operation));
         vm.prank(coordinator);
         coreExecutor.completeOperation();
 
@@ -425,8 +434,9 @@ contract CoreUpgradeExecutorTest is Test {
         assertEq(_liveImpl(bridgehubProxy), address(implOld), "completion leaves the re-patch in place");
         // Free again: the next operation reserves normally.
         IEcosystemUpgradeOperation next = _operationNaming(address(coreTransition));
+        OperationManifest memory nextManifest = next.getManifest();
         vm.prank(coordinator);
-        coreExecutor.beginOperation(next);
+        coreExecutor.beginOperation(next, nextManifest);
         assertEq(address(coreExecutor.activeOperation()), address(next));
     }
 
@@ -434,7 +444,7 @@ contract CoreUpgradeExecutorTest is Test {
         _reserve(operation);
 
         vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.OperationAbandoned(address(operation));
+        emit IDomainUpgradeExecutor.OperationAbandoned(address(operation));
         vm.prank(coordinator);
         coreExecutor.abandonOperation();
 

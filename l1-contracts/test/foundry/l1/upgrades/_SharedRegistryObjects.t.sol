@@ -88,8 +88,6 @@ abstract contract RegistryObjectsFixture is Test {
 
     /// @dev Dummy EVM bytecode standing in for the authored L2 upgrade delegate (see {L2PlanFixtures}).
     bytes internal constant DELEGATE_CODE = hex"aa01";
-    /// @dev The fixed force-deployments blob every fixture release pins.
-    bytes internal constant FIXED_FORCE_DEPLOYMENTS_DATA = hex"f1f2";
 
     // The two chains the mocked ecosystem knows: one ETH-based, one whose base token is an ERC20
     // bridged from another chain (so its metadata lives on a LOCAL representation).
@@ -220,7 +218,7 @@ abstract contract RegistryObjectsFixture is Test {
                     genesisUpgrade: genesisUpgradeStub,
                     genesisFacets: rows,
                     genesis: ReleaseGenesisData({
-                        fixedForceDeploymentsData: FIXED_FORCE_DEPLOYMENTS_DATA,
+                        fixedForceDeploymentsData: _fixedForceDeploymentsData(),
                         genesisBatchHash: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 54
                     }),
@@ -245,6 +243,11 @@ abstract contract RegistryObjectsFixture is Test {
     /// @dev No authored L2 side: an L1-only edge.
     function _emptyPlan() internal pure returns (AuthoredL2Plan memory) {
         return L2PlanFixtures.emptyPlan();
+    }
+
+    /// @dev The fixed force-deployments blob every fixture release pins (their L2 tables are empty).
+    function _fixedForceDeploymentsData() internal pure returns (bytes memory) {
+        return L2PlanFixtures.emptyTableForceDeploymentsData();
     }
 
     /// @dev The minimal authored L2 side: the delegate's bytecode info (the object constructs its
@@ -313,7 +316,7 @@ abstract contract RegistryObjectsFixture is Test {
                 ctm: ctmStub,
                 expectedProtocolVersion: _oldProtocolVersion,
                 ctmProxyAdmin: ProxyAdmin(makeAddr("ctmProxyAdmin")),
-                proxyUpgrades: rows,
+                ctmProxyUpgrades: rows,
                 currentRelease: address(_release),
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeEngine: _upgradeEngine,
@@ -353,7 +356,7 @@ abstract contract RegistryObjectsFixture is Test {
                 _newProtocolVersion,
                 abi.encodeCall(
                     IL2DefaultUpgrade.upgrade,
-                    (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(_chainId))
+                    (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(_chainId))
                 )
             );
     }

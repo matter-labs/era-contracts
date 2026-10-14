@@ -6,15 +6,17 @@ import {ICTMRelease} from "./ICTMRelease.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ReleaseFacetReader} from "../libraries/ReleaseFacetReader.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
+import {FixedForceDeploymentsData} from "../../../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {
     GenesisBatchHashZero,
     RegistryDuplicateFacetRow,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
+    ReleaseForceDeploymentMismatch,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
-import {L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
+import {L2EcosystemContract, L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 
 /// @notice Storage-backed, write-once description of one CTM release.
 /// @dev A release names its members by ADDRESS. What those addresses run is what governance
@@ -63,6 +65,7 @@ contract CTMRelease is ICTMRelease {
         if (_manifest.l2BytecodeInfos.length != L2_ECOSYSTEM_CONTRACT_COUNT) {
             revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
+        _requireForceDeploymentsMatchTable(_manifest);
         // NO routing validation here — the release does not own the routing concept at all. It
         // names facet rows; the selectors live in the facets' own self-description, and routing
         // well-formedness is enforced where routing actually executes: `Diamond.diamondCut`
@@ -144,6 +147,42 @@ contract CTMRelease is ICTMRelease {
             if (ISelfDescribingFacet(facet).selectors().length == 0) {
                 revert RegistryEmptySelectors(facet);
             }
+        }
+    }
+
+    /// @dev The genesis force-deployments blob names the implementation of each table member a
+    ///      second time; both copies must agree, so the genesis path and the upgrade path cannot
+    ///      describe different L2 code. `beaconDeployerInfo` has no table member and is not compared.
+    function _requireForceDeploymentsMatchTable(ReleaseManifest memory _manifest) private pure {
+        FixedForceDeploymentsData memory data = abi.decode(
+            _manifest.genesis.fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
+        bytes[] memory table = _manifest.l2BytecodeInfos;
+        bytes memory shell = _manifest.l2SystemProxyBytecodeInfo;
+        _requireTableField(data.bridgehubBytecodeInfo, table, shell, L2EcosystemContract.L2Bridgehub);
+        _requireTableField(data.l2AssetRouterBytecodeInfo, table, shell, L2EcosystemContract.L2AssetRouter);
+        _requireTableField(data.l2NtvBytecodeInfo, table, shell, L2EcosystemContract.L2NativeTokenVault);
+        _requireTableField(data.messageRootBytecodeInfo, table, shell, L2EcosystemContract.L2MessageRoot);
+        _requireTableField(data.chainAssetHandlerBytecodeInfo, table, shell, L2EcosystemContract.L2ChainAssetHandler);
+        _requireTableField(data.interopCenterBytecodeInfo, table, shell, L2EcosystemContract.InteropCenter);
+        _requireTableField(data.interopHandlerBytecodeInfo, table, shell, L2EcosystemContract.L2InteropHandler);
+        _requireTableField(data.assetTrackerBytecodeInfo, table, shell, L2EcosystemContract.L2AssetTracker);
+        _requireTableField(data.baseTokenHolderBytecodeInfo, table, shell, L2EcosystemContract.BaseTokenHolder);
+    }
+
+    /// @dev A blob field is the `(implementation, proxy shell)` descriptor of its member's table
+    ///      row, and empty when the row is.
+    function _requireTableField(
+        bytes memory _field,
+        bytes[] memory _table,
+        bytes memory _shell,
+        L2EcosystemContract _member
+    ) private pure {
+        bytes memory row = _table[uint256(_member)];
+        bytes memory expected = row.length == 0 ? bytes("") : abi.encode(row, _shell);
+        if (keccak256(_field) != keccak256(expected)) {
+            revert ReleaseForceDeploymentMismatch(uint256(_member));
         }
     }
 

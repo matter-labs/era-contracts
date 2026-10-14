@@ -16,6 +16,7 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
+import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
@@ -146,6 +147,25 @@ contract CTMUpgradeOrphanedDeployment is RecurringCTMUpgradeForTests {
 ///         singleton, so nothing is deployed and no `CoreTransition` exists for the operation to
 ///         name. That the CTM leg alone carries the change is the point.
 contract CoreUpgradeNoEcosystemLeg is DefaultCoreUpgrade {}
+
+/// @notice A core prepare whose local `L1MessageRoot` build differs from the live one (simulated:
+///         the fixture's live code is this build) while the version declares no change.
+contract CoreUpgradeUndeclaredChange is CoreUpgradeNoEcosystemLeg {
+    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
+        if (keccak256(bytes(_name)) == keccak256(bytes("L1MessageRoot"))) {
+            return false;
+        }
+        return super._canReuseEcosystemImplementation(_name, _live);
+    }
+}
+
+/// @notice The same differing build, declared as this version's change.
+contract CoreUpgradeDeclaredChange is CoreUpgradeUndeclaredChange {
+    function changedEcosystemImplementations() internal pure override returns (string[] memory names) {
+        names = new string[](1);
+        names[0] = "L1MessageRoot";
+    }
+}
 
 /// @notice The ecosystem counterpart of `CTMUpgradeOrphanedDeployment`: a fresh
 ///         `ChainRegistrationSender` implementation, which `_coreProxyUpgradeRows()` has no row
@@ -278,7 +298,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         // ── The operation carries the row and its timer, and nothing else ──
         IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
         assertTrue(address(operation).code.length != 0, "the prepare must deploy an operation");
-        assertEq(operation.transition(), address(0), "the operation names no transition");
+        assertEq(operation.ctmTransition(), address(0), "the operation names no transition");
         assertEq(operation.coreTransition(), address(0), "the operation names no core transition");
         assertEq(operation.timer(), hop.preparedTimer(), "the operation names this prepare's timer");
         assertTrue(operation.timer().code.length != 0, "the named timer must be deployed");
@@ -339,7 +359,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         assertTrue(ICTMTransition(transition).newRelease() != liveRelease, "a changed verifier publishes a release");
 
         IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
-        assertEq(operation.transition(), transition, "the operation names the transition");
+        assertEq(operation.ctmTransition(), transition, "the operation names the transition");
         assertEq(operation.ctmInfrastructureRows().length, 0, "this hop changes no CTM-domain proxy");
 
         _runOperation(operation);
@@ -362,7 +382,7 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         address transition = hop.preparedTransition();
         ProxyUpgradeRow[] memory rows = operation.ctmInfrastructureRows();
         assertTrue(transition != address(0), "a mixed hop still deploys its transition");
-        assertEq(operation.transition(), transition, "the operation names it");
+        assertEq(operation.ctmTransition(), transition, "the operation names it");
         assertEq(rows.length, 1, "and carries the infrastructure row beside it");
         assertEq(rows[0].proxy, validatorTimelockProxy, "the row names the timelock proxy");
 
@@ -432,6 +452,94 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         assertEq(IChainTypeManager(inputs.ctm).currentRelease(), address(newRelease), "and installed the release");
     }
 
+    // ───────────────────────────── ecosystem implementations and the coordinator ─────────────
+
+    /// @notice The base core prepare deploys only what differs from the live code: on an ecosystem
+    ///         already running this build it reuses every implementation and pins no core leg.
+    function test_corePrepare_reusesEveryUnchangedImplementation() public {
+        CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
+        core.initializeWithArgs(
+            inputs.bridgehub,
+            HOP_SALT,
+            SAME_VERSION_INPUT,
+            "/script-out/foundry-upgrade/recurring-core-reuse-core.toml"
+        );
+        core.prepareEcosystemUpgrade();
+
+        assertEq(address(core.coreTransition()), address(0), "nothing changed, so there is no core leg");
+        address messageRootProxy = core.getDiscoveredBridgehub().proxies.messageRoot;
+        assertEq(
+            core.getDiscoveredBridgehub().implementations.messageRoot,
+            DeployScriptUtils.getImplementation(messageRootProxy),
+            "the live implementation is reused"
+        );
+    }
+
+    /// @notice A replacement the version did not declare is refused: it is either an unintended
+    ///         scope change or a local build that differs from the one that produced the live code.
+    function test_corePrepare_refusesAnUndeclaredReplacement() public {
+        CoreUpgradeUndeclaredChange core = new CoreUpgradeUndeclaredChange();
+        core.initializeWithArgs(
+            inputs.bridgehub,
+            HOP_SALT,
+            SAME_VERSION_INPUT,
+            "/script-out/foundry-upgrade/recurring-core-undeclared-core.toml"
+        );
+        vm.expectRevert(
+            bytes(
+                "ecosystem implementation 'L1MessageRoot' would be replaced but this version does not declare it "
+                "as changed. Either add it to `changedEcosystemImplementations()`, or the local build differs from "
+                "the one that produced the live code."
+            )
+        );
+        core.prepareEcosystemUpgrade();
+    }
+
+    /// @notice A declared replacement is deployed and pinned as the core leg's only row, departing
+    ///         from what the proxy runs today; every undeclared implementation is reused.
+    function test_corePrepare_deploysAndInstallsADeclaredReplacement() public {
+        CoreUpgradeDeclaredChange core = new CoreUpgradeDeclaredChange();
+        core.initializeWithArgs(
+            inputs.bridgehub,
+            HOP_SALT,
+            SAME_VERSION_INPUT,
+            "/script-out/foundry-upgrade/recurring-core-declared-core.toml"
+        );
+        core.prepareEcosystemUpgrade();
+
+        assertTrue(address(core.coreTransition()) != address(0), "the declared change is a core leg");
+        ProxyUpgradeRow[] memory rows = core.coreTransition().ecosystemRows();
+        address messageRootProxy = core.getDiscoveredBridgehub().proxies.messageRoot;
+        assertEq(rows.length, 1, "the one declared replacement is the only row");
+        assertEq(rows[0].proxy, messageRootProxy, "on the message root's proxy");
+        assertEq(rows[0].expectedOldImpl, DeployScriptUtils.getImplementation(messageRootProxy), "from live");
+        assertEq(rows[0].implNew, core.getDiscoveredBridgehub().implementations.messageRoot, "to this run's");
+        assertTrue(rows[0].implNew != rows[0].expectedOldImpl, "a real replacement");
+    }
+
+    /// @notice A recurring CTM prepare derives the coordinator from the CTM (its owner is the bound
+    ///         executor, which names the coordinator) and ignores the coordinator input, which only
+    ///         the bootstrap edge reads.
+    function test_recurringPrepare_derivesTheCoordinatorFromTheCTM() public {
+        CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeValidatorTimelockOnly();
+        _initHop(core, hop, SAME_VERSION_INPUT, "recurring-derived-coordinator");
+        hop.setEcosystemUpgradeExecutor(makeAddr("staleCoordinatorInput"));
+        _finishPrepare(core, hop);
+
+        assertEq(hop.upgradeCoordinator(), coordinator, "the coordinator the CTM's executor answers to");
+        assertEq(
+            GovernanceUpgradeTimer(hop.preparedTimer()).TIMER_GOVERNANCE(),
+            coordinator,
+            "the timer is bound to it"
+        );
+        string memory output = vm.readFile(
+            string.concat(vm.projectRoot(), "/script-out/foundry-upgrade/recurring-derived-coordinator-ctm.toml")
+        );
+        assertEq(output.readAddress("$.registry.coordinator_addr"), coordinator, "and the output names it");
+        _runOperation(IEcosystemUpgradeOperation(hop.preparedOperation()));
+    }
+
     // ───────────────────────────── refusals ─────────────────────────────
 
     /// @notice An operation that changes nothing is refused at PREPARATION, where the message can
@@ -443,7 +551,6 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         _initHop(core, hop, SAME_VERSION_INPUT, "recurring-empty");
         core.prepareEcosystemUpgrade();
         assertEq(address(core.coreTransition()), address(0), "the fixture must leave the ecosystem leg empty");
-        hop.setEcosystemUpgradeExecutor(coordinator);
         hop.setCoreTransition(address(core.coreTransition()));
 
         vm.expectRevert("this upgrade changes nothing: no core transition, no infrastructure row and no transition");
@@ -485,7 +592,6 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         RecurringCTMUpgradeForTests hop = new CTMUpgradeOrphanedDeployment();
         _initHop(core, hop, SAME_VERSION_INPUT, "recurring-orphan");
         core.prepareEcosystemUpgrade();
-        hop.setEcosystemUpgradeExecutor(coordinator);
         hop.setCoreTransition(address(core.coreTransition()));
 
         // The message names the slot and the address so the operator can tell which of the two
@@ -608,7 +714,6 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
 
     function _finishPrepare(CoreUpgradeNoEcosystemLeg _core, RecurringCTMUpgradeForTests _hop) internal {
         _core.prepareEcosystemUpgrade();
-        _hop.setEcosystemUpgradeExecutor(_core.getEcosystemUpgradeExecutor());
         _hop.setCoreTransition(address(_core.coreTransition()));
         _hop.prepareCTMUpgrade();
     }

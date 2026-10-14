@@ -185,7 +185,7 @@ struct ProxyUpgradeRow {
 ///        here — a CTM is one of possibly many and upgrades on its own cadence; shared contracts
 ///        belong to the core transition. All slots zero when the CTM domain's implementations do
 ///        not change.
-/// @param transition The `CTMTransition` applied to the coordinator's bound CTM; zero when the
+/// @param ctmTransition The `CTMTransition` applied to the coordinator's bound CTM; zero when the
 ///        operation moves no chain version.
 /// @param timer The `GovernanceUpgradeTimer` gating stage 1: stage 0 starts it, stage 1 requires
 ///        its deadline. Bound to the coordinating `EcosystemUpgradeExecutor`
@@ -196,7 +196,7 @@ struct ProxyUpgradeRow {
 struct OperationManifest {
     address coreTransition;
     ProxyUpgradeRow[] ctmInfrastructure;
-    address transition;
+    address ctmTransition;
     address timer;
 }
 
@@ -215,9 +215,9 @@ struct CoreTransitionManifest {
 
 /// @param ctm The ChainTypeManager proxy this migration bootstraps.
 /// @param expectedProtocolVersion The version the CTM must currently be at (the departing one).
-/// @param ctmProxyAdmin The ProxyAdmin administering every proxy in `proxyUpgrades` (and the CTM
+/// @param ctmProxyAdmin The ProxyAdmin administering every proxy in `ctmProxyUpgrades` (and the CTM
 ///        proxy).
-/// @param proxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
+/// @param ctmProxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
 ///        as {CoreTransitionManifest}): each participating slot applies only if the proxy
 ///        currently points at `expectedOldImpl`. The CTM's own implementation swap is one of
 ///        these slots, and the `ServerNotifier` slot is mandatory: its proxy is the notifier whose
@@ -263,7 +263,7 @@ struct BootstrapManifest {
     address ctm;
     uint256 expectedProtocolVersion;
     ProxyAdmin ctmProxyAdmin;
-    ProxyUpgradeRow[] proxyUpgrades;
+    ProxyUpgradeRow[] ctmProxyUpgrades;
     address currentRelease;
     uint256 oldProtocolVersionDeadline;
     address upgradeEngine;

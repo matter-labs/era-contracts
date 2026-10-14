@@ -20,12 +20,11 @@ import {L2UpgradePlan, TransitionManifest} from "../RegistryTypes.sol";
 ///         pinned object and the L2 protocol upgrade transaction — from that object's constants, at
 ///         execution time, on-chain. Facet changes are NOT composed here: they are derived at
 ///         transition initialization and applied verbatim from `transition.facetCuts()`. New-chain
-///         genesis data comes from the release the CTM pins, not from a composed
-///         `ChainCreationParams`.
+///         genesis data comes from the release the CTM points at.
 /// @dev Everything here is CTM-scoped, including the L2 force-deployments keyed by
 ///      `L2EcosystemContract`: L2 system-contract bytecodes are pinned per CTM. The registry
 ///      composes for ZKsync OS chains only. Ecosystem-wide (core) L1 upgrades have no composition
-///      to do beyond proxy/impl lookups and live in `EcosystemUpgradeExecutor`.
+///      to do beyond proxy/impl lookups and are applied by `CoreUpgradeExecutor`.
 /// @dev Because the upgrade path (existing chains) and the genesis path (new chains) both resolve
 ///      to the same pinned release, they cannot drift apart.
 library CTMUpgradeComposer {

@@ -74,9 +74,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
     /// @dev Deprecated. Genesis batch zero, the initial diamond cut hash and the L1 genesis
-    ///      upgrade address are no longer stored: they are read from the genesis `CTMRegistry`
-    ///      (see `storedBatchZero()` / `l1GenesisUpgrade()` and the `_deployNewChain` cut). Slots
-    ///      retained to preserve the upgradeable storage layout.
+    ///      upgrade address are read from `currentRelease` (see `storedBatchZero()` /
+    ///      `l1GenesisUpgrade()` and the `_deployNewChain` cut). Slots retained to preserve the
+    ///      upgradeable storage layout.
     // slither-disable-next-line constable-states
     bytes32 internal __DEPRECATED_storedBatchZero;
 
@@ -103,7 +103,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      deployed CTMs, so removing it would shift every storage slot after it.
     address internal __DEPRECATED_validatorTimelock;
 
-    /// @dev Deprecated. Written only by the legacy cut-taking commit path: pre-v32 Admin facets
+    /// @dev Deprecated. Written only by the legacy cut-taking commit path: pre-v35 Admin facets
     ///      crossing that edge verify the handed cut bytes against it (served through the
     ///      {upgradeCutHash} view). Registry-driven edges commit only the transition
     ///      ({upgradeTransition}); chains read {upgradeCutForVersion}.
@@ -115,7 +115,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The address to accept the admin role
     address private pendingAdmin;
 
-    /// @dev Deprecated. The genesis force-deployments are read from the registry
+    /// @dev Deprecated. The genesis force-deployments are read from the current release
     ///      (`fixedForceDeploymentsData`); no hash of a caller-supplied copy is stored. Slot
     ///      retained to preserve the upgradeable storage layout.
     // slither-disable-next-line constable-states
@@ -161,7 +161,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice The transition committed for chains departing from a given protocol version. The
     ///         ONLY commitment for registry-driven edges: {upgradeCutForVersion} derives the cut
     ///         from it, so chains are never handed cut bytes. `upgradeCutHash` remains only for
-    ///         chains on pre-v32 Admin facets, whose handed-cut path verifies against it.
+    ///         chains on pre-v35 Admin facets, whose handed-cut path verifies against it.
     mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -276,13 +276,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      the bootstrap edge, each right after it moved `protocolVersion`: the release's own check
     ///      surface, then its version. The genesis params need no check here: a release refuses a
     ///      zero genesis batch hash at construction and a codeless genesis upgrade in `validate()`.
-    /// @dev No codehash pin. A runtime hash cannot establish that the audited constructor
-    ///      produced the object it is applied to (creation code may return canonical runtime
-    ///      bytecode over storage of its own choosing), so the model does not ask the chain to
-    ///      pretend otherwise: the release reaching here is the one GOVERNANCE reviewed and named
-    ///      in the call it signed, and `protocol-ops ecosystem verify-bootstrap` re-derives that
-    ///      object's address from the reviewed creation code before it signs. What stays on-chain
-    ///      are the checks a chain can actually make — see {docs/registry-driven-upgrades.md}.
+    /// @dev The release is the one governance approved; its construction is verified off-chain,
+    ///      not here — see "Provenance and validation" in {docs/registry-driven-upgrades.md}.
     function _setCurrentRelease(address _release) internal {
         if (_release == address(0)) {
             revert ZeroAddress();
@@ -298,15 +293,15 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewCurrentRelease(protocolVersion, _release);
     }
 
-    /// @notice The L1 genesis upgrade contract new chains run at creation, read from the genesis
-    ///         registry (used to set chainId + force-deploy the L2 system contracts).
+    /// @notice The L1 genesis upgrade contract new chains run at creation, read from the current
+    ///         release (used to set chainId + force-deploy the L2 system contracts).
     function l1GenesisUpgrade() public view returns (address genesisUpgrade) {
         // slither-disable-next-line unused-return
         (genesisUpgrade, , ) = ICTMRelease(currentRelease).genesisParams();
     }
 
     /// @notice The genesis (batch zero) stored-batch hash new chains start from — derived from
-    ///         the genesis params the registry pins, so it stays consistent with the registry.
+    ///         the current release's genesis params.
     function storedBatchZero() public view returns (bytes32) {
         // slither-disable-next-line unused-return
         (, bytes32 genesisBatchHash, uint64 genesisIndexRepeatedStorageChanges) = ICTMRelease(currentRelease)
@@ -378,10 +373,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The cut is DERIVED here rather than supplied: it is a pure function of the transition
     ///      (`upgradeEngine.upgradeFromTransition(transition)` over no facet cuts), so passing it
     ///      would only add a second, unverifiable copy of data this contract can compute.
-    /// @dev No factory attestation is performed here. The caller is the owner, which under the
-    ///      registry model is the bound `CTMUpgradeExecutor` that already rejects transitions its
-    ///      immutable factory did not deploy. This is strictly narrower than the cut-taking
-    ///      entrypoint below, which accepts arbitrary calldata from the same owner.
+    /// @dev The transition is the one governance approved through the owner (the bound
+    ///      `CTMUpgradeExecutor`); its construction is verified off-chain, not here — see
+    ///      "Provenance and validation" in {docs/registry-driven-upgrades.md}.
     function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external onlyOwner {
         // The cut is derived from `fromRelease`'s routing, so it only applies from that release.
         address fromRelease = _transition.fromRelease();
@@ -644,10 +638,10 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
     /// @param _admin the chain's admin address
-    /// @dev The genesis cut is built entirely from the genesis registry this CTM pins: no facet
-    ///      cuts, the DiamondInit address read from the registry, and `initialize(chainId, admin)`
-    ///      as init calldata. DiamondInit reads everything else back from this CTM (it is
-    ///      `msg.sender` during the proxy construction) and the registry / bridgehub.
+    /// @dev The genesis cut is built entirely from `currentRelease`: no facet cuts, the
+    ///      DiamondInit address read from the release, and `initialize(chainId, admin)` as init
+    ///      calldata. DiamondInit reads everything else back from this CTM (it is `msg.sender`
+    ///      during the proxy construction), the release and the bridgehub.
     function _deployNewChain(uint256 _chainId, address _admin) internal returns (address zkChainAddress) {
         if (getZKChain(_chainId) != address(0)) {
             // ZKChain already registered

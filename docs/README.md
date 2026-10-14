@@ -9,7 +9,8 @@
     release / transition / registry / operation objects, the coordinator and domain executors, provenance and
     validation, the bootstrap edge.
   - [upgrade-stage-lifecycle.md](./upgrade-stage-lifecycle.md) — operational policies of the on-chain lifecycle:
-    pause composition, the ServerNotifier row, the upgrade timer, coordinator succession, recovery.
+    pause composition, the ServerNotifier handover, the upgrade timer and stage timing, coordinator succession,
+    monitoring, recovery.
   - [upgrade-script-retirement.md](./upgrade-script-retirement.md) — the temporary plan for moving what the prepare
     scripts still decide on-chain.
   - [governance-self-migration.md](./governance-self-migration.md) — how the governance layer upgrades itself.

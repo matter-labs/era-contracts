@@ -11,8 +11,8 @@ import {TrimmedUpgradeOutput} from "./_EcosystemUpgradeForTests.sol";
 ///         scripts, driven by the anvil-interop pipeline upgrade runner through protocol-ops
 ///         right after the v35 bootstrap hop (`--core-script-path` / `--ctm-script-path`).
 
-/// @dev Same trimming as the bootstrap variant: the target version comes from the upgrade input, and the
-///      output carries only what the runner and the merger read.
+/// @dev The target version comes from the upgrade input, and the output carries only what the runner and
+///      the merger read.
 contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
     using stdToml for string;
 
@@ -59,11 +59,21 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
                 // Not a bootstrap: no migration to name.
                 bootstrapMigration: address(0),
                 operation: upgradeAddresses.ecosystemUpgradeOperation,
-                coordinator: upgradeAddresses.ecosystemUpgradeExecutor
+                coordinator: upgradeCoordinator()
             })
         );
     }
 }
 
-/// @dev Core upgrade for the harness; the version script needs no trimming on the core side.
-contract CoreUpgradeForTests_v36 is CoreUpgrade_v36 {}
+/// @dev Core upgrade for the harness. The anvil ecosystem this hop runs on was bootstrapped from the
+///      current sources, so its `L1MessageRoot` already runs this build and the base pipeline would
+///      reuse it; the harness deploys the declared change anyway so the hop carries the ecosystem leg
+///      it exists to exercise.
+contract CoreUpgradeForTests_v36 is CoreUpgrade_v36 {
+    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
+        if (keccak256(bytes(_name)) == keccak256(bytes("L1MessageRoot"))) {
+            return false;
+        }
+        return super._canReuseEcosystemImplementation(_name, _live);
+    }
+}

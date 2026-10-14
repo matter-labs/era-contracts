@@ -47,19 +47,19 @@ The current branch includes the following review surfaces:
 
 | Review area                     | Implementation and evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Upgrade description             | [RegistryTypes](./l1-contracts/contracts/upgrades/registry/RegistryTypes.sol): releases, transitions, ecosystem rows, inline codehash pins, timer and L2 plan inputs.                                                                                                                                                                                                                                                                                                           |
+| Upgrade description             | [RegistryTypes](./l1-contracts/contracts/upgrades/registry/RegistryTypes.sol): releases, transitions, core transitions, operations, proxy rows, timer and L2 plan inputs.                                                                                                                                                                                                                                                                                                       |
 | Execution and recovery          | [CTMUpgradeExecutor](./l1-contracts/contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol) and [lifecycle tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/CTMUpgradeLifecycle.t.sol): the coordinator model — the `EcosystemUpgradeExecutor` drives each domain's `beginOperation` / apply / `completeOperation` / `abandonOperation` callbacks, the CTM executor holds the per-CTM migration pause — plus coordinator succession and abandonment. |
-| Separately administered proxies | [ProxyUpgradeRowLib](./l1-contracts/contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol): explicit per-row ProxyAdmin, including ServerNotifier; application and completion checks.                                                                                                                                                                                                                                                                                    |
+| Separately administered proxies | [ProxyUpgradeRowLib](./l1-contracts/contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol): source-checked rows applied through each executor's bound ProxyAdmin (the ServerNotifier after its one-time handover) and verified in the same stage-1 transaction.                                                                                                                                                                                                          |
 | L2 and bootstrap payloads       | [CTMUpgradeComposer](./l1-contracts/contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol), [L2DefaultDelegateCalldataComposer](./l1-contracts/contracts/upgrades/L2DefaultDelegateCalldataComposer.sol), and [RegistryBootstrapMigration](./l1-contracts/contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol).                                                                                                                                         |
 | Individual-contract changes     | [RegistryIndividualUpgrade tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/RegistryIndividualUpgrade.t.sol): facet-only, verifier-only and validator-timelock-only upgrades assert that unrelated state is unchanged.                                                                                                                                                                                                                                     |
 | Production proposal generation  | [v36 prepare scripts](./l1-contracts/deploy-scripts/upgrade/v36): recurring upgrades emit the three executor stage calls; other actions must be declared in the output.                                                                                                                                                                                                                                                                                                         |
 
 Security review should focus on the full authority and execution path:
 
-- Check the source and target release/version edges, proxy identities, implementation pins,
+- Check the source and target release/version edges, proxy identities, implementation addresses,
   initialization behavior, and the code of each upgrade engine and L2 delegate/composer.
-- Check every declared external action. A row under a separately owned ProxyAdmin still needs
-  its administrator to act; naming the row does not grant the executor that authority.
+- Check every declared external action, and verify the package with
+  `protocol-ops ecosystem verify-bootstrap` before every vote.
 - Review governance's recovery powers alongside the normal stages. Abandoning a pending
   lifecycle releases its hold and clears its bookkeeping; it does not reverse an executed upgrade.
 - Stage 2 checks the applied L1 state. It does not prove that every chain has completed its L2
@@ -67,10 +67,8 @@ Security review should focus on the full authority and execution path:
 
 Remaining work includes retiring duplicate script-side composition, isolating legacy bootstrap
 and chain-call adapters, reducing unconditional deployment work for small patches, and making
-fresh deployments establish the executor authority setup directly. Compatibility with any
-already-deployed older registry schema needs an explicit migration decision; regenerated
-current-source fixtures do not prove that compatibility. These items are distinct from the
-implemented on-chain lifecycle and payload composition.
+fresh deployments establish the executor authority setup directly. These items are distinct from
+the implemented on-chain lifecycle and payload composition.
 
 ## Building and testing
 

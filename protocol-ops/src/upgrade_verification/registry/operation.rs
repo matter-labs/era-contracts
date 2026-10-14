@@ -36,6 +36,7 @@ use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{expect_canonical_construction, ReviewedBuild};
+use super::genesis::{judge_release_genesis, ReviewedGenesis};
 use super::lifecycle::{
     verify_lifecycle_construction, verify_timer_construction, LifecycleReview, TimerReview,
 };
@@ -56,6 +57,7 @@ pub(crate) async fn verify<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
+    genesis: &ReviewedGenesis,
     package: &OperationPackage,
     expected_governance_owner: Option<Address>,
     salts: &[B256],
@@ -108,13 +110,13 @@ pub(crate) async fn verify<P: Provider>(
         reviewed.insert(package.operation, "the operation".to_string());
     }
 
-    let transition = non_zero(manifest.transition);
+    let transition = non_zero(manifest.ctmTransition);
     cross_check(
         result,
         "ctm_transition_addr",
-        package.reported_transition,
+        package.reported_ctm_transition,
         transition,
-        "the transition",
+        "the CTM transition",
     );
     let transition_manifest = match transition {
         Some(address) => {
@@ -122,6 +124,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 identity,
                 build,
+                genesis,
                 result,
                 address,
                 salts,
@@ -131,8 +134,8 @@ pub(crate) async fn verify<P: Provider>(
         }
         None => {
             result.report_ok(
-                "the operation carries no transition: it moves no chain version, so its CTM leg \
-                 is infrastructure only",
+                "the operation carries no CTM transition: it moves no chain version, so its CTM \
+                 leg is infrastructure only",
             );
             None
         }
@@ -236,6 +239,12 @@ pub(crate) async fn verify<P: Provider>(
     // is their CONSTRUCTION — from the reviewed governance owner and the bindings the package
     // records, never from the values they answer with. A read compared with itself always
     // agrees and would report a passing check that established nothing.
+    result.print_info(
+        "  the executors predate this package, which records none of their original constructor \
+         arguments: each is re-derived from the CURRENT reviewed owner and coordinator, under the \
+         reviewed salts — pass the salts they were deployed under with --create2-salt. A genuine \
+         executor whose owner or coordinator has moved since its deployment does not re-derive",
+    );
     let bindings = verify_lifecycle_construction(
         provider,
         build,
@@ -614,6 +623,7 @@ async fn verify_transition<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
+    genesis: &ReviewedGenesis,
     result: &mut VerificationResult,
     transition: Address,
     salts: &[B256],
@@ -660,6 +670,7 @@ async fn verify_transition<P: Provider>(
         provider,
         identity,
         build,
+        genesis,
         result,
         "the release the transition installs",
         manifest.newRelease,
@@ -716,12 +727,14 @@ async fn verify_transition<P: Provider>(
     }))
 }
 
-/// A release's provenance and construction, re-derived from the manifest it serves.
+/// A release's provenance and construction, re-derived from the manifest it serves, and its
+/// genesis against the reviewed one.
 #[allow(clippy::too_many_arguments)]
 async fn verify_release<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
+    genesis: &ReviewedGenesis,
     result: &mut VerificationResult,
     label: &str,
     release: Address,
@@ -767,6 +780,7 @@ async fn verify_release<P: Provider>(
             row.facet, row.isFreezable
         ));
     }
+    judge_release_genesis(result, label, &manifest.genesis, genesis);
     Ok(())
 }
 
@@ -973,6 +987,45 @@ async fn verify_governance_owner<P: Provider>(
         ),
     ];
 
+    let pending_owners = [
+        (
+            "the coordinator",
+            tolerate(
+                EcosystemUpgradeExecutorView::new(coordinator, provider)
+                    .pendingOwner()
+                    .call()
+                    .await,
+                result,
+                "the coordinator's pending owner",
+            ),
+        ),
+        (
+            "the core executor",
+            tolerate(
+                CoreUpgradeExecutorView::new(core_executor, provider)
+                    .pendingOwner()
+                    .call()
+                    .await,
+                result,
+                "the core executor's pending owner",
+            ),
+        ),
+        (
+            "the CTM executor",
+            tolerate(
+                CTMUpgradeExecutorView::new(ctm_executor, provider)
+                    .pendingOwner()
+                    .call()
+                    .await,
+                result,
+                "the CTM executor's pending owner",
+            ),
+        ),
+    ];
+    for (label, pending) in pending_owners {
+        expect_no_nomination(result, label, pending);
+    }
+
     // The coordinator's owner is the address that signs all three stages, so every domain must
     // answer to it: one lifecycle under two owners cannot complete.
     let Some(Some(governance)) = owners.first().map(|(_, owner)| *owner) else {
@@ -1003,6 +1056,21 @@ async fn verify_governance_owner<P: Provider>(
             "no --expected-governance-owner supplied: the lifecycle owner {governance} is \
              reported but unverified against the review"
         )),
+    }
+}
+
+/// A lifecycle object's `pendingOwner()`: a nominee could accept after the review and take the
+/// lifecycle with it.
+fn expect_no_nomination(result: &mut VerificationResult, label: &str, pending: Option<Address>) {
+    match pending {
+        Some(pending) if pending.is_zero() => {
+            result.report_ok(&format!("{label} has no pending owner"))
+        }
+        Some(pending) => result.report_error(&format!(
+            "{label} has a pending owner {pending}: a nomination is outstanding that could take \
+             the lifecycle this upgrade runs through"
+        )),
+        None => {}
     }
 }
 
@@ -1146,7 +1214,7 @@ mod tests {
             operation: OPERATION,
             coordinator: COORDINATOR,
             ctm_key: "zksync_os".to_string(),
-            reported_transition: None,
+            reported_ctm_transition: None,
             reported_core_transition: None,
             reported_ctm_executor: None,
             reported_timer: None,
@@ -1158,6 +1226,7 @@ mod tests {
             external_actions,
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
+            force_deployments_data: None,
         }
     }
 
@@ -1168,6 +1237,23 @@ mod tests {
             vec![stage_call(2, COORDINATOR, OPERATION)],
             Vec::new(),
         )
+    }
+
+    /// The current-owner half of the lifecycle check: an outstanding nomination on any lifecycle
+    /// object fails the run, a cleared one passes, an unreadable one was reported when read.
+    #[test]
+    fn a_pending_nomination_on_a_lifecycle_object_fails() {
+        let mut result = VerificationResult::default();
+        expect_no_nomination(&mut result, "the coordinator", Some(Address::ZERO));
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        expect_no_nomination(&mut result, "the coordinator", None);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        expect_no_nomination(
+            &mut result,
+            "the CTM executor",
+            Some(Address::repeat_byte(0xBA)),
+        );
+        assert_eq!(result.errors, 1);
     }
 
     #[test]

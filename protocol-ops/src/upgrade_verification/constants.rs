@@ -8,7 +8,7 @@ pub const EIP1967_PROXY_ADMIN_SLOT: B256 =
 /// `CTMContract.ServerNotifier` — the slot of the CTM-domain inventory (`ProxyUpgradeRow[]`
 /// indexed by `CTMContract`) holding the ServerNotifier row, mandatory in a bootstrap manifest.
 /// The source-sync test below fails the build if the append-only enum moves it.
-pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 20;
+pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 19;
 
 /// Builds an L2 built-in address from a 16-bit offset into the
 /// `BUILT_IN_CONTRACTS_OFFSET` range (`0x10000..=0x1ffff`).

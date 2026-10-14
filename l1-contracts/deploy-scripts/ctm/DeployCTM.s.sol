@@ -45,13 +45,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     ///      set: the CTM holds no pointer to an engine, every transition pins the one it commits.
     address internal deployedUpgradeEngine;
 
-    /// @dev Nothing calls this: Rust drives `runInner`, CI `runWithBridgehub`, tests `runForTest`
-    ///      and `runForAnvilTest`. It stays only because `IDeployCTM` declares it, and that
-    ///      interface is compiled into `zkstack-out/` for the external `zkstack` CLI.
-    function run() public virtual {
-        return ();
-    }
-
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
         runInner({
@@ -484,7 +477,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     /// @dev The `(implementation, proxy)` system-proxy descriptor of `_c` for the genesis
-    ///      force-deployments blob, from the cached bytecode infos.
+    ///      force-deployments blob, from the cached bytecode infos. Only for the beacon deployer,
+    ///      which has no release-table row; every other descriptor comes from {_tableDescriptor}.
     function _getBytecodeInfo(L2EcosystemContract _c) internal virtual returns (bytes memory) {
         (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_c);
         return
@@ -494,26 +488,40 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             );
     }
 
+    /// @dev The blob field `CTMRelease` requires for `_member`: its table row behind the shell, or
+    ///      empty when the row is.
+    function _tableDescriptor(
+        bytes[] memory _table,
+        bytes memory _shell,
+        L2EcosystemContract _member
+    ) internal pure returns (bytes memory) {
+        bytes memory row = _table[uint256(_member)];
+        return row.length == 0 ? bytes("") : abi.encode(row, _shell);
+    }
+
     function _buildForceDeploymentsData(
         address _governance
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
         _precomputeBlakeHashes();
+        // The same table the release pins, so its two copies of each implementation agree.
+        bytes[] memory table = getL2BytecodeInfoTable();
+        bytes memory shell = getL2SystemProxyBytecodeInfo();
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2AssetRouter),
-            l2NtvBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2MessageRoot),
+            bridgehubBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2AssetRouter),
+            l2NtvBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2MessageRoot),
             beaconDeployerInfo: _getBytecodeInfo(L2EcosystemContract.UpgradeableBeaconDeployer),
-            baseTokenHolderBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.BaseTokenHolder),
-            chainAssetHandlerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2ChainAssetHandler),
-            interopCenterBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.InteropCenter),
-            interopHandlerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2InteropHandler),
-            assetTrackerBytecodeInfo: _getBytecodeInfo(L2EcosystemContract.L2AssetTracker),
+            baseTokenHolderBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.BaseTokenHolder),
+            chainAssetHandlerBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2ChainAssetHandler),
+            interopCenterBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.InteropCenter),
+            interopHandlerBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2InteropHandler),
+            assetTrackerBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

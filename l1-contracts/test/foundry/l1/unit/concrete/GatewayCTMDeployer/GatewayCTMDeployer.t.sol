@@ -27,6 +27,8 @@ import {
     DirectCreate2Calldata
 } from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsProcessing.s.sol";
+import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {
@@ -123,7 +125,11 @@ contract GatewayCTMDeployerTest is Test {
             genesisRollupLeafIndex: 10,
             // The genesis batch commitment must be equal to 1.
             genesisBatchCommitment: bytes32(uint256(1)),
-            forceDeploymentsData: hex"deadbeef",
+            // Consistent with the release table the helper builds, as `CTMRelease` requires.
+            forceDeploymentsData: L2PlanFixtures.forceDeploymentsData(
+                SystemContractsProcessing.buildL2BytecodeInfoTable(),
+                SystemContractsProcessing.systemProxyBytecodeInfo()
+            ),
             protocolVersion: 1
         });
 

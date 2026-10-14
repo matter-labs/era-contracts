@@ -16,7 +16,8 @@ This is the architecture document. Two other documents complete it and are not r
   is the **runbook**: how a prepare is run, composed, verified, replayed and how chains cross.
 
 [`upgrade-stage-lifecycle.md`](upgrade-stage-lifecycle.md) keeps the operational policies that
-belong to neither: pause composition, the ServerNotifier row, the timer, coordinator succession.
+belong to neither: pause composition, the ServerNotifier handover, the timer and stage timing,
+coordinator succession, monitoring and recovery.
 
 Read in this order: [objects](#objects), [authority](#authority), [upgrading](#flow-upgrading),
 [bootstrap](#bootstrap). The central security question is whether the reviewed objects and the
@@ -64,13 +65,13 @@ All are storage-backed, built once from a manifest they take in the constructor,
 `manifestHash = keccak256(abi.encode(manifest))`. The struct definitions and their field docs are
 in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                                                                                         |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                         |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                     |
-| `CoreTransition`             | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                                        |
-| `EcosystemUpgradeOperation`  | `{coreTransition, ctmInfrastructure, transition, timer}` — three optional changes and the mandatory execution delay. `ctmInfrastructure` is the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself. Executors are bound on the coordinator; an operation carrying no change at all is rejected. |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                |
+| Contract                     | Holds                                                                                                                                                                                                                                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                            |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                        |
+| `CoreTransition`             | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                                                           |
+| `EcosystemUpgradeOperation`  | `{coreTransition, ctmInfrastructure, ctmTransition, timer}` — three optional changes and the mandatory execution delay. `ctmInfrastructure` is the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself. Executors are bound on the coordinator; an operation carrying no change at all is rejected. |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                   |
 
 ### Enum-indexed proxy inventories
 
@@ -80,10 +81,10 @@ deployment, one enum per domain (`ContractIdentifiers.sol`) — whose length mus
 enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT`):
 
 - `CoreTransitionManifest.proxyUpgrades` is indexed by `L1EcosystemContract`.
-- `OperationManifest.ctmInfrastructure` and `BootstrapManifest.proxyUpgrades` are indexed by
-  `CTMContract`. Only the TUPP members can participate: those under the CTM-domain ProxyAdmin
-  (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator) through the
-  executor's bound admin, and the `ServerNotifier` through the row's own named admin.
+- `OperationManifest.ctmInfrastructure` and `BootstrapManifest.ctmProxyUpgrades` are indexed by
+  `CTMContract`. Only the members behind a proxy under the CTM-domain `ProxyAdmin` can
+  participate: ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator
+  and the ServerNotifier.
 
 Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **"not
 upgraded" statement**. The length check means every contract of the domain HAS a slot and none can
@@ -150,9 +151,9 @@ flowchart TB
     end
 
     subgraph exe["Executors — immutable bindings"]
-      EE["EcosystemUpgradeExecutor (coordinator)<br/>CORE_EXECUTOR<br/>pendingOperation · pendingStage"]
-      CO["CoreUpgradeExecutor<br/>PROXY_ADMIN<br/>coordinator · reservation"]
-      CE["CTMUpgradeExecutor<br/>CHAIN_TYPE_MANAGER · CTM_PROXY_ADMIN<br/>coordinator · reservation"]
+      EE["EcosystemUpgradeExecutor (coordinator)<br/>CORE_EXECUTOR · ctmExecutor<br/>pendingOperation · pendingStage · pendingManifestHash"]
+      CO["CoreUpgradeExecutor<br/>PROXY_ADMIN<br/>coordinator · reservedCoreTransition"]
+      CE["CTMUpgradeExecutor<br/>CHAIN_TYPE_MANAGER · CTM_PROXY_ADMIN<br/>coordinator · reservedTransition"]
     end
 
     T["GovernanceUpgradeTimer<br/>TIMER_GOVERNANCE = coordinator"]
@@ -165,13 +166,13 @@ flowchart TB
     ENG["DefaultUpgrade — upgradeFromTransition"]
     BOOTENG["BootstrapUpgrade — upgradeFromBootstrap"]
 
-    EE -. "codehash-check + validate" .-> OP
+    EE -. "validate + manifest held to the pinned hash" .-> OP
     EE -- "beginOperation / applyL1Upgrade /<br/>completeOperation / abandonOperation" --> CO
-    EE -- "beginOperation / applyOperation /<br/>completeOperation / abandonOperation" --> CE
-    EE -- "startTimer (stage 0) · checkDeadline (stage 1)" --> T
-    CO -. "codehash-check + validate" .-> CR
+    EE -- "beginOperation / applyOperation /<br/>completeOperation / abandonOperation /<br/>releaseMigrationPause" --> CE
+    EE -- "startTimer (stage 0) · checkDeadline (stages 1, 2)" --> T
+    CO -. "validate + rows" .-> CR
     CO -- "upgrade / upgradeAndCall" --> PA
-    CE -. "codehash-check + validate + both edges" .-> TRA
+    CE -. "validate + both edges" .-> TRA
     CE -- "the operation's infrastructure rows" --> CPA
     CE -- "setNewVersionUpgradeFromTransition ·<br/>upgradeChainFromVersion" --> CTM
     CE -- "pauseCTMMigration (begin) ·<br/>unpauseCTMMigration (complete)" --> CAH
@@ -216,26 +217,29 @@ piece of protocol authority and answers to exactly one coordinator, which it nam
 (`coordinator`, set by the owner). A shared owner is not authorization: each domain callback rejects callers other than its
 configured coordinator.
 
-| Executor                   | Bound to (immutable)                                                    | Entrypoints                                                                                                                                                                                                                                           |
-| -------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `EcosystemUpgradeExecutor` | `CORE_EXECUTOR`, the `EcosystemUpgradeOperation` codehash               | `stage0/1/2(operation)`, `abandonPendingOperation(unpauseMigrations)` (owner); `pendingOperation()`, `pendingStage()`, `pendingManifestHash()`                                                                                                        |
-| `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`, the `CoreTransition` codehash               | `beginOperation`, `completeOperation`, `abandonOperation` (coordinator); `applyL1Upgrade` (coordinator for the reserved registry, or the owner for any — bootstrap and recovery); `setCoordinator` (owner, refused while reserved); `forward` (owner) |
-| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its `ProxyAdmin`, the `CTMTransition` codehash | `beginOperation`, `applyOperation`, `completeOperation`, `abandonOperation(unpauseMigrations)` (coordinator); `validateTransitionApplied`, `validateOperationApplied`; `upgradeChain`; `acceptCTMOwnership`; `setCoordinator`, `forward` (owner)      |
+| Executor                   | Bound to (immutable)                      | Entrypoints                                                                                                                                                                                                                                                  |
+| -------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EcosystemUpgradeExecutor` | `CORE_EXECUTOR`                           | `stage0/1/2(operation)`, `abandonPendingOperation(unpauseMigrations)`, `setCTMExecutor`, `forward` (owner); `pendingOperation()`, `pendingStage()`, `pendingManifestHash()`                                                                                  |
+| `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`                | `beginOperation`, `completeOperation`, `abandonOperation` (coordinator); `applyL1Upgrade` (coordinator for the reserved core transition, or the owner for any — bootstrap and recovery); `setCoordinator` (owner, refused while reserved); `forward` (owner) |
+| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its `ProxyAdmin` | `beginOperation`, `applyOperation`, `completeOperation`, `abandonOperation`, `releaseMigrationPause` (coordinator); `validateTransitionApplied`, `validateOperationApplied`; `upgradeChain`; `acceptCTMOwnership`; `setCoordinator`, `forward` (owner)       |
 
-The coordinator owns no proxy administration and applies nothing itself: it orders the core and CTM changes,
-holds the pending operation and its stage, starts and checks the timers, and drives the domain
-callbacks. Each domain stores only its `activeOperation`; its registry, its infrastructure rows and its
-transition are read from that operation rather than supplied or stored a second time. Domain callbacks enforce coordinator
-authorization; only `beginOperation` names an operation, and every callback after it acts on the
-reservation the executor already holds. How the stages compose these calls, what each stage checks
-and what abandonment leaves behind is the
+The lifecycle half of both domain executors — the coordinator binding, `beginOperation` /
+`completeOperation` / `abandonOperation` and the one-operation reservation — is one shared
+surface (`IDomainUpgradeExecutor`, implemented once in `DomainUpgradeExecutorBase`).
+
+The coordinator owns no proxy administration and applies nothing itself: it orders the core and
+CTM changes, holds the pending operation, its stage and its pinned manifest hash, starts and checks
+the timer, and hands each domain callback the pinned manifest. How the stages compose these
+calls, what each stage checks and what abandonment leaves behind is the
 [coordinator spec](../protocol-docs/ecosystem-upgrade-coordination.md).
 
 `UpgradeExecutorBase` gives every executor ONE role. `owner` (`Ownable2Step`) drives the fixed
-entrypoints, whose inputs are write-once objects and whose invariants cannot be bypassed, and the
-same owner can `forward` raw calls — the logged escape hatch that keeps the authority the executor
-holds reachable for recovery and succession. The base contract's own comment records why the
-hatch is owner-gated rather than gated on an emergency board.
+entrypoints, whose inputs are write-once objects, and the same owner can `forward` raw calls — the
+escape hatch that keeps the authority the executor holds reachable, every call logged as
+`CallForwarded`. It has no gate of its own: routine proposals and the `EmergencyUpgradeBoard` both
+reach the executor through the `ProtocolUpgradeHandler`, so no on-chain distinction between them
+exists, and what guards a raw call is the owner's governance process (the handler's timelock, the
+Security Council's veto, the board's quorum).
 
 ### Authority matrix after bootstrap
 
@@ -259,51 +263,52 @@ method outside the upgrade lifecycle, through the executor's owner-gated, logged
 | `executeUpgrade` (arbitrary cut), legacy `setNewVersionUpgrade` / `setUpgradeDiamondCut` / `setLegacyValidatorTimelock`             | `forward` only — deliberately: the bypass the object-driven path exists to remove               | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                                                          | `forward` only                                                                                  | —                                       |
 
+The executors hold three more authorities, reached the same way outside the lifecycle:
+`CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
+(`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
+ecosystem `ProxyAdmin` (the core executor's owner may also apply a whole `CoreTransition` directly
+with `applyL1Upgrade`). The `L1ChainAssetHandler` and the timers' `changeDeadline` stay with their
+own owners.
+
 ## Provenance and validation
 
-Object trust is established by REVIEW, not by a check the chain can make. Everything below follows
-from one fact about the EVM: creation code can write arbitrary storage and then return whatever
-runtime bytecode it likes. A contract that returns the audited runtime code therefore proves only
-that it runs audited code — never that the audited CONSTRUCTOR produced the state that code reads.
+**Governance approves the exact deployed objects, and verifying them off-chain is a mandatory step
+before every vote.** `protocol-ops ecosystem verify-bootstrap` re-derives each object's address from
+the reviewed creation code and the arguments it was constructed with — for a write-once object, the
+manifest it serves — and treats "unverifiable" as an error. Nothing on-chain attests to an object's
+construction or to what its members run: `validate()` only proves that every contract an object
+names is deployed code.
 
-That distinction is not academic for these objects. A `CTMTransition` DERIVES its facet cuts and L2
-plan at construction and stores them; every chain applies those cuts verbatim through delegatecall.
-A counterfeit built from adversarial creation code would answer `manifestHash()` with the approved
-manifest, hash identically to the audited object, pass `validate()`, and still route
-security-critical selectors wherever its author chose.
+Construction, not runtime code, is what has to be verified: creation code can write arbitrary
+storage and then return whatever runtime bytecode it likes, so a contract running the audited
+runtime code proves only that — never that the audited CONSTRUCTOR produced the state that code
+reads. A `CTMTransition` derives its facet cuts and L2 plan at construction and every chain applies
+those cuts by delegatecall; a counterfeit built from adversarial creation code could serve the
+approved manifest, pass `validate()` and still route security-critical selectors wherever its author
+chose. Objects therefore carry no codehash of themselves or of their members: a hash supplied
+beside the address it describes can only agree with itself.
 
-**There are no object-type codehash anchors.** An earlier iteration pinned one per object type
-(`releaseCodehash` on the CTM; `TRANSITION_CODEHASH` / `CORE_TRANSITION_CODEHASH` /
-`OPERATION_CODEHASH` on the executors). They were removed — all four, together — because they make
-exactly the claim the paragraph above refutes, and three survivors would have gone on implying a
-guarantee the fourth had just been admitted not to give. Objects consequently carry no fingerprint
-of themselves and none of their members: a hash the manifest author supplies beside the address it
-describes can only ever agree with itself.
-
-**What establishes an object, then.** Governance approves the exact deployed objects, and the
-review is a tool's output rather than an eyeball comparison of hashes. `protocol-ops ecosystem
-verify-bootstrap` answers three questions for every object a package names, and treats
-"unverifiable" as an error rather than a caveat:
+The verification answers three questions for every object a package names:
 
 1. **Was it PRODUCED by the reviewed code's constructor, from its reviewed arguments?** Every
-   object is deployed through the deterministic CREATE2 factory (`0x4e59…4956C`, the same address
-   on L1 and on ZKsync OS settlement layers), so
+   object is deployed through the deterministic CREATE2 factory (`0x4e59…4956C`), so
    `address == keccak256(0xff ++ factory ++ salt ++ keccak256(creationCode ++ abi.encode(args)))[12:]`.
    For a write-once object the arguments are the manifest it serves: the verifier reads it off the
    object, re-encodes it, and recomputes that address from the reviewed creation code. For the
    lifecycle objects — the coordinator, both domain executors, the timer — and the bootstrap
-   sequence, the arguments are the REVIEWED binding values: the governance owner (the bootstrap
-   manifest's `governance`, or the reviewer's `--expected-governance-owner`), the manifest's core
-   executor, the ecosystem `ProxyAdmin`, the timer delay and owner, the
-   manifest's CTM, `ProxyAdmin` and coordinator, the prepare's `2 weeks`. Never the object's own
-   getters: a genuine executor built for an attacker's owner answers every getter like the reviewed
-   one, and only the reviewed owner tells them apart. A match proves the canonical constructor ran
-   on those arguments, which covers the object's WHOLE state — immutables, storage, derived fields,
-   and derived fields nobody has added yet. The creation-code BYTES come from the local build
-   (`l1-contracts/out`), which is itself held against the committed `evmBytecodeHash`, so a
-   doctored build directory cannot pass. The salt is per prepare leg (the core prepare's
-   `[contracts] create2_factory_salt`, each CTM prepare's `[create2_factory_salts]` entry); the
-   package records neither, so both are reviewer inputs and every object is tried under each.
+   sequence, the arguments are the ones each was constructed with, as the package records them
+   (otherwise the reviewed values): the governance owner, the core executor, the ecosystem
+   `ProxyAdmin`, the timer delay and owner, the CTM, its `ProxyAdmin` and coordinator, the
+   prepare's `2 weeks`. Never the object's own getters: a genuine executor built for an attacker's
+   owner answers every getter like the reviewed one. What legitimately moves after construction —
+   the current owner, a pending nomination, the coordinator — is checked live against the reviewed
+   governance and bindings. A match proves the canonical constructor ran on those arguments, which
+   covers the object's WHOLE state — immutables, storage and derived fields. The creation-code
+   BYTES come from the local build (`l1-contracts/out`), held against the committed
+   `evmBytecodeHash`, so a doctored build directory cannot pass. The salt is per prepare leg (the
+   core prepare's `[contracts] create2_factory_salt`, each CTM prepare's `[create2_factory_salts]`
+   entry); the package records neither, so both are reviewer inputs and every object is tried
+   under each.
 2. **Does it run the reviewed code?** Live `EXTCODEHASH` against `AllContractsHashes.json` for the
    reviewed commit, for the objects without constructor-set immutables (the objects with them
    cannot hash to any artifact; question 1 is the whole of their identity). Code the commit does
@@ -317,6 +322,9 @@ verify-bootstrap` answers three questions for every object a package names, and 
    legitimate calls, say — is an error whether the package declares it or not. On chain,
    `RegistryBootstrapMigration.validateApplied()` refuses a pending nomination on every
    `Ownable2Step` authority the edge lands on or drives, for the same reason.
+
+The tool's full checklist, including what it deliberately does not check, is in
+[`ai-review/docs/protocol-ops.md`](ai-review/docs/protocol-ops.md).
 
 Its limits, stated so they are not mistaken for coverage: the salt is a package input, so an
 attacker free to choose both a salt and a counterfeit deployment faces the standard ~2^80 CREATE2
@@ -334,28 +342,24 @@ break question 2.
 the verifier, the genesis upgrade, the upgrade engine, the timer, the composer, each `implNew` — is
 an ADDRESS, and what it runs is what governance reviewed before approving the object.
 
-**What the chain still enforces.** Removing the anchors removed a check that did not hold; it
-removed nothing that did. Every execution check stays, on every path:
+**What the chain enforces**, on every path:
 
 - `ObjectAnchorLib.requireCode` on every object and every member an object names. Not bookkeeping:
   a call to a codeless address SUCCEEDS silently, and a codeless delegatecall target turns a
   chain's upgrade into a no-op that reports success.
-- `validate()` on each object, where it is committed or applied (`stage0` on the coordinator,
-  `beginOperation` on both domain executors, `applyL1Upgrade`, `applyOperation`, `migrate()`,
-  transition construction for both release edges). Two paths deliberately skip it and say so in
-  code: the per-chain `upgradeChain` and the engine's `upgradeFromTransition` execute only the
-  transition the CTM already committed, whose members cannot have lost their code since.
+- `validate()` on each object, where it is committed or applied (`stage0` on the coordinator, which
+  validates the whole operation including both transitions it names, `beginOperation` on both
+  domain executors, `applyL1Upgrade`, `applyOperation`, `migrate()`, transition construction for
+  both release edges). Two paths deliberately skip it and say so in code: the per-chain
+  `upgradeChain` and the engine's `upgradeFromTransition` execute only the transition the CTM
+  already committed, whose members cannot have lost their code since.
 - The source-checked edges: every proxy row departs from `expectedOldImpl`, a transition departs
   from the CTM's live `currentRelease` and its live `protocolVersion`, and the bootstrap refuses
   unless the live ecosystem is exactly the starting state its manifest names.
 - Authority and bindings: the executors' bound CTM, ProxyAdmin, coordinator and owner, checked by
   value against the manifest before the domain is handed over.
-- Lifecycle ordering and reservations: one operation at a time, stages in order, each domain
-  answering only to its coordinator.
-
-**Validation.** `validate()` reverts unless every contract an object names is deployed code. It
-does NOT attest that the code is the reviewed code — that is governance's approval of the
-addresses, established off-chain.
+- Lifecycle ordering and reservations: one operation at a time, stages in order, the manifest held
+  to the hash pinned at stage 0, each domain answering only to its coordinator.
 
 **Post-state verification.** A second layer proves the upgrade LANDED, in the stage-1 transaction
 that applies it:
@@ -441,16 +445,16 @@ sequenceDiagram
     participant D as Chain diamond
 
     G->>X: stage0(operation)
-    Note over X: domain callbacks enforce onlyCoordinator
-    X->>CO: beginOperation(operation) — code present + validate
-    X->>E: beginOperation(operation) — code present, validate, both edges
+    Note over X: operation.validate(), manifest pinned to manifestHash();<br/>domain callbacks enforce onlyCoordinator
+    X->>CO: beginOperation(operation, manifest) — validate the core transition
+    X->>E: beginOperation(operation, manifest) — validate rows and transition, both edges
     E->>H: pauseCTMMigration(ctm)
     X->>T: startTimer() — the operation's timer; onlyTimerAdmin, so TIMER_GOVERNANCE must be X
     G->>X: stage1(operation)
     X->>T: checkDeadline()
-    X->>CO: applyL1Upgrade(coreTransition) — core leg first
-    X->>E: applyOperation() — the reserved leg
-    E->>C: infrastructure rows first, then the commit
+    X->>CO: applyL1Upgrade(coreTransition) — core leg first, rows verified
+    X->>E: applyOperation(manifest) — must be the reserved one
+    E->>C: infrastructure rows first (CTM-domain ProxyAdmin), verified, then the commit
     E->>C: setNewVersionUpgradeFromTransition(transition) — version, cut and newRelease together
     G->>E: upgradeChain(transition, chainId)
     E->>C: upgradeChainFromVersion(chainId, oldV)
@@ -458,9 +462,9 @@ sequenceDiagram
     D->>C: upgradeCutForVersion(oldV) — derived from upgradeTransition[oldV]
     Note over D: apply derived facetCuts verbatim,<br/>then version + target release's verifier + composed L2 tx
     G->>X: stage2(operation)
-    X->>CO: completeOperation() — validates applied
-    X->>E: completeOperation() — validates applied
-    Note over X,E: Any later failure rolls back all completions
+    X->>T: checkDeadline()
+    X->>CO: completeOperation() — releases the reservation
+    X->>E: completeOperation() — releases the reservation
     E->>H: unpauseCTMMigration(ctm)
 ```
 
@@ -518,7 +522,9 @@ The **L2 force deployments are derived too**: only changed, nonempty target rows
 `l2BytecodeInfos` table are deployed at their member’s fixed address (`L2InventoryLib`). The release
 stores each implementation descriptor and one shared system-proxy shell; derivation joins them
 into the executable descriptor. A changed shell also changes the corresponding target rows.
-Unchanged rows are not reinstalled.
+Unchanged rows are not reinstalled. A row for a member with no fixed address — a proxy, a
+bridged-token template, the `L2DefaultUpgrade` delegate (deployed from the authored plan below) —
+is refused at transition construction (`RegistryMemberHasNoFixedAddress`).
 
 The reviewed input outside that table is `AuthoredL2Plan`: delegate bytecode info, extra bytecode
 infos and a calldata composer. `L2PlanLib.build` constructs the delegate and extra
@@ -533,7 +539,12 @@ bytecode hash names an auditable artifact, not a behavior.
 
 **Release shape.** Nonempty facet array; every facet row has selectors; exactly one row per facet
 address (`Diamond._addOneFunction` requires uniform freezability per facet); a selector appears in at
-most one row.
+most one row. The release names each L2 implementation twice — in `l2BytecodeInfos`, which
+transitions read, and in `fixedForceDeploymentsData`, which genesis reads — so each bytecode-info
+field of the latter must equal `abi.encode(row, l2SystemProxyBytecodeInfo)` for its member's table
+row (empty for an empty row), and the genesis and upgrade paths cannot describe different L2 code.
+`beaconDeployerInfo` is the exception: its member is not in the force-deployed table, so the blob
+is its only copy.
 
 **Version edge.** Read off the two releases, then `newProtocolVersion > oldProtocolVersion` — which
 also refuses the same release on both edges; both majors zero; the minor delta is within
@@ -553,7 +564,7 @@ batch and the VM its `DiamondInit` selects. A patch that changes nothing but the
 copy of the departing release one patch version up, and derives nothing.
 
 A verifier rotation is therefore: deploy the verifier, publish release B copying release A except
-that member, publish the `0.34.0 -> 0.34.1` transition naming `A -> B` with no L2 side, run the
+that member, publish the `0.35.0 -> 0.35.1` transition naming `A -> B` with no L2 side, run the
 normal lifecycle. Mechanical permission is not a safety argument: a facet patch still needs the
 usual compatibility review of storage layout, proof handling and L2 interaction.
 
@@ -681,14 +692,20 @@ before it existed.
 ## Deployment determinism
 
 Objects take their manifest as a constructor argument, so the manifest is part of the initcode and a
-CREATE2 address commits to it. There is no separate salt to reproduce and no window in which a
-deployed-but-uninitialized instance exists. Every prepare deployment rides the CREATE2 factory,
-because the deployer Safe bundle replays factory transactions only.
+CREATE2 address commits to it, and no deployed-but-uninitialized instance ever exists. Every
+prepare deployment rides the CREATE2 factory, because the deployer Safe bundle replays factory
+transactions only.
 
-The objects are built with a CBOR-metadata-free profile (`registry-deterministic`) so their
-bytecode is byte-identical across platforms. That is what lets a reviewer's own build reproduce the
-creation code a package's objects were deployed from, which is what the construction check in
-`protocol-ops ecosystem verify-bootstrap` rests on.
+Prepares deploy each object from its build artifact (`BytecodeUtils.readBytecodeL1`), the same
+bytes a reviewer's build of the reviewed commit produces — the remapping set recorded in CBOR
+metadata is pinned, so it does not depend on the machine — and which `AllContractsHashes.json`
+commits to. The construction check in `protocol-ops ecosystem verify-bootstrap` rests on that.
+
+The anvil registry runner (`test/anvil-interop/run-recurring-upgrade-test.ts`) deploys its objects
+from a committed manifest, `l1-contracts/scripts/registry-manifests/v35-local.json`, and fails on
+any drift from it; the contracts that manifest names by a bytecode-derived value come from the
+CBOR-metadata-free `registry-deterministic` profile. The manifest is a generated artifact
+(`yarn regen:registry-manifest` in `l1-contracts/test/anvil-interop`).
 
 **Gateway.** EraVM has no constructors, so these objects cannot be constructed there. A Gateway CTM
 therefore cannot deploy its own `CTMRelease` in-flow and the registry model cannot bump it yet; the
@@ -699,7 +716,7 @@ Gateway deployer takes a pre-deployed release address instead (`GatewayCTMDeploy
 - [Ecosystem upgrade coordination](../protocol-docs/ecosystem-upgrade-coordination.md) — the
   coordinator spec.
 - [Upgrade stage lifecycle](upgrade-stage-lifecycle.md) — pause composition, the ServerNotifier
-  handover, the timer, coordinator succession.
+  handover, the timer and stage timing, coordinator succession, monitoring and recovery.
 - [Upgrade scripts runbook](../l1-contracts/deploy-scripts/upgrade/README.md) — prepare, compose,
   verify, replay, chain crossing.
 - [Script retirement plan](upgrade-script-retirement.md) — what tooling still decides, and the

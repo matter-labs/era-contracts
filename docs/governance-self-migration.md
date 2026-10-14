@@ -33,11 +33,12 @@ A `GovernanceUpgradeExecutor` analogous to the domain executors does not fit:
 A **write-once `GovernanceMigration` object** — the same data discipline applied to succession:
 
 - constructor-initialized (the manifest is the constructor argument), write-once by construction,
-  `manifestHash` as the 32-byte commitment, provenance by pinned codehash;
-- pins the new PUH implementation and each new multisig with inline codehashes;
+  `manifestHash` as the 32-byte commitment, provenance by its construction verified off-chain
+  before the vote, as for the upgrade objects;
+- names the new PUH implementation and each new multisig by address;
 - carries **source-checked ownership edges** — `(target, expectedCurrentOwner -> newOwner)` plus the
   analogous proxy-admin edges — so a stale or replayed migration cannot re-point ownership backwards.
-  This is the `expectedOldImpl` property of `EcosystemContractRow`, applied to authority instead of
+  This is the `expectedOldImpl` property of `ProxyUpgradeRow`, applied to authority instead of
   implementations;
 - executed by one call in one PUH proposal (`migration.execute()`, gated `msg.sender == PUH`). The
   audit unit becomes the migration manifest. The EmergencyUpgradeBoard remains the break-glass

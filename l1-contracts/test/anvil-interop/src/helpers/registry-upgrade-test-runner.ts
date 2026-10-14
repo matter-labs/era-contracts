@@ -98,7 +98,14 @@ import {
   getDeterministicCreationBytecode,
 } from "../core/contracts";
 import { createProvider, impersonateAndRun } from "../core/utils";
-import { coreInitArgs, operationInitArgs, packSemVer, releaseInitArgs, transitionInitArgs } from "./registry-manifest";
+import {
+  coreInitArgs,
+  emptyTableForceDeploymentsData,
+  operationInitArgs,
+  packSemVer,
+  releaseInitArgs,
+  transitionInitArgs,
+} from "./registry-manifest";
 import {
   assertBootstrapCompleted,
   assertBootstrapEndState,
@@ -1208,8 +1215,8 @@ async function buildRegistryManifest(
           verifier: { address: deployed.newVerifier },
           genesisFacets,
           // Chain-creation payload for chains created at this release. No new chain is created
-          // in this test, so a synthetic payload (mirroring the foundry e2e test) suffices.
-          fixedForceDeploymentsData: "0xf1f2",
+          // in this test, so a synthetic payload consistent with the empty table suffices.
+          fixedForceDeploymentsData: emptyTableForceDeploymentsData(),
           // Keys are `L2EcosystemContract` member names; empty = every slot an explicit empty
           // row (synthetic, like the payload above — no chain is created at this release here),
           // and an empty table names no shell.

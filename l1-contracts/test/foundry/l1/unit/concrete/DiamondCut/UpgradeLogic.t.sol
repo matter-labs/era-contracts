@@ -101,7 +101,12 @@ contract UpgradeLogicTest is DiamondCutTest {
             address(dummyBridgehub),
             baseTokenAssetId,
             makeAddr("validatorTimelock"),
-            bytes32(0)
+            Utils.TEST_STORED_BATCH_ZERO
+        );
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
+            abi.encode(address(permissionlessValidator))
         );
         vm.prank(chainTypeManager);
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);

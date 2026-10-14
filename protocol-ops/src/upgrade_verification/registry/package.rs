@@ -21,7 +21,7 @@
 
 use std::path::Path;
 
-use alloy::primitives::{Address, B256, U256};
+use alloy::primitives::{Address, Bytes, B256, U256};
 use anyhow::Context;
 
 use crate::common::external_actions::ExternalAction;
@@ -87,7 +87,7 @@ pub(crate) struct OperationPackage {
     pub(crate) ctm_key: String,
     /// `[ctms.*.registry] ctm_transition_addr`, when the prepare named one: a cross-check on the
     /// transition the operation's own manifest pins.
-    pub(crate) reported_transition: Option<Address>,
+    pub(crate) reported_ctm_transition: Option<Address>,
     /// `[core.registry] core_transition_addr`, likewise a cross-check on the manifest's.
     pub(crate) reported_core_transition: Option<Address>,
     /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the executor the
@@ -114,6 +114,9 @@ pub(crate) struct OperationPackage {
     pub(crate) create2_salts: Vec<B256>,
     /// The package's record of the lifecycle objects' binding values.
     pub(crate) lifecycle: LifecycleInputs,
+    /// `[ctms.*.contracts_config] force_deployments_data` — the blob the prepare pinned in the
+    /// release the transition installs.
+    pub(crate) force_deployments_data: Option<Bytes>,
 }
 
 impl OperationPackage {
@@ -140,7 +143,7 @@ impl OperationPackage {
         Ok(Self {
             operation,
             coordinator,
-            reported_transition: registry_address(root, &ctm_key, "ctm_transition_addr"),
+            reported_ctm_transition: registry_address(root, &ctm_key, "ctm_transition_addr"),
             reported_core_transition: address_at(
                 root,
                 &["core", "registry", "core_transition_addr"],
@@ -166,6 +169,7 @@ impl OperationPackage {
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, &ctm_key),
             lifecycle: lifecycle_inputs_in(root, &ctm_key),
+            force_deployments_data: force_deployments_data_in(root, &ctm_key),
             ctm_key,
         })
     }
@@ -263,6 +267,9 @@ pub(crate) struct BootstrapPackage {
     /// Empty for a package produced before the prepare recorded them, in which case the reviewer
     /// supplies the reviewed salts on the command line.
     pub(crate) create2_salts: Vec<B256>,
+    /// `[ctms.*.contracts_config] force_deployments_data` — the blob the prepare pinned in the
+    /// release the edge installs.
+    pub(crate) force_deployments_data: Option<Bytes>,
 }
 
 fn table<'a>(root: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
@@ -328,6 +335,22 @@ fn external_actions_in(root: &toml::Value) -> anyhow::Result<Vec<ExternalAction>
             .context("`external_actions` does not decode as a list of declared actions"),
         None => Ok(Vec::new()),
     }
+}
+
+/// The force-deployments blob the CTM prepare wrote with `vm.serializeBytes` (a `0x` string).
+fn force_deployments_data_in(root: &toml::Value, ctm_key: &str) -> Option<Bytes> {
+    table(
+        root,
+        &[
+            "ctms",
+            ctm_key,
+            "contracts_config",
+            "force_deployments_data",
+        ],
+    )?
+    .as_str()?
+    .parse()
+    .ok()
 }
 
 fn ctm_address(root: &toml::Value, ctm_key: &str, section: &str, key: &str) -> Option<Address> {
@@ -406,6 +429,7 @@ impl BootstrapPackage {
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, &ctm_key),
             lifecycle: lifecycle_inputs_in(root, &ctm_key),
+            force_deployments_data: force_deployments_data_in(root, &ctm_key),
             ctm_key,
         })
     }
@@ -543,7 +567,7 @@ mod tests {
         assert_eq!(package.coordinator, COORDINATOR.parse::<Address>().unwrap());
         assert_eq!(package.ctm_key, "zksync_os");
         assert_eq!(
-            package.reported_transition,
+            package.reported_ctm_transition,
             Some(
                 "0x00000000000000000000000000000000000000cc"
                     .parse()
@@ -618,6 +642,7 @@ mod tests {
              ecosystem_admin_addr = \"0x00000000000000000000000000000000000000f3\"\n\
              [ctms.zksync_os.contracts_config]\n\
              governance_upgrade_timer_initial_delay = 172800\n\
+             force_deployments_data = \"0xf0f1f2\"\n\
              [core.registry]\n\
              core_transition_addr = \"0x00000000000000000000000000000000000000ee\"\n\
              core_upgrade_executor_addr = \"0x00000000000000000000000000000000000000e1\"\n\
@@ -707,6 +732,29 @@ mod tests {
                     .unwrap()
             )
         );
+    }
+
+    /// The force-deployments blob the release genesis is held against comes from the CTM
+    /// prepare's output; a package without it loads with it absent, and the release check then
+    /// reports it.
+    #[test]
+    fn the_force_deployments_data_is_read_from_the_ctm_prepare_output() {
+        let RegistryPackage::Operation(package) = load_str(&ordinary_release_toml()).unwrap()
+        else {
+            panic!("an ordinary release");
+        };
+        assert_eq!(
+            package.force_deployments_data,
+            Some(Bytes::from_static(&[0xf0, 0xf1, 0xf2]))
+        );
+
+        let body = recurring_toml(&format!(
+            "[operation]\noperation_addr = \"{OPERATION}\"\ncoordinator_addr = \"{COORDINATOR}\"\n"
+        ));
+        let RegistryPackage::Operation(package) = load_str(&body).unwrap() else {
+            panic!("an ordinary release");
+        };
+        assert!(package.force_deployments_data.is_none());
     }
 
     /// A package produced before the prepare recorded the lifecycle values loads with them

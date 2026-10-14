@@ -241,7 +241,10 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
                 genesisUpgrade: address(genesisUpgradeContract),
                 genesisFacets: _releaseFacets(_adminFacet),
                 genesis: ReleaseGenesisData({
-                    fixedForceDeploymentsData: hex"f1f2",
+                    fixedForceDeploymentsData: L2PlanFixtures.forceDeploymentsData(
+                        l2BytecodeInfos,
+                        l2SystemProxyBytecodeInfo
+                    ),
                     genesisBatchHash: bytes32(uint256(1)),
                     genesisIndexRepeatedStorageChanges: 54
                 }),

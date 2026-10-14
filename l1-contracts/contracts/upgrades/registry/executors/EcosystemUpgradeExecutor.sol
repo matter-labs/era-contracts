@@ -31,7 +31,8 @@ import {OperationManifest} from "../RegistryTypes.sol";
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Fixed logic, no generic delegatecall. Every stage takes the pinned write-once
 ///      `EcosystemUpgradeOperation` governance approved; no caller-supplied calldata enters a
-///      stage.
+///      stage. This contract is the operation's only reader: it reads `getManifest()`, holds it to
+///      the hash pinned at stage 0, and hands that manifest to the domain executors.
 contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecutor {
     using ObjectAnchorLib for address;
 
@@ -104,14 +105,14 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         pendingManifestHash = manifestHash;
 
         if (m.coreTransition != address(0)) {
-            CORE_EXECUTOR.beginOperation(_operation);
+            CORE_EXECUTOR.beginOperation(_operation, m);
         }
         if (address(ctmExecutor) == address(0)) {
             revert ZeroAddress();
         }
         // The CTM domain is reserved for EVERY operation, transition or not: an infrastructure
         // change swaps implementations under chains that may be migrating.
-        ctmExecutor.beginOperation(_operation);
+        ctmExecutor.beginOperation(_operation, m);
         GovernanceUpgradeTimer(m.timer).startTimer();
         emit OperationPrepared(address(_operation));
     }
@@ -129,7 +130,7 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         if (m.coreTransition != address(0)) {
             CORE_EXECUTOR.applyL1Upgrade(ICoreTransition(m.coreTransition));
         }
-        ctmExecutor.applyOperation();
+        ctmExecutor.applyOperation(m);
         emit OperationExecuted(address(_operation));
     }
 
@@ -162,14 +163,18 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
             revert NoPendingOperation();
         }
         UpgradeStage stage = pendingStage;
-        OperationManifest memory m = operation.getManifest();
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
         delete pendingManifestHash;
-        if (m.coreTransition != address(0)) {
+        // Break-glass reads nothing off the operation: whether the core leg is held is the core
+        // executor's own state.
+        if (address(CORE_EXECUTOR.activeOperation()) == address(operation)) {
             CORE_EXECUTOR.abandonOperation();
         }
-        ctmExecutor.abandonOperation(_unpauseMigrations);
+        ctmExecutor.abandonOperation();
+        if (_unpauseMigrations) {
+            ctmExecutor.releaseMigrationPause();
+        }
         emit OperationAbandoned(address(operation), stage);
     }
 

@@ -25,7 +25,6 @@ import {
     L2_REMOVED_GW_ASSET_TRACKER_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -37,9 +36,11 @@ import {
 ///         addresses.
 library L2InventoryLib {
     /// @notice The fixed L2 address a force deployment of `_member` targets.
-    /// @dev Reverts for the bytecode-identity members (proxies, bridged-token templates): they
-    ///      have no fixed address, so a release table row for them is unexecutable — the revert
-    ///      surfaces at transition construction, before anything is committed.
+    /// @dev Reverts for the bytecode-identity members (proxies, bridged-token templates, and the
+    ///      `L2DefaultUpgrade` delegate, which a transition force-deploys at the address its
+    ///      `AuthoredL2Plan.delegateBytecodeInfo` derives): they have no fixed address, so a release
+    ///      table row for them is unexecutable — the revert surfaces at transition construction,
+    ///      before anything is committed.
     // solhint-disable-next-line code-complexity
     function fixedAddress(L2EcosystemContract _member) internal pure returns (address) {
         if (_member == L2EcosystemContract.L2Bridgehub) {
@@ -83,9 +84,6 @@ library L2InventoryLib {
         }
         if (_member == L2EcosystemContract.L2InteropRootStorage) {
             return L2_INTEROP_ROOT_STORAGE_ADDR;
-        }
-        if (_member == L2EcosystemContract.L2DefaultUpgrade) {
-            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
         if (_member == L2EcosystemContract.L2InteropCommitmentTree) {
             return L2_INTEROP_COMMITMENT_TREE_ADDR;

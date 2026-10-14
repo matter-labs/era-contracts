@@ -114,7 +114,7 @@ contract UtilsCallMockerTest is Test {
             bridgehub,
             baseTokenAssetId,
             Utils.TEST_VALIDATOR_TIMELOCK,
-            bytes32(0),
+            Utils.TEST_STORED_BATCH_ZERO,
             baseTokenAssetIdChainId
         );
 
@@ -142,7 +142,9 @@ contract UtilsCallMockerTest is Test {
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
-        // Mock PERMISSIONLESS_VALIDATOR on the chainTypeManager
+        if (permissionlessValidator == address(0)) {
+            permissionlessValidator = Utils.TEST_PERMISSIONLESS_VALIDATOR;
+        }
         vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),

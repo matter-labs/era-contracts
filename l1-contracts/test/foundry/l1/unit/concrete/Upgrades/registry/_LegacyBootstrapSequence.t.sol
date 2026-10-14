@@ -8,6 +8,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {IDomainUpgradeExecutor} from "contracts/upgrades/registry/executors/IDomainUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
@@ -102,7 +103,7 @@ library LegacyBootstrapSequence {
         calls[1] = Call({
             target: _in.coreUpgradeExecutor,
             value: 0,
-            data: abi.encodeCall(CoreUpgradeExecutor.setCoordinator, (_in.coordinator))
+            data: abi.encodeCall(IDomainUpgradeExecutor.setCoordinator, (_in.coordinator))
         });
         calls[2] = Call({
             target: _in.chainAssetHandler,

@@ -94,8 +94,14 @@ contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     }
 }
 
-/// @notice The v35 core prepare needs no trimming in the local fixture.
-contract CoreUpgradeForLocalTest is CoreUpgrade_v35 {}
+/// @notice The v35 core prepare against the local fixture, whose ecosystem was deployed from the
+///         current sources: it reuses nothing, standing in for the v0.34.0 build a production
+///         bootstrap departs from, so the edge carries the ecosystem leg it carries in production.
+contract CoreUpgradeForLocalTest is CoreUpgrade_v35 {
+    function _canReuseEcosystemImplementation(string memory, address) internal pure override returns (bool) {
+        return false;
+    }
+}
 
 /// @notice Chain leg of the bootstrap edge: the local baseline chain runs the CURRENT
 ///         (cut-READING) Admin facet, but the bootstrap commits the legacy cut-taking edge —

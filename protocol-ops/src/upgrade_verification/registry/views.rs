@@ -38,7 +38,7 @@ sol! {
         address ctm;
         uint256 expectedProtocolVersion;
         address ctmProxyAdmin;
-        ProxyUpgradeRow[] proxyUpgrades;
+        ProxyUpgradeRow[] ctmProxyUpgrades;
         address currentRelease;
         uint256 oldProtocolVersionDeadline;
         address upgradeEngine;
@@ -140,7 +140,7 @@ sol! {
     struct OperationManifest {
         address coreTransition;
         ProxyUpgradeRow[] ctmInfrastructure;
-        address transition;
+        address ctmTransition;
         address timer;
     }
 
@@ -304,10 +304,13 @@ sol! {
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
-    /// Only the hop from the CTM to its ChainAssetHandler, which the pause calls target.
+    /// The hop from the CTM to its ChainAssetHandler, which the pause calls target, and the
+    /// chain registry the bootstrap's lagging-chain report enumerates.
     #[sol(rpc)]
     contract BridgehubView {
         function chainAssetHandler() external view returns (address);
+        function getAllZKChainChainIDs() external view returns (uint256[] memory);
+        function chainTypeManager(uint256 _chainId) external view returns (address);
     }
 
     #[sol(rpc)]
@@ -319,5 +322,6 @@ sol! {
         function L1_BYTECODES_SUPPLIER() external view returns (address);
         function BRIDGE_HUB() external view returns (address);
         function serverNotifierAddress() external view returns (address);
+        function getProtocolVersion(uint256 _chainId) external view returns (uint256);
     }
 }

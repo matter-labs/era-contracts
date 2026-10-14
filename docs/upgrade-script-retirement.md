@@ -21,9 +21,10 @@ Do not replace Solidity scripts with equivalent Rust or TypeScript orchestration
 unrestricted `Call[]` interpreter on-chain and call the migration complete. Reuse releases,
 transitions, core registries, operations, executors and existing deployment primitives wherever
 possible; introduce another permanent contract type only if a concrete responsibility cannot fit
-them. A boundary batch 2 established: every file in `contracts/script-interfaces/` is exported to
-`l1-contracts/zkstack-out/` and consumed by the external `zkstack` CLI, so absence of an in-repo
-caller is NOT evidence that one of those declarations is dead.
+them. Every file in `contracts/script-interfaces/` is exported to `l1-contracts/zkstack-out/`, which
+protocol-ops binds its script ABIs from, so absence of a Solidity caller is NOT evidence that one
+of those declarations is dead. Compatibility with the external `zkstack` CLI is no longer a reason
+to keep one.
 
 ## Status
 
@@ -45,12 +46,9 @@ Finished, and described where it now lives:
   migration (`upgradeFromBootstrap`); nothing is repackaged into an intermediate struct.
 - **`CTMUpgradeBase` and `DefaultL2UpgradeStrategy` are gone**; the L2 side a version authors is
   one `authorL2Side` result.
-- **Proposal-local L1 codehash pins are removed.** Every proposal member is a plain address:
-  `PinnedContract`, `CodehashPinLib`, the `_pins` enumerations and the non-reverting `verifyAll()`
-  twin are gone, `validate()` now enforces that every named contract is deployed code, and
-  `ObjectAnchorLib` keeps the two checks that remain. The four object-type ANCHORS still constrain
-  later inputs, and the bootstrap establishes the CTM's from the live runtime code of the release
-  governance approved. Described in
+- **Objects carry no codehash pins.** Every object and member is a plain address, `validate()`
+  enforces that every named contract is deployed code, and provenance is governance's approval of
+  the exact deployed objects, verified off-chain before every vote. Described in
   [registry-driven-upgrades.md](registry-driven-upgrades.md#provenance-and-validation).
 - Batch 1 (below) is implemented; batch 2 is partially implemented.
 
@@ -72,18 +70,22 @@ Finished, and described where it now lives:
 - Unchanged release members are reused by CODE IDENTITY: the prepare probes what the current
   sources produce (a local, never-broadcast deployment with this run's constructor arguments — an
   artifact's `deployedBytecode` has immutable slots zeroed) and keeps the live member when they
-  match. A release whose members all reused is reused itself and the transition derives an empty
-  L1 delta (`ReleaseMemberReuse.t.sol`).
+  match (`ReleaseMemberReuse.t.sol`). A version bump still publishes its own release (one release
+  per version), and when every member is reused the transition derives an empty L1 delta by value;
+  only an infrastructure-only edge, whose release manifest is identical, reuses the live release
+  object. `DefaultCoreUpgrade` deploys or reuses every L1 ecosystem implementation against the live
+  one the same way, so a version script lists only what it changes; `CoreUpgrade_v35` keeps only
+  the bootstrap's own deployments (the core executor and the coordinator).
 - Replacing a live member is a change of SCOPE and must be INTENDED: the prepare refuses to replace
-  any member the version does not name in `changedReleaseMembers()`. The v35 bootstrap declares
-  the whole set, since it authors a complete release for a pre-registry ecosystem — the genesis
-  engine (`L1GenesisUpgrade`) included: the pre-v35 one lacks the entrypoint the v35 Admin facet
+  any member the version does not name in `changedReleaseMembers()`, and any ecosystem
+  implementation the version does not declare. The v34 -> v35 bootstrap declares the whole set,
+  since it authors a complete release for a pre-registry ecosystem — the genesis engine
+  (`L1GenesisUpgrade`) included: the pre-v35 one lacks the entrypoint the v35 Admin facet
   calls, so a release that kept it could create no chain.
 - A registry-era CTM's members (facets, `DiamondInit`, verifier, genesis engine) come from its
-  current RELEASE. Introspection used to read them off a chain at the CTM's version — and could
-  not see `DiamondInit`, the genesis cut's init target, at all — so after a commit no chain had
-  followed yet a prepare found no members. Only a pre-registry CTM (the bootstrap source) is still
-  discovered through a chain.
+  current RELEASE, never from a chain: a chain at the CTM's version may not exist yet after a
+  commit, and a chain cannot show `DiamondInit` at all. Only a pre-registry CTM (the bootstrap
+  source) is discovered through a chain.
 - Two findings fixed here: a hash taken from a build artifact while the object is deployed from
   the script's own compiled copy can differ (CBOR metadata records the remappings), so registry
   objects are deployed from the same artifact a reviewer reproduces
@@ -105,16 +107,15 @@ Landed, each verified by naming the surviving owner of the responsibility:
 - `DefaultChainUpgrade.run`, `upgradeChainWithoutCut`, `setUpgradeTimestamp` and `getChainConfig`
   are deleted; they duplicated `AdminFunctions.upgradeChainFromCTM` and `adminScheduleUpgrade`.
 - Eight dead members on the upgrade bases and the introspector, the one-field `GatewayConfig`
-  struct and both copies of the empty `saveOutputVersionSpecific` extension point are deleted.
-  `DeployCTM.run()` stays because `IDeployCTM` declares it.
+  struct and both copies of the empty `saveOutputVersionSpecific` extension point are deleted, and
+  so are `DeployCTM.run()` / `IDeployCTM.run` and its `state_transition_implementation_addr` output
+  key, which existed only for zkstack compatibility.
 
 Deliberately KEPT despite having no in-repo caller — each is a hand-run operator command with no
 replacement: `DeployPrividiumTransactionFilterer.s.sol`, `tokens/DeployZKAndBridgeToL1.s.sol`,
 `utils/BlakeContractHashing.s.sol`.
 
-No new permanent registries and no deployment-inventory redesign in this release. An earlier
-draft of this batch specified a `CTMRegistry` current-inventory object with derivation from
-source and target snapshots; that is withdrawn.
+No new permanent registries and no deployment-inventory redesign in this release.
 
 ### Remaining
 
@@ -129,7 +130,7 @@ source and target snapshots; that is withdrawn.
 ### Gate
 
 Exercise facet-only, verifier-only, timelock-only, notifier-only, core-only and mixed upgrades
-through the CURRENT objects. Test stale source state, wrong admin and codehash mismatch. Every address a prepare no longer reconstructs must be shown to come
+through the CURRENT objects. Test stale source state and wrong admin. Every address a prepare no longer reconstructs must be shown to come
 from a getter the deployed contracts expose.
 
 ## Batch 3: move cross-contract follow-up work into audited execution

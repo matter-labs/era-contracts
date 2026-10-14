@@ -24,6 +24,7 @@ import {
     ReleaseGenesisData,
     ReleaseManifest
 } from "../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 
 /// @notice Test-friendly subclass of GatewayVotePreparation that exposes the
 /// initialization + calculateAddresses path without executing L1->L2 transactions.
@@ -287,7 +288,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
                 genesisUpgrade: (contracts.stateTransition.genesisUpgrade),
                 genesisFacets: facets,
                 genesis: ReleaseGenesisData({
-                    fixedForceDeploymentsData: config.forceDeploymentsData,
+                    // Matches the empty table below, as `CTMRelease` requires.
+                    fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                     genesisBatchHash: config.genesisRoot,
                     genesisIndexRepeatedStorageChanges: uint64(config.genesisRollupLeafIndex)
                 }),

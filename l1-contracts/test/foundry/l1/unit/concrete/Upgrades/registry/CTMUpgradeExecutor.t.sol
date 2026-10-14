@@ -40,6 +40,7 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     GenesisFacet,
+    OperationManifest,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest
@@ -167,7 +168,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
                 genesisUpgrade: address(genesisUpgradeContract),
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
-                    fixedForceDeploymentsData: hex"f1f2",
+                    fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                     genesisBatchHash: bytes32(_manifestNonce),
                     genesisIndexRepeatedStorageChanges: 54
                 }),
@@ -322,14 +323,17 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     function test_revertWhen_callbacksCalledByOwner() public {
         EcosystemUpgradeOperation operation = _operationFor(transition);
         vm.startPrank(governor);
+        OperationManifest memory manifest = operation.getManifest();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.beginOperation(operation);
+        ctmExecutor.beginOperation(operation, manifest);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.applyOperation();
+        ctmExecutor.applyOperation(manifest);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         ctmExecutor.completeOperation();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.abandonOperation(false);
+        ctmExecutor.abandonOperation();
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
+        ctmExecutor.releaseMigrationPause();
         vm.stopPrank();
         assertEq(address(ctmExecutor.activeOperation()), address(0));
     }

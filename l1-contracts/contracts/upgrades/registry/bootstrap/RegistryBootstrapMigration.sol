@@ -92,16 +92,16 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             revert ZeroAddress();
         }
         // An edge with no implementation swaps is not a bootstrap; it would silently reduce to
-        // "install anchors and hand over authority", which is a different (unreviewed) operation.
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, CTM_CONTRACT_COUNT);
+        // "install a release and hand over authority", which is a different (unreviewed) operation.
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.ctmProxyUpgrades, CTM_CONTRACT_COUNT);
         if (rows.length == 0) {
             revert RegistryUnknownKey();
         }
-        // Same row discipline as {CoreTransition} and {CTMTransition} (shared lib).
+        // Same row discipline as {CoreTransition} and {EcosystemUpgradeOperation} (shared lib).
         ProxyUpgradeRowLib.validateRows(rows);
         // The notifier's slot is mandatory: its proxy is what `validate()` holds the one-time
         // notifier handover against.
-        if (_manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)].implNew == address(0)) {
+        if (_manifest.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)].implNew == address(0)) {
             revert BootstrapServerNotifierRowMissing();
         }
         // The L2 leg, exactly as a transition constructs it: the genesis release's table (the target
@@ -225,7 +225,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         // Every implementation swap is source-checked: replaying a stale migration, or running it
         // against an ecosystem someone already moved, cannot silently re-point a proxy. A row
         // already at `implNew` is fine — `applyRows` skips it.
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT);
+        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(m.ctmProxyUpgrades, CTM_CONTRACT_COUNT);
         uint256 rowsLength = rows.length;
         for (uint256 i = 0; i < rowsLength; ++i) {
             ProxyUpgradeRow memory row = rows[i];
@@ -360,7 +360,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     ///      transparent proxy answers `admin()` only to its own admin.
     /// @param _m The manifest.
     function _requireNotifierHandedOver(BootstrapManifest memory _m) private view {
-        address notifier = _m.proxyUpgrades[uint256(CTMContract.ServerNotifier)].proxy;
+        address notifier = _m.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)].proxy;
         address ctmNotifier = IChainTypeManager(_m.ctm).serverNotifierAddress();
         if (ctmNotifier != notifier) {
             revert BootstrapServerNotifierNotBound(notifier, ctmNotifier);
@@ -410,7 +410,10 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         }
         validate();
 
-        ProxyUpgradeRowLib.applyRows(m.ctmProxyAdmin, ProxyUpgradeRowLib.toRows(m.proxyUpgrades, CTM_CONTRACT_COUNT));
+        ProxyUpgradeRowLib.applyRows(
+            m.ctmProxyAdmin,
+            ProxyUpgradeRowLib.toRows(m.ctmProxyUpgrades, CTM_CONTRACT_COUNT)
+        );
 
         IChainTypeManager ctm = IChainTypeManager(m.ctm);
         // The cut-taking form, not `setNewVersionUpgradeFromTransition`: there is no transition for

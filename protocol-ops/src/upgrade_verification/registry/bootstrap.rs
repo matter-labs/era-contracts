@@ -36,6 +36,7 @@ use crate::upgrade_verification::report::VerificationResult;
 use super::construction::{
     canonical_create2_address, constructor_args, expect_canonical_construction, ReviewedBuild,
 };
+use super::genesis::{judge_release_genesis, ReviewedGenesis};
 use super::lifecycle::{
     verify_lifecycle_construction, verify_timer_construction, LifecycleBindings, LifecycleReview,
     TimerReview,
@@ -57,6 +58,7 @@ pub(crate) async fn verify<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
+    genesis: &ReviewedGenesis,
     package: &BootstrapPackage,
     expected_governance_owner: Option<Address>,
     salts: &[B256],
@@ -181,6 +183,7 @@ pub(crate) async fn verify<P: Provider>(
     verify_release_construction(
         provider,
         build,
+        genesis,
         result,
         manifest.currentRelease,
         salts,
@@ -501,8 +504,9 @@ pub(crate) async fn verify<P: Provider>(
 
     // Each CTM-domain row must depart from the implementation that is LIVE, not from whatever
     // the prepare saw: a row at an unexpected implementation reverts stage 1 wholesale.
-    let ctm_rows = participating_ctm_rows(&manifest.proxyUpgrades, handover.under_ctm_proxy_admin);
-    if ctm_rows.len() < participating_ctm_rows(&manifest.proxyUpgrades, true).len() {
+    let ctm_rows =
+        participating_ctm_rows(&manifest.ctmProxyUpgrades, handover.under_ctm_proxy_admin);
+    if ctm_rows.len() < participating_ctm_rows(&manifest.ctmProxyUpgrades, true).len() {
         result.print_info(
             "  the ServerNotifier row is not source-checked: its proxy is not under the \
              CTM-domain ProxyAdmin yet, so its implementation cannot be read through it (see the \
@@ -518,7 +522,12 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await?;
 
-    // ── 6. The ecosystem leg ──
+    // ── 6. Chains the edge leaves behind ──
+    result.print_info("\n== Chains below the departing version ==");
+    let chains = read_chain_versions(provider, result, manifest.ctm).await;
+    judge_lagging_chains(result, manifest.expectedProtocolVersion, &chains);
+
+    // ── 7. The ecosystem leg ──
     result.print_info("\n== Ecosystem leg ==");
     if let Some(core_transition_addr) = package.core_transition {
         expect_code_identity(
@@ -555,7 +564,7 @@ pub(crate) async fn verify<P: Provider>(
         result.report_ok("no core transition: this edge upgrades no shared singletons");
     }
 
-    // ── 7. The timer that gates the edge ──
+    // ── 8. The timer that gates the edge ──
     result.print_info("\n== Stage sequencing ==");
     let timer = GovernanceUpgradeTimerView::new(manifest.upgradeTimer, provider);
     let Some(timer_governance) = tolerate(
@@ -584,7 +593,7 @@ pub(crate) async fn verify<P: Provider>(
         ));
     }
 
-    // ── 8. The calldata governance will actually sign ──
+    // ── 9. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
     // The pause/unpause calls land on the CTM's own ChainAssetHandler, which no manifest names;
     // it is derived from the CTM's Bridgehub so a call to it counts as that contract rather than
@@ -637,6 +646,118 @@ pub(crate) async fn verify<P: Provider>(
     Ok(())
 }
 
+/// One chain registered on the CTM, as the lagging-chain report reads it.
+#[derive(Debug)]
+struct ChainVersion {
+    chain_id: U256,
+    /// `None` when the CTM could not answer for the chain (already reported).
+    protocol_version: Option<U256>,
+}
+
+/// Every chain the CTM's Bridgehub registers on `ctm`, with its protocol version.
+///
+/// Reads, in order: the CTM's `BRIDGE_HUB()`, the Bridgehub's `getAllZKChainChainIDs()`, then per
+/// chain `chainTypeManager(id)` and, for the CTM's own chains, the CTM's `getProtocolVersion(id)`.
+/// The report is informational, so a failed read is a warning rather than an error.
+async fn read_chain_versions<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    ctm: Address,
+) -> Vec<ChainVersion> {
+    let not_enumerable = |result: &mut VerificationResult, e: &dyn std::fmt::Display| {
+        result.report_warn(&format!(
+            "the chains on the CTM cannot be enumerated ({e}): no chain is reported as lagging, \
+             which is not the same as none lagging"
+        ));
+    };
+    let ctm_view = CtmView::new(ctm, provider);
+    let bridgehub = match ctm_view.BRIDGE_HUB().call().await {
+        Ok(bridgehub) => BridgehubView::new(bridgehub, provider),
+        Err(e) => {
+            not_enumerable(result, &e);
+            return Vec::new();
+        }
+    };
+    let chain_ids = match bridgehub.getAllZKChainChainIDs().call().await {
+        Ok(ids) => ids,
+        Err(e) => {
+            not_enumerable(result, &e);
+            return Vec::new();
+        }
+    };
+    let mut chains = Vec::new();
+    for chain_id in chain_ids {
+        match bridgehub.chainTypeManager(chain_id).call().await {
+            Ok(chain_ctm) if chain_ctm == ctm => {}
+            Ok(_) => continue,
+            Err(e) => {
+                result.report_warn(&format!(
+                    "chain {chain_id}: its CTM could not be read ({e}), so it is left out of the \
+                     lagging-chain report"
+                ));
+                continue;
+            }
+        }
+        let protocol_version = match ctm_view.getProtocolVersion(chain_id).call().await {
+            Ok(version) => Some(version),
+            Err(e) => {
+                result.report_warn(&format!(
+                    "chain {chain_id}: the CTM could not read its protocol version ({e})"
+                ));
+                None
+            }
+        };
+        chains.push(ChainVersion {
+            chain_id,
+            protocol_version,
+        });
+    }
+    chains
+}
+
+/// Reports every chain on the CTM below the edge's departing version. A warning, not an error:
+/// such a chain still upgrades along the pre-registry edges, whose upgrade engines read the CTM's
+/// legacy `protocolVersionVerifier` getter — governance needs to know who still depends on it.
+fn judge_lagging_chains(result: &mut VerificationResult, departing: U256, chains: &[ChainVersion]) {
+    let mut lagging = 0usize;
+    let mut unknown = 0usize;
+    for chain in chains {
+        match chain.protocol_version {
+            Some(version) if version < departing => {
+                lagging += 1;
+                result.report_warn(&format!(
+                    "chain {} is at {}, below the departing {}: it reaches {} only along the \
+                     pre-registry edges, through the CTM's legacy `protocolVersionVerifier` getter",
+                    chain.chain_id,
+                    format_semver(version),
+                    format_semver(departing),
+                    format_semver(departing)
+                ));
+            }
+            Some(_) => {}
+            None => unknown += 1,
+        }
+    }
+    if lagging == 0 && unknown == 0 {
+        result.report_ok(&format!(
+            "none of the {} chain(s) on the CTM is below the departing version {}",
+            chains.len(),
+            format_semver(departing)
+        ));
+        return;
+    }
+    result.print_info(&format!(
+        "  {lagging} of {} chain(s) on the CTM are below the departing version {}",
+        chains.len(),
+        format_semver(departing)
+    ));
+    if unknown > 0 {
+        result.print_info(&format!(
+            "  {unknown} chain(s) could not be read and may lag too"
+        ));
+    }
+}
+
 /// The CTM-domain rows `migrate()` applies, minus the ServerNotifier's while its proxy is not yet
 /// under the CTM-domain `ProxyAdmin` (`notifier_readable`) — reading it through that admin would
 /// ask a non-admin, and the prerequisite has already reported why.
@@ -681,7 +802,7 @@ async fn verify_notifier_handover<P: Provider>(
     stage0: &[GovernanceCall],
 ) -> anyhow::Result<NotifierHandover> {
     let Some(row) = manifest
-        .proxyUpgrades
+        .ctmProxyUpgrades
         .get(CTM_CONTRACT_SERVER_NOTIFIER_SLOT)
         .filter(|row| !row.implNew.is_zero())
     else {
@@ -859,10 +980,12 @@ fn notifier_acceptance(ctm_executor: Address, notifier: Address) -> GovernanceCa
     }
 }
 
-/// The release's construction, re-derived from the manifest the release itself serves.
+/// The release's construction, re-derived from the manifest the release itself serves, and its
+/// genesis against the reviewed one.
 async fn verify_release_construction<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
+    genesis: &ReviewedGenesis,
     result: &mut VerificationResult,
     release: Address,
     salts: &[B256],
@@ -906,6 +1029,12 @@ async fn verify_release_construction<P: Provider>(
             row.facet, row.isFreezable
         ));
     }
+    judge_release_genesis(
+        result,
+        "the release the edge installs",
+        &manifest.genesis,
+        genesis,
+    );
 }
 
 /// The core transition's construction, re-derived from the manifest it serves.
@@ -1306,7 +1435,7 @@ mod tests {
             ctm: Address::repeat_byte(0x11),
             expectedProtocolVersion: U256::from(1),
             ctmProxyAdmin: Address::repeat_byte(0x22),
-            proxyUpgrades: Vec::new(),
+            ctmProxyUpgrades: Vec::new(),
             currentRelease: Address::repeat_byte(0x33),
             oldProtocolVersionDeadline: U256::from(3),
             upgradeEngine: Address::repeat_byte(0x44),
@@ -1640,6 +1769,7 @@ mod tests {
             external_actions: Vec::new(),
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
+            force_deployments_data: None,
         }
     }
 
@@ -1813,7 +1943,7 @@ mod tests {
             ctm: CTM,
             expectedProtocolVersion: U256::from(1),
             ctmProxyAdmin: CTM_ADMIN,
-            proxyUpgrades: proxy_upgrades,
+            ctmProxyUpgrades: proxy_upgrades,
             currentRelease: Address::repeat_byte(0x33),
             oldProtocolVersionDeadline: U256::ZERO,
             upgradeEngine: Address::repeat_byte(0x44),
@@ -1985,5 +2115,85 @@ mod tests {
         assert!(asserter.read_q().is_empty());
         assert_eq!(result.errors, 0);
         assert!(verdict.under_ctm_proxy_admin);
+    }
+
+    // ───────────────────────── chains below the departing version ─────────────────────────
+
+    /// v0.34.0 and v0.33.0 in the packed encoding.
+    const V34: u64 = 0x22_0000_0000;
+    const V33: u64 = 0x21_0000_0000;
+
+    fn chain(chain_id: u64, protocol_version: Option<u64>) -> ChainVersion {
+        ChainVersion {
+            chain_id: U256::from(chain_id),
+            protocol_version: protocol_version.map(U256::from),
+        }
+    }
+
+    fn judge_chains(chains: &[ChainVersion]) -> VerificationResult {
+        let mut result = VerificationResult::default();
+        judge_lagging_chains(&mut result, U256::from(V34), chains);
+        result
+    }
+
+    #[test]
+    fn chains_at_the_departing_version_report_nothing() {
+        let result = judge_chains(&[chain(270, Some(V34)), chain(271, Some(V34))]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        let result = judge_chains(&[]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// Informational: every lagging chain is named as a warning, and none of it fails the run.
+    #[test]
+    fn each_chain_below_the_departing_version_is_a_warning() {
+        let result = judge_chains(&[
+            chain(270, Some(V34)),
+            chain(271, Some(V33)),
+            chain(272, Some(V33)),
+        ]);
+        assert_eq!((result.errors, result.warnings), (0, 2));
+        assert!(result.ensure_success().is_ok());
+    }
+
+    /// An unreadable version was warned about when it was read, so the verdict adds nothing for
+    /// it — but it also does not claim that no chain lags.
+    #[test]
+    fn an_unreadable_chain_is_neither_lagging_nor_cleared() {
+        let result = judge_chains(&[chain(270, None)]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// The live read path, in the order it queries: the CTM's Bridgehub, its chain ids, then per
+    /// chain its CTM and — for this CTM's chains only — the version the CTM reports.
+    #[tokio::test]
+    async fn the_chains_are_enumerated_through_the_bridgehub_and_filtered_by_ctm() {
+        const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        const OTHER_CTM: Address = Address::repeat_byte(0xC1);
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::from(BRIDGEHUB.abi_encode()));
+        let ids = vec![U256::from(270u64), U256::from(271u64), U256::from(272u64)];
+        asserter.push_success(&Bytes::from(ids.abi_encode()));
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(U256::from(V34).abi_encode()));
+        asserter.push_success(&Bytes::from(OTHER_CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(U256::from(V33).abi_encode()));
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let chains = read_chain_versions(&provider, &mut result, CTM).await;
+        assert!(asserter.read_q().is_empty());
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        let read: Vec<(U256, Option<U256>)> = chains
+            .iter()
+            .map(|c| (c.chain_id, c.protocol_version))
+            .collect();
+        assert_eq!(
+            read,
+            vec![
+                (U256::from(270u64), Some(U256::from(V34))),
+                (U256::from(272u64), Some(U256::from(V33))),
+            ]
+        );
     }
 }

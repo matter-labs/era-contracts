@@ -256,7 +256,10 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 genesisUpgrade: genesisUpgradeAddr,
                 genesisFacets: genesisFacets,
                 genesis: ReleaseGenesisData({
-                    fixedForceDeploymentsData: hex"f1f2",
+                    fixedForceDeploymentsData: L2PlanFixtures.forceDeploymentsData(
+                        _l2BytecodeInfos,
+                        L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE)
+                    ),
                     genesisBatchHash: bytes32(uint256(1)),
                     // ChainTypeManager requires the commitment to be exactly 1.
                     genesisIndexRepeatedStorageChanges: 54
@@ -323,7 +326,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 ctm: address(chainContractAddress),
                 expectedProtocolVersion: chainContractAddress.protocolVersion(),
                 ctmProxyAdmin: ctmProxyAdmin,
-                proxyUpgrades: upgrades,
+                ctmProxyUpgrades: upgrades,
                 currentRelease: address(genesisRelease),
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeEngine: upgradeEngine,
@@ -465,7 +468,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     {
         fresh = _deployNotifier();
         manifest = _manifest();
-        manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)] = _notifierRow(fresh);
+        manifest.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)] = _notifierRow(fresh);
     }
 
     /// @dev Deploys a migration for `_bootstrapManifest` and hands it the authority `_handOverAuthority`
@@ -1230,7 +1233,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         MockProxyUpgradeInitImpl initImpl = new MockProxyUpgradeInitImpl();
         TransparentUpgradeableProxy vtProxy = new TransparentUpgradeableProxy(implV31, address(ctmProxyAdmin), hex"");
         BootstrapManifest memory manifest = _manifest();
-        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+        manifest.ctmProxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(vtProxy),
             expectedOldImpl: implV31,
             implNew: address(initImpl),
@@ -1253,7 +1256,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     function test_revertWhen_manifestCarriesDuplicateProxyRows() public {
         BootstrapManifest memory manifest = _manifest();
         // A second slot pointing at the same proxy, with a different target.
-        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+        manifest.ctmProxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(ctmDomainProxy),
             expectedOldImpl: implV31,
             implNew: implV31,
@@ -1266,7 +1269,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     function test_revertWhen_manifestCarriesAZeroRowField() public {
         BootstrapManifest memory manifest = _manifest();
-        manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)].expectedOldImpl = address(0);
+        manifest.ctmProxyUpgrades[uint256(CTMContract.ChainTypeManager)].expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new RegistryBootstrapMigration(manifest);
@@ -1609,7 +1612,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     function test_revertWhen_manifestHasNoServerNotifierRow() public {
         BootstrapManifest memory manifest = _manifest();
-        delete manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)];
+        delete manifest.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)];
 
         vm.expectRevert(BootstrapServerNotifierRowMissing.selector);
         new RegistryBootstrapMigration(manifest);

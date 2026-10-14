@@ -153,19 +153,37 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         }
     }
 
-    /// @dev What an operation names ITSELF: the timer and every participating infrastructure row's
-    ///      implementation. The core transition and the transition are objects with their own check
-    ///      surfaces, so the operation deliberately does not walk into them.
+    /// @dev An operation validates in one call: its own members (the timer and every participating
+    ///      infrastructure row's implementation), the core transition and its rows, and the CTM
+    ///      transition with both of its releases.
     function test_everyOperationMemberIsRequiredToHaveCode() public {
-        ProxyUpgradeRow[] memory rows = operation.ctmInfrastructureRows();
+        EcosystemUpgradeOperation complete = _deployOperation(
+            address(coreTransition),
+            operation.getManifest().ctmInfrastructure,
+            address(fullTransition),
+            _newOperationTimer()
+        );
+        ProxyUpgradeRow[] memory rows = complete.ctmInfrastructureRows();
         assertEq(rows.length, 1, "one participating infrastructure row");
-        address[] memory members = new address[](1 + rows.length);
-        members[0] = operation.timer();
+        ProxyUpgradeRow[] memory coreRows = coreTransition.ecosystemRows();
+        address[] memory transitionMembers = _transitionMembers(fullTransition.getManifest());
+
+        address[] memory members = new address[](3 + rows.length + coreRows.length + transitionMembers.length);
+        uint256 next = 0;
+        members[next++] = complete.getManifest().timer;
         for (uint256 i = 0; i < rows.length; ++i) {
-            members[1 + i] = rows[i].implNew;
+            members[next++] = rows[i].implNew;
+        }
+        members[next++] = address(coreTransition);
+        for (uint256 i = 0; i < coreRows.length; ++i) {
+            members[next++] = coreRows[i].implNew;
+        }
+        members[next++] = address(fullTransition);
+        for (uint256 i = 0; i < transitionMembers.length; ++i) {
+            members[next++] = transitionMembers[i];
         }
         for (uint256 i = 0; i < members.length; ++i) {
-            _assertCodelessMemberIsRefused(IValidatable(address(operation)), members[i]);
+            _assertCodelessMemberIsRefused(IValidatable(address(complete)), members[i]);
         }
     }
 

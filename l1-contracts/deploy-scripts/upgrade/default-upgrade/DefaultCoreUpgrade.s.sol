@@ -27,16 +27,18 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CoreUpgradeParams} from "./UpgradeParams.sol";
 import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
+import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
-///         prepare: deploys the new ecosystem implementations and pins them in a write-once
-///         `CoreTransition`. It emits NO governance calls of its own — the transition the CTM
-///         prepare deploys names the core transition, and the coordinator's stage 1 applies it through
-///         the `CoreUpgradeExecutor`. Anything a version script still needs governance to do is
-///         declared as an external action and listed in the output.
-/// @dev Version scripts inherit and override; the v35 bootstrap edge overrides the object
-///      deployment and declares every call of its one-time edge.
+///         prepare: deploys every ecosystem implementation whose code differs from the live one
+///         (and reuses the rest) and pins the swaps in a write-once `CoreTransition`. It emits NO
+///         governance calls of its own — the operation the CTM prepare deploys names the core
+///         transition, and the coordinator's stage 1 applies it through the `CoreUpgradeExecutor`.
+///         Anything a version script still needs governance to do is declared as an external
+///         action and listed in the output.
+/// @dev Version scripts inherit and declare what they change ({changedEcosystemImplementations});
+///      the v35 bootstrap edge also deploys the executors.
 contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
@@ -48,6 +50,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     /// @dev The governance/admin calls this prepare emits that the upgrade objects do not
     ///      describe (see {ExternalActionsLib}).
     ExternalActionsLib.Ledger internal externalActions;
+
+    /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
+    ReleaseMemberProbe internal implementationProbe;
 
     /// @notice Internal state of the upgrade script
     struct EcosystemUpgradeConfig {
@@ -133,6 +138,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a
     ///         source-checked row (live implementation read from the EIP-1967 slot) for every proxy
     ///         this run deployed a new implementation for, every other slot an explicit inert zero.
+    /// @dev `L1InteropHandler` and `ChainRegistrationSender` have no row builder, so no prepare
+    ///      deploys or installs them (TODO(EVM-1644): decide whether the sender is refreshed).
     function _coreProxyUpgradeRows() internal view virtual returns (ProxyUpgradeRow[] memory rows) {
         rows = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         rows[uint256(L1EcosystemContract.L1Bridgehub)] = _row(
@@ -187,42 +194,24 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             });
     }
 
-    /// @notice Ecosystem slots this version deploys an implementation for and deliberately does
-    ///         NOT install. Empty by default — see {_requireDeployedImplementationsInstalled}.
-    function uninstalledCoreDeployments() internal view virtual returns (L1EcosystemContract[] memory) {
-        return new L1EcosystemContract[](0);
-    }
-
     /// @notice Refuses an ORPHANED deployment: an ecosystem implementation this run produced that
-    ///         the inventory does not install and the version did not name in
-    ///         {uninstalledCoreDeployments}. A deployment nothing references is either a swap that
+    ///         the inventory does not install. A deployment nothing references is either a swap that
     ///         silently will not ship or a row builder that was never written, and both look
     ///         exactly like a successful prepare from the output alone.
     function _requireDeployedImplementationsInstalled(ProxyUpgradeRow[] memory _rows) internal view {
         address[] memory deployed = _deployedCoreImplementations();
-        L1EcosystemContract[] memory excused = uninstalledCoreDeployments();
         uint256 length = deployed.length;
         for (uint256 i = 0; i < length; ++i) {
-            if (deployed[i] == address(0) || _rows[i].implNew == deployed[i]) {
-                continue;
-            }
-            bool accountedFor = false;
-            for (uint256 j = 0; j < excused.length; ++j) {
-                if (uint256(excused[j]) == i) {
-                    accountedFor = true;
-                    break;
-                }
-            }
             require(
-                accountedFor,
+                deployed[i] == address(0) || _rows[i].implNew == deployed[i],
                 // solhint-disable-next-line func-named-parameters
                 string.concat(
                     "orphaned ecosystem deployment at inventory slot ",
                     vm.toString(i),
                     " (",
                     vm.toString(deployed[i]),
-                    "): this run deployed it but the CoreTransition does not install it. Either add its row to "
-                    "`_coreProxyUpgradeRows()`, or name the slot in `uninstalledCoreDeployments()`."
+                    "): this run deployed it but the CoreTransition does not install it. Add its row to "
+                    "`_coreProxyUpgradeRows()`."
                 )
             );
         }
@@ -301,8 +290,106 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return externalActions.serialize();
     }
 
-    /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContractsL1() public virtual {}
+    /// @notice Deploys every ecosystem implementation the inventory can install
+    ///         ({_coreProxyUpgradeRows}) whose code differs from the live one, and reuses the rest.
+    function deployNewEcosystemContractsL1() public virtual {
+        BridgehubAddresses storage bridgehubAddresses = coreAddresses.bridgehub;
+        bridgehubAddresses.implementations.bridgehub = _deployEcosystemImplementation(
+            "L1Bridgehub",
+            bridgehubAddresses.proxies.bridgehub
+        );
+        bridgehubAddresses.implementations.messageRoot = _deployEcosystemImplementation(
+            "L1MessageRoot",
+            bridgehubAddresses.proxies.messageRoot
+        );
+        bridgehubAddresses.implementations.ctmDeploymentTracker = _deployEcosystemImplementation(
+            "CTMDeploymentTracker",
+            bridgehubAddresses.proxies.ctmDeploymentTracker
+        );
+        bridgehubAddresses.implementations.chainAssetHandler = _deployEcosystemImplementation(
+            "L1ChainAssetHandler",
+            bridgehubAddresses.proxies.chainAssetHandler
+        );
+        coreAddresses.bridges.implementations.l1Nullifier = _deployEcosystemImplementation(
+            "L1Nullifier",
+            coreAddresses.bridges.proxies.l1Nullifier
+        );
+        coreAddresses.bridges.implementations.l1AssetRouter = _deployEcosystemImplementation(
+            "L1AssetRouter",
+            coreAddresses.bridges.proxies.l1AssetRouter
+        );
+        coreAddresses.bridges.implementations.l1NativeTokenVault = _deployEcosystemImplementation(
+            "L1NativeTokenVault",
+            coreAddresses.bridges.proxies.l1NativeTokenVault
+        );
+    }
+
+    /// @notice The ecosystem implementations this version SETS OUT to change, by `deploySimpleContract`
+    ///         name. The prepare refuses to replace a live implementation not named here — the same
+    ///         rule as `DefaultCTMUpgrade.changedReleaseMembers`, for the same reason. Empty by
+    ///         default: a version that changes no ecosystem contract reuses all of them.
+    function changedEcosystemImplementations() internal view virtual returns (string[] memory) {
+        return new string[](0);
+    }
+
+    /// @notice The implementation `_proxy` runs after this upgrade: its live one when that already
+    ///         runs the code the current sources produce, a fresh deployment otherwise.
+    function _deployEcosystemImplementation(string memory _name, address _proxy) internal returns (address) {
+        if (_proxy == address(0)) {
+            return address(0);
+        }
+        address live = Utils.getImplementation(_proxy);
+        if (_canReuseEcosystemImplementation(_name, live)) {
+            console.log("Ecosystem implementation unchanged, reusing:", _name, live);
+            return live;
+        }
+        _requireDeclaredEcosystemChange(_name, live);
+        console.log("Ecosystem implementation changed by this version, replacing:", _name, live);
+        return deploySimpleContract(_name);
+    }
+
+    /// @notice Whether the live `_live` already runs the code `_name` deploys with this run's
+    ///         constructor arguments (runtime codehash, immutables included; see {ReleaseMemberProbe}).
+    /// @dev Virtual so a fixture whose live ecosystem was deployed from the current sources can
+    ///      simulate the older build a production edge departs from.
+    function _canReuseEcosystemImplementation(string memory _name, address _live) internal virtual returns (bool) {
+        if (_live == address(0) || _live.code.length == 0) {
+            return false;
+        }
+        if (address(implementationProbe) == address(0)) {
+            // Plain CREATE, never broadcast: it lives only inside this run's simulation.
+            implementationProbe = new ReleaseMemberProbe();
+        }
+        return _live.codehash == implementationProbe.codehashOf(_name, getCreationCalldata(_name));
+    }
+
+    /// @notice Refuses a replacement this version did not declare (see
+    ///         {changedEcosystemImplementations}).
+    function _requireDeclaredEcosystemChange(string memory _name, address _live) internal view {
+        if (_live == address(0) || _live.code.length == 0) {
+            return;
+        }
+        string[] memory declared = changedEcosystemImplementations();
+        uint256 length = declared.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (compareStrings(declared[i], _name)) {
+                return;
+            }
+        }
+        console.log("Undeclared ecosystem implementation change:", _name);
+        console.log("  live:", _live);
+        console.logBytes32(_live.codehash);
+        require(
+            false,
+            string.concat(
+                "ecosystem implementation '",
+                _name,
+                "' would be replaced but this version does not declare it as changed. Either add it to "
+                "`changedEcosystemImplementations()`, or the local build differs from the one that produced "
+                "the live code."
+            )
+        );
+    }
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;

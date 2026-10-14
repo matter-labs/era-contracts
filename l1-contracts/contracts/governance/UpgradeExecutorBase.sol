@@ -11,23 +11,12 @@ import {ZeroAddress} from "../common/L1ContractErrors.sol";
 /// @title UpgradeExecutorBase
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Shared authority base for the domain-specific upgrade executors. It holds the
-///         ownerships protocol governance used to exercise directly (ChainTypeManagers, the
-///         ecosystem ProxyAdmin, ...) behind FIXED, non-delegatecall entrypoints, plus ONE raw-call
-///         escape hatch — `forward` — so the authority the executor holds never becomes
-///         unreachable.
-/// @dev One role, deliberately. An earlier design gated `forward` behind a separately governed
-///      "emergency board", but that gate is not implementable in the ZKsync governance model: the
-///      `EmergencyUpgradeBoard` does not call targets itself — it submits through the
-///      `ProtocolUpgradeHandler`, which performs the calls, and so does every routine proposal.
-///      Both routes reach this contract as the same `msg.sender` (the handler), so an on-chain
-///      distinction between them does not exist, and a gate on the board's address would have
-///      left the hatch permanently dead. `forward` is therefore owner-gated: what guards raw calls
-///      is the owner's own governance process (the handler's timelock, the Security Council's
-///      veto, or the emergency board's all-of quorum), not this contract. What the fixed
-///      entrypoints still guarantee is that the NORMAL upgrade path is object-driven — its inputs
-///      are pinned write-once objects and its invariants cannot be bypassed without an explicit,
-///      event-logged raw call.
+/// @notice Shared authority base for the domain-specific upgrade executors. It holds ownerships on
+///         governance's behalf (ChainTypeManagers, the ecosystem ProxyAdmin, ...) behind FIXED,
+///         non-delegatecall entrypoints, plus ONE raw-call escape hatch — `forward` — so the
+///         authority the executor holds never becomes unreachable.
+/// @dev One role: `forward` is gated on the owner alone — see "Authority" in
+///      {docs/registry-driven-upgrades.md}.
 abstract contract UpgradeExecutorBase is Ownable2Step, IUpgradeExecutorBase {
     /// @param _initialOwner The governance executor that drives the fixed domain entrypoints.
     constructor(address _initialOwner) {

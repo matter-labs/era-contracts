@@ -10,6 +10,7 @@ import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 import {RegistryEmptySelectors, RegistryTargetHasNoCode} from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
+import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 
 /// @notice The CTM keeps no genesis-param checks of its own: the release it installs refuses a
 ///         zero genesis batch hash at construction, and the release's `validate()` — which the CTM
@@ -38,7 +39,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             genesisUpgrade: address(genesisUpgradeContract),
             genesisFacets: genesisFacets,
             genesis: ReleaseGenesisData({
-                fixedForceDeploymentsData: hex"f1f2",
+                fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                 genesisBatchHash: bytes32(uint256(0x01)),
                 genesisIndexRepeatedStorageChanges: 0x01
             }),

@@ -5,7 +5,7 @@
 //! artifact and [`super::provenance`] has nothing to say about them. What identifies each is its
 //! CONSTRUCTION ([`super::construction`]): the reviewed creation code run on its reviewed
 //! constructor arguments must land at its address. The arguments are the point. The owner is
-//! the reviewed governance address — the bootstrap manifest's `ctmExecutorOwner`, or the
+//! the reviewed governance address — the bootstrap manifest's `governance`, or the
 //! reviewer's `--expected-governance-owner` for a recurring upgrade — and the bindings are the
 //! reviewed package or manifest values. Nothing is taken from the object's own answers: a
 //! genuine executor built for an attacker's owner answers every getter like the reviewed one,

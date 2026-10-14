@@ -276,7 +276,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
 
     const migration = new ethers.Contract(migrationAddr, getAbi("RegistryBootstrapMigration"), l1Provider);
-    const notifierRow = (await migration.getManifest()).proxyUpgrades[
+    const notifierRow = (await migration.getManifest()).ctmProxyUpgrades[
       proxyUpgradeSlotIndex("CTMContract", "ServerNotifier")
     ];
     await assertServerNotifierState(
@@ -533,7 +533,7 @@ async function runRecurringHop(
     // The operation names the transition; the coordinator binds the CTM executor.
     const operation = new ethers.Contract(operationAddr, getAbi("EcosystemUpgradeOperation"), l1Provider);
     const coordinator = new ethers.Contract(coordinatorAddr, getAbi("EcosystemUpgradeExecutor"), l1Provider);
-    const namedTransition: string = await operation.transition();
+    const namedTransition: string = await operation.ctmTransition();
     const boundExecutor: string = await coordinator.ctmExecutor();
     if (
       namedTransition.toLowerCase() !== transitionAddr.toLowerCase() ||

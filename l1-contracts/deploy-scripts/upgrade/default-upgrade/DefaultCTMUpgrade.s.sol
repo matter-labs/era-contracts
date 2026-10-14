@@ -88,8 +88,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
-        /// @dev The lifecycle coordinator (an input, see `CTMUpgradeParams`): the timer's governance
-        ///      and, for the bootstrap edge, the executor's coordinator.
+        /// @dev The bootstrap edge's coordinator input (`CTMUpgradeParams.ecosystemUpgradeExecutor`);
+        ///      every later edge reads it off-chain from the CTM through {upgradeCoordinator}.
         address ecosystemUpgradeExecutor;
         /// @dev The core prepare's ecosystem inventory (an input, see `CTMUpgradeParams`): the
         ///      operation's ecosystem leg, and the bootstrap edge's second object.
@@ -430,11 +430,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
                 _participatingRows(inventory) != 0,
             "this upgrade changes nothing: no core transition, no infrastructure row and no transition"
         );
-        address coordinator = upgradeAddresses.ecosystemUpgradeExecutor;
+        address coordinator = upgradeCoordinator();
         // A call to a codeless address is a silent success, so a coordinator that is not deployed
         // would turn all three stage calls into no-ops the governance bundle reports as executed.
         // Nothing on-chain catches that, which is why it is checked here.
-        require(coordinator.code.length != 0, "coordinator has no code (core prepare output)");
+        require(coordinator.code.length != 0, "coordinator has no code");
         // From the build ARTIFACT, for the same reason as the transition above.
         upgradeAddresses.ecosystemUpgradeOperation = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
@@ -444,7 +444,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
                     // The CTM-domain rows ride the OPERATION, not the transition: replacing an
                     // ecosystem singleton is not a chain-version edge.
                     ctmInfrastructure: inventory,
-                    transition: upgradeAddresses.ctmTransition,
+                    ctmTransition: upgradeAddresses.ctmTransition,
                     timer: upgradeAddresses.upgradeTimer
                 })
             ),
@@ -635,7 +635,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function ctmProxyInventory() internal view virtual returns (ProxyUpgradeRow[] memory) {
         address migration = bootstrapMigrationAddress();
         if (migration != address(0)) {
-            return RegistryBootstrapMigration(migration).getManifest().proxyUpgrades;
+            return RegistryBootstrapMigration(migration).getManifest().ctmProxyUpgrades;
         }
         require(
             upgradeAddresses.ctmTransition != address(0) || upgradeKind() == UpgradeKind.InfrastructureOnly,
@@ -658,13 +658,19 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return executor;
     }
 
-    /// @notice Who may start this upgrade's timer: the coordinator the bound executor answers to
-    ///         (its `stage0` starts it). The bootstrap edge, which predates the coordinator, has
-    ///         governance start it.
-    function timerGovernance() internal view virtual returns (address) {
+    /// @notice The ecosystem's lifecycle coordinator (`EcosystemUpgradeExecutor`): the one the
+    ///         CTM's bound executor answers to. The bootstrap edge, which binds it, overrides this
+    ///         with the core prepare's output.
+    function upgradeCoordinator() public view virtual returns (address) {
         address coordinator = CTMUpgradeExecutor(payable(boundCTMUpgradeExecutor())).coordinator();
         require(coordinator != address(0), "the bound CTM executor answers to no coordinator");
         return coordinator;
+    }
+
+    /// @notice Who may start this upgrade's timer: the coordinator (its `stage0` starts it). The
+    ///         bootstrap edge, which predates the coordinator, has governance start it.
+    function timerGovernance() internal view virtual returns (address) {
+        return upgradeCoordinator();
     }
 
     /// @notice The CTM domain's live EIP-7702 checker (see `CTMUpgradeParams.eip7702Checker`).
@@ -792,8 +798,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return config.ownerAddress;
     }
 
-    /// @notice The ecosystem executor of this upgrade (a core-prepare output). Set from the prepare
-    ///         params in production; in-forge harnesses that drive both prepares call it directly.
+    /// @notice The coordinator the core prepare of the bootstrap edge deployed (see
+    ///         {upgradeCoordinator}). Set from the prepare params in production; in-forge harnesses
+    ///         that drive both prepares call it directly.
     function setEcosystemUpgradeExecutor(address _ecosystemUpgradeExecutor) public virtual {
         upgradeAddresses.ecosystemUpgradeExecutor = _ecosystemUpgradeExecutor;
     }
@@ -1013,12 +1020,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             "chain_type_manager_proxy",
             ctmAddresses.stateTransition.proxies.chainTypeManager
         );
-        // Also save as state_transition_implementation_addr for backwards compatibility with zkstack CLI
-        vm.serializeAddress(
-            "state_transition",
-            "state_transition_implementation_addr",
-            ctmAddresses.stateTransition.implementations.chainTypeManager
-        );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
         vm.serializeAddress("state_transition", "admin_facet_addr", ctmAddresses.stateTransition.facets.adminFacet);
         vm.serializeAddress("state_transition", "mailbox_facet_addr", ctmAddresses.stateTransition.facets.mailboxFacet);
@@ -1156,7 +1157,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         );
         // The operation and the coordinator it is driven through: the merge derives this upgrade's
         // three governance calls — `stage0/1/2(operation)` — from exactly these two addresses.
-        vm.serializeAddress("registry", "coordinator_addr", upgradeAddresses.ecosystemUpgradeExecutor);
+        vm.serializeAddress("registry", "coordinator_addr", upgradeCoordinator());
         string memory registry = vm.serializeAddress(
             "registry",
             "operation_addr",

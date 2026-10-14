@@ -18,11 +18,11 @@ import {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice THE `ProxyUpgradeRow` semantics, shared by everything that carries rows (the core
-///         registry, the CTM transition, the bootstrap migration) and everything that applies
-///         them: rows are SOURCE-CHECKED edges — a proxy already at `implNew` is skipped
-///         (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy at anything else
-///         reverts, so replaying a stale object can never downgrade a proxy that a later upgrade
-///         has already moved on.
+///         transition, the operation's CTM-domain inventory, the bootstrap migration) and
+///         everything that applies them: rows are SOURCE-CHECKED edges — a proxy already at
+///         `implNew` is skipped (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy
+///         at anything else reverts, so replaying a stale object can never downgrade a proxy that
+///         a later upgrade has already moved on.
 /// @dev Manifests carry rows as inventories indexed by the canonical contract enums
 ///      (`L1EcosystemContract` for the ecosystem domain, `CTMContract` for the CTM domain — one
 ///      enum per domain for deployment and upgrades alike), with the array length checked

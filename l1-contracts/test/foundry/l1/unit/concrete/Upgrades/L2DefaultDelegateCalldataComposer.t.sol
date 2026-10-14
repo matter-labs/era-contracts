@@ -22,6 +22,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {RegistryObjectsFixture} from "foundry-test/l1/upgrades/_SharedRegistryObjects.t.sol";
+import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 
 /// @notice The default delegate-calldata composer: the pinned code that DEFINES what `L2DefaultUpgrade`
 ///         is called with, from the target release, the ecosystem's Bridgehub and the chain the
@@ -34,14 +35,17 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     CTMRelease internal release;
     address internal bridgehub;
 
-    bytes internal constant OTHER_FIXED_FORCE_DEPLOYMENTS_DATA = hex"0a0b";
+    /// @dev A second valid blob, differing from the fixture's in its chain id.
+    function _otherFixedForceDeploymentsData() internal pure returns (bytes memory) {
+        return L2PlanFixtures.forceDeploymentsData(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT), "", 2);
+    }
 
     function setUp() public {
         _setUpRegistryObjects("");
         bridgehub = makeAddr("bridgehub");
         _mockEcosystemForComposer(bridgehub, ctmDeployerStub);
         release = new CTMRelease(
-            _releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifier"), SemVer.packSemVer(0, 34, 0))
+            _releaseManifest(_fixedForceDeploymentsData(), _deployedStub("verifier"), SemVer.packSemVer(0, 34, 0))
         );
     }
 
@@ -63,13 +67,13 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
             composed,
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the delegate call must be the ZKsync OS upgrade with the release's fixed data and the chain's data"
         );
         (address deployer, bytes memory fixedData, bytes memory chainData) = this.decodeDefaultUpgrade(composed);
         assertEq(deployer, ctmDeployerStub, "the CTM deployer is the Bridgehub's live tracker");
-        assertEq(fixedData, FIXED_FORCE_DEPLOYMENTS_DATA, "the fixed data is the release's pinned payload");
+        assertEq(fixedData, _fixedForceDeploymentsData(), "the fixed data is the release's pinned payload");
         ZKChainSpecificForceDeploymentsData memory data = abi.decode(chainData, (ZKChainSpecificForceDeploymentsData));
         assertEq(data.l2LegacySharedBridge, address(0), "the legacy bridge slot is always zero");
         assertEq(data.predeployedL2WethAddress, address(0), "the deprecated WETH slot is always zero");
@@ -97,7 +101,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
             composed,
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ERC20_CHAIN_ID))
+                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(ERC20_CHAIN_ID))
             )
         );
         (, , bytes memory chainData) = this.decodeDefaultUpgrade(composed);
@@ -120,7 +124,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
             defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(NO_METADATA_CHAIN_ID))
+                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(NO_METADATA_CHAIN_ID))
             ),
             "a token without metadata must compose the defaults"
         );
@@ -132,7 +136,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
             ),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
+                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
             ),
             "a bytes32-returning token must compose the defaults too"
         );
@@ -143,7 +147,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     function test_composesFromLiveInputs() public {
         CTMRelease otherRelease = new CTMRelease(
             _releaseManifest(
-                OTHER_FIXED_FORCE_DEPLOYMENTS_DATA,
+                _otherFixedForceDeploymentsData(),
                 _deployedStub("otherVerifier"),
                 SemVer.packSemVer(0, 34, 0)
             )
@@ -156,7 +160,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
             defaultComposer.composeDelegateCalldata(ICTMRelease(address(otherRelease)), bridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, OTHER_FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                (ctmDeployerStub, _otherFixedForceDeploymentsData(), _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the fixed data follows the release"
         );
@@ -164,7 +168,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
             defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), otherBridgehub, ETH_CHAIN_ID),
             abi.encodeCall(
                 IL2DefaultUpgrade.upgrade,
-                (otherDeployer, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                (otherDeployer, _fixedForceDeploymentsData(), _expectedPerChainData(ETH_CHAIN_ID))
             ),
             "the CTM deployer follows the Bridgehub"
         );
@@ -225,7 +229,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      data.
     function test_transitionNamingTheComposerComposesTheDefaultUpgradeCall() public {
         CTMRelease fromRelease = new CTMRelease(
-            _releaseManifest(FIXED_FORCE_DEPLOYMENTS_DATA, _deployedStub("verifierV33"), SemVer.packSemVer(0, 33, 0))
+            _releaseManifest(_fixedForceDeploymentsData(), _deployedStub("verifierV33"), SemVer.packSemVer(0, 33, 0))
         );
         CTMTransition transition = _transition(
             fromRelease,
@@ -252,7 +256,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
                     plan.delegateTo,
                     abi.encodeCall(
                         IL2DefaultUpgrade.upgrade,
-                        (ctmDeployerStub, FIXED_FORCE_DEPLOYMENTS_DATA, _expectedPerChainData(ETH_CHAIN_ID))
+                        (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(ETH_CHAIN_ID))
                     )
                 )
             ),

@@ -7,19 +7,17 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {IEcosystemUpgradeOperation} from "../objects/IEcosystemUpgradeOperation.sol";
 import {ICTMUpgradeExecutor} from "./ICTMUpgradeExecutor.sol";
-import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
+import {DomainUpgradeExecutorBase} from "./DomainUpgradeExecutorBase.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {
     MigrationsNotPaused,
-    NoPendingOperation,
     ExecutorCoordinatorMismatch,
     OperationCarriesNoTransition,
+    OperationManifestChanged,
     TransitionNotCommitted,
     TransitionReleaseMismatch,
-    Unauthorized,
-    UpgradeLifecycleBusy,
     UpgradeNotPermissionlessYet,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
@@ -27,6 +25,8 @@ import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransiti
 import {ProtocolVersionTooSmall} from "../../ZkSyncUpgradeErrors.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
+import {OperationManifest} from "../RegistryTypes.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 import {IEcosystemUpgradeExecutor} from "./IEcosystemUpgradeExecutor.sol";
@@ -38,12 +38,11 @@ import {IEcosystemUpgradeExecutor} from "./IEcosystemUpgradeExecutor.sol";
 ///         `ProxyAdmin`, and applies pinned, write-once `CTMTransition`s to it on the coordinating
 ///         `EcosystemUpgradeExecutor`'s instructions — reserve, apply, complete — plus the
 ///         per-chain `upgradeChain`. See {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @dev Fixed logic, no generic delegatecall. The transition each callback takes is an
-///      *implementation address* — the exact generated contract governance approved — never a
-///      proxy. The fixed entrypoints are the upgrade lifecycle and `upgradeChain`; every other
+/// @dev Fixed logic, no generic delegatecall. The transition it reserves is the exact deployed
+///      object governance approved, never a proxy. The fixed entrypoints are the upgrade lifecycle and `upgradeChain`; every other
 ///      owner operation of the CTM (freezing a chain, moving a deadline, replacing a committed
 ///      transition, ...) goes through the owner-gated, event-logged `forward`.
-contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
+contract CTMUpgradeExecutor is DomainUpgradeExecutorBase, ICTMUpgradeExecutor {
     using ObjectAnchorLib for address;
 
     /// @notice The one ChainTypeManager this executor governs. Transitions carry no CTM pointer;
@@ -57,103 +56,49 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     ProxyAdmin public immutable CTM_PROXY_ADMIN;
 
     /// @inheritdoc ICTMUpgradeExecutor
-    address public coordinator;
+    ICTMTransition public reservedTransition;
 
-    /// @inheritdoc ICTMUpgradeExecutor
-    IEcosystemUpgradeOperation public activeOperation;
-
-    modifier onlyCoordinator() {
-        if (msg.sender != coordinator) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
+    /// @dev `keccak256(abi.encode(manifest))` of the manifest `beginOperation` reserved:
+    ///      `applyOperation` applies that manifest and no other.
+    bytes32 internal reservedManifestHash;
 
     constructor(
         address _initialOwner,
         IChainTypeManager _ctm,
         ProxyAdmin _ctmProxyAdmin,
         address _coordinator
-    ) UpgradeExecutorBase(_initialOwner) {
+    ) DomainUpgradeExecutorBase(_initialOwner, _coordinator) {
         if (address(_ctm) == address(0) || address(_ctmProxyAdmin) == address(0) || _coordinator == address(0)) {
             revert ZeroAddress();
         }
         CHAIN_TYPE_MANAGER = _ctm;
         CTM_PROXY_ADMIN = _ctmProxyAdmin;
-        coordinator = _coordinator;
     }
 
-    /// @notice Points this executor at a coordinator (zero detaches it).
-    /// @dev Refused while reserved, so one operation is prepared, executed and completed by one
-    ///      coordinator.
-    function setCoordinator(address _coordinator) external onlyOwner {
-        if (address(activeOperation) != address(0)) {
-            revert UpgradeLifecycleBusy(address(activeOperation));
-        }
-        emit CoordinatorChanged(coordinator, _coordinator);
-        coordinator = _coordinator;
-    }
-
-    /// @notice Completes the two-step ownership handover of the bound CTM to this executor.
-    /// @dev Deliberately PERMISSIONLESS: it can only ever accept ownership of the BOUND CTM, and
-    ///      only after that CTM's current owner nominated this executor — the nomination is the
-    ///      approval. That is what lets `RegistryBootstrapMigration.migrate()` complete the
-    ///      handover inside one transaction, so authority is never parked between calls.
+    /// @inheritdoc ICTMUpgradeExecutor
     function acceptCTMOwnership() external {
         Ownable2Step(address(CHAIN_TYPE_MANAGER)).acceptOwnership();
-    }
-
-    // ---------------------------------------------------------------------------------------
-    // The coordinator's callbacks. One operation at a time: `beginOperation` names the operation
-    // to reserve, and every callback after it acts on that reservation alone.
-    // ---------------------------------------------------------------------------------------
-
-    /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev The coordinator binds this executor; the operation supplies both halves of the leg.
-    ///      Migrations are paused for an infrastructure-only leg too — see "Pause policy" in
-    ///      {protocol-docs/ecosystem-upgrade-coordination.md}.
-    function beginOperation(IEcosystemUpgradeOperation _operation) external onlyCoordinator {
-        if (address(activeOperation) != address(0)) {
-            revert UpgradeLifecycleBusy(address(activeOperation));
-        }
-        address boundExecutor = address(IEcosystemUpgradeExecutor(coordinator).ctmExecutor());
-        if (boundExecutor != address(this)) {
-            revert ExecutorCoordinatorMismatch(address(this), boundExecutor);
-        }
-        ProxyUpgradeRowLib.requireRowCode(_operation.ctmInfrastructureRows());
-        ICTMTransition transition = ICTMTransition(_operation.transition());
-        if (address(transition) != address(0)) {
-            _requireTransitionDeployed(transition);
-            transition.validate();
-            _requireEdges(transition);
-        }
-
-        activeOperation = _operation;
-
-        _chainAssetHandler().pauseCTMMigration(address(CHAIN_TYPE_MANAGER));
-        emit OperationReserved(address(_operation), address(transition));
-    }
-
-    /// @inheritdoc ICTMUpgradeExecutor
-    function reservedTransition() public view returns (ICTMTransition) {
-        if (address(activeOperation) == address(0)) {
-            return ICTMTransition(address(0));
-        }
-        return ICTMTransition(activeOperation.transition());
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
     /// @dev The rows go FIRST — the commit may need setters that only exist on the implementation
     ///      this very operation installs — and any failure reverts the coordinator's whole stage,
     ///      so a failed row leg cannot leave a version commit standing.
-    function applyOperation() external onlyCoordinator {
-        IEcosystemUpgradeOperation operation = _requireActive();
+    function applyOperation(OperationManifest calldata _manifest) external onlyCoordinator {
+        _requireActive();
+        bytes32 supplied = keccak256(abi.encode(_manifest));
+        if (supplied != reservedManifestHash) {
+            revert OperationManifestChanged(reservedManifestHash, supplied);
+        }
         // Checked here for a clear failure; the CTM's own version commit refuses to run unpaused.
         if (!_chainAssetHandler().migrationPausedFor(address(CHAIN_TYPE_MANAGER))) {
             revert MigrationsNotPaused();
         }
-        ProxyUpgradeRowLib.applyRows(CTM_PROXY_ADMIN, operation.ctmInfrastructureRows());
-        ICTMTransition transition = ICTMTransition(operation.transition());
+        ProxyUpgradeRowLib.applyRows(
+            CTM_PROXY_ADMIN,
+            ProxyUpgradeRowLib.toRows(_manifest.ctmInfrastructure, CTM_CONTRACT_COUNT)
+        );
+        ICTMTransition transition = reservedTransition;
         if (address(transition) != address(0)) {
             _applyCTMUpgrade(transition);
             _requireDepartureCommitted(transition);
@@ -161,23 +106,9 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
-    function completeOperation() external onlyCoordinator {
-        IEcosystemUpgradeOperation operation = _requireActive();
-        delete activeOperation;
+    function releaseMigrationPause() external onlyCoordinator {
+        _requireIdle();
         _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
-        emit OperationCompleted(address(operation));
-    }
-
-    /// @inheritdoc ICTMUpgradeExecutor
-    /// @dev Whatever `applyOperation` already committed stands — abandoning is bookkeeping, not a
-    ///      rollback.
-    function abandonOperation(bool _unpauseMigrations) external onlyCoordinator {
-        IEcosystemUpgradeOperation operation = _requireActive();
-        delete activeOperation;
-        if (_unpauseMigrations) {
-            _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
-        }
-        emit OperationAbandoned(address(operation));
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -188,7 +119,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
 
     /// @inheritdoc ICTMUpgradeExecutor
     function validateOperationApplied(IEcosystemUpgradeOperation _operation) external view {
-        ICTMTransition transition = ICTMTransition(_operation.transition());
+        ICTMTransition transition = ICTMTransition(_operation.getManifest().ctmTransition);
         if (address(transition) == address(0)) {
             revert OperationCarriesNoTransition(address(_operation));
         }
@@ -196,20 +127,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         _requireDepartureCommitted(transition);
     }
 
-    /// @notice Upgrades a single chain diamond to the transition's new protocol version with the
-    ///         same composed cut that `applyOperation` committed to.
-    /// @dev Execution policy, in order of precedence:
-    ///      - the OWNER may upgrade any chain at any time;
-    ///      - a CHAIN'S OWN ADMIN may upgrade that chain at any time — upgrading is the chain's
-    ///        decision to make, and the check is scoped per chain because `_chainId` is an
-    ///        argument: an unscoped admin check would let any chain's admin upgrade every other
-    ///        chain on this CTM, including ones deliberately waiting to finalize batches first;
-    ///      - ANYONE ELSE only once the old-version deadline has passed, at which point the
-    ///        upgrade is operationally mandatory and execution carries no discretionary inputs.
-    ///      The chain-side `upgradeTimestamp` gate applies to non-admin callers regardless.
-    /// @param _transition The transition the CTM currently commits for the chain's departure
-    ///        (`upgradeTransition`) — after a replacement, the replacement, never the replaced one.
-    /// @param _chainId The chain to upgrade.
+    /// @inheritdoc ICTMUpgradeExecutor
     function upgradeChain(ICTMTransition _transition, uint256 _chainId) external {
         uint256 oldProtocolVersion = _transition.oldProtocolVersion();
         if (msg.sender != owner() && msg.sender != CHAIN_TYPE_MANAGER.getChainAdmin(_chainId)) {
@@ -236,23 +154,41 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     // Internals
     // ---------------------------------------------------------------------------------------
 
-    /// @dev The execution precondition every transition-taking entrypoint shares. It is
-    ///      deliberately NOT an identity check: a runtime codehash cannot establish that the
-    ///      audited constructor produced this object, so the model does not pretend it can — the
-    ///      transition reaching here is the one governance reviewed and named, re-derived from the
-    ///      reviewed creation code before signing (`protocol-ops ecosystem verify-bootstrap`).
-    ///      What a chain CAN check is that something is deployed here at all, and it must: a call
-    ///      to a codeless address succeeds silently.
+    /// @dev Code presence only — a call to a codeless address succeeds silently. Provenance is
+    ///      governance's review: see "Provenance and validation" in {docs/registry-driven-upgrades.md}.
     function _requireTransitionDeployed(ICTMTransition _transition) private view {
         address(_transition).requireCode();
     }
 
-    /// @dev The reservation every callback after `beginOperation` acts on.
-    function _requireActive() private view returns (IEcosystemUpgradeOperation operation) {
-        operation = activeOperation;
-        if (address(operation) == address(0)) {
-            revert NoPendingOperation();
+    /// @dev The coordinator binds this executor; the manifest supplies both halves of the leg.
+    ///      Migrations are paused for an infrastructure-only leg too — see "Pause policy" in
+    ///      {protocol-docs/ecosystem-upgrade-coordination.md}.
+    function _reserveLeg(OperationManifest calldata _manifest) internal override returns (address) {
+        address boundExecutor = address(IEcosystemUpgradeExecutor(coordinator).ctmExecutor());
+        if (boundExecutor != address(this)) {
+            revert ExecutorCoordinatorMismatch(address(this), boundExecutor);
         }
+        ProxyUpgradeRowLib.requireRowCode(ProxyUpgradeRowLib.toRows(_manifest.ctmInfrastructure, CTM_CONTRACT_COUNT));
+        ICTMTransition transition = ICTMTransition(_manifest.ctmTransition);
+        if (address(transition) != address(0)) {
+            _requireTransitionDeployed(transition);
+            transition.validate();
+            _requireEdges(transition);
+        }
+        reservedTransition = transition;
+        reservedManifestHash = keccak256(abi.encode(_manifest));
+        _chainAssetHandler().pauseCTMMigration(address(CHAIN_TYPE_MANAGER));
+        return address(transition);
+    }
+
+    function _releaseLeg() internal override {
+        delete reservedTransition;
+        delete reservedManifestHash;
+    }
+
+    /// @dev Completion lifts the migration pause `beginOperation` took.
+    function _afterCompletion() internal override {
+        _chainAssetHandler().unpauseCTMMigration(address(CHAIN_TYPE_MANAGER));
     }
 
     /// @dev Both transition edges, asserted independently (and both re-checked inside

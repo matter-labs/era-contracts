@@ -105,9 +105,9 @@ test("the bootstrap manifest carries the CTM and ServerNotifier rows, every othe
   );
   const ctmSlot = proxyUpgradeSlotIndex("CTMContract", "ChainTypeManager");
   const notifierSlot = proxyUpgradeSlotIndex("CTMContract", "ServerNotifier");
-  assert.deepEqual(args.proxyUpgrades[ctmSlot], { ...ctmRow, callInitializeUpgrade: false });
-  assert.deepEqual(args.proxyUpgrades[notifierSlot], notifierRow);
-  args.proxyUpgrades.forEach((row: { implNew: string }, i: number) => {
+  assert.deepEqual(args.ctmProxyUpgrades[ctmSlot], { ...ctmRow, callInitializeUpgrade: false });
+  assert.deepEqual(args.ctmProxyUpgrades[notifierSlot], notifierRow);
+  args.ctmProxyUpgrades.forEach((row: { implNew: string }, i: number) => {
     assertRowShape(row, `CTMContract[${i}]`);
     if (i !== ctmSlot && i !== notifierSlot) {
       assert.equal(row.implNew, ethers.constants.AddressZero, `CTMContract[${i}] must be inert`);

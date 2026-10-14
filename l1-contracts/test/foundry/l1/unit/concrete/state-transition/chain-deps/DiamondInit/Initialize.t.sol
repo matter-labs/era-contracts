@@ -12,7 +12,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {EmptyAssetId, GenesisBatchHashZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L2DACommitmentScheme, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
@@ -104,6 +105,57 @@ contract InitializeTest is DiamondInitTest {
         _deployDiamondAsCtm(cut);
     }
 
+    function test_revertWhen_assetRouterIsZeroAddress() public {
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.assetRouter.selector),
+            abi.encode(address(0))
+        );
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
+        vm.expectRevert(ZeroAddress.selector);
+        _deployDiamondAsCtm(cut);
+    }
+
+    function test_revertWhen_nativeTokenVaultIsZeroAddress() public {
+        address assetRouter = makeAddr("zeroVaultAssetRouter");
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehubBase.assetRouter.selector),
+            abi.encode(assetRouter)
+        );
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
+            abi.encode(address(0))
+        );
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
+        vm.expectRevert(ZeroAddress.selector);
+        _deployDiamondAsCtm(cut);
+    }
+
+    /// @dev Priority mode is L1-only, so an L1 chain needs the CTM's permissionless validator.
+    function test_revertWhen_permissionlessValidatorIsZeroAddressOnL1() public {
+        vm.mockCall(
+            Utils.TEST_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
+            abi.encode(address(0))
+        );
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
+        vm.expectRevert(ZeroAddress.selector);
+        _deployDiamondAsCtm(cut);
+    }
+
+    function test_revertWhen_storedBatchZeroIsZero() public {
+        vm.mockCall(
+            Utils.TEST_CHAIN_TYPE_MANAGER,
+            abi.encodeWithSelector(IChainTypeManager.storedBatchZero.selector),
+            abi.encode(bytes32(0))
+        );
+        Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);
+        vm.expectRevert(GenesisBatchHashZero.selector);
+        _deployDiamondAsCtm(cut);
+    }
+
     function test_valuesCorrectWhenSuccessfulInit() public {
         // Mock CTM to return testnetVerifier for this protocol version
         vm.mockCall(
@@ -126,7 +178,7 @@ contract InitializeTest is DiamondInitTest {
         assertEq(utilsFacet.util_getAdmin(), Utils.TEST_CHAIN_ADMIN);
         assertEq(utilsFacet.util_getValidator(Utils.TEST_VALIDATOR_TIMELOCK), true);
 
-        assertEq(utilsFacet.util_getStoredBatchHashes(0), bytes32(0));
+        assertEq(utilsFacet.util_getStoredBatchHashes(0), Utils.TEST_STORED_BATCH_ZERO);
         // The EraVM bytecode-hash slots are deprecated tombstones: initialization must leave the
         // physical slots zero even though the mocked release still serves non-zero hashes. Read
         // the raw slots (indices from ZKChainStorage's layout, see

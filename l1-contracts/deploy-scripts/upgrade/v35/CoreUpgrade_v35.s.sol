@@ -5,19 +5,16 @@ pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
-import {L1EcosystemContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
-/// @notice Core (ecosystem) side of the v35 upgrade: deploys the new shared-singleton
-///         implementation set, pins it in a write-once `CoreTransition` (the enum-indexed
-///         inventory — one slot per `L1EcosystemContract` member, inert slots explicit), and
-///         deploys the bound `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under
-///         together with the lifecycle coordinator every later upgrade runs through. The
-///         governance calls that put those to work are derived from `RegistryBootstrapSequence`
+/// @notice Core (ecosystem) side of the v35 upgrade — the registry bootstrap edge. The base
+///         pipeline deploys the changed ecosystem implementations and pins them in a write-once
+///         `CoreTransition`; this edge also deploys the bound `CoreUpgradeExecutor` the ecosystem
+///         `ProxyAdmin` lands under and the lifecycle coordinator every later upgrade runs through.
+///         The governance calls that put those to work are derived from `RegistryBootstrapSequence`
 ///         over this registry, not authored here.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgrade_v35 is DefaultCoreUpgrade {
@@ -29,40 +26,20 @@ contract CoreUpgrade_v35 is DefaultCoreUpgrade {
     ///         prepare run; the CTM prepare constructs its executor answering to it.
     EcosystemUpgradeExecutor public ecosystemUpgradeExecutor;
 
-    /// @notice Deploy the v35 ecosystem-wide implementation set (implementations only).
-    function deployNewEcosystemContractsL1() public virtual override {
-        // Defensive: on ecosystems whose discovery misses the ChainRegistrationSender proxy
-        // (see the v32 script for the introspection edge case), read it from the bridgehub so
-        // the force-deployments data carries the correct aliased sender.
-        if (coreAddresses.bridgehub.proxies.chainRegistrationSender == address(0)) {
-            coreAddresses.bridgehub.proxies.chainRegistrationSender = IBridgehubBase(
-                coreAddresses.bridgehub.proxies.bridgehub
-            ).chainRegistrationSender();
-        }
-
-        coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub");
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot");
-        coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier");
-        coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter");
-        coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault");
-        coreAddresses.bridgehub.implementations.ctmDeploymentTracker = deploySimpleContract("CTMDeploymentTracker");
-        coreAddresses.bridgehub.implementations.chainAssetHandler = deploySimpleContract("L1ChainAssetHandler");
-        coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
-            "ChainRegistrationSender"
-        );
-    }
-
     /// @inheritdoc DefaultCoreUpgrade
-    /// @dev TODO(EVM-1644): decide whether this edge installs the ChainRegistrationSender or stops
-    ///      deploying it. This run deploys a fresh implementation that `_coreProxyUpgradeRows()`
-    ///      has no row for, so it ships nowhere; naming the slot here is what keeps that VISIBLE
-    ///      until the question is settled, rather than a dangling address in the output. Both
-    ///      readings are open: the sender's source has not changed since v0.33.0, but the live
-    ///      implementation this edge departs from is a v31-era build, and
-    ///      {protocol-docs/chain-lifecycle.md} still describes the upgrade as refreshing it.
-    function uninstalledCoreDeployments() internal view virtual override returns (L1EcosystemContract[] memory slots) {
-        slots = new L1EcosystemContract[](1);
-        slots[0] = L1EcosystemContract.ChainRegistrationSender;
+    /// @dev Every installable ecosystem implementation differs from the v0.34.0 build by runtime
+    ///      codehash. In executable code only `L1Bridgehub`, `L1MessageRoot` and
+    ///      `L1ChainAssetHandler` changed; the other four differ in their CBOR metadata alone,
+    ///      because sources in their import closure (shared error and interface files) changed.
+    function changedEcosystemImplementations() internal view virtual override returns (string[] memory names) {
+        names = new string[](7);
+        names[0] = "L1Bridgehub";
+        names[1] = "L1MessageRoot";
+        names[2] = "L1ChainAssetHandler";
+        names[3] = "L1Nullifier";
+        names[4] = "L1AssetRouter";
+        names[5] = "L1NativeTokenVault";
+        names[6] = "CTMDeploymentTracker";
     }
 
     /// @notice The coordinator this run deployed — the CTM prepare constructs its executor
@@ -85,7 +62,7 @@ contract CoreUpgrade_v35 is DefaultCoreUpgrade {
     ///      a plain CREATE would leave the stage-1 calls pointing at codeless addresses.
     function deployEcosystemUpgradeObjects() public virtual override {
         deployCoreTransition();
-        require(address(coreTransition) != address(0), "v35 deploys every ecosystem implementation");
+        require(address(coreTransition) != address(0), "the bootstrap edge needs an ecosystem leg");
         coreUpgradeExecutor = CoreUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(

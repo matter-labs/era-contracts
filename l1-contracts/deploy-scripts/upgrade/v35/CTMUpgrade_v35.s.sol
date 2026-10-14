@@ -310,7 +310,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             ctm: _ctmProxy,
             expectedProtocolVersion: getOldProtocolVersion(),
             ctmProxyAdmin: _ctmProxyAdmin,
-            proxyUpgrades: proxyUpgrades,
+            ctmProxyUpgrades: proxyUpgrades,
             currentRelease: release,
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
             upgradeEngine: engine,
@@ -355,12 +355,18 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
 
     /// @notice The `EcosystemUpgradeExecutor` (lifecycle coordinator) the core prepare of this
     ///         upgrade deployed — an input of this prepare (`CTMUpgradeParams.ecosystemUpgradeExecutor`,
-    ///         read by protocol-ops from the core output TOML), checked to exist so a stale or
-    ///         missing input fails here instead of at the bootstrap's binding check.
+    ///         read by protocol-ops from the core output TOML): no executor answers to it on-chain
+    ///         until this edge binds them. Checked to exist so a stale or missing input fails here
+    ///         instead of at the bootstrap's binding check.
     function ecosystemUpgradeExecutor() public view returns (EcosystemUpgradeExecutor) {
         address coordinator = upgradeAddresses.ecosystemUpgradeExecutor;
         require(coordinator != address(0), "coordinator not set (core prepare output)");
         require(coordinator.code.length != 0, "coordinator has no code");
         return EcosystemUpgradeExecutor(payable(coordinator));
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    function upgradeCoordinator() public view virtual override returns (address) {
+        return address(ecosystemUpgradeExecutor());
     }
 }

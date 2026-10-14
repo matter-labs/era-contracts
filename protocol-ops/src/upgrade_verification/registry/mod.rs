@@ -24,12 +24,14 @@
 //!      ([`provenance`]) — the objects that set immutables cannot hash to any artifact, and
 //!      question 1 is the whole of their identity.
 //!   3. Does every contract an object names exist?
-//!   4. Is authority bound where the review says, and to the expected governance owner — with
+//!   4. Does every release the package installs pin the reviewed genesis — the genesis config's
+//!      root and the force deployments the prepare wrote? ([`genesis`])
+//!   5. Is authority bound where the review says, and to the expected governance owner — with
 //!      no nomination outstanding on any authority the upgrade drives?
-//!   5. Does every proxy row depart from the implementation that is actually live, read through
+//!   6. Does every proxy row depart from the implementation that is actually live, read through
 //!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — completion does not
 //!      re-read implementations ("Stages" in `protocol-docs/ecosystem-upgrade-coordination.md`).
-//!   6. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
+//!   7. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
 //!      address — and nothing else?
 //!
 //! None of it is "does an object's own fingerprint of a member match that member's code": the
@@ -55,6 +57,7 @@ use crate::upgrade_verification::report::VerificationResult;
 
 pub(crate) mod bootstrap;
 pub(crate) mod construction;
+pub(crate) mod genesis;
 pub(crate) mod lifecycle;
 pub(crate) mod operation;
 pub(crate) mod package;
@@ -63,6 +66,7 @@ pub(crate) mod rows;
 pub(crate) mod views;
 
 use construction::ReviewedBuild;
+use genesis::ReviewedGenesis;
 use package::RegistryPackage;
 use provenance::CodeIdentity;
 use views::CommittedUpgradeView;
@@ -86,14 +90,20 @@ pub(crate) async fn verify(
     let provider = get_provider(l1_rpc_url)?;
     let identity = CodeIdentity::from_local_hashes()?;
     let build = ReviewedBuild::load(&identity);
+    let genesis_root = genesis::reviewed_genesis_root();
 
     match RegistryPackage::load(ecosystem_toml)? {
         RegistryPackage::Operation(package) => {
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
+            let genesis = ReviewedGenesis {
+                genesis_root,
+                force_deployments_data: package.force_deployments_data.clone(),
+            };
             operation::verify(
                 &provider,
                 &identity,
                 &build,
+                &genesis,
                 &package,
                 expected_governance_owner,
                 &salts,
@@ -103,10 +113,15 @@ pub(crate) async fn verify(
         }
         RegistryPackage::Bootstrap(package) => {
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
+            let genesis = ReviewedGenesis {
+                genesis_root,
+                force_deployments_data: package.force_deployments_data.clone(),
+            };
             bootstrap::verify(
                 &provider,
                 &identity,
                 &build,
+                &genesis,
                 &package,
                 expected_governance_owner,
                 &salts,

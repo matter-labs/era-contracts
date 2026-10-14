@@ -66,11 +66,11 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
-    /// @notice The `EcosystemUpgradeExecutor` — the lifecycle coordinator — the core prepare of this
-    ///         upgrade deployed or discovered (its output TOML, `[registry].ecosystem_upgrade_executor_addr`).
-    ///         The bootstrap's CTM executor is constructed answering to it and every transition's
-    ///         timer is bound to it, so the CTM prepare takes it as an input rather than re-deriving
-    ///         a deployment it did not make.
+    /// @notice The `EcosystemUpgradeExecutor` — the lifecycle coordinator — the core prepare of the
+    ///         BOOTSTRAP edge deployed (its output TOML, `[registry].ecosystem_upgrade_executor_addr`):
+    ///         the bootstrap's CTM executor is constructed answering to it. Every later prepare
+    ///         derives the coordinator from the CTM (owner = bound `CTMUpgradeExecutor`, then its
+    ///         `coordinator()`) and ignores this field.
     address ecosystemUpgradeExecutor;
     /// @notice The core prepare's `CoreTransition` (its output TOML,
     ///         `[registry].core_transition_addr`), zero when the upgrade has no ecosystem leg. It is

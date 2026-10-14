@@ -116,6 +116,12 @@ library Utils {
     address internal constant TEST_CHAIN_ADMIN = address(0x32149872498357874258787);
     address internal constant TEST_VALIDATOR_TIMELOCK = address(0x85430237648403822345345);
     bytes32 internal constant TEST_BASE_TOKEN_ASSET_ID = bytes32(uint256(0x923645439232223445));
+    /// @dev The CTM's `storedBatchZero()` for fixtures that never commit a batch: any nonzero hash
+    ///      (DiamondInit refuses zero).
+    bytes32 internal constant TEST_STORED_BATCH_ZERO = bytes32(uint256(0x5BA7C4));
+    /// @dev The CTM's `PERMISSIONLESS_VALIDATOR()` for fixtures that do not exercise priority mode
+    ///      (DiamondInit refuses zero on L1).
+    address internal constant TEST_PERMISSIONLESS_VALIDATOR = address(0x9E7A11D);
 
     function randomBytes32(bytes memory seed) public view returns (bytes32) {
         return keccak256(abi.encodePacked(block.timestamp, seed));

@@ -23,9 +23,8 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     ///      from its own CTM (`upgradeCutForVersion`), which derives it from the transition that CTM
     ///      committed — a transition cannot be aimed at a foreign CTM's chains. No `validate()`
     ///      here either: that cut's init calldata names THIS transition address, so the object is
-    ///      the committed one by construction, and its pins were checked when it was committed.
-    ///      Pins cannot have moved since: an `EXTCODEHASH` is fixed for a non-selfdestructible
-    ///      contract.
+    ///      the committed one by construction, and its `validate()` ran when it was committed;
+    ///      code present then is present now.
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         _requireAllBatchesExecuted();
         ICTMTransition transition = ICTMTransition(_transition);

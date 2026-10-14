@@ -31,6 +31,7 @@ import {
     ReleaseManifest,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
+import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 /// @notice Individual-contract upgrades through the registry model, end to end on a real ZKsync OS
 ///         chain: a facet-only edge, a verifier-only edge and a ValidatorTimelock-only SemVer
@@ -195,7 +196,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         ) = _timelockRowFixture();
         assertEq(_liveImpl(timelock), implOld, "fixture: the proxy starts at the old implementation");
         EcosystemUpgradeOperation operation = _deployOperation(address(0), rows, address(0), _newOperationTimer());
-        assertEq(operation.transition(), address(0), "an infrastructure-only operation carries no transition");
+        assertEq(operation.ctmTransition(), address(0), "an infrastructure-only operation carries no transition");
 
         vm.startPrank(governor);
         coordinator.stage0(operation);
@@ -359,7 +360,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
                     genesisUpgrade: address(genesisUpgradeContract),
                     genesisFacets: _releaseFacets(_adminFacet),
                     genesis: ReleaseGenesisData({
-                        fixedForceDeploymentsData: hex"f1f2",
+                        fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
                         genesisBatchHash: bytes32(uint256(1)),
                         genesisIndexRepeatedStorageChanges: 54
                     }),

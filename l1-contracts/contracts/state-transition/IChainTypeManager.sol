@@ -94,7 +94,7 @@ interface IChainTypeManager {
 
     function l1GenesisUpgrade() external view returns (address);
 
-    /// @dev Deprecated. Populated only by the legacy cut-taking commit path, for pre-v32 Admin
+    /// @dev Deprecated. Populated only by the legacy cut-taking commit path, for pre-v35 Admin
     ///      facets that verify handed cut bytes. Registry-driven edges commit only the transition.
     function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
 
@@ -134,9 +134,9 @@ interface IChainTypeManager {
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
     /// @notice Deploys a new chain. The bridgehub passes only the minimal chain-specific data
-    ///         (id + admin); everything else (base token asset id, genesis facet set, base system
-    ///         hashes, genesis params, force deployments) is derived from the bridgehub and the
-    ///         CTM's current release.
+    ///         (id + admin); everything else (base token asset id, genesis facet set, genesis
+    ///         params, force deployments) is derived from the bridgehub and the CTM's current
+    ///         release.
     function createNewChain(uint256 _chainId, address _admin) external returns (address);
 
     function setNewVersionUpgrade(

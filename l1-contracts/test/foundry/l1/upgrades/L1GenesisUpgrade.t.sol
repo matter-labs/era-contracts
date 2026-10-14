@@ -121,7 +121,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
                         (
                             ETH_CHAIN_ID,
                             ctmDeployerStub,
-                            FIXED_FORCE_DEPLOYMENTS_DATA,
+                            _fixedForceDeploymentsData(),
                             _expectedPerChainData(ETH_CHAIN_ID)
                         )
                     )
@@ -162,7 +162,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
                 _chainId: chainIds[i],
                 _baseTokenAssetId: assetIds[i],
                 _protocolVersion: protocolVersion,
-                _fixedForceDeploymentsData: FIXED_FORCE_DEPLOYMENTS_DATA
+                _fixedForceDeploymentsData: _fixedForceDeploymentsData()
             });
 
             assertEq(
@@ -259,7 +259,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(genesisDeployer, upgradeDeployer, "the CTM deployment tracker must match");
         assertEq(genesisFixed, upgradeFixed, "the release's pinned force-deployments must match");
         assertEq(genesisPerChain, upgradePerChain, "the per-chain data must match");
-        assertEq(genesisFixed, FIXED_FORCE_DEPLOYMENTS_DATA, "and it is the release's own blob");
+        assertEq(genesisFixed, _fixedForceDeploymentsData(), "and it is the release's own blob");
     }
 
     // ─────────────────────────── base-token tolerance ───────────────────────────

@@ -145,7 +145,7 @@ export function bootstrapInitArgs(
     // The CTM-domain inventory (indexed by `CTMContract`): this edge swaps the CTM's own
     // implementation and the ServerNotifier's, so the other slots encode as the explicit zero
     // ("not upgraded") row.
-    proxyUpgrades: proxyUpgradeSlots("CTMContract", {
+    ctmProxyUpgrades: proxyUpgradeSlots("CTMContract", {
       ChainTypeManager: {
         proxy: manifest.bootstrap.ctmImpl.proxy,
         expectedOldImpl: manifest.bootstrap.ctmImpl.expectedOldImpl,

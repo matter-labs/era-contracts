@@ -5,7 +5,7 @@
 - `protocol-ops/src/main.rs` — top-level CLI dispatcher.
 - `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `verify-bootstrap`, `list-ctms`, `governance-toml-to-simulator`, …).
 - `protocol-ops/src/commands/ecosystem/upgrade_inner.rs` — canonical prepare-phase orchestration (`UpgradeInner::prepare`: core prepare, per-CTM prepares, then `compose_operation`).
-- `protocol-ops/src/commands/ecosystem/upgrade_full.rs` — `UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`) + the ServerNotifier admin call after the prepares.
+- `protocol-ops/src/commands/ecosystem/upgrade_full.rs` — `UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`) + the ServerNotifier handover calls after the prepares (bootstrap only).
 - `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`) and the free `replay_governance_stages` helper.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — converts prepared governance TOMLs into transaction-simulator JSON.
 - `protocol-ops/src/commands/chain/` — per-chain commands (`chain init`, `chain upgrade`, `chain set-da-validator-pair`, …).
@@ -27,35 +27,30 @@ the merged prepare TOML and an L1 RPC: the registry model moved the reviewable c
 calldata and onto write-once objects, so objects are identified against the reviewed commit's own
 artifacts rather than reconstructed from a CREATE2 deployment history.
 
-> The pre-registry (v31) calldata verifier, `ecosystem verify-upgrade`, has been RETIRED along
-> with its whole `upgrade_verification/versions/` tree. Verifying v31-era packages is no longer a
-> supported capability; the tool and its procedure live on in the release branches that shipped
-> them. There is no `versions/` directory any more, and adding one back would be the mistake this
-> removed: a registry-driven upgrade is reviewed the same way for every release, so a release does
-> NOT get a verifier module of its own. `v36` needs no code here — its prepare is
-> `CTMUpgrade_v36 is DefaultCTMUpgrade {}`, an ordinary operation, and the recurring path verifies
-> it as one. If a future release ever seems to need version-specific handling, it belongs as an
-> INPUT to the general path, not as a new module.
+> Pre-registry calldata packages are verified by the `ecosystem verify-upgrade` of the release
+> branches that shipped them, not here. A registry-driven upgrade is reviewed the same way for
+> every release, so a release does NOT get a verifier module of its own: `v36` needs no code here —
+> its prepare is `CTMUpgrade_v36 is DefaultCTMUpgrade {}`, an ordinary operation, and the recurring
+> path verifies it as one. If a future release ever seems to need version-specific handling, it
+> belongs as an INPUT to the general path, not as a new module.
 
 It answers two questions and keeps them apart.
 
 **What does this upgrade do?** is answered by reviewing the objects, never by reconstructing them
 from calldata:
 
-- **Construction.** The check that carries object trust, because a runtime codehash cannot give
-  it: creation code can write any storage it likes and then return the canonical runtime
-  bytecode. Every object is deployed through the deterministic CREATE2 factory, so its address is
-  re-derived from the reviewed creation code and its reviewed constructor arguments, and compared
-  with the address the package uses. For a write-once object the arguments are the manifest it
-  serves; for the lifecycle objects (the coordinator, both domain executors, the timer) and the
-  bootstrap sequence they are the reviewed governance owner and the bindings the package and
-  manifest record — never the object's own getters, since a genuine executor built for an
-  attacker's owner answers them like the reviewed one. A match proves the audited constructor ran
-  on those arguments, which covers the object's whole state, immutables included. The
-  creation-code bytes come from the local build (`l1-contracts/out`, so the reviewed commit must
-  be built), held against the committed `evmBytecodeHash`. The salts are per prepare leg and come
-  from `--create2-salt` (a package records none); with no salt the check cannot run, and that is
-  an ERROR rather than a silent pass.
+- **Construction.** The check that carries object trust (why: "Provenance and validation" in
+  `docs/registry-driven-upgrades.md`). Each object's address is re-derived from the reviewed
+  creation code and the arguments it was constructed with, and compared with the address the
+  package uses. For a write-once object the arguments are the manifest it serves; for the
+  lifecycle objects (the coordinator, both domain executors, the timer) and the bootstrap sequence
+  they are the original constructor arguments the package records (otherwise the reviewed
+  values), never the object's own getters. The current owner, nomination and coordinator are
+  checked separately against the reviewed governance and bindings. The creation-code bytes come
+  from the local build (`l1-contracts/out`, so the reviewed commit must be built), held against the
+  committed `evmBytecodeHash`. The salts are per prepare leg and come from `--create2-salt` (a
+  package records none); with no salt the check cannot run, and that is an ERROR rather than a
+  silent pass.
 - **Object provenance** — for the objects without constructor-set immutables, the code at each
   address, looked up in `AllContractsHashes.json`. Code attributable to a _different_ contract is
   an ERROR, and so is code attributable to NO contract: the reviewer cannot say what is deployed
@@ -65,20 +60,24 @@ from calldata:
 - **Constructor-set immutables.** `AllContractsHashes.json` records the ARTIFACT's deployed
   bytecode, whose immutable slots are zero, so a contract that sets immutables never hashes to its
   own artifact once deployed. Such an object gets NO provenance lookup and NO identity from its
-  getters: its construction above is the whole of its identity. (An earlier primitive accepted an
-  immutable-bearing object on its getters answering the reviewed values while its code stayed
-  unattributed; that admitted any counterfeit answering the same getters, and it is gone.)
+  getters: its construction above is the whole of its identity — getters answering the reviewed
+  values would admit any counterfeit that answers them too.
 - **Named members exist.** Every contract an object names by address must be deployed code,
   which is what the objects' own `validate()` refuses on-chain.
 - **Bound authority** — the coordinator, both domain executors, the CTM and both ProxyAdmins,
   and the governance owner the whole lifecycle answers to, with no ownership nomination
-  outstanding on any of them. The reviewed owner is also what the executors' construction is
-  re-derived from, so for a recurring package `--expected-governance-owner` is not optional: without
-  it every executor is unverifiable, which is an error.
+  outstanding on any of them. The reviewed owner is what the executors' current ownership is
+  checked against (and their construction, where the package records no constructor arguments),
+  so for a recurring package `--expected-governance-owner` is not optional: without it every
+  executor is unverifiable, which is an error.
 - **Departing state** — the version and release edge against live, and every proxy row's
   `expectedOldImpl` against the implementation actually live behind that proxy, read through the
-  admin that administers it (the row's own, or the domain's when it names none) and accepting a
-  row its own administrator already applied.
+  domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. For a bootstrap, every
+  chain on the CTM below the departing version is listed as a warning, not an error (the legacy
+  `protocolVersionVerifier` getter keeps them upgradeable).
+- **Genesis** — on both paths, a release's genesis batch hash against the reviewed commit's
+  genesis config (`configs/genesis/zksync-os/latest.json`), its index against zero, and its
+  force-deployments data against the package's `force_deployments_data`.
 - **Readiness**, reported apart from anything about value: the transition's L2 factory
   dependencies published on the CTM's supplier, the timer startable, no lifecycle in flight.
 
@@ -147,7 +146,7 @@ Both `upgrade-governance --env` and `governance-toml-to-simulator --env` discove
 For non-trivial flows (the ecosystem upgrade in particular) we keep a small library-style struct hierarchy distinct from the CLI shells:
 
 - **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. The CTM prepare also deploys the `EcosystemUpgradeOperation` (none on a bootstrap edge, which has no transition). Returns the per-step output TOML paths.
-- **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before and the ServerNotifier admin call after. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
+- **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before and the ServerNotifier handover calls (bootstrap only) after. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
 - **Free `replay_governance_stages` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `stage{N}_calls`, dispatches `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
 
 The asymmetry (Inner/Full for prepare; free fn for governance) is deliberate: prepare needs orchestration (multiple forge invocations + preconditions); governance is a single ABI-passthrough loop.

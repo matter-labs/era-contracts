@@ -12,7 +12,7 @@ not acquire their proxy administration directly.
 
 ## Operation commitment
 
-One immutable operation contains `{coreTransition, ctmInfrastructure, transition, timer}`: an
+One immutable operation contains `{coreTransition, ctmInfrastructure, ctmTransition, timer}`: an
 optional ecosystem change, an optional set of CTM-domain proxy rows, an optional chain-version
 edge, and the mandatory delay before governance may execute. The coordinator is bound to one core
 executor and one CTM executor. The operation describes the change; it does not repeat the executor
@@ -29,6 +29,11 @@ stage 0 read it. Later public stages require that exact operation, still serving
 manifest that hashes to it, so a stale governance transaction cannot act on a replacement proposal
 and an object whose answers change between stages is refused.
 
+The coordinator is the operation's only reader. Each stage reads `getManifest()`, holds it to the
+pinned hash, and passes that manifest to the domain executors, which take their legs from it; no
+lifecycle callback of a domain executor calls the operation, and its per-field getters (`coreTransition()`,
+`ctmTransition()`, …) serve tooling and never steer a stage.
+
 ### One home per responsibility
 
 - **Operation**: infrastructure changes, participation, execution delay.
@@ -36,10 +41,9 @@ and an object whose answers change between stages is refused.
 - **Release**: what a chain runs.
 
 No transition carries proxy rows, mixed upgrades included. That is what decouples infrastructure
-from chain versions: `ValidatorTimelock` is a `CTMContract`, so replacing it used to be a row on a
-transition, and a transition refuses unless the protocol version strictly increases. Committing
-that edge advanced the CTM's version and every chain then had to adopt it one by one — fleet-wide
-work bought for a swap that changes nothing about what any chain runs.
+from chain versions: a transition refuses unless the protocol version strictly increases, and
+every chain must then adopt the new version one by one, so a `ValidatorTimelock` swap carried by a
+transition would buy fleet-wide work for a change to nothing any chain runs.
 
 ### Infrastructure-only operations
 
@@ -61,8 +65,7 @@ chain-release edge whose input forgot to move it.
 The operation's `timer` is the delay before GOVERNANCE may execute stage 1 on L1. The transition's
 `upgradeTimestamp` is the earliest a CHAIN may execute its own diamond upgrade, and
 `oldProtocolVersionDeadline` is when the departing version stops being usable. The transition
-enforces `oldProtocolVersionDeadline >= upgradeTimestamp`; both operands are its own, so moving the
-timer away did not touch that invariant.
+enforces `oldProtocolVersionDeadline >= upgradeTimestamp`; both operands are its own.
 
 No relationship between the timer's deadline and `upgradeTimestamp` is enforced, and none should
 be. Ordering between the two is already established by the commit itself: a chain cannot upgrade
@@ -74,9 +77,13 @@ timer's owner may extend it within a bound — so there is nothing well-defined 
 
 ## Stages
 
-Stage 0 reserves the optional core domain and the CTM, pauses CTM migrations, and starts the
-operation's timer. Domains validate their own committed inputs and authorize their coordinator. The
-CTM also verifies it is the coordinator's bound executor.
+Stage 0 validates the whole operation in one call (`validate()`: the timer, every row's
+implementation, and the core and CTM transitions' own `validate()`), pins its manifest hash,
+reserves the optional core domain and the CTM, pauses CTM migrations, and starts the operation's
+timer. Each domain re-checks its own leg as it reserves and authorizes only its coordinator; the CTM
+executor also checks both transition edges against the live CTM and that it is the coordinator's
+bound executor. How long to leave between the stages, and the delay policy, are operational
+policies: see `docs/upgrade-stage-lifecycle.md`.
 
 Stage 1 checks the timer deadline, applies the optional core transition, then the CTM leg: the
 infrastructure rows first, then the transition's version commit when the operation carries one. The
@@ -106,15 +113,19 @@ first implementation, not a proof that a narrower policy would be wrong.
 
 Abandonment clears reservations without reversing already committed upgrades. Whether migrations
 resume is governance's explicit decision, made in the same call: `abandonPendingOperation(true)`
-also lifts this CTM's pause through the CTM executor, `false` leaves it held.
+also lifts this CTM's pause (the CTM executor's `releaseMigrationPause`, refused while an operation
+is reserved), `false` leaves it held.
 
 ## Authorization and recovery
 
 Each domain explicitly authorizes its coordinator (`setCoordinator`). An address
-declaring the same governance owner is not evidence of authorization. `beginOperation` reserves an operation. Later callbacks act on that reservation;
-CTM execution, completion and abandonment derive their inputs from it. Core execution
-checks its registry argument against the reservation. A domain cannot be reserved for
-one registry or transition and driven with another. Replacement is forbidden while the domain has a pending
+declaring the same governance owner is not evidence of authorization. `beginOperation` reserves an
+operation together with the pinned manifest the coordinator read from it, and each domain takes its
+leg from that argument: the core executor stores `reservedCoreTransition` and, from its
+coordinator, applies only that one; the CTM executor stores `reservedTransition` and the manifest's
+hash, and `applyOperation` refuses any manifest but the reserved one. Completion and abandonment act on the reservation alone, and
+abandonment reads nothing off the operation: the coordinator asks the core executor whether it
+holds the leg. Replacement is forbidden while the domain has a pending
 operation. Every other owner operation of a domain — freezing a chain, moving a deadline, replacing a
 committed transition — is an ordinary call through the executor's owner-gated, event-logged
 `forward`; the executors carry no typed passthroughs for them.
@@ -161,7 +172,7 @@ Consequences:
 
 Multi-CTM participation is deliberately absent from this version. Restore it at these boundaries:
 
-1. Change `OperationManifest.transition` and `ctmInfrastructure` into an ordered list of explicit
+1. Change `OperationManifest.ctmTransition` and `ctmInfrastructure` into an ordered list of explicit
    CTM participation records (each CTM's rows beside its own transition), and update
    `EcosystemUpgradeOperation` to reject duplicate CTMs and empty participation.
 2. Replace the coordinator's single `ctmExecutor` binding with explicit participant authorization.

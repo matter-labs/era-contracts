@@ -8,14 +8,9 @@ import {RegistryTargetHasNoCode} from "../../../common/L1ContractErrors.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The one code check the registry model runs against live addresses: "there is a
 ///         contract here at all".
-/// @dev There used to be a second — a runtime-`EXTCODEHASH` comparison against a pinned
-///      expectation, one per object type. It was removed because it answers a strictly weaker
-///      question than it appeared to: creation code can write arbitrary storage and then return
-///      the canonical runtime bytecode, so an object that PASSES such a check can still serve
-///      state the audited constructor would never have produced. Object trust is established by
-///      governance reviewing the exact deployed objects, with `protocol-ops ecosystem
-///      verify-bootstrap` re-deriving each object's address from the reviewed creation code and
-///      the manifest it serves — see "Provenance and validation" in
+/// @dev Deliberately the only one: a runtime codehash cannot show that the audited constructor
+///      produced an object, so object trust is governance's approval of the exact deployed
+///      objects, verified off-chain — see "Provenance and validation" in
 ///      {docs/registry-driven-upgrades.md}.
 library ObjectAnchorLib {
     /// @notice Reverts unless `_target` is a deployed contract.
