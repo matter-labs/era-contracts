@@ -91,9 +91,9 @@ any Safe-bundle-aware executor.
 
 ## Running the Protocol Upgrade Verification Tool (PUVT)
 
-> The verifier is reconciled with v34's contracts and default upgrade scripts. It accepts v0.33.x
-> source versions, reads the target version from genesis, and distinguishes `v34_upgrade_addr`
-> (the cut initializer) from `default_upgrade_addr` (the generic stored default). The Solidity-payload
+> The verifier is reconciled with v35's contracts and default upgrade scripts. It accepts v0.34.x
+> source versions, reads the target version from genesis, and checks the cut initializer and the
+> stored default against `default_upgrade_addr` (the generic `DefaultUpgradeZKsyncOS`). The Solidity-payload
 > regression below exercises the ABI and force-deployment checks; it does not exercise live RPC state
 > or the full governance ceremony.
 
@@ -146,10 +146,10 @@ After building L1/DA artifacts and refreshing `AllContractsHashes.json`, run wit
 Foundry version on `PATH`:
 
 ```bash
-cargo test accepts_solidity_v34_payload_and_rejects_corrupted_deployments -- --ignored
+cargo test accepts_solidity_release_payload_and_rejects_corrupted_deployments -- --ignored
 ```
 
-This runs the v34 Solidity payload builder and checks its force deployments, factory dependencies,
+This runs the release's Solidity payload builder and checks its force deployments, factory dependencies,
 and `IL2DefaultUpgrade` calldata with the Rust verifier. It also rejects a missing ComplexUpgrader
 upgrade and corrupted delegate bytecode descriptors. RPC state and governance execution are covered
 separately by the upgrade integration tests.

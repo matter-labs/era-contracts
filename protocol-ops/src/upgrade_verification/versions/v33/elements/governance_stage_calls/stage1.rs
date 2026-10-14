@@ -714,17 +714,11 @@ fn verify_kept_proxy_upgrade_call_args(
 }
 
 /// `setDefaultUpgrade` must store the CTM's *generic* upgrade contract
-/// (`DefaultUpgradeZKsyncOS`), not the one-shot cut used by this release.
-/// The distinction matters: the stored address is what every *later* patch
-/// upgrade reuses, so pointing it at the one-shot contract would silently
-/// re-run this release's migration on a future upgrade.
+/// (`DefaultUpgradeZKsyncOS`): every later patch upgrade reuses it.
 ///
-/// Three independent things are checked, because the first two alone are
-/// self-referential — they only relate the call to other fields of the same
-/// artifact, so substituting one live address in both places would pass:
-/// the call matches the artifact's declared address, that address is *not*
-/// the one-shot upgrader, and it is a `DefaultUpgradeZKsyncOS` this upgrade
-/// CREATE2-deployed. The last one is what actually establishes what the CTM
+/// The call must match the artifact's declared address, and that address
+/// must be a `DefaultUpgradeZKsyncOS` this upgrade CREATE2-deployed. The
+/// first alone is self-referential; the second establishes what the CTM
 /// will delegate through.
 fn verify_set_default_upgrade_call_args(
     calls: &CallList,
@@ -752,22 +746,8 @@ fn verify_set_default_upgrade_call_args(
                 expected,
                 &format!("{}.default_upgrade_addr", ctm.flavor.label()),
             );
-            // Guard the whole point of the field: the stored generic upgrade
-            // must not be this release's one-shot contract.
-            if let Some(one_shot) =
-                required_ctm_address(ctm, &["state_transition", "v34_upgrade_addr"], result)
-            {
-                if decoded.newUpgrade == one_shot {
-                    result.report_error(&format!(
-                        "{} setDefaultUpgrade stores the one-shot upgrade {one_shot}; it must store the generic DefaultUpgrade contract",
-                        ctm.flavor.label(),
-                    ));
-                    errors += 1;
-                }
-            }
-
             // Establish what the address actually *is*, independently of the
-            // artifact. Without this the two checks above are satisfied by any
+            // artifact. Without this the check above is satisfied by any
             // address the artifact names consistently.
             const STORED_DEFAULT_UPGRADE_FILE: &str = "l1-contracts/DefaultUpgradeZKsyncOS";
             match verifiers
@@ -1068,14 +1048,14 @@ async fn verify_set_new_version_upgrade_payload(
         &hex::encode(diamond_cut.abi_encode()),
     );
     if let Some(expected_default_upgrade) =
-        required_ctm_address(ctm, &["state_transition", "v34_upgrade_addr"], result)
+        required_ctm_address(ctm, &["state_transition", "default_upgrade_addr"], result)
     {
         errors += expect_address_equal(
             result,
             verifiers,
             &diamond_cut.initAddress,
             expected_default_upgrade,
-            &format!("{}.v34_upgrade_addr", ctm.flavor.label()),
+            &format!("{}.default_upgrade_addr", ctm.flavor.label()),
         );
     } else {
         errors += 1;
@@ -1162,5 +1142,109 @@ mod tests {
         by_offset.sort_by_key(|(offset, _)| *offset);
         by_source.sort_by_key(|(_, call)| position(call));
         assert_eq!(by_offset, by_source);
+    }
+
+    /// A release without a one-shot upgrade (v35's `CTMUpgrade_v35` is a plain
+    /// `DefaultCTMUpgrade`) records only `default_upgrade_addr`, and that alone verifies.
+    #[test]
+    fn set_default_upgrade_needs_only_the_generic_default_upgrade() {
+        use super::super::super::call_list::Call;
+        use crate::upgrade_verification::artifacts::{ContractsConfig, CtmFlavor};
+        use alloy::primitives::Address;
+
+        let default_upgrade = Address::repeat_byte(0xd0);
+        let mut verifiers = Verifiers::offline_v34();
+        verifiers.network_verifier.create2_known_bytecodes.insert(
+            default_upgrade,
+            "l1-contracts/DefaultUpgradeZKsyncOS".to_string(),
+        );
+        let ctm = CtmArtifact {
+            flavor: CtmFlavor::ZksyncOs,
+            chain_upgrade_diamond_cut: String::new(),
+            contracts_config: ContractsConfig {
+                diamond_cut_data: String::new(),
+                force_deployments_data: String::new(),
+                new_protocol_version: 0,
+                old_protocol_version: 0,
+                governance_upgrade_timer_initial_delay: 0,
+                is_testnet: true,
+            },
+            value: toml::from_str(&format!(
+                "[state_transition]\ndefault_upgrade_addr = \"{default_upgrade}\"\n"
+            ))
+            .unwrap(),
+        };
+        let calls = CallList {
+            elems: vec![Call {
+                target: Address::ZERO,
+                value: U256::ZERO,
+                data: setDefaultUpgradeCall {
+                    newUpgrade: default_upgrade,
+                }
+                .abi_encode()
+                .into(),
+            }],
+        };
+
+        let mut result = VerificationResult::default();
+        let errors = verify_set_default_upgrade_call_args(&calls, 0, &ctm, &verifiers, &mut result);
+        assert_eq!((errors, result.errors), (0, 0));
+    }
+
+    /// The cut initializer is checked against `default_upgrade_addr` alone. The rest of the
+    /// payload is left empty, so the test compares the error count with a wrong initializer's.
+    #[tokio::test]
+    async fn new_version_cut_initializer_is_the_generic_default_upgrade() {
+        use super::super::super::call_list::Call;
+        use crate::upgrade_verification::artifacts::{ContractsConfig, CtmFlavor};
+        use alloy::primitives::Address;
+
+        let default_upgrade = Address::repeat_byte(0xd0);
+        let verifiers = Verifiers::offline_v34();
+        let mut counts = vec![];
+        for init in [default_upgrade, Address::repeat_byte(0xee)] {
+            let cut = set_new_version_upgrade::DiamondCutData {
+                facetCuts: vec![],
+                initAddress: init,
+                initCalldata: Default::default(),
+            };
+            let ctm = CtmArtifact {
+                flavor: CtmFlavor::ZksyncOs,
+                chain_upgrade_diamond_cut: hex::encode(cut.abi_encode()),
+                contracts_config: ContractsConfig {
+                    diamond_cut_data: String::new(),
+                    force_deployments_data: String::new(),
+                    new_protocol_version: 0,
+                    old_protocol_version: 0,
+                    governance_upgrade_timer_initial_delay: 0,
+                    is_testnet: true,
+                },
+                value: toml::from_str(&format!(
+                    "[state_transition]\ndefault_upgrade_addr = \"{default_upgrade}\"\n"
+                ))
+                .unwrap(),
+            };
+            let calls = CallList {
+                elems: vec![Call {
+                    target: Address::ZERO,
+                    value: U256::ZERO,
+                    data: set_new_version_upgrade::setNewVersionUpgradeCall {
+                        diamondCut: cut,
+                        oldProtocolVersion: U256::ZERO,
+                        oldProtocolVersionDeadline: U256::MAX,
+                        newProtocolVersion: U256::ZERO,
+                        verifier: Address::ZERO,
+                    }
+                    .abi_encode()
+                    .into(),
+                }],
+            };
+            let mut result = VerificationResult::default();
+            let _ =
+                verify_set_new_version_upgrade_payload(&calls, 0, &ctm, &verifiers, &mut result)
+                    .await;
+            counts.push(result.errors);
+        }
+        assert_eq!(counts[1], counts[0] + 1, "{counts:?}");
     }
 }
