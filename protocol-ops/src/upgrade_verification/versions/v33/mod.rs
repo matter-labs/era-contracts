@@ -27,6 +27,18 @@ use elements::{
 };
 
 pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.33.0";
+/// CREATE2 deployments PUVT recognizes in an env's transactions logs that this upgrade does not
+/// use: contracts of earlier broadcasts kept in a reference log. No element expects them, so no
+/// constructor check applies. For an env with a list, any other unchecked CREATE2 deployment is
+/// an error (`report_unverified_create2_deployments`), and transactions-log entries the RPC
+/// cannot return are errors too; envs without one keep both as warnings.
+///
+/// No environment has had a real run enumerate its historical deployments yet, so every env
+/// is on the warning path. Add an env's list here once one has.
+pub(crate) fn historical_create2_deployments(_env: VerifyUpgradeEnv) -> Option<&'static [Address]> {
+    None
+}
+
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 
 /// Stage Sepolia's Era chain (270) is the single registered chain still
@@ -96,6 +108,10 @@ pub(crate) async fn verify(
     era_chain_id: u64,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
+    // A prior regen's already-broadcast deployment log. Only enriches the
+    // address book — exempt from the salt gate, since its deploys carry that
+    // regen's (now-rotated) salts.
+    reference_tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
     expected_salts: &[FixedBytes<32>],
     zk_token_asset_id: FixedBytes<32>,
@@ -123,18 +139,38 @@ pub(crate) async fn verify(
     // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
     // matches AllContractsHashes after a regen) are silently skipped — the
     // address-book lookup in `expect_create2_params` hard-errors only if a
-    // load-bearing deployment is missing.
+    // load-bearing deployment is missing. Entries the RPC cannot return even
+    // after retries are reported, as errors in an env with a historical list
+    // (see `historical_create2_deployments`), since the coverage check could
+    // not see their deployments.
+    let strict_fetch = historical_create2_deployments(verifiers.env).is_some();
     let count = {
         let Verifiers {
             bytecode_verifier,
             network_verifier,
             ..
         } = &mut verifiers;
+        // This run's own log first, salt-gated: a prepare that missed its
+        // config salt and fell back to a random one must fail here.
         network_verifier
             .populate_create2_from_transactions_log(
                 tx_hashes,
                 &create2_factory,
                 expected_salts,
+                true,
+                strict_fetch,
+                bytecode_verifier,
+                result,
+            )
+            .await;
+        // Then the reference log, ungated (see `reference_tx_hashes`).
+        network_verifier
+            .populate_create2_from_transactions_log(
+                reference_tx_hashes,
+                &create2_factory,
+                expected_salts,
+                false,
+                strict_fetch,
                 bytecode_verifier,
                 result,
             )
@@ -155,6 +191,12 @@ pub(crate) async fn verify(
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
     verify_ctm_admin_calls(artifact, &verifiers, result).await?;
+
+    // Last, so it sees every expectation the elements above registered.
+    result.report_unverified_create2_deployments(
+        &verifiers,
+        historical_create2_deployments(verifiers.env),
+    );
 
     Ok(())
 }

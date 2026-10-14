@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -29,6 +30,8 @@ import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAss
 import {L2DefaultUpgrade} from "contracts/l2-upgrades/L2DefaultUpgrade.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
+import {V31_INTEROP_HANDLER_L1_CHAIN_ID_SLOT} from "contracts/interop/InteropConstants.sol";
 import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
@@ -146,6 +149,15 @@ contract MockL2DefaultUpgradeBaseToken {
     }
 }
 
+/// @dev The storage layout of mainnet v31's interop handler: `PausableUpgradeable` first, then the L1 chain id.
+contract MockV31MainnetInteropHandler is PausableUpgradeable {
+    uint256 public L1_CHAIN_ID;
+
+    function setL1ChainId(uint256 _l1ChainId) external {
+        L1_CHAIN_ID = _l1ChainId;
+    }
+}
+
 contract L2DefaultUpgradeUnitTest is Test {
     bytes32 internal constant BASE_TOKEN_ASSET_ID = keccak256("base-token");
     uint256 internal constant L1_CHAIN_ID = 9;
@@ -245,6 +257,7 @@ contract L2DefaultUpgradeUnitTest is Test {
         vm.etch(L2_BRIDGEHUB_ADDR, address(new L2Bridgehub()).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(new L2AssetRouter()).code);
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(new L2ChainAssetHandler()).code);
+        vm.etch(L2_INTEROP_HANDLER_ADDR, address(new L2InteropHandler()).code);
 
         _runUpgrade();
 
@@ -282,6 +295,38 @@ contract L2DefaultUpgradeUnitTest is Test {
             ALIASED_L1_GOVERNANCE,
             "chain asset handler owner"
         );
+    }
+
+    /// @dev A v31 handler on mainnet's layout leaves its L1 chain id in a slot past the current handler's storage;
+    /// the upgrade clears it. The mock writes the value through its own code, then the handler's code replaces it
+    /// at the same address, as the v33 upgrade did.
+    function test_UpgradeViaComplexUpgrader_ClearsV31MainnetHandlerL1ChainId() public {
+        MockV31MainnetInteropHandler v31Handler = new MockV31MainnetInteropHandler();
+        _etchCode(L2_INTEROP_HANDLER_ADDR, address(v31Handler));
+        MockV31MainnetInteropHandler(L2_INTEROP_HANDLER_ADDR).setL1ChainId(L1_CHAIN_ID);
+        assertEq(
+            uint256(vm.load(L2_INTEROP_HANDLER_ADDR, bytes32(V31_INTEROP_HANDLER_L1_CHAIN_ID_SLOT))),
+            L1_CHAIN_ID,
+            "the mock must write the v31 mainnet slot"
+        );
+        _etchCode(L2_INTEROP_HANDLER_ADDR, address(new L2InteropHandler()));
+
+        _runUpgrade();
+
+        assertEq(
+            uint256(vm.load(L2_INTEROP_HANDLER_ADDR, bytes32(V31_INTEROP_HANDLER_L1_CHAIN_ID_SLOT))),
+            0,
+            "v31 mainnet l1 chain id slot"
+        );
+    }
+
+    function testFuzz_InteropHandlerUpdateL2_RevertWhen_NotUpgrader(address _caller) public {
+        vm.assume(_caller != L2_COMPLEX_UPGRADER_ADDR);
+        _etchCode(L2_INTEROP_HANDLER_ADDR, address(new L2InteropHandler()));
+
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        vm.prank(_caller);
+        L2InteropHandler(payable(L2_INTEROP_HANDLER_ADDR)).updateL2();
     }
 
     /// @dev Genesis state of the atomic-interop built-ins, as `L2GenesisUpgrade` leaves it.

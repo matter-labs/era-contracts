@@ -84,8 +84,9 @@ Every command that generates Safe bundles runs **exclusively against a temporary
 of `--l1-rpc-url`. The real L1 is **never modified** by the CLI. The fork exists only for
 the duration of the command and stops when it exits.
 
-To apply the generated Safe bundles to a real chain, use `dev execute-manifest` (or any
-Safe-bundle-aware executor) with the keys from `wallets.yaml`.
+To apply the generated Safe bundles to a real chain, use `ecosystem upgrade-broadcast --manifest
+<out>/manifest.json` (one `--key` per signer in the manifest), `dev execute-safe` per bundle, or
+any Safe-bundle-aware executor.
 
 ## Running the Protocol Upgrade Verification Tool (PUVT)
 
@@ -122,16 +123,17 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
 
 ## Output
 
-Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a successful run:
+Commands that support **`--out`** write, into that directory, one Safe Transaction Builder JSON
+file per consecutive run of transactions by the same signer, plus a **`manifest.json`**:
 
-| Field              | Meaning                                                                                                                      |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| **`command`**      | CLI path id (e.g. `chain.init`, `ecosystem.upgrade`).                                                                        |
-| **`version`**      | Envelope format version (currently `1`).                                                                                     |
-| **`runs`**         | One entry per Forge script: `script` (path) and `run` (broadcast JSON for that script).                                      |
-| **`transactions`** | Flat array in execution order: `{ "to", "data", "value" }` for replay (normalized like `cast send`). Built from every `run`. |
-| **`input`**        | Serialized command input (may be `{}` if the command passes an empty object).                                                |
-| **`output`**       | Command-specific result object (may be `{}`).                                                                                |
+| Field          | Meaning                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **`bundles`**  | One entry per bundle file, in execution order: `index`, `file`, `target` (the signer), `steps`, `tx_count`.                         |
+| **`metadata`** | One entry per command run into this directory: `command` (CLI path id, e.g. `chain.init`), `input` and `output` (both may be `{}`). |
+
+Without `--out` no bundles are written, unless the command derives a default from `--env`:
+`upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`),
+`upgrade-governance` and `chain upgrade` do.
 
 ## Requirements
 
