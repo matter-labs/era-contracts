@@ -43,6 +43,11 @@
                     "name": "permissionlessValidator",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "interopFeeManager",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -73,6 +78,11 @@
                   },
                   {
                     "name": "permissionlessValidator",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "interopFeeManager",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -154,23 +164,6 @@
               },
               {
                 "name": "chainTypeManagerProxyAdmin",
-                "type": "address",
-                "internalType": "address"
-              }
-            ]
-          },
-          {
-            "name": "l1Specific",
-            "type": "tuple",
-            "internalType": "struct L1SpecificStateTransitionAddresses",
-            "components": [
-              {
-                "name": "legacyValidatorTimelock",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "interopFeeManager",
                 "type": "address",
                 "internalType": "address"
               }
