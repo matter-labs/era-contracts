@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test, Vm} from "forge-std/Test.sol";
 
 import {SystemContractsProcessing} from "deploy-scripts/upgrade/SystemContractsProcessing.s.sol";
+import {Blake2s} from "deploy-scripts/utils/bytecode/Blake2s.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
@@ -253,9 +254,9 @@ contract RemovedTrackerNeutralizationTest is Test {
                 "SystemContractProxy.sol",
                 "SystemContractProxy"
             );
-            deployer.register(emptyContractBytecode, Utils.blakeHashBytecode(emptyContractBytecode));
-            deployer.register(proxyBytecode, Utils.blakeHashBytecode(proxyBytecode));
-            deployer.register(complexUpgraderBytecode, Utils.blakeHashBytecode(complexUpgraderBytecode));
+            deployer.register(emptyContractBytecode, Blake2s.hash(emptyContractBytecode));
+            deployer.register(proxyBytecode, Blake2s.hash(proxyBytecode));
+            deployer.register(complexUpgraderBytecode, Blake2s.hash(complexUpgraderBytecode));
         }
         deployer.setDefaultBytecode(emptyContractBytecode);
 

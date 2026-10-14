@@ -594,7 +594,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function _buildForceDeploymentsData(
         address _governance
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
-        _precomputeBlakeHashes();
+        _cacheReleaseBytecodeInfos();
         // The same table the release pins, so its two copies of each implementation agree.
         bytes[] memory table = getL2BytecodeInfoTable();
         bytes memory shell = getL2SystemProxyBytecodeInfo();

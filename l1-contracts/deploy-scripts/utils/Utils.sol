@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 import {BytecodeUtils} from "./bytecode/BytecodeUtils.s.sol";
+import {Blake2s} from "./bytecode/Blake2s.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
@@ -1129,14 +1130,6 @@ library Utils {
         });
     }
 
-    function blakeHashBytecode(bytes memory _bytecode) internal returns (bytes32 hashedBytecode) {
-        string[] memory input = new string[](3);
-        input[0] = "node";
-        input[1] = "./scripts/blake2s256.js";
-        input[2] = vm.toString(_bytecode);
-        hashedBytecode = bytes32(vm.ffi(input));
-    }
-
     /// Per-regen salt for legacy `Governance.sol` ceremonies. The op id is
     /// `hash(targets, values, calldatas, predecessor, salt)`; rotating the salt
     /// each regen prevents collisions with prior op ids that may still sit in
@@ -1452,7 +1445,7 @@ library Utils {
     }
 
     function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
-        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
+        bytes32 bytecodeBlakeHash = Blake2s.hash(bytecode);
         bytes32 observableBytecodeHash = keccak256(bytecode);
         bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
             bytecodeBlakeHash,

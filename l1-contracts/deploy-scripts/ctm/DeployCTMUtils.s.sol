@@ -14,11 +14,10 @@ import {Utils} from "../utils/Utils.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
+import {BytecodeInfoCache} from "../utils/bytecode/BytecodeInfoCache.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {L2EcosystemContract, L2SystemContract} from "../ecosystem/CoreContract.sol";
-import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
@@ -73,7 +72,7 @@ struct GeneratedData {
     bytes forceDeploymentsData;
 }
 
-abstract contract DeployCTMUtils is DeployUtils {
+abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
     using stdToml for string;
 
     Config public config;
@@ -84,10 +83,6 @@ abstract contract DeployCTMUtils is DeployUtils {
     // This variable is initialized by concrete implementations before use
     CoreDeployedAddresses internal coreAddresses; //slither-disable-line uninitialized-state
 
-    /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
-    mapping(bytes32 => bytes32) private _blakeCache;
-    /// @dev ZKsync OS bytecode infos keyed by artifact identity.
-    mapping(bytes32 => bytes) private _bytecodeInfoCache;
     /// @dev Per-run scratch file for the batch blake2s FFI call.
     string internal _blakeBatchTmpFile;
 
@@ -102,17 +97,16 @@ abstract contract DeployCTMUtils is DeployUtils {
     ///         redeployed (see {_canReuseReleaseMember}), so an upgrade deploys what it changes.
     //slither-disable-next-line reentrancy-benign
     function deployStateTransitionDiamondFacets() internal {
-        Facets memory live = ctmAddresses.stateTransition.facets;
         Facets storage facets = ctmAddresses.stateTransition.facets;
         delete releaseFacets;
-        facets.adminFacet = _deployReleaseFacet("AdminFacet", live.adminFacet, false);
-        facets.gettersFacet = _deployReleaseFacet("GettersFacet", live.gettersFacet, false);
-        facets.mailboxFacet = _deployReleaseFacet("MailboxFacet", live.mailboxFacet, true);
-        facets.executorFacet = _deployReleaseFacet("ExecutorFacet", live.executorFacet, true);
-        facets.migratorFacet = _deployReleaseFacet("MigratorFacet", live.migratorFacet, false);
-        facets.committerFacet = _deployReleaseFacet("CommitterFacet", live.committerFacet, true);
+        facets.adminFacet = _deployReleaseFacet("AdminFacet", facets.adminFacet, false);
+        facets.gettersFacet = _deployReleaseFacet("GettersFacet", facets.gettersFacet, false);
+        facets.mailboxFacet = _deployReleaseFacet("MailboxFacet", facets.mailboxFacet, true);
+        facets.executorFacet = _deployReleaseFacet("ExecutorFacet", facets.executorFacet, true);
+        facets.migratorFacet = _deployReleaseFacet("MigratorFacet", facets.migratorFacet, false);
+        facets.committerFacet = _deployReleaseFacet("CommitterFacet", facets.committerFacet, true);
         deployAdditionalReleaseFacets();
-        facets.diamondInit = _deployReleaseMember("DiamondInit", live.diamondInit);
+        facets.diamondInit = _deployReleaseMember("DiamondInit", facets.diamondInit);
         ctmAddresses.stateTransition.genesisUpgrade = _deployReleaseMember(
             "L1GenesisUpgrade",
             ctmAddresses.stateTransition.genesisUpgrade
@@ -173,102 +167,40 @@ abstract contract DeployCTMUtils is DeployUtils {
         return _cachedBytecodeInfo("SystemContractProxy.sol", "SystemContractProxy");
     }
 
-    /// @dev Precompute hashes and bytecode infos for the genesis and release inventories.
-    /// Artifact JSON is decoded once per implementation and the shared proxy, then all blake2s
-    /// hashes are computed in one FFI process to keep Forge below its script-memory cap.
-    function _precomputeBlakeHashes() internal {
+    /// @dev Caches the bytecode infos of every artifact the release and its genesis name: the L2
+    ///      table's inventory, the beacon deployer of the legacy genesis descriptor, EmptyContract for
+    ///      the removed trackers and the shared SystemContractProxy shell.
+    function _cacheReleaseBytecodeInfos() internal {
         L2EcosystemContract[] memory coreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
         L2SystemContract[] memory systemContracts = SystemContractsProcessing.getSystemProxyUpgradeContracts();
 
-        // In addition to the release table, the legacy genesis descriptor needs the beacon
-        // deployer, removed trackers need EmptyContract, and the release names the shared
-        // SystemContractProxy shell once.
-        bytes[] memory bytecodes = new bytes[](coreContracts.length + systemContracts.length + 3);
-        bytes32[] memory descriptorKeys = new bytes32[](bytecodes.length);
-        uint256 bytecodeIndex;
+        uint256 artifactCount = coreContracts.length + systemContracts.length + 3;
+        string[] memory fileNames = new string[](artifactCount);
+        string[] memory contractNames = new string[](artifactCount);
+        uint256 index;
 
         for (uint256 i = 0; i < coreContracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(coreContracts[i]);
-            descriptorKeys[bytecodeIndex] = _bytecodeInfoKey(fileName, contractName);
-            bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
+            (fileNames[index], contractNames[index]) = CoreOnGatewayHelper.resolve(coreContracts[i]);
+            ++index;
         }
-
-        {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(
-                L2EcosystemContract.UpgradeableBeaconDeployer
-            );
-            descriptorKeys[bytecodeIndex] = _bytecodeInfoKey(fileName, contractName);
-            bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
-        }
-
-        for (uint256 i = 0; i < systemContracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveL2SystemContract(
-                systemContracts[i]
-            );
-            descriptorKeys[bytecodeIndex] = _bytecodeInfoKey(fileName, contractName);
-            bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
-        }
-
-        descriptorKeys[bytecodeIndex] = _bytecodeInfoKey("EmptyContract.sol", "EmptyContract");
-        bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1("EmptyContract.sol", "EmptyContract");
-        descriptorKeys[bytecodeIndex] = _bytecodeInfoKey("SystemContractProxy.sol", "SystemContractProxy");
-        bytecodes[bytecodeIndex++] = BytecodeUtils.readDeployedBytecodeL1(
-            "SystemContractProxy.sol",
-            "SystemContractProxy"
+        (fileNames[index], contractNames[index]) = CoreOnGatewayHelper.resolve(
+            L2EcosystemContract.UpgradeableBeaconDeployer
         );
-        require(bytecodeIndex == bytecodes.length, "bytecode precompute inventory length mismatch");
+        ++index;
+        for (uint256 i = 0; i < systemContracts.length; i++) {
+            (fileNames[index], contractNames[index]) = CoreOnGatewayHelper.resolveL2SystemContract(systemContracts[i]);
+            ++index;
+        }
+        (fileNames[index], contractNames[index]) = ("EmptyContract.sol", "EmptyContract");
+        ++index;
+        (fileNames[index], contractNames[index]) = ("SystemContractProxy.sol", "SystemContractProxy");
+        ++index;
+        require(index == artifactCount, "bytecode precompute inventory length mismatch");
 
-        string memory tmpFile = bytes(_blakeBatchTmpFile).length != 0
+        string memory scratchFile = bytes(_blakeBatchTmpFile).length != 0
             ? _blakeBatchTmpFile
             : string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
-        vm.writeFile(tmpFile, "");
-
-        for (uint256 i = 0; i < bytecodes.length; i++) {
-            vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
-        }
-
-        string[] memory input = new string[](4);
-        input[0] = "node";
-        input[1] = "./scripts/blake2s256.js";
-        input[2] = "--batch";
-        input[3] = tmpFile;
-        bytes memory result = vm.ffi(input);
-
-        require(result.length == bytecodes.length * 32, "Unexpected batch blake2s result length");
-        for (uint256 i = 0; i < bytecodes.length; i++) {
-            bytes32 hash;
-            assembly {
-                hash := mload(add(result, add(32, mul(i, 32))))
-            }
-            _blakeCache[keccak256(bytecodes[i])] = hash;
-        }
-
-        for (uint256 i = 0; i < descriptorKeys.length; i++) {
-            _bytecodeInfoCache[descriptorKeys[i]] = _cachedZKOSBytecodeInfo(bytecodes[i]);
-        }
-
-        vm.removeFile(tmpFile);
-    }
-
-    function _bytecodeInfoKey(string memory _fileName, string memory _contractName) private pure returns (bytes32) {
-        return keccak256(abi.encode(_fileName, _contractName));
-    }
-
-    function _cachedZKOSBytecodeInfo(bytes memory _bytecode) private view returns (bytes memory) {
-        bytes32 key = keccak256(_bytecode);
-        bytes32 blakeHash = _blakeCache[key];
-        require(blakeHash != bytes32(0), "Blake hash not cached");
-        return ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(blakeHash, uint32(_bytecode.length), key);
-    }
-
-    /// @dev The ZKsync OS bytecode info of an artifact, from the {_precomputeBlakeHashes} cache.
-    function _cachedBytecodeInfo(
-        string memory _fileName,
-        string memory _contractName
-    ) internal view returns (bytes memory) {
-        bytes memory bytecodeInfo = _bytecodeInfoCache[_bytecodeInfoKey(_fileName, _contractName)];
-        require(bytecodeInfo.length != 0, "Bytecode info not cached");
-        return bytecodeInfo;
+        _cacheBytecodeInfos(fileNames, contractNames, scratchFile);
     }
 
     /// @notice Commits the release just deployed — the facet rows
