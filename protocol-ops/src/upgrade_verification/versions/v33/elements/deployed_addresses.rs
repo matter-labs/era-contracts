@@ -8,7 +8,9 @@ use crate::upgrade_verification::{
     constants::L2_INTEROP_CENTER_ADDR,
     verifiers::{VerificationResult, Verifiers},
     versions::v33::{
-        utils::network_verifier::{Bridgehub as BridgehubContract, L1AssetRouter},
+        utils::network_verifier::{
+            Bridgehub as BridgehubContract, ChainTypeManager as CtmContract, L1AssetRouter,
+        },
         MAX_NUMBER_OF_ZK_CHAINS,
     },
 };
@@ -101,7 +103,8 @@ mod ctm_signatures {
                 address _bridgehub,
                 address _interopCenter,
                 address _l1BytecodesSupplier,
-                address _permissionlessValidator
+                address _permissionlessValidator,
+                address _l1InteropFeeManager
             );
         }
         contract V33ZKsyncOSVerifier {
@@ -126,6 +129,10 @@ mod ctm_signatures {
         }
         contract V33BytecodesSupplier {
             function initialize();
+        }
+        contract V33L1InteropFeeManager {
+            constructor(address _bridgehub);
+            function initialize(address _owner, address _feeRecipient);
         }
     }
 }
@@ -817,6 +824,7 @@ async fn verify_ctm_provenance(
     let ecosystem_admin = required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
     let bytecodes_supplier = in_st("bytecodes_supplier_addr")?;
     let permissionless_validator = in_st("permissionless_validator_addr")?;
+    let interop_fee_manager = in_st("interop_fee_manager_proxy_addr")?;
     let ctm_impl = in_st("chain_type_manager_implementation_addr")?;
     let validator_timelock_impl = in_st("validator_timelock_implementation_addr")?;
     let transparent_proxy_admin = in_dep("transparent_proxy_admin")?;
@@ -884,7 +892,8 @@ async fn verify_ctm_provenance(
             .abi_encode(),
             "l1-contracts/UpgradeStageValidator",
         ),
-        // ChainTypeManager impl(bridgehub, interopCenter, bytecodesSupplier, permissionlessValidator).
+        // ChainTypeManager impl(bridgehub, interopCenter, bytecodesSupplier, permissionlessValidator,
+        // l1InteropFeeManager).
         (
             ctm_impl,
             V33ChainTypeManager::constructorCall::new((
@@ -892,6 +901,7 @@ async fn verify_ctm_provenance(
                 L2_INTEROP_CENTER_ADDR,
                 bytecodes_supplier,
                 permissionless_validator,
+                interop_fee_manager,
             ))
             .abi_encode(),
             ctm_file,
@@ -923,6 +933,40 @@ async fn verify_ctm_provenance(
     ] {
         result
             .expect_preexisting_proxy(verifiers, proxy, transparent_proxy_admin, label)
+            .await;
+    }
+
+    // The interop fee manager proxy is deployed by the release that introduces it
+    // (`CTMUpgrade_v35`) and kept by every later one. It is initialized straight to the CTM's
+    // owner, as owner and fee recipient both.
+    if verifiers
+        .network_verifier
+        .create2_known_bytecodes
+        .contains_key(&interop_fee_manager)
+    {
+        let ctm_owner = CtmContract::new(ctm_proxy, verifiers.network_verifier.get_l1_provider())
+            .owner()
+            .call()
+            .await
+            .context("calling ChainTypeManager.owner() for the interop fee manager provenance")?;
+        result
+            .expect_create2_params_proxy_with_bytecode(
+                verifiers,
+                &interop_fee_manager,
+                V33L1InteropFeeManager::initializeCall::new((ctm_owner, ctm_owner)).abi_encode(),
+                transparent_proxy_admin,
+                V33L1InteropFeeManager::constructorCall::new((bridgehub_addr,)).abi_encode(),
+                "l1-contracts/L1InteropFeeManager",
+            )
+            .await;
+    } else {
+        result
+            .expect_preexisting_proxy(
+                verifiers,
+                &interop_fee_manager,
+                transparent_proxy_admin,
+                "L1InteropFeeManager",
+            )
             .await;
     }
 
@@ -1167,6 +1211,65 @@ mod tests {
             encoded.len(),
             solidity_arity * 32,
             "V33L1Nullifier must encode one word per Solidity constructor parameter"
+        );
+    }
+
+    // The ChainTypeManager mirror stayed at four words when v35 added the interop fee manager to
+    // the constructor, so every v35 CTM implementation failed its provenance check. Pin the CTM
+    // and fee manager mirrors to their Solidity parameter lists, which are all single words.
+    #[test]
+    fn ctm_and_interop_fee_manager_mirrors_match_solidity_source() {
+        use super::ctm_signatures::*;
+        use alloy::{primitives::Address, sol_types::SolCall};
+
+        fn solidity_params<'a>(source: &'a str, signature: &str) -> Vec<&'a str> {
+            source
+                .split_once(signature)
+                .unwrap_or_else(|| panic!("{signature} must exist"))
+                .1
+                .split_once(')')
+                .expect("parameter list must be closed")
+                .0
+                .split(',')
+                .map(str::trim)
+                .collect()
+        }
+
+        let ctm = include_str!(
+            "../../../../../../l1-contracts/contracts/state-transition/ChainTypeManager.sol"
+        );
+        let manager = include_str!(
+            "../../../../../../l1-contracts/contracts/core/interop-fee/L1InteropFeeManager.sol"
+        );
+        for (params, encoded) in [
+            (
+                solidity_params(ctm, "constructor("),
+                V33ChainTypeManager::constructorCall::new((
+                    Address::ZERO,
+                    Address::ZERO,
+                    Address::ZERO,
+                    Address::ZERO,
+                    Address::ZERO,
+                ))
+                .abi_encode(),
+            ),
+            (
+                solidity_params(manager, "constructor("),
+                V33L1InteropFeeManager::constructorCall::new((Address::ZERO,)).abi_encode(),
+            ),
+            (
+                solidity_params(manager, "function initialize("),
+                // Drop the selector: only the arguments are one word per parameter.
+                V33L1InteropFeeManager::initializeCall::new((Address::ZERO, Address::ZERO))
+                    .abi_encode()[4..]
+                    .to_vec(),
+            ),
+        ] {
+            assert_eq!(encoded.len(), params.len() * 32, "{params:?}");
+        }
+        assert_eq!(
+            solidity_params(ctm, "constructor(").last(),
+            Some(&"address _l1InteropFeeManager")
         );
     }
 }
