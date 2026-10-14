@@ -27,6 +27,19 @@
   },
   {
     "type": "function",
+    "name": "L1_INTEROP_FEE_MANAGER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "PERMISSIONLESS_VALIDATOR",
     "inputs": [],
     "outputs": [
@@ -487,6 +500,43 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "protocolVersionVerifier",
+    "inputs": [
+      {
+        "name": "_protocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "replaceUpgradeTransition",
+    "inputs": [
+      {
+        "name": "_expectedTransition",
+        "type": "address",
+        "internalType": "contract ICTMTransition"
+      },
+      {
+        "name": "_replacement",
+        "type": "address",
+        "internalType": "contract ICTMTransition"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1268,6 +1318,31 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UpgradeTransitionReplaced",
+    "inputs": [
+      {
+        "name": "oldProtocolVersion",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "previousTransition",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "replacementTransition",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
