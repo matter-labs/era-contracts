@@ -759,3 +759,77 @@ async fn verify_v33_ctm_permissionless_validator(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn addr(byte: u8) -> Address {
+        Address::repeat_byte(byte)
+    }
+
+    const GOVERNANCE: u8 = 0x11;
+    const ECOSYSTEM_ADMIN: u8 = 0x33;
+    const CONTROLLER: u8 = 0x44;
+    const STRANGER: u8 = 0x55;
+
+    fn classify(owner: u8, pending: u8, controller: Option<u8>) -> GovernanceOwnership {
+        classify_governance_ownership(
+            addr(owner),
+            addr(pending),
+            addr(GOVERNANCE),
+            controller.map(addr),
+            addr(ECOSYSTEM_ADMIN),
+        )
+    }
+
+    #[test]
+    fn governance_holding_it_outright_is_accepted() {
+        assert_eq!(
+            classify(GOVERNANCE, 0, None),
+            GovernanceOwnership::Governance
+        );
+    }
+
+    #[test]
+    fn handoff_in_flight_from_the_ecosystem_admin_is_accepted() {
+        assert_eq!(
+            classify(ECOSYSTEM_ADMIN, GOVERNANCE, None),
+            GovernanceOwnership::PendingHandoff
+        );
+    }
+
+    /// A pending handoff to governance is not enough on its own: an unknown intermediate
+    /// can still act on the contract until governance accepts.
+    #[test]
+    fn handoff_from_an_unknown_intermediate_is_not_accepted() {
+        assert_eq!(
+            classify(STRANGER, GOVERNANCE, None),
+            GovernanceOwnership::Foreign
+        );
+    }
+
+    #[test]
+    fn the_account_owning_governance_is_flagged_not_accepted_silently() {
+        assert_eq!(
+            classify(CONTROLLER, 0, Some(CONTROLLER)),
+            GovernanceOwnership::GovernanceController
+        );
+    }
+
+    #[test]
+    fn a_stranger_is_foreign_whether_or_not_governance_is_ownable() {
+        assert_eq!(
+            classify(STRANGER, 0, Some(CONTROLLER)),
+            GovernanceOwnership::Foreign
+        );
+        assert_eq!(classify(STRANGER, 0, None), GovernanceOwnership::Foreign);
+    }
+
+    /// `governance_controller` returns `None` for an unset owner, so a contract whose owner
+    /// reads as the zero address must never be mistaken for a governance-controlled one.
+    #[test]
+    fn an_unset_owner_is_foreign() {
+        assert_eq!(classify(0, 0, None), GovernanceOwnership::Foreign);
+    }
+}

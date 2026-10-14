@@ -200,6 +200,7 @@ impl ForgeScriptUpgrade {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::env_config::DEFAULT_UPGRADE;
 
     const FORGE_SCRIPT: &str = r#"
 prepare = "forge-script"
@@ -326,6 +327,18 @@ output = "emergency-upgrade-board.json"
             }
         }
         assert!(loaded > 0, "no upgrade.toml found");
+    }
+
+    /// The release's own upgrade, `--upgrade`'s default, has a descriptor, and it is the
+    /// `prepare-all` flow reserved for it.
+    #[test]
+    fn the_default_upgrade_is_prepare_all() {
+        if paths::resolve_l1_contracts_path().is_err() {
+            return; // no checkout around the test binary
+        }
+        let descriptor = UpgradeDescriptor::load(DEFAULT_UPGRADE)
+            .unwrap_or_else(|error| panic!("{DEFAULT_UPGRADE}: {error:#}"));
+        assert_eq!(descriptor, UpgradeDescriptor::PrepareAll {});
     }
 
     #[test]

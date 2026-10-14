@@ -1,9 +1,9 @@
 # v31 ecosystem upgrade: generate → deploy
 
 > **Scope.** Written for the v31 rollout from the `draft-v31` line, and its commands assume that
-> line's `protocol_ops`. On the v34 line the same two steps run the release's upgrade: the
-> generate workflow defaults to `upgrade = v0.34.0-chain-config` (only that directory may use
-> `prepare = "prepare-all"`), outputs land under `upgrade-envs/v0.34.0-chain-config/output/<env>/`,
+> line's `protocol_ops`. On the v35 line the same two steps run the release's upgrade: the
+> generate workflow defaults to `upgrade = v0.35.0-upgrade-system` (only that directory may use
+> `prepare = "prepare-all"`), outputs land under `upgrade-envs/v0.35.0-upgrade-system/output/<env>/`,
 > and `ecosystem verify-upgrade` takes no `--gw-rpc-url` (the PUVT has no Gateway checks).
 
 The v31 ecosystem upgrade is produced and shipped in **two steps**, each runnable
