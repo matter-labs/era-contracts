@@ -183,8 +183,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                 proxy: _proxy,
                 expectedOldImpl: liveImpl,
                 implNew: _implNew,
-                callInitializeUpgrade: false,
-                admin: ProxyAdmin(address(0))
+                callInitializeUpgrade: false
             });
     }
 

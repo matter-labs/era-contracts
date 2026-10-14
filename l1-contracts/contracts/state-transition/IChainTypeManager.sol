@@ -58,6 +58,13 @@ interface IChainTypeManager {
     /// @notice The transition committed for chains departing from `oldProtocolVersion`.
     event NewUpgradeTransition(uint256 indexed oldProtocolVersion, address indexed transition);
 
+    /// @notice The transition committed for `oldProtocolVersion` was replaced by governance.
+    event UpgradeTransitionReplaced(
+        uint256 indexed oldProtocolVersion,
+        address indexed previousTransition,
+        address indexed replacementTransition
+    );
+
     /// @notice New UpgradeCutData
     event NewUpgradeCutData(uint256 indexed protocolVersion, Diamond.DiamondCutData diamondCutData);
 
@@ -140,6 +147,14 @@ interface IChainTypeManager {
     ) external;
 
     function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external;
+
+    /// @notice Replaces the transition committed for an already-departed version, without moving
+    ///         the CTM's version or release. Compare-and-replace: `_expectedTransition` must be the
+    ///         one committed now, and `_replacement` must depart from the same release with the
+    ///         same pinned deadline and land on a release a chain can continue from.
+    /// @param _expectedTransition The transition currently committed for the departed version.
+    /// @param _replacement The transition chains departing that version execute from now on.
+    function replaceUpgradeTransition(ICTMTransition _expectedTransition, ICTMTransition _replacement) external;
 
     /// @notice The transition committed for chains departing from `_oldProtocolVersion` — the
     ///         machine-readable pointer tooling composes that version's upgrade cut from.

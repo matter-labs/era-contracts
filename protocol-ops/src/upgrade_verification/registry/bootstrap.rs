@@ -22,27 +22,32 @@
 
 use std::collections::BTreeMap;
 
-use alloy::primitives::{Address, B256};
+use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
-use alloy::sol_types::SolValue;
+use alloy::sol_types::{SolCall, SolValue};
 
 use crate::common::external_actions::ExternalAction;
 use crate::common::governance_calls::GovernanceCall;
+use crate::upgrade_verification::constants::{
+    CTM_CONTRACT_SERVER_NOTIFIER_SLOT, EIP1967_PROXY_ADMIN_SLOT,
+};
 use crate::upgrade_verification::report::VerificationResult;
 
-use super::construction::{constructor_args, expect_canonical_construction, ReviewedBuild};
+use super::construction::{
+    canonical_create2_address, constructor_args, expect_canonical_construction, ReviewedBuild,
+};
 use super::lifecycle::{
     verify_lifecycle_construction, verify_timer_construction, LifecycleBindings, LifecycleReview,
     TimerReview,
 };
 use super::operation::cross_check;
-use super::package::{BootstrapPackage, VALIDATE_APPLIED_SELECTOR};
+use super::package::BootstrapPackage;
 use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
 use super::rows::verify_rows;
 use super::views::{
-    self, BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CoreTransitionView,
+    self, BootstrapCall, BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CoreTransitionView,
     CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView, GovernanceUpgradeTimerView,
-    ProxyUpgradeRow, RegistryBootstrapMigrationView,
+    ProxyUpgradeRow, RegistryBootstrapMigrationView, ServerNotifierView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -131,6 +136,12 @@ pub(crate) async fn verify<P: Provider>(
             "the CTM executor",
         ),
         (
+            "core_upgrade_executor_addr",
+            package.lifecycle.core_executor,
+            manifest.coreExecutor,
+            "the core executor",
+        ),
+        (
             "chain_type_manager_proxy",
             package.reported_ctm,
             manifest.ctm,
@@ -189,16 +200,16 @@ pub(crate) async fn verify<P: Provider>(
     }
 
     // The lifecycle objects, from the values the manifest and the package fix for them. The
-    // owner is the manifest's: the edge hands the whole CTM domain to executors built for it,
-    // and it is cross-checked against the reviewed governance address below.
+    // owner is the manifest's: the edge hands both domains to executors built for it, and it is
+    // cross-checked against the reviewed governance address below.
     let bindings = verify_lifecycle_construction(
         provider,
         build,
         result,
         &LifecycleReview {
-            owner: Some(manifest.ctmExecutorOwner),
+            owner: Some(manifest.governance),
             coordinator: manifest.coordinator,
-            core_executor: package.lifecycle.core_executor,
+            core_executor: Some(manifest.coreExecutor),
             core_proxy_admin: package.lifecycle.core_proxy_admin,
             ctm_executor: manifest.ctmExecutor,
             ctm: Some(manifest.ctm),
@@ -218,7 +229,7 @@ pub(crate) async fn verify<P: Provider>(
         &TimerReview {
             address: manifest.upgradeTimer,
             initial_delay: package.lifecycle.timer_initial_delay,
-            governance: manifest.ctmExecutorOwner,
+            governance: manifest.governance,
             reported_governance: package.lifecycle.timer_governance,
             owner: package.lifecycle.timer_owner,
         },
@@ -226,9 +237,7 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
-    let sequence =
-        verify_sequence_construction(provider, build, result, package, salts, &mut reviewed)
-            .await?;
+    let sequence = locate_sequence(provider, build, result, package, salts, &mut reviewed).await?;
     render_derived_payloads(provider, result, package.migration).await;
 
     result.print_info("\n== Edge state ==");
@@ -319,9 +328,9 @@ pub(crate) async fn verify<P: Provider>(
         ));
     }
 
-    // The coordinator and the core executor it drives: the same governance owner as the CTM
-    // executor, no nomination outstanding on either, and (pre-execution) an unbound core
-    // executor — stage 2 binds it.
+    // Every executor the edge binds answers to the manifest's governance with no nomination
+    // outstanding (`migrate()` refuses anything else), and the two bindings stage 1 sets are
+    // still unset or already the manifest's.
     let coordinator = EcosystemUpgradeExecutorView::new(manifest.coordinator, provider);
     let coordinator_owner = tolerate(
         coordinator.owner().call().await,
@@ -338,52 +347,54 @@ pub(crate) async fn verify<P: Provider>(
         "the coordinator",
         coordinator_owner,
         coordinator_pending_owner,
-        manifest.ctmExecutorOwner,
+        manifest.governance,
     );
-    if let Some(core_executor_addr) = bindings.core_executor {
-        let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, provider);
-        let core_executor_owner = tolerate(
-            core_executor.owner().call().await,
-            result,
-            "the core executor's owner",
-        );
-        let core_executor_pending_owner = tolerate(
-            core_executor.pendingOwner().call().await,
-            result,
-            "the core executor's pending owner",
-        );
-        expect_owner_and_no_nomination(
-            result,
-            "the core executor",
-            core_executor_owner,
-            core_executor_pending_owner,
-            manifest.ctmExecutorOwner,
-        );
-        if let Some(bound) = tolerate(
-            core_executor.coordinator().call().await,
-            result,
-            "the core executor's coordinator",
-        ) {
-            if bound == manifest.coordinator {
-                result.report_ok("the core executor already answers to the coordinator");
-            } else if bound.is_zero() {
-                result.report_ok(
-                    "the core executor answers to no coordinator yet: stage 2 binds it \
-                     (`setCoordinator`, in the derived sequence)",
-                );
-            } else {
-                result.report_error(&format!(
-                    "the core executor answers to coordinator {bound}, not the manifest's {}",
-                    manifest.coordinator
-                ));
-            }
-        }
-    }
+    let coordinator_ctm_executor = tolerate(
+        coordinator.ctmExecutor().call().await,
+        result,
+        "the coordinator's ctmExecutor()",
+    );
+    expect_bound_or_unset(
+        result,
+        "the coordinator's CTM executor",
+        coordinator_ctm_executor,
+        manifest.ctmExecutor,
+        "`setCTMExecutor`",
+    );
+    let core_executor = CoreUpgradeExecutorView::new(manifest.coreExecutor, provider);
+    let core_executor_owner = tolerate(
+        core_executor.owner().call().await,
+        result,
+        "the core executor's owner",
+    );
+    let core_executor_pending_owner = tolerate(
+        core_executor.pendingOwner().call().await,
+        result,
+        "the core executor's pending owner",
+    );
+    expect_owner_and_no_nomination(
+        result,
+        "the core executor",
+        core_executor_owner,
+        core_executor_pending_owner,
+        manifest.governance,
+    );
+    let core_executor_coordinator = tolerate(
+        core_executor.coordinator().call().await,
+        result,
+        "the core executor's coordinator",
+    );
+    expect_bound_or_unset(
+        result,
+        "the core executor's coordinator",
+        core_executor_coordinator,
+        manifest.coordinator,
+        "`setCoordinator`",
+    );
 
-    // The owner binding: the manifest states the owner the executor must already have, and the
-    // migration refuses to run otherwise. Verifying it here catches a wrong owner BEFORE
-    // governance signs, which is the whole point — after `migrate()` the CTM domain is that
-    // owner's permanently.
+    // The manifest states the owner every executor must already have, and the migration refuses
+    // to run otherwise. Verifying it here catches a wrong owner BEFORE governance signs — after
+    // `migrate()` both domains are that owner's permanently.
     let executor_owner = tolerate(
         executor.owner().call().await,
         result,
@@ -396,32 +407,37 @@ pub(crate) async fn verify<P: Provider>(
     );
     expect_owner_and_no_nomination(
         result,
-        "the executor",
+        "the CTM executor",
         executor_owner,
         executor_pending_owner,
-        manifest.ctmExecutorOwner,
+        manifest.governance,
     );
 
     match expected_governance_owner {
-        Some(expected) if expected == manifest.ctmExecutorOwner => {
+        Some(expected) if expected == manifest.governance => {
             result.report_ok(&format!(
-                "the manifest's expected owner is the reviewed governance address {expected}"
+                "the manifest's governance is the reviewed governance address {expected}"
             ));
         }
         Some(expected) => {
             result.report_error(&format!(
-                "the manifest binds the executor to owner {} but the reviewed governance address \
-                 is {expected}",
-                manifest.ctmExecutorOwner
+                "the manifest binds the executors to governance {} but the reviewed governance \
+                 address is {expected}",
+                manifest.governance
             ));
         }
         None => result.report_warn(
-            "no --expected-governance-owner supplied: the owner the CTM domain lands on is \
+            "no --expected-governance-owner supplied: the governance both domains land on is \
              unverified against the review",
         ),
     }
 
-    // ── 4. The departing state the manifest asserts ──
+    // ── 4. The one-time ServerNotifier handover: a precondition of the edge, half of which
+    //    governance cannot perform ──
+    result.print_info("\n== Prerequisite: ServerNotifier handover ==");
+    let handover = verify_notifier_handover(provider, result, &manifest, &package.stage0).await?;
+
+    // ── 5. The departing state the manifest asserts ──
     result.print_info("\n== Departing state ==");
     let ctm = CtmView::new(manifest.ctm, provider);
     let Some(live_version) = tolerate(
@@ -485,12 +501,14 @@ pub(crate) async fn verify<P: Provider>(
 
     // Each CTM-domain row must depart from the implementation that is LIVE, not from whatever
     // the prepare saw: a row at an unexpected implementation reverts stage 1 wholesale.
-    let ctm_rows: Vec<ProxyUpgradeRow> = manifest
-        .proxyUpgrades
-        .iter()
-        .filter(|row| !row.implNew.is_zero())
-        .cloned()
-        .collect();
+    let ctm_rows = participating_ctm_rows(&manifest.proxyUpgrades, handover.under_ctm_proxy_admin);
+    if ctm_rows.len() < participating_ctm_rows(&manifest.proxyUpgrades, true).len() {
+        result.print_info(
+            "  the ServerNotifier row is not source-checked: its proxy is not under the \
+             CTM-domain ProxyAdmin yet, so its implementation cannot be read through it (see the \
+             prerequisite above)",
+        );
+    }
     verify_rows(
         provider,
         result,
@@ -500,7 +518,7 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await?;
 
-    // ── 5. The ecosystem leg ──
+    // ── 6. The ecosystem leg ──
     result.print_info("\n== Ecosystem leg ==");
     if let Some(core_transition_addr) = package.core_transition {
         expect_code_identity(
@@ -537,7 +555,7 @@ pub(crate) async fn verify<P: Provider>(
         result.report_ok("no core transition: this edge upgrades no shared singletons");
     }
 
-    // ── 6. The timer that gates the edge ──
+    // ── 7. The timer that gates the edge ──
     result.print_info("\n== Stage sequencing ==");
     let timer = GovernanceUpgradeTimerView::new(manifest.upgradeTimer, provider);
     let Some(timer_governance) = tolerate(
@@ -547,10 +565,10 @@ pub(crate) async fn verify<P: Provider>(
     ) else {
         return Ok(());
     };
-    if timer_governance == manifest.ctmExecutorOwner {
+    if timer_governance == manifest.governance {
         result.report_ok(
-            "the timer is governed by the same address that owns the executor, so governance \
-             can start it at stage 0",
+            "the timer is governed by the manifest's governance, which owns the executors, so it \
+             can start the timer at stage 0",
         );
     } else if timer_governance == manifest.ctmExecutor {
         result.report_error(
@@ -560,13 +578,13 @@ pub(crate) async fn verify<P: Provider>(
         );
     } else {
         result.report_error(&format!(
-            "the timer is governed by {timer_governance}, which neither owns the executor ({}) \
-             nor is the executor itself: stage 0 could not start it",
-            manifest.ctmExecutorOwner
+            "the timer is governed by {timer_governance}, which is neither the manifest's \
+             governance ({}) nor the executor itself: stage 0 could not start it",
+            manifest.governance
         ));
     }
 
-    // ── 7. The calldata governance will actually sign ──
+    // ── 8. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
     // The pause/unpause calls land on the CTM's own ChainAssetHandler, which no manifest names;
     // it is derived from the CTM's Bridgehub so a call to it counts as that contract rather than
@@ -590,6 +608,12 @@ pub(crate) async fn verify<P: Provider>(
         &reviewed,
     );
     verify_derived_sequence(provider, result, package, sequence, &authorities).await;
+    if let Some(sequence) = sequence {
+        result.print_info(&format!(
+            "  completion is not part of any stage bundle: `validateApplied()` on the sequence \
+             {sequence} is its own call after stage 2"
+        ));
+    }
 
     // A bootstrap edge legitimately declares external actions — the derived sequence itself
     // rides as declared actions, and so do the merge's appends. They are the reviewable list,
@@ -611,6 +635,228 @@ pub(crate) async fn verify<P: Provider>(
     }
 
     Ok(())
+}
+
+/// The CTM-domain rows `migrate()` applies, minus the ServerNotifier's while its proxy is not yet
+/// under the CTM-domain `ProxyAdmin` (`notifier_readable`) — reading it through that admin would
+/// ask a non-admin, and the prerequisite has already reported why.
+fn participating_ctm_rows(
+    rows: &[ProxyUpgradeRow],
+    notifier_readable: bool,
+) -> Vec<ProxyUpgradeRow> {
+    rows.iter()
+        .enumerate()
+        .filter(|(slot, row)| {
+            !row.implNew.is_zero()
+                && (notifier_readable || *slot != CTM_CONTRACT_SERVER_NOTIFIER_SLOT)
+        })
+        .map(|(_, row)| row.clone())
+        .collect()
+}
+
+/// The prerequisite's verdict, for the row check that follows it.
+struct NotifierHandover {
+    /// The notifier proxy sits under the manifest's CTM-domain `ProxyAdmin`, so its row can be
+    /// read through that admin like every other.
+    under_ctm_proxy_admin: bool,
+}
+
+/// What the chain says about the ServerNotifier the manifest's mandatory row names. A getter that
+/// could not be read is `None` (and already reported).
+struct NotifierFacts {
+    notifier: Address,
+    ctm_notifier: Option<Address>,
+    notifier_ctm: Option<Address>,
+    proxy_admin: Address,
+    owner: Option<Address>,
+    pending_owner: Option<Address>,
+}
+
+/// The one-time ServerNotifier handover `RegistryBootstrapMigration.validate()` requires complete
+/// before stage 1 can run (see `docs/upgrade-stage-lifecycle.md`), read live.
+async fn verify_notifier_handover<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    manifest: &views::BootstrapManifest,
+    stage0: &[GovernanceCall],
+) -> anyhow::Result<NotifierHandover> {
+    let Some(row) = manifest
+        .proxyUpgrades
+        .get(CTM_CONTRACT_SERVER_NOTIFIER_SLOT)
+        .filter(|row| !row.implNew.is_zero())
+    else {
+        result.report_error(&format!(
+            "the manifest carries no ServerNotifier row (CTMContract slot \
+             {CTM_CONTRACT_SERVER_NOTIFIER_SLOT}): the reviewed migration refuses construction \
+             without it (`BootstrapServerNotifierRowMissing`), so this migration does not come \
+             from the reviewed code, and the handover cannot be checked"
+        ));
+        return Ok(NotifierHandover {
+            under_ctm_proxy_admin: false,
+        });
+    };
+    let notifier = row.proxy;
+    let notifier_view = ServerNotifierView::new(notifier, provider);
+    // A transparent proxy answers `admin()` only to its admin, so the slot itself is read.
+    let admin_word = provider
+        .get_storage_at(notifier, EIP1967_PROXY_ADMIN_SLOT.into())
+        .await?;
+    let facts = NotifierFacts {
+        notifier,
+        ctm_notifier: tolerate(
+            CtmView::new(manifest.ctm, provider)
+                .serverNotifierAddress()
+                .call()
+                .await,
+            result,
+            "the CTM's serverNotifierAddress()",
+        ),
+        notifier_ctm: tolerate(
+            notifier_view.chainTypeManager().call().await,
+            result,
+            "the ServerNotifier's chainTypeManager()",
+        ),
+        proxy_admin: Address::from_word(admin_word.into()),
+        owner: tolerate(
+            notifier_view.owner().call().await,
+            result,
+            "the ServerNotifier's owner",
+        ),
+        pending_owner: tolerate(
+            notifier_view.pendingOwner().call().await,
+            result,
+            "the ServerNotifier's pending owner",
+        ),
+    };
+    Ok(judge_notifier_handover(result, &facts, manifest, stage0))
+}
+
+/// The handover verdict over the live facts: anything short of a completed handover — or a
+/// nomination the derived stage 0 accepts — is an ERROR, because `migrate()` refuses it.
+fn judge_notifier_handover(
+    result: &mut VerificationResult,
+    facts: &NotifierFacts,
+    manifest: &views::BootstrapManifest,
+    stage0: &[GovernanceCall],
+) -> NotifierHandover {
+    const MISSING: &str = "the ChainAdmin half of the ServerNotifier handover is missing: the \
+                           prepare's `[ctm_admin_calls] server_notifier_handover` calls must be \
+                           executed by their live owners before the bundle, or stage 1's \
+                           `migrate()` refuses";
+    let notifier = facts.notifier;
+    let executor = manifest.ctmExecutor;
+
+    match facts.ctm_notifier {
+        Some(bound) if bound == notifier => result.report_ok(&format!(
+            "the manifest's ServerNotifier row names the CTM's notifier {notifier}"
+        )),
+        Some(bound) => result.report_error(&format!(
+            "the manifest's ServerNotifier row names {notifier} but the CTM's notifier is {bound}: \
+             `migrate()` refuses (`BootstrapServerNotifierNotBound`)"
+        )),
+        None => {}
+    }
+    match facts.notifier_ctm {
+        Some(ctm) if ctm == manifest.ctm => {
+            result.report_ok("the ServerNotifier serves the CTM the manifest names")
+        }
+        Some(ctm) => result.report_error(&format!(
+            "the ServerNotifier serves CTM {ctm}, not the manifest's {}: `migrate()` refuses \
+             (`BootstrapServerNotifierNotBound`)",
+            manifest.ctm
+        )),
+        None => {}
+    }
+
+    let under_ctm_proxy_admin = facts.proxy_admin == manifest.ctmProxyAdmin;
+    if under_ctm_proxy_admin {
+        result.report_ok(&format!(
+            "the ServerNotifier proxy is administered by the CTM-domain ProxyAdmin {}",
+            manifest.ctmProxyAdmin
+        ));
+    } else {
+        result.report_error(&format!(
+            "the ServerNotifier proxy is administered by {} (EIP-1967 admin slot), not by the \
+             CTM-domain ProxyAdmin {} — {MISSING}",
+            facts.proxy_admin, manifest.ctmProxyAdmin
+        ));
+    }
+
+    let acceptance = notifier_acceptance(executor, notifier);
+    let stage0_accepts = stage0.iter().any(|call| {
+        call.target == acceptance.target
+            && call.value == acceptance.value
+            && call.data == acceptance.data
+    });
+    match (facts.owner, facts.pending_owner) {
+        (Some(owner), pending) if owner == executor => {
+            match pending {
+                Some(pending) if pending.is_zero() => result.report_ok(&format!(
+                    "the ServerNotifier is owned by the CTM executor {executor} with no nomination \
+                     outstanding: the handover is complete"
+                )),
+                Some(pending) => result.report_error(&format!(
+                    "the ServerNotifier is owned by the CTM executor but has a pending owner \
+                     {pending}: `migrate()` refuses an outstanding nomination"
+                )),
+                None => {}
+            }
+            if stage0_accepts {
+                result.report_error(
+                    "stage 0 accepts the ServerNotifier ownership, which the CTM executor already \
+                     holds: `acceptOwnership` reverts for a caller that is not the pending owner, \
+                     so the bundle was prepared against an earlier state and stage 0 would fail",
+                );
+            }
+        }
+        (Some(owner), Some(pending)) if pending == executor => {
+            result.report_ok(&format!(
+                "the ServerNotifier's owner {owner} has nominated the CTM executor {executor}: the \
+                 ChainAdmin half of the ownership handover is done"
+            ));
+            if stage0_accepts {
+                result.report_ok(
+                    "stage 0 carries governance's acceptance of that nomination (`forward` on the \
+                     CTM executor)",
+                );
+            } else {
+                result.report_error(
+                    "stage 0 does not carry governance's acceptance of the ServerNotifier \
+                     nomination (`forward([acceptOwnership()])` on the CTM executor): the \
+                     nomination would stay unaccepted, and stage 1's `migrate()` refuses",
+                );
+            }
+        }
+        (Some(owner), Some(pending)) => result.report_error(&format!(
+            "the ServerNotifier is owned by {owner} with pending owner {pending}, neither of \
+             which is the CTM executor {executor} — {MISSING}"
+        )),
+        _ => {}
+    }
+
+    NotifierHandover {
+        under_ctm_proxy_admin,
+    }
+}
+
+/// The stage-0 call through which governance accepts the ServerNotifier ownership the ChainAdmin
+/// nominated the CTM executor for: `ctmExecutor.forward([notifier.acceptOwnership()])`.
+fn notifier_acceptance(ctm_executor: Address, notifier: Address) -> GovernanceCall {
+    let accept = BootstrapCall {
+        target: notifier,
+        value: U256::ZERO,
+        data: ServerNotifierView::acceptOwnershipCall {}
+            .abi_encode()
+            .into(),
+    };
+    GovernanceCall {
+        target: ctm_executor,
+        value: U256::ZERO,
+        data: CTMUpgradeExecutorView::forwardCall {
+            _calls: vec![accept],
+        }
+        .abi_encode(),
+    }
 }
 
 /// The release's construction, re-derived from the manifest the release itself serves.
@@ -695,16 +941,14 @@ async fn verify_core_transition_construction<P: Provider>(
     }
 }
 
-/// The bootstrap sequence's construction, from the two objects the verifier already holds — the
-/// migration recovered from stage 1's `migrate()` and the package's core transition — so a
-/// counterfeit terminating stage 2 fails BEFORE any list it derives is consulted.
+/// The bootstrap sequence over this edge, DERIVED rather than read from the package: the address
+/// the deterministic factory gives the reviewed creation code over the migration (recovered from
+/// stage 1's `migrate()`) and the package's core transition, under a reviewed salt. Code there is
+/// the reviewed constructor having run on exactly those arguments, so the package has no say in
+/// which oracle its bundle is compared against.
 ///
-/// The sequence is recovered from the terminal `validateApplied()` call rather than read from a
-/// field, for the same reason the migration is recovered from `migrate()`: the verifier checks
-/// the calldata governance will execute.
-///
-/// Returns the sequence's address once its construction re-derived, and nothing otherwise.
-async fn verify_sequence_construction<P: Provider>(
+/// Returns the first derived address that holds code, and nothing when none does.
+async fn locate_sequence<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
     result: &mut VerificationResult,
@@ -712,46 +956,75 @@ async fn verify_sequence_construction<P: Provider>(
     salts: &[B256],
     reviewed: &mut BTreeMap<Address, String>,
 ) -> anyhow::Result<Option<Address>> {
-    let Some(last) = package.stage2.last() else {
-        result.report_error(
-            "stage 2 is empty: a derived bootstrap sequence always ends with the completion gate",
-        );
-        return Ok(None);
-    };
-    if last.data != VALIDATE_APPLIED_SELECTOR || !last.value.is_zero() {
-        result.report_error(
-            "stage 2 does not end with the edge's completion gate (`validateApplied()`): \
-             governance would complete without the edge proving it reached the intended state, \
-             and the bundle is not the one the derived sequence describes",
-        );
-        return Ok(None);
-    }
-    let label = "the bootstrap sequence terminating stage 2";
+    let label = "the bootstrap sequence over this edge";
     let Some(core_transition) = package.core_transition else {
         result.report_error(&format!(
-            "{label} at {}: the package names no core transition, but the sequence is constructed \
-             over the edge's core transition, so its construction cannot be re-derived and the \
-             stage lists it derives cannot be trusted",
-            last.target
+            "{label}: the package names no core transition, but the sequence is constructed over \
+             the edge's core transition, so its address cannot be derived and the stage lists it \
+             derives cannot be read"
         ));
         return Ok(None);
     };
-    if !expect_code_present(provider, result, label, last.target).await? {
+    let creation_code = match build.get("RegistryBootstrapSequence") {
+        Ok(code) => code,
+        Err(why) => {
+            result.report_error(&format!("{label}: its address cannot be derived — {why}"));
+            return Ok(None);
+        }
+    };
+    if salts.is_empty() {
+        result.report_error(&format!(
+            "{label}: no CREATE2 salt is available, so its address cannot be derived. Pass \
+             --create2-salt with the reviewed salts from the upgrade env"
+        ));
         return Ok(None);
     }
-    if expect_canonical_construction(
-        build,
-        result,
-        label,
-        last.target,
-        "RegistryBootstrapSequence",
-        &constructor_args::registry_bootstrap_sequence(package.migration, core_transition),
-        salts,
-    ) {
-        reviewed.insert(last.target, label.to_string());
-        Ok(Some(last.target))
-    } else {
-        Ok(None)
+    let args = constructor_args::registry_bootstrap_sequence(package.migration, core_transition);
+    let mut derived = Vec::with_capacity(salts.len());
+    for salt in salts {
+        let address = canonical_create2_address(*salt, creation_code.code(), &args);
+        if !provider.get_code_at(address).await?.is_empty() {
+            result.report_ok(&format!(
+                "{label} is deployed at {address}: the reviewed RegistryBootstrapSequence built \
+                 over migration {} and core transition {core_transition} (CREATE2 salt {salt})",
+                package.migration
+            ));
+            reviewed.insert(address, label.to_string());
+            return Ok(Some(address));
+        }
+        derived.push(format!("salt {salt} -> {address}"));
+    }
+    result.report_error(&format!(
+        "{label} is not deployed: the reviewed RegistryBootstrapSequence over migration {} and \
+         core transition {core_transition} lands at {}, and none of them holds code — the stage \
+         lists cannot be read, so the bundle cannot be held against anything",
+        package.migration,
+        derived.join("; ")
+    ));
+    Ok(None)
+}
+
+/// A storage binding stage 1 sets through `setter`: unset, or already the manifest's.
+fn expect_bound_or_unset(
+    result: &mut VerificationResult,
+    label: &str,
+    bound: Option<Address>,
+    expected: Address,
+    setter: &str,
+) {
+    match bound {
+        Some(bound) if bound == expected => {
+            result.report_ok(&format!("{label} is already the manifest's {expected}"))
+        }
+        Some(bound) if bound.is_zero() => result.report_ok(&format!(
+            "{label} is unset: stage 1 sets it to {expected} ({setter}, in the derived sequence)"
+        )),
+        Some(bound) => result.report_error(&format!(
+            "{label} is {bound}, not the manifest's {expected}: the objects this edge binds are \
+             fresh, so the binding means one of them is already in use elsewhere — stage 1 would \
+             re-point it ({setter}) or revert"
+        )),
+        None => {}
     }
 }
 
@@ -829,8 +1102,8 @@ fn edge_authorities(
         "the release the manifest names",
     );
     note(
-        bindings.core_executor,
-        "the core executor the coordinator names",
+        Some(manifest.coreExecutor),
+        "the core executor the manifest names",
     );
     note(
         bindings.core_proxy_admin,
@@ -841,7 +1114,7 @@ fn edge_authorities(
         chain_asset_handler,
         "the ChainAssetHandler the CTM's Bridgehub names",
     );
-    note(sequence, "the bootstrap sequence terminating stage 2");
+    note(sequence, "the bootstrap sequence over this edge");
     authorities
 }
 
@@ -860,9 +1133,8 @@ fn edge_authorities(
 /// [`operation::verify_stage_calls`](super::operation). Do not build new machinery on top of this
 /// function — when the bootstrap edge is behind us, it goes.
 ///
-/// `sequence` is the address whose construction [`verify_sequence_construction`] re-derived from
-/// the reviewed migration and core transition; with none, no list is consulted — an oracle the
-/// package chose says nothing about the bundle until it is shown to be the reviewed object.
+/// `sequence` is the address [`locate_sequence`] derived from the reviewed migration and core
+/// transition; with none, no list is consulted.
 async fn verify_derived_sequence<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
@@ -872,9 +1144,9 @@ async fn verify_derived_sequence<P: Provider>(
 ) {
     let Some(sequence_addr) = sequence else {
         result.report_error(
-            "the bootstrap sequence terminating stage 2 is not established as the reviewed \
-             object built over this edge, so the calls it derives are not consulted and the \
-             submitted stage calls cannot be held against anything: the bundle is unreviewed",
+            "the bootstrap sequence over this edge is not established, so the calls it derives \
+             are not consulted and the submitted stage calls cannot be held against anything: \
+             the bundle is unreviewed",
         );
         return;
     };
@@ -1045,7 +1317,8 @@ mod tests {
             },
             upgradeTimestamp: U256::from(0),
             ctmExecutor: Address::repeat_byte(0x55),
-            ctmExecutorOwner: Address::repeat_byte(0x66),
+            coreExecutor: Address::repeat_byte(0x67),
+            governance: Address::repeat_byte(0x66),
             coordinator: Address::repeat_byte(0x77),
             upgradeTimer: Address::repeat_byte(0x88),
         };
@@ -1075,6 +1348,7 @@ mod tests {
     const MIGRATION: Address = Address::repeat_byte(0x05);
     const CAH: Address = Address::repeat_byte(0x06);
     const PUH: Address = Address::repeat_byte(0x07);
+    const COORDINATOR: Address = Address::repeat_byte(0x0C);
     const ATTACKER: Address = Address::repeat_byte(0xBA);
 
     /// `transferOwnership(address)`.
@@ -1110,6 +1384,16 @@ mod tests {
                 "re-assert the migration pause",
                 CAH,
                 vec![0xaa, 0xbb, 0xcc, 0xdd],
+            ),
+            action(
+                "bind the core executor to the lifecycle coordinator",
+                CORE_EXECUTOR,
+                vec![0x55, 0x66, 0x77, 0x88],
+            ),
+            action(
+                "bind the coordinator to the CTM executor",
+                COORDINATOR,
+                vec![0x99, 0xaa, 0xbb, 0xcc],
             ),
             action(
                 "hand the ecosystem ProxyAdmin to the core executor",
@@ -1167,6 +1451,7 @@ mod tests {
             (CTM_ADMIN, "the CTM-domain ProxyAdmin"),
             (ECO_ADMIN, "the ecosystem ProxyAdmin"),
             (CORE_EXECUTOR, "the core executor"),
+            (COORDINATOR, "the coordinator"),
             (MIGRATION, "the bootstrap migration"),
             (CAH, "the ChainAssetHandler"),
         ]
@@ -1197,7 +1482,7 @@ mod tests {
     }
 
     /// THE finding: `coreExecutor.transferOwnership(attacker)` appended after the legitimate
-    /// run. The address is known (it takes a derived call two positions earlier), the selector
+    /// run. The address is known (it takes two derived calls earlier in the run), the selector
     /// is one the run itself uses, and on chain `validateApplied()` never looked at
     /// `pendingOwner()` — the nominee accepts after the bundle and owns the ecosystem domain.
     #[test]
@@ -1300,7 +1585,7 @@ mod tests {
     fn a_reordered_run_fails() {
         let derived = derived_stage1();
         let mut submitted = submitted_from(&derived);
-        submitted.swap(4, 5);
+        submitted.swap(6, 7);
         let result = run(&submitted, &declared_from(&derived));
         assert!(result.errors >= 1);
         assert!(result.ensure_success().is_err());
@@ -1337,7 +1622,7 @@ mod tests {
         )])
     }
 
-    fn package_ending_on(sequence: Address) -> BootstrapPackage {
+    fn package() -> BootstrapPackage {
         BootstrapPackage {
             core_transition: Some(CORE_TRANSITION),
             release: Address::repeat_byte(0x09),
@@ -1351,104 +1636,72 @@ mod tests {
             ctm_key: "zksync_os".to_string(),
             stage0: Vec::new(),
             stage1: Vec::new(),
-            stage2: vec![call(sequence, VALIDATE_APPLIED_SELECTOR.to_vec())],
+            stage2: Vec::new(),
             external_actions: Vec::new(),
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
         }
     }
 
-    /// THE finding: the oracle the bundle is compared against was whatever address the package
-    /// chose. A counterfeit sequence answering the reviewed `MIGRATION()` and `CORE_TRANSITION()`
-    /// with attacker-chosen stage lists passed, and its address was accounted for as a target.
-    /// Now its construction — from the migration and core transition the verifier already holds —
-    /// fails first, and nothing it derives is ever read: the queued stage-list answers stay
-    /// unconsumed.
-    #[tokio::test]
-    async fn a_counterfeit_sequence_is_never_consulted() {
-        let counterfeit = Address::repeat_byte(0xCF);
-        let asserter = Asserter::new();
-        asserter.push_success(&Bytes::from_static(&[0x60, 0x00])); // it has code
-        for _ in 0..3 {
-            // the attacker-chosen lists it would answer with
-            asserter.push_success(&Bytes::from(
-                Vec::<views::BootstrapAction>::new().abi_encode(),
-            ));
-        }
+    fn genuine_sequence(salt: B256) -> Address {
+        canonical_create2_address(
+            salt,
+            &sequence_code(),
+            &constructor_args::registry_bootstrap_sequence(MIGRATION, CORE_TRANSITION),
+        )
+    }
+
+    async fn locate(
+        asserter: &Asserter,
+        package: &BootstrapPackage,
+        salts: &[B256],
+    ) -> (
+        Option<Address>,
+        VerificationResult,
+        BTreeMap<Address, String>,
+    ) {
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        let package = package_ending_on(counterfeit);
         let mut result = VerificationResult::default();
         let mut reviewed = BTreeMap::new();
-        let sequence = verify_sequence_construction(
+        let sequence = locate_sequence(
             &provider,
             &build(),
             &mut result,
-            &package,
-            &[SALT],
+            package,
+            salts,
             &mut reviewed,
         )
         .await
         .unwrap();
-        assert_eq!(sequence, None, "a counterfeit is not established");
-        assert_eq!(result.errors, 1);
-        assert!(reviewed.is_empty(), "and is not accounted for as a target");
-
-        verify_derived_sequence(&provider, &mut result, &package, sequence, &BTreeMap::new()).await;
-        assert_eq!(
-            asserter.read_q().len(),
-            3,
-            "the counterfeit's stage lists must never be read"
-        );
-        assert_eq!(result.errors, 2);
-        assert!(result.ensure_success().is_err());
+        (sequence, result, reviewed)
     }
 
-    /// The genuine sequence — built by the reviewed code over the reviewed migration and core
-    /// registry — is established, and only then are its lists read and the bundle held against
-    /// them.
+    /// The oracle the bundle is compared against is DERIVED from the reviewed creation code over
+    /// the migration and core transition, never read from the package — so it is established by
+    /// construction, and only then are its lists read and the bundle held against them.
     #[tokio::test]
-    async fn the_genuine_sequence_is_established_and_then_consulted() {
-        let genuine = canonical_create2_address(
-            SALT,
-            &sequence_code(),
-            &constructor_args::registry_bootstrap_sequence(MIGRATION, CORE_TRANSITION),
-        );
-        let mut package = package_ending_on(genuine);
-        let gate = action(
-            "bootstrap completion gate",
-            genuine,
-            VALIDATE_APPLIED_SELECTOR.to_vec(),
-        );
+    async fn the_derived_sequence_is_established_and_then_consulted() {
+        let genuine = genuine_sequence(SALT);
+        let mut package = package();
         let derived = [
             vec![action("pause", CAH, vec![0xaa, 0xbb, 0xcc, 0xdd])],
             derived_stage1(),
-            vec![gate],
+            vec![action("unpause", CAH, vec![0xdd, 0xcc, 0xbb, 0xaa])],
         ];
         package.stage0 = submitted_from(&derived[0]);
         package.stage1 = submitted_from(&derived[1]);
         package.stage2 = submitted_from(&derived[2]);
 
         let asserter = Asserter::new();
-        asserter.push_success(&Bytes::from_static(&[0x60, 0x00]));
+        asserter.push_success(&Bytes::from_static(&[0x60, 0x00])); // code at the derived address
         for stage in &derived {
             asserter.push_success(&Bytes::from(stage.abi_encode()));
         }
-        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        let mut result = VerificationResult::default();
-        let mut reviewed = BTreeMap::new();
-        let sequence = verify_sequence_construction(
-            &provider,
-            &build(),
-            &mut result,
-            &package,
-            &[SALT],
-            &mut reviewed,
-        )
-        .await
-        .unwrap();
+        let (sequence, mut result, reviewed) = locate(&asserter, &package, &[SALT]).await;
         assert_eq!(sequence, Some(genuine));
         assert_eq!(reviewed.len(), 1);
 
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut authorities = authorities();
         authorities.insert(genuine, "the bootstrap sequence".to_string());
         verify_derived_sequence(&provider, &mut result, &package, sequence, &authorities).await;
@@ -1459,25 +1712,278 @@ mod tests {
         );
     }
 
-    /// A bootstrap package without a core transition has nothing to construct the sequence over:
+    /// The sequence is found under whichever reviewed salt built it.
+    #[tokio::test]
+    async fn the_sequence_is_found_under_the_salt_that_built_it() {
+        let other_salt = B256::repeat_byte(0x11);
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::new()); // nothing under the first salt
+        asserter.push_success(&Bytes::from_static(&[0x60, 0x00]));
+        let (sequence, result, _) = locate(&asserter, &package(), &[other_salt, SALT]).await;
+        assert_eq!(sequence, Some(genuine_sequence(SALT)));
+        assert_eq!(result.errors, 0);
+    }
+
+    /// Nothing deployed at the derived address: an error, and no list is ever read — the queued
+    /// stage-list answers stay unconsumed.
+    #[tokio::test]
+    async fn an_undeployed_sequence_is_never_consulted() {
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::new());
+        for _ in 0..3 {
+            asserter.push_success(&Bytes::from(
+                Vec::<views::BootstrapAction>::new().abi_encode(),
+            ));
+        }
+        let package = package();
+        let (sequence, mut result, reviewed) = locate(&asserter, &package, &[SALT]).await;
+        assert_eq!(sequence, None);
+        assert_eq!(result.errors, 1);
+        assert!(reviewed.is_empty());
+
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        verify_derived_sequence(&provider, &mut result, &package, sequence, &BTreeMap::new()).await;
+        assert_eq!(asserter.read_q().len(), 3, "no stage list may be read");
+        assert_eq!(result.errors, 2);
+    }
+
+    /// A bootstrap package without a core transition has nothing to derive the sequence over:
     /// an error, not a sequence taken on trust.
     #[tokio::test]
     async fn a_sequence_without_a_core_transition_is_unverifiable() {
-        let mut package = package_ending_on(Address::repeat_byte(0xCF));
+        let mut package = package();
         package.core_transition = None;
-        let provider = ProviderBuilder::new().connect_mocked_client(Asserter::new());
-        let mut result = VerificationResult::default();
-        let sequence = verify_sequence_construction(
-            &provider,
-            &build(),
-            &mut result,
-            &package,
-            &[SALT],
-            &mut BTreeMap::new(),
-        )
-        .await
-        .unwrap();
+        let (sequence, result, _) = locate(&Asserter::new(), &package, &[SALT]).await;
         assert_eq!(sequence, None);
         assert_eq!(result.errors, 1);
+    }
+
+    /// The completion check is its own call after stage 2. A bundle still carrying it as a
+    /// stage-2 call (the old terminal gate) calls the sequence outside the derived run.
+    #[test]
+    fn a_completion_check_inside_stage_two_is_an_extra_authority_call() {
+        let sequence = genuine_sequence(SALT);
+        let unpause = action("unpause", CAH, vec![0xdd, 0xcc, 0xbb, 0xaa]);
+        let mut submitted = submitted_from(std::slice::from_ref(&unpause));
+        submitted.push(call(
+            sequence,
+            views::RegistryBootstrapMigrationView::validateAppliedCall {}.abi_encode(),
+        ));
+        let mut authorities = authorities();
+        authorities.insert(sequence, "the bootstrap sequence".to_string());
+        let mut result = VerificationResult::default();
+        verify_stage(2, &submitted, &[unpause], &[], &authorities, &mut result);
+        assert_eq!(result.errors, 1);
+    }
+
+    // ───────────────────────── the ServerNotifier handover ─────────────────────────
+    //
+    // The facts as the chain reports them at review time, judged against a manifest whose
+    // mandatory notifier row names NOTIFIER. Every state short of "complete", or "nominated and
+    // accepted by the derived stage 0", must be an error: `migrate()` refuses it.
+
+    const NOTIFIER: Address = Address::repeat_byte(0x2A);
+    const CTM_EXECUTOR: Address = Address::repeat_byte(0x2B);
+    const CHAIN_ADMIN: Address = Address::repeat_byte(0x2C);
+    const DEPLOYER: Address = Address::repeat_byte(0x2D);
+    const OLD_NOTIFIER_ADMIN: Address = Address::repeat_byte(0x2E);
+
+    fn notifier_row() -> ProxyUpgradeRow {
+        ProxyUpgradeRow {
+            proxy: NOTIFIER,
+            expectedOldImpl: Address::repeat_byte(0x3A),
+            implNew: Address::repeat_byte(0x3B),
+            callInitializeUpgrade: false,
+        }
+    }
+
+    fn inert_row() -> ProxyUpgradeRow {
+        ProxyUpgradeRow {
+            proxy: Address::ZERO,
+            expectedOldImpl: Address::ZERO,
+            implNew: Address::ZERO,
+            callInitializeUpgrade: false,
+        }
+    }
+
+    fn manifest_with(notifier: ProxyUpgradeRow) -> views::BootstrapManifest {
+        let mut proxy_upgrades = vec![inert_row(); CTM_CONTRACT_SERVER_NOTIFIER_SLOT + 1];
+        proxy_upgrades[CTM_CONTRACT_SERVER_NOTIFIER_SLOT] = notifier;
+        views::BootstrapManifest {
+            ctm: CTM,
+            expectedProtocolVersion: U256::from(1),
+            ctmProxyAdmin: CTM_ADMIN,
+            proxyUpgrades: proxy_upgrades,
+            currentRelease: Address::repeat_byte(0x33),
+            oldProtocolVersionDeadline: U256::ZERO,
+            upgradeEngine: Address::repeat_byte(0x44),
+            l2Plan: views::AuthoredL2Plan {
+                delegateBytecodeInfo: Default::default(),
+                extraBytecodeInfos: Vec::new(),
+                delegateComposer: Address::ZERO,
+            },
+            upgradeTimestamp: U256::ZERO,
+            ctmExecutor: CTM_EXECUTOR,
+            coreExecutor: Address::repeat_byte(0x67),
+            governance: Address::repeat_byte(0x66),
+            coordinator: Address::repeat_byte(0x77),
+            upgradeTimer: Address::repeat_byte(0x88),
+        }
+    }
+
+    /// A notifier bound to the manifest's CTM, with the given authority state.
+    fn notifier_facts(
+        owner: Address,
+        pending_owner: Address,
+        proxy_admin: Address,
+    ) -> NotifierFacts {
+        NotifierFacts {
+            notifier: NOTIFIER,
+            ctm_notifier: Some(NOTIFIER),
+            notifier_ctm: Some(CTM),
+            proxy_admin,
+            owner: Some(owner),
+            pending_owner: Some(pending_owner),
+        }
+    }
+
+    fn judge(facts: &NotifierFacts, stage0: &[GovernanceCall]) -> (VerificationResult, bool) {
+        let mut result = VerificationResult::default();
+        let verdict =
+            judge_notifier_handover(&mut result, facts, &manifest_with(notifier_row()), stage0);
+        (result, verdict.under_ctm_proxy_admin)
+    }
+
+    fn accepting_stage0() -> Vec<GovernanceCall> {
+        vec![notifier_acceptance(CTM_EXECUTOR, NOTIFIER)]
+    }
+
+    #[test]
+    fn a_completed_handover_passes() {
+        let facts = notifier_facts(CTM_EXECUTOR, Address::ZERO, CTM_ADMIN);
+        let (result, readable) = judge(&facts, &[]);
+        assert_eq!(result.errors, 0);
+        assert!(readable);
+    }
+
+    /// The ChainAdmin moved the proxy and nominated the executor; governance's acceptance is the
+    /// first derived stage-0 call, and the bundle carries it.
+    #[test]
+    fn a_nomination_the_bundle_accepts_passes() {
+        let facts = notifier_facts(CHAIN_ADMIN, CTM_EXECUTOR, CTM_ADMIN);
+        let (result, readable) = judge(&facts, &accepting_stage0());
+        assert_eq!(result.errors, 0);
+        assert!(readable);
+    }
+
+    #[test]
+    fn a_nomination_the_bundle_does_not_accept_fails() {
+        let facts = notifier_facts(CHAIN_ADMIN, CTM_EXECUTOR, CTM_ADMIN);
+        let (result, _) = judge(&facts, &[]);
+        assert_eq!(result.errors, 1);
+    }
+
+    /// The frozen v34 fixture before the ChainAdmin acted: the deployer still owns the notifier
+    /// with the ChainAdmin nominated (never accepted), and the proxy sits under its own
+    /// ChainAdmin-owned ProxyAdmin. Both halves are reported, and the notifier row is marked
+    /// unreadable through the CTM-domain admin.
+    #[test]
+    fn the_untouched_v34_notifier_is_the_missing_chain_admin_half() {
+        let facts = notifier_facts(DEPLOYER, CHAIN_ADMIN, OLD_NOTIFIER_ADMIN);
+        let (result, readable) = judge(&facts, &accepting_stage0());
+        assert_eq!(result.errors, 2);
+        assert!(!readable);
+        assert!(result.ensure_success().is_err());
+    }
+
+    /// The bundle was prepared while the nomination was pending, and governance accepted
+    /// outside it since: stage 0 would revert on its own first call.
+    #[test]
+    fn an_acceptance_of_an_already_accepted_ownership_fails() {
+        let facts = notifier_facts(CTM_EXECUTOR, Address::ZERO, CTM_ADMIN);
+        let (result, _) = judge(&facts, &accepting_stage0());
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn a_nomination_outstanding_after_the_acceptance_fails() {
+        let facts = notifier_facts(CTM_EXECUTOR, ATTACKER, CTM_ADMIN);
+        let (result, _) = judge(&facts, &[]);
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn a_notifier_bound_to_another_ctm_fails_both_ways() {
+        let mut facts = notifier_facts(CTM_EXECUTOR, Address::ZERO, CTM_ADMIN);
+        facts.ctm_notifier = Some(Address::repeat_byte(0x4A));
+        facts.notifier_ctm = Some(Address::repeat_byte(0x4B));
+        let (result, _) = judge(&facts, &[]);
+        assert_eq!(result.errors, 2);
+    }
+
+    /// The acceptance is `RegistryBootstrapSequence.stage0Actions`' first call:
+    /// `forward(Call[])` on the executor wrapping `acceptOwnership()` on the notifier.
+    #[test]
+    fn the_acceptance_forwards_accept_ownership_to_the_notifier() {
+        let call = notifier_acceptance(CTM_EXECUTOR, NOTIFIER);
+        assert_eq!(call.target, CTM_EXECUTOR);
+        assert_eq!(
+            &call.data[..4],
+            &alloy::primitives::keccak256(b"forward((address,uint256,bytes)[])")[..4]
+        );
+        let decoded = CTMUpgradeExecutorView::forwardCall::abi_decode(&call.data).unwrap();
+        assert_eq!(decoded._calls.len(), 1);
+        assert_eq!(decoded._calls[0].target, NOTIFIER);
+        assert_eq!(
+            &decoded._calls[0].data[..],
+            &alloy::primitives::keccak256(b"acceptOwnership()")[..4]
+        );
+    }
+
+    /// The notifier row is left out of the source check only while it is unreadable through the
+    /// CTM-domain admin; every other participating row stays in.
+    #[test]
+    fn only_an_unreadable_notifier_row_is_left_out_of_the_source_check() {
+        let mut rows = vec![inert_row(); CTM_CONTRACT_SERVER_NOTIFIER_SLOT + 1];
+        rows[0] = notifier_row();
+        rows[0].proxy = Address::repeat_byte(0x5A);
+        rows[CTM_CONTRACT_SERVER_NOTIFIER_SLOT] = notifier_row();
+        assert_eq!(participating_ctm_rows(&rows, true).len(), 2);
+        let readable_only = participating_ctm_rows(&rows, false);
+        assert_eq!(readable_only.len(), 1);
+        assert_eq!(readable_only[0].proxy, Address::repeat_byte(0x5A));
+    }
+
+    #[tokio::test]
+    async fn a_manifest_without_the_notifier_row_is_an_error() {
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let verdict =
+            verify_notifier_handover(&provider, &mut result, &manifest_with(inert_row()), &[])
+                .await
+                .unwrap();
+        assert_eq!(result.errors, 1);
+        assert!(!verdict.under_ctm_proxy_admin);
+    }
+
+    /// The live read path, in the order it queries: the proxy's EIP-1967 admin slot (an address
+    /// in the low 20 bytes of the word), then the four getters.
+    #[tokio::test]
+    async fn the_handover_is_read_from_the_admin_slot_and_the_getters() {
+        let asserter = Asserter::new();
+        asserter.push_success(&U256::from_be_bytes(CTM_ADMIN.into_word().0));
+        for answer in [NOTIFIER, CTM, CTM_EXECUTOR, Address::ZERO] {
+            asserter.push_success(&Bytes::from(answer.abi_encode()));
+        }
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let verdict =
+            verify_notifier_handover(&provider, &mut result, &manifest_with(notifier_row()), &[])
+                .await
+                .unwrap();
+        assert!(asserter.read_q().is_empty());
+        assert_eq!(result.errors, 0);
+        assert!(verdict.under_ctm_proxy_admin);
     }
 }

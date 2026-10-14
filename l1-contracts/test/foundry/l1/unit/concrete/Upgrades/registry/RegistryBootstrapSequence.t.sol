@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {
     ITransparentUpgradeableProxy,
@@ -9,6 +10,8 @@ import {
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Call} from "contracts/governance/Common.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {UpgradeExecutorBase} from "contracts/governance/UpgradeExecutorBase.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
@@ -20,13 +23,12 @@ import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpg
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
+import {BootstrapAction} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {
-    BootstrapAction,
-    IRegistryBootstrapSequence
-} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
-import {
+    BootstrapAuthorityNotHeld,
+    BootstrapNominationPending,
     BootstrapNotYetExecuted,
-    ProxyUpgradeRowMismatch,
+    MigrationPaused,
     RegistryTargetHasNoCode,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
@@ -93,6 +95,12 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
 
     address internal implOld;
     address internal implNew;
+    /// @dev The pre-bootstrap ServerNotifier: under its own ProxyAdmin, owned by the chain admin.
+    address internal chainAdmin;
+    ProxyAdmin internal notifierAdmin;
+    TransparentUpgradeableProxy internal notifierProxy;
+    address internal notifierImplOld;
+    address internal notifierImplNew;
     address internal genesisUpgradeAddr;
     address internal upgradeEngine;
     address internal mockChainAssetHandler;
@@ -112,6 +120,21 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         ecosystemProxyAdmin = new ProxyAdmin();
         bridgehubProxy = new TransparentUpgradeableProxy(implOld, address(ecosystemProxyAdmin), hex"");
 
+        chainAdmin = makeAddr("chainAdmin");
+        notifierAdmin = new ProxyAdmin();
+        notifierAdmin.transferOwnership(chainAdmin);
+        notifierImplOld = address(new ServerNotifier());
+        notifierImplNew = address(new ServerNotifier());
+        notifierProxy = new TransparentUpgradeableProxy(
+            notifierImplOld,
+            address(notifierAdmin),
+            abi.encodeCall(ServerNotifier.initialize, (chainAdmin))
+        );
+        vm.prank(chainAdmin);
+        ServerNotifier(address(notifierProxy)).setChainTypeManager(IChainTypeManager(address(chainContractAddress)));
+        vm.prank(governor);
+        chainContractAddress.setServerNotifier(address(notifierProxy));
+
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
         upgradeEngine = makeAddr("upgradeEngine");
@@ -126,10 +149,13 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             address(coordinator)
         );
 
+        // Governance holds both ProxyAdmins before the edge, as in production.
+        ctmProxyAdmin.transferOwnership(governor);
+        ecosystemProxyAdmin.transferOwnership(governor);
+
         newVersion = SemVer.packSemVer(0, 1, 0);
+        // Started by the derived stage 0.
         upgradeTimer = new GovernanceUpgradeTimer(0, 0, governor, governor);
-        vm.prank(governor);
-        upgradeTimer.startTimer();
 
         _mockFacetSelfDescriptions(facetCuts);
         genesisRelease = _deployRelease();
@@ -164,8 +190,8 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             );
     }
 
-    /// @dev One participating ecosystem row, so the core leg is a real edge the completion gate
-    ///      can find unapplied.
+    /// @dev One participating ecosystem row, so the core leg the derived stage 1 applies is a real
+    ///      edge.
     function _deployCoreTransition() internal returns (ICoreTransition) {
         CoreTransitionManifest memory manifest;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
@@ -173,8 +199,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             proxy: address(bridgehubProxy),
             expectedOldImpl: implOld,
             implNew: implNew,
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: false
         });
         return ICoreTransition(address(new CoreTransition(manifest)));
     }
@@ -185,8 +210,13 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             proxy: address(ctmDomainProxy),
             expectedOldImpl: implOld,
             implNew: implNew,
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: false
+        });
+        upgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: address(notifierProxy),
+            expectedOldImpl: notifierImplOld,
+            implNew: notifierImplNew,
+            callInitializeUpgrade: false
         });
         return
             BootstrapManifest({
@@ -200,7 +230,8 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                 l2Plan: L2PlanFixtures.emptyPlan(),
                 upgradeTimestamp: 0,
                 ctmExecutor: address(ctmExecutor),
-                ctmExecutorOwner: governor,
+                coreExecutor: address(coreExecutor),
+                governance: governor,
                 coordinator: address(coordinator),
                 upgradeTimer: address(upgradeTimer)
             });
@@ -236,21 +267,46 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         assertEq(_derived.data, _authored.data, string.concat(_what, ": calldata"));
     }
 
-    /// @dev Runs the edge's CTM leg: governance hands both CTM-domain authorities over and the
-    ///      permissionless `migrate()` performs the whole edge.
-    function _runCtmLeg() internal {
-        vm.prank(governor);
-        chainContractAddress.transferOwnership(address(migration));
-        ctmProxyAdmin.transferOwnership(address(migration));
-        migration.migrate();
+    /// @dev The ChainAdmin's half of the one-time notifier handover.
+    function _chainAdminHandsOverTheNotifier() internal {
+        vm.startPrank(chainAdmin);
+        notifierAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(address(notifierProxy)), address(ctmProxyAdmin));
+        Ownable2Step(address(notifierProxy)).transferOwnership(address(ctmExecutor));
+        vm.stopPrank();
     }
 
-    /// @dev Runs the edge's ecosystem leg: governance hands the shared admin to the bound executor
-    ///      and applies the pinned inventory through it.
-    function _runCoreLeg() internal {
-        ecosystemProxyAdmin.transferOwnership(address(coreExecutor));
+    /// @dev Executes the derived stage-0 accept as governance.
+    function _runDerivedNotifierAccept() internal {
+        Call memory accept = sequence.stage0Actions()[0].call;
+        assertEq(accept.target, address(ctmExecutor), "the first stage-0 action is the executor's accept");
         vm.prank(governor);
-        coreExecutor.applyL1Upgrade(coreTransition);
+        // solhint-disable-next-line avoid-low-level-calls
+        (bool ok, ) = accept.target.call{value: accept.value}(accept.data);
+        assertTrue(ok, "the derived accept must succeed once the ChainAdmin nominated the executor");
+    }
+
+    /// @dev Executes one derived stage as governance, call by call. The fixture's chain asset
+    ///      handler is a mock whose pause answer is fixed by the fixture, so its calls are skipped.
+    /// @param _actions The derived stage.
+    /// @param _skip A call index not to execute (`type(uint256).max` for none).
+    function _runDerivedStage(BootstrapAction[] memory _actions, uint256 _skip) internal {
+        for (uint256 i = 0; i < _actions.length; ++i) {
+            Call memory call = _actions[i].call;
+            if (call.target == mockChainAssetHandler || i == _skip) {
+                continue;
+            }
+            vm.prank(governor);
+            // solhint-disable-next-line avoid-low-level-calls
+            (bool ok, ) = call.target.call{value: call.value}(call.data);
+            assertTrue(ok, string.concat(_actions[i].label, " reverted"));
+        }
+    }
+
+    /// @dev The ChainAdmin's half of the notifier handover, then the derived stages 0 and 1.
+    function _runEdgeThroughStage1() internal {
+        _chainAdminHandsOverTheNotifier();
+        _runDerivedStage(sequence.stage0Actions(), type(uint256).max);
+        _runDerivedStage(sequence.stage1Actions(), type(uint256).max);
     }
 
     /// @dev Stage 2's unpause, as the fixture's mocked handler sees it.
@@ -260,51 +316,75 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
 
     // ──────────────────── the sequence is the one it replaced ────────────────────
 
-    function test_stage0_matchesTheAuthoredSequence() public {
+    /// @notice Until the notifier handover is accepted, stage 0 differs from the authored bundle
+    ///         in exactly one way: it starts with the executor's accept of the notifier. Once
+    ///         accepted, it is the authored bundle again.
+    function test_stage0_isTheAuthoredSequenceAfterTheNotifierAccept() public {
         Call[] memory derived = _calls(sequence.stage0Actions());
         Call[] memory authored = LegacyBootstrapSequence.stage0(_legacyInputs());
-        assertEq(derived.length, authored.length, "stage 0 length");
+        assertEq(derived.length, authored.length + 1, "stage 0: the accept, then the authored calls");
+        _assertSameCall(
+            derived[0],
+            Call({
+                target: address(ctmExecutor),
+                value: 0,
+                data: abi.encodeCall(UpgradeExecutorBase.forward, (_singleAcceptCall()))
+            }),
+            "stage 0 accept"
+        );
+        for (uint256 i = 0; i < authored.length; ++i) {
+            _assertSameCall(derived[i + 1], authored[i], string.concat("stage 0 call ", vm.toString(i + 1)));
+        }
+
+        _chainAdminHandsOverTheNotifier();
+        _runDerivedNotifierAccept();
+        assertEq(Ownable2Step(address(notifierProxy)).owner(), address(ctmExecutor), "the accept landed");
+        assertEq(Ownable2Step(address(notifierProxy)).pendingOwner(), address(0));
+
+        derived = _calls(sequence.stage0Actions());
+        assertEq(derived.length, authored.length, "stage 0 length after the accept");
         for (uint256 i = 0; i < authored.length; ++i) {
             _assertSameCall(derived[i], authored[i], string.concat("stage 0 call ", vm.toString(i)));
         }
     }
 
-    function test_stage1_matchesTheAuthoredSequence() public {
+    /// @notice The accept is governance's half only: before the ChainAdmin nominated the
+    ///         executor, it reverts and with it the whole stage-0 bundle.
+    function test_derivedNotifierAccept_revertsUntilTheChainAdminNominated() public {
+        Call memory accept = sequence.stage0Actions()[0].call;
+        vm.prank(governor);
+        vm.expectRevert("Ownable2Step: caller is not the new owner");
+        UpgradeExecutorBase(payable(accept.target)).forward(_singleAcceptCall());
+        assertEq(Ownable2Step(address(notifierProxy)).owner(), chainAdmin, "nothing moved");
+    }
+
+    /// @notice Stage 1 is the authored stage 1 with the two executor bindings the authored
+    ///         stage 2 made moved in right after the pause, ahead of every handover: `migrate()`
+    ///         (last) refuses unless they hold.
+    function test_stage1_isTheAuthoredSequenceWithTheBindingsAhead() public {
         Call[] memory derived = _calls(sequence.stage1Actions());
-        Call[] memory authored = LegacyBootstrapSequence.stage1(_legacyInputs());
-        assertEq(derived.length, authored.length, "stage 1 length");
-        for (uint256 i = 0; i < authored.length; ++i) {
-            _assertSameCall(derived[i], authored[i], string.concat("stage 1 call ", vm.toString(i)));
+        Call[] memory authored1 = LegacyBootstrapSequence.stage1(_legacyInputs());
+        Call[] memory authored2 = LegacyBootstrapSequence.stage2(_legacyInputs());
+        assertEq(derived.length, authored1.length + 2, "stage 1: the authored calls plus the two bindings");
+
+        _assertSameCall(derived[0], authored1[0], "stage 1 pause");
+        // authored2[1] is the core executor's `setCoordinator`, authored2[3] the coordinator's
+        // `setCTMExecutor`.
+        _assertSameCall(derived[1], authored2[1], "stage 1 core binding");
+        _assertSameCall(derived[2], authored2[3], "stage 1 coordinator binding");
+        for (uint256 i = 1; i < authored1.length; ++i) {
+            _assertSameCall(derived[i + 2], authored1[i], string.concat("stage 1 call ", vm.toString(i + 2)));
         }
     }
 
-    /// @notice Stage 2 differs from the authored bundle in exactly one way, by design: the two
-    ///         separate post-state checks (the core executor's applied-row check, authored FIRST,
-    ///         and the migration's `validateApplied()`, authored LAST) are folded into the single
-    ///         completion gate that terminates every derived stage 2. The three calls that do
-    ///         work are byte-identical and keep their relative order.
-    function test_stage2_matchesTheAuthoredSequenceWithTheChecksFolded() public {
+    /// @notice Stage 2 is the authored unpause alone: no binding and no completion check rides it,
+    ///         so a failing completion check cannot hold the unpause back.
+    function test_stage2_isTheAuthoredUnpauseAlone() public {
         Call[] memory derived = _calls(sequence.stage2Actions());
         Call[] memory authored = LegacyBootstrapSequence.stage2(_legacyInputs());
-        assertEq(derived.length, 4, "stage 2: three working calls plus the completion gate");
-        assertEq(authored.length, 5, "the authored stage 2 carried two separate checks");
-
-        // authored[1..3] are `setCoordinator`, `unpauseMigration`, `setCTMExecutor`.
-        for (uint256 i = 0; i < 3; ++i) {
-            _assertSameCall(derived[i], authored[i + 1], string.concat("stage 2 call ", vm.toString(i)));
-        }
-    }
-
-    function test_stage2_endsWithTheCompletionGate() public {
-        BootstrapAction[] memory actions = sequence.stage2Actions();
-        Call memory terminal = actions[actions.length - 1].call;
-        assertEq(terminal.target, address(sequence), "the gate is the sequence's own check");
-        assertEq(terminal.value, 0, "the gate carries no value");
-        assertEq(
-            terminal.data,
-            abi.encodeCall(IRegistryBootstrapSequence.validateApplied, ()),
-            "the gate is `validateApplied()`"
-        );
+        assertEq(derived.length, 1, "stage 2: the unpause only");
+        // authored[2] is `unpauseMigration`.
+        _assertSameCall(derived[0], authored[2], "stage 2 unpause");
     }
 
     /// @notice Every derived action carries the label and authority a reviewer reads it under, so
@@ -349,75 +429,112 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         new RegistryBootstrapSequence(RegistryBootstrapMigration(codeless), coreTransition);
     }
 
-    // ──────────────────── the completion gate requires BOTH domains ────────────────────
+    // ──────────────────── the derived stages run the edge ────────────────────
 
-    function test_validateApplied_revertsBeforeTheEdgeRuns() public {
-        // The ecosystem rows are unapplied, so the core half fails first.
-        vm.expectRevert(
-            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(bridgehubProxy), implNew, implOld)
-        );
-        sequence.validateApplied();
-    }
-
-    /// @notice The ecosystem leg alone is not completion: the gate still refuses while the CTM
-    ///         edge is unspent. This is the half the authored bundle could drop by omitting one
-    ///         of its two check calls.
-    function test_validateApplied_revertsWhenOnlyTheEcosystemLegRan() public {
-        _runCoreLeg();
+    /// @notice The derived stages, executed in order, perform the whole edge; the completion
+    ///         check then passes as its own call once stage 2 lifted the pause.
+    function test_derivedStagesRunTheEdge_thenTheCompletionCheckPasses() public {
         vm.expectRevert(BootstrapNotYetExecuted.selector);
         sequence.validateApplied();
-    }
 
-    /// @notice And the CTM edge alone is not completion either.
-    function test_validateApplied_revertsWhenOnlyTheCtmLegRan() public {
-        _runCtmLeg();
-        _unpauseMigrations();
-        vm.expectRevert(
-            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(bridgehubProxy), implNew, implOld)
-        );
-        sequence.validateApplied();
-    }
+        _runEdgeThroughStage1();
 
-    function test_validateApplied_passesOnceBothDomainsApplied() public {
-        _runCoreLeg();
-        _runCtmLeg();
-        // The stage-2 binding the migration's own gate requires, and the unpause both gates do.
-        vm.prank(governor);
-        coordinator.setCTMExecutor(ctmExecutor);
-        _unpauseMigrations();
-
-        sequence.validateApplied();
-
-        // The gate is a real post-state read, not a tautology: both domains actually moved.
+        assertTrue(migration.executed(), "the edge is spent");
+        assertEq(chainContractAddress.protocolVersion(), newVersion, "the CTM sits at the new version");
         assertEq(
             ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(bridgehubProxy))),
             implNew,
-            "the ecosystem row must be applied"
+            "the ecosystem row is applied"
         );
-        assertEq(chainContractAddress.protocolVersion(), newVersion, "the CTM must sit at the new version");
-        assertTrue(migration.executed(), "the edge must be spent");
+        assertEq(ecosystemProxyAdmin.owner(), address(coreExecutor), "the ecosystem admin is the core executor's");
+        assertEq(coreExecutor.coordinator(), address(coordinator), "the core executor is bound");
+        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor), "the coordinator is bound");
+        assertEq(chainContractAddress.owner(), address(ctmExecutor), "the CTM is the executor's");
+
+        // Before stage 2 lifts the pause, completion is not reached.
+        vm.expectRevert(MigrationPaused.selector);
+        sequence.validateApplied();
+
+        _runDerivedStage(sequence.stage2Actions(), type(uint256).max);
+        _unpauseMigrations();
+        sequence.validateApplied();
     }
 
-    /// @notice Executing the derived stage-2 bundle in order leaves the gate satisfied — the
-    ///         unpause the gate depends on is ordered ahead of it by the derivation itself.
-    function test_derivedStage2_leavesTheCompletionGateSatisfied() public {
-        _runCoreLeg();
-        _runCtmLeg();
+    /// @notice A completion check that fails cannot hold anything back: the bindings were made
+    ///         in stage 1 and stage 2 still runs; the check passes once the cause is removed.
+    function test_aFailingCompletionCheckDoesNotHoldBackStage2() public {
+        _runEdgeThroughStage1();
+        address attacker = makeAddr("attacker");
+        vm.prank(governor);
+        coordinator.transferOwnership(attacker);
 
-        Call[] memory stage2 = _calls(sequence.stage2Actions());
-        for (uint256 i = 0; i < stage2.length; ++i) {
-            if (stage2[i].target == mockChainAssetHandler) {
-                // The fixture's handler is a mock, so the unpause is applied as the mock's answer.
-                _unpauseMigrations();
+        _runDerivedStage(sequence.stage2Actions(), type(uint256).max);
+        _unpauseMigrations();
+        vm.expectRevert(abi.encodeWithSelector(BootstrapNominationPending.selector, address(coordinator), attacker));
+        sequence.validateApplied();
+
+        vm.prank(governor);
+        coordinator.transferOwnership(address(0));
+        sequence.validateApplied();
+    }
+
+    /// @notice Stage 1's `migrate()` refuses unless the ecosystem `ProxyAdmin` reached the core
+    ///         executor earlier in the same stage, so a stage 1 missing that handover reverts as a
+    ///         whole.
+    function test_migrateRefusesWithoutTheEcosystemHandover() public {
+        _chainAdminHandsOverTheNotifier();
+        _runDerivedStage(sequence.stage0Actions(), type(uint256).max);
+        BootstrapAction[] memory stage1 = sequence.stage1Actions();
+        // Everything but the migrate (last) and the ecosystem ProxyAdmin handover (index 3) and
+        // the core leg that needs it (index 4).
+        for (uint256 i = 0; i < stage1.length - 1; ++i) {
+            Call memory call = stage1[i].call;
+            if (call.target == mockChainAssetHandler || i == 3 || i == 4) {
                 continue;
             }
             vm.prank(governor);
             // solhint-disable-next-line avoid-low-level-calls
-            (bool ok, ) = stage2[i].target.call{value: stage2[i].value}(stage2[i].data);
-            assertTrue(ok, string.concat("stage 2 call ", vm.toString(i), " reverted"));
+            (bool ok, ) = call.target.call{value: call.value}(call.data);
+            assertTrue(ok, string.concat(stage1[i].label, " reverted"));
         }
 
-        assertEq(coreExecutor.coordinator(), address(coordinator), "the core executor must be bound");
-        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor), "the coordinator must be bound");
+        vm.expectRevert(
+            abi.encodeWithSelector(BootstrapAuthorityNotHeld.selector, address(ecosystemProxyAdmin), governor)
+        );
+        migration.migrate();
+        assertFalse(migration.executed(), "a refused edge must stay unspent");
+    }
+
+    /// @notice The completion check does not re-read the ecosystem rows: a re-patch governance
+    ///         made after the core leg leaves completion possible.
+    function test_validateApplied_passesAfterAnEcosystemRepatch() public {
+        _runEdgeThroughStage1();
+        _runDerivedStage(sequence.stage2Actions(), type(uint256).max);
+        _unpauseMigrations();
+
+        Call[] memory repatch = new Call[](1);
+        repatch[0] = Call({
+            target: address(ecosystemProxyAdmin),
+            value: 0,
+            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(address(bridgehubProxy)), implOld))
+        });
+        vm.prank(governor);
+        coreExecutor.forward(repatch);
+        assertEq(
+            ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(bridgehubProxy))),
+            implOld,
+            "fixture: the ecosystem proxy moved off the row's target"
+        );
+
+        sequence.validateApplied();
+    }
+
+    function _singleAcceptCall() internal view returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: address(notifierProxy),
+            value: 0,
+            data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+        });
     }
 }

@@ -33,8 +33,6 @@ pub(crate) const MIGRATE_SELECTOR: [u8; 4] = [0x8f, 0xd3, 0xab, 0x80];
 /// reviewer, which the tests append to a derived sequence.
 #[cfg(test)]
 pub(crate) const TRANSFER_OWNERSHIP_SELECTOR: [u8; 4] = [0xf2, 0xfd, 0xe3, 0x8b];
-/// `RegistryBootstrapMigration.validateApplied()` — the edge asserting its own completion.
-pub(crate) const VALIDATE_APPLIED_SELECTOR: [u8; 4] = [0xfe, 0x30, 0xc9, 0xfd];
 
 /// A merged prepare output, classified by the kind of upgrade it drives.
 #[derive(Debug)]
@@ -413,15 +411,19 @@ impl BootstrapPackage {
     }
 }
 
-/// The migration is whatever stage 1 calls `migrate()` on — and there must be exactly one such
-/// call, or the package drives more than one bootstrap edge in a single stage.
-fn sole_migrate_target(stage1: &[GovernanceCall]) -> anyhow::Result<Address> {
-    let targets: Vec<Address> = stage1
+/// Every target stage 1 calls `migrate()` on — the bootstrap migrations a bundle drives.
+pub(crate) fn migrate_targets(stage1: &[GovernanceCall]) -> Vec<Address> {
+    stage1
         .iter()
         .filter(|c| c.data.len() == 4 && c.data[..4] == MIGRATE_SELECTOR)
         .map(|c| c.target)
-        .collect();
-    match targets.as_slice() {
+        .collect()
+}
+
+/// The migration is whatever stage 1 calls `migrate()` on — and there must be exactly one such
+/// call, or the package drives more than one bootstrap edge in a single stage.
+fn sole_migrate_target(stage1: &[GovernanceCall]) -> anyhow::Result<Address> {
+    match migrate_targets(stage1).as_slice() {
         [one] => Ok(*one),
         [] => anyhow::bail!(
             "stage 1 contains no `migrate()` call, and the package declares no [operation]: it is \
@@ -460,14 +462,6 @@ mod tests {
     fn transfer_ownership_selector_matches_the_solidity_signature() {
         let computed = alloy::primitives::keccak256(b"transferOwnership(address)");
         assert_eq!(&computed[..4], &TRANSFER_OWNERSHIP_SELECTOR);
-    }
-
-    #[test]
-    fn stage_selector_constants_match_their_signatures() {
-        assert_eq!(
-            &alloy::primitives::keccak256(b"validateApplied()")[..4],
-            &VALIDATE_APPLIED_SELECTOR
-        );
     }
 
     #[test]

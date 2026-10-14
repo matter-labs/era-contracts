@@ -27,7 +27,8 @@
 //!   4. Is authority bound where the review says, and to the expected governance owner — with
 //!      no nomination outstanding on any authority the upgrade drives?
 //!   5. Does every proxy row depart from the implementation that is actually live, read through
-//!      the admin that administers it? ([`rows`])
+//!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — completion does not
+//!      re-read implementations ("Stages" in `protocol-docs/ecosystem-upgrade-coordination.md`).
 //!   6. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
 //!      address — and nothing else?
 //!

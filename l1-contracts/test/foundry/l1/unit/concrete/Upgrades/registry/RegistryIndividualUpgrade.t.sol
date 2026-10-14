@@ -23,6 +23,7 @@ import {
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {OperationCarriesNoTransition} from "contracts/common/L1ContractErrors.sol";
 import {
     AuthoredL2Plan,
     ProxyUpgradeRow,
@@ -210,6 +211,8 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
 
         // The one thing that changed.
         assertEq(_liveImpl(timelock), implNew, "the timelock proxy points at the new implementation");
+        // No transition, so there is no applied state for the post-state check to read back.
+        vm.expectRevert(abi.encodeWithSelector(OperationCarriesNoTransition.selector, address(operation)));
         ctmExecutor.validateOperationApplied(operation);
 
         // Everything a chain-version edge would have moved, unmoved.
@@ -406,8 +409,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
             proxy: address(timelock),
             expectedOldImpl: implOld,
             implNew: implNew,
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: false
         });
     }
 

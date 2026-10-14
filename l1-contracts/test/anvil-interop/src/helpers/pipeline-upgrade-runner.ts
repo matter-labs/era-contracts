@@ -13,9 +13,12 @@
  *      fixture carries the real cut-taking facet, so the chains cross natively — exactly like
  *      production pre-v35 chains.
  *   4. `protocol-ops ecosystem upgrade-prepare-all` with the scenario's core/CTM script paths
- *      (deployer Safe bundles replayed onto the harness anvil), then
+ *      (deployer Safe bundles replayed onto the harness anvil, the ChainAdmin's half of the one-time
+ *      ServerNotifier handover included), then
  *      `protocol-ops ecosystem upgrade-governance` (stage 0/1/2 bundles replayed) — for the v35
- *      edge, stage 1 IS the four-call bootstrap handover + `migrate()`.
+ *      edge, stage 0 opens with governance's notifier accept, stage 1 binds the executors, hands
+ *      over the ecosystem and CTM-domain authority and runs `migrate()`, and the edge's
+ *      completion check runs as its own call after stage 2.
  *   5. Per-chain legacy handed-cut crossing, recorded-L2-tx verification, and the L2 relay of
  *      the proposed upgrade transaction on each chain's anvil fork.
  *   6. Final protocol-version verification on every upgraded chain.
@@ -34,6 +37,8 @@ import { DeploymentRunner } from "../deployment-runner";
 import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
+  EIP1967_ADMIN_SLOT,
+  EIP1967_IMPL_SLOT,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_ATTRIBUTE_PARSER_ADDR,
   INTEROP_CENTER_ADDR,
@@ -64,18 +69,19 @@ import {
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
-import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
-import { installLegacyFacet, crossBootstrapEdgeOnChains } from "./bootstrap-upgrade-stage";
+import { clearGenesisUpgradeTxHash, readProxyAdmin, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
+import {
+  assertBootstrapCompleted,
+  assertServerNotifierState,
+  installLegacyFacet,
+  crossBootstrapEdgeOnChains,
+} from "./bootstrap-upgrade-stage";
+import { proxyUpgradeSlotIndex } from "./registry-manifest";
 import { createProvider, impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
 // ── Constants ────────────────────────────────────────────────────────
-
-// EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
-const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-// EIP-1967 implementation slot: keccak256("eip1967.proxy.implementation") - 1
-const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 // ContractUpgradeType enum values from IComplexUpgrader.sol
 const UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT = 0;
@@ -239,6 +245,26 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       throw new Error(`Merged ecosystem TOML not emitted by upgrade-prepare-all: ${mergedEcosystemToml}`);
     }
 
+    // The cut comes from the per-CTM prepare output (`chain_upgrade_diamond_cut`); the file name
+    // is protocol-ops' convention (`upgrade_inner.rs`). The L2 leg is read from the migration
+    // object the cut names, exactly as the engine reads it at execution.
+    const ctmTomlPath = path.join(
+      l1ContractsDir,
+      "script-out",
+      `upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
+    );
+    const { cut, migrationAddr, ctmExecutor } = readBootstrapPrepareOutput(ctmTomlPath);
+
+    // The ChainAdmin's half of the one-time ServerNotifier handover rode the prepare (protocol-ops'
+    // CTM admin calls); governance's accept is still to come, as stage 0's first action.
+    const ctmProxyAdmin = await readProxyAdmin(l1Provider, ctmAddresses.chainTypeManager);
+    await assertServerNotifierState(
+      l1Provider,
+      ctmAddresses.chainTypeManager,
+      { admin: ctmProxyAdmin, pendingOwner: ctmExecutor },
+      "under the CTM ProxyAdmin and nominating the CTM executor after the prepare"
+    );
+
     // ── Execute governance calls (stages 0-2) via protocol-ops bundle ──
     console.log("\n── Replaying governance upgrade bundles ──");
     await runEcosystemGovernanceUpgrade({
@@ -249,6 +275,24 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       executeBundles: true,
     });
 
+    const migration = new ethers.Contract(migrationAddr, getAbi("RegistryBootstrapMigration"), l1Provider);
+    const notifierRow = (await migration.getManifest()).proxyUpgrades[
+      proxyUpgradeSlotIndex("CTMContract", "ServerNotifier")
+    ];
+    await assertServerNotifierState(
+      l1Provider,
+      ctmAddresses.chainTypeManager,
+      {
+        admin: ctmProxyAdmin,
+        owner: ctmExecutor,
+        pendingOwner: ethers.constants.AddressZero,
+        implementation: notifierRow.implNew,
+        chainTypeManager: ctmAddresses.chainTypeManager,
+      },
+      "held by the CTM executor and re-pointed by migrate() after the governance replay"
+    );
+    await assertBootstrapCompleted(l1Provider, migrationAddr);
+
     // ── Prepare diamond state for chain upgrades ──
     if (scenario.clearGenesisUpgradeTxHash) {
       console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
@@ -256,15 +300,6 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     }
 
     // ── Per-chain legacy crossing + L2 relay ──
-    // The cut comes from the per-CTM prepare output (`chain_upgrade_diamond_cut`); the file name
-    // is protocol-ops' convention (`upgrade_inner.rs`). The L2 leg is read from the migration
-    // object the cut names, exactly as the engine reads it at execution.
-    const ctmTomlPath = path.join(
-      l1ContractsDir,
-      "script-out",
-      `upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
-    );
-    const { cut, migrationAddr } = readCommittedCut(ctmTomlPath);
     await runLegacyChainLegAndRelayL2({
       l1Provider,
       anvilManager,
@@ -379,8 +414,8 @@ function decodeGovernanceCalls(hex: string): Array<{ target: string; value: ethe
  *      compose step then deploys the `EcosystemUpgradeOperation` naming the registry and the
  *      (executor, transition) leg and emits exactly `stage0/1/2(operation)` on the coordinator.
  *   2. The merged `ecosystem.toml` is asserted to carry ONLY those three calls (one per stage,
- *      all on the coordinator) and to list nothing but the admin action under
- *      `external_actions` — the tooling claim, checked on the artifact.
+ *      all on the coordinator) and no `external_actions` at all — the tooling claim, checked on
+ *      the artifact.
  *   3. The governance replay executes the three stages; each chain then crosses through the
  *      cut-READING `upgradeChainFromVersion` as its own admin (no cut is handed over).
  *   4. End state: chains and CTM at the new version, the transition committed for the departing
@@ -513,14 +548,15 @@ async function runRecurringHop(
         `the operation names core transition ${namedCoreTransition}, the core prepare pinned ${preparedCoreTransition}`
       );
     }
+    // After the bootstrap the whole CTM domain, the ServerNotifier included, is governance's: no
+    // call is left to any other authority, admin phase included.
     const externalActions = merged.external_actions ?? [];
-    const nonAdmin = externalActions.filter((line) => !line.startsWith("phase admin |"));
-    if (nonAdmin.length !== 0) {
-      throw new Error(`a registry-driven prepare declared governance external actions:\n${nonAdmin.join("\n")}`);
+    if (externalActions.length !== 0) {
+      throw new Error(
+        `a registry-driven prepare declared external actions; after the bootstrap it must declare none:\n${externalActions.join("\n")}`
+      );
     }
-    console.log(
-      `  ✓ merged bundles are exactly stage0/1/2(operation); ${externalActions.length} admin-phase external action(s), no governance ones`
-    );
+    console.log("  ✓ merged bundles are exactly stage0/1/2(operation), with no external actions");
 
     // ── Governance executes the three stages ──
     console.log("\n── Replaying the three coordinator calls via protocol-ops ──");
@@ -720,8 +756,7 @@ async function normalizeProxyAdminOwnerToEoa(
   defaultSigner: ethers.Wallet,
   proxyAddress: string
 ): Promise<void> {
-  const rawAdmin = await provider.getStorageAt(proxyAddress, EIP1967_ADMIN_SLOT);
-  const proxyAdmin = ethers.utils.getAddress(ethers.utils.hexDataSlice(rawAdmin, 12));
+  const proxyAdmin = await readProxyAdmin(provider, proxyAddress);
 
   const proxyAdminContract = new ethers.Contract(proxyAdmin, getAbi("ProxyAdmin"), provider);
   const owner: string = await proxyAdminContract.owner();
@@ -947,19 +982,21 @@ const DIAMOND_CUT_TYPE =
 /**
  * Read the committed upgrade cut from the per-CTM light output and resolve the pinned
  * `RegistryBootstrapMigration` its init calldata names (the engine's `upgradeFromBootstrap(address)`
- * delegatecall payload). The engine reads the edge's L2 leg from that object at execution; so does
- * this harness.
+ * delegatecall payload), plus the bound CTM executor the prepare deployed. The engine reads the
+ * edge's L2 leg from that object at execution; so does this harness.
  */
-function readCommittedCut(ctmTomlPath: string): {
+function readBootstrapPrepareOutput(ctmTomlPath: string): {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cut: any;
   migrationAddr: string;
+  ctmExecutor: string;
 } {
   if (!fs.existsSync(ctmTomlPath)) {
     throw new Error(`Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run?`);
   }
   const ctmOutput = parseToml(fs.readFileSync(ctmTomlPath, "utf8")) as {
     chain_upgrade_diamond_cut?: string;
+    registry?: { ctm_upgrade_executor_addr?: string };
   };
   const cutBytes = ctmOutput.chain_upgrade_diamond_cut;
   if (typeof cutBytes !== "string" || cutBytes.length < 4) {
@@ -969,7 +1006,12 @@ function readCommittedCut(ctmTomlPath: string): {
 
   const engineIface = new ethers.utils.Interface(getAbi("BootstrapUpgrade"));
   const [migrationAddr] = engineIface.decodeFunctionData("upgradeFromBootstrap", cut.initCalldata);
-  return { cut, migrationAddr };
+
+  const ctmExecutor = ctmOutput.registry?.ctm_upgrade_executor_addr;
+  if (!ctmExecutor || ctmExecutor === ethers.constants.AddressZero) {
+    throw new Error(`No registry.ctm_upgrade_executor_addr in ${ctmTomlPath}`);
+  }
+  return { cut, migrationAddr, ctmExecutor };
 }
 
 // ── Per-chain legacy crossing + L2 relay ─────────────────────────────
@@ -1313,8 +1355,7 @@ async function verifyCtmEndState(
   }
 
   const ctmOwner: string = await ownable.owner();
-  const rawAdmin = await provider.getStorageAt(ctmAddr, EIP1967_ADMIN_SLOT);
-  const proxyAdminAddr = ethers.utils.getAddress(ethers.utils.hexDataSlice(rawAdmin, 12));
+  const proxyAdminAddr = await readProxyAdmin(provider, ctmAddr);
   const proxyAdmin = new ethers.Contract(proxyAdminAddr, getAbi("ProxyAdmin"), provider);
   const proxyAdminOwner: string = await proxyAdmin.owner();
   if (ctmOwner.toLowerCase() === governance.toLowerCase()) {

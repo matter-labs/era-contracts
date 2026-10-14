@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
@@ -176,8 +175,7 @@ contract StorageRegistriesTest is Test {
             proxy: address(0xB001),
             expectedOldImpl: address(0xB101),
             implNew: coreImplNew,
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: false
         });
     }
 
@@ -1401,10 +1399,9 @@ contract StorageRegistriesTest is Test {
         );
     }
 
-    /// @dev A row's `admin` rides the manifest into the flattened rows unchanged: zero for rows
-    ///      under the applying executor's bound admin, the named admin otherwise — and it is part
-    ///      of the committed manifest hash.
-    function test_operationRowsCarryTheirNamedAdmin() public {
+    /// @dev The participating inventory slots ride the manifest into the flattened rows unchanged,
+    ///      the notifier's included, and are part of the committed manifest hash.
+    function test_operationRowsCarryTheirInventorySlots() public {
         OperationManifest memory manifest = _operationManifest();
         manifest.ctmInfrastructure = _ctmInventoryWithTwoRows();
 
@@ -1412,10 +1409,10 @@ contract StorageRegistriesTest is Test {
         ProxyUpgradeRow[] memory rows = withRows.ctmInfrastructureRows();
         assertEq(rows.length, 2, "both participating slots become rows, in inventory order");
         assertEq(rows[0].proxy, address(0xC001));
-        assertEq(address(rows[0].admin), address(0), "a bound-admin row names no admin");
+        assertEq(rows[0].implNew, manifest.ctmInfrastructure[uint256(CTMContract.ChainTypeManager)].implNew);
         assertEq(rows[1].proxy, address(0xC002));
-        assertEq(address(rows[1].admin), makeAddr("notifierAdmin"), "the notifier row names its own admin");
-        assertEq(withRows.manifestHash(), keccak256(abi.encode(manifest)), "the admin is part of the commitment");
+        assertEq(rows[1].implNew, manifest.ctmInfrastructure[uint256(CTMContract.ServerNotifier)].implNew);
+        assertEq(withRows.manifestHash(), keccak256(abi.encode(manifest)), "the rows are part of the commitment");
     }
 
     // ─────────────────────────── operation fixtures ───────────────────────────
@@ -1431,23 +1428,20 @@ contract StorageRegistriesTest is Test {
             });
     }
 
-    /// @dev Two participating CTM-domain slots: the CTM itself under the executor's bound admin,
-    ///      and the ServerNotifier under its own.
+    /// @dev Two participating CTM-domain slots: the CTM itself and the ServerNotifier.
     function _ctmInventoryWithTwoRows() internal returns (ProxyUpgradeRow[] memory inventory) {
         inventory = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         inventory[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: address(0xC001),
             expectedOldImpl: address(0xC101),
             implNew: _deployedStub("ctmImplNew"),
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: false
         });
         inventory[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
             proxy: address(0xC002),
             expectedOldImpl: address(0xC102),
             implNew: _deployedStub("notifierImplNew"),
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(makeAddr("notifierAdmin"))
+            callInitializeUpgrade: false
         });
     }
 }

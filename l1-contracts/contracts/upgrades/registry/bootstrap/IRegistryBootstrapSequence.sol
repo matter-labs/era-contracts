@@ -18,7 +18,7 @@ struct BootstrapAction {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The read surface of the bootstrap edge's call sequence: the ordered governance calls of
-///         each stage, and the completion gate that terminates stage 2.
+///         each stage, and the completion check run as its own call after stage 2.
 interface IRegistryBootstrapSequence {
     /// @notice The edge this sequence describes.
     function MIGRATION() external view returns (address);
@@ -32,10 +32,11 @@ interface IRegistryBootstrapSequence {
     /// @notice The stage-1 calls, in execution order.
     function stage1Actions() external view returns (BootstrapAction[] memory);
 
-    /// @notice The stage-2 calls, in execution order; the last one is `validateApplied()` on this
-    ///         contract.
+    /// @notice The stage-2 calls, in execution order.
     function stage2Actions() external view returns (BootstrapAction[] memory);
 
-    /// @notice Reverts unless BOTH domains of the edge are applied.
+    /// @notice The edge's completion check (`RegistryBootstrapMigration.validateApplied`), run as
+    ///         its own call after stage 2 rather than inside any stage bundle, so a failing check
+    ///         can never hold back the stage-2 unpause.
     function validateApplied() external view;
 }

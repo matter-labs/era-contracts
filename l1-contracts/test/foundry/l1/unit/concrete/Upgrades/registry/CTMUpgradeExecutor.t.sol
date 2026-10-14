@@ -7,6 +7,7 @@ import {UtilsFacet} from "../../Utils/UtilsFacet.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {IUpgradeExecutorBase} from "contracts/governance/IUpgradeExecutorBase.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
@@ -28,6 +29,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {
     L2BytecodeNotPublished,
@@ -277,7 +279,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 }
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
-///         objects: the stage-1 commit and what it writes, the fixed passthroughs, the post-state
+///         objects: the stage-1 commit and what it writes, CTM owner calls through `forward`, the post-state
 ///         check and the per-chain entrypoint. Release data describes new-chain genesis;
 ///         transition data describes the one movement from the fixture's current version to that
 ///         release — its facet delta is DERIVED from the release pair (a facet-neutral hop here;
@@ -327,7 +329,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
         ctmExecutor.completeOperation();
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        ctmExecutor.abandonOperation();
+        ctmExecutor.abandonOperation(false);
         vm.stopPrank();
         assertEq(address(ctmExecutor.activeOperation()), address(0));
     }
@@ -386,26 +388,19 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     }
 
     // The transition pins the deadline its edge was approved with (1000 in this fixture), but the
-    // deadline is operational state that keeps moving after the commit — the executor's fixed
-    // entrypoint must keep overriding it, repeatedly, without the escape hatch.
-    function test_setProtocolVersionDeadline_overridesTransitionPinnedDeadline() public {
+    // deadline is operational state that keeps moving after the commit — governance keeps
+    // overriding it, repeatedly, through the executor's `forward`.
+    function test_setProtocolVersionDeadline_throughForward_overridesTransitionPinnedDeadline() public {
         _prepareAndExecute(transition);
         assertEq(chainContractAddress.protocolVersionDeadline(0), 1000);
 
-        vm.prank(governor);
-        ctmExecutor.setProtocolVersionDeadline(0, 5000);
+        vm.expectEmit(true, true, true, true, address(chainContractAddress));
+        emit IChainTypeManager.UpdateProtocolVersionDeadline(0, 5000);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.setProtocolVersionDeadline, (0, 5000)));
         assertEq(chainContractAddress.protocolVersionDeadline(0), 5000);
 
-        vm.prank(governor);
-        ctmExecutor.setProtocolVersionDeadline(0, 8000);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.setProtocolVersionDeadline, (0, 8000)));
         assertEq(chainContractAddress.protocolVersionDeadline(0), 8000);
-    }
-
-    function test_revertWhen_setProtocolVersionDeadlineByStranger() public {
-        _prepareAndExecute(transition);
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(makeAddr("stranger"));
-        ctmExecutor.setProtocolVersionDeadline(0, 5000);
     }
 
     function test_revertWhen_stage0FromWrongRelease() public {
@@ -495,36 +490,34 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         );
     }
 
-    // ──────────────── routine operational and recovery passthroughs ────────────────
-    // Each passthrough runs end-to-end: executor -> bound CTM -> the fixture's real chain diamond,
-    // asserting the chain-side (or CTM-side) state and event. All of them share one unhappy path,
-    // the executor's `onlyOwner` gate, checked before the CTM is reached.
+    // ──────────────── routine operational and recovery calls through `forward` ────────────────
+    // The executor has no typed passthroughs: every CTM owner operation outside the upgrade
+    // lifecycle goes through the owner-gated, event-logged `forward`. Each runs end-to-end —
+    // executor -> bound CTM -> the fixture's real chain diamond — asserting the chain-side (or
+    // CTM-side) state and event.
 
-    function test_freezeChain_freezesTheChainDiamond() public {
+    function test_forwardFreezeChain_freezesTheChainDiamond() public {
         assertFalse(IGetters(chainAddress).isDiamondStorageFrozen());
 
         vm.expectEmit(true, true, true, true, chainAddress);
         emit IAdmin.Freeze();
-        vm.prank(governor);
-        ctmExecutor.freezeChain(chainId);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.freezeChain, (chainId)));
 
         assertTrue(IGetters(chainAddress).isDiamondStorageFrozen(), "the freeze must land on the chain diamond");
     }
 
-    function test_unfreezeChain_unfreezesTheChainDiamond() public {
-        vm.prank(governor);
-        ctmExecutor.freezeChain(chainId);
+    function test_forwardUnfreezeChain_unfreezesTheChainDiamond() public {
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.freezeChain, (chainId)));
         assertTrue(IGetters(chainAddress).isDiamondStorageFrozen());
 
         vm.expectEmit(true, true, true, true, chainAddress);
         emit IAdmin.Unfreeze();
-        vm.prank(governor);
-        ctmExecutor.unfreezeChain(chainId);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.unfreezeChain, (chainId)));
 
         assertFalse(IGetters(chainAddress).isDiamondStorageFrozen(), "the unfreeze must land on the chain diamond");
     }
 
-    function test_revertBatches_rollsTheChainBackToTheGivenBatch() public {
+    function test_forwardRevertBatches_rollsTheChainBackToTheGivenBatch() public {
         // Committing real batches is the executor-facet suites' business; the fixture's UtilsFacet
         // seeds the committed counter so the revert has something to roll back.
         UtilsFacet(chainAddress).util_setTotalBatchesCommitted(3);
@@ -532,28 +525,25 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
 
         vm.expectEmit(true, true, true, true, chainAddress);
         emit IExecutor.BlocksRevert(1, 0, 0);
-        vm.prank(governor);
-        ctmExecutor.revertBatches(chainId, 1);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.revertBatches, (chainId, 1)));
 
         assertEq(IGetters(chainAddress).getTotalBatchesCommitted(), 1, "the chain must be rolled back to batch 1");
     }
 
-    function test_setValidator_togglesTheChainValidatorFlag() public {
+    function test_forwardSetValidator_togglesTheChainValidatorFlag() public {
         address newValidator = makeAddr("newValidator");
         assertFalse(IGetters(chainAddress).isValidator(newValidator));
 
         vm.expectEmit(true, true, true, true, chainAddress);
         emit IAdmin.ValidatorStatusUpdate(newValidator, true);
-        vm.prank(governor);
-        ctmExecutor.setValidator(chainId, newValidator, true);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.setValidator, (chainId, newValidator, true)));
         assertTrue(IGetters(chainAddress).isValidator(newValidator), "the validator must be enabled on the chain");
 
-        vm.prank(governor);
-        ctmExecutor.setValidator(chainId, newValidator, false);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.setValidator, (chainId, newValidator, false)));
         assertFalse(IGetters(chainAddress).isValidator(newValidator), "the validator must be disabled again");
     }
 
-    function test_setPriorityTxMaxGasLimit_setsTheChainCap() public {
+    function test_forwardSetPriorityTxMaxGasLimit_setsTheChainCap() public {
         uint256 oldLimit = IGetters(chainAddress).getPriorityTxMaxGasLimit();
         assertTrue(
             oldLimit != NEW_PRIORITY_TX_MAX_GAS_LIMIT,
@@ -562,61 +552,64 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
 
         vm.expectEmit(true, true, true, true, chainAddress);
         emit IAdmin.NewPriorityTxMaxGasLimit(oldLimit, NEW_PRIORITY_TX_MAX_GAS_LIMIT);
-        vm.prank(governor);
-        ctmExecutor.setPriorityTxMaxGasLimit(chainId, NEW_PRIORITY_TX_MAX_GAS_LIMIT);
+        _forwardToCTM(
+            abi.encodeCall(IChainTypeManager.setPriorityTxMaxGasLimit, (chainId, NEW_PRIORITY_TX_MAX_GAS_LIMIT))
+        );
 
         assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), NEW_PRIORITY_TX_MAX_GAS_LIMIT);
     }
 
-    function test_deactivatePriorityMode_clearsTheChainFlag() public {
+    function test_forwardDeactivatePriorityMode_clearsTheChainFlag() public {
         // Entering priority mode is the chain's own flow (a permanent rollup with stale priority
         // ops), covered by the priority-mode suites; the fixture's UtilsFacet arms the flag so the
-        // passthrough has something to clear.
+        // call has something to clear.
         UtilsFacet utilsFacet = UtilsFacet(chainAddress);
         utilsFacet.util_setPriorityModeActivated(true);
 
         vm.expectEmit(true, true, true, true, chainAddress);
         emit IAdmin.PriorityModeDeactivated();
-        vm.prank(governor);
-        ctmExecutor.deactivatePriorityMode(chainId);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.deactivatePriorityMode, (chainId)));
 
         assertFalse(utilsFacet.util_getPriorityModeActivated(), "priority mode must be cleared on the chain");
     }
 
-    function test_setValidatorTimelockPostV29_updatesTheCtm() public {
+    function test_forwardSetValidatorTimelockPostV29_updatesTheCtm() public {
         address oldTimelock = chainContractAddress.validatorTimelockPostV29();
         address newTimelock = makeAddr("validatorTimelockPostV29");
 
         vm.expectEmit(true, true, true, true, address(chainContractAddress));
         emit IChainTypeManager.NewValidatorTimelockPostV29(oldTimelock, newTimelock);
-        vm.prank(governor);
-        ctmExecutor.setValidatorTimelockPostV29(newTimelock);
+        _forwardToCTM(abi.encodeCall(IChainTypeManager.setValidatorTimelockPostV29, (newTimelock)));
 
         assertEq(chainContractAddress.validatorTimelockPostV29(), newTimelock);
     }
 
-    function test_revertWhen_passthroughsCalledByStranger() public {
+    /// @dev Governance no longer owns the CTM, so the only route to these owner operations is
+    ///      the executor's `forward` (whose own gate is `test_revertWhen_forwardCalledByStranger`).
+    function test_revertWhen_ctmOwnerOperationsCalledDirectlyByGovernance() public {
         address newValidator = makeAddr("newValidator");
         address newTimelock = makeAddr("validatorTimelockPostV29");
         address oldTimelock = chainContractAddress.validatorTimelockPostV29();
         uint256 oldLimit = IGetters(chainAddress).getPriorityTxMaxGasLimit();
         UtilsFacet(chainAddress).util_setPriorityModeActivated(true);
 
-        vm.startPrank(makeAddr("stranger"));
+        vm.startPrank(governor);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.freezeChain(chainId);
+        chainContractAddress.freezeChain(chainId);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.unfreezeChain(chainId);
+        chainContractAddress.unfreezeChain(chainId);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.revertBatches(chainId, 0);
+        chainContractAddress.revertBatches(chainId, 0);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.setValidator(chainId, newValidator, true);
+        chainContractAddress.setValidator(chainId, newValidator, true);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.setPriorityTxMaxGasLimit(chainId, NEW_PRIORITY_TX_MAX_GAS_LIMIT);
+        chainContractAddress.setPriorityTxMaxGasLimit(chainId, NEW_PRIORITY_TX_MAX_GAS_LIMIT);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.deactivatePriorityMode(chainId);
+        chainContractAddress.deactivatePriorityMode(chainId);
         vm.expectRevert("Ownable: caller is not the owner");
-        ctmExecutor.setValidatorTimelockPostV29(newTimelock);
+        chainContractAddress.setValidatorTimelockPostV29(newTimelock);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setProtocolVersionDeadline(0, 5000);
         vm.stopPrank();
 
         // Nothing reached the chain or the CTM.
@@ -625,6 +618,18 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(IGetters(chainAddress).getPriorityTxMaxGasLimit(), oldLimit);
         assertTrue(UtilsFacet(chainAddress).util_getPriorityModeActivated());
         assertEq(chainContractAddress.validatorTimelockPostV29(), oldTimelock);
+    }
+
+    /// @dev Governance's one call into the bound CTM, through the executor's `forward`, asserting
+    ///      the forward is logged.
+    /// @param _data The CTM calldata.
+    function _forwardToCTM(bytes memory _data) internal {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: address(chainContractAddress), value: 0, data: _data});
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit IUpgradeExecutorBase.CallForwarded(address(chainContractAddress), 0, _data);
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
     }
 
     // ─────────────────────────── post-state verification ───────────────────────────
@@ -642,8 +647,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     }
 
     /// @dev `>=` semantics: the check verifies the transition LANDED, not that it is still the
-    ///      newest — a later hop moving the CTM's version further must not invalidate it, as
-    ///      long as the transition's CTM-domain rows (inert here) still hold.
+    ///      newest — a later hop moving the CTM's version further must not invalidate it.
     function test_validateTransitionApplied_survivesALaterVersionBump() public {
         _runLifecycle(transition);
         CTMTransition first = transition;
@@ -660,6 +664,69 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
 
         ctmExecutor.validateTransitionApplied(ICTMTransition(address(first)));
         ctmExecutor.validateTransitionApplied(ICTMTransition(address(second)));
+    }
+
+    /// @dev The operation's post-state check names the departure, not the object: it holds while
+    ///      the transition (or a replacement of it) is committed, and refuses before the commit.
+    function test_validateOperationApplied_followsTheCommittedDeparture() public {
+        EcosystemUpgradeOperation operation = _operationFor(transition);
+        vm.expectRevert(abi.encodeWithSelector(TransitionNotCommitted.selector, address(transition), address(0)));
+        ctmExecutor.validateOperationApplied(operation);
+
+        _prepareAndExecute(transition);
+        ctmExecutor.validateOperationApplied(operation);
+    }
+
+    /// @dev By-value guards on a supersession. The CTM's replacement rules never let such a
+    ///      commitment stand, so the committed transition is mocked: the test isolates the
+    ///      executor's own check from the CTM.
+    function test_revertWhen_theCommittedDepartureLeftTheSourceRelease() public {
+        _prepareAndExecute(transition);
+        CTMRelease beyond = _deployRelease(5, SemVer.packSemVer(0, 2, 0));
+        CTMTransition foreign = new CTMTransition(
+            TransitionManifest({
+                fromRelease: address(release),
+                newRelease: address(beyond),
+                upgradeEngine: upgradeEngineAddr,
+                oldProtocolVersionDeadline: 1000,
+                upgradeTimestamp: 777,
+                l2Plan: L2PlanFixtures.delegatePlan(L2_DELEGATE_CODE, address(delegateComposer))
+            })
+        );
+        vm.mockCall(
+            address(chainContractAddress),
+            abi.encodeCall(IChainTypeManager.upgradeTransition, (0)),
+            abi.encode(address(foreign))
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(TransitionReleaseMismatch.selector, address(fromRelease), address(release))
+        );
+        ctmExecutor.validateOperationApplied(_operationFor(transition));
+    }
+
+    /// @dev The same isolation, for a committed departure landing before the original target.
+    function test_revertWhen_theCommittedDepartureLandsBeforeTheOriginalTarget() public {
+        _prepareAndExecute(transition);
+        uint256 lowerVersion = SemVer.packSemVer(0, 0, 1);
+        CTMTransition lower = new CTMTransition(
+            TransitionManifest({
+                fromRelease: address(fromRelease),
+                newRelease: address(_deployRelease(1, lowerVersion)),
+                upgradeEngine: upgradeEngineAddr,
+                oldProtocolVersionDeadline: 1000,
+                upgradeTimestamp: 777,
+                l2Plan: L2PlanFixtures.emptyPlan()
+            })
+        );
+        vm.mockCall(
+            address(chainContractAddress),
+            abi.encodeCall(IChainTypeManager.upgradeTransition, (0)),
+            abi.encode(address(lower))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, newVersion, lowerVersion));
+        ctmExecutor.validateOperationApplied(_operationFor(transition));
     }
 
     function test_upgradeChain_rejectsDifferentTransition() public {

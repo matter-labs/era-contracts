@@ -8,9 +8,9 @@ import { packProtocolVersion, readGenesisSemVer } from "./src/helpers/upgrade-te
 // current release's scripts), applied to the previous release's ecosystem (`upgradeSourceStateVersion` in
 // config/anvil-config.json). On this release that is the BOOTSTRAP edge into registry-driven upgrades: the
 // prepare deploys the `CTMUpgradeExecutor` + `RegistryBootstrapMigration`, the governance replay executes the
-// collapsed stage-1 leg — nominate the CTM, hand over its ProxyAdmin, `migrate()`, `acceptCTMOwnership()` — and
-// the chains cross via the legacy handed-cut entrypoint, the production shape for pre-registry chains. See
-// docs/registry-driven-upgrades.md (Bootstrap). The target version is the one in the ZKsync OS genesis config.
+// bootstrap's stages (stage 1 ending in `migrate()`), and the chains cross via the legacy handed-cut entrypoint,
+// the production shape for pre-registry chains. See docs/registry-driven-upgrades.md (Bootstrap). The target
+// version is the one in the ZKsync OS genesis config.
 const genesis = readGenesisSemVer();
 
 runPipelineUpgradeScenario({

@@ -161,20 +161,15 @@ struct TransitionManifest {
 ///        implementation itself — constants, or immutables on L1 (see {IUpgradeInit.sol}). A
 ///        manifest can therefore never route the init call to an arbitrary function or smuggle
 ///        arguments into it.
-/// @param admin The `ProxyAdmin` administering `proxy`. ZERO means the applying executor's own
-///        bound admin — the common case. A nonzero admin names a proxy administered elsewhere (the
-///        `ServerNotifier` under its chainAdmin-owned admin): reads go through it, because a
-///        transparent proxy answers `implementation()` only to its own admin, and the row applies
-///        only if the applying contract OWNS it — otherwise stage 1 leaves the row to that
-///        administrator (event-logged) and stage 2 still requires it applied. The row therefore
-///        names the action in the reviewed description whoever ends up executing it.
+/// @dev No admin field: a row is always applied through the applying contract's bound
+///      `ProxyAdmin`, which administers every proxy of its domain — the `ServerNotifier` included
+///      (see {docs/upgrade-stage-lifecycle.md}).
 // solhint-disable-next-line gas-struct-packing
 struct ProxyUpgradeRow {
     address proxy;
     address expectedOldImpl;
     address implNew;
     bool callInitializeUpgrade;
-    ProxyAdmin admin;
 }
 
 /// @notice One ecosystem upgrade: what changes, and when governance may execute it. Each of the
@@ -220,14 +215,14 @@ struct CoreTransitionManifest {
 
 /// @param ctm The ChainTypeManager proxy this migration bootstraps.
 /// @param expectedProtocolVersion The version the CTM must currently be at (the departing one).
-/// @param ctmProxyAdmin The ProxyAdmin owning every proxy in `proxyUpgrades` (and the CTM proxy).
+/// @param ctmProxyAdmin The ProxyAdmin administering every proxy in `proxyUpgrades` (and the CTM
+///        proxy).
 /// @param proxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
 ///        as {CoreTransitionManifest}): each participating slot applies only if the proxy
 ///        currently points at `expectedOldImpl`. The CTM's own implementation swap is one of
-///        these slots. A row under a FOREIGN admin (the
-///        ServerNotifier's) is left to that administrator: `migrate()` hands onward only
-///        `ctmProxyAdmin`, so a foreign admin must never be transferred to this one-shot object —
-///        hand it to the executor, or keep it and apply the row yourself before stage 2.
+///        these slots, and the `ServerNotifier` slot is mandatory: its proxy is the notifier whose
+///        administration and ownership must already have been handed to the CTM domain (see
+///        {docs/upgrade-stage-lifecycle.md}).
 /// @param currentRelease The genesis release the edge installs as the CTM's `currentRelease`. The
 ///        version the CTM moves to is this release's own ({ReleaseManifest.protocolVersion}).
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
@@ -248,15 +243,18 @@ struct CoreTransitionManifest {
 ///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
 ///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
 ///        drive what it is handed.
-/// @param ctmExecutorOwner The governance the executor must ALREADY answer to: an executor
-///        whose ownership moved between deployment and `migrate()` would receive the whole CTM
-///        domain on behalf of whoever owns it now. The edge therefore names the expected owner
-///        and refuses to hand anything over otherwise — and refuses a PENDING transfer too,
-///        which would let a third party claim the domain right after.
-/// @param coordinator The `EcosystemUpgradeExecutor` the CTM executor must currently answer to
-///        (`coordinator()`) — the only address that can drive the executor's lifecycle
-///        callbacks afterwards. Storage rather than an immutable, since governance may replace
-///        it between operations, so the edge checks it by value.
+/// @param coreExecutor The `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` is handed to in the
+///        same stage-1 transaction; it must be the coordinator's `CORE_EXECUTOR` and answer to it.
+/// @param governance The governance every executor the edge binds (the CTM executor, the core
+///        executor and the coordinator) must ALREADY answer to: an executor whose ownership moved
+///        between deployment and `migrate()` would receive its domain on behalf of whoever owns
+///        it now. The edge therefore names the expected owner and refuses to hand anything over
+///        otherwise — and refuses a PENDING transfer too, which would let a third party claim the
+///        domain right after.
+/// @param coordinator The `EcosystemUpgradeExecutor` both domain executors must answer to
+///        (`coordinator()`), and which must name both of them — the only address that can drive
+///        their lifecycle callbacks afterwards. These bindings are storage, so the edge checks
+///        them by value.
 /// @param upgradeTimer The `GovernanceUpgradeTimer` whose `checkDeadline()` gates the
 ///        edge: stage 0 starts the timer, and `migrate()` refuses to run until the operational
 ///        window has passed — the stage sequencing is enforced by the object itself, not by the
@@ -272,7 +270,8 @@ struct BootstrapManifest {
     AuthoredL2Plan l2Plan;
     uint256 upgradeTimestamp;
     address ctmExecutor;
-    address ctmExecutorOwner;
+    address coreExecutor;
+    address governance;
     address coordinator;
     address upgradeTimer;
 }

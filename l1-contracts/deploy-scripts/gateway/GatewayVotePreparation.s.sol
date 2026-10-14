@@ -304,9 +304,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
             });
         }
-        // else: existing ServerNotifier proxy stays in place. The per-CTM
-        // upgrade flow (`DefaultCTMUpgrade.prepareUpgradeServerNotifierCall`)
-        // already emits a `ProxyAdmin.upgrade(existing, newImpl)` for it, so
+        // else: existing ServerNotifier proxy stays in place; its implementation
+        // swaps ride the per-CTM upgrade's CTM-domain rows, so
         // GatewayVotePreparation has no extra work to do — `ecosystemAdminCalls`
         // is left empty (length 0).
 

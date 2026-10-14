@@ -92,10 +92,12 @@ library LegacyBootstrapSequence {
     function stage2(Inputs memory _in) internal pure returns (Call[] memory calls) {
         calls = new Call[](5);
         // Core prepare.
+        // The core executor's row check this call made no longer exists, so it is transcribed by
+        // its signature.
         calls[0] = Call({
             target: _in.coreUpgradeExecutor,
             value: 0,
-            data: abi.encodeCall(CoreUpgradeExecutor.validateUpgradeApplied, (ICoreTransition(_in.coreTransition)))
+            data: abi.encodeWithSignature("validateUpgradeApplied(address)", _in.coreTransition)
         });
         calls[1] = Call({
             target: _in.coreUpgradeExecutor,

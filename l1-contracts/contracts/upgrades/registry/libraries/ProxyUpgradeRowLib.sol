@@ -35,17 +35,6 @@ library ProxyUpgradeRowLib {
     ///         off-chain manifest).
     event ProxyImplementationUpgraded(address indexed proxy, address newImpl);
 
-    /// @notice Emitted (from the applying contract) for a row whose explicitly named `ProxyAdmin`
-    ///         the applying contract does not own: the row is left to that administrator, and the
-    ///         applied-state check still requires it.
-    event ProxyRowLeftToAdministrator(address indexed proxy, address indexed admin);
-
-    /// @notice The admin a row is read and applied through: its own named `admin`, or the
-    ///         applying contract's bound `_defaultAdmin` when the row names none.
-    function adminOf(ProxyAdmin _defaultAdmin, ProxyUpgradeRow memory _row) internal pure returns (ProxyAdmin) {
-        return address(_row.admin) == address(0) ? _defaultAdmin : _row.admin;
-    }
-
     /// @notice Flattens an enum-indexed inventory into rows. Its length must be exactly the domain
     ///         enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT` — the
     ///         caller passes its domain's), so every member of the domain HAS a slot and none can
@@ -93,41 +82,17 @@ library ProxyUpgradeRowLib {
         }
     }
 
-    /// @notice Reverts unless every row has been APPLIED: the proxy's live implementation, read
-    ///         through `_admin` (the same authority that applied it), is `implNew`. The
-    ///         post-state counterpart of `applyRows`' source check — a stage-2 gate calls this so
-    ///         a bundle cannot conclude with a swap silently missing.
-    /// @dev Meaningful right after the upgrade that carries the rows: a LATER upgrade legitimately
-    ///      moves proxies past `implNew`, after which this reverts by design (the rows describe
-    ///      one edge, not a standing invariant).
-    function requireRowsApplied(ProxyAdmin _admin, ProxyUpgradeRow[] memory _rows) internal view {
-        uint256 length = _rows.length;
-        for (uint256 i = 0; i < length; ++i) {
-            address liveImpl = adminOf(_admin, _rows[i]).getProxyImplementation(
-                ITransparentUpgradeableProxy(_rows[i].proxy)
-            );
-            if (liveImpl != _rows[i].implNew) {
-                revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].implNew, liveImpl);
-            }
-        }
-    }
-
-    /// @notice Applies every row with the source-checked semantics above, each through the admin
-    ///         that administers its proxy (`adminOf`). A row under the bound `_admin` the caller
-    ///         does not own reverts as before (a misbound applier is a configuration error); a row
-    ///         under an explicitly named foreign admin the caller does not own is LEFT to that
-    ///         administrator and logged — `requireRowsApplied` still demands it afterwards.
+    /// @notice Applies every row with the source-checked semantics above through `_admin`, the
+    ///         applying contract's bound `ProxyAdmin`, which administers every proxy of its domain,
+    ///         then verifies every row's proxy runs its `implNew` before returning.
+    /// @dev The verification is a separate pass after every swap, so a reinitializer that moves
+    ///      any proxy of the row set is caught too.
     function applyRows(ProxyAdmin _admin, ProxyUpgradeRow[] memory _rows) internal {
         uint256 length = _rows.length;
         for (uint256 i = 0; i < length; ++i) {
-            ProxyAdmin admin = adminOf(_admin, _rows[i]);
             ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(_rows[i].proxy);
-            if (address(_rows[i].admin) != address(0) && admin.owner() != address(this)) {
-                emit ProxyRowLeftToAdministrator(address(proxy), address(admin));
-                continue;
-            }
             address newImpl = _rows[i].implNew;
-            address liveImpl = admin.getProxyImplementation(proxy);
+            address liveImpl = _admin.getProxyImplementation(proxy);
             if (liveImpl == newImpl) {
                 continue;
             }
@@ -136,11 +101,17 @@ library ProxyUpgradeRowLib {
             }
             if (_rows[i].callInitializeUpgrade) {
                 // The reinitializer carries no arguments and no data — see {IUpgradeInit.sol}.
-                admin.upgradeAndCall(proxy, newImpl, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()));
+                _admin.upgradeAndCall(proxy, newImpl, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()));
             } else {
-                admin.upgrade(proxy, newImpl);
+                _admin.upgrade(proxy, newImpl);
             }
             emit ProxyImplementationUpgraded(address(proxy), newImpl);
+        }
+        for (uint256 i = 0; i < length; ++i) {
+            address liveImpl = _admin.getProxyImplementation(ITransparentUpgradeableProxy(_rows[i].proxy));
+            if (liveImpl != _rows[i].implNew) {
+                revert ProxyUpgradeRowMismatch(_rows[i].proxy, _rows[i].implNew, liveImpl);
+            }
         }
     }
 

@@ -352,11 +352,10 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Execute zero-value calls against Ownable targets as their current
-    /// owners. This is used for operational admin surfaces that intentionally
-    /// stay outside governance ownership, such as the ServerNotifier
-    /// ProxyAdmin. Contract owners without an explicit registry entry are
-    /// treated as ChainAdmin-style wrappers, matching the ServerNotifier
-    /// ownership model used by CTM deployments.
+    /// owners: the CTM-admin calls of a prepare (`[ctm_admin_calls]`), today
+    /// only the bootstrap's one-time ServerNotifier handover. Contract owners
+    /// without an explicit registry entry are treated as ChainAdmin-style
+    /// wrappers, the pre-v35 ServerNotifier ownership model.
     function executeOwnableCallsWithWraps(bytes memory _callsToExecute, OwnerWrap[] memory _wraps) public {
         Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
         for (uint256 i = 0; i < calls.length; i++) {

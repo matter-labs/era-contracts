@@ -21,7 +21,7 @@ interface ICoreUpgradeExecutor {
     /// @notice Emitted when the coordinator reserves this executor for an operation's core leg.
     event OperationReserved(address indexed operation, address indexed coreTransition);
 
-    /// @notice Emitted by `completeOperation`: the core transition is applied and the reservation released.
+    /// @notice Emitted by `completeOperation`: the reservation of an executed operation is released.
     event OperationCompleted(address indexed operation);
 
     /// @notice Emitted by `abandonOperation`: the reservation is released, nothing verified.
@@ -44,17 +44,13 @@ interface ICoreUpgradeExecutor {
     function beginOperation(IEcosystemUpgradeOperation _operation) external;
 
     /// @notice Applies a core transition's source-checked implementation swaps through the bound
-    ///         `ProxyAdmin`.
+    ///         `ProxyAdmin`, and verifies every row at its `implNew` before returning.
     /// @param _coreTransition The write-once core transition approved by governance.
     function applyL1Upgrade(ICoreTransition _coreTransition) external;
 
-    /// @notice Requires the reserved transition applied, then releases the reservation.
+    /// @notice Releases the reservation of an operation stage 1 executed.
     function completeOperation() external;
 
     /// @notice Releases the reservation this executor holds without verifying anything.
     function abandonOperation() external;
-
-    /// @notice Reverts unless every row of `_coreTransition` is applied: each proxy points at its
-    ///         `implNew`, read live through the bound `ProxyAdmin`.
-    function validateUpgradeApplied(ICoreTransition _coreTransition) external view;
 }

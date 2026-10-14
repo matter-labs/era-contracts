@@ -63,16 +63,18 @@ error BootstrapAlreadyExecuted();
 error BootstrapAuthorityNotHeld(address target, address actualOwner);
 // 0xb772460f
 error BootstrapExecutorNotBound(address executor, address expectedTarget, address actualTarget);
-// 0x53ec216a
-error BootstrapExecutorOwnerMismatch(address expectedOwner, address actualOwner);
-// 0xc819eb06
-error BootstrapExecutorOwnershipPending(address pendingOwner);
+// 0x00fcba27
+error BootstrapExecutorOwnerMismatch(address executor, address expectedOwner, address actualOwner);
 // 0x8a593161
 error BootstrapNominationPending(address target, address pendingOwner);
 // 0x447aee1e
 error BootstrapNotYetExecuted();
 // 0x24c8e294
 error BootstrapReleaseNotInstalled(address expected, address actual);
+// 0x5f5dd61c
+error BootstrapServerNotifierNotBound(address expected, address actual);
+// 0xdc145e4f
+error BootstrapServerNotifierRowMissing();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
@@ -356,10 +358,14 @@ error OnlyNormalMode();
 error OnlyPriorityMode();
 // 0x6c167909
 error OnlySelfAllowed();
+// 0x7cc71545
+error OperationCarriesNoTransition(address operation);
 // 0xcfc11a41
 error OperationChangesNothing();
 // 0x1a21feed
 error OperationExists();
+// 0xe27b2c86
+error OperationManifestChanged(bytes32 pinned, bytes32 served);
 // 0xeda2fbb1
 error OperationMustBePending();
 // 0xe1c1ff37

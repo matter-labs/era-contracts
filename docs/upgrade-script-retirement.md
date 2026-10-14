@@ -38,8 +38,9 @@ Finished, and described where it now lives:
   checks the timer's deadline, the CTM's version-edge commit refuses to run unpaused, and
   `validateApplied()` refuses while the CTM's migrations are still paused. The contract remains
   only because the v31 verifier reads its deployment.
-- **The ServerNotifier admin call is rendered from the reviewed row**, not defined a second time in
-  the script (`prepareUpgradeServerNotifierCall`; `ServerNotifierRowCall.t.sol`).
+- **The ServerNotifier is an ordinary CTM-domain row.** After the bootstrap's one-time handover
+  (rendered from live state, `CTMUpgrade_v35.serverNotifierHandoverCalls`;
+  `ServerNotifierHandover.t.sol`) no prepare emits an admin call for it.
 - **`ProposedUpgrade` is gone.** The engines read the transition (`upgradeFromTransition`) or the
   migration (`upgradeFromBootstrap`); nothing is repackaged into an intermediate struct.
 - **`CTMUpgradeBase` and `DefaultL2UpgradeStrategy` are gone**; the L2 side a version authors is
@@ -128,14 +129,13 @@ source and target snapshots; that is withdrawn.
 ### Gate
 
 Exercise facet-only, verifier-only, timelock-only, notifier-only, core-only and mixed upgrades
-through the CURRENT objects. Test stale source state, wrong admin, codehash mismatch and
-foreign-admin completion. Every address a prepare no longer reconstructs must be shown to come
+through the CURRENT objects. Test stale source state, wrong admin and codehash mismatch. Every address a prepare no longer reconstructs must be shown to come
 from a getter the deployed contracts expose.
 
 ## Batch 3: move cross-contract follow-up work into audited execution
 
 Inventory all declared external actions and classify each by reason: bootstrap authorization,
-foreign administrator, upgrade-specific wiring, governance self-upgrade, or Gateway operations.
+upgrade-specific wiring, governance self-upgrade, or Gateway operations.
 
 For wiring intrinsic to an upgrade, prefer an existing implementation's fixed initializer when it
 has the required authority and can express the complete action. Otherwise define a narrowly scoped,
@@ -151,7 +151,7 @@ allowlisted description does not grant execution rights.
 
 Gate: a representative multi-contract upgrade with real authorization. A failed follow-up must
 revert the atomic leg; skipped or incorrectly applied work must prevent normal completion. Test
-unauthorized targets, replay, a foreign-admin row and abandonment after stage 1.
+unauthorized targets, replay and abandonment after stage 1.
 
 ## Batch 4: establish deployment wiring and authority on-chain
 

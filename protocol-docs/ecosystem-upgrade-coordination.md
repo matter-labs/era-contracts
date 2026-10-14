@@ -24,8 +24,10 @@ registry, a nonempty row set, or a nonzero transition. An all-inert inventory do
 mere presence of the container must never make an operation that upgrades nothing look like one
 that upgrades something — so such a manifest is refused at construction.
 
-The coordinator stores one pending operation and its stage. Later public stages require
-that exact operation, so a stale governance transaction cannot act on a replacement proposal.
+The coordinator stores one pending operation, its stage, and the operation's `manifestHash()` as
+stage 0 read it. Later public stages require that exact operation, still serving that hash and a
+manifest that hashes to it, so a stale governance transaction cannot act on a replacement proposal
+and an object whose answers change between stages is refused.
 
 ### One home per responsibility
 
@@ -79,28 +81,32 @@ CTM also verifies it is the coordinator's bound executor.
 Stage 1 checks the timer deadline, applies the optional core transition, then the CTM leg: the
 infrastructure rows first, then the transition's version commit when the operation carries one. The
 rows go first because the commit may need a setter that only the implementation this very operation
-installs has. The entire stage is atomic; no CTM callback applies core upgrades independently. The
-ordering makes the atomicity case a specific one: an infrastructure failure cannot roll back a
-commit that never happened, so what has to hold is the reverse — rows that already applied are
-rolled back when the transition leg then fails.
+installs has. Each leg then verifies what it applied before it returns: every row's proxy runs its
+`implNew`, and the transition's departure is committed and its target reached. The entire stage is
+atomic; no CTM callback applies core upgrades independently. The ordering makes the atomicity case
+a specific one: an infrastructure failure cannot roll back a commit that never happened, so what
+has to hold is the reverse — rows that already applied are rolled back when the transition leg
+then fails.
 
-Stage 2 verifies and completes the optional core domain, then the CTM. The CTM's completion
-requires every infrastructure row applied AND, when the operation carries one, its transition
-committed and reached. A CTM failure rolls back core completion. Foreign-admin rows must already be
-applied. Completion concerns L1 execution; it does not claim that every chain has completed its L2
-upgrade.
+Stage 2 checks the timer deadline again — a deadline extension made after stage 1 defers
+completion too — then releases the optional core reservation and the CTM's, lifting the CTM's
+migration pause. It re-reads nothing stage 1 applied: application was verified in the transaction
+that made it, and governance may legitimately re-patch an implementation between the stages, or
+replace the committed transition (see [Replacing a committed transition](#replacing-a-committed-transition)).
+Completion concerns L1 execution; it does not claim that every chain has completed its L2 upgrade.
 
 ### Pause policy
 
 The CTM domain is reserved and its migrations paused for EVERY operation, whether or not it carries
-a transition. Making the transition optional deliberately did not make reservation, pausing or the
-stage-2 completion checks conditional: an infrastructure change swaps implementations under chains
+a transition. Making the transition optional deliberately did not make reservation or pausing
+conditional: an infrastructure change swaps implementations under chains
 that could otherwise be migrating, and "does a version edge ride along" is not a signal the
 coordinator should infer a safe migration window from. This is the conservative choice for the
 first implementation, not a proof that a narrower policy would be wrong.
 
-Abandonment clears reservations without reversing already committed upgrades and leaves
-migrations paused. Governance explicitly decides whether to resume them.
+Abandonment clears reservations without reversing already committed upgrades. Whether migrations
+resume is governance's explicit decision, made in the same call: `abandonPendingOperation(true)`
+also lifts this CTM's pause through the CTM executor, `false` leaves it held.
 
 ## Authorization and recovery
 
@@ -109,8 +115,9 @@ declaring the same governance owner is not evidence of authorization. `beginOper
 CTM execution, completion and abandonment derive their inputs from it. Core execution
 checks its registry argument against the reservation. A domain cannot be reserved for
 one registry or transition and driven with another. Replacement is forbidden while the domain has a pending
-operation. Existing governance operational entrypoints and the logged ordinary-call
-recovery path remain available.
+operation. Every other owner operation of a domain — freezing a chain, moving a deadline, replacing a
+committed transition — is an ordinary call through the executor's owner-gated, event-logged
+`forward`; the executors carry no typed passthroughs for them.
 
 The coordinator's owner binds `ctmExecutor` using `setCTMExecutor` after bootstrap deployment.
 The executor must already name this coordinator. The binding cannot change while an operation
@@ -118,6 +125,37 @@ is pending; replacing an executor must preserve its `CHAIN_TYPE_MANAGER` identit
 the coordinator, deploy the replacement, change the domain bindings while idle, then bind its
 CTM executor before preparing an operation. Governance approval of deployed code and authority
 remains required; these binding checks do not authenticate arbitrary executor code.
+
+## Replacing a committed transition
+
+A transition already committed for a departed version can be repaired without moving the CTM:
+`ChainTypeManager.replaceUpgradeTransition(expected, replacement)`, called by governance through the
+CTM executor's `forward`. It is compare-and-replace — `expected` must be the transition committed
+for that departure now, so a stale proposal fails — and it moves neither `protocolVersion` nor
+`currentRelease`, so it needs no reservation, pause or timer.
+
+**Recovery invariant.** Every committed departure keeps a path to the CTM's current release. A
+replacement therefore departs from the SAME release object (and so the same version) with the same
+pinned deadline, lands no earlier than what it replaces, and lands on a release a chain can continue
+from: the current release at the current version, otherwise the source release of the transition
+committed onward from its target version. Nothing revokes a commitment without replacing it, so
+ordinary commits extend the path and replacements only redirect it into the existing one. A
+different release object that merely shares a committed version number is never a destination. The
+replacement's own `validate()` and the publication of its L2 bytecodes on the CTM's supplier are
+checked as on a commit. The invariant is structural: it does not prove that an intermediate
+release's L2 effects may be skipped, which remains a review question.
+
+Consequences:
+
+- A chain that has not crossed the departure executes the replacement; `upgradeChain` names the
+  committed transition exactly, so the replaced object stops working at once.
+- A chain that already crossed keeps the state it reached and continues on its own onward edge: the
+  chain-side version check refuses to replay the replacement from the earlier source.
+- A deadline change stays a separate `setProtocolVersionDeadline`, which may ride the same `forward`.
+- An operation whose transition was replaced between its stages still completes: its departure is
+  still committed, by a transition from the same source landing no earlier.
+- Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) are repaired by the
+  legacy cut setter, which refuses a registry-committed departure.
 
 ## Future multi-CTM extension
 
@@ -141,7 +179,10 @@ introduce placeholder lists, loops or a second CTM today solely for this extensi
 
 Cover the no-change rejection, each change on its own (core-only, infrastructure-only,
 transition-only), an infrastructure-only operation moving no version, stage ordering, timer
-enforcement, rollback of applied rows when the transition leg fails, wrong coordinator binding,
+enforcement at stages 1 and 2, a changed manifest refused after stage 0, rollback of applied rows
+when the transition leg fails, a row left off its target failing stage 1, completion after an
+infrastructure re-patch and after a transition replacement, abandonment with and without the
+unpause, wrong coordinator binding,
 rebinding while pending, a different-CTM replacement refusal, valid same-CTM executor succession,
 and per-chain upgrades. Exercise the bootstrap binding and recurring operation through production
 preparation and both Anvil pipelines.

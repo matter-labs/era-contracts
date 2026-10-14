@@ -107,8 +107,7 @@ contract EcosystemUpgradeCoordinationTest is CTMUpgradeExecutorFixture {
             proxy: address(ecosystemProxy),
             expectedOldImpl: implOld,
             implNew: implNew,
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: false
         });
         coreTransition = new CoreTransition(manifest);
     }

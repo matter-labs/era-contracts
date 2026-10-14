@@ -40,7 +40,8 @@ pub(super) struct LifecycleReview {
     /// The governance address every executor was constructed for.
     pub(super) owner: Option<Address>,
     pub(super) coordinator: Address,
-    /// The core executor the coordinator was built over (package `core_upgrade_executor_addr`).
+    /// The core executor the coordinator was built over: the bootstrap manifest's `coreExecutor`,
+    /// or package `core_upgrade_executor_addr` for a recurring upgrade.
     pub(super) core_executor: Option<Address>,
     /// The ecosystem `ProxyAdmin` the core executor was built over (package
     /// `transparent_proxy_admin`).

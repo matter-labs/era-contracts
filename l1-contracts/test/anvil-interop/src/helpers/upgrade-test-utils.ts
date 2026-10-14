@@ -7,7 +7,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
-import { SEMVER_MAJOR_OFFSET, SEMVER_MINOR_OFFSET } from "../core/const";
+import { EIP1967_ADMIN_SLOT, EIP1967_IMPL_SLOT, SEMVER_MAJOR_OFFSET, SEMVER_MINOR_OFFSET } from "../core/const";
 import type { ChainRole } from "../core/types";
 
 // The genesis config the default upgrade scripts read their target version from.
@@ -47,6 +47,20 @@ export async function clearGenesisUpgradeTxHash(
   for (const chain of chains) {
     await provider.send("anvil_setStorageAt", [chain.diamondProxy, "0x22", ethers.constants.HashZero]);
   }
+}
+
+/** A transparent proxy's admin, read from its EIP-1967 slot: the proxy answers `admin()` only to it. */
+export async function readProxyAdmin(provider: ethers.providers.Provider, proxy: string): Promise<string> {
+  return readAddressSlot(provider, proxy, EIP1967_ADMIN_SLOT);
+}
+
+/** A transparent proxy's implementation, read from its EIP-1967 slot. */
+export async function readProxyImplementation(provider: ethers.providers.Provider, proxy: string): Promise<string> {
+  return readAddressSlot(provider, proxy, EIP1967_IMPL_SLOT);
+}
+
+async function readAddressSlot(provider: ethers.providers.Provider, account: string, slot: string): Promise<string> {
+  return ethers.utils.getAddress(ethers.utils.hexDataSlice(await provider.getStorageAt(account, slot), 12));
 }
 
 export function selectUpgradeChains(

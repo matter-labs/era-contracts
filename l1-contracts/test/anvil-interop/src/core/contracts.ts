@@ -54,6 +54,8 @@ const ARTIFACTS = {
   // CTM implementation the bootstrap's proxy row swaps in.
   RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
   GovernanceUpgradeTimer: "GovernanceUpgradeTimer.sol/GovernanceUpgradeTimer.json",
+  // The bootstrap's mandatory notifier row swaps in a fresh implementation of it.
+  ServerNotifier: "ServerNotifier.sol/ServerNotifier.json",
   LegacyTestAdminFacet: "LegacyTestAdminFacet.sol/LegacyTestAdminFacet.json",
   ChainTypeManager: "ChainTypeManager.sol/ChainTypeManager.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",

@@ -30,7 +30,7 @@ interface IEcosystemUpgradeExecutor {
     /// @notice Emitted by `stage1` after the core leg and the operation's CTM leg were applied.
     event OperationExecuted(address indexed operation);
 
-    /// @notice Emitted by `stage2` after every leg verified and the migration pause was released.
+    /// @notice Emitted by `stage2` after every reservation and the migration pause were released.
     event OperationCompleted(address indexed operation);
 
     /// @notice Emitted when governance abandons the pending operation.
@@ -43,4 +43,8 @@ interface IEcosystemUpgradeExecutor {
     function pendingOperation() external view returns (IEcosystemUpgradeOperation);
 
     function pendingStage() external view returns (UpgradeStage);
+
+    /// @notice The pending operation's `manifestHash()`, pinned by `stage0`: stages 1 and 2 refuse
+    ///         an operation that no longer serves it.
+    function pendingManifestHash() external view returns (bytes32);
 }

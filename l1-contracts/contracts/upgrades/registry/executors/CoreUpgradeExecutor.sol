@@ -109,11 +109,8 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase, ICoreUpgradeExecutor {
     }
 
     /// @inheritdoc ICoreUpgradeExecutor
-    /// @dev The ecosystem leg has no pause of its own; what completion adds over abandonment is
-    ///      the verification, owned by the domain that applied the rows.
     function completeOperation() external onlyCoordinator {
         IEcosystemUpgradeOperation operation = _requireActive();
-        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, reservedCoreTransition().ecosystemRows());
         delete activeOperation;
         emit OperationCompleted(address(operation));
     }
@@ -131,13 +128,5 @@ contract CoreUpgradeExecutor is UpgradeExecutorBase, ICoreUpgradeExecutor {
         if (address(operation) == address(0)) {
             revert NoPendingOperation();
         }
-    }
-
-    /// @inheritdoc ICoreUpgradeExecutor
-    /// @dev The row check describes one edge, not a standing invariant: a later upgrade moves
-    ///      proxies past these rows and this then reverts by design.
-    function validateUpgradeApplied(ICoreTransition _coreTransition) external view {
-        address(_coreTransition).requireCode();
-        ProxyUpgradeRowLib.requireRowsApplied(PROXY_ADMIN, _coreTransition.ecosystemRows());
     }
 }

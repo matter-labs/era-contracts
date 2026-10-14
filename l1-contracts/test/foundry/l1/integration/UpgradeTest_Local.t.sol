@@ -39,7 +39,6 @@ import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
-import {IRegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {BootstrapManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
@@ -197,8 +196,8 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     ///      CTM-domain admin to the CTM executor. Model that shape by moving the CTM proxy and
     ///      the per-CTM proxies that can carry an inventory row (`CTMContract`) onto a fresh
     ///      admin, owned by the same identity as the shared one, before prepare. The
-    ///      ServerNotifier is deliberately left where it is: its ProxyAdmin is chainAdmin-owned
-    ///      in production too, which is the foreign-admin row case.
+    ///      ServerNotifier is put in its pre-v35 production shape instead — under its own
+    ///      ProxyAdmin owned by the CTM's ChainAdmin — so the bootstrap's one-time handover runs.
     function _splitCTMProxyAdmin() private {
         address ctm = address(addresses.chainTypeManager);
         ProxyAdmin sharedAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(ctm));
@@ -220,6 +219,13 @@ abstract contract UpgradeIntegrationBootstrapFixture is
             vm.prank(sharedAdminOwner);
             sharedAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(payable(proxy)), address(ctmAdmin));
         }
+
+        address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
+        ProxyAdmin liveNotifierAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(notifier));
+        ProxyAdmin notifierAdmin = new ProxyAdmin();
+        notifierAdmin.transferOwnership(ctmAddresses.chainAdmin);
+        vm.prank(liveNotifierAdmin.owner());
+        liveNotifierAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(payable(notifier)), address(notifierAdmin));
     }
 
     function setUp() public virtual {
@@ -283,6 +289,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         address ecosystemProxyAdmin = coreOutput.readAddress("$.upgrade_addresses.shared.transparent_proxy_admin");
 
         // The package summary the verifier cross-checks against the manifest.
+        assertEq(coreExecutor, manifest.coreExecutor, "the manifest names the core prepare's executor");
         assertEq(coreOutput.readAddress("$.registry.ecosystem_upgrade_executor_addr"), manifest.coordinator);
         assertEq(ctmOutput.readAddress("$.registry.coordinator_addr"), manifest.coordinator);
         assertEq(ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr"), manifest.ctmExecutor);
@@ -293,14 +300,14 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             ctmOutput.readAddress("$.deployed_addresses.transparent_proxy_admin"),
             address(manifest.ctmProxyAdmin)
         );
-        assertEq(ctmOutput.readAddress("$.admin.timer_governance_addr"), manifest.ctmExecutorOwner);
+        assertEq(ctmOutput.readAddress("$.admin.timer_governance_addr"), manifest.governance);
 
         // The core leg, under the core prepare's salt.
         assertEq(
             DeployScriptUtils.canonicalCreate2Address(
                 coreSalt,
                 vm.getCode("CoreUpgradeExecutor.sol:CoreUpgradeExecutor"),
-                abi.encode(manifest.ctmExecutorOwner, ecosystemProxyAdmin)
+                abi.encode(manifest.governance, ecosystemProxyAdmin)
             ),
             coreExecutor,
             "the core executor re-derives from the reviewed owner and the ecosystem ProxyAdmin"
@@ -309,7 +316,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             DeployScriptUtils.canonicalCreate2Address(
                 coreSalt,
                 vm.getCode("EcosystemUpgradeExecutor.sol:EcosystemUpgradeExecutor"),
-                abi.encode(manifest.ctmExecutorOwner, coreExecutor)
+                abi.encode(manifest.governance, coreExecutor)
             ),
             manifest.coordinator,
             "the coordinator re-derives from the reviewed owner and the core executor"
@@ -329,7 +336,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             DeployScriptUtils.canonicalCreate2Address(
                 ctmSalt,
                 vm.getCode("CTMUpgradeExecutor.sol:CTMUpgradeExecutor"),
-                abi.encode(manifest.ctmExecutorOwner, manifest.ctm, manifest.ctmProxyAdmin, manifest.coordinator)
+                abi.encode(manifest.governance, manifest.ctm, manifest.ctmProxyAdmin, manifest.coordinator)
             ),
             manifest.ctmExecutor,
             "the CTM executor re-derives from the manifest's owner and bindings"
@@ -341,7 +348,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
                 abi.encode(
                     ctmOutput.readUint("$.contracts_config.governance_upgrade_timer_initial_delay"),
                     2 weeks,
-                    manifest.ctmExecutorOwner,
+                    manifest.governance,
                     ctmOutput.readAddress("$.admin.ecosystem_admin_addr")
                 )
             ),
@@ -480,43 +487,49 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "the new chain carries the release engine's genesis transaction"
         );
 
-        // The whole bootstrap edge — both domains — is DERIVED from `RegistryBootstrapSequence`
-        // and declared by the CTM prepare; the core prepare of this edge declares nothing, so the
-        // merged bundles are exactly the object's. The harness already executed the merged stage-2
-        // bundle green in `internalTest`; assert the emitted call list shape, that the completion
-        // gate still holds against the final state, and that both bindings landed.
-        address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
-        EcosystemUpgradeExecutor coordinator = bootstrap.ecosystemUpgradeExecutor();
-        RegistryBootstrapSequence sequence = bootstrap.bootstrapSequence();
-        Call[] memory stage2 = bootstrap.prepareStage2GovernanceCalls();
-        assertEq(stage2.length, 4, "v35 stage 2: two bindings, the unpause and the completion gate");
+        _assertBootstrapJoinsTheLifecycle(bootstrap, ctm, bridgehub, executor);
+    }
+
+    /// @dev The whole bootstrap edge — both domains — is DERIVED from `RegistryBootstrapSequence`
+    ///      and declared by the CTM prepare; the core prepare of this edge declares nothing, so the
+    ///      merged bundles are exactly the object's. The harness already executed them green in
+    ///      `internalTest`; this asserts the emitted shape, that both bindings landed in stage 1,
+    ///      that the completion check — its own call, outside every bundle — holds, and the
+    ///      notifier handover.
+    function _assertBootstrapJoinsTheLifecycle(
+        CTMUpgradeForLocalTest _bootstrap,
+        address _ctm,
+        address _bridgehub,
+        address _executor
+    ) private {
+        address chainAssetHandler = IBridgehubBase(_bridgehub).chainAssetHandler();
+        EcosystemUpgradeExecutor coordinator = _bootstrap.ecosystemUpgradeExecutor();
+        Call[] memory stage1 = _bootstrap.prepareStage1GovernanceCalls();
+        Call[] memory stage2 = _bootstrap.prepareStage2GovernanceCalls();
+        assertEq(stage1.length, 8, "v35 stage 1: pause, two bindings, the core leg and the CTM handover");
+        assertEq(stage1[1].target, address(coreUpgrade.getCoreUpgradeExecutor()), "the core binding rides stage 1");
+        assertEq(stage1[2].target, address(coordinator), "the coordinator binding rides stage 1");
+        assertEq(stage2.length, 1, "v35 stage 2: the unpause alone");
+        assertEq(stage2[0].target, chainAssetHandler, "stage 2 lifts the migration pause");
         assertEq(
-            bootstrap.externalActionEntries().length,
-            13,
-            "the bootstrap's CTM prepare declares every derived governance call plus its admin call"
+            _bootstrap.externalActionEntries().length,
+            14,
+            "the CTM prepare declares the 3 + 8 + 1 derived governance calls and the 2 handover admin calls"
         );
         assertEq(coreUpgrade.externalActionEntries().length, 0, "the core prepare of a derived edge authors nothing");
-        assertEq(address(coordinator.ctmExecutor()), executor, "coordinator CTM binding");
-        assertEq(stage2[2].target, address(coordinator), "the coordinator binding rides stage 2");
-        assertEq(stage2[3].target, address(sequence), "stage 2 ends with the derived completion gate");
-        assertEq(
-            stage2[3].data,
-            abi.encodeCall(IRegistryBootstrapSequence.validateApplied, ()),
-            "the completion gate is `validateApplied()`"
-        );
-        // The gate asserts BOTH domains, so this one call covers the migration's post-state check
-        // and the core executor's applied-row check.
+        assertEq(address(coordinator.ctmExecutor()), _executor, "coordinator CTM binding");
+        RegistryBootstrapSequence sequence = _bootstrap.bootstrapSequence();
         sequence.validateApplied();
-        assertEq(sequence.MIGRATION(), address(bootstrap.bootstrapMigration()), "the gate names this edge");
+        assertEq(sequence.MIGRATION(), address(_bootstrap.bootstrapMigration()), "the check names this edge");
         assertEq(
-            CTMUpgradeExecutor(payable(executor)).coordinator(),
+            CTMUpgradeExecutor(payable(_executor)).coordinator(),
             address(coordinator),
             "the CTM executor answers to the coordinator"
         );
         assertEq(
             coreUpgrade.getCoreUpgradeExecutor().coordinator(),
             address(coordinator),
-            "the core stage 2 must bind the core executor to the coordinator"
+            "stage 1 must bind the core executor to the coordinator"
         );
         assertEq(
             address(coordinator.CORE_EXECUTOR()),
@@ -527,21 +540,26 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         // ownership, which `migrate()` already handed to the executor. What the join must leave is
         // an UNPAUSED CTM — nothing pauses until a transition's stage 0.
         assertEq(
-            IOwnable(ctm).owner(),
-            executor,
+            IOwnable(_ctm).owner(),
+            _executor,
             "the executor owns the CTM, which is what lets it pause that CTM's migrations"
         );
-        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm), "no pause before stage 0");
+        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(_ctm), "no pause before stage 0");
 
-        // The ServerNotifier swap rode the ChainAdmin's own call (`ctm_admin_calls`), rendered from
-        // the row the bootstrap manifest pins under the notifier's foreign admin — the row
-        // `validateApplied()` above required applied.
-        address notifierProxy = bootstrap.getAddresses().stateTransition.proxies.serverNotifier;
+        // The ChainAdmin handed the notifier over (`ctm_admin_calls`), stage 0 accepted it, and
+        // `migrate()` swapped it through the CTM-domain ProxyAdmin like the CTM's own row.
+        address notifierProxy = _bootstrap.getAddresses().stateTransition.proxies.serverNotifier;
         assertEq(
             DeployScriptUtils.getImplementation(notifierProxy),
-            bootstrap.getAddresses().stateTransition.implementations.serverNotifier,
+            _bootstrap.getAddresses().stateTransition.implementations.serverNotifier,
             "the notifier runs the implementation its pinned row names"
         );
+        assertEq(
+            DeployScriptUtils.getProxyAdminAddress(notifierProxy),
+            DeployScriptUtils.getProxyAdminAddress(_ctm),
+            "the notifier sits under the CTM-domain ProxyAdmin"
+        );
+        assertEq(IOwnable(notifierProxy).owner(), _executor, "the notifier is the CTM executor's");
     }
 
     /// @dev Decodes an `upgradeFromBootstrap(address)` init payload; external so the selector can

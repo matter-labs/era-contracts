@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
@@ -174,13 +173,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
 
     function _row(address _proxy) internal view returns (ProxyUpgradeRow memory) {
         return
-            ProxyUpgradeRow({
-                proxy: _proxy,
-                expectedOldImpl: implOld,
-                implNew: implNew,
-                callInitializeUpgrade: false,
-                admin: ProxyAdmin(address(0))
-            });
+            ProxyUpgradeRow({proxy: _proxy, expectedOldImpl: implOld, implNew: implNew, callInitializeUpgrade: false});
     }
 
     /// @dev What a release names, read off its manifest: DiamondInit, genesis upgrade, verifier,

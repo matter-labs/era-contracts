@@ -300,8 +300,13 @@ abstract contract RegistryObjectsFixture is Test {
             proxy: makeAddr("ctmProxy"),
             expectedOldImpl: makeAddr("ctmImplOld"),
             implNew: _deployedStub("ctmImplNew"),
-            callInitializeUpgrade: false,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: false
+        });
+        rows[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: makeAddr("serverNotifierProxy"),
+            expectedOldImpl: makeAddr("serverNotifierImplOld"),
+            implNew: _deployedStub("serverNotifierImplNew"),
+            callInitializeUpgrade: false
         });
         return
             BootstrapManifest({
@@ -315,7 +320,8 @@ abstract contract RegistryObjectsFixture is Test {
                 l2Plan: _plan,
                 upgradeTimestamp: _upgradeTimestamp,
                 ctmExecutor: _deployedStub("ctmExecutor"),
-                ctmExecutorOwner: makeAddr("governor"),
+                coreExecutor: _deployedStub("coreExecutor"),
+                governance: makeAddr("governor"),
                 coordinator: makeAddr("coordinator"),
                 upgradeTimer: upgradeTimerStub
             });

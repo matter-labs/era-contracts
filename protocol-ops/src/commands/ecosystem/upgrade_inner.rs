@@ -6,7 +6,7 @@
 //! bundle.
 //!
 //! Real-world ecosystems also need governance-owned proxy preconditions and
-//! operational admin call execution around prepare; those live in
+//! CTM-admin call execution around prepare; those live in
 //! [`super::upgrade_full::UpgradeFull`], which composes this.
 //!
 //! The governance phase is not on this struct — it's a free helper in
@@ -119,7 +119,7 @@ impl<'a> UpgradeInner<'a> {
     /// `pub(super)` so production callers must go through
     /// [`super::upgrade_full::UpgradeFull::prepare`] — that wrapper
     /// runs the governance-owned proxy precondition first and executes
-    /// operational admin calls afterwards.
+    /// the CTM-admin calls afterwards.
     pub(super) async fn prepare(
         &self,
         runner: &mut ForgeRunner,

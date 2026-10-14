@@ -37,39 +37,44 @@ Consequences:
 - One CTM's stage 2 lifts only that CTM's pause. An ecosystem pause governance holds — or another
   CTM's upgrade — is untouched (`CTMUpgradeLifecycle.t.sol`, `L1ChainAssetHandlerMigrationPause.t.sol`).
 - **Governance cannot clear a CTM's pause directly.** Only that CTM's owner can. Governance owns
-  the executor, so after an abandonment it reaches `unpauseCTMMigration` through the executor's
-  owner-gated `forward`, which logs the call.
+  the executor, so it lifts the pause with `abandonPendingOperation(true)` when abandoning, or
+  through the executor's owner-gated `forward` to `unpauseCTMMigration`, which logs the call.
 - **The release-level ban is checked first.** `CHAIN_MIGRATIONS_ENABLED` is false in this release,
   so on a production handler a migration reverts with `ChainMigrationsDisabled` before the pause is
   consulted. The pause gate is exercised against the Dev handlers, which re-enable migrations.
 
-## ServerNotifier: a row under a foreign admin
+## ServerNotifier: a one-time handover, then an ordinary CTM-domain proxy
 
-The notifier is a per-CTM proxy but sits under its OWN `ProxyAdmin`, owned by the CTM's
-`ChainAdmin` — not under the CTM-domain `ProxyAdmin` the executor owns. Its implementation swap
-is therefore the one operation-inventory row whose `admin` field is set (the row format is
-described with the objects in the architecture document). Two operating modes follow, both expressible as
-on-chain state:
+The notifier is a per-CTM proxy. Pre-v35 deployments put it under its OWN `ProxyAdmin`, owned by
+the CTM's `ChainAdmin`, and nominated the `ChainAdmin` as its owner. From the registry bootstrap on
+it is administered like the rest of the CTM domain: its proxy sits under the CTM-domain `ProxyAdmin`
+the CTM executor owns, the CTM executor owns the notifier itself, and its implementation swaps are
+ordinary CTM-domain inventory rows applied in stage 1 (`DeployCTM.deployServerNotifier` deploys
+fresh ecosystems under the CTM-domain `ProxyAdmin` already).
 
-- **Hand the notifier's `ProxyAdmin` to the `CTMUpgradeExecutor`.** The row rides stage 1 like
-  any other CTM-domain row.
-- **Keep it with the `ChainAdmin`.** Stage 1 leaves the row to that administrator
-  (`ProxyRowLeftToAdministrator`), and the ChainAdmin's own call must land before stage 2, which
-  requires the row applied. This is the shape today.
+Getting there is a one-time handover and a PRECONDITION of the bootstrap, because governance cannot
+perform the ChainAdmin's half:
 
-The ChainAdmin's call is RENDERED from the pinned row (`DefaultCTMUpgrade.prepareUpgradeServerNotifierCall`,
-written to the prepare output's `[ctm_admin_calls]` and declared as an `admin`-phase external
-action): the same `ProxyAdmin` call `ProxyUpgradeRowLib.applyRows` makes for that row —
-`upgradeAndCall` with the fixed `initializeUpgrade()` when the row reinitializes, a plain
-`upgrade` otherwise — so the administrator executes exactly the swap governance reviewed and the
-prepare defines the swap nowhere else (`ServerNotifierRowCall.t.sol`). protocol-ops runs that
-call right after the prepares (`UpgradeFull::run_ctm_admin_steps`). On the bootstrap edge the row
-is pinned by the migration, `migrate()` leaves it to the ChainAdmin, and both `validate()` (a row
-already at `implNew` passes) and `validateApplied()` account for it.
+| step | authority                                      | call                                                                    |
+| ---- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| 1    | owner of the notifier's old `ProxyAdmin`       | `changeProxyAdmin(notifier, ctmProxyAdmin)`                             |
+| 2    | the notifier's current owner                   | `transferOwnership(ctmExecutor)`                                        |
+| 3    | the CTM executor's owner (governance), stage 0 | `ctmExecutor.forward([notifier.acceptOwnership()])`                     |
+| 4    | stage 1                                        | `migrate()` swaps the notifier's implementation through `ctmProxyAdmin` |
 
-One footgun: never transfer a foreign admin to the bootstrap MIGRATION — it hands onward only the
-CTM-domain `ProxyAdmin`, so an admin parked on the spent one-shot object has no way out. The
-executor is the long-lived owner.
+Steps 1–2 are RENDERED from live state by the bootstrap prepare
+(`CTMUpgrade_v35.serverNotifierHandoverCalls`, a step already done is left out), written to the
+prepare output's `[ctm_admin_calls].server_notifier_handover`, declared as `admin`-phase external
+actions, and run by protocol-ops right after the prepares (`UpgradeFull::run_ctm_admin_steps`). Step
+3 is the first call of the derived stage 0 while the notifier is not yet the executor's, so stage 0
+reverts until steps 1–2 landed. `RegistryBootstrapMigration.validate()` refuses to run unless the
+manifest's mandatory notifier row names the CTM's notifier, the notifier serves the CTM, sits under
+`ctmProxyAdmin` and is owned by the CTM executor with no nomination outstanding;
+`validateApplied()` keeps checking all of it. `protocol-ops ecosystem verify-bootstrap` reports the
+handover as its own prerequisite.
+
+The handover is not undone if the bootstrap is cancelled afterwards: the notifier then simply
+belongs to the CTM domain early. A recurring prepare has no admin calls.
 
 ## L2 delegate composition
 
@@ -87,8 +92,9 @@ the execution engine no longer decodes placeholders or understands the delegate 
 Each operation pins its own `GovernanceUpgradeTimer`, deployed by the CTM prepare with
 `TIMER_GOVERNANCE` = the coordinator and `owner` = the ecosystem admin. Stage 0 starts it once —
 `startTimer` is `onlyTimerAdmin`, so a timer anybody else could have started early fails the stage;
-stage 1 requires `checkDeadline()`. It is the delay before GOVERNANCE may execute, and is
-independent of the transition's chain-side `upgradeTimestamp` (see the coordinator spec). The ecosystem admin keeps the bounded extension right through the timer's own
+stages 1 and 2 require `checkDeadline()`, so an extension made after stage 1 defers completion too.
+It is the delay before GOVERNANCE may execute, and is independent of the transition's chain-side
+`upgradeTimestamp` (see the coordinator spec). The ecosystem admin keeps the bounded extension right through the timer's own
 `changeDeadline`, capped at
 `deadline + MAX_ADDITIONAL_DELAY` (two weeks in the prepare). That right is separately governed
 and stays explicit. The bootstrap edge predates the coordinator, so its timer is bound to
@@ -111,9 +117,12 @@ simulated by regenerating already-deployed source state.
 
 ## Abandonment and recovery
 
-`abandonPendingOperation` (coordinator owner) frees every reservation and the lifecycle slot;
-what stage 1 already committed stands, and the CTM pause stays held (the semantics are in the
-coordinator spec). Recovery is then governance's explicit decision: prepare a corrected operation,
-and resume migrations — per CTM through the executor's `forward` to `unpauseCTMMigration`, or
-ecosystem-wide with `unpauseMigration`. Authority the executors hold stays reachable through
-`forward` in every case, so a stuck lifecycle never strands the CTM or its `ProxyAdmin`.
+`abandonPendingOperation(unpauseMigrations)` (coordinator owner) frees every reservation and the
+lifecycle slot; what stage 1 already committed stands (the semantics are in the coordinator spec).
+With `unpauseMigrations` the CTM executor lifts this CTM's pause in the same call; without it the
+pause stays held until governance lifts it — per CTM through the executor's `forward` to
+`unpauseCTMMigration`, or ecosystem-wide with `unpauseMigration`. A transition committed for a
+departed version is repaired with `ChainTypeManager.replaceUpgradeTransition` through `forward`
+(see "Replacing a committed transition" in the coordinator spec). Every other CTM owner operation
+goes through `forward` too, so authority the executors hold stays reachable in every case and a
+stuck lifecycle never strands the CTM or its `ProxyAdmin`.

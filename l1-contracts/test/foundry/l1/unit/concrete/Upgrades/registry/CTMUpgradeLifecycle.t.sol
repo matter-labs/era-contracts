@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {
     ITransparentUpgradeableProxy,
@@ -42,15 +43,18 @@ import {
     MigrationsNotPaused,
     NoPendingOperation,
     NotCTMOwner,
+    OperationManifestChanged,
     OperationNotPending,
     ProxyUpgradeRowMismatch,
     RegistryTargetHasNoCode,
+    TransitionNotCommitted,
     Unauthorized,
     UpgradeLifecycleBusy,
     UpgradeStageOutOfOrder
 } from "contracts/common/L1ContractErrors.sol";
 import {
     CoreTransitionManifest,
+    OperationManifest,
     ProxyUpgradeRow,
     TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
@@ -75,10 +79,26 @@ contract LifecycleImplOther {
     }
 }
 
+/// @dev An implementation whose reinitializer re-points its own proxy elsewhere: a swap whose end
+///      state is not the row's `implNew`. The write happens inside the upgrade call, through the
+///      proxy's own delegatecall; the test itself touches no storage.
+contract SelfRepointingImpl {
+    bytes32 internal constant IMPLEMENTATION_SLOT = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
+    address internal immutable REPOINT_TO;
+
+    constructor(address _repointTo) {
+        REPOINT_TO = _repointTo;
+    }
+
+    function initializeUpgrade() external {
+        StorageSlot.getAddressSlot(IMPLEMENTATION_SLOT).value = REPOINT_TO;
+    }
+}
+
 /// @notice The three-stage lifecycle of one operation over one CTM, driven by the coordinator
 ///         ({protocol-docs/ecosystem-upgrade-coordination.md}): ordering and authority of the
 ///         stages, the stage-0 binding and admission conditions, the all-or-nothing stage 1, the
-///         verify-then-release stage 2, abandonment, coordinator replacement, and how the CTM's
+///         timer-gated stage 2 that does not re-read implementations, abandonment, coordinator replacement, and how the CTM's
 ///         own migration pause composes with the ecosystem pause on the fixture's real
 ///         `L1ChainAssetHandler`. Several CTMs under one operation are
 ///         EcosystemUpgradeCoordination.t.sol.
@@ -123,8 +143,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
                 implNew: _implNew,
-                callInitializeUpgrade: false,
-                admin: ProxyAdmin(address(0))
+                callInitializeUpgrade: false
             });
     }
 
@@ -284,8 +303,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implNew, "the ecosystem row must be applied");
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implNew, "the CTM-domain row must be applied");
 
-        // Stage 2: each domain verifies its own leg and releases its reservation (the CTM
-        // executor its pause), core first.
+        // Stage 2: each domain releases its reservation (the CTM executor its pause), core first.
         vm.expectEmit(true, true, true, true, address(coreExecutor));
         emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
         vm.expectEmit(true, true, true, true, address(chainAssetHandler));
@@ -298,9 +316,8 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
 
         _assertLifecycleIdle();
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
-        // The post-state checks keep holding on their own after completion.
+        // The post-state check keeps holding on its own after completion.
         ctmExecutor.validateOperationApplied(operation);
-        coreExecutor.validateUpgradeApplied(ICoreTransition(address(coreTransition)));
     }
 
     /// @dev The operation is the reviewable, queryable record of what was prepared.
@@ -561,7 +578,9 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.completeOperation, ()))
         );
         vm.expectRevert(NoPendingOperation.selector);
-        coordinator.forward(_singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.abandonOperation, ())));
+        coordinator.forward(
+            _singleCall(address(ctmExecutor), abi.encodeCall(CTMUpgradeExecutor.abandonOperation, (false)))
+        );
         vm.expectRevert(NoPendingOperation.selector);
         coordinator.forward(
             _singleCall(address(coreExecutor), abi.encodeCall(CoreUpgradeExecutor.completeOperation, ()))
@@ -603,7 +622,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             IEcosystemUpgradeExecutor.UpgradeStage.Prepared
         );
         vm.prank(governor);
-        coordinator.abandonPendingOperation();
+        coordinator.abandonPendingOperation(false);
 
         _assertLifecycleIdle();
         assertTrue(
@@ -633,7 +652,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
             IEcosystemUpgradeExecutor.UpgradeStage.Executed
         );
         vm.prank(governor);
-        coordinator.abandonPendingOperation();
+        coordinator.abandonPendingOperation(false);
 
         _assertLifecycleIdle();
         assertTrue(
@@ -655,7 +674,7 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)));
 
         vm.prank(governor);
-        coordinator.abandonPendingOperation();
+        coordinator.abandonPendingOperation(false);
 
         _assertLifecycleIdle();
         assertFalse(
@@ -664,17 +683,59 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         );
     }
 
+    /// @dev Abandoning with `_unpauseMigrations` lifts this CTM's pause in the same call, through
+    ///      the CTM executor that holds it — no raw `forward` needed — and leaves an ecosystem pause
+    ///      governance holds in place.
+    function test_abandon_withUnpause_liftsTheCTMPauseInTheSameCall() public {
+        EcosystemUpgradeOperation operation = _operationFor(transition);
+        vm.prank(governor);
+        chainAssetHandler.pauseMigration();
+        _stage0(transition);
+        assertTrue(chainAssetHandler.ctmMigrationPaused(address(chainContractAddress)), "stage 0 paused the CTM");
+
+        vm.expectEmit(true, true, true, true, address(chainAssetHandler));
+        emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit ICTMUpgradeExecutor.OperationAbandoned(address(operation));
+        vm.prank(governor);
+        coordinator.abandonPendingOperation(true);
+
+        _assertLifecycleIdle();
+        assertFalse(
+            chainAssetHandler.ctmMigrationPaused(address(chainContractAddress)),
+            "the CTM's own pause is lifted"
+        );
+        assertTrue(
+            chainAssetHandler.migrationPausedFor(address(chainContractAddress)),
+            "the ecosystem pause is not the abandonment's to lift"
+        );
+    }
+
+    /// @dev The same, after stage 1 committed: the commit stands and migrations resume.
+    function test_abandon_afterStage1_withUnpause_keepsTheEdgeAndResumesMigrations() public {
+        uint256 oldVersion = chainContractAddress.protocolVersion();
+        _stage0(transition);
+        _stage1(transition);
+
+        vm.prank(governor);
+        coordinator.abandonPendingOperation(true);
+
+        _assertLifecycleIdle();
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "migrations resume");
+        assertEq(chainContractAddress.upgradeTransition(oldVersion), address(transition), "the commit stands");
+    }
+
     function test_revertWhen_abandonWithoutAPendingOperation() public {
         vm.expectRevert(NoPendingOperation.selector);
         vm.prank(governor);
-        coordinator.abandonPendingOperation();
+        coordinator.abandonPendingOperation(false);
     }
 
     function test_revertWhen_abandonByStranger() public {
         _stage0(transition);
         vm.prank(makeAddr("stranger"));
         vm.expectRevert("Ownable: caller is not the owner");
-        coordinator.abandonPendingOperation();
+        coordinator.abandonPendingOperation(false);
         _assertPendingAndPaused(transition, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
 
@@ -924,44 +985,255 @@ contract CTMUpgradeLifecycleTest is CTMUpgradeExecutorFixture {
         _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
 
-    // ─────────────────────────── verification before release ───────────────────────────
+    // ─────────────────────────── stage 1 verifies what it applied ───────────────────────────
 
-    /// @dev Each domain verifies its own leg in `completeOperation`; the stage is one transaction,
-    ///      so the core leg's release is rolled back when the CTM leg refuses.
-    function test_revertWhen_stage2CtmRowNoLongerApplied_keepsMigrationsPaused() public {
-        CTMTransition full = _deployFullTransition();
-        EcosystemUpgradeOperation operation = _operationFor(full);
-        _prepareAndExecute(full);
-
-        // Between stages 1 and 2 the CTM-domain proxy is moved off the row's target.
-        vm.prank(governor);
-        ctmExecutor.forward(_singleCall(address(ctmProxyAdmin), _moveProxyCall(ctmDomainProxy, implOther)));
+    /// @dev A CTM-domain row whose swap does not END at its `implNew` (the reinitializer re-points
+    ///      the proxy) fails stage 1 itself, so nothing of the stage stands.
+    function test_revertWhen_stage1LeavesACtmRowOffItsTarget() public {
+        address repointing = address(new SelfRepointingImpl(implOther));
+        ProxyUpgradeRow[] memory inventory = _emptyInventory();
+        inventory[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+            proxy: address(ctmDomainProxy),
+            expectedOldImpl: implOld,
+            implNew: repointing,
+            callInitializeUpgrade: true
+        });
+        CTMTransition t = _deployTransition(777);
+        EcosystemUpgradeOperation operation = _deployOperation(
+            address(coreTransition),
+            inventory,
+            address(t),
+            _newOperationTimer()
+        );
+        operationOf[address(t)] = operation;
+        _stage0(t);
 
         vm.expectRevert(
-            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ctmDomainProxy), implNew, implOther)
+            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ctmDomainProxy), repointing, implOther)
         );
         vm.prank(governor);
-        coordinator.stage2(operation);
-        _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
-        assertEq(address(coreExecutor.activeOperation()), address(operation), "the core reservation holds too");
+        coordinator.stage1(operation);
+
+        assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implOld, "the row is rolled back");
+        assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implOld, "and so is the ecosystem leg");
+        _assertCtmUntouched();
+        _assertPendingAndPaused(t, IEcosystemUpgradeExecutor.UpgradeStage.Prepared);
     }
 
-    function test_revertWhen_stage2EcosystemRowNoLongerApplied_keepsMigrationsPaused() public {
+    /// @dev The same for the ecosystem leg.
+    function test_revertWhen_stage1LeavesAnEcosystemRowOffItsTarget() public {
+        address repointing = address(new SelfRepointingImpl(implOther));
+        CoreTransitionManifest memory manifest;
+        manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
+            proxy: address(ecosystemProxy),
+            expectedOldImpl: implOld,
+            implNew: repointing,
+            callInitializeUpgrade: true
+        });
+        CoreTransition repointingCore = new CoreTransition(manifest);
+        CTMTransition t = _deployTransition(777);
+        EcosystemUpgradeOperation operation = _deployOperation(
+            address(repointingCore),
+            _emptyInventory(),
+            address(t),
+            _newOperationTimer()
+        );
+        operationOf[address(t)] = operation;
+        _stage0(t);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ecosystemProxy), repointing, implOther)
+        );
+        vm.prank(governor);
+        coordinator.stage1(operation);
+
+        assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implOld, "the row is rolled back");
+        _assertCtmUntouched();
+    }
+
+    // ─────────────────────────── the pinned manifest ───────────────────────────
+
+    /// @dev Stage 0 pins the operation's `manifestHash()`; abandonment and completion clear it.
+    function test_stage0PinsTheManifestHash_abandonmentAndCompletionClearIt() public {
+        assertEq(coordinator.pendingManifestHash(), bytes32(0));
+
+        CTMTransition abandoned = _deployTransition(778);
+        _stage0(abandoned);
+        assertEq(coordinator.pendingManifestHash(), _operationFor(abandoned).manifestHash(), "stage 0 pins the hash");
+        vm.prank(governor);
+        coordinator.abandonPendingOperation(false);
+        assertEq(coordinator.pendingManifestHash(), bytes32(0), "abandonment clears it");
+
+        CTMTransition full = _deployFullTransition();
+        EcosystemUpgradeOperation operation = _operationFor(full);
+        _stage0(full);
+        assertEq(coordinator.pendingManifestHash(), operation.manifestHash(), "stage 0 pins the hash");
+        _stage1(full);
+        assertEq(coordinator.pendingManifestHash(), operation.manifestHash(), "stage 1 keeps it");
+        _stage2(full);
+        assertEq(coordinator.pendingManifestHash(), bytes32(0), "completion clears it");
+    }
+
+    /// @dev An operation whose answers change after stage 0 is refused at stages 1 and 2. A
+    ///      genuine `EcosystemUpgradeOperation` cannot change them (its manifest is write-once), so
+    ///      the change is mocked: the test isolates the coordinator's pin from the object.
+    function test_revertWhen_theOperationServesAnotherManifestHashAfterStage0() public {
+        CTMTransition full = _deployFullTransition();
+        EcosystemUpgradeOperation operation = _operationFor(full);
+        _stage0(full);
+        bytes32 pinned = operation.manifestHash();
+        bytes32 other = keccak256("another manifest");
+
+        vm.mockCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.manifestHash, ()), abi.encode(other));
+        vm.expectRevert(abi.encodeWithSelector(OperationManifestChanged.selector, pinned, other));
+        vm.prank(governor);
+        coordinator.stage1(operation);
+        _assertCtmUntouched();
+
+        vm.mockCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.manifestHash, ()), abi.encode(pinned));
+        _stage1(full);
+        vm.mockCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.manifestHash, ()), abi.encode(other));
+        vm.expectRevert(abi.encodeWithSelector(OperationManifestChanged.selector, pinned, other));
+        vm.prank(governor);
+        coordinator.stage2(operation);
+        _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
+    }
+
+    /// @dev The pinned hash covers what the stages decode, not only what the object reports: a
+    ///      manifest that no longer hashes to the pin is refused even under an unchanged
+    ///      `manifestHash()` (mocked, as above).
+    function test_revertWhen_theOperationServesAnotherManifestUnderTheSameHash() public {
+        CTMTransition full = _deployFullTransition();
+        EcosystemUpgradeOperation operation = _operationFor(full);
+        _stage0(full);
+        bytes32 pinned = operation.manifestHash();
+        OperationManifest memory changed = operation.getManifest();
+        changed.coreTransition = address(otherCoreTransition);
+
+        vm.mockCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.getManifest, ()), abi.encode(changed));
+        vm.expectRevert(
+            abi.encodeWithSelector(OperationManifestChanged.selector, pinned, keccak256(abi.encode(changed)))
+        );
+        vm.prank(governor);
+        coordinator.stage1(operation);
+        assertEq(_liveImpl(ecosystemProxyAdmin, otherEcosystemProxy), implOld, "the swapped-in leg never runs");
+    }
+
+    /// @dev Stage 0 refuses an operation whose decoded manifest is not the one its hash commits to.
+    function test_revertWhen_stage0OperationHashDoesNotCommitToItsManifest() public {
+        CTMTransition full = _deployFullTransition();
+        EcosystemUpgradeOperation operation = _operationFor(full);
+        bytes32 served = keccak256("not this manifest");
+        vm.mockCall(address(operation), abi.encodeCall(EcosystemUpgradeOperation.manifestHash, ()), abi.encode(served));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OperationManifestChanged.selector,
+                served,
+                keccak256(abi.encode(operation.getManifest()))
+            )
+        );
+        vm.prank(governor);
+        coordinator.stage0(operation);
+        _assertLifecycleIdle();
+    }
+
+    // ─────────────────────────── completion after stage 1 ───────────────────────────
+
+    /// @dev Stage 2 does not pin infrastructure to its stage-1 implementations: governance may
+    ///      re-patch a proxy between the stages (a quick fix to what the operation just installed)
+    ///      and completion still releases every reservation and the pause.
+    function test_stage2CompletesAfterAnInfrastructureRepatch() public {
         CTMTransition full = _deployFullTransition();
         EcosystemUpgradeOperation operation = _operationFor(full);
         _prepareAndExecute(full);
 
-        // The ecosystem admin is owned by the core executor; its owner moves the proxy through
-        // that executor's escape hatch.
-        vm.prank(governor);
+        // Between stages 1 and 2 governance moves both domains' proxies past the rows' targets,
+        // each through the executor that owns its admin.
+        vm.startPrank(governor);
+        ctmExecutor.forward(_singleCall(address(ctmProxyAdmin), _moveProxyCall(ctmDomainProxy, implOther)));
         coreExecutor.forward(_singleCall(address(ecosystemProxyAdmin), _moveProxyCall(ecosystemProxy, implOther)));
+        vm.stopPrank();
 
-        vm.expectRevert(
-            abi.encodeWithSelector(ProxyUpgradeRowMismatch.selector, address(ecosystemProxy), implNew, implOther)
+        vm.expectEmit(true, true, true, true, address(coreExecutor));
+        emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
+        vm.expectEmit(true, true, true, true, address(chainAssetHandler));
+        emit IChainAssetHandlerBase.UnpausedCTMMigration(address(chainContractAddress), address(ctmExecutor));
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit ICTMUpgradeExecutor.OperationCompleted(address(operation));
+        vm.expectEmit(true, true, true, true, address(coordinator));
+        emit IEcosystemUpgradeExecutor.OperationCompleted(address(operation));
+        _stage2(full);
+
+        _assertLifecycleIdle();
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
+        assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implOther, "the CTM-domain re-patch stands");
+        assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implOther, "the ecosystem re-patch stands");
+    }
+
+    /// @dev The timer is re-checked at completion: a deadline extension made after stage 1 defers
+    ///      stage 2 too, and the lifecycle stays open — pause and all — until it passes.
+    function test_revertWhen_stage2BeforeAnExtendedTimerDeadline() public {
+        GovernanceUpgradeTimer timer = _newTimer(100, 50);
+        CTMTransition delayed = _deployTransition(777);
+        EcosystemUpgradeOperation operation = _deployOperation(
+            address(0),
+            _emptyInventory(),
+            address(delayed),
+            address(timer)
         );
+        operationOf[address(delayed)] = operation;
+        uint256 preparedAt = block.timestamp;
+        _stage0(delayed);
+        vm.warp(preparedAt + 100);
+        _stage1(delayed);
+
+        vm.prank(governor);
+        timer.changeDeadline(preparedAt + 120);
+        vm.expectRevert(DeadlineNotYetPassed.selector);
         vm.prank(governor);
         coordinator.stage2(operation);
-        _assertPendingAndPaused(full, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
+        _assertPendingAndPaused(delayed, IEcosystemUpgradeExecutor.UpgradeStage.Executed);
+
+        vm.warp(preparedAt + 120);
+        _stage2(delayed);
+        _assertLifecycleIdle();
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
+    }
+
+    /// @dev Governance repairs the transition stage 1 committed before completing the operation
+    ///      (`replaceUpgradeTransition` through `forward`): completion accepts the replacement as
+    ///      the departure's commitment, while the exact-object check names the change.
+    function test_stage2CompletesAfterTheTransitionWasReplaced() public {
+        EcosystemUpgradeOperation operation = _operationFor(transition);
+        _prepareAndExecute(transition);
+
+        // Same source, same target release, same deadline; a different object.
+        CTMTransition repaired = _deployTransitionFrom(778, transition.fromRelease());
+        vm.prank(governor);
+        ctmExecutor.forward(
+            _singleCall(
+                address(chainContractAddress),
+                abi.encodeCall(
+                    IChainTypeManager.replaceUpgradeTransition,
+                    (ICTMTransition(address(transition)), ICTMTransition(address(repaired)))
+                )
+            )
+        );
+        assertEq(chainContractAddress.upgradeTransition(0), address(repaired));
+
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit ICTMUpgradeExecutor.OperationCompleted(address(operation));
+        _stage2(transition);
+
+        _assertLifecycleIdle();
+        assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "stage 2 unpauses migrations");
+        ctmExecutor.validateOperationApplied(operation);
+        vm.expectRevert(
+            abi.encodeWithSelector(TransitionNotCommitted.selector, address(transition), address(repaired))
+        );
+        ctmExecutor.validateTransitionApplied(ICTMTransition(address(transition)));
     }
 
     /// @dev The owner path of the core executor is unaffected by the coordinator: the bootstrap

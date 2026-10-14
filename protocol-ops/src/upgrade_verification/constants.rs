@@ -1,7 +1,14 @@
-use alloy::primitives::{address, Address};
+use alloy::primitives::{address, b256, Address, B256};
 
-pub const EIP1967_PROXY_ADMIN_SLOT: &str =
-    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+/// EIP-1967 admin slot: `keccak256("eip1967.proxy.admin") - 1`. Read with `eth_getStorageAt`,
+/// because a transparent proxy answers `admin()` only to its own admin.
+pub const EIP1967_PROXY_ADMIN_SLOT: B256 =
+    b256!("0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103");
+
+/// `CTMContract.ServerNotifier` — the slot of the CTM-domain inventory (`ProxyUpgradeRow[]`
+/// indexed by `CTMContract`) holding the ServerNotifier row, mandatory in a bootstrap manifest.
+/// The source-sync test below fails the build if the append-only enum moves it.
+pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 20;
 
 /// Builds an L2 built-in address from a 16-bit offset into the
 /// `BUILT_IN_CONTRACTS_OFFSET` range (`0x10000..=0x1ffff`).
@@ -279,6 +286,41 @@ mod tests {
                 .unwrap_or_else(|| panic!("{sol_name} not found in Solidity source"));
             assert_eq!(expected, actual, "{sol_name} drift vs Solidity source");
         }
+    }
+
+    /// The slot is the member's position in `enum CTMContract`, read from the Solidity source.
+    #[test]
+    fn the_server_notifier_slot_is_its_ctm_contract_position() {
+        const CONTRACT_IDENTIFIERS: &str = include_str!(
+            "../../../l1-contracts/contracts/upgrades/registry/libraries/ContractIdentifiers.sol"
+        );
+        let body = CONTRACT_IDENTIFIERS
+            .split_once("enum CTMContract {")
+            .expect("ContractIdentifiers.sol must declare `enum CTMContract`")
+            .1
+            .split_once('}')
+            .expect("the enum must be closed")
+            .0;
+        let members: Vec<&str> = body
+            .lines()
+            .map(|line| line.split("//").next().unwrap_or_default())
+            .flat_map(|line| line.split(','))
+            .map(str::trim)
+            .filter(|member| !member.is_empty())
+            .collect();
+        assert_eq!(
+            members.iter().position(|m| *m == "ServerNotifier"),
+            Some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
+            "CTMContract.ServerNotifier moved; update CTM_CONTRACT_SERVER_NOTIFIER_SLOT"
+        );
+    }
+
+    #[test]
+    fn the_eip1967_admin_slot_is_the_standard_preimage() {
+        let slot = alloy::primitives::U256::from_be_bytes(
+            alloy::primitives::keccak256(b"eip1967.proxy.admin").0,
+        ) - alloy::primitives::U256::from(1);
+        assert_eq!(B256::from(slot), EIP1967_PROXY_ADMIN_SLOT);
     }
 
     /// The timer's maximal extension is the one constructor argument no package records: the

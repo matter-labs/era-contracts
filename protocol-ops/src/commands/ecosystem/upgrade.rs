@@ -5,9 +5,9 @@
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
 //!                         by running the release's `CoreUpgrade_v<N>` once + `CTMUpgrade_v<N>`
 //!                         once for the target `--ctm-proxy` on a single anvil fork, then
-//!                         executes operational CTM-admin calls such as
-//!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
-//!                         governance TOMLs.
+//!                         executes the CTM-admin calls the CTM prepare emits (the
+//!                         registry bootstrap's ServerNotifier handover; none on a
+//!                         recurring upgrade). Emits per-script governance TOMLs.
 //!   `upgrade-governance`  runs governance stages 0 + 1 + 2 on one anvil fork
 //!                         and emits one Safe bundle (governance owner signs).
 //!                         Accepts multiple `--governance-toml` args and orders
@@ -356,8 +356,9 @@ fn sole_operation(
 /// All stage-0 calls (across the TOMLs in the order given) execute first,
 /// then all stage-1, then all stage-2. Each `governanceExecuteCalls`
 /// invocation is signed by `sender` (the governance owner) so they merge
-/// into one governance Safe bundle. Returns the resolved governance contract
-/// address for diagnostics.
+/// into one governance Safe bundle. A bootstrap package's completion check
+/// then runs on the fork ([`check_bootstrap_completion`]). Returns the
+/// resolved governance contract address for diagnostics.
 pub async fn replay_governance_stages(
     runner: &mut ForgeRunner,
     sender: &Wallet,
@@ -385,7 +386,48 @@ pub async fn replay_governance_stages(
             .with_context(|| format!("governance stage {stage} ({})", toml_path.display()))?;
         }
     }
+    let provider = crate::common::ethereum::get_provider(&runner.rpc_url)?;
+    for toml_path in governance_tomls {
+        check_bootstrap_completion(&provider, toml_path)
+            .await
+            .with_context(|| format!("bootstrap completion ({})", toml_path.display()))?;
+    }
     Ok(governance_addr)
+}
+
+/// A bootstrap package's completion check, which rides no stage bundle: after stage 2,
+/// `RegistryBootstrapMigration.validateApplied()` on every migration stage 1 ran `migrate()` on
+/// (what `RegistryBootstrapSequence.validateApplied()` forwards to). A recurring package has no
+/// such call and nothing is checked.
+async fn check_bootstrap_completion<P: alloy::providers::Provider>(
+    provider: &P,
+    governance_toml: &Path,
+) -> anyhow::Result<()> {
+    use crate::upgrade_verification::registry::{
+        package::migrate_targets, views::RegistryBootstrapMigrationView,
+    };
+    let stage1 = crate::common::governance_calls::decode_calls(&read_governance_stage_calls(
+        governance_toml,
+        1,
+    )?)
+    .context("decode stage 1 calls")?;
+    for migration in migrate_targets(&stage1) {
+        RegistryBootstrapMigrationView::new(migration, provider)
+            .validateApplied()
+            .call()
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "the bootstrap edge did not complete: \
+                     RegistryBootstrapMigration({migration:#x}).validateApplied() reverts after \
+                     stage 2 ({e})"
+                )
+            })?;
+        logger::success(format!(
+            "Bootstrap completion check passed ({migration:#x}.validateApplied())"
+        ));
+    }
+    Ok(())
 }
 
 fn read_governance_stage_calls(governance_toml: &Path, stage: u8) -> anyhow::Result<String> {
@@ -1638,5 +1680,80 @@ mod release_script_tests {
         assert!(cfg
             .protocol_ops_out_dir()
             .ends_with("upgrade-envs/v0.33.0-atomic-interop/output/stage"));
+    }
+}
+
+#[cfg(test)]
+mod bootstrap_completion_tests {
+    use super::*;
+    use crate::common::governance_calls::{empty_calls_hex, encode_calls, GovernanceCall};
+    use crate::upgrade_verification::registry::package::MIGRATE_SELECTOR;
+    use alloy::primitives::U256;
+    use alloy::providers::ProviderBuilder;
+    use alloy::transports::mock::Asserter;
+
+    const MIGRATION: Address = Address::repeat_byte(0x5E);
+
+    /// A merged package whose stage 1 carries `stage1` and nothing else.
+    fn package_with_stage1(stage1: &[GovernanceCall]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "protocol-ops-bootstrap-completion-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("ecosystem.toml");
+        fs::write(
+            &path,
+            format!(
+                "[governance_calls]\nstage0_calls = \"{empty}\"\nstage1_calls = \"0x{}\"\n\
+                 stage2_calls = \"{empty}\"\n",
+                hex::encode(encode_calls(stage1)),
+                empty = empty_calls_hex()
+            ),
+        )
+        .unwrap();
+        path
+    }
+
+    fn migrate_call() -> GovernanceCall {
+        GovernanceCall {
+            target: MIGRATION,
+            value: U256::ZERO,
+            data: MIGRATE_SELECTOR.to_vec(),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_completed_bootstrap_passes() {
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::new());
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        check_bootstrap_completion(&provider, &package_with_stage1(&[migrate_call()]))
+            .await
+            .unwrap();
+        assert!(asserter.read_q().is_empty(), "validateApplied() was called");
+    }
+
+    /// The check fails loudly rather than being logged past: the stage-2 unpause already ran,
+    /// and the edge it was meant to finish did not.
+    #[tokio::test]
+    async fn an_incomplete_bootstrap_fails_the_replay() {
+        let asserter = Asserter::new();
+        asserter.push_failure_msg("execution reverted");
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+        let err = check_bootstrap_completion(&provider, &package_with_stage1(&[migrate_call()]))
+            .await
+            .unwrap_err();
+        assert!(format!("{err:#}").contains("did not complete"), "{err:#}");
+    }
+
+    /// A recurring package runs no `migrate()`, so nothing is queried.
+    #[tokio::test]
+    async fn a_recurring_package_has_no_bootstrap_completion() {
+        let provider = ProviderBuilder::new().connect_mocked_client(Asserter::new());
+        check_bootstrap_completion(&provider, &package_with_stage1(&[]))
+            .await
+            .unwrap();
     }
 }

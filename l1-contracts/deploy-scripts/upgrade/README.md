@@ -55,15 +55,15 @@ On one anvil fork of L1, in this order:
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
    reused when it already runs the code the current sources produce and redeployed only when the
    version names it in `changedReleaseMembers()`; a release whose members all reused is reused
-   itself. Then the timer, the transition (validated), and the ServerNotifier admin call rendered
-   from the pinned row. Output
+   itself. Then the timer, the transition (validated), and — on the bootstrap edge only — the
+   ChainAdmin's half of the one-time ServerNotifier handover, rendered from live state. Output
    `[registry]`: `ctm_transition_addr`, `ctm_release_addr`, `upgrade_timer_addr`,
    `ctm_upgrade_executor_addr`, `bootstrap_migration_addr` (zero unless a bootstrap),
    `operation_addr` and `coordinator_addr` (both zero on a bootstrap edge, which has no transition
    to compose over).
-4. The ServerNotifier admin call, executed on the fork as the ChainAdmin
-   (`UpgradeFull::run_ctm_admin_steps`; see the
-   [lifecycle document](../../../docs/upgrade-stage-lifecycle.md#servernotifier-a-row-under-a-foreign-admin)).
+4. The ServerNotifier handover calls (bootstrap only), executed on the fork as each target's live
+   owner (`UpgradeFull::run_ctm_admin_steps`; see the
+   [lifecycle document](../../../docs/upgrade-stage-lifecycle.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
 5. On PUH-governed environments, the PUH/Guardians redeploy (`zk_governance.rs`).
 6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml`: each
    stage bundle is core actions → the coordinator's `stageN(operation)`, derived from the
@@ -125,7 +125,9 @@ governance Safe bundle; `ecosystem governance-toml-to-simulator` emits the trans
 JSON. On the real chain the stages are separate proposals: stage 0 starts each distinct
 transition timer once, stage 1 is admissible once the timers' deadlines have passed, stage 2 after stage 1. A
 lifecycle that cannot complete is cleared with `EcosystemUpgradeExecutor.abandonPendingOperation`
-(see the lifecycle document for what that leaves behind).
+(see the lifecycle document for what that leaves behind). On the bootstrap edge the replay then
+runs the edge's completion check (`RegistryBootstrapMigration.validateApplied()`) as its own call
+and fails if it reverts.
 
 ## 7. Chain crossing
 
@@ -188,7 +190,7 @@ coordinator calls is a `declareExternalAction`.
 - `test/anvil-interop/run-recurring-upgrade-test.ts` — the registry-driven hop with objects
   deployed by the harness itself.
 - `test/foundry/l1/unit/concrete/Upgrades/registry/` — the lifecycle, coordination, executor,
-  foreign-admin-row and individual-upgrade suites.
+  transition-replacement, ServerNotifier-handover and individual-upgrade suites.
 
 Script retirement — what tooling still decides and the batches that move it on-chain — is
 tracked in [the retirement plan](../../../docs/upgrade-script-retirement.md).

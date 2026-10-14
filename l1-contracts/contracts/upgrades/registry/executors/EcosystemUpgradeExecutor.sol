@@ -12,6 +12,7 @@ import {
     ExecutorCoordinatorMismatch,
     CoordinatorCTMMismatch,
     NoPendingOperation,
+    OperationManifestChanged,
     OperationNotPending,
     UpgradeLifecycleBusy,
     UpgradeStageOutOfOrder,
@@ -46,6 +47,9 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
 
     /// @inheritdoc IEcosystemUpgradeExecutor
     UpgradeStage public pendingStage;
+
+    /// @inheritdoc IEcosystemUpgradeExecutor
+    bytes32 public pendingManifestHash;
 
     constructor(address _initialOwner, CoreUpgradeExecutor _coreExecutor) UpgradeExecutorBase(_initialOwner) {
         if (address(_coreExecutor) == address(0)) {
@@ -92,9 +96,12 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         address(_operation).requireCode();
         _operation.validate();
         OperationManifest memory m = _operation.getManifest();
+        bytes32 manifestHash = _operation.manifestHash();
+        _requireServes(m, manifestHash);
 
         pendingOperation = _operation;
         pendingStage = UpgradeStage.Prepared;
+        pendingManifestHash = manifestHash;
 
         if (m.coreTransition != address(0)) {
             CORE_EXECUTOR.beginOperation(_operation);
@@ -110,11 +117,11 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
     }
 
     /// @notice Stage 1 — execution. Requires the timer's deadline, then applies the core leg
-    ///         once and the CTM leg. Any failure reverts the whole stage.
+    ///         once and the CTM leg, each verifying its own result before it returns. Any failure
+    ///         reverts the whole stage.
     /// @param _operation The operation prepared by `stage0`.
     function stage1(IEcosystemUpgradeOperation _operation) external onlyOwner {
-        _requirePending(_operation, UpgradeStage.Prepared);
-        OperationManifest memory m = _operation.getManifest();
+        OperationManifest memory m = _requirePending(_operation, UpgradeStage.Prepared);
         GovernanceUpgradeTimer(m.timer).checkDeadline();
         // The stage advances before the domains are driven: any leg's revert unwinds the whole
         // stage, so nothing observes `Executed` with a leg still unapplied.
@@ -126,18 +133,18 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         emit OperationExecuted(address(_operation));
     }
 
-    /// @notice Stage 2 — completion. Every domain verifies its own result and releases its
-    ///         reservation (the CTM executor also releases its migration pause); the lifecycle slot clears.
-    /// @dev One transaction: a later domain's failed verification rolls back every earlier
-    ///      release, so no pause is lifted unless every leg verified. Completion means the L1 edge
-    ///      is complete and the operational restrictions are lifted; it does not attest that every
-    ///      chain has finished its own upgrade.
+    /// @notice Stage 2 — completion. Requires the timer's deadline again, then every domain
+    ///         releases its reservation (the CTM executor also releases its migration pause); the
+    ///         lifecycle slot clears.
+    /// @dev Stage 1 already verified what it applied, so nothing here re-reads it: see "Stages" in
+    ///      {protocol-docs/ecosystem-upgrade-coordination.md}.
     /// @param _operation The operation executed by `stage1`.
     function stage2(IEcosystemUpgradeOperation _operation) external onlyOwner {
-        _requirePending(_operation, UpgradeStage.Executed);
-        OperationManifest memory m = _operation.getManifest();
+        OperationManifest memory m = _requirePending(_operation, UpgradeStage.Executed);
+        GovernanceUpgradeTimer(m.timer).checkDeadline();
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
+        delete pendingManifestHash;
         if (m.coreTransition != address(0)) {
             CORE_EXECUTOR.completeOperation();
         }
@@ -146,9 +153,10 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
     }
 
     /// @notice Break-glass for an operation that cannot complete: frees every reservation and the
-    ///         lifecycle slot. Whatever stage 1 already committed stands, and migrations stay
-    ///         paused — resuming them is governance's explicit decision.
-    function abandonPendingOperation() external onlyOwner {
+    ///         lifecycle slot. Whatever stage 1 already committed stands.
+    /// @param _unpauseMigrations Whether the CTM executor also lifts this CTM's migration pause;
+    ///        otherwise the pause stays held until governance lifts it.
+    function abandonPendingOperation(bool _unpauseMigrations) external onlyOwner {
         IEcosystemUpgradeOperation operation = pendingOperation;
         if (address(operation) == address(0)) {
             revert NoPendingOperation();
@@ -157,21 +165,44 @@ contract EcosystemUpgradeExecutor is UpgradeExecutorBase, IEcosystemUpgradeExecu
         OperationManifest memory m = operation.getManifest();
         delete pendingOperation;
         pendingStage = UpgradeStage.None;
+        delete pendingManifestHash;
         if (m.coreTransition != address(0)) {
             CORE_EXECUTOR.abandonOperation();
         }
-        ctmExecutor.abandonOperation();
+        ctmExecutor.abandonOperation(_unpauseMigrations);
         emit OperationAbandoned(address(operation), stage);
     }
 
-    /// @dev The lifecycle gate every stage after 0 shares: the named operation is the pending one
-    ///      and it sits exactly one stage back.
-    function _requirePending(IEcosystemUpgradeOperation _operation, UpgradeStage _expected) private view {
+    /// @dev The lifecycle gate every stage after 0 shares: the named operation is the pending one,
+    ///      it sits exactly one stage back, and it still serves the manifest stage 0 pinned.
+    /// @return m The operation's manifest.
+    function _requirePending(
+        IEcosystemUpgradeOperation _operation,
+        UpgradeStage _expected
+    ) private view returns (OperationManifest memory m) {
         if (address(pendingOperation) != address(_operation)) {
             revert OperationNotPending(address(_operation), address(pendingOperation));
         }
         if (pendingStage != _expected) {
             revert UpgradeStageOutOfOrder(uint8(pendingStage), uint8(_expected));
+        }
+        m = _operation.getManifest();
+        bytes32 pinned = pendingManifestHash;
+        bytes32 served = _operation.manifestHash();
+        if (served != pinned) {
+            revert OperationManifestChanged(pinned, served);
+        }
+        _requireServes(m, pinned);
+    }
+
+    /// @dev The manifest an operation decodes must be the one its hash commits to, so the hash
+    ///      pinned at stage 0 covers every field the stages read.
+    /// @param _manifest The manifest the operation served.
+    /// @param _manifestHash The commitment it is held to.
+    function _requireServes(OperationManifest memory _manifest, bytes32 _manifestHash) private pure {
+        bytes32 decoded = keccak256(abi.encode(_manifest));
+        if (decoded != _manifestHash) {
+            revert OperationManifestChanged(_manifestHash, decoded);
         }
     }
 }

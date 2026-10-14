@@ -4,7 +4,12 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    ITransparentUpgradeableProxy,
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+import {Call} from "contracts/governance/Common.sol";
 
 import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
@@ -128,8 +133,7 @@ contract CoreUpgradeExecutorTest is Test {
                 proxy: _proxy,
                 expectedOldImpl: _expectedOldImpl,
                 implNew: _implNew,
-                callInitializeUpgrade: false,
-                admin: ProxyAdmin(address(0))
+                callInitializeUpgrade: false
             });
     }
 
@@ -195,8 +199,7 @@ contract CoreUpgradeExecutorTest is Test {
             proxy: address(bridgehubProxy),
             expectedOldImpl: address(implOld),
             implNew: address(initImpl),
-            callInitializeUpgrade: true,
-            admin: ProxyAdmin(address(0))
+            callInitializeUpgrade: true
         });
         ICoreTransition initRegistry = _deployRegistry(rows);
 
@@ -389,25 +392,29 @@ contract CoreUpgradeExecutorTest is Test {
         assertEq(address(coreExecutor.activeOperation()), address(operation), "the reservation is untouched");
     }
 
-    /// @dev Completion is the domain's own verification: the reservation is released only once the
-    ///      reserved registry is applied.
-    function test_completeOperation_requiresTheRegistryAppliedThenReleases() public {
+    /// @dev Completion is lifecycle bookkeeping the coordinator sequences after stage 1: it
+    ///      releases the reservation without re-reading the rows, so a re-patch governance made
+    ///      after stage 1 does not block it.
+    function test_completeOperation_releasesWithoutRereadingTheRows() public {
         _reserve(operation);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ProxyUpgradeRowMismatch.selector,
-                address(bridgehubProxy),
-                address(implNew),
-                address(implOld)
-            )
-        );
-        vm.prank(coordinator);
-        coreExecutor.completeOperation();
-        assertEq(address(coreExecutor.activeOperation()), address(operation), "a refused completion keeps the slot");
-
         vm.prank(coordinator);
         coreExecutor.applyL1Upgrade(coreTransition);
+
+        // Governance re-patches the proxy the registry just upgraded, through the executor that
+        // owns its admin.
+        Call[] memory repatch = new Call[](1);
+        repatch[0] = Call({
+            target: address(proxyAdmin),
+            value: 0,
+            data: abi.encodeCall(
+                ProxyAdmin.upgrade,
+                (ITransparentUpgradeableProxy(address(bridgehubProxy)), address(implOld))
+            )
+        });
+        vm.prank(ecosystemGovernor);
+        coreExecutor.forward(repatch);
+        assertEq(_liveImpl(bridgehubProxy), address(implOld), "fixture: the proxy moved off the row's target");
+
         vm.expectEmit(true, true, true, true, address(coreExecutor));
         emit ICoreUpgradeExecutor.OperationCompleted(address(operation));
         vm.prank(coordinator);
@@ -415,6 +422,7 @@ contract CoreUpgradeExecutorTest is Test {
 
         assertEq(address(coreExecutor.activeOperation()), address(0), "the operation must be cleared");
         assertEq(address(coreExecutor.reservedCoreTransition()), address(0), "nothing stays reserved");
+        assertEq(_liveImpl(bridgehubProxy), address(implOld), "completion leaves the re-patch in place");
         // Free again: the next operation reserves normally.
         IEcosystemUpgradeOperation next = _operationNaming(address(coreTransition));
         vm.prank(coordinator);
@@ -456,38 +464,6 @@ contract CoreUpgradeExecutorTest is Test {
         coreExecutor.abandonOperation();
         vm.stopPrank();
         assertEq(address(coreExecutor.activeOperation()), address(operation));
-    }
-
-    // ─────────────────────────── post-state verification ───────────────────────────
-
-    function test_validateUpgradeApplied_revertsBeforeAndPassesAfterApply() public {
-        // Before the upgrade, the bridgehub row's proxy still points at the old implementation.
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ProxyUpgradeRowMismatch.selector,
-                address(bridgehubProxy),
-                address(implNew),
-                address(implOld)
-            )
-        );
-        coreExecutor.validateUpgradeApplied(coreTransition);
-
-        _applyL1Upgrade();
-
-        // A view over live state — anyone may run the post-state check.
-        vm.prank(makeAddr("stranger"));
-        coreExecutor.validateUpgradeApplied(coreTransition);
-    }
-
-    /// @dev Retargeted from the removed codehash anchor: the post-state check reads its rows from
-    ///      the registry, so it enforces the same code-presence precondition as the apply path —
-    ///      without it an undeployed registry would report "applied" over an empty row list.
-    function test_revertWhen_validateUpgradeAppliedAgainstAnUndeployedRegistry() public {
-        _applyL1Upgrade();
-        address codeless = makeAddr("codelessRegistry");
-
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
-        coreExecutor.validateUpgradeApplied(ICoreTransition(codeless));
     }
 
     function test_manifestHashCommitsToTheRows() public {

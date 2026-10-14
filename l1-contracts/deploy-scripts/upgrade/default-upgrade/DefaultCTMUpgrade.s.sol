@@ -11,9 +11,7 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
 import {StateTransitionContracts} from "contracts/common/StateTransitionTypes.sol";
@@ -44,7 +42,6 @@ import {CTMUpgradeParams, UpgradeKind} from "./UpgradeParams.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
-import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {
@@ -457,39 +454,28 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /// @notice The enum-indexed CTM-domain inventory of this edge: a source-checked row for every
     ///         proxy this run deployed a new implementation for, every other slot an explicit inert
-    ///         zero. The ServerNotifier row names its own (ChainAdmin-owned) ProxyAdmin.
+    ///         zero. Every row applies through the CTM-domain ProxyAdmin the executor owns.
     function _ctmProxyUpgradeRows() internal view virtual returns (ProxyUpgradeRow[] memory rows) {
         rows = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         rows[uint256(CTMContract.ChainTypeManager)] = _ctmRow(
             ctmAddresses.stateTransition.proxies.chainTypeManager,
-            ctmAddresses.stateTransition.implementations.chainTypeManager,
-            ProxyAdmin(address(0))
+            ctmAddresses.stateTransition.implementations.chainTypeManager
         );
         rows[uint256(CTMContract.ValidatorTimelock)] = _ctmRow(
             ctmAddresses.stateTransition.proxies.validatorTimelock,
-            ctmAddresses.stateTransition.implementations.validatorTimelock,
-            ProxyAdmin(address(0))
+            ctmAddresses.stateTransition.implementations.validatorTimelock
         );
-        address notifierImplNew = ctmAddresses.stateTransition.implementations.serverNotifier;
-        if (notifierImplNew != address(0)) {
-            address notifierProxy = ctmAddresses.stateTransition.proxies.serverNotifier;
-            rows[uint256(CTMContract.ServerNotifier)] = _ctmRow(
-                notifierProxy,
-                notifierImplNew,
-                ProxyAdmin(Utils.getProxyAdminAddress(notifierProxy))
-            );
-        }
+        rows[uint256(CTMContract.ServerNotifier)] = _ctmRow(
+            ctmAddresses.stateTransition.proxies.serverNotifier,
+            ctmAddresses.stateTransition.implementations.serverNotifier
+        );
     }
 
     /// @dev The inert (all-zero) row when this run deployed no implementation for the proxy.
     ///      Discovery fills `implementations` from the LIVE EIP-1967 slots, so "a new
     ///      implementation" is the one that DIFFERS from what the proxy already runs (see
     ///      `DefaultCoreUpgrade._row` for the same rule on the ecosystem side).
-    function _ctmRow(
-        address _proxy,
-        address _implNew,
-        ProxyAdmin _admin
-    ) internal view returns (ProxyUpgradeRow memory row) {
+    function _ctmRow(address _proxy, address _implNew) internal view returns (ProxyUpgradeRow memory row) {
         if (_implNew == address(0)) {
             return row;
         }
@@ -502,8 +488,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
                 proxy: _proxy,
                 expectedOldImpl: liveImpl,
                 implNew: _implNew,
-                callInitializeUpgrade: false,
-                admin: _admin
+                callInitializeUpgrade: false
             });
     }
 
@@ -942,28 +927,27 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }
 
-    /// @notice The ServerNotifier's implementation swap, an ADMIN action (the notifier's ProxyAdmin
-    ///         is ChainAdmin-owned, not governance-owned) emitted only when the pinned inventory
-    ///         carries a notifier row; the section is written either way so tooling reads one shape.
+    /// @notice The CTM-ADMIN calls of this prepare — calls on authority governance does not hold —
+    ///         written to `[ctm_admin_calls]` and declared as `admin`-phase external actions. Only
+    ///         the registry bootstrap has any: the ChainAdmin's half of the one-time ServerNotifier
+    ///         handover ({serverNotifierHandoverCalls}). The section is written either way so
+    ///         tooling reads one shape.
     function prepareDefaultCTMAdminCalls() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = Utils.getProxyAdminAddress(
-            ctmAddresses.stateTransition.proxies.serverNotifier
-        );
-        address chainAdmin = IOwnable(serverNotifierProxyAdmin).owner();
-        address chainAdminOwner = IOwnable(chainAdmin).owner();
-        calls = prepareUpgradeServerNotifierCall();
-        if (calls.length != 0) {
-            // The section records the live administrator's approval, so the row must name that
-            // same administrator as its authority.
-            require(
-                calls[0].target == serverNotifierProxyAdmin,
-                "the pinned ServerNotifier row names an administrator other than the live proxy's"
-            );
+        calls = serverNotifierHandoverCalls();
+        address chainAdmin;
+        address chainAdminOwner;
+        uint256 length = calls.length;
+        if (length != 0) {
+            // The administrator the section records: the live owner of the first call's target.
+            chainAdmin = IOwnable(calls[0].target).owner();
+            chainAdminOwner = chainAdmin.code.length == 0 ? address(0) : IOwnable(chainAdmin).owner();
+        }
+        for (uint256 i = 0; i < length; ++i) {
             declareExternalAction(
                 ExternalActionsLib.PHASE_ADMIN,
-                "ServerNotifier implementation swap (ctm_admin_calls)",
-                "ChainAdmin (owner of the notifier's ProxyAdmin)",
-                calls[0]
+                "ServerNotifier handover to the CTM domain (ctm_admin_calls)",
+                "the live owner of the call target (normally the ChainAdmin)",
+                calls[i]
             );
         }
         vm.serializeAddress("ctm_admin_calls", "chain_admin", chainAdmin);
@@ -971,7 +955,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
         string memory ctmAdminCallsSerialized = vm.serializeBytes(
             "ctm_admin_calls",
-            "server_notifier_upgrade",
+            "server_notifier_handover",
             abi.encode(calls)
         );
 
@@ -980,29 +964,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         vm.writeToml(updatedCtmAdminToml, upgradeConfig.outputPath);
     }
 
-    /// @notice The pinned `CTMContract.ServerNotifier` row rendered as the call its own
-    ///         administrator makes — the same `ProxyAdmin` call `ProxyUpgradeRowLib.applyRows`
-    ///         would make were the executor to own that admin: `upgradeAndCall` with the fixed,
-    ///         argument-less `initializeUpgrade()` when the row reinitializes, a plain `upgrade`
-    ///         otherwise (see "ServerNotifier: a row under a foreign admin" in
-    ///         {docs/upgrade-stage-lifecycle.md}). Empty when the inventory leaves the notifier alone.
-    function prepareUpgradeServerNotifierCall() public view virtual returns (Call[] memory calls) {
-        ProxyUpgradeRow memory row = ctmProxyInventory()[uint256(CTMContract.ServerNotifier)];
-        if (row.implNew == address(0)) {
-            return calls;
-        }
-        require(address(row.admin) != address(0), "the pinned ServerNotifier row names no administrator");
-
-        ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(payable(row.proxy));
-        bytes memory data = row.callInitializeUpgrade
-            ? abi.encodeCall(
-                ProxyAdmin.upgradeAndCall,
-                (proxy, row.implNew, abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ()))
-            )
-            : abi.encodeCall(ProxyAdmin.upgrade, (proxy, row.implNew));
-
-        calls = new Call[](1);
-        calls[0] = Call({target: address(row.admin), data: data, value: 0});
+    /// @notice The ChainAdmin's half of the one-time ServerNotifier handover (see
+    ///         {docs/upgrade-stage-lifecycle.md}). Empty by default: once the registry bootstrap
+    ///         has run, the notifier is administered and owned like the rest of the CTM domain.
+    function serverNotifierHandoverCalls() public view virtual returns (Call[] memory calls) {
+        return calls;
     }
 
     /// @notice The governance stages of this prepare: only what a version script declared as an

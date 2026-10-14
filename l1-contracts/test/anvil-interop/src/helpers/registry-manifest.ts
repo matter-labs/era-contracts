@@ -67,13 +67,11 @@ function enumValue(map: Record<string, number>, name: string, enumName: string):
 }
 
 /** One `ProxyUpgradeRow` in the shape ethers encodes against the contract ABI. */
-interface ProxyUpgradeRowArg {
+export interface ProxyUpgradeRowArg {
   proxy: string;
   expectedOldImpl: string;
   implNew: string;
   callInitializeUpgrade: boolean;
-  /** The row's own ProxyAdmin; the zero address means the applying executor's bound admin. */
-  admin: string;
 }
 
 /** An inert inventory slot: the explicit "not upgraded" statement. */
@@ -83,8 +81,12 @@ function zeroProxyUpgradeRow(): ProxyUpgradeRowArg {
     expectedOldImpl: ethers.constants.AddressZero,
     implNew: ethers.constants.AddressZero,
     callInitializeUpgrade: false,
-    admin: ethers.constants.AddressZero,
   };
+}
+
+/** The inventory slot of `member` in the canonical contract enum `enumName` (e.g. `CTMContract`). */
+export function proxyUpgradeSlotIndex(enumName: string, member: string): number {
+  return enumValue(parseSolidityEnum(CONTRACT_IDENTIFIERS_SOL, enumName), member, enumName);
 }
 
 /**
@@ -133,7 +135,6 @@ export function coreInitArgs(manifest: any): any {
         expectedOldImpl: e.expectedOldImpl ?? ethers.constants.AddressZero,
         implNew: e.implNew ?? ethers.constants.AddressZero,
         callInitializeUpgrade: e.callInitializeUpgrade ?? false,
-        admin: e.admin ?? ethers.constants.AddressZero,
       },
     ])
   );

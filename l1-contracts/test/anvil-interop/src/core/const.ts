@@ -105,6 +105,10 @@ export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111
 // L2 bootloader address (used for failed deposit logs)
 export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
 
+// EIP-1967 proxy slots: keccak256("eip1967.proxy.admin") - 1 and keccak256("eip1967.proxy.implementation") - 1.
+export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+export const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+
 // NTV (L2NativeTokenVault) storage slot numbers.
 // Obtained via: forge inspect L2NativeTokenVault storageLayout
 export const NTV_WETH_TOKEN_SLOT = 251;

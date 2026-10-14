@@ -11,15 +11,14 @@
 use alloy::sol;
 
 sol! {
-    /// The bootstrap manifest, as stored in `RegistryBootstrapMigration`'s constructor.
-    /// Field order and types mirror `RegistryTypes.sol` exactly — the decode is positional.
+    /// Positional mirror of `RegistryTypes.ProxyUpgradeRow`. It names no admin: a row is always
+    /// read and applied through the applying domain's bound `ProxyAdmin`.
     #[derive(Debug)]
     struct ProxyUpgradeRow {
         address proxy;
         address expectedOldImpl;
         address implNew;
         bool callInitializeUpgrade;
-        address admin;
     }
 
     /// The authored L2 input only: the object constructs the deployments, the delegate
@@ -46,7 +45,8 @@ sol! {
         AuthoredL2Plan l2Plan;
         uint256 upgradeTimestamp;
         address ctmExecutor;
-        address ctmExecutorOwner;
+        address coreExecutor;
+        address governance;
         address coordinator;
         address upgradeTimer;
     }
@@ -59,6 +59,8 @@ sol! {
         /// The version the edge lands on: its genesis release's own, read at construction.
         function newProtocolVersion() external view returns (uint256);
         function validate() external view;
+        /// The edge's completion check, run as its own call after stage 2.
+        function validateApplied() external view;
     }
 
     /// One governance call of a bootstrap edge, as `RegistryBootstrapSequence` derives it.
@@ -78,20 +80,18 @@ sol! {
         bytes data;
     }
 
-    /// The object the edge's whole governance call sequence is derived from. The verifier reads
-    /// the two objects it was built over, so the completion gate terminating stage 2 can be held
-    /// against the edge the rest of the package describes, and the three stage lists, so the
-    /// submitted bundle can be compared against the list the contract itself derives.
+    /// The object the edge's whole governance call sequence is derived from: the verifier reads
+    /// the three stage lists, so the submitted bundle can be compared against the list the
+    /// contract itself derives.
     #[sol(rpc)]
     contract RegistryBootstrapSequenceView {
-        function MIGRATION() external view returns (address);
-        function CORE_TRANSITION() external view returns (address);
         function stage0Actions() external view returns (BootstrapAction[] memory);
         function stage1Actions() external view returns (BootstrapAction[] memory);
         function stage2Actions() external view returns (BootstrapAction[] memory);
-        function validateApplied() external view;
     }
 
+    /// `forward` is declared so the verifier can ENCODE the owner-gated call through which
+    /// governance acts on the CTM domain (the bootstrap's ServerNotifier acceptance).
     #[sol(rpc)]
     contract CTMUpgradeExecutorView {
         function CHAIN_TYPE_MANAGER() external view returns (address);
@@ -100,6 +100,18 @@ sol! {
         function activeOperation() external view returns (address);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
+        function forward(BootstrapCall[] calldata _calls) external payable;
+    }
+
+    /// The CTM's ServerNotifier, whose administration and ownership the bootstrap requires
+    /// handed to the CTM domain. `acceptOwnership` is declared to ENCODE the stage-0 call that
+    /// completes that handover.
+    #[sol(rpc)]
+    contract ServerNotifierView {
+        function chainTypeManager() external view returns (address);
+        function owner() external view returns (address);
+        function pendingOwner() external view returns (address);
+        function acceptOwnership() external;
     }
 
     /// The lifecycle coordinator every later operation runs through.
@@ -306,5 +318,6 @@ sol! {
         function currentRelease() external view returns (address);
         function L1_BYTECODES_SUPPLIER() external view returns (address);
         function BRIDGE_HUB() external view returns (address);
+        function serverNotifierAddress() external view returns (address);
     }
 }
