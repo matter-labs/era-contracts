@@ -29,8 +29,10 @@ review from the [root README review guide](../../../README.md#reviewing-registry
   `RegistryBootstrapSequence` over both objects, and declares every call of the one-time edge by
   reading it off that sequence.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
+- `EmergencyStageUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
+  emergency upgrade ("Emergency execution" below).
 
-One-off scripts of shipped upgrades live on their release branches, not here.
+Other one-off scripts of shipped upgrades live on their release branches, not here.
 
 ## 1. Inputs
 
@@ -144,6 +146,64 @@ A lifecycle that cannot complete is cleared with
 `EcosystemUpgradeExecutor.abandonPendingOperation`. On the bootstrap edge the replay then
 runs the edge's completion check (`RegistryBootstrapMigration.validateApplied()`) as its own call
 and fails if it reverts.
+
+## Emergency execution
+
+On a PUH-governed environment (`governance_kind = "puh"`) the package can run as an emergency
+upgrade instead of step 6: `EmergencyUpgradeBoard.executeEmergencyUpgrade` has the
+`ProtocolUpgradeHandler` execute the calls at once. The scripts make ONE emergency proposal of every
+governance call in `<env-out>/ecosystem.toml`: the `[governance_calls]` entries taken in key order
+(`stage0_calls`, `stage1_calls`, `stage2_calls` today) and concatenated.
+
+1. Dry run on a fork before any approval is collected. It impersonates the board, so only the
+   signature check is skipped:
+
+   ```sh
+   forge script deploy-scripts/upgrade/VerifyStage1Pause.s.sol:VerifyStage1Pause \
+     --sig 'verify(address,string)' <puh> <env-out>/ecosystem.toml --rpc-url <fork>
+   ```
+
+2. Emit the calldata. This step is read-only and needs no key:
+
+   ```sh
+   forge script deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata \
+     --sig 'run(address,string)' <puh> <env-out>/ecosystem.toml --rpc-url <l1>
+   ```
+
+   It prints one `approveHash` transaction per required approval: the first `EIP1271_THRESHOLD`
+   members of the Guardians, then of the Security Council, then the ZK Foundation Safe. The one EOA
+   that owns every approving Safe sends them. The board call comes last and any account may send it.
+   The script refuses a board whose approving Safes are not 1-of-1 Safes of that EOA, the staging
+   setup, because the "approved hash" marker it emits stands for that owner's approval only.
+
+Gotchas:
+
+- **Timer delay.** One proposal executes in one block. Every `GovernanceUpgradeTimer` the calls start
+  must therefore have a zero delay (`governance_upgrade_timer_initial_delay = 0` in the upgrade
+  input). Otherwise the timer check later in the same proposal reverts. Both scripts refuse such a
+  package.
+- **Migration pause.** The handler's emergency path lifts the ecosystem-wide migration pause before
+  it executes. That is why the bootstrap sequence re-asserts its pause in stage 1. A registry
+  operation holds a per-CTM pause, which this does not touch.
+- **CTM-admin calls.** The `[ctm_admin_calls]` of a bootstrap (the ServerNotifier handover) are not
+  governance calls. They must land before the proposal.
+- **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
+  the rewiring runs inside the proposal. The proposal is still approved through the board the
+  handler names when the calldata is emitted.
+
+Companions:
+
+- `VerifyEmergencyApproveHash.s.sol` (`run(address)`, fork only) checks that the board accepts the
+  approved-hash route, using an empty proposal.
+- `SecurityCouncilEmergencyStageUpgrade.s.sol` and `SecurityCouncilApproveStageUpgrade.s.sol` cover
+  the SIGNED route through `Utils`. They need the Safes' owner key and read the env vars
+  `PROTOCOL_UPGRADE_HANDLER`, `PRIVATE_KEY` and `UPGRADE_ID`. The first executes an empty emergency
+  proposal; the second records the Security Council's approval of a standard-path proposal id.
+- `EmergencyValidatorTimelockRestore.s.sol` is a stage one-off from v31, kept as the template for an
+  emergency swap of a single proxy. Once the bootstrap has run, it sends the swap through the CTM
+  executor's `forward`.
+
+Tests: `test/foundry/l1/integration/emergency-upgrade/`.
 
 ## 7. Chain crossing
 
