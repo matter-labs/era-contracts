@@ -371,7 +371,7 @@ library Utils {
         bytes32 _salt,
         bytes memory _creationCode,
         bytes memory _constructorArgs
-    ) internal view returns (address) {
+    ) internal pure returns (address) {
         return getL2AddressViaDeterministicCreate2(_salt, abi.encodePacked(_creationCode, _constructorArgs));
     }
 

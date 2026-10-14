@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Vm} from "forge-std/Vm.sol";
-
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {AuthoredL2Plan, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 
 import {RegistryObjectsFixture} from "./_SharedRegistryObjects.t.sol";

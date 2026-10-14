@@ -3,8 +3,6 @@ pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {console2 as console} from "forge-std/Script.sol";
-
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";

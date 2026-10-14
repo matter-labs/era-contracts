@@ -148,6 +148,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      to the pre-v35 upgrade engines of legacy edges. The verifier is part of the installed
     ///      chain state and is pinned by the release (`ICTMRelease.verifier`), so both the genesis
     ///      path and the upgrade path read it from the release they resolve to.
+    // Never written by THIS implementation by design — live CTMs carry pre-v35 values in it.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 protocolVersion => address) internal __DEPRECATED_protocolVersionVerifier;
 
     /// @dev Deprecated pre-v35 `defaultUpgrade` (the verifier-only upgrade engine). Slot retained

@@ -595,7 +595,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         L2CanonicalTransaction memory _transaction,
         L2UpgradePlan memory _plan,
         bytes memory _expectedDelegateCalldata
-    ) internal {
+    ) internal view {
         assertEq(_transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the VM's upgrade tx type");
         assertEq(_transaction.from, uint256(uint160(L2_FORCE_DEPLOYER_ADDR)));
         assertEq(_transaction.to, uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)));

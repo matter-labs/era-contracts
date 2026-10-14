@@ -125,7 +125,7 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
 
     // ─────────────────────────── metadata ───────────────────────────
 
-    function test_ethBaseTokenUsesTheHardcodedEtherMetadata() public {
+    function test_ethBaseTokenUsesTheHardcodedEtherMetadata() public view {
         ZKChainSpecificForceDeploymentsData memory chainData = _build();
 
         assertEq(chainData.baseTokenBridgingData.assetId, BASE_TOKEN_ASSET_ID);

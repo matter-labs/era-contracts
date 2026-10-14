@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -271,11 +270,6 @@ contract ValidatorTimelockTest is Test {
 
     function test_upgradeChainFromVersion_PropagatesToDiamondProxy() public {
         uint256 oldProtocolVersion = 1;
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
 
         vm.mockCall(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion)), "");
         vm.expectCall(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion)));
@@ -286,11 +280,6 @@ contract ValidatorTimelockTest is Test {
 
     function test_RevertWhen_upgradeChainFromVersionNotUpgrader() public {
         uint256 oldProtocolVersion = 1;
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(0),
-            initCalldata: bytes("")
-        });
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));

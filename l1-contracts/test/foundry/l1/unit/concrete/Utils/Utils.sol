@@ -28,7 +28,6 @@ import {
     ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
     PubdataContent
 } from "contracts/common/Config.sol";
-import {TEST_CHAIN_ID} from "foundry-test/TestConstants.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
@@ -44,6 +43,7 @@ L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUB
 address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 
 library Utils {
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is

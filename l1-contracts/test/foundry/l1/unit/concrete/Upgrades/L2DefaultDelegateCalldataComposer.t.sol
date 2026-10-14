@@ -90,7 +90,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      bridged representation (what the Bridgehub's `baseToken` resolves to), not from
     ///      `originToken`, which may have no code on this layer; the bridging data still describes
     ///      the token on its origin chain.
-    function test_readsAnERC20BaseTokenFromItsLocalRepresentation() public {
+    function test_readsAnERC20BaseTokenFromItsLocalRepresentation() public view {
         bytes memory composed = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,
@@ -119,7 +119,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      `bytes32` — is still composable here. Genesis deliberately permits such a base token,
     ///      and the upgrade path probes it the same tolerant way, so the chain does not become
     ///      unupgradeable the moment its metadata has to be recomposed.
-    function test_composesForBaseTokensWithoutUsableMetadata() public {
+    function test_composesForBaseTokensWithoutUsableMetadata() public view {
         assertEq(
             defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
             abi.encodeCall(
@@ -176,7 +176,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
 
     /// @dev Two chains of one ecosystem: the ecosystem-wide arguments are shared, only the
     ///      per-chain data differs.
-    function test_composesPerChain() public {
+    function test_composesPerChain() public view {
         bytes memory forEthChain = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,

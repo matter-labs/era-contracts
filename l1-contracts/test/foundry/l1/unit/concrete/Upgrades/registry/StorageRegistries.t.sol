@@ -7,7 +7,6 @@ import {Test} from "forge-std/Test.sol";
 import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
-import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -21,7 +20,6 @@ import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/Tra
 import {L2InventoryLib} from "contracts/upgrades/registry/libraries/L2InventoryLib.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -691,11 +689,11 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.upgradeTimestamp = 0;
 
-        CTMTransition transition = new CTMTransition(manifest);
+        CTMTransition newTransition = new CTMTransition(manifest);
 
-        assertEq(transition.upgradeTimestamp(), 0, "upgradeTimestamp");
+        assertEq(newTransition.upgradeTimestamp(), 0, "upgradeTimestamp");
         assertEq(
-            transition.oldProtocolVersionDeadline(),
+            newTransition.oldProtocolVersionDeadline(),
             manifest.oldProtocolVersionDeadline,
             "oldProtocolVersionDeadline"
         );
@@ -855,7 +853,7 @@ contract StorageRegistriesTest is Test {
         L2PlanFixtures.syncForceDeployments(manifest);
     }
 
-    function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public {
+    function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public pure {
         bytes[] memory table = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
         table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(BRIDGEHUB_IMPL_CODE);
         table[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(SYSTEM_CONTEXT_IMPL_CODE);
@@ -1106,9 +1104,9 @@ contract StorageRegistriesTest is Test {
         manifest.fromRelease = address(departing);
         manifest.newRelease = address(target);
         manifest.l2Plan = _l2Plan();
-        CTMTransition transition = new CTMTransition(manifest);
+        CTMTransition newTransition = new CTMTransition(manifest);
 
-        L2UpgradePlan memory plan = transition.l2Plan();
+        L2UpgradePlan memory plan = newTransition.l2Plan();
         assertEq(plan.deployments.length, 4, "only the two changed members are derived, then the authored two");
         // Derived rows follow the table (member) order: L2AssetRouter precedes SystemContext.
         assertEq(
@@ -1321,7 +1319,7 @@ contract StorageRegistriesTest is Test {
         manifest.genesisFacets = new GenesisFacet[](0);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
-        CTMRelease empty = new CTMRelease(manifest);
+        new CTMRelease(manifest);
     }
 
     function test_revertWhen_releaseNamesCodelessFacet() public {

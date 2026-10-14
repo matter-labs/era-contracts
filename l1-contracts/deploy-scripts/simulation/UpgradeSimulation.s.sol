@@ -40,8 +40,10 @@ contract UpgradeSimulation is Script {
         createCalls[0] = createChainCall(ctm, witness.chainId, ZKSYNC_OS_TEST_CREATE_CHAIN_ID, msg.sender);
         address bridgehub = ChainTypeManager(ctm).BRIDGE_HUB();
         // Append an independent table; keyed writeToml would replace the rest of the package.
+        // solhint-disable quotes
         vm.writeLine(
             outputPath,
+            // solhint-disable-next-line func-named-parameters
             string.concat(
                 "\n[test_upgrade_calls]\n",
                 'test_upgrade_chain = "',
@@ -58,6 +60,7 @@ contract UpgradeSimulation is Script {
                 '"\n'
             )
         );
+        // solhint-enable quotes
     }
 
     function createChainCall(

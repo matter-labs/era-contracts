@@ -73,11 +73,11 @@ contract LegacyGenesisEngineForLocalTest {
 contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
     ///      Correct length, empty rows — and no shell, since no row sits behind one.
-    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
+    function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
-    function getL2SystemProxyBytecodeInfo() internal override returns (bytes memory) {
+    function getL2SystemProxyBytecodeInfo() internal pure override returns (bytes memory) {
         return "";
     }
 
@@ -328,7 +328,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     ///         from where the verifier takes it. Pinned in a real EVM over a real prepare run: a
     ///         prepare that passes an argument the constructor does not take (as this one once
     ///         did) deploys fine and is unreproducible from the constructor's own arguments.
-    function test_bootstrapObjectsAreReproducibleFromTheirReviewedArguments() public {
+    function test_bootstrapObjectsAreReproducibleFromTheirReviewedArguments() public view {
         CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
         string memory root = vm.projectRoot();
         string memory coreOutput = vm.readFile(string.concat(root, CORE_OUTPUT));
@@ -554,7 +554,11 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         L1InteropFeeManager interopFeeManager = L1InteropFeeManager(
             ctmUpgrade.getAddresses().stateTransition.proxies.interopFeeManager
         );
-        assertEq(address(interopFeeManager), interopFeeManagerBeforeUpgrade, "Upgrade replaced the interop fee manager");
+        assertEq(
+            address(interopFeeManager),
+            interopFeeManagerBeforeUpgrade,
+            "Upgrade replaced the interop fee manager"
+        );
         assertEq(
             IChainTypeManager(_ctm).L1_INTEROP_FEE_MANAGER(),
             address(interopFeeManager),

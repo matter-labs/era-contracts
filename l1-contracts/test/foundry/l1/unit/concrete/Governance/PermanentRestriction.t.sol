@@ -464,7 +464,6 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function createNewChainBridgehub() internal {
-        bytes[] memory factoryDeps = new bytes[](0);
         vm.stopPrank();
         vm.startPrank(governor);
         // The shared fixture already registers it (the ChainAssetHandler derives pause authority

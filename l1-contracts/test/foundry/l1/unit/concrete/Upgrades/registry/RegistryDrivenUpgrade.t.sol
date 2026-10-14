@@ -16,7 +16,6 @@ import {ChainRouting} from "test-utils/ChainRouting.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {
-    CTM_CONTRACT_COUNT,
     L2_ECOSYSTEM_CONTRACT_COUNT,
     L2EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
@@ -45,8 +44,7 @@ import {
     L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
-    TransitionManifest,
-    ProxyUpgradeRow
+    TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
@@ -222,7 +220,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         address _adminFacet,
         address _verifier,
         uint256 _protocolVersion
-    ) internal returns (ReleaseManifest memory) {
+    ) internal view returns (ReleaseManifest memory) {
         bytes[] memory l2BytecodeInfos = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
         bytes memory l2SystemProxyBytecodeInfo;
         if (_adminFacet != address(0)) {

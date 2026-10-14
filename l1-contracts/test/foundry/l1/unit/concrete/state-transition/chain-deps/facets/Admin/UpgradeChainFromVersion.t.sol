@@ -48,11 +48,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
     function test_revertWhen_calledByNonAdminOrChainTypeManager() public {
         address nonAdminOrChainTypeManager = makeAddr("nonAdminOrChainTypeManager");
         uint256 oldProtocolVersion = 1;
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(0),
-            initCalldata: new bytes(0)
-        });
 
         vm.startPrank(nonAdminOrChainTypeManager);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdminOrChainTypeManager));

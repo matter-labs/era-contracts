@@ -107,7 +107,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev The inner call is the genesis one, NOT a deployment plan: a new chain has nothing
     ///      force-deployed yet, so it goes through `IComplexUpgrader.upgrade` into the L2 genesis
     ///      upgrade, with the release's fixed blob and this chain's own data.
-    function test_genesisUpgradeTx_delegatesToTheL2GenesisUpgrade() public {
+    function test_genesisUpgradeTx_delegatesToTheL2GenesisUpgrade() public view {
         L2CanonicalTransaction memory transaction = _composedGenesisTx(ETH_CHAIN_ID);
 
         assertEq(
@@ -134,7 +134,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
     /// @dev Nothing is cached: two chains of one ecosystem get transactions that differ in exactly
     ///      the per-chain half.
-    function test_genesisUpgradeTx_isComposedPerChain() public {
+    function test_genesisUpgradeTx_isComposedPerChain() public view {
         L2CanonicalTransaction memory forEthChain = _composedGenesisTx(ETH_CHAIN_ID);
         L2CanonicalTransaction memory forErc20Chain = _composedGenesisTx(ERC20_CHAIN_ID);
 
@@ -148,7 +148,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev The refactoring must be observably a no-op: the transaction is byte-identical to what
     ///      the pre-refactor struct literal and metadata probe produced for the same inputs (see
     ///      {LegacyGenesisComposition}).
-    function test_genesisUpgradeTx_isByteIdenticalToTheRetiredComposition() public {
+    function test_genesisUpgradeTx_isByteIdenticalToTheRetiredComposition() public view {
         uint256[4] memory chainIds = [ETH_CHAIN_ID, ERC20_CHAIN_ID, NO_METADATA_CHAIN_ID, BYTES32_METADATA_CHAIN_ID];
         bytes32[4] memory assetIds = [
             ETH_BASE_TOKEN_ASSET_ID,
@@ -176,7 +176,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev The two paths agree on the nonce for a reason, not by coincidence: the shared
     ///      `protocolUpgradeNonce` is `major << 32 | minor`, and genesis rejects a non-zero major,
     ///      so it equals the bare minor version the retired code used.
-    function test_genesisUpgradeTx_nonceIsTheMinorVersion() public {
+    function test_genesisUpgradeTx_nonceIsTheMinorVersion() public view {
         uint256 version = SemVer.packSemVer(0, 27, 5);
 
         // slither-disable-next-line unused-return
@@ -267,19 +267,19 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev A chain created on a base token that serves no metadata: genesis composes the ERC20
     ///      defaults rather than reverting, and the upgrade path recomposes exactly the same data,
     ///      so such a chain is upgradeable afterwards.
-    function test_aBaseTokenWithoutMetadataComposesOnBothPaths() public {
+    function test_aBaseTokenWithoutMetadataComposesOnBothPaths() public view {
         _assertTolerated(NO_METADATA_CHAIN_ID, address(noMetadataToken));
     }
 
     /// @dev The same for a Maker-style token whose `name()`/`symbol()` answer with a `bytes32`.
-    function test_aBytes32MetadataBaseTokenComposesOnBothPaths() public {
+    function test_aBytes32MetadataBaseTokenComposesOnBothPaths() public view {
         _assertTolerated(BYTES32_METADATA_CHAIN_ID, address(bytes32MetadataToken));
     }
 
     /// @dev The genesis path and the upgrade path both compose for `_chainId`, and both land on the
     ///      defaults — which is what keeps the chain's L2 base-token metadata stable across the
     ///      upgrade that rewrites it.
-    function _assertTolerated(uint256 _chainId, address _token) internal {
+    function _assertTolerated(uint256 _chainId, address _token) internal view {
         ZKChainSpecificForceDeploymentsData memory genesisData = _genesisPerChainData(_composedGenesisTx(_chainId));
         ZKChainSpecificForceDeploymentsData memory upgradeData = abi.decode(
             _upgradePathPerChainData(_chainId),

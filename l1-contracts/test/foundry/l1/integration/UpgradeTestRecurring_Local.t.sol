@@ -41,11 +41,11 @@ import {UpgradeIntegrationBootstrapFixture} from "./UpgradeTest_Local.t.sol";
 ///      this file tests — the declaration, the objects, the version and release invariants — runs
 ///      unmocked.
 abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
-    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
+    function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
-    function getL2SystemProxyBytecodeInfo() internal override returns (bytes memory) {
+    function getL2SystemProxyBytecodeInfo() internal pure override returns (bytes memory) {
         return "";
     }
 
@@ -212,7 +212,7 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 /// @dev Everything here drives `DefaultCoreUpgrade`/`DefaultCTMUpgrade` themselves; the object
 ///      layer is covered separately by `RegistryIndividualUpgrade.t.sol`, which cannot show that
 ///      PREPARATION can produce these shapes.
-contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFixture {
+contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixture {
     using stdToml for string;
 
     /// @dev The upgrade input whose `latest_protocol_version` EQUALS the version the bootstrap

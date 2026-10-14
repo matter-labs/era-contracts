@@ -79,7 +79,7 @@ library GetDiamondCutData {
     function getDiamondCutAndForceDeployment(
         address ctm,
         bool skipLogs
-    ) external returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
+    ) external view returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
         if (skipLogs) {
             return ("", "");
         }

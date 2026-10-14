@@ -13,6 +13,7 @@ import {TrimmedUpgradeOutput} from "./_EcosystemUpgradeForTests.sol";
 
 /// @dev The target version comes from the upgrade input, and the output carries only what the runner and
 ///      the merger read.
+// solhint-disable-next-line contract-name-capwords
 contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
     using stdToml for string;
 
@@ -45,13 +46,13 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
     }
 
     function saveOutput(string memory outputPath) internal override {
-        TrimmedUpgradeOutput.write(
-            vm,
-            outputPath,
-            getChainUpgradeDiamondCutData(),
-            committedUpgradeEngine(),
-            getAddresses().admin.eip7702Checker,
-            TrimmedUpgradeOutput.Registry({
+        TrimmedUpgradeOutput.write({
+            _vm: vm,
+            _outputPath: outputPath,
+            _upgradeCutData: getChainUpgradeDiamondCutData(),
+            _defaultUpgrade: committedUpgradeEngine(),
+            _eip7702Checker: getAddresses().admin.eip7702Checker,
+            _registry: TrimmedUpgradeOutput.Registry({
                 ctmTransition: upgradeAddresses.ctmTransition,
                 ctmUpgradeExecutor: boundCTMUpgradeExecutor(),
                 ctmRelease: getAddresses().stateTransition.currentRelease,
@@ -60,7 +61,7 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
                 operation: upgradeAddresses.ecosystemUpgradeOperation,
                 coordinator: upgradeCoordinator()
             })
-        );
+        });
     }
 }
 
@@ -68,6 +69,7 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
 ///      current sources, so its `L1MessageRoot` already runs this build and the base pipeline would
 ///      reuse it; the harness deploys the declared change anyway so the hop carries the ecosystem leg
 ///      it exists to exercise.
+// solhint-disable-next-line contract-name-capwords
 contract CoreUpgradeForTests_v36 is CoreUpgrade_v36 {
     function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
         if (keccak256(bytes(_name)) == keccak256(bytes("L1MessageRoot"))) {

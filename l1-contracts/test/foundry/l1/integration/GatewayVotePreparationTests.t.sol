@@ -57,11 +57,11 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
     /// @dev The real builder reads every L2 contract's bytecode from artifacts, which pushes this
     ///      test over the gas limit (MemoryOOG). The table's content is irrelevant to the address
     ///      calculation under test, so an empty enum-length table (with no shell) stands in.
-    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
+    function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
-    function getL2SystemProxyBytecodeInfo() internal override returns (bytes memory) {
+    function getL2SystemProxyBytecodeInfo() internal pure override returns (bytes memory) {
         return "";
     }
 }
@@ -301,7 +301,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         return address(release);
     }
 
-    function _liveFacetRow(address _facet, bool _isFreezable) internal view returns (GenesisFacet memory) {
+    function _liveFacetRow(address _facet, bool _isFreezable) internal pure returns (GenesisFacet memory) {
         return GenesisFacet({facet: (_facet), isFreezable: _isFreezable});
     }
 

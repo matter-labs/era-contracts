@@ -305,7 +305,7 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
 
     function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (Diamond.DiamondCutData memory diamondCut) {
+    ) internal pure returns (Diamond.DiamondCutData memory diamondCut) {
         // The committed genesis cut is only the DiamondInit address: no `facetCuts` and no init
         // payload. `DiamondInit` reads the facet set and the base system contract hashes from
         // the CTM's pinned `currentRelease`.
