@@ -30,7 +30,6 @@ const ARTIFACTS = {
   CoreUpgradeExecutor: "CoreUpgradeExecutor.sol/CoreUpgradeExecutor.json",
   EcosystemUpgradeExecutor: "EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
   EcosystemUpgradeOperation: "EcosystemUpgradeOperation.sol/EcosystemUpgradeOperation.json",
-  IChainTypeManager: "IChainTypeManager.sol/IChainTypeManager.json",
   ISelfDescribingFacet: "ISelfDescribingFacet.sol/ISelfDescribingFacet.json",
   ICTMRelease: "ICTMRelease.sol/ICTMRelease.json",
   ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
