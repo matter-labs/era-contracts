@@ -40,10 +40,6 @@ interface ICTMRelease {
 
     function genesisParams() external view returns (address, bytes32, uint64);
 
-    /// @notice Whether `_chain`'s live diamond routing is EXACTLY this release's — same facets,
-    ///         same per-facet selector sets, nothing extra.
-    function verifyChainRouting(address _chain) external view returns (bool);
-
     /// @notice Reverts unless every contract this release names (DiamondInit, genesis upgrade,
     ///         verifier, every genesis facet) is deployed code and every genesis facet describes at
     ///         least one selector. THE enforcement surface: the paths that install or apply a

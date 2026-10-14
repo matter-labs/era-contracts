@@ -14,8 +14,11 @@
 //! * a BOOTSTRAP edge, the one-time migration onto the registry model. It has no operation and
 //!   no coordinator stage calls; governance executes the list a `RegistryBootstrapSequence`
 //!   derives.
+//! * a transition REPLACEMENT: no operation, no `migrate()`, and one
+//!   `CTMUpgradeExecutor.forward` carrying `ChainTypeManager.replaceUpgradeTransition` (see
+//!   `protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition`).
 //!
-//! In both kinds an object is recovered from the CALLDATA governance will execute, never from
+//! In every kind an object is recovered from the CALLDATA governance will execute, never from
 //! the prepare's summary of it, and the summary field is then a cross-check: a disagreement
 //! means the reviewer read one upgrade and governance would sign another.
 
@@ -25,7 +28,10 @@ use alloy::primitives::{Address, Bytes, B256, U256};
 use anyhow::Context;
 
 use crate::common::external_actions::ExternalAction;
+use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
+
+use super::records::records_in;
 
 /// `RegistryBootstrapMigration.migrate()`.
 pub(crate) const MIGRATE_SELECTOR: [u8; 4] = [0x8f, 0xd3, 0xab, 0x80];
@@ -41,15 +47,18 @@ pub(crate) enum RegistryPackage {
     Operation(OperationPackage),
     /// The one-time migration onto the registry model.
     Bootstrap(BootstrapPackage),
+    /// A compare-and-replace of a committed transition.
+    Replacement(Box<ReplacementPackage>),
 }
 
 impl RegistryPackage {
     /// Reads `ecosystem_toml` and decides which kind of upgrade it drives.
     ///
     /// `[operation]` is written by the merge itself and only for a package whose CTM prepare
-    /// deployed an operation, so its presence is the classification. A package with neither an
-    /// operation nor a `migrate()` call is REFUSED rather than verified as the nearest match:
-    /// an unrecognised package is an input this tool cannot review.
+    /// deployed an operation, so its presence is the classification. Otherwise a stage-1
+    /// `migrate()` call makes a bootstrap edge, and a `forward` carrying `replaceUpgradeTransition`
+    /// a replacement. A package that is none of these is REFUSED rather than verified as the
+    /// nearest match: an unrecognised package is an input this tool cannot review.
     pub(crate) fn load(ecosystem_toml: &Path) -> anyhow::Result<Self> {
         let root = read_toml(ecosystem_toml)?;
         if root.get("operation").is_some() {
@@ -57,6 +66,21 @@ impl RegistryPackage {
                 ecosystem_toml,
                 &root,
             )?));
+        }
+        let stages = [
+            calls_at(&root, "stage0_calls")?,
+            calls_at(&root, "stage1_calls")?,
+            calls_at(&root, "stage2_calls")?,
+        ];
+        if migrate_targets(&stages[1]).is_empty() {
+            if let Some(forward) = recover_replacement(&stages)? {
+                return Ok(Self::Replacement(Box::new(ReplacementPackage::load(
+                    ecosystem_toml,
+                    &root,
+                    forward,
+                    stages,
+                )?)));
+            }
         }
         Ok(Self::Bootstrap(BootstrapPackage::load(
             ecosystem_toml,
@@ -117,6 +141,9 @@ pub(crate) struct OperationPackage {
     /// `[ctms.*.contracts_config] force_deployments_data` — the blob the prepare pinned in the
     /// release the transition installs.
     pub(crate) force_deployments_data: Option<Bytes>,
+    /// The executor records the package carries, plus any `--executor-record` the reviewer added
+    /// (see [`super::records`]).
+    pub(crate) executor_records: UpgradeExecutorsRecord,
 }
 
 impl OperationPackage {
@@ -170,6 +197,7 @@ impl OperationPackage {
             create2_salts: create2_salts_in(root, &ctm_key),
             lifecycle: lifecycle_inputs_in(root, &ctm_key),
             force_deployments_data: force_deployments_data_in(root, &ctm_key),
+            executor_records: records_in(root, &ecosystem_toml.display().to_string())?,
             ctm_key,
         })
     }
@@ -270,6 +298,9 @@ pub(crate) struct BootstrapPackage {
     /// `[ctms.*.contracts_config] force_deployments_data` — the blob the prepare pinned in the
     /// release the edge installs.
     pub(crate) force_deployments_data: Option<Bytes>,
+    /// The executor records the package carries (the v35 prepares record the executors they
+    /// deploy), plus any `--executor-record` the reviewer added.
+    pub(crate) executor_records: UpgradeExecutorsRecord,
 }
 
 fn table<'a>(root: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
@@ -430,6 +461,7 @@ impl BootstrapPackage {
             create2_salts: create2_salts_in(root, &ctm_key),
             lifecycle: lifecycle_inputs_in(root, &ctm_key),
             force_deployments_data: force_deployments_data_in(root, &ctm_key),
+            executor_records: records_in(root, &ecosystem_toml.display().to_string())?,
             ctm_key,
         })
     }
@@ -450,9 +482,10 @@ fn sole_migrate_target(stage1: &[GovernanceCall]) -> anyhow::Result<Address> {
     match migrate_targets(stage1).as_slice() {
         [one] => Ok(*one),
         [] => anyhow::bail!(
-            "stage 1 contains no `migrate()` call, and the package declares no [operation]: it is \
-             neither a bootstrap edge nor a recurring registry-driven upgrade, so this tool \
-             cannot say what it does"
+            "stage 1 contains no `migrate()` call, the package declares no [operation] and no \
+             `forward` replaces a transition: it is neither a bootstrap edge, a recurring \
+             registry-driven upgrade nor a transition replacement, so this tool cannot say what \
+             it does"
         ),
         many => anyhow::bail!(
             "stage 1 calls `migrate()` on {} objects ({many:?}); a bootstrap package must drive \
@@ -460,6 +493,216 @@ fn sole_migrate_target(stage1: &[GovernanceCall]) -> anyhow::Result<Address> {
             many.len()
         ),
     }
+}
+
+/// A replacement of a committed transition: one `CTMUpgradeExecutor.forward` carrying
+/// `ChainTypeManager.replaceUpgradeTransition(expected, replacement)`, optionally followed by
+/// `setProtocolVersionDeadline`. Its prepare deploys the replacement alone — no release (it lands
+/// on an existing one), no operation, no timer, no executor.
+#[derive(Debug)]
+pub(crate) struct ReplacementPackage {
+    /// The forward call, recovered from the calldata — the executable source of truth.
+    pub(crate) forward: RecoveredReplacement,
+    /// The CTM key under `[ctms]` this package names (e.g. `zksync_os`).
+    pub(crate) ctm_key: String,
+    /// `[ctms.*.registry] replaced_transition_addr`, a cross-check on the recovered `expected`.
+    pub(crate) reported_replaced: Option<Address>,
+    /// `[ctms.*.registry] replacement_transition_addr`, a cross-check on the recovered replacement.
+    pub(crate) reported_replacement: Option<Address>,
+    /// `[ctms.*.registry] ctm_transition_addr` — the prepare's transition, i.e. the replacement.
+    pub(crate) reported_ctm_transition: Option<Address>,
+    /// `[ctms.*.registry] ctm_release_addr` — the replacement's arriving release.
+    pub(crate) reported_release: Option<Address>,
+    /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the forward's target.
+    pub(crate) reported_ctm_executor: Option<Address>,
+    /// `[ctms.*.registry] coordinator_addr` — the coordinator the CTM executor answers to.
+    pub(crate) reported_coordinator: Option<Address>,
+    /// `[ctms.*.state_transition] chain_type_manager_proxy`, a cross-check on the inner target and
+    /// the value the CTM executor's `CHAIN_TYPE_MANAGER` is held against.
+    pub(crate) reported_ctm: Option<Address>,
+    /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — the CTM executor's
+    /// `CTM_PROXY_ADMIN` is held against it.
+    pub(crate) reported_ctm_proxy_admin: Option<Address>,
+    /// `[core.registry] core_transition_addr` — a core leg a replacement does not carry.
+    pub(crate) reported_core_transition: Option<Address>,
+    pub(crate) stage0: Vec<GovernanceCall>,
+    pub(crate) stage1: Vec<GovernanceCall>,
+    pub(crate) stage2: Vec<GovernanceCall>,
+    /// The prepare's declared external actions (the forward is one of them).
+    pub(crate) external_actions: Vec<ExternalAction>,
+    /// Every CREATE2 salt the package records; see [`BootstrapPackage::create2_salts`].
+    pub(crate) create2_salts: Vec<B256>,
+    /// The package's record of the lifecycle objects' binding values.
+    pub(crate) lifecycle: LifecycleInputs,
+    /// `[ctms.*.contracts_config] old_protocol_version` — the replaced transition's departing
+    /// version, a cross-check.
+    pub(crate) reported_old_version: Option<U256>,
+    /// `[ctms.*.contracts_config] new_protocol_version` — the replacement's target, a cross-check.
+    pub(crate) reported_new_version: Option<U256>,
+    /// The executor records the reviewer added with `--executor-record` (the prepare deploys no
+    /// executor, so the package itself normally carries none).
+    pub(crate) executor_records: UpgradeExecutorsRecord,
+}
+
+impl ReplacementPackage {
+    fn load(
+        ecosystem_toml: &Path,
+        root: &toml::Value,
+        forward: RecoveredReplacement,
+        [stage0, stage1, stage2]: [Vec<GovernanceCall>; 3],
+    ) -> anyhow::Result<Self> {
+        let ctm_key = sole_ctm_key(root)?;
+        Ok(Self {
+            forward,
+            reported_replaced: registry_address(root, &ctm_key, "replaced_transition_addr"),
+            reported_replacement: registry_address(root, &ctm_key, "replacement_transition_addr"),
+            reported_ctm_transition: registry_address(root, &ctm_key, "ctm_transition_addr"),
+            reported_release: registry_address(root, &ctm_key, "ctm_release_addr"),
+            reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
+            reported_coordinator: registry_address(root, &ctm_key, "coordinator_addr"),
+            reported_ctm: ctm_address(
+                root,
+                &ctm_key,
+                "state_transition",
+                "chain_type_manager_proxy",
+            ),
+            reported_ctm_proxy_admin: ctm_address(
+                root,
+                &ctm_key,
+                "deployed_addresses",
+                "transparent_proxy_admin",
+            ),
+            reported_core_transition: address_at(
+                root,
+                &["core", "registry", "core_transition_addr"],
+            )
+            .filter(|a| !a.is_zero()),
+            stage0,
+            stage1,
+            stage2,
+            external_actions: external_actions_in(root)?,
+            create2_salts: create2_salts_in(root, &ctm_key),
+            lifecycle: lifecycle_inputs_in(root, &ctm_key),
+            reported_old_version: u256_at(
+                root,
+                &["ctms", &ctm_key, "contracts_config", "old_protocol_version"],
+            ),
+            reported_new_version: u256_at(
+                root,
+                &["ctms", &ctm_key, "contracts_config", "new_protocol_version"],
+            ),
+            executor_records: records_in(root, &ecosystem_toml.display().to_string())?,
+            ctm_key,
+        })
+    }
+}
+
+/// The replacement as the calldata states it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RecoveredReplacement {
+    /// The stage the forward sits in (`0..=2`) and its index there.
+    pub(crate) stage: usize,
+    pub(crate) index: usize,
+    /// The forward's target: the verifier requires it to be the CTM's executor.
+    pub(crate) executor: Address,
+    /// The inner calls' one target: the verifier requires it to be the CTM.
+    pub(crate) ctm: Address,
+    pub(crate) expected: Address,
+    pub(crate) replacement: Address,
+    /// The `setProtocolVersionDeadline` riding the same forward, if any.
+    pub(crate) deadline: Option<DeadlineChange>,
+}
+
+/// `ChainTypeManager.setProtocolVersionDeadline(protocol_version, timestamp)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct DeadlineChange {
+    pub(crate) protocol_version: U256,
+    pub(crate) timestamp: U256,
+}
+
+/// The `forward` that replaces a transition, if any call of any stage is one.
+///
+/// A forward counts when one of its inner calls has `replaceUpgradeTransition`'s selector; it must
+/// then be exactly `[replaceUpgradeTransition]` or `[replaceUpgradeTransition,
+/// setProtocolVersionDeadline]` on one target, carrying no value — anything else in it is
+/// refused, since this tool would otherwise verify the replacement and wave the rest through.
+pub(crate) fn recover_replacement(
+    stages: &[Vec<GovernanceCall>; 3],
+) -> anyhow::Result<Option<RecoveredReplacement>> {
+    use super::views::{CTMUpgradeExecutorView, CtmView};
+    use alloy::sol_types::SolCall;
+
+    let replace_selector = CtmView::replaceUpgradeTransitionCall::SELECTOR;
+    let mut found: Option<RecoveredReplacement> = None;
+    for (stage, calls) in stages.iter().enumerate() {
+        for (index, call) in calls.iter().enumerate() {
+            if call.data.get(..4) != Some(&CTMUpgradeExecutorView::forwardCall::SELECTOR[..]) {
+                continue;
+            }
+            let Ok(forward) = CTMUpgradeExecutorView::forwardCall::abi_decode(&call.data) else {
+                continue;
+            };
+            let inner = forward._calls;
+            if !inner
+                .iter()
+                .any(|c| c.data.get(..4) == Some(&replace_selector[..]))
+            {
+                continue;
+            }
+            anyhow::ensure!(
+                found.is_none(),
+                "more than one `forward` replaces a transition (stage {stage}, call {index}, and \
+                 an earlier one): a replacement package replaces exactly one"
+            );
+            anyhow::ensure!(
+                call.value.is_zero() && inner.iter().all(|c| c.value.is_zero()),
+                "the `forward` that replaces a transition (stage {stage}, call {index}) carries \
+                 value; a replacement moves none"
+            );
+            let shape = |why: &str| {
+                anyhow::anyhow!(
+                    "the `forward` that replaces a transition (stage {stage}, call {index}) {why}: \
+                     it must carry exactly `replaceUpgradeTransition(expected, replacement)`, \
+                     optionally followed by `setProtocolVersionDeadline`, on the CTM — anything \
+                     else in it is refused"
+                )
+            };
+            let replace = inner
+                .first()
+                .and_then(|c| CtmView::replaceUpgradeTransitionCall::abi_decode(&c.data).ok())
+                .ok_or_else(|| shape("does not start with `replaceUpgradeTransition`"))?;
+            let deadline = match inner.get(1) {
+                None => None,
+                Some(c) => {
+                    let call = CtmView::setProtocolVersionDeadlineCall::abi_decode(&c.data)
+                        .map_err(|_| {
+                            shape("carries a second call that is not `setProtocolVersionDeadline`")
+                        })?;
+                    Some(DeadlineChange {
+                        protocol_version: call._protocolVersion,
+                        timestamp: call._timestamp,
+                    })
+                }
+            };
+            if inner.len() > 2 {
+                return Err(shape(&format!("carries {} calls", inner.len())));
+            }
+            let ctm = inner[0].target;
+            if inner.iter().any(|c| c.target != ctm) {
+                return Err(shape("addresses more than one target"));
+            }
+            found = Some(RecoveredReplacement {
+                stage,
+                index,
+                executor: call.target,
+                ctm,
+                expected: replace._expectedTransition,
+                replacement: replace._replacement,
+                deadline,
+            });
+        }
+    }
+    Ok(found)
 }
 
 #[cfg(test)]
@@ -772,6 +1015,222 @@ mod tests {
         assert!(package.lifecycle.core_proxy_admin.is_none());
         assert!(package.lifecycle.timer_initial_delay.is_none());
         assert!(package.lifecycle.timer_owner.is_none());
+    }
+
+    // ───────────────────────── transition replacements ─────────────────────────
+
+    use super::super::views::{BootstrapCall, CTMUpgradeExecutorView, CtmView};
+    use alloy::sol_types::SolCall;
+
+    const CTM: Address = Address::repeat_byte(0xC7);
+    const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
+    const EXPECTED: Address = Address::repeat_byte(0x7A);
+    const REPLACEMENT: Address = Address::repeat_byte(0x7B);
+    const DEPARTURE: u64 = 0x23_0000_0000;
+
+    fn inner(target: Address, data: Vec<u8>) -> BootstrapCall {
+        BootstrapCall {
+            target,
+            value: U256::ZERO,
+            data: data.into(),
+        }
+    }
+
+    fn replace_call() -> BootstrapCall {
+        inner(
+            CTM,
+            CtmView::replaceUpgradeTransitionCall {
+                _expectedTransition: EXPECTED,
+                _replacement: REPLACEMENT,
+            }
+            .abi_encode(),
+        )
+    }
+
+    fn deadline_call(version: u64, timestamp: u64) -> BootstrapCall {
+        inner(
+            CTM,
+            CtmView::setProtocolVersionDeadlineCall {
+                _protocolVersion: U256::from(version),
+                _timestamp: U256::from(timestamp),
+            }
+            .abi_encode(),
+        )
+    }
+
+    fn forward(calls: Vec<BootstrapCall>) -> GovernanceCall {
+        call(
+            CTM_EXECUTOR,
+            CTMUpgradeExecutorView::forwardCall { _calls: calls }.abi_encode(),
+        )
+    }
+
+    fn stages(stage1: Vec<GovernanceCall>) -> [Vec<GovernanceCall>; 3] {
+        [Vec::new(), stage1, Vec::new()]
+    }
+
+    #[test]
+    fn recovers_a_replacement_from_its_forward() {
+        let recovered = recover_replacement(&stages(vec![forward(vec![replace_call()])]))
+            .unwrap()
+            .expect("a forward of replaceUpgradeTransition is a replacement");
+        assert_eq!(
+            recovered,
+            RecoveredReplacement {
+                stage: 1,
+                index: 0,
+                executor: CTM_EXECUTOR,
+                ctm: CTM,
+                expected: EXPECTED,
+                replacement: REPLACEMENT,
+                deadline: None,
+            }
+        );
+    }
+
+    #[test]
+    fn recovers_the_deadline_call_riding_the_same_forward() {
+        let recovered = recover_replacement(&stages(vec![
+            call(Address::repeat_byte(0x11), vec![0xde, 0xad, 0xbe, 0xef]),
+            forward(vec![
+                replace_call(),
+                deadline_call(DEPARTURE, 1_900_000_000),
+            ]),
+        ]))
+        .unwrap()
+        .unwrap();
+        assert_eq!(recovered.index, 1);
+        assert_eq!(
+            recovered.deadline,
+            Some(DeadlineChange {
+                protocol_version: U256::from(DEPARTURE),
+                timestamp: U256::from(1_900_000_000u64),
+            })
+        );
+    }
+
+    /// The bootstrap's notifier acceptance is a `forward` too; without a replace it is not a
+    /// replacement, and a package of only ordinary calls has none.
+    #[test]
+    fn a_forward_that_replaces_nothing_is_not_a_replacement() {
+        let accept = inner(Address::repeat_byte(0x2A), vec![0x79, 0xba, 0x50, 0x97]);
+        assert!(recover_replacement(&stages(vec![forward(vec![accept])]))
+            .unwrap()
+            .is_none());
+        assert!(recover_replacement(&stages(Vec::new())).unwrap().is_none());
+    }
+
+    /// Anything beside the replace and the optional deadline would ride a verified replacement
+    /// unverified, so it is refused outright.
+    #[test]
+    fn a_forward_carrying_anything_else_is_refused() {
+        let nomination = inner(
+            CTM,
+            [
+                TRANSFER_OWNERSHIP_SELECTOR.to_vec(),
+                Address::repeat_byte(0xBA).into_word().to_vec(),
+            ]
+            .concat(),
+        );
+        for calls in [
+            vec![replace_call(), nomination.clone()],
+            vec![nomination.clone(), replace_call()],
+            vec![
+                replace_call(),
+                deadline_call(DEPARTURE, 1),
+                deadline_call(DEPARTURE, 2),
+            ],
+        ] {
+            let err = recover_replacement(&stages(vec![forward(calls)]))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("anything else in it is refused"), "{err}");
+        }
+
+        // Two targets in one forward.
+        let mut elsewhere = deadline_call(DEPARTURE, 1);
+        elsewhere.target = Address::repeat_byte(0xC8);
+        let err = recover_replacement(&stages(vec![forward(vec![replace_call(), elsewhere])]))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("more than one target"), "{err}");
+
+        // Value.
+        let mut paying = forward(vec![replace_call()]);
+        paying.value = U256::from(1);
+        let err = recover_replacement(&stages(vec![paying]))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("carries value"), "{err}");
+    }
+
+    #[test]
+    fn two_replacing_forwards_are_refused() {
+        let err = recover_replacement(&[
+            vec![forward(vec![replace_call()])],
+            vec![forward(vec![replace_call()])],
+            Vec::new(),
+        ])
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("more than one `forward`"), "{err}");
+    }
+
+    /// The merged package a replacement prepare produces: no [operation], no `migrate()`, the
+    /// forward in stage 1 — classified as its own kind, with every summary field picked up.
+    #[test]
+    fn a_replacement_package_loads_as_its_own_kind() {
+        let stage1 = forward(vec![replace_call(), deadline_call(DEPARTURE, 7)]);
+        let body = format!(
+            "[[external_actions]]\n\
+             phase = \"1\"\n\
+             label = \"replace the committed transition departing {DEPARTURE}\"\n\
+             authority = \"CTM executor owner (governance)\"\n\
+             target = \"{CTM_EXECUTOR}\"\n\
+             value = \"0\"\n\
+             data = \"0x{}\"\n\
+             [governance_calls]\n\
+             stage0_calls = \"0x\"\n\
+             stage1_calls = \"0x{}\"\n\
+             stage2_calls = \"0x\"\n\
+             [ctms.zksync_os.registry]\n\
+             replaced_transition_addr = \"{EXPECTED}\"\n\
+             replacement_transition_addr = \"{REPLACEMENT}\"\n\
+             ctm_transition_addr = \"{REPLACEMENT}\"\n\
+             ctm_upgrade_executor_addr = \"{CTM_EXECUTOR}\"\n\
+             coordinator_addr = \"{COORDINATOR}\"\n\
+             operation_addr = \"0x0000000000000000000000000000000000000000\"\n\
+             upgrade_timer_addr = \"0x0000000000000000000000000000000000000000\"\n\
+             [ctms.zksync_os.state_transition]\n\
+             chain_type_manager_proxy = \"{CTM}\"\n\
+             [ctms.zksync_os.contracts_config]\n\
+             old_protocol_version = {DEPARTURE}\n\
+             new_protocol_version = {}\n",
+            alloy::hex::encode(&stage1.data),
+            alloy::hex::encode(crate::common::governance_calls::encode_calls(
+                std::slice::from_ref(&stage1)
+            )),
+            DEPARTURE + 0x1_0000_0000,
+        );
+        let RegistryPackage::Replacement(package) = load_str(&body).unwrap() else {
+            panic!("a forwarded replaceUpgradeTransition must load as a replacement");
+        };
+        assert_eq!(package.forward.expected, EXPECTED);
+        assert_eq!(package.forward.replacement, REPLACEMENT);
+        assert_eq!(package.forward.executor, CTM_EXECUTOR);
+        assert!(package.forward.deadline.is_some());
+        assert_eq!(package.reported_replaced, Some(EXPECTED));
+        assert_eq!(package.reported_replacement, Some(REPLACEMENT));
+        assert_eq!(package.reported_ctm_executor, Some(CTM_EXECUTOR));
+        assert_eq!(package.reported_ctm, Some(CTM));
+        assert_eq!(
+            package.reported_coordinator,
+            Some(COORDINATOR.parse::<Address>().unwrap())
+        );
+        assert_eq!(package.reported_old_version, Some(U256::from(DEPARTURE)));
+        assert_eq!(package.external_actions.len(), 1);
+        assert!(package.external_actions[0].is_call(&stage1));
+        assert!(package.executor_records.is_empty());
     }
 
     /// The zero `bootstrap_migration_addr` a post-bootstrap release carries must not divert it

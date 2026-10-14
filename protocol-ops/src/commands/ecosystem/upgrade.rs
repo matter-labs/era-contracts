@@ -467,6 +467,19 @@ async fn stage_governance_execute(
         governance_addr
     ));
 
+    // A stage with no calls is skipped rather than replayed as an empty governance operation (a
+    // transition replacement carries stage 1 alone): two empty stages under one legacy-Gov salt
+    // would be the SAME operation, and the second schedule reverts.
+    if crate::common::governance_calls::decode_calls(&encoded_calls_hex)
+        .context("decode governance calls")?
+        .is_empty()
+    {
+        logger::info(format!(
+            "Governance stage {stage} ({}) carries no calls: nothing to execute",
+            governance_toml.display()
+        ));
+        return Ok(governance_addr);
+    }
     let encoded_calls = Bytes::from(
         hex::decode(encoded_calls_hex.trim_start_matches("0x"))
             .context("invalid governance calls hex")?,

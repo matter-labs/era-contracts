@@ -21,7 +21,7 @@ import {
     L1EcosystemContract,
     L1_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-import {BridgehubAddresses} from "../../utils/Types.sol";
+import {BridgehubAddresses, BridgesDeployedAddresses} from "../../utils/Types.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CoreUpgradeParams} from "./UpgradeParams.sol";
@@ -138,8 +138,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a
     ///         source-checked row (live implementation read from the EIP-1967 slot) for every proxy
     ///         this run deployed a new implementation for, every other slot an explicit inert zero.
-    /// @dev `L1InteropHandler` and `ChainRegistrationSender` have no row builder, so no prepare
-    ///      deploys or installs them (TODO(EVM-1644): decide whether the sender is refreshed).
     function _coreProxyUpgradeRows() internal view virtual returns (ProxyUpgradeRow[] memory rows) {
         rows = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         rows[uint256(L1EcosystemContract.L1Bridgehub)] = _row(
@@ -169,6 +167,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         rows[uint256(L1EcosystemContract.L1ChainAssetHandler)] = _row(
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.implementations.chainAssetHandler
+        );
+        rows[uint256(L1EcosystemContract.L1InteropHandler)] = _row(
+            coreAddresses.bridges.proxies.l1InteropHandler,
+            coreAddresses.bridges.implementations.l1InteropHandler
+        );
+        rows[uint256(L1EcosystemContract.ChainRegistrationSender)] = _row(
+            coreAddresses.bridgehub.proxies.chainRegistrationSender,
+            coreAddresses.bridgehub.implementations.chainRegistrationSender
         );
     }
 
@@ -322,6 +328,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             "L1NativeTokenVault",
             coreAddresses.bridges.proxies.l1NativeTokenVault
         );
+        coreAddresses.bridges.implementations.l1InteropHandler = _deployEcosystemImplementation(
+            "L1InteropHandler",
+            coreAddresses.bridges.proxies.l1InteropHandler
+        );
+        bridgehubAddresses.implementations.chainRegistrationSender = _deployEcosystemImplementation(
+            "ChainRegistrationSender",
+            bridgehubAddresses.proxies.chainRegistrationSender
+        );
     }
 
     /// @notice The ecosystem implementations this version SETS OUT to change, by `deploySimpleContract`
@@ -427,6 +441,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return coreAddresses.bridgehub;
     }
 
+    function getDiscoveredBridges() public view returns (BridgesDeployedAddresses memory) {
+        return coreAddresses.bridges;
+    }
+
     function initializeConfigWithArgs(
         address bridgehubProxyAddress,
         bytes32 create2FactorySalt,
@@ -468,6 +486,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubProxy);
     }
+
+    /// @notice The `[upgrade_executors]` record of the executors THIS run deployed (see
+    ///         {UpgradeExecutorsRecord}). A recurring prepare deploys none and records nothing.
+    /// @return recorded Whether this run deployed any.
+    /// @return json The serialized record.
+    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {}
 
     function saveOutput(string memory outputPath) internal virtual {
         // Serialize bridgehub addresses
@@ -588,6 +612,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             getEcosystemUpgradeExecutor()
         );
         vm.serializeString("root", "registry", registry);
+        (bool recorded, string memory executorsRecord) = upgradeExecutorsRecord();
+        if (recorded) {
+            vm.serializeString("root", "upgrade_executors", executorsRecord);
+        }
         string memory toml = vm.serializeString("root", "misc", misc);
 
         vm.writeToml(toml, outputPath);

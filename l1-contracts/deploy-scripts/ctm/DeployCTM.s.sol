@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Utils} from "../utils/Utils.sol";
+import {CTM_PROXY_ADMIN_SALT_DOMAIN, Utils} from "../utils/Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
@@ -17,6 +17,12 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../utils/UpgradeExecutorsRecord.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -44,6 +50,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     /// @dev The reusable upgrade engine this deployment publishes. Not part of the CTM's address
     ///      set: the CTM holds no pointer to an engine, every transition pins the one it commits.
     address internal deployedUpgradeEngine;
+
+    /// @dev The CTM executor this deployment created (see {deployCTMUpgradeExecutor}).
+    CTMExecutorDeployment internal ctmUpgradeExecutorDeployment;
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
@@ -84,6 +93,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return config;
     }
 
+    /// @notice The CTM executor this deployment created, with its construction.
+    function getCTMUpgradeExecutor() public view returns (CTMExecutorDeployment memory) {
+        return ctmUpgradeExecutorDeployment;
+    }
+
     /// @notice Returns the address to use as the deployer/owner for contracts.
     function getDeployerAddress() public view returns (address) {
         return tx.origin;
@@ -112,15 +126,17 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         if (reuseGovAndAdmin) {
             ctmAddresses.admin.governance = coreAddresses.shared.governance;
             ctmAddresses.chainAdmin = coreAddresses.shared.bridgehubAdmin;
-            ctmAddresses.admin.transparentProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
         } else {
             (ctmAddresses.admin.governance) = deploySimpleContract("Governance");
             (ctmAddresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
-            ctmAddresses.admin.transparentProxyAdmin = deployWithCreate2AndOwner(
-                "ProxyAdmin",
-                ctmAddresses.admin.governance
-            );
         }
+        // The CTM domain always has its OWN ProxyAdmin, held by the CTM executor (the ecosystem's is
+        // the core executor's). Owned by the deployer until {deployCTMUpgradeExecutor} hands it over.
+        ctmAddresses.admin.transparentProxyAdmin = deployWithCreate2AndOwner(
+            "ProxyAdmin",
+            getDeployerAddress(),
+            CTM_PROXY_ADMIN_SALT_DOMAIN
+        );
 
         deployEIP7702Checker();
         deployDAValidators();
@@ -171,6 +187,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
+        deployCTMUpgradeExecutor();
 
         saveOutput(outputPath);
     }
@@ -315,6 +332,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
     }
 
+    /// @dev The CTM, its ProxyAdmin and the ServerNotifier are not handed out here: they go to the
+    ///      CTM executor ({deployCTMUpgradeExecutor}).
     function updateOwners() internal {
         vm.startBroadcast(getDeployerAddress());
 
@@ -322,14 +341,79 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         validatorTimelock.transferOwnership(config.ownerAddress);
 
         IChainTypeManager ctm = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
-        IOwnable(address(ctm)).transferOwnership(ctmAddresses.admin.governance);
         ctm.setPendingAdmin(ctmAddresses.chainAdmin);
 
-        IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");
+    }
+
+    /// @notice Deploys the CTM executor bound to the ecosystem's coordinator and hands it the whole CTM
+    ///         domain — the CTM (whose nomination its permissionless `acceptCTMOwnership` completes),
+    ///         the CTM-domain ProxyAdmin and the ServerNotifier (accepted through `forward`) — then
+    ///         nominates the coordinator's governance on it: the CTM half of what the v35 bootstrap
+    ///         ends with. `RegisterCTM` binds it to the coordinator. Constructed for the deployer,
+    ///         which performs the handover; governance accepts afterwards.
+    /// @dev Rides the CREATE2 factory like every deployment of this script.
+    function deployCTMUpgradeExecutor() internal {
+        address deployer = getDeployerAddress();
+        address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        address ctmProxyAdmin = ctmAddresses.admin.transparentProxyAdmin;
+        address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
+        address coordinator = _ecosystemCoordinator();
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(
+            payable(
+                deployViaCreate2AndNotify(
+                    type(CTMUpgradeExecutor).creationCode,
+                    abi.encode(deployer, ctm, ctmProxyAdmin, coordinator),
+                    "CTMUpgradeExecutor"
+                )
+            )
+        );
+        ctmUpgradeExecutorDeployment = CTMExecutorDeployment({
+            ctmExecutor: address(executor),
+            create2Salt: _create2FactorySalt,
+            initialOwner: deployer,
+            chainTypeManager: ctm,
+            ctmProxyAdmin: ctmProxyAdmin,
+            coordinator: coordinator
+        });
+
+        Call[] memory acceptNotifier = new Call[](1);
+        acceptNotifier[0] = Call({target: notifier, value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
+        vm.startBroadcast(deployer);
+        IOwnable(ctm).transferOwnership(address(executor));
+        executor.acceptCTMOwnership();
+        ProxyAdmin(ctmProxyAdmin).transferOwnership(address(executor));
+        IOwnable(notifier).transferOwnership(address(executor));
+        executor.forward(acceptNotifier);
+        executor.transferOwnership(_coordinatorGovernance(coordinator));
+        vm.stopBroadcast();
+        console.log("CTM upgrade executor deployed and handed the CTM domain");
+    }
+
+    /// @dev The ecosystem's coordinator, read off the ecosystem ProxyAdmin's owner — the core executor
+    ///      `DeployL1CoreContracts` handed it to.
+    function _ecosystemCoordinator() internal view returns (address coordinator) {
+        address coreExecutor = ProxyAdmin(coreAddresses.shared.transparentProxyAdmin).owner();
+        require(
+            coreExecutor.code.length != 0,
+            "the ecosystem ProxyAdmin is not held by a CoreUpgradeExecutor: the ecosystem predates the registry model"
+        );
+        coordinator = CoreUpgradeExecutor(payable(coreExecutor)).coordinator();
+        require(coordinator != address(0), "the core executor is bound to no coordinator");
+    }
+
+    /// @dev The governance the coordinator answers to: its owner, or — while a fresh ecosystem
+    ///      deployment's nomination is still to be accepted — the nominee. All three executors end
+    ///      owned by this one governance.
+    /// @param _coordinator The ecosystem's coordinator.
+    function _coordinatorGovernance(address _coordinator) internal view returns (address governance) {
+        governance = Ownable2Step(_coordinator).pendingOwner();
+        if (governance == address(0)) {
+            governance = Ownable2Step(_coordinator).owner();
+        }
     }
 
     function saveOutput(string memory outputPath) internal virtual {
@@ -464,7 +548,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts", contracts);
-        string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeString("root", "contracts_config", contractsConfig);
+        string memory toml = vm.serializeString(
+            "root",
+            "upgrade_executors",
+            UpgradeExecutorsRecord.serializeCTM(ctmUpgradeExecutorDeployment)
+        );
         vm.writeToml(toml, outputPath);
     }
 

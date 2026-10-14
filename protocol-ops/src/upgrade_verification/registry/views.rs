@@ -185,6 +185,9 @@ sol! {
         function getManifest() external view returns (TransitionManifest memory);
         function oldProtocolVersion() external view returns (uint256);
         function newProtocolVersion() external view returns (uint256);
+        function fromRelease() external view returns (address);
+        function newRelease() external view returns (address);
+        function oldProtocolVersionDeadline() external view returns (uint256);
         function facetCuts() external view returns (FacetCut[] memory);
         function validate() external view;
     }
@@ -304,15 +307,46 @@ sol! {
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
-    /// The hop from the CTM to its ChainAssetHandler, which the pause calls target, and the
-    /// chain registry the bootstrap's lagging-chain report enumerates.
+    /// The hop from the CTM to its ChainAssetHandler, which the pause calls target, the chain
+    /// registry the bootstrap's lagging-chain report enumerates, and the live values a release's
+    /// force deployments are held against.
     #[sol(rpc)]
     contract BridgehubView {
         function chainAssetHandler() external view returns (address);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
         function chainTypeManager(uint256 _chainId) external view returns (address);
+        function assetRouter() external view returns (address);
+        function MAX_NUMBER_OF_ZK_CHAINS() external view returns (uint256);
+        function chainRegistrationSender() external view returns (address);
     }
 
+    /// Positional mirror of `IL2GenesisUpgrade.FixedForceDeploymentsData` — what a release's
+    /// `fixedForceDeploymentsData` decodes as.
+    #[derive(Debug)]
+    struct FixedForceDeploymentsData {
+        uint256 l1ChainId;
+        address l1AssetRouter;
+        address aliasedL1Governance;
+        uint256 maxNumberOfZKChains;
+        bytes bridgehubBytecodeInfo;
+        bytes l2AssetRouterBytecodeInfo;
+        bytes l2NtvBytecodeInfo;
+        bytes messageRootBytecodeInfo;
+        bytes chainAssetHandlerBytecodeInfo;
+        bytes interopCenterBytecodeInfo;
+        bytes interopHandlerBytecodeInfo;
+        bytes assetTrackerBytecodeInfo;
+        bytes beaconDeployerInfo;
+        bytes baseTokenHolderBytecodeInfo;
+        address l2SharedBridgeLegacyImpl;
+        address l2BridgedStandardERC20Impl;
+        address aliasedChainRegistrationSender;
+        address dangerousTestOnlyForcedBeacon;
+        bytes32 zkTokenAssetId;
+    }
+
+    /// `replaceUpgradeTransition` and `setProtocolVersionDeadline` are declared to DECODE the calls
+    /// a replacement package forwards to the CTM.
     #[sol(rpc)]
     contract CtmView {
         function protocolVersion() external view returns (uint256);
@@ -323,5 +357,9 @@ sol! {
         function BRIDGE_HUB() external view returns (address);
         function serverNotifierAddress() external view returns (address);
         function getProtocolVersion(uint256 _chainId) external view returns (uint256);
+        function upgradeTransition(uint256 _oldProtocolVersion) external view returns (address);
+        function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
+        function replaceUpgradeTransition(address _expectedTransition, address _replacement) external;
+        function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external;
     }
 }

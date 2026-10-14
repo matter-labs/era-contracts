@@ -3,24 +3,32 @@
 //!
 //! All four set their bindings as constructor immutables, so none of them can hash to its
 //! artifact and [`super::provenance`] has nothing to say about them. What identifies each is its
-//! CONSTRUCTION ([`super::construction`]): the reviewed creation code run on its reviewed
-//! constructor arguments must land at its address. The arguments are the point. The owner is
-//! the reviewed governance address — the bootstrap manifest's `governance`, or the
-//! reviewer's `--expected-governance-owner` for a recurring upgrade — and the bindings are the
-//! reviewed package or manifest values. Nothing is taken from the object's own answers: a
-//! genuine executor built for an attacker's owner answers every getter like the reviewed one,
-//! and only the reviewed owner tells the two apart. The getters ARE read, but only to name in
-//! the report which argument a failed derivation disagrees on.
+//! CONSTRUCTION ([`super::construction`]): the reviewed creation code run on its constructor
+//! arguments must land at its address. Nothing is taken from the object's own answers: a genuine
+//! executor built for an attacker's owner answers every getter like the reviewed one. The getters
+//! ARE read, but only to name in the report which argument a failed derivation disagrees on.
 //!
-//! What construction does not cover is the storage that legitimately moves afterwards — an
-//! executor's current `owner()`, `pendingOwner()` and `coordinator()`. Those are live checks the
-//! two verifiers keep beside the construction check, against the same reviewed values.
+//! An executor's arguments come from one of two places:
+//!
+//! * its EXECUTOR RECORD ([`super::records`]) — the salt and original arguments the run that
+//!   deployed it wrote down. The immutable bindings (the CTM, the ProxyAdmins, `CORE_EXECUTOR`)
+//!   are still held against the reviewed package values; the initial owner and the CTM executor's
+//!   constructor coordinator are only reported, since both may legitimately differ from today's
+//!   (a fresh ecosystem constructs for its deployer and nominates governance);
+//! * without a record, the CURRENT reviewed values — the governance owner (the bootstrap
+//!   manifest's `governance`, or `--expected-governance-owner`) and the reviewed coordinator. An
+//!   executor whose owner or coordinator moved since its deployment does not re-derive this way.
+//!
+//! What construction does not cover is the storage that moves afterwards — an executor's current
+//! `owner()`, `pendingOwner()` and `coordinator()`. Those are live checks the verifiers keep beside
+//! the construction check, against the same reviewed values.
 
 use std::collections::BTreeMap;
 
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 
+use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::upgrade_verification::constants::GOVERNANCE_UPGRADE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS;
 use crate::upgrade_verification::report::VerificationResult;
 
@@ -34,10 +42,11 @@ use super::views::{
 /// The reviewed values the three executors are re-derived from.
 ///
 /// An `Option` marks a value the review may lack (a package written before the prepare recorded
-/// it, or no `--expected-governance-owner`); the construction that needs it is then reported as
+/// it, or no `--expected-governance-owner`); the check that needs it is then reported as
 /// unverifiable — an ERROR — rather than run on a placeholder.
 pub(super) struct LifecycleReview {
-    /// The governance address every executor was constructed for.
+    /// The reviewed governance address: the live owner every executor must have, and the owner an
+    /// executor without a record is re-derived for.
     pub(super) owner: Option<Address>,
     pub(super) coordinator: Address,
     /// The core executor the coordinator was built over: the bootstrap manifest's `coreExecutor`,
@@ -51,6 +60,8 @@ pub(super) struct LifecycleReview {
     pub(super) ctm: Option<Address>,
     /// The CTM-domain `ProxyAdmin` the CTM executor was built over.
     pub(super) ctm_proxy_admin: Option<Address>,
+    /// The executors' records, from the package and `--executor-record`.
+    pub(super) records: UpgradeExecutorsRecord,
 }
 
 /// The bindings as the objects themselves answer them, for the checks that follow (the
@@ -79,9 +90,9 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
     let mut bindings = LifecycleBindings::default();
     if review.owner.is_none() {
         result.report_error(
-            "no reviewed governance owner: the executors are constructed for their owner, so \
-             without it none of their constructions can be re-derived. Pass \
-             --expected-governance-owner",
+            "no reviewed governance owner: the executors' live owner cannot be held against the \
+             review, and an executor without a record is constructed for its owner, so its \
+             construction cannot be re-derived. Pass --expected-governance-owner",
         );
     }
 
@@ -103,20 +114,49 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
             review.core_executor,
             "core_upgrade_executor_addr",
         );
-        match (review.owner, review.core_executor) {
-            (Some(owner), Some(core_executor)) => {
-                construct(
-                    build,
-                    result,
+        match &review.records.coordinator {
+            Some(record) => construct_from_record(
+                build,
+                result,
+                review.owner,
+                Recorded {
                     label,
-                    review.coordinator,
-                    "EcosystemUpgradeExecutor",
-                    constructor_args::ecosystem_upgrade_executor(owner, core_executor),
-                    salts,
-                    reviewed,
-                );
+                    address: review.coordinator,
+                    short_name: "EcosystemUpgradeExecutor",
+                    record_address: record.address,
+                    salt: record.create2_salt,
+                    initial_owner: record.initial_owner,
+                    args: constructor_args::ecosystem_upgrade_executor(
+                        record.initial_owner,
+                        record.core_executor,
+                    ),
+                    immutables: vec![RecordedImmutable {
+                        name: "CORE_EXECUTOR",
+                        recorded: record.core_executor,
+                        reviewed: review.core_executor,
+                        source: "core_upgrade_executor_addr",
+                    }],
+                },
+                reviewed,
+            ),
+            None => {
+                note_no_record(result, label);
+                match (review.owner, review.core_executor) {
+                    (Some(owner), Some(core_executor)) => {
+                        construct(
+                            build,
+                            result,
+                            label,
+                            review.coordinator,
+                            "EcosystemUpgradeExecutor",
+                            constructor_args::ecosystem_upgrade_executor(owner, core_executor),
+                            salts,
+                            reviewed,
+                        );
+                    }
+                    _ => unverifiable(result, label, review.coordinator, "the reviewed owner and the core executor it was built over (`core_upgrade_executor_addr`)"),
+                }
             }
-            _ => unverifiable(result, label, review.coordinator, "the reviewed owner and the core executor it was built over (`core_upgrade_executor_addr`)"),
         }
     }
 
@@ -139,20 +179,49 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
                 review.core_proxy_admin,
                 "transparent_proxy_admin",
             );
-            match (review.owner, review.core_proxy_admin) {
-                (Some(owner), Some(proxy_admin)) => {
-                    construct(
-                        build,
-                        result,
+            match &review.records.core_executor {
+                Some(record) => construct_from_record(
+                    build,
+                    result,
+                    review.owner,
+                    Recorded {
                         label,
-                        core_executor_addr,
-                        "CoreUpgradeExecutor",
-                        constructor_args::core_upgrade_executor(owner, proxy_admin),
-                        salts,
-                        reviewed,
-                    );
+                        address: core_executor_addr,
+                        short_name: "CoreUpgradeExecutor",
+                        record_address: record.address,
+                        salt: record.create2_salt,
+                        initial_owner: record.initial_owner,
+                        args: constructor_args::core_upgrade_executor(
+                            record.initial_owner,
+                            record.proxy_admin,
+                        ),
+                        immutables: vec![RecordedImmutable {
+                            name: "PROXY_ADMIN",
+                            recorded: record.proxy_admin,
+                            reviewed: review.core_proxy_admin,
+                            source: "transparent_proxy_admin",
+                        }],
+                    },
+                    reviewed,
+                ),
+                None => {
+                    note_no_record(result, label);
+                    match (review.owner, review.core_proxy_admin) {
+                        (Some(owner), Some(proxy_admin)) => {
+                            construct(
+                                build,
+                                result,
+                                label,
+                                core_executor_addr,
+                                "CoreUpgradeExecutor",
+                                constructor_args::core_upgrade_executor(owner, proxy_admin),
+                                salts,
+                                reviewed,
+                            );
+                        }
+                        _ => unverifiable(result, label, core_executor_addr, "the reviewed owner and the ecosystem ProxyAdmin it was built over (`transparent_proxy_admin`)"),
+                    }
                 }
-                _ => unverifiable(result, label, core_executor_addr, "the reviewed owner and the ecosystem ProxyAdmin it was built over (`transparent_proxy_admin`)"),
             }
         }
     } else {
@@ -164,63 +233,239 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
     }
 
     // ── the CTM executor ──
+    verify_ctm_executor_construction(provider, build, result, review, salts, reviewed).await?;
+
+    Ok(bindings)
+}
+
+/// Verifies the CTM executor's construction from `review`, recording it in `reviewed` when it
+/// re-derives.
+///
+/// Reads, in order: the executor's code, `CHAIN_TYPE_MANAGER()` and `CTM_PROXY_ADMIN()`.
+async fn verify_ctm_executor_construction<P: Provider>(
+    provider: &P,
+    build: &ReviewedBuild,
+    result: &mut VerificationResult,
+    review: &LifecycleReview,
+    salts: &[B256],
+    reviewed: &mut BTreeMap<Address, String>,
+) -> anyhow::Result<()> {
     let label = "the CTM executor";
-    if expect_code_present(provider, result, label, review.ctm_executor).await? {
-        let ctm_executor = CTMUpgradeExecutorView::new(review.ctm_executor, provider);
-        let bound_ctm = tolerate(
-            ctm_executor.CHAIN_TYPE_MANAGER().call().await,
-            result,
-            "the CTM executor's CHAIN_TYPE_MANAGER",
-        );
-        binding_check(
-            result,
-            label,
-            "CHAIN_TYPE_MANAGER",
-            bound_ctm,
-            review.ctm,
-            "chain_type_manager_proxy",
-        );
-        let bound_admin = tolerate(
-            ctm_executor.CTM_PROXY_ADMIN().call().await,
-            result,
-            "the CTM executor's CTM_PROXY_ADMIN",
-        );
-        binding_check(
-            result,
-            label,
-            "CTM_PROXY_ADMIN",
-            bound_admin,
-            review.ctm_proxy_admin,
-            "transparent_proxy_admin",
-        );
-        match (review.owner, review.ctm, review.ctm_proxy_admin) {
-            (Some(owner), Some(ctm), Some(ctm_proxy_admin)) => {
-                construct(
-                    build,
+    if !expect_code_present(provider, result, label, review.ctm_executor).await? {
+        return Ok(());
+    }
+    let ctm_executor = CTMUpgradeExecutorView::new(review.ctm_executor, provider);
+    let bound_ctm = tolerate(
+        ctm_executor.CHAIN_TYPE_MANAGER().call().await,
+        result,
+        "the CTM executor's CHAIN_TYPE_MANAGER",
+    );
+    binding_check(
+        result,
+        label,
+        "CHAIN_TYPE_MANAGER",
+        bound_ctm,
+        review.ctm,
+        "chain_type_manager_proxy",
+    );
+    let bound_admin = tolerate(
+        ctm_executor.CTM_PROXY_ADMIN().call().await,
+        result,
+        "the CTM executor's CTM_PROXY_ADMIN",
+    );
+    binding_check(
+        result,
+        label,
+        "CTM_PROXY_ADMIN",
+        bound_admin,
+        review.ctm_proxy_admin,
+        "transparent_proxy_admin",
+    );
+    match &review.records.ctm_executor {
+        Some(record) => {
+            if record.coordinator == review.coordinator {
+                result.report_ok(&format!(
+                    "{label} was constructed with the reviewed coordinator {}",
+                    review.coordinator
+                ));
+            } else {
+                result.print_info(&format!(
+                    "  {label} was constructed with coordinator {} and must have been re-pointed \
+                     to the reviewed {} since (`setCoordinator`): its live coordinator is checked \
+                     separately",
+                    record.coordinator, review.coordinator
+                ));
+            }
+            construct_from_record(
+                build,
+                result,
+                review.owner,
+                Recorded {
+                    label,
+                    address: review.ctm_executor,
+                    short_name: "CTMUpgradeExecutor",
+                    record_address: record.address,
+                    salt: record.create2_salt,
+                    initial_owner: record.initial_owner,
+                    args: constructor_args::ctm_upgrade_executor(
+                        record.initial_owner,
+                        record.chain_type_manager,
+                        record.ctm_proxy_admin,
+                        record.coordinator,
+                    ),
+                    immutables: vec![
+                        RecordedImmutable {
+                            name: "CHAIN_TYPE_MANAGER",
+                            recorded: record.chain_type_manager,
+                            reviewed: review.ctm,
+                            source: "chain_type_manager_proxy",
+                        },
+                        RecordedImmutable {
+                            name: "CTM_PROXY_ADMIN",
+                            recorded: record.ctm_proxy_admin,
+                            reviewed: review.ctm_proxy_admin,
+                            source: "transparent_proxy_admin",
+                        },
+                    ],
+                },
+                reviewed,
+            );
+        }
+        None => {
+            note_no_record(result, label);
+            match (review.owner, review.ctm, review.ctm_proxy_admin) {
+                (Some(owner), Some(ctm), Some(ctm_proxy_admin)) => {
+                    construct(
+                        build,
+                        result,
+                        label,
+                        review.ctm_executor,
+                        "CTMUpgradeExecutor",
+                        constructor_args::ctm_upgrade_executor(
+                            owner,
+                            ctm,
+                            ctm_proxy_admin,
+                            review.coordinator,
+                        ),
+                        salts,
+                        reviewed,
+                    );
+                }
+                _ => unverifiable(
                     result,
                     label,
                     review.ctm_executor,
-                    "CTMUpgradeExecutor",
-                    constructor_args::ctm_upgrade_executor(
-                        owner,
-                        ctm,
-                        ctm_proxy_admin,
-                        review.coordinator,
-                    ),
-                    salts,
-                    reviewed,
-                );
+                    "the reviewed owner, the CTM and the CTM-domain ProxyAdmin it was built over",
+                ),
             }
-            _ => unverifiable(
-                result,
-                label,
-                review.ctm_executor,
-                "the reviewed owner, the CTM and the CTM-domain ProxyAdmin it was built over",
-            ),
+        }
+    }
+    Ok(())
+}
+
+/// One executor's construction as its record states it.
+struct Recorded<'a> {
+    label: &'a str,
+    /// The executor being verified.
+    address: Address,
+    short_name: &'a str,
+    /// The address the record itself names.
+    record_address: Address,
+    salt: B256,
+    initial_owner: Address,
+    /// The constructor arguments, built from the RECORDED values.
+    args: Vec<u8>,
+    immutables: Vec<RecordedImmutable<'a>>,
+}
+
+/// A constructor immutable as the record states it, and the reviewed value it must equal.
+struct RecordedImmutable<'a> {
+    name: &'a str,
+    recorded: Address,
+    reviewed: Option<Address>,
+    /// The package field the reviewed value comes from.
+    source: &'a str,
+}
+
+/// Re-derives an executor from its record under the recorded salt, holding each recorded immutable
+/// against the review. The executor counts as reviewed only when the record names it, every
+/// immutable is the reviewed one and the derivation lands at its address.
+fn construct_from_record(
+    build: &ReviewedBuild,
+    result: &mut VerificationResult,
+    reviewed_owner: Option<Address>,
+    recorded: Recorded<'_>,
+    reviewed: &mut BTreeMap<Address, String>,
+) {
+    let Recorded {
+        label,
+        address,
+        short_name,
+        record_address,
+        salt,
+        initial_owner,
+        args,
+        immutables,
+    } = recorded;
+    if record_address != address {
+        result.report_error(&format!(
+            "{label} at {address}: its executor record names {record_address}, another object — \
+             it says nothing about this one, so this executor's construction is unverified"
+        ));
+        return;
+    }
+
+    let mut bindings_reviewed = true;
+    for immutable in &immutables {
+        match immutable.reviewed {
+            Some(reviewed) if reviewed == immutable.recorded => result.report_ok(&format!(
+                "{label}: its recorded {} is the reviewed {reviewed}",
+                immutable.name
+            )),
+            Some(reviewed) => {
+                bindings_reviewed = false;
+                result.report_error(&format!(
+                    "{label}: its record says it was built over {} {}, but the review fixes {reviewed} \
+                     ({}): the executor is bound to something other than what the package names",
+                    immutable.name, immutable.recorded, immutable.source
+                ));
+            }
+            None => {
+                bindings_reviewed = false;
+                result.report_error(&format!(
+                    "{label}: its record says it was built over {} {}, but the package does not name \
+                     `{}`, so that binding is held against nothing the review fixes",
+                    immutable.name, immutable.recorded, immutable.source
+                ));
+            }
         }
     }
 
-    Ok(bindings)
+    match reviewed_owner {
+        Some(owner) if owner == initial_owner => result.report_ok(&format!(
+            "{label} was constructed for the reviewed governance {owner}"
+        )),
+        Some(owner) => result.print_info(&format!(
+            "  {label} was constructed for {initial_owner}, not the reviewed governance {owner}: \
+             a fresh deployment constructs for its deployer and nominates governance, so this is \
+             expected there — the live owner is checked separately"
+        )),
+        None => result.print_info(&format!("  {label} was constructed for {initial_owner}")),
+    }
+
+    if expect_canonical_construction(build, result, label, address, short_name, &args, &[salt])
+        && bindings_reviewed
+    {
+        reviewed.insert(address, label.to_string());
+    }
+}
+
+fn note_no_record(result: &mut VerificationResult, label: &str) {
+    result.print_info(&format!(
+        "  {label}: no executor record, so it is re-derived from the CURRENT reviewed owner and \
+         coordinator — one whose owner or coordinator moved since its deployment does not \
+         re-derive that way; pass --executor-record with the output of the run that deployed it"
+    ));
 }
 
 /// The reviewed values a timer is re-derived from.
@@ -454,20 +699,35 @@ mod tests {
     }
 
     fn genuine_trio(owner: Address) -> Trio {
+        trio_built(owner, SALT, None)
+    }
+
+    /// A trio built for `owner` under `salt`, its CTM executor constructed with
+    /// `ctm_constructor_coordinator` (the trio's own coordinator when `None`).
+    fn trio_built(
+        owner: Address,
+        salt: B256,
+        ctm_constructor_coordinator: Option<Address>,
+    ) -> Trio {
         let core_executor = canonical_create2_address(
-            SALT,
+            salt,
             &code("CoreUpgradeExecutor"),
             &constructor_args::core_upgrade_executor(owner, ECO_ADMIN),
         );
         let coordinator = canonical_create2_address(
-            SALT,
+            salt,
             &code("EcosystemUpgradeExecutor"),
             &constructor_args::ecosystem_upgrade_executor(owner, core_executor),
         );
         let ctm_executor = canonical_create2_address(
-            SALT,
+            salt,
             &code("CTMUpgradeExecutor"),
-            &constructor_args::ctm_upgrade_executor(owner, CTM, CTM_ADMIN, coordinator),
+            &constructor_args::ctm_upgrade_executor(
+                owner,
+                CTM,
+                CTM_ADMIN,
+                ctm_constructor_coordinator.unwrap_or(coordinator),
+            ),
         );
         Trio {
             coordinator,
@@ -502,6 +762,7 @@ mod tests {
             ctm_executor: trio.ctm_executor,
             ctm: Some(CTM),
             ctm_proxy_admin: Some(CTM_ADMIN),
+            records: Default::default(),
         }
     }
 
@@ -596,6 +857,161 @@ mod tests {
         );
         assert_eq!(reviewed, 0);
         assert!(result.ensure_success().is_err());
+    }
+
+    // ───────────────────────── executor records ─────────────────────────
+
+    const DEPLOYER: Address = Address::repeat_byte(0xD1);
+    const FIRST_COORDINATOR: Address = Address::repeat_byte(0xC1);
+    /// Deliberately NOT among the reviewed salts: a record's own salt is what it is re-derived under.
+    const RECORD_SALT: B256 = B256::repeat_byte(0x6E);
+
+    /// What the run that deployed `trio` for `initial_owner` under `salt` records, the CTM
+    /// executor constructed with `ctm_constructor_coordinator`.
+    fn records_of(
+        trio: &Trio,
+        initial_owner: Address,
+        salt: B256,
+        ctm_constructor_coordinator: Address,
+    ) -> UpgradeExecutorsRecord {
+        use crate::common::forge::scripts::upgrade_executors::{
+            CoordinatorRecord, CoreExecutorRecord, CtmExecutorRecord,
+        };
+        UpgradeExecutorsRecord {
+            core_executor: Some(CoreExecutorRecord {
+                address: trio.core_executor,
+                create2_salt: salt,
+                initial_owner,
+                proxy_admin: ECO_ADMIN,
+            }),
+            coordinator: Some(CoordinatorRecord {
+                address: trio.coordinator,
+                create2_salt: salt,
+                initial_owner,
+                core_executor: trio.core_executor,
+            }),
+            ctm_executor: Some(CtmExecutorRecord {
+                address: trio.ctm_executor,
+                create2_salt: salt,
+                initial_owner,
+                chain_type_manager: CTM,
+                ctm_proxy_admin: CTM_ADMIN,
+                coordinator: ctm_constructor_coordinator,
+            }),
+        }
+    }
+
+    /// THE case records exist for: a fresh ecosystem's executors, constructed for the deployer
+    /// and handed to governance afterwards, the CTM executor since re-pointed from the coordinator
+    /// it was built with. Re-derived from the current owner and coordinator, none of the three is
+    /// genuine-looking; re-derived from the record, all three are.
+    #[tokio::test]
+    async fn a_moved_executor_verifies_from_its_record_and_fails_the_current_values_derivation() {
+        let trio = trio_built(DEPLOYER, RECORD_SALT, Some(FIRST_COORDINATOR));
+        let current = review(Some(OWNER), &trio);
+        let (result, reviewed) = run(&trio, &current).await;
+        assert_eq!(
+            result.errors, 3,
+            "without a record each executor re-derives for today's owner, which it was not built for"
+        );
+        assert_eq!(reviewed, 0);
+
+        let recorded = LifecycleReview {
+            records: records_of(&trio, DEPLOYER, RECORD_SALT, FIRST_COORDINATOR),
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
+        assert_eq!(result.errors, 0, "the record re-derives all three");
+        assert_eq!(result.warnings, 0);
+        assert_eq!(reviewed, 3);
+    }
+
+    /// With a record the owner is no longer needed to re-derive, but the review still cannot hold
+    /// the live owner against anything: that alone stays an error.
+    #[tokio::test]
+    async fn a_record_does_not_excuse_a_missing_reviewed_owner() {
+        let trio = trio_built(DEPLOYER, RECORD_SALT, None);
+        let recorded = LifecycleReview {
+            records: records_of(&trio, DEPLOYER, RECORD_SALT, trio.coordinator),
+            ..review(None, &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
+        assert_eq!(result.errors, 1);
+        assert_eq!(reviewed, 3);
+    }
+
+    /// A record whose values do not reproduce the executor's address — here, another initial
+    /// owner — is not evidence for it.
+    #[tokio::test]
+    async fn a_record_whose_values_do_not_rederive_the_address_errors() {
+        let trio = trio_built(DEPLOYER, RECORD_SALT, None);
+        let mut records = records_of(&trio, DEPLOYER, RECORD_SALT, trio.coordinator);
+        records.ctm_executor.as_mut().unwrap().initial_owner = ATTACKER;
+        let recorded = LifecycleReview {
+            records,
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
+        assert_eq!(result.errors, 1);
+        assert_eq!(reviewed, 2, "only the CTM executor is left unverified");
+
+        // The same for a wrong salt.
+        let mut records = records_of(&trio, DEPLOYER, RECORD_SALT, trio.coordinator);
+        records.core_executor.as_mut().unwrap().create2_salt = SALT;
+        let recorded = LifecycleReview {
+            records,
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
+        assert_eq!(result.errors, 1);
+        assert_eq!(reviewed, 2);
+    }
+
+    /// A record of ANOTHER object says nothing about this one, even if it re-derives perfectly for
+    /// the address it names.
+    #[tokio::test]
+    async fn a_record_naming_another_address_errors() {
+        let trio = trio_built(DEPLOYER, RECORD_SALT, None);
+        let other = trio_built(DEPLOYER, SALT, None);
+        let mut records = records_of(&trio, DEPLOYER, RECORD_SALT, trio.coordinator);
+        records.coordinator = records_of(&other, DEPLOYER, SALT, other.coordinator).coordinator;
+        let recorded = LifecycleReview {
+            records,
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
+        assert_eq!(result.errors, 1);
+        assert_eq!(reviewed, 2);
+    }
+
+    /// The record proves what an executor was BUILT over; it is still held against what the
+    /// package names. A genuine executor over another ProxyAdmin is the wrong executor.
+    #[tokio::test]
+    async fn a_recorded_binding_the_review_does_not_fix_errors() {
+        let trio = trio_built(DEPLOYER, RECORD_SALT, None);
+        let recorded = LifecycleReview {
+            records: records_of(&trio, DEPLOYER, RECORD_SALT, trio.coordinator),
+            ctm_proxy_admin: None,
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
+        assert_eq!(
+            result.errors, 1,
+            "the CTM-domain ProxyAdmin is held against nothing"
+        );
+        assert_eq!(reviewed, 2);
+
+        let recorded = LifecycleReview {
+            records: records_of(&trio, DEPLOYER, RECORD_SALT, trio.coordinator),
+            ctm: Some(Address::repeat_byte(0x7C)),
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
+        assert_eq!(
+            result.errors, 2,
+            "the live CHAIN_TYPE_MANAGER and the recorded one both disagree with the review"
+        );
+        assert_eq!(reviewed, 2);
     }
 
     fn queue_timer_answers(

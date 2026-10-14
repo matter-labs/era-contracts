@@ -64,6 +64,27 @@ cold identity build adds compilation time; reruns reuse that separate cache. A f
 version) installs the predeploys from `out/`, whatever profile built it, so the spec compares
 against those artifacts and skips the reference build.
 
+## Upgrade Tests
+
+```bash
+cd l1-contracts/test/anvil-interop
+yarn test:upgrade             # the v35 bootstrap via protocol-ops on the frozen v0.34.0 states, then two registry-driven hops
+yarn test:upgrade-recurring   # the recurring registry-driven hop on the current-genesis states
+```
+
+A fresh deployment is born into the registry-driven model: `DeployL1CoreContracts` gives the
+ecosystem ProxyAdmin to the `CoreUpgradeExecutor`, `DeployCTM` gives the CTM, its own ProxyAdmin and
+the ServerNotifier to the `CTMUpgradeExecutor`, and `RegisterCTM` binds it to the coordinator
+(`EcosystemUpgradeExecutor`). Governance is only nominated on the three executors, and anvil never
+accepts, so they stay owned by the deployer; anything needing the CTM, ServerNotifier or a ProxyAdmin
+owner must go through that executor's `forward`. `run-recurring-upgrade-test.ts` discovers the executors
+from chain and drives the hop through the existing coordinator, with no bootstrap. It builds its
+objects from the committed manifest `scripts/registry-manifests/v35-local.json` and fails on any
+drift; `yarn regen:registry-manifest` (`REGEN_REGISTRIES=1`) rewrites it from the live deployment.
+`ANVIL_INTEROP_FRESH_DEPLOY=1` runs it against a fresh deployment instead of the chain states. The
+committed manifest describes the chain states, which are built with the `anvil-interop` profile, so a
+fresh deployment from the default build only matches in emit mode — restore the manifest afterwards.
+
 ## Running Tests Without Redeployment
 
 After running once with `--keep-chains`, the Anvil chains and deployment state persist. Re-run just the hardhat tests:
@@ -249,7 +270,7 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
 ├── run-upgrade-test.ts            # Default upgrade (the v35 bootstrap) + the patch and v36 hops, via protocol-ops
-├── run-recurring-upgrade-test.ts  # Registry-driven hop over harness-deployed objects (current-genesis states)
+├── run-recurring-upgrade-test.ts  # Registry-driven v35 -> v36 hop through the executors the deployment created
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/

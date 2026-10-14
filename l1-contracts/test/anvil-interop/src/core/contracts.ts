@@ -49,15 +49,12 @@ const ARTIFACTS = {
   CTMRelease: "CTMRelease.sol/CTMRelease.json",
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
   CoreTransition: "CoreTransition.sol/CoreTransition.json",
-  // Bootstrap stage (see bootstrap-upgrade-stage.ts): the one-time entry edge into the
-  // registry-driven model, plus the legacy cut-taking entrypoint the harness installs and the
-  // CTM implementation the bootstrap's proxy row swaps in.
-  RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
   GovernanceUpgradeTimer: "GovernanceUpgradeTimer.sol/GovernanceUpgradeTimer.json",
-  // The bootstrap's mandatory notifier row swaps in a fresh implementation of it.
   ServerNotifier: "ServerNotifier.sol/ServerNotifier.json",
+  // Bootstrap edge (see bootstrap-upgrade-stage.ts): the one-time entry into the registry-driven
+  // model, plus the legacy cut-taking entrypoint a fixture may need installed.
+  RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
   LegacyTestAdminFacet: "LegacyTestAdminFacet.sol/LegacyTestAdminFacet.json",
-  ChainTypeManager: "ChainTypeManager.sol/ChainTypeManager.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",

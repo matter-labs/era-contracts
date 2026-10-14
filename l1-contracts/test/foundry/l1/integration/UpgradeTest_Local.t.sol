@@ -34,9 +34,12 @@ import {IAdminWithCut} from "../../../../deploy-scripts/utils/UpgradeChainCall.s
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ChainRouting} from "test-utils/ChainRouting.sol";
 import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
@@ -195,43 +198,69 @@ abstract contract UpgradeIntegrationBootstrapFixture is
         IChainTypeManager(ctm).executeUpgrade(chainId, addCut);
     }
 
-    /// @dev The local fixture is Era-shaped: the CTM-domain proxies share the ecosystem's
-    ///      transparentProxyAdmin. Production ZKsyncOS CTMs sit under their OWN ProxyAdmin
-    ///      (see upgrade-envs/v0.31.0-interopB), which the v35 bootstrap requires — the core
-    ///      leg hands the ecosystem admin to the ecosystem executor, the CTM leg hands the
-    ///      CTM-domain admin to the CTM executor. Model that shape by moving the CTM proxy and
-    ///      the per-CTM proxies that can carry an inventory row (`CTMContract`) onto a fresh
-    ///      admin, owned by the same identity as the shared one, before prepare. The
-    ///      ServerNotifier is put in its pre-v35 production shape instead — under its own
-    ///      ProxyAdmin owned by the CTM's ChainAdmin — so the bootstrap's one-time handover runs.
-    function _splitCTMProxyAdmin() private {
+    /// @dev A fresh ecosystem is born in the registry model (`DeployL1CoreContracts` / `DeployCTM`); the
+    ///      bootstrap departs from one that is not. Governance takes the authority back out through the
+    ///      executors' own `forward` — real calls, the only way out the model leaves — into the pre-v35
+    ///      production shape: the CTM and both ProxyAdmins governance's (the CTM domain keeps its OWN
+    ///      ProxyAdmin, which the bootstrap requires), and the ServerNotifier under its own ProxyAdmin,
+    ///      owned by the CTM's ChainAdmin, so the bootstrap's one-time handover runs. The fresh executors
+    ///      are left behind unused: the bootstrap prepare deploys its own.
+    function _revertToPreRegistryAuthority() private {
         address ctm = address(addresses.chainTypeManager);
-        ProxyAdmin sharedAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(ctm));
-        address sharedAdminOwner = sharedAdmin.owner();
-
-        ProxyAdmin ctmAdmin = new ProxyAdmin();
-        ctmAdmin.transferOwnership(sharedAdminOwner);
-
-        address[] memory ctmDomainProxies = new address[](4);
-        ctmDomainProxies[0] = ctm;
-        ctmDomainProxies[1] = ctmAddresses.stateTransition.proxies.validatorTimelock;
-        ctmDomainProxies[2] = ctmAddresses.stateTransition.proxies.permissionlessValidator;
-        ctmDomainProxies[3] = ctmAddresses.stateTransition.proxies.bytecodesSupplier;
-        for (uint256 i = 0; i < ctmDomainProxies.length; ++i) {
-            address proxy = ctmDomainProxies[i];
-            if (proxy == address(0) || DeployScriptUtils.getProxyAdminAddress(proxy) != address(sharedAdmin)) {
-                continue;
-            }
-            vm.prank(sharedAdminOwner);
-            sharedAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(payable(proxy)), address(ctmAdmin));
-        }
-
         address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
-        ProxyAdmin liveNotifierAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(notifier));
+        address chainAdmin = ctmAddresses.chainAdmin;
+        address governance = IOwnable(upgradeExecutors.ctmExecutor).owner();
+        ProxyAdmin ctmProxyAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(ctm));
         ProxyAdmin notifierAdmin = new ProxyAdmin();
-        notifierAdmin.transferOwnership(ctmAddresses.chainAdmin);
-        vm.prank(liveNotifierAdmin.owner());
-        liveNotifierAdmin.changeProxyAdmin(ITransparentUpgradeableProxy(payable(notifier)), address(notifierAdmin));
+        notifierAdmin.transferOwnership(chainAdmin);
+
+        Call[] memory ctmDomain = new Call[](4);
+        ctmDomain[0] = Call({target: ctm, value: 0, data: abi.encodeCall(Ownable.transferOwnership, (governance))});
+        ctmDomain[1] = Call({
+            target: address(ctmProxyAdmin),
+            value: 0,
+            data: abi.encodeCall(
+                ProxyAdmin.changeProxyAdmin,
+                (ITransparentUpgradeableProxy(payable(notifier)), address(notifierAdmin))
+            )
+        });
+        ctmDomain[2] = Call({
+            target: notifier,
+            value: 0,
+            data: abi.encodeCall(Ownable.transferOwnership, (chainAdmin))
+        });
+        ctmDomain[3] = Call({
+            target: address(ctmProxyAdmin),
+            value: 0,
+            data: abi.encodeCall(Ownable.transferOwnership, (governance))
+        });
+        vm.prank(governance);
+        CTMUpgradeExecutor(payable(upgradeExecutors.ctmExecutor)).forward(ctmDomain);
+        vm.prank(governance);
+        IOwnable(ctm).acceptOwnership();
+        Call[] memory acceptNotifier = new Call[](1);
+        acceptNotifier[0] = Call({target: notifier, value: 0, data: abi.encodeCall(IOwnable.acceptOwnership, ())});
+        vm.prank(Ownable(chainAdmin).owner());
+        IChainAdminMulticall(chainAdmin).multicall(acceptNotifier, true);
+
+        Call[] memory ecosystem = new Call[](1);
+        ecosystem[0] = Call({
+            target: ecosystemAddresses.shared.transparentProxyAdmin,
+            value: 0,
+            data: abi.encodeCall(Ownable.transferOwnership, (governance))
+        });
+        vm.prank(governance);
+        CoreUpgradeExecutor(payable(upgradeExecutors.coreExecutor)).forward(ecosystem);
+
+        assertEq(IOwnable(ctm).owner(), governance, "pre-v35: governance owns the CTM");
+        assertEq(ctmProxyAdmin.owner(), governance, "pre-v35: governance owns the CTM-domain ProxyAdmin");
+        assertEq(
+            ProxyAdmin(ecosystemAddresses.shared.transparentProxyAdmin).owner(),
+            governance,
+            "pre-v35: governance owns the ecosystem ProxyAdmin"
+        );
+        assertEq(IOwnable(notifier).owner(), chainAdmin, "pre-v35: the ChainAdmin owns the notifier");
+        assertEq(DeployScriptUtils.getProxyAdminAddress(notifier), address(notifierAdmin), "under its own admin");
     }
 
     function setUp() public virtual {
@@ -244,8 +273,8 @@ abstract contract UpgradeIntegrationBootstrapFixture is
         chainId = eraZKChainId;
         acceptPendingAdmin();
 
-        _splitCTMProxyAdmin();
-        console.log("setUp: CTM proxy moved onto its own ProxyAdmin");
+        _revertToPreRegistryAuthority();
+        console.log("setUp: authority taken back into the pre-v35 shape");
 
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
@@ -307,6 +336,26 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             address(manifest.ctmProxyAdmin)
         );
         assertEq(ctmOutput.readAddress("$.admin.timer_governance_addr"), manifest.governance);
+
+        // The executors' construction record (`[upgrade_executors]`), which protocol-ops re-derives each
+        // executor from after its owner or coordinator moves: the ORIGINAL constructor arguments and salt.
+        assertEq(coreOutput.readAddress("$.upgrade_executors.core_executor.address"), coreExecutor);
+        assertEq(coreOutput.readBytes32("$.upgrade_executors.core_executor.create2_salt"), coreSalt);
+        assertEq(coreOutput.readAddress("$.upgrade_executors.core_executor.initial_owner"), manifest.governance);
+        assertEq(coreOutput.readAddress("$.upgrade_executors.core_executor.proxy_admin"), ecosystemProxyAdmin);
+        assertEq(coreOutput.readAddress("$.upgrade_executors.coordinator.address"), manifest.coordinator);
+        assertEq(coreOutput.readBytes32("$.upgrade_executors.coordinator.create2_salt"), coreSalt);
+        assertEq(coreOutput.readAddress("$.upgrade_executors.coordinator.initial_owner"), manifest.governance);
+        assertEq(coreOutput.readAddress("$.upgrade_executors.coordinator.core_executor"), coreExecutor);
+        assertEq(ctmOutput.readAddress("$.upgrade_executors.ctm_executor.address"), manifest.ctmExecutor);
+        assertEq(ctmOutput.readBytes32("$.upgrade_executors.ctm_executor.create2_salt"), ctmSalt);
+        assertEq(ctmOutput.readAddress("$.upgrade_executors.ctm_executor.initial_owner"), manifest.governance);
+        assertEq(ctmOutput.readAddress("$.upgrade_executors.ctm_executor.chain_type_manager"), manifest.ctm);
+        assertEq(
+            ctmOutput.readAddress("$.upgrade_executors.ctm_executor.ctm_proxy_admin"),
+            address(manifest.ctmProxyAdmin)
+        );
+        assertEq(ctmOutput.readAddress("$.upgrade_executors.ctm_executor.coordinator"), manifest.coordinator);
 
         // The core leg, under the core prepare's salt.
         assertEq(
@@ -448,7 +497,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "no L2 protocol upgrade transaction on an L1-only edge"
         );
         assertTrue(
-            ICTMRelease(release).verifyChainRouting(_eraDiamond),
+            ChainRouting.matchesRelease(ICTMRelease(release), _eraDiamond),
             "the bootstrap engine reinstalled exactly the release's routing"
         );
 

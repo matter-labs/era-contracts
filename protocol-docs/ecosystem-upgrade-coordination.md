@@ -130,7 +130,8 @@ operation. Every other owner operation of a domain — freezing a chain, moving 
 committed transition — is an ordinary call through the executor's owner-gated, event-logged
 `forward`; the executors carry no typed passthroughs for them.
 
-The coordinator's owner binds `ctmExecutor` using `setCTMExecutor` after bootstrap deployment.
+The coordinator's owner binds `ctmExecutor` using `setCTMExecutor` — in the bootstrap's stage 1, or
+when a fresh ecosystem registers its CTM.
 The executor must already name this coordinator. The binding cannot change while an operation
 is pending; replacing an executor must preserve its `CHAIN_TYPE_MANAGER` identity. To replace
 the coordinator, deploy the replacement, change the domain bindings while idle, then bind its
@@ -167,6 +168,20 @@ Consequences:
   still committed, by a transition from the same source landing no earlier.
 - Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) are repaired by the
   legacy cut setter, which refuses a registry-committed departure.
+
+### Preparing and verifying a replacement
+
+A replacement is prepared like any upgrade: `DefaultTransitionReplacement` runs as the CTM prepare of
+`protocol-ops ecosystem upgrade-prepare-all`, named by the upgrade input's
+`[transition_replacement] replaced_transition` (and optionally `protocol_version_deadline`). It
+deploys the replacement `CTMTransition` exactly as a chain-release prepare deploys its transition —
+this run's engine and authored L2 side, bytecodes published on the CTM's supplier — from the replaced
+one's source release, deadline and timestamp onto the continuation release, and refuses a stale
+`expected` or a replacement that pins the replaced edge unchanged. The package carries one governance
+call, `CTMUpgradeExecutor.forward([replaceUpgradeTransition(expected, replacement)])`, optionally
+followed by `setProtocolVersionDeadline` in the same `forward`. `protocol-ops ecosystem verify-package`
+recognises it and holds it to the [recovery invariant](#replacing-a-committed-transition) against live
+state before the vote.
 
 ## Future multi-CTM extension
 

@@ -58,11 +58,44 @@ under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge on
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 
+A fresh ecosystem (`ecosystem init`, or `hub init` + `ctm init`) is born into the registry model: the
+deployer creates the core executor, the coordinator and the CTM executor, hands them the ProxyAdmins, the CTM
+and the ServerNotifier, and nominates the ecosystem governance, which `hub init` / `ctm init` accept. Its first
+upgrade is therefore a recurring one, never the bootstrap edge. Owner operations on its CTM go through
+`CTMUpgradeExecutor.forward`.
+
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
-Historical preparations must select the matching scripts and input explicitly. The anvil upgrade tests
-(`l1-contracts/test/anvil-interop/run-upgrade-test.ts` for the bootstrap edge,
-`run-recurring-upgrade-test.ts` for the recurring one) pass their test subclasses of these scripts explicitly. See
+Historical preparations must select the matching scripts and input explicitly. The anvil upgrade test
+`l1-contracts/test/anvil-interop/run-upgrade-test.ts` passes its test subclasses of these scripts explicitly, for
+the bootstrap edge and the recurring hops after it (`run-recurring-upgrade-test.ts` drives a registry-driven hop on
+a fresh ecosystem's own executors without protocol-ops). See
 [the activation requirements](../protocol-docs/chain-config.md#activation).
+
+### Replacing a committed transition
+
+A transition already committed for a departed version is repaired with
+`ChainTypeManager.replaceUpgradeTransition` (see
+[Replacing a committed transition](../protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition)).
+Prepare it as the CTM prepare of an ordinary `upgrade-prepare-all`, naming the replaced transition in the upgrade
+input:
+
+```toml
+[transition_replacement]
+replaced_transition = "0x..."          # the transition committed for the departure, as the CTM names it now
+protocol_version_deadline = 1900000000 # optional: also move the departing version's deadline
+```
+
+```bash
+cargo run --release --bin protocol_ops -- ecosystem upgrade-prepare-all --env <env> \
+  --deployer-address 0x... \
+  --ctm-script-path deploy-scripts/upgrade/default-upgrade/DefaultTransitionReplacement.s.sol
+```
+
+The prepare deploys only the replacement `CTMTransition` (under the CTM salt), landing on an existing release,
+and emits one stage-1 governance call, `CTMUpgradeExecutor.forward([replaceUpgradeTransition(expected,
+replacement)])`, optionally followed in the same `forward` by `setProtocolVersionDeadline`. The merged package
+has no `[operation]`; `upgrade-governance` replays it like any other (empty stages are skipped). Verify it with
+`verify-package` before it is signed (see below).
 
 ## Environment inputs
 
@@ -94,15 +127,18 @@ Safe-bundle-aware executor) with the keys from `wallets.yaml`.
 
 `ecosystem verify-bootstrap` (alias `verify-package`) is the verifier for current packages. It
 reads the merged `ecosystem.toml`, decides from the package itself whether it drives a recurring
-upgrade or the one-time bootstrap edge, and refuses a package that is neither. It is read-only and
-needs nothing but that file and an L1 RPC.
+upgrade, the one-time bootstrap edge or a transition replacement, and refuses a package that is none
+of them. It is read-only and needs nothing but that file, an L1 RPC and the reviewer's inputs.
 
 ```bash
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <path-to>/ecosystem.toml \
   --l1-rpc-url <l1-rpc-url> \
   --expected-governance-owner 0x... \
-  --create2-salt 0x...
+  --create2-salt 0x... \
+  --zk-token-asset-id 0x... \
+  --executor-record l1-contracts/script-out/output-deploy-l1.toml \
+  --executor-record l1-contracts/script-out/output-deploy-ctm.toml
 ```
 
 It answers two questions and keeps them apart.
@@ -121,13 +157,34 @@ codehash identifies them at all) — so it needs the reviewed commit built local
 (`cd l1-contracts && forge build`) for the creation code BYTES, and the reviewed CREATE2 salts:
 the core prepare's `[contracts] create2_factory_salt` and the CTM prepare's
 `[create2_factory_salts]` entry, both passed as `--create2-salt` (a package records neither).
-A recurring package records no constructor arguments for the executors either, which predate it:
-they are re-derived from the current reviewed owner and coordinator, under the salts they were
-deployed under, which must be passed too. The immutable-free objects are additionally identified
-against `AllContractsHashes.json`. Every release the package installs is held against the reviewed
-genesis: `genesisBatchHash` against the `genesis_root` of `configs/genesis/zksync-os/latest.json`,
-`genesisIndexRepeatedStorageChanges` against zero, and `fixedForceDeploymentsData` against the
-package's `force_deployments_data`.
+An executor is re-derived from its EXECUTOR RECORD when the review has one: the `[upgrade_executors]`
+table the run that deployed it wrote (the `ecosystem init` / `ctm init` forge outputs
+`script-out/output-deploy-l1.toml` / `output-deploy-ctm.toml`, or a bootstrap package, which carries
+its own), passed with the repeatable `--executor-record`. The record's salt and ORIGINAL constructor
+arguments re-derive the address; its immutable bindings are still held against the package's values,
+and its initial owner is only reported — a fresh ecosystem constructs its executors for the deployer
+and nominates governance. Without a record an executor is re-derived from the CURRENT reviewed owner
+and coordinator, under the reviewed salts, so one whose owner or coordinator moved since its
+deployment (every fresh ecosystem's) only verifies with its record. Either way the live owner,
+pending owner and coordinator are checked separately. The immutable-free objects are additionally
+identified against `AllContractsHashes.json`. Every release the package installs is held against the
+reviewed genesis: `genesisBatchHash` against the `genesis_root` of
+`configs/genesis/zksync-os/latest.json`, `genesisIndexRepeatedStorageChanges` against zero, and
+`fixedForceDeploymentsData` against the package's `force_deployments_data` — and decoded, with every
+field held against an independent expectation: `l1ChainId` against the RPC's chain id,
+`l1AssetRouter`, `maxNumberOfZKChains` and the aliased chain registration sender against the CTM's
+live Bridgehub, `aliasedL1Governance` against the alias of the reviewed governance, `zkTokenAssetId`
+against `--zk-token-asset-id`, the legacy and test-only addresses against zero, and each bytecode
+field against the release's own L2 bytecode table.
+
+A transition replacement is held against the transition it replaces rather than the CTM's current
+state: the replacement's construction as for any transition, the same source release (the replaced
+transition's, not the CTM's current one) and pinned deadline, `upgradeTransition[departure]` still
+the expected one and not the replacement, a departure below the CTM's version, a target no earlier
+than the replaced one that is the CTM's current release at its version or else the source of the
+edge committed onward from it, and the replacement's L2 bytecodes published. The effective deadline
+and any `setProtocolVersionDeadline` riding the `forward` are reported. The destination is an
+existing release, so no genesis is judged on this path.
 
 **Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
 `EcosystemUpgradeExecutor.stage0/1/2(operation)` on the reviewed coordinator and comparing byte
@@ -136,7 +193,9 @@ them on chain from the same pinned object. Any call that is neither a lifecycle 
 declared external action fails the run. For the bootstrap edge each stage must carry the run the
 construction-verified sequence derives, in order, and every other call must be a declared external
 action to a target outside the edge's authorities — an extra call to the CTM, a `ProxyAdmin`, an
-executor, the timer or an object is an error whether declared or not.
+executor, the timer or an object is an error whether declared or not. A replacement's stage 1 must
+carry the one `forward`, sent to the executor that owns the CTM, and nothing else may reach the CTM
+or its executor.
 
 Around those it checks what the objects cannot answer for themselves: authority bound where the
 review says (governance, coordinator, both domain executors, the CTM and both ProxyAdmins), the

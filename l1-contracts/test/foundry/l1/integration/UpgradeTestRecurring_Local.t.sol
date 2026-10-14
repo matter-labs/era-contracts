@@ -167,14 +167,42 @@ contract CoreUpgradeDeclaredChange is CoreUpgradeUndeclaredChange {
     }
 }
 
+/// @notice The two ecosystem proxies that gained row builders last (`L1InteropHandler`,
+///         `ChainRegistrationSender`), their local builds differing from the live ones (simulated:
+///         the fixture's live code is this build) and declared as this version's changes.
+contract CoreUpgradeDeclaredInteropAndRegistration is CoreUpgradeNoEcosystemLeg {
+    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
+        if (_isOneOfTheTwo(_name)) {
+            return false;
+        }
+        return super._canReuseEcosystemImplementation(_name, _live);
+    }
+
+    function changedEcosystemImplementations() internal pure override returns (string[] memory names) {
+        names = new string[](2);
+        names[0] = "L1InteropHandler";
+        names[1] = "ChainRegistrationSender";
+    }
+
+    function _isOneOfTheTwo(string memory _name) private pure returns (bool) {
+        bytes32 name = keccak256(bytes(_name));
+        return name == keccak256(bytes("L1InteropHandler")) || name == keccak256(bytes("ChainRegistrationSender"));
+    }
+}
+
 /// @notice The ecosystem counterpart of `CTMUpgradeOrphanedDeployment`: a fresh
-///         `ChainRegistrationSender` implementation, which `_coreProxyUpgradeRows()` has no row
-///         builder for. This is the exact shape the check was written for.
+///         `ChainRegistrationSender` implementation whose row builder this version script dropped —
+///         the shape of a row builder nobody wrote, which the check exists to catch.
 contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
     function deployNewEcosystemContractsL1() public override {
         coreAddresses.bridgehub.implementations.chainRegistrationSender = deploySimpleContract(
             "ChainRegistrationSender"
         );
+    }
+
+    function _coreProxyUpgradeRows() internal view override returns (ProxyUpgradeRow[] memory rows) {
+        rows = super._coreProxyUpgradeRows();
+        delete rows[uint256(L1EcosystemContract.ChainRegistrationSender)];
     }
 }
 
@@ -473,6 +501,43 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
             DeployScriptUtils.getImplementation(messageRootProxy),
             "the live implementation is reused"
         );
+        address senderProxy = core.getDiscoveredBridgehub().proxies.chainRegistrationSender;
+        assertEq(
+            core.getDiscoveredBridgehub().implementations.chainRegistrationSender,
+            DeployScriptUtils.getImplementation(senderProxy),
+            "the live ChainRegistrationSender is reused"
+        );
+    }
+
+    /// @notice `L1InteropHandler` and `ChainRegistrationSender` are installable like every other
+    ///         ecosystem singleton: declared and differing, each is deployed, pinned as a row departing
+    ///         from its live implementation, and swapped by the core executor in stage 1.
+    function test_corePrepare_installsTheInteropHandlerAndRegistrationSender() public {
+        CoreUpgradeDeclaredInteropAndRegistration core = new CoreUpgradeDeclaredInteropAndRegistration();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeEmpty();
+        _prepareHop(core, hop, SAME_VERSION_INPUT, "recurring-core-interop-registration");
+
+        address senderProxy = IBridgehubBase(inputs.bridgehub).chainRegistrationSender();
+        address interopHandlerProxy = core.getDiscoveredBridges().proxies.l1InteropHandler;
+        assertTrue(interopHandlerProxy != address(0), "the fixture has an L1 interop handler proxy");
+        ProxyUpgradeRow[] memory rows = core.coreTransition().ecosystemRows();
+        assertEq(rows.length, 2, "exactly the two declared replacements");
+        address[2] memory proxies = [interopHandlerProxy, senderProxy];
+        address[2] memory implsNew = [
+            core.getDiscoveredBridges().implementations.l1InteropHandler,
+            core.getDiscoveredBridgehub().implementations.chainRegistrationSender
+        ];
+        for (uint256 i = 0; i < 2; ++i) {
+            assertEq(rows[i].proxy, proxies[i], "rows follow the inventory order");
+            assertEq(rows[i].expectedOldImpl, DeployScriptUtils.getImplementation(proxies[i]), "from live");
+            assertEq(rows[i].implNew, implsNew[i], "to this run's deployment");
+            assertTrue(rows[i].implNew != rows[i].expectedOldImpl, "a real replacement");
+        }
+
+        _runOperation(IEcosystemUpgradeOperation(hop.preparedOperation()));
+        for (uint256 i = 0; i < 2; ++i) {
+            assertEq(DeployScriptUtils.getImplementation(proxies[i]), implsNew[i], "the core executor swapped it");
+        }
     }
 
     /// @notice A replacement the version did not declare is refused: it is either an unintended
@@ -609,9 +674,9 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         }
     }
 
-    /// @notice The same control on the ECOSYSTEM side, where the defect it was written for lives:
-    ///         a fresh `ChainRegistrationSender` implementation that `_coreProxyUpgradeRows()` has
-    ///         no row for is refused rather than written to an output key nothing reads.
+    /// @notice The same control on the ECOSYSTEM side: a fresh `ChainRegistrationSender`
+    ///         implementation that `_coreProxyUpgradeRows()` leaves without a row is refused rather
+    ///         than written to an output key nothing reads.
     function test_orphanedEcosystemDeployment_isRefusedAtPreparation() public {
         CoreUpgradeOrphanedDeployment core = new CoreUpgradeOrphanedDeployment();
         core.initializeWithArgs(

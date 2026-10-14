@@ -201,8 +201,8 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
     );
   }
 
-  // No version edge: the object reads it off `fromRelease` (the bootstrap edge's target release,
-  // at manifest.bootstrapVersion) and `newRelease` (at manifest.newVersion).
+  // No version edge: the object reads it off `fromRelease` (the CTM's live release, at
+  // manifest.oldVersion) and `newRelease` (at manifest.newVersion).
   return {
     fromRelease: transition.fromRelease,
     newRelease,

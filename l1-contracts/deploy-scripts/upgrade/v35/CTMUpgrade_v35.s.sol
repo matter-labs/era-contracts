@@ -31,6 +31,7 @@ import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
+import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
 
 /// @notice The v35 CTM upgrade: the ONE-TIME edge into the registry-driven model (see the
 ///         Bootstrap section of {docs/registry-driven-upgrades.md}). Chains crossing this edge
@@ -63,6 +64,9 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     /// @notice The delegate-calldata composer the bootstrap manifest pins: the CODE that
     ///         defines what `L2DefaultUpgrade` is called with.
     address public l2DelegateComposer;
+
+    /// @dev How {deployRegistryBootstrap} constructed the CTM executor, for the output record.
+    CTMExecutorDeployment internal ctmExecutorDeployment;
 
     /// @notice The bootstrap edge deploys no transition: after the engine every edge pins, its
     ///         objects are the bound executor and the write-once migration. The committed cut is
@@ -144,6 +148,12 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
                 data: abi.encodeCall(Ownable2Step.transferOwnership, (executor))
             });
         }
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    function upgradeExecutorsRecord() internal override returns (bool recorded, string memory json) {
+        require(ctmExecutorDeployment.ctmExecutor != address(0), "CTM executor not deployed");
+        return (true, UpgradeExecutorsRecord.serializeCTM(ctmExecutorDeployment));
     }
 
     /// @notice The executor this run deploys — the CTM's owner only once `migrate()` has run.
@@ -230,22 +240,32 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         // bundle replays only factory transactions, so a plain CREATE here would leave the
         // stage-1 `migrate()`/`acceptCTMOwnership()` calls pointing at codeless addresses on
         // the real chain (a call to code-less address is a silent success).
+        (, bytes32 salt) = getCreate2FactoryParams();
+        ctmExecutorDeployment = CTMExecutorDeployment({
+            ctmExecutor: address(0),
+            create2Salt: salt,
+            initialOwner: getOwnerAddress(),
+            chainTypeManager: ctmProxy,
+            ctmProxyAdmin: address(ctmProxyAdmin),
+            // The coordinator the core prepare of this upgrade deployed — the only address that
+            // will drive this executor's lifecycle callbacks.
+            coordinator: address(ecosystemUpgradeExecutor())
+        });
         ctmUpgradeExecutor = CTMUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(
                     type(CTMUpgradeExecutor).creationCode,
                     abi.encode(
-                        getOwnerAddress(),
+                        ctmExecutorDeployment.initialOwner,
                         IChainTypeManager(ctmProxy),
                         ctmProxyAdmin,
-                        // The coordinator the core prepare of this upgrade deployed — the only
-                        // address that will drive this executor's lifecycle callbacks.
-                        address(ecosystemUpgradeExecutor())
+                        ctmExecutorDeployment.coordinator
                     ),
                     "CTMUpgradeExecutor"
                 )
             )
         );
+        ctmExecutorDeployment.ctmExecutor = address(ctmUpgradeExecutor);
 
         bootstrapMigration = RegistryBootstrapMigration(
             deployViaCreate2AndNotify(

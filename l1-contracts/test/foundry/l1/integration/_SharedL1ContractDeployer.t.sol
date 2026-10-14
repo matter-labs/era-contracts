@@ -42,7 +42,17 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         ChainRegistrationSender chainRegistrationSender;
     }
 
+    /// @notice The upgrade executors a fresh ecosystem is born with (see `DeployL1CoreContracts` and
+    ///         `DeployCTM`): governance owns all three once the harness accepted.
+    struct UpgradeExecutorAddresses {
+        address coreExecutor;
+        address coordinator;
+        address ctmExecutor;
+    }
+
     Config public ecosystemConfig;
+
+    UpgradeExecutorAddresses internal upgradeExecutors;
 
     AllAddresses public addresses;
     CoreDeployedAddresses internal ecosystemAddresses;
@@ -100,8 +110,16 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         addresses.chainRegistrationSender = ChainRegistrationSender(
             ecosystemAddresses.bridgehub.proxies.chainRegistrationSender
         );
+        upgradeExecutors = UpgradeExecutorAddresses({
+            coreExecutor: l1CoreContractsScript.getUpgradeExecutors().coreExecutor,
+            coordinator: l1CoreContractsScript.getUpgradeExecutors().coordinator,
+            ctmExecutor: ctmScript.getCTMUpgradeExecutor().ctmExecutor
+        });
         _acceptOwnershipCore();
         _acceptOwnershipCTM();
+        if (_harnessAcceptsUpgradeExecutors()) {
+            _acceptUpgradeExecutors();
+        }
 
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
@@ -115,11 +133,31 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.stopPrank();
     }
 
+    /// @dev The CTM itself needs no accept: `DeployCTM` completed its handover to the CTM executor.
     function _acceptOwnershipCTM() private {
-        vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
-        IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
-        IOwnable(address(ctmAddresses.daAddresses.daContracts.rollupDAManager)).acceptOwnership();
+        address rollupDAManager = ctmAddresses.daAddresses.daContracts.rollupDAManager;
+        vm.startPrank(IOwnable(rollupDAManager).pendingOwner());
+        IOwnable(rollupDAManager).acceptOwnership();
         vm.stopPrank();
+    }
+
+    /// @dev Governance accepts the three executors the deploy scripts nominated it on.
+    function _acceptUpgradeExecutors() private {
+        address[3] memory executors = [
+            upgradeExecutors.coreExecutor,
+            upgradeExecutors.coordinator,
+            upgradeExecutors.ctmExecutor
+        ];
+        for (uint256 i = 0; i < executors.length; ++i) {
+            vm.prank(IOwnable(executors[i]).pendingOwner());
+            IOwnable(executors[i]).acceptOwnership();
+        }
+    }
+
+    /// @dev Whether `_deployL1Contracts` accepts governance's nominations on the upgrade executors
+    ///      itself. A test driving protocol-ops' own accept steps opts out.
+    function _harnessAcceptsUpgradeExecutors() internal virtual returns (bool) {
+        return true;
     }
 
     function _registerNewToken(address _tokenAddress) internal {

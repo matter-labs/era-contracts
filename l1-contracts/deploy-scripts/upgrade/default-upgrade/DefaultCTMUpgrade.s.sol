@@ -388,24 +388,33 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(newRelease != address(0), "new release not deployed");
         address engine = committedUpgradeEngine();
         require(upgradeAddresses.upgradeTimer != address(0), "upgrade timer not deployed");
-        TransitionManifest memory manifest = TransitionManifest({
-            fromRelease: fromRelease,
-            newRelease: newRelease,
-            upgradeEngine: engine,
-            oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
-            upgradeTimestamp: 0,
-            l2Plan: authoredL2Plan()
-        });
-        // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
-        // creation code this object's address is re-derived from.
-        upgradeAddresses.ctmTransition = deployViaCreate2AndNotify(
+        upgradeAddresses.ctmTransition = deployTransition(
+            TransitionManifest({
+                fromRelease: fromRelease,
+                newRelease: newRelease,
+                upgradeEngine: engine,
+                oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
+                upgradeTimestamp: 0,
+                l2Plan: authoredL2Plan()
+            })
+        );
+    }
+
+    /// @notice Deploys a write-once `CTMTransition` serving `_manifest` and validates it. The one
+    ///         derivation every transition a prepare deploys goes through.
+    /// @dev From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
+    ///      creation code the object's address is re-derived from.
+    /// @param _manifest The edge the transition pins.
+    /// @return transition The deployed transition.
+    function deployTransition(TransitionManifest memory _manifest) internal returns (address transition) {
+        transition = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("CTMTransition.sol", "CTMTransition"),
-            abi.encode(manifest),
+            abi.encode(_manifest),
             "CTMTransition"
         );
         // Fail here, not in stage 0: every contract the object names must already be deployed,
         // and the object's own revert names the one that is not.
-        ICTMTransition(upgradeAddresses.ctmTransition).validate();
+        ICTMTransition(transition).validate();
     }
 
     /// @notice Deploys the write-once `EcosystemUpgradeOperation` this upgrade's three coordinator
@@ -857,6 +866,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
+        if (upgradeKind() == UpgradeKind.TransitionReplacement) {
+            // The edge's versions are the replaced transition's, not the input's.
+            return;
+        }
         if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
             // The declaration decides the kind; the configured version is held against it. An
             // input naming a version the CTM is not already on describes a chain-version edge,
@@ -1164,10 +1177,20 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             upgradeAddresses.ecosystemUpgradeOperation
         );
         vm.serializeString("root", "registry", registry);
+        (bool recorded, string memory executorsRecord) = upgradeExecutorsRecord();
+        if (recorded) {
+            vm.serializeString("root", "upgrade_executors", executorsRecord);
+        }
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", getChainUpgradeDiamondCutData());
 
         vm.writeToml(toml, outputPath);
     }
+
+    /// @notice The `[upgrade_executors]` record of the executor THIS run deployed (see
+    ///         {UpgradeExecutorsRecord}). A recurring prepare deploys none and records nothing.
+    /// @return recorded Whether this run deployed one.
+    /// @return json The serialized record.
+    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {}
 
     function getCTMAddress() public view returns (address) {
         return newConfig.ctm;

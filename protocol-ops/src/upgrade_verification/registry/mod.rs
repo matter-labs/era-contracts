@@ -11,7 +11,8 @@
 //!
 //! The single exception is the one-time BOOTSTRAP edge ([`bootstrap`]), and it is an exception
 //! because it happens exactly once: it is how a CTM that predates the registry model enters it.
-//! Every upgrade after it is an ordinary operation ([`operation`]).
+//! Every upgrade after it is an ordinary operation ([`operation`]). Repairing a committed
+//! transition is not an upgrade but a CTM owner operation, and has its own path ([`replacement`]).
 //!
 //! # What it asks
 //!
@@ -62,29 +63,35 @@ pub(crate) mod lifecycle;
 pub(crate) mod operation;
 pub(crate) mod package;
 pub(crate) mod provenance;
+pub(crate) mod records;
+pub(crate) mod replacement;
 pub(crate) mod rows;
 pub(crate) mod views;
 
 use construction::ReviewedBuild;
-use genesis::ReviewedGenesis;
+use genesis::{ExpectedForceDeployments, ReviewedGenesis};
 use package::RegistryPackage;
 use provenance::CodeIdentity;
 use views::CommittedUpgradeView;
 
 /// Verify a registry-driven upgrade package against the live L1 it targets.
 ///
-/// The package's own content decides which verifier runs — a recurring operation or a bootstrap
-/// edge (see [`RegistryPackage::load`]); a package that is neither is refused rather than
-/// verified as the nearest match.
+/// The package's own content decides which verifier runs — a recurring operation, a bootstrap
+/// edge or a transition replacement (see [`RegistryPackage::load`]); a package that is none of
+/// them is refused rather than verified as the nearest match.
 ///
 /// `expected_governance_owner` is the reviewed address the upgrade must be driven by. For a
-/// bootstrap that is the owner the CTM domain lands on permanently; for a recurring upgrade it is
-/// the owner of the whole lifecycle.
+/// bootstrap that is the owner the CTM domain lands on permanently; otherwise it is the owner of
+/// the whole lifecycle. `executor_records` are files whose `[upgrade_executors]` records add to
+/// the package's own ([`records`]); `zk_token_asset_id` is the reviewed value an installed
+/// release's force deployments are held against ([`genesis`]).
 pub(crate) async fn verify(
     ecosystem_toml: &std::path::Path,
     l1_rpc_url: &str,
     expected_governance_owner: Option<Address>,
     extra_create2_salts: &[B256],
+    executor_records: &[std::path::PathBuf],
+    zk_token_asset_id: Option<B256>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     let provider = get_provider(l1_rpc_url)?;
@@ -92,12 +99,37 @@ pub(crate) async fn verify(
     let build = ReviewedBuild::load(&identity);
     let genesis_root = genesis::reviewed_genesis_root();
 
-    match RegistryPackage::load(ecosystem_toml)? {
+    let mut package = RegistryPackage::load(ecosystem_toml)?;
+    let held = match &mut package {
+        RegistryPackage::Operation(p) => &mut p.executor_records,
+        RegistryPackage::Bootstrap(p) => &mut p.executor_records,
+        RegistryPackage::Replacement(p) => &mut p.executor_records,
+    };
+    for path in executor_records {
+        let records = records::load_record_file(path)?;
+        records::merge_records(held, records, &path.display().to_string())?;
+    }
+
+    match package {
+        RegistryPackage::Replacement(package) => {
+            let salts = merge_salts(&package.create2_salts, extra_create2_salts);
+            replacement::verify(
+                &provider,
+                &identity,
+                &build,
+                &package,
+                expected_governance_owner,
+                &salts,
+                result,
+            )
+            .await
+        }
         RegistryPackage::Operation(package) => {
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
                 force_deployments_data: package.force_deployments_data.clone(),
+                force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };
             operation::verify(
                 &provider,
@@ -116,6 +148,7 @@ pub(crate) async fn verify(
             let genesis = ReviewedGenesis {
                 genesis_root,
                 force_deployments_data: package.force_deployments_data.clone(),
+                force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };
             bootstrap::verify(
                 &provider,

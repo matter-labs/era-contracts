@@ -47,7 +47,9 @@ pub struct CtmInitArgs {
     pub shared: SharedRunArgs,
 
     // Advanced input
-    /// Reuse governance and admin contracts from hub
+    /// Reuse the hub's governance and ChainAdmin. The CTM always gets its own ProxyAdmin, which
+    /// the CTM's CTMUpgradeExecutor owns together with the CTM and the ServerNotifier; the
+    /// executor itself is owned by the ecosystem governance (bridgehub.owner()) either way.
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub reuse_gov_and_admin: bool,
     /// Use testnet verifier
@@ -146,6 +148,7 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
 
     logger::info("CTM contracts initialized");
     logger::info(format!("CTM Proxy: {:#x}", ctm_proxy));
+    logger::info(format!("CTM executor: {:#x}", ctm_output.ctm_executor()?));
     Ok(())
 }
 
@@ -174,6 +177,18 @@ pub async fn ctm_init(
     logger::info(format!("[timing] ctm.deploy: {:.2?}", t.elapsed()));
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
+    // DeployCTM hands the CTM, its ProxyAdmin and the ServerNotifier to a CTMUpgradeExecutor
+    // (completing the CTM and notifier transfers itself) and nominates the ECOSYSTEM governance
+    // as the executor's owner; owner operations on the CTM go through `forward` from then on.
+    let ctm_executor = deploy_output.ctm_executor()?;
+    let ecosystem_governance =
+        crate::common::l1_contracts::resolve_governance(&runner.rpc_url, input.bridgehub)
+            .await
+            .context("resolving the ecosystem governance (bridgehub.owner()) from L1")?;
+    logger::info(format!(
+        "CTM executor: {ctm_executor:#x} (nominated owner: ecosystem governance \
+         {ecosystem_governance:#x})"
+    ));
     logger::step("Accepting ownership of CTM contracts...");
     // The ChainAdmin steps must be sent by its owner; standalone `ctm init` passes the ChainAdmin itself as `admin`.
     let chain_admin_owner = runner
@@ -183,11 +198,11 @@ pub async fn ctm_init(
     let accept_scripts = [
         runner
             .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
-                _governor: deployed.governance_addr,
-                _target: ctm_proxy,
+                _governor: ecosystem_governance,
+                _target: ctm_executor,
             })
             .with_wallet(owner)
-            .with_timing_label("ctm.accept_owner"),
+            .with_timing_label("ctm.accept_ctm_executor_owner"),
         runner
             .script_call(AdminFunctionsAbi::chainAdminAcceptAdminCall {
                 _chainAdmin: deployed.chain_admin,
@@ -202,13 +217,6 @@ pub async fn ctm_init(
             })
             .with_wallet(owner)
             .with_timing_label("ctm.accept_rollup_da_manager_owner"),
-        runner
-            .script_call(AdminFunctionsAbi::chainAdminAcceptOwnerCall {
-                _chainAdmin: deployed.chain_admin,
-                _target: deployed.server_notifier_proxy_addr,
-            })
-            .with_wallet(&chain_admin_owner)
-            .with_timing_label("ctm.accept_server_notifier_owner"),
         runner
             .script_call(AdminFunctionsAbi::governanceAcceptOwnerConditionalCall {
                 _governor: input.owner,

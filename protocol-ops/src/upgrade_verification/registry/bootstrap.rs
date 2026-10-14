@@ -27,6 +27,7 @@ use alloy::providers::Provider;
 use alloy::sol_types::{SolCall, SolValue};
 
 use crate::common::external_actions::ExternalAction;
+use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::constants::{
     CTM_CONTRACT_SERVER_NOTIFIER_SLOT, EIP1967_PROXY_ADMIN_SLOT,
@@ -180,10 +181,20 @@ pub(crate) async fn verify<P: Provider>(
     ) {
         reviewed.insert(package.migration, "the bootstrap migration".to_string());
     }
+    let mut genesis = genesis.clone();
+    genesis
+        .force_deployments
+        .read_live(
+            provider,
+            Some(manifest.ctm),
+            Some(manifest.governance),
+            "the manifest's governance",
+        )
+        .await;
     verify_release_construction(
         provider,
         build,
-        genesis,
+        &genesis,
         result,
         manifest.currentRelease,
         salts,
@@ -202,9 +213,11 @@ pub(crate) async fn verify<P: Provider>(
         .await;
     }
 
-    // The lifecycle objects, from the values the manifest and the package fix for them. The
-    // owner is the manifest's: the edge hands both domains to executors built for it, and it is
+    // The lifecycle objects, from the values the manifest and the package fix for them (their
+    // records, when the package carries them, are held against the same values). The owner is
+    // the manifest's: the edge hands both domains to executors that answer to it, and it is
     // cross-checked against the reviewed governance address below.
+    judge_executor_records_against_manifest(result, &package.executor_records, &manifest);
     let bindings = verify_lifecycle_construction(
         provider,
         build,
@@ -217,6 +230,7 @@ pub(crate) async fn verify<P: Provider>(
             ctm_executor: manifest.ctmExecutor,
             ctm: Some(manifest.ctm),
             ctm_proxy_admin: Some(manifest.ctmProxyAdmin),
+            records: package.executor_records.clone(),
         },
         salts,
         &mut reviewed,
@@ -646,6 +660,66 @@ pub(crate) async fn verify<P: Provider>(
     Ok(())
 }
 
+/// The bootstrap prepare deploys the executors it hands the domains to, so their records describe
+/// the manifest's own objects: each must name the manifest's address, and the CTM executor must
+/// have been constructed with the manifest's coordinator. (The immutables are held against the
+/// manifest by the lifecycle construction check.)
+fn judge_executor_records_against_manifest(
+    result: &mut VerificationResult,
+    records: &UpgradeExecutorsRecord,
+    manifest: &views::BootstrapManifest,
+) {
+    if records.is_empty() {
+        result.print_info(
+            "  the package carries no executor records: the executors are re-derived from the \
+             manifest's governance and coordinator",
+        );
+        return;
+    }
+    let mut check = |what: &str, recorded: Address, expected: Address, field: &str| {
+        if recorded == expected {
+            result.report_ok(&format!(
+                "the executor record's {what} is the manifest's {field} {expected}"
+            ));
+        } else {
+            result.report_error(&format!(
+                "the executor record's {what} is {recorded} but the manifest's {field} is \
+                 {expected}: the record describes another deployment than the edge hands over to"
+            ));
+        }
+    };
+    if let Some(record) = &records.core_executor {
+        check(
+            "core executor",
+            record.address,
+            manifest.coreExecutor,
+            "coreExecutor",
+        );
+    }
+    if let Some(record) = &records.coordinator {
+        check(
+            "coordinator",
+            record.address,
+            manifest.coordinator,
+            "coordinator",
+        );
+    }
+    if let Some(record) = &records.ctm_executor {
+        check(
+            "CTM executor",
+            record.address,
+            manifest.ctmExecutor,
+            "ctmExecutor",
+        );
+        check(
+            "CTM executor's constructor coordinator",
+            record.coordinator,
+            manifest.coordinator,
+            "coordinator",
+        );
+    }
+}
+
 /// One chain registered on the CTM, as the lagging-chain report reads it.
 #[derive(Debug)]
 struct ChainVersion {
@@ -1029,12 +1103,7 @@ async fn verify_release_construction<P: Provider>(
             row.facet, row.isFreezable
         ));
     }
-    judge_release_genesis(
-        result,
-        "the release the edge installs",
-        &manifest.genesis,
-        genesis,
-    );
+    judge_release_genesis(result, "the release the edge installs", &manifest, genesis);
 }
 
 /// The core transition's construction, re-derived from the manifest it serves.
@@ -1770,6 +1839,7 @@ mod tests {
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
             force_deployments_data: None,
+            executor_records: Default::default(),
         }
     }
 
@@ -2115,6 +2185,73 @@ mod tests {
         assert!(asserter.read_q().is_empty());
         assert_eq!(result.errors, 0);
         assert!(verdict.under_ctm_proxy_admin);
+    }
+
+    // ───────────────────────── executor records ─────────────────────────
+
+    /// The records a v35 bootstrap prepare writes for the manifest's own executors.
+    fn records_for(manifest: &views::BootstrapManifest) -> UpgradeExecutorsRecord {
+        use crate::common::forge::scripts::upgrade_executors::{
+            CoordinatorRecord, CoreExecutorRecord, CtmExecutorRecord,
+        };
+        UpgradeExecutorsRecord {
+            core_executor: Some(CoreExecutorRecord {
+                address: manifest.coreExecutor,
+                create2_salt: SALT,
+                initial_owner: manifest.governance,
+                proxy_admin: ECO_ADMIN,
+            }),
+            coordinator: Some(CoordinatorRecord {
+                address: manifest.coordinator,
+                create2_salt: SALT,
+                initial_owner: manifest.governance,
+                core_executor: manifest.coreExecutor,
+            }),
+            ctm_executor: Some(CtmExecutorRecord {
+                address: manifest.ctmExecutor,
+                create2_salt: SALT,
+                initial_owner: manifest.governance,
+                chain_type_manager: manifest.ctm,
+                ctm_proxy_admin: manifest.ctmProxyAdmin,
+                coordinator: manifest.coordinator,
+            }),
+        }
+    }
+
+    fn judge_records(records: &UpgradeExecutorsRecord) -> VerificationResult {
+        let mut result = VerificationResult::default();
+        judge_executor_records_against_manifest(
+            &mut result,
+            records,
+            &manifest_with(notifier_row()),
+        );
+        result
+    }
+
+    #[test]
+    fn records_of_the_manifests_executors_pass() {
+        let records = records_for(&manifest_with(notifier_row()));
+        assert_eq!(judge_records(&records).errors, 0);
+        assert_eq!(judge_records(&UpgradeExecutorsRecord::default()).errors, 0);
+    }
+
+    /// A record of another deployment — another executor, or a CTM executor built against another
+    /// coordinator than the edge binds — is refused before anything is re-derived from it.
+    #[test]
+    fn records_of_another_deployment_fail() {
+        let manifest = manifest_with(notifier_row());
+        let mut records = records_for(&manifest);
+        records.core_executor.as_mut().unwrap().address = ATTACKER;
+        assert_eq!(judge_records(&records).errors, 1);
+
+        let mut records = records_for(&manifest);
+        records.ctm_executor.as_mut().unwrap().coordinator = ATTACKER;
+        assert_eq!(judge_records(&records).errors, 1);
+
+        let mut records = records_for(&manifest);
+        records.coordinator.as_mut().unwrap().address = ATTACKER;
+        records.ctm_executor.as_mut().unwrap().address = ATTACKER;
+        assert_eq!(judge_records(&records).errors, 2);
     }
 
     // ───────────────────────── chains below the departing version ─────────────────────────

@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
-import {ReleaseFacetReader} from "../libraries/ReleaseFacetReader.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {FixedForceDeploymentsData} from "../../../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {
@@ -121,13 +120,6 @@ contract CTMRelease is ICTMRelease {
         return (m.genesisUpgrade, m.genesis.genesisBatchHash, m.genesis.genesisIndexRepeatedStorageChanges);
     }
 
-    /// @notice Whether `_chain`'s live diamond routing is EXACTLY this release's: same facets,
-    ///         same per-facet selector sets, nothing extra. The on-chain form of the "upgrade
-    ///         path equals genesis path" guarantee, for post-upgrade checks and monitoring.
-    function verifyChainRouting(address _chain) external view returns (bool) {
-        return ReleaseFacetReader.chainMatchesFacetRows(getManifest().genesisFacets, _chain);
-    }
-
     /// @inheritdoc ICTMRelease
     function validate() external view {
         ReleaseManifest memory m = getManifest();
@@ -187,10 +179,8 @@ contract CTMRelease is ICTMRelease {
     }
 
     /// @dev One row per facet address. A repeated address describes a routing no diamond can hold
-    ///      (`Diamond.diamondCut` would re-add selectors already routed) and makes the release's
-    ///      row count disagree with the facet count any live diamond can show — which is what
-    ///      {ReleaseFacetReader.chainMatchesFacetRows} counts. Checked at construction AND on
-    ///      every `validate()`, because the two answer to different threats: a mistake in an
+    ///      (`Diamond.diamondCut` would re-add selectors already routed). Checked at construction
+    ///      AND on every `validate()`, because the two answer to different threats: a mistake in an
     ///      authored manifest, and rows read off an object some caller could not attest.
     function _requireUniqueFacetRows(GenesisFacet[] memory _facets) private pure {
         uint256 length = _facets.length;

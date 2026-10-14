@@ -20,9 +20,11 @@
 ## Verifying a package before it is signed
 
 One verifier, `ecosystem verify-bootstrap` (alias `verify-package`,
-`upgrade_verification/registry/`). It decides from the package itself which of the two kinds
-it drives — a RECURRING upgrade, or the one-time BOOTSTRAP edge onto the registry model — and
-refuses a package that is neither rather than verifying it as the nearest match. It needs only
+`upgrade_verification/registry/`). It decides from the package itself which kind it drives — a
+RECURRING upgrade, the one-time BOOTSTRAP edge onto the registry model, or the REPLACEMENT of a
+committed transition (one `CTMUpgradeExecutor.forward([replaceUpgradeTransition(...)])`, see
+"Replacing a committed transition" in `protocol-docs/ecosystem-upgrade-coordination.md`) — and
+refuses a package that is none of them rather than verifying it as the nearest match. It needs only
 the merged prepare TOML and an L1 RPC: the registry model moved the reviewable content off the
 calldata and onto write-once objects, so objects are identified against the reviewed commit's own
 artifacts rather than reconstructed from a CREATE2 deployment history.
@@ -50,7 +52,10 @@ from calldata:
   from the local build (`l1-contracts/out`, so the reviewed commit must be built), held against the
   committed `evmBytecodeHash`. The salts are per prepare leg and come from `--create2-salt` (a
   package records none); with no salt the check cannot run, and that is an ERROR rather than a
-  silent pass.
+  silent pass. An executor is re-derived from its `[upgrade_executors]` record — salt and ORIGINAL
+  constructor arguments, written by the run that deployed it (`ecosystem init`, `ctm init` or the
+  bootstrap prepares) and read from the package or `--executor-record` — so one whose owner or
+  coordinator moved since still verifies; without a record, from the current reviewed values.
 - **Object provenance** — for the objects without constructor-set immutables, the code at each
   address, looked up in `AllContractsHashes.json`. Code attributable to a _different_ contract is
   an ERROR, and so is code attributable to NO contract: the reviewer cannot say what is deployed
@@ -75,9 +80,14 @@ from calldata:
   domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. For a bootstrap, every
   chain on the CTM below the departing version is listed as a warning, not an error (the legacy
   `protocolVersionVerifier` getter keeps them upgradeable).
-- **Genesis** — on both paths, a release's genesis batch hash against the reviewed commit's
-  genesis config (`configs/genesis/zksync-os/latest.json`), its index against zero, and its
-  force-deployments data against the package's `force_deployments_data`.
+- **Genesis** — on the recurring and bootstrap paths, a release's genesis batch hash against the
+  reviewed commit's genesis config (`configs/genesis/zksync-os/latest.json`), its index against
+  zero, and every field of its force-deployments data against an independent expectation: the L1
+  chain id, the live Bridgehub's asset router, chain cap and (aliased) chain-registration sender,
+  the aliased reviewed governance, the reviewed ZK token asset id (`--zk-token-asset-id`), zero for
+  the legacy fields, and the release's own table for the bytecode fields; the package's
+  `force_deployments_data` remains a cross-check. A replacement lands on an existing release and is
+  exempt.
 - **Readiness**, reported apart from anything about value: the transition's L2 factory
   dependencies published on the CTM's supplier, the timer startable, no lifecycle in flight.
 
@@ -104,6 +114,8 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <out>/prepare/ecosystem.toml \
   --l1-rpc-url $L1_RPC \
   --expected-governance-owner 0x... \
+  --zk-token-asset-id 0x... \
+  --executor-record <the package or init output that deployed the executors> \
   --create2-salt 0x...
 ```
 

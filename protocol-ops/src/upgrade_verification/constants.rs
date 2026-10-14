@@ -5,6 +5,25 @@ use alloy::primitives::{address, b256, Address, B256};
 pub const EIP1967_PROXY_ADMIN_SLOT: B256 =
     b256!("0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103");
 
+/// `AddressAliasHelper.offset`: an L1 contract's `msg.sender` as an L2 sees it is its address plus
+/// this, modulo 2^160.
+pub const L1_TO_L2_ALIAS_OFFSET: Address = address!("0x1111000000000000000000000000000000001111");
+
+/// The `L2EcosystemContract` members whose release-table row a genesis force-deployments blob
+/// repeats (`DeployCTM._buildForceDeploymentsData`), with their slots. The source-sync test below
+/// fails the build if the append-only enum moves one.
+pub const FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS: [(&str, usize); 9] = [
+    ("L2Bridgehub", 0),
+    ("L2AssetRouter", 1),
+    ("L2NativeTokenVault", 2),
+    ("L2MessageRoot", 3),
+    ("BaseTokenHolder", 5),
+    ("L2ChainAssetHandler", 6),
+    ("InteropCenter", 7),
+    ("L2InteropHandler", 9),
+    ("L2AssetTracker", 10),
+];
+
 /// `CTMContract.ServerNotifier` — the slot of the CTM-domain inventory (`ProxyUpgradeRow[]`
 /// indexed by `CTMContract`) holding the ServerNotifier row, mandatory in a bootstrap manifest.
 /// The source-sync test below fails the build if the append-only enum moves it.
@@ -289,30 +308,59 @@ mod tests {
     }
 
     /// The slot is the member's position in `enum CTMContract`, read from the Solidity source.
-    #[test]
-    fn the_server_notifier_slot_is_its_ctm_contract_position() {
-        const CONTRACT_IDENTIFIERS: &str = include_str!(
-            "../../../l1-contracts/contracts/upgrades/registry/libraries/ContractIdentifiers.sol"
-        );
+    const CONTRACT_IDENTIFIERS: &str = include_str!(
+        "../../../l1-contracts/contracts/upgrades/registry/libraries/ContractIdentifiers.sol"
+    );
+
+    /// The members of `enum <name>` in ContractIdentifiers.sol, in declaration order.
+    fn enum_members(name: &str) -> Vec<&'static str> {
         let body = CONTRACT_IDENTIFIERS
-            .split_once("enum CTMContract {")
-            .expect("ContractIdentifiers.sol must declare `enum CTMContract`")
+            .split_once(&format!("enum {name} {{"))
+            .unwrap_or_else(|| panic!("ContractIdentifiers.sol must declare `enum {name}`"))
             .1
             .split_once('}')
             .expect("the enum must be closed")
             .0;
-        let members: Vec<&str> = body
-            .lines()
+        body.lines()
             .map(|line| line.split("//").next().unwrap_or_default())
             .flat_map(|line| line.split(','))
             .map(str::trim)
             .filter(|member| !member.is_empty())
-            .collect();
+            .collect()
+    }
+
+    #[test]
+    fn the_server_notifier_slot_is_its_ctm_contract_position() {
         assert_eq!(
-            members.iter().position(|m| *m == "ServerNotifier"),
+            enum_members("CTMContract")
+                .iter()
+                .position(|m| *m == "ServerNotifier"),
             Some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
             "CTMContract.ServerNotifier moved; update CTM_CONTRACT_SERVER_NOTIFIER_SLOT"
         );
+    }
+
+    #[test]
+    fn the_force_deployed_slots_are_their_l2_ecosystem_contract_positions() {
+        let members = enum_members("L2EcosystemContract");
+        for (member, slot) in FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS {
+            assert_eq!(
+                members.iter().position(|m| *m == member),
+                Some(slot),
+                "L2EcosystemContract.{member} moved; update FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS"
+            );
+        }
+    }
+
+    /// The offset is `AddressAliasHelper`'s.
+    #[test]
+    fn the_alias_offset_is_the_helpers() {
+        const ALIAS_HELPER: &str =
+            include_str!("../../../l1-contracts/contracts/vendor/AddressAliasHelper.sol");
+        assert!(ALIAS_HELPER.contains(&format!(
+            "uint160 private constant offset = uint160({});",
+            alloy::hex::encode_prefixed(L1_TO_L2_ALIAS_OFFSET)
+        )));
     }
 
     #[test]

@@ -1,10 +1,10 @@
 //! `protocol-ops ecosystem verify-bootstrap` (alias `verify-package`) — read-only verification
 //! of a v35 registry-driven upgrade package against the live L1 it targets.
 //!
-//! Handles both kinds of package and decides which from the package itself: a RECURRING upgrade
-//! driven through its coordinator, and the one-time BOOTSTRAP edge onto the registry model. The
-//! name kept its original spelling because the docs and runbooks that reference it predate the
-//! recurring path.
+//! Handles every kind of package and decides which from the package itself: a RECURRING upgrade
+//! driven through its coordinator, the one-time BOOTSTRAP edge onto the registry model, and a
+//! transition REPLACEMENT forwarded through the CTM executor. The name kept its original spelling
+//! because the docs and runbooks that reference it predate the other paths.
 //!
 //! A registry package's reviewable content is the write-once objects and the authority they land
 //! on, so the tool needs only the merged prepare TOML and an L1 RPC: an object's provenance is
@@ -33,10 +33,10 @@ pub struct VerifyBootstrapArgs {
 
     /// The reviewed governance address the upgrade must be driven by — for a bootstrap, the
     /// owner the CTM domain lands on permanently (held against the manifest's); for a recurring
-    /// upgrade, the owner of the whole lifecycle, and the owner the executors' construction is
-    /// re-derived from. Without it a bootstrap's owner is reported but not checked against the
-    /// review, and a recurring package's executors are unverifiable — an error — so supply it for
-    /// any package that will actually be signed.
+    /// upgrade or a replacement, the owner of the whole lifecycle, and the owner an executor
+    /// without a record is re-derived for. Without it a bootstrap's owner is reported but not
+    /// checked against the review, and any other package fails — so supply it for any package
+    /// that will actually be signed.
     #[clap(long)]
     pub expected_governance_owner: Option<Address>,
 
@@ -48,6 +48,22 @@ pub struct VerifyBootstrapArgs {
     /// automatically and these add to them.
     #[clap(long = "create2-salt")]
     pub create2_salts: Vec<B256>,
+
+    /// A file carrying `[upgrade_executors]` records, repeatable: the forge output of `ecosystem
+    /// init` / `ctm init` (`DeployL1CoreContracts`, `DeployCTM`) or a merged bootstrap package.
+    /// An executor with a record is re-derived from the salt and ORIGINAL constructor arguments
+    /// it records, so one whose owner or coordinator moved since its deployment still verifies;
+    /// without a record it is re-derived from the current reviewed owner and coordinator. Adds to
+    /// the records the package carries; two different records of one executor are refused.
+    #[clap(long = "executor-record")]
+    pub executor_records: Vec<PathBuf>,
+
+    /// The reviewed ZK token asset id (`zk_token_asset_id` in the env's permanent values). Every
+    /// release the package installs pins it in its genesis force deployments, which are held
+    /// against this value; without it that field is unverifiable — an error. A replacement
+    /// installs no release and does not need it.
+    #[clap(long)]
+    pub zk_token_asset_id: Option<B256>,
 }
 
 pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
@@ -59,6 +75,8 @@ pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         args.expected_governance_owner,
         &args.create2_salts,
+        &args.executor_records,
+        args.zk_token_asset_id,
         &mut result,
     )
     .await?;

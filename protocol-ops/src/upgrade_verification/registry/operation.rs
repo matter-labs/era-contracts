@@ -120,12 +120,23 @@ pub(crate) async fn verify<P: Provider>(
     );
     let transition_manifest = match transition {
         Some(address) => {
+            let mut genesis = genesis.clone();
+            genesis
+                .force_deployments
+                .read_live(
+                    provider,
+                    package.reported_ctm,
+                    expected_governance_owner,
+                    "--expected-governance-owner",
+                )
+                .await;
             verify_transition(
                 provider,
                 identity,
                 build,
-                genesis,
+                ArrivingRelease::Installed(&genesis),
                 result,
+                "the transition the operation carries",
                 address,
                 salts,
                 &mut reviewed,
@@ -235,16 +246,9 @@ pub(crate) async fn verify<P: Provider>(
     }
 
     // The coordinator, the core executor and the CTM executor set their bindings as constructor
-    // immutables, so their runtime code cannot hash to the reviewed artifacts and their identity
-    // is their CONSTRUCTION — from the reviewed governance owner and the bindings the package
-    // records, never from the values they answer with. A read compared with itself always
-    // agrees and would report a passing check that established nothing.
-    result.print_info(
-        "  the executors predate this package, which records none of their original constructor \
-         arguments: each is re-derived from the CURRENT reviewed owner and coordinator, under the \
-         reviewed salts — pass the salts they were deployed under with --create2-salt. A genuine \
-         executor whose owner or coordinator has moved since its deployment does not re-derive",
-    );
+    // immutables, so their identity is their CONSTRUCTION — from their executor records when the
+    // review has them, else from the reviewed governance owner and coordinator; never from the
+    // values they answer with ([`super::lifecycle`]).
     let bindings = verify_lifecycle_construction(
         provider,
         build,
@@ -257,6 +261,7 @@ pub(crate) async fn verify<P: Provider>(
             ctm_executor: ctm_executor_addr,
             ctm: package.reported_ctm,
             ctm_proxy_admin: package.reported_ctm_proxy_admin,
+            records: package.executor_records.clone(),
         },
         salts,
         &mut reviewed,
@@ -290,37 +295,14 @@ pub(crate) async fn verify<P: Provider>(
     ));
     let core_executor = CoreUpgradeExecutorView::new(core_executor_addr, provider);
 
-    // Both domains must already answer to THIS coordinator, or its stage callbacks revert.
-    for (label, bound) in [
-        (
-            "the CTM executor",
-            tolerate(
-                ctm_executor.coordinator().call().await,
-                result,
-                "the CTM executor's coordinator",
-            ),
-        ),
-        (
-            "the core executor",
-            tolerate(
-                core_executor.coordinator().call().await,
-                result,
-                "the core executor's coordinator",
-            ),
-        ),
-    ] {
-        match bound {
-            Some(bound) if bound == package.coordinator => {
-                result.report_ok(&format!("{label} answers to the reviewed coordinator"))
-            }
-            Some(bound) => result.report_error(&format!(
-                "{label} answers to coordinator {bound}, not the reviewed {}: its lifecycle \
-                 callbacks would revert",
-                package.coordinator
-            )),
-            None => {}
-        }
-    }
+    expect_domains_answer_to(
+        provider,
+        result,
+        package.coordinator,
+        core_executor_addr,
+        ctm_executor_addr,
+    )
+    .await;
 
     verify_governance_owner(
         provider,
@@ -611,20 +593,34 @@ fn verify_stage_calls(package: &OperationPackage, result: &mut VerificationResul
 
 /// The transition as the departing-state check reads it: the manifest its address commits to, and
 /// the version edge it serves — read off its two releases at construction, so no manifest field.
-struct TransitionEdge {
-    manifest: super::views::TransitionManifest,
-    old_version: U256,
-    new_version: U256,
+pub(super) struct TransitionEdge {
+    pub(super) manifest: super::views::TransitionManifest,
+    pub(super) old_version: U256,
+    pub(super) new_version: U256,
 }
 
-/// The transition's provenance, construction and derived payload.
+/// How [`verify_transition`] treats the releases a transition names.
+#[derive(Clone, Copy)]
+pub(super) enum ArrivingRelease<'a> {
+    /// The package deployed the arriving release: its construction and its genesis (against the
+    /// reviewed one) are verified, and the departing release is identified against the commit.
+    Installed(&'a ReviewedGenesis),
+    /// Both releases already exist — possibly built by an earlier commit — and the caller judges
+    /// them by identity with live objects (a replacement's continuation release), so they are only
+    /// required to hold code.
+    Existing,
+}
+
+/// The transition's provenance, construction and derived payload; `label` names it in the
+/// report.
 #[allow(clippy::too_many_arguments)]
-async fn verify_transition<P: Provider>(
+pub(super) async fn verify_transition<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
-    genesis: &ReviewedGenesis,
+    arriving: ArrivingRelease<'_>,
     result: &mut VerificationResult,
+    label: &str,
     transition: Address,
     salts: &[B256],
     reviewed: &mut BTreeMap<Address, String>,
@@ -633,7 +629,7 @@ async fn verify_transition<P: Provider>(
         provider,
         identity,
         result,
-        "the transition the operation carries",
+        label,
         transition,
         "CTMTransition",
     )
@@ -643,8 +639,8 @@ async fn verify_transition<P: Provider>(
         Ok(m) => m,
         Err(e) => {
             result.report_error(&format!(
-                "the transition at {transition} does not answer `getManifest()` ({e}): its \
-                 construction cannot be verified"
+                "{label} at {transition} does not answer `getManifest()` ({e}): its construction \
+                 cannot be verified"
             ));
             return Ok(None);
         }
@@ -652,41 +648,56 @@ async fn verify_transition<P: Provider>(
     if expect_canonical_construction(
         build,
         result,
-        "the transition the operation carries",
+        label,
         transition,
         "CTMTransition",
         &manifest.abi_encode(),
         salts,
     ) {
-        reviewed.insert(
-            transition,
-            "the transition the operation carries".to_string(),
-        );
+        reviewed.insert(transition, label.to_string());
     }
 
-    // The arriving release is a member the transition NAMES, so its own construction is verified
-    // separately — the transition's address commits to the release's ADDRESS, not to its state.
-    verify_release(
-        provider,
-        identity,
-        build,
-        genesis,
-        result,
-        "the release the transition installs",
-        manifest.newRelease,
-        salts,
-        reviewed,
-    )
-    .await?;
-    expect_code_identity(
-        provider,
-        identity,
-        result,
-        "the release the transition departs from",
-        manifest.fromRelease,
-        "CTMRelease",
-    )
-    .await?;
+    match arriving {
+        ArrivingRelease::Installed(genesis) => {
+            // The arriving release is a member the transition NAMES, so its own construction is
+            // verified separately — the transition's address commits to the release's ADDRESS,
+            // not to its state.
+            verify_release(
+                provider,
+                identity,
+                build,
+                genesis,
+                result,
+                "the release the transition installs",
+                manifest.newRelease,
+                salts,
+                reviewed,
+            )
+            .await?;
+            expect_code_identity(
+                provider,
+                identity,
+                result,
+                "the release the transition departs from",
+                manifest.fromRelease,
+                "CTMRelease",
+            )
+            .await?;
+        }
+        ArrivingRelease::Existing => {
+            for (what, release) in [
+                ("the release the transition lands on", manifest.newRelease),
+                (
+                    "the release the transition departs from",
+                    manifest.fromRelease,
+                ),
+            ] {
+                if expect_code_present(provider, result, what, release).await? {
+                    result.print_info(&format!("  {what}: the existing release {release}"));
+                }
+            }
+        }
+    }
     expect_code_present(
         provider,
         result,
@@ -780,7 +791,7 @@ async fn verify_release<P: Provider>(
             row.facet, row.isFreezable
         ));
     }
-    judge_release_genesis(result, label, &manifest.genesis, genesis);
+    judge_release_genesis(result, label, &manifest, genesis);
     Ok(())
 }
 
@@ -885,7 +896,7 @@ async fn verify_timer<P: Provider>(
 ///
 /// This is a READINESS check and nothing more — it says the upgrade can execute, never that any
 /// value is safe.
-async fn verify_bytecodes_published<P: Provider>(
+pub(super) async fn verify_bytecodes_published<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
     ctm: &super::views::CtmView::CtmViewInstance<&P>,
@@ -915,35 +926,93 @@ async fn verify_bytecodes_published<P: Provider>(
     }
 
     let supplier = BytecodesSupplierView::new(supplier_addr, provider);
-    let mut unpublished = 0usize;
+    let mut publication = Vec::with_capacity(plan.factoryDepHashes.len());
     for hash in &plan.factoryDepHashes {
         let hash: B256 = (*hash).into();
-        let Some(block) = tolerate(
+        let block = tolerate(
             supplier.evmPublishingBlock(hash).call().await,
             result,
             &format!("the supplier's publication block for {hash}"),
-        ) else {
-            continue;
-        };
-        if block.is_zero() {
+        );
+        publication.push((hash, block));
+    }
+    judge_bytecode_publication(result, supplier_addr, &publication);
+    Ok(())
+}
+
+/// The publication verdict over `(hash, publishing block)` pairs; an unreadable block (`None`) was
+/// already reported when read.
+pub(super) fn judge_bytecode_publication(
+    result: &mut VerificationResult,
+    supplier: Address,
+    publication: &[(B256, Option<U256>)],
+) {
+    let mut unpublished = 0usize;
+    for (hash, block) in publication {
+        if block.is_some_and(|block| block.is_zero()) {
             unpublished += 1;
             result.report_error(&format!(
-                "the L2 bytecode {hash} is NOT published on supplier {supplier_addr}: stage 1 \
-                 reverts in `L2PlanLib.requirePublished`"
+                "the L2 bytecode {hash} is NOT published on supplier {supplier}: \
+                 `L2PlanLib.requirePublished` reverts the call that commits the transition"
             ));
         }
     }
     if unpublished == 0 {
         result.report_ok(&format!(
-            "all {} L2 factory dependencies are published on supplier {supplier_addr}",
-            plan.factoryDepHashes.len()
+            "all {} L2 factory dependencies are published on supplier {supplier}",
+            publication.len()
         ));
     }
-    Ok(())
+}
+
+/// Both domain executors' LIVE `coordinator()` — `setCoordinator` moves it after construction —
+/// against the reviewed coordinator: a domain answering to another one reverts its callbacks.
+pub(super) async fn expect_domains_answer_to<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    coordinator: Address,
+    core_executor: Address,
+    ctm_executor: Address,
+) {
+    for (label, bound) in [
+        (
+            "the CTM executor",
+            tolerate(
+                CTMUpgradeExecutorView::new(ctm_executor, provider)
+                    .coordinator()
+                    .call()
+                    .await,
+                result,
+                "the CTM executor's coordinator",
+            ),
+        ),
+        (
+            "the core executor",
+            tolerate(
+                CoreUpgradeExecutorView::new(core_executor, provider)
+                    .coordinator()
+                    .call()
+                    .await,
+                result,
+                "the core executor's coordinator",
+            ),
+        ),
+    ] {
+        match bound {
+            Some(bound) if bound == coordinator => {
+                result.report_ok(&format!("{label} answers to the reviewed coordinator"))
+            }
+            Some(bound) => result.report_error(&format!(
+                "{label} answers to coordinator {bound}, not the reviewed {coordinator}: its \
+                 lifecycle callbacks would revert"
+            )),
+            None => {}
+        }
+    }
 }
 
 /// The governance address the whole lifecycle answers to, held against the review.
-async fn verify_governance_owner<P: Provider>(
+pub(super) async fn verify_governance_owner<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
     expected: Option<Address>,
@@ -1061,7 +1130,11 @@ async fn verify_governance_owner<P: Provider>(
 
 /// A lifecycle object's `pendingOwner()`: a nominee could accept after the review and take the
 /// lifecycle with it.
-fn expect_no_nomination(result: &mut VerificationResult, label: &str, pending: Option<Address>) {
+pub(super) fn expect_no_nomination(
+    result: &mut VerificationResult,
+    label: &str,
+    pending: Option<Address>,
+) {
     match pending {
         Some(pending) if pending.is_zero() => {
             result.report_ok(&format!("{label} has no pending owner"))
@@ -1075,7 +1148,7 @@ fn expect_no_nomination(result: &mut VerificationResult, label: &str, pending: O
 }
 
 /// An `Ownable` whose owner the review fixes.
-async fn expect_owned_by<P: Provider>(
+pub(super) async fn expect_owned_by<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
     label: &str,
@@ -1152,15 +1225,15 @@ pub(super) fn cross_check(
             "the package's reported {field} is {what} that executes"
         )),
         (Some(reported), Some(actual)) => result.report_error(&format!(
-            "the package reports {field} {reported} but the operation pins {actual} as {what}: \
+            "the package reports {field} {reported} but what executes names {actual} as {what}: \
              the summary a reviewer reads describes a different object from the executing one"
         )),
         (Some(reported), None) => result.report_error(&format!(
-            "the package reports {field} {reported} but the operation carries no {what} at all"
+            "the package reports {field} {reported} but what executes carries no {what} at all"
         )),
         (None, Some(actual)) => result.report_warn(&format!(
-            "the package does not report {field}, so {what} ({actual}) is known only from the \
-             operation's own manifest"
+            "the package does not report {field}, so {what} ({actual}) is known only from what \
+             executes"
         )),
         (None, None) => {}
     }
@@ -1227,6 +1300,7 @@ mod tests {
             create2_salts: Vec::new(),
             lifecycle: Default::default(),
             force_deployments_data: None,
+            executor_records: Default::default(),
         }
     }
 

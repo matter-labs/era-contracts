@@ -8,15 +8,11 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
+import {RegistryAuthorityLib} from "../libraries/RegistryAuthorityLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
-import {CoreUpgradeExecutor} from "../executors/CoreUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
 import {ICommittedUpgrade} from "../objects/ICommittedUpgrade.sol";
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
-import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
-import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
-import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {GovernanceUpgradeTimer} from "../../GovernanceUpgradeTimer.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
@@ -26,14 +22,9 @@ import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {
     BootstrapAlreadyExecuted,
     BootstrapAuthorityNotHeld,
-    BootstrapExecutorNotBound,
-    BootstrapExecutorOwnerMismatch,
-    BootstrapNominationPending,
     BootstrapNotYetExecuted,
     BootstrapReleaseNotInstalled,
-    BootstrapServerNotifierNotBound,
     BootstrapServerNotifierRowMissing,
-    MigrationPaused,
     ProxyUpgradeRowMismatch,
     RegistryUnknownKey,
     ZeroAddress
@@ -210,7 +201,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
         }
 
-        _requireExecutorsBound(m);
+        RegistryAuthorityLib.requireExecutorsBound(_authority(m));
 
         // The departing version fixes which ecosystem this edge is valid for.
         uint256 liveVersion = IChainTypeManager(m.ctm).protocolVersion();
@@ -220,7 +211,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
 
         // Checked before the rows: a notifier still under its old administrator cannot be read
         // through `ctmProxyAdmin` at all.
-        _requireNotifierHandedOver(m);
+        RegistryAuthorityLib.requireNotifierHandedOver(_authority(m));
 
         // Every implementation swap is source-checked: replaying a stale migration, or running it
         // against an ecosystem someone already moved, cannot silently re-point a proxy. A row
@@ -279,113 +270,24 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         }
 
         // The whole CTM domain must have LANDED under the bound executor — the accept inside
-        // `migrate()` completed, nothing is parked on this spent object.
-        address ctmOwner = Ownable2Step(m.ctm).owner();
-        if (ctmOwner != m.ctmExecutor) {
-            revert BootstrapAuthorityNotHeld(m.ctm, ctmOwner);
-        }
-        _requireNoNomination(m.ctm);
-        address proxyAdminOwner = m.ctmProxyAdmin.owner();
-        if (proxyAdminOwner != m.ctmExecutor) {
-            revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
-        }
-        _requireExecutorsBound(m);
-        _requireNotifierHandedOver(m);
-        IChainAssetHandlerBase chainAssetHandler = IChainAssetHandlerBase(
-            IBridgehubBase(ctm.BRIDGE_HUB()).chainAssetHandler()
-        );
-        if (chainAssetHandler.migrationPausedFor(m.ctm)) {
-            revert MigrationPaused();
-        }
+        // `migrate()` completed, nothing is parked on this spent object — in the shape a fresh
+        // deployment is born with.
+        RegistryAuthorityLib.requireRegistryAuthority(_authority(m));
     }
 
-    /// @dev Every executor the edge binds, checked BY VALUE against what it is handed: each is
-    ///      owned by `governance` with no nomination outstanding (an executor whose ownership moved
-    ///      after review would take its domain on behalf of its new owner; a nominee could claim it
-    ///      right after); the CTM executor is bound to the CTM and its `ProxyAdmin`; both domain
-    ///      executors answer to the coordinator and the coordinator names both; and the ecosystem
-    ///      `ProxyAdmin` is the core executor's.
     /// @param _m The manifest.
-    function _requireExecutorsBound(BootstrapManifest memory _m) private view {
-        ObjectAnchorLib.requireCode(_m.ctmExecutor);
-        ObjectAnchorLib.requireCode(_m.coreExecutor);
-        ObjectAnchorLib.requireCode(_m.coordinator);
-        _requireGovernedBy(_m.ctmExecutor, _m.governance);
-        _requireGovernedBy(_m.coreExecutor, _m.governance);
-        _requireGovernedBy(_m.coordinator, _m.governance);
-
-        CTMUpgradeExecutor ctmExecutor = CTMUpgradeExecutor(payable(_m.ctmExecutor));
-        _requireBound(_m.ctmExecutor, _m.coordinator, ctmExecutor.coordinator());
-        _requireBound(_m.ctmExecutor, _m.ctm, address(ctmExecutor.CHAIN_TYPE_MANAGER()));
-        _requireBound(_m.ctmExecutor, address(_m.ctmProxyAdmin), address(ctmExecutor.CTM_PROXY_ADMIN()));
-
-        CoreUpgradeExecutor coreExecutor = CoreUpgradeExecutor(payable(_m.coreExecutor));
-        _requireBound(_m.coreExecutor, _m.coordinator, coreExecutor.coordinator());
-
-        EcosystemUpgradeExecutor coordinator = EcosystemUpgradeExecutor(payable(_m.coordinator));
-        _requireBound(_m.coordinator, _m.coreExecutor, address(coordinator.CORE_EXECUTOR()));
-        _requireBound(_m.coordinator, _m.ctmExecutor, address(coordinator.ctmExecutor()));
-
-        address ecosystemProxyAdmin = address(coreExecutor.PROXY_ADMIN());
-        address ecosystemProxyAdminOwner = coreExecutor.PROXY_ADMIN().owner();
-        if (ecosystemProxyAdminOwner != _m.coreExecutor) {
-            revert BootstrapAuthorityNotHeld(ecosystemProxyAdmin, ecosystemProxyAdminOwner);
-        }
-    }
-
-    /// @param _executor An executor the edge binds.
-    /// @param _governance The owner it must already answer to.
-    function _requireGovernedBy(address _executor, address _governance) private view {
-        address owner = Ownable2Step(_executor).owner();
-        if (owner != _governance) {
-            revert BootstrapExecutorOwnerMismatch(_executor, _governance, owner);
-        }
-        _requireNoNomination(_executor);
-    }
-
-    /// @param _executor The executor (or coordinator) whose binding is read.
-    /// @param _expected What the manifest says it must be bound to.
-    /// @param _actual What it is bound to.
-    function _requireBound(address _executor, address _expected, address _actual) private pure {
-        if (_actual != _expected) {
-            revert BootstrapExecutorNotBound(_executor, _expected, _actual);
-        }
-    }
-
-    /// @dev The one-time ServerNotifier handover, a PRECONDITION of the edge (governance cannot
-    ///      perform the ChainAdmin's half of it): the manifest's notifier is the CTM's and serves
-    ///      it, sits under `ctmProxyAdmin`, and is owned by the CTM executor with no nomination
-    ///      outstanding.
-    /// @dev `getProxyAdmin` reverts without data while the proxy is still under another admin: a
-    ///      transparent proxy answers `admin()` only to its own admin.
-    /// @param _m The manifest.
-    function _requireNotifierHandedOver(BootstrapManifest memory _m) private view {
-        address notifier = _m.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)].proxy;
-        address ctmNotifier = IChainTypeManager(_m.ctm).serverNotifierAddress();
-        if (ctmNotifier != notifier) {
-            revert BootstrapServerNotifierNotBound(notifier, ctmNotifier);
-        }
-        address notifierCtm = address(ServerNotifier(notifier).chainTypeManager());
-        if (notifierCtm != _m.ctm) {
-            revert BootstrapServerNotifierNotBound(_m.ctm, notifierCtm);
-        }
-        address notifierOwner = Ownable2Step(notifier).owner();
-        if (notifierOwner != _m.ctmExecutor) {
-            revert BootstrapAuthorityNotHeld(notifier, notifierOwner);
-        }
-        _requireNoNomination(notifier);
-        address notifierAdmin = _m.ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(notifier));
-        if (notifierAdmin != address(_m.ctmProxyAdmin)) {
-            revert BootstrapAuthorityNotHeld(notifier, notifierAdmin);
-        }
-    }
-
-    /// @param _target An `Ownable2Step` authority of the edge.
-    function _requireNoNomination(address _target) private view {
-        address pendingOwner = Ownable2Step(_target).pendingOwner();
-        if (pendingOwner != address(0)) {
-            revert BootstrapNominationPending(_target, pendingOwner);
-        }
+    /// @return The authority shape the manifest names.
+    function _authority(BootstrapManifest memory _m) private pure returns (RegistryAuthorityLib.Authority memory) {
+        return
+            RegistryAuthorityLib.Authority({
+                ctm: _m.ctm,
+                ctmProxyAdmin: _m.ctmProxyAdmin,
+                serverNotifier: _m.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)].proxy,
+                ctmExecutor: _m.ctmExecutor,
+                coreExecutor: _m.coreExecutor,
+                coordinator: _m.coordinator,
+                governance: _m.governance
+            });
     }
 
     /// @notice Performs the whole edge, then hands authority to the bound executors.

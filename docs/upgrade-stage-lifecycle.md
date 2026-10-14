@@ -47,8 +47,9 @@ The notifier is a per-CTM proxy. Pre-v35 deployments put it under its OWN `Proxy
 the CTM's `ChainAdmin`, and nominated the `ChainAdmin` as its owner. From the registry bootstrap on
 it is administered like the rest of the CTM domain: its proxy sits under the CTM-domain `ProxyAdmin`
 the CTM executor owns, the CTM executor owns the notifier itself, and its implementation swaps are
-ordinary CTM-domain inventory rows applied in stage 1 (`DeployCTM.deployServerNotifier` deploys
-fresh ecosystems under the CTM-domain `ProxyAdmin` already).
+ordinary CTM-domain inventory rows applied in stage 1. A fresh ecosystem is deployed in that shape
+already: `DeployCTM` puts the notifier under the CTM-domain `ProxyAdmin` and hands it to the CTM
+executor.
 
 Getting there is a one-time handover and a PRECONDITION of the bootstrap, because governance cannot
 perform the ChainAdmin's half:

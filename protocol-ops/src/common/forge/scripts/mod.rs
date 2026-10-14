@@ -12,6 +12,7 @@ use crate::common::abi::{
 pub mod deploy_ctm;
 pub mod deploy_ecosystem;
 pub mod register_chain;
+pub mod upgrade_executors;
 
 pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";

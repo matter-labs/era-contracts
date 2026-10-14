@@ -217,6 +217,16 @@ piece of protocol authority and answers to exactly one coordinator, which it nam
 (`coordinator`, set by the owner). A shared owner is not authorization: each domain callback rejects callers other than its
 configured coordinator.
 
+A fresh ecosystem is born in this shape. `DeployL1CoreContracts` deploys the core executor and the
+coordinator, binds them and hands the core executor the ecosystem `ProxyAdmin`; `DeployCTM` deploys
+the CTM executor answering to that coordinator and hands it the CTM, the CTM-domain `ProxyAdmin`
+(every CTM gets its own, even when it reuses the ecosystem's governance and ChainAdmin) and the
+ServerNotifier; `RegisterCTM` binds it on the coordinator (`setCTMExecutor`). The scripts construct
+the executors for the deployer, which makes these bindings and handovers, and nominate governance,
+which accepts in `protocol-ops hub init` / `ctm init`. The end state is exactly what a completed
+[bootstrap](#bootstrap) leaves: `RegistryAuthorityLib.requireRegistryAuthority`, the authority half
+of `RegistryBootstrapMigration.validateApplied()`, accepts both.
+
 | Executor                   | Bound to (immutable)                      | Entrypoints                                                                                                                                                                                                                                                  |
 | -------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `EcosystemUpgradeExecutor` | `CORE_EXECUTOR`                           | `stage0/1/2(operation)`, `abandonPendingOperation(unpauseMigrations)`, `setCTMExecutor`, `forward` (owner); `pendingOperation()`, `pendingStage()`, `pendingManifestHash()`                                                                                  |
@@ -308,7 +318,11 @@ The verification answers three questions for every object a package names:
    `evmBytecodeHash`, so a doctored build directory cannot pass. The salt is per prepare leg (the
    core prepare's `[contracts] create2_factory_salt`, each CTM prepare's `[create2_factory_salts]`
    entry); the package records neither, so both are reviewer inputs and every object is tried
-   under each.
+   under each. The executors outlive the run that deployed them, so that run — `ecosystem init`,
+   `ctm init` or the bootstrap prepares — records each one's salt and ORIGINAL constructor
+   arguments in its output (`[upgrade_executors]`); a later package is verified against that
+   record (`--executor-record`), so an executor whose owner or coordinator has legitimately moved
+   since still re-derives.
 2. **Does it run the reviewed code?** Live `EXTCODEHASH` against `AllContractsHashes.json` for the
    reviewed commit, for the objects without constructor-set immutables (the objects with them
    cannot hash to any artifact; question 1 is the whole of their identity). Code the commit does
@@ -373,9 +387,12 @@ that applies it:
 - `RegistryBootstrapMigration.validateApplied()` — the bootstrap's completion check, run as its own
   call after stage 2: the CTM domain and the ServerNotifier landed under the bound executor, every
   executor is governed and bound as the manifest names, and the CTM's migrations are no longer
-  paused.
-- `CTMRelease.verifyChainRouting(chain)` — a live diamond's loupe output set-equals the release's
-  self-described routing, for per-chain post-upgrade checks and monitoring.
+  paused. Its authority half (`RegistryAuthorityLib.requireRegistryAuthority`) is the shape a fresh
+  deployment is born with (see [Authority](#authority)).
+
+Whether a chain's diamond routes exactly its release's facets is not checked on chain: the chain's
+loupe (`facets()`, `isFacetFreezable`) and each release facet's `selectors()` are public, and
+monitoring compares them off chain.
 
 Stage 2 re-reads none of it: it checks the timer and releases the reservations and the pause, so an
 implementation governance re-patched after stage 1 never blocks completion.
@@ -597,8 +614,8 @@ identifies the schema, coordinator and tooling changes needed to expand particip
 
 A pre-registry CTM has no `currentRelease`, and transitions never accept a zero `fromRelease`. It
 must therefore cross into the model once, through one-time migration code — never through an
-accommodation inside the transition model. Fresh CTMs pin their release at genesis and need no
-bootstrap.
+accommodation inside the transition model. Fresh ecosystems pin their release at genesis and are
+deployed with their executors already bound (see [Authority](#authority)); they need no bootstrap.
 
 `RegistryBootstrapMigration` expresses that crossing as a single write-once object. Its manifest names
 the CTM and its departing version, the CTM-domain `ProxyAdmin`, the source-checked implementation

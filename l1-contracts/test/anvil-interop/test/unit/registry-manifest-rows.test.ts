@@ -1,9 +1,9 @@
 /**
- * Unit tests for the harness's `ProxyUpgradeRow` and `BootstrapManifest` encoders.
+ * Unit tests for the harness's `ProxyUpgradeRow` and `OperationManifest` encoders.
  *
  * Structs are encoded against the contract ABI by field name, so a helper that drifts from the
  * Solidity struct only fails deep inside an anvil run. These cases pin both shapes to the structs
- * in `RegistryTypes.sol`, and the bootstrap manifest to its mandatory `ServerNotifier` slot.
+ * in `RegistryTypes.sol`.
  *
  * Run with: yarn test:unit registry-manifest-rows
  */
@@ -12,10 +12,9 @@ import * as assert from "assert/strict";
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
-import { bootstrapInitArgs } from "../../src/helpers/bootstrap-upgrade-stage";
 import {
   coreInitArgs,
-  packSemVer,
+  operationInitArgs,
   proxyUpgradeSlotIndex,
   proxyUpgradeSlots,
 } from "../../src/helpers/registry-manifest";
@@ -66,52 +65,22 @@ test("a core manifest entry encodes exactly the Solidity row's fields, in its ow
   assert.deepEqual(row, { ...entry, callInitializeUpgrade: false });
 });
 
-test("the bootstrap manifest carries the CTM and ServerNotifier rows, every other slot inert", () => {
-  const ctmRow = { proxy: address(10), expectedOldImpl: address(11), implNew: address(12) };
-  const notifierRow = {
-    proxy: address(20),
-    expectedOldImpl: address(21),
-    implNew: address(22),
-    callInitializeUpgrade: false,
-  };
-  const args = bootstrapInitArgs(
-    {
-      oldVersion: "0.34.0",
-      bootstrap: {
-        ctmImpl: ctmRow,
-        oldProtocolVersionDeadline: "0x01",
-        upgradeEngine: { address: address(30) },
-      },
-    },
-    packSemVer,
-    {
-      ctmProxy: ctmRow.proxy,
-      proxyAdmin: address(40),
-      currentRelease: address(41),
-      ctmExecutor: address(42),
-      coreExecutor: address(47),
-      governance: address(43),
-      coordinator: address(44),
-      upgradeTimer: address(45),
-      delegateComposer: address(46),
-      l2Delegate: { deployedBytecodeInfo: "0x" },
-      serverNotifierRow: notifierRow,
-    }
-  );
+test("the operation manifest carries exactly the Solidity struct's fields, every CTM-domain slot inert", () => {
+  const args = operationInitArgs({ transition: {} }, address(1), address(2), address(3));
   assert.deepEqual(
     Object.keys(args).sort(),
-    solidityStructFields("BootstrapManifest").sort(),
-    "bootstrap init args: fields differ from the Solidity BootstrapManifest"
+    solidityStructFields("OperationManifest").sort(),
+    "operation init args: fields differ from the Solidity OperationManifest"
   );
-  const ctmSlot = proxyUpgradeSlotIndex("CTMContract", "ChainTypeManager");
-  const notifierSlot = proxyUpgradeSlotIndex("CTMContract", "ServerNotifier");
-  assert.deepEqual(args.ctmProxyUpgrades[ctmSlot], { ...ctmRow, callInitializeUpgrade: false });
-  assert.deepEqual(args.ctmProxyUpgrades[notifierSlot], notifierRow);
-  args.ctmProxyUpgrades.forEach((row: { implNew: string }, i: number) => {
+  assert.deepEqual(
+    [args.coreTransition, args.ctmTransition, args.timer],
+    [address(1), address(2), address(3)],
+    "operation init args name the objects they were given"
+  );
+  assert.equal(args.ctmInfrastructure.length, proxyUpgradeSlots("CTMContract", {}).length);
+  args.ctmInfrastructure.forEach((row: { implNew: string }, i: number) => {
     assertRowShape(row, `CTMContract[${i}]`);
-    if (i !== ctmSlot && i !== notifierSlot) {
-      assert.equal(row.implNew, ethers.constants.AddressZero, `CTMContract[${i}] must be inert`);
-    }
+    assert.equal(row.implNew, ethers.constants.AddressZero, `CTMContract[${i}] must be inert`);
   });
 });
 

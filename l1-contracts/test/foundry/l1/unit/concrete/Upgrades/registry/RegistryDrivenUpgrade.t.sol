@@ -13,6 +13,8 @@ import {OperationFixtures} from "./OperationFixtures.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {ChainRouting} from "test-utils/ChainRouting.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {
     CTM_CONTRACT_COUNT,
@@ -452,26 +454,38 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
     }
 
-    /// @dev The release's live routing check against the chain loupe, across every chain state
-    ///      this suite produces: freshly genesised, and having crossed a transition. The v33
-    ///      release replaces the AdminFacet ADDRESS (same selectors), so each side of the hop is
-    ///      a missing-facet mismatch for the other side's release.
-    function test_verifyChainRoutingTracksTheLiveChain() public {
+    /// @dev A chain's loupe routing against its release (the test-side {ChainRouting} check), across
+    ///      every chain state this suite produces: freshly genesised, and having crossed a transition.
+    ///      The v33 release replaces the AdminFacet ADDRESS (same selectors), so each side of the hop
+    ///      is a missing-facet mismatch for the other side's release.
+    function test_chainRoutingTracksTheLiveChain() public {
         CTMRelease genesisRelease = CTMRelease(chainContractAddress.currentRelease());
         CTMRelease releaseV33 = CTMRelease(transitionV33.newRelease());
 
         // Freshly genesised chain runs exactly its release's routing — and not yet the v33
         // release's, whose replacement AdminFacet is not installed.
-        assertTrue(genesisRelease.verifyChainRouting(chainAddress), "genesis chain must match its release");
-        assertFalse(releaseV33.verifyChainRouting(chainAddress), "target release must not match pre-hop");
+        assertTrue(
+            ChainRouting.matchesRelease(ICTMRelease(address(genesisRelease)), chainAddress),
+            "genesis chain must match its release"
+        );
+        assertFalse(
+            ChainRouting.matchesRelease(ICTMRelease(address(releaseV33)), chainAddress),
+            "target release must not match pre-hop"
+        );
 
         _runHop(transitionV32);
         _runHop(transitionV33);
 
         // After crossing, the chain matches the release it transitioned to; the departed
         // release (still routing the replaced AdminFacet address) no longer matches.
-        assertTrue(releaseV33.verifyChainRouting(chainAddress), "post-hop chain must match the target release");
-        assertFalse(genesisRelease.verifyChainRouting(chainAddress), "departed release must not match");
+        assertTrue(
+            ChainRouting.matchesRelease(ICTMRelease(address(releaseV33)), chainAddress),
+            "post-hop chain must match the target release"
+        );
+        assertFalse(
+            ChainRouting.matchesRelease(ICTMRelease(address(genesisRelease)), chainAddress),
+            "departed release must not match"
+        );
 
         // Same facet ADDRESS, different selector set: the check compares full selector sets, so
         // a drifted self-description fails even when the address is live. Mocked drift — with
@@ -483,17 +497,23 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
             abi.encodeWithSelector(ISelfDescribingFacet.selectors.selector),
             abi.encode(drifted)
         );
-        assertFalse(releaseV33.verifyChainRouting(chainAddress), "drifted selector set must not match");
+        assertFalse(
+            ChainRouting.matchesRelease(ICTMRelease(address(releaseV33)), chainAddress),
+            "drifted selector set must not match"
+        );
     }
 
     /// @dev Freezability is part of a release row but not of the loupe's `facets()` view, so the
     ///      routing check reads it per facet from the live diamond: a release pinning the live
     ///      addresses and selectors but the OPPOSITE freezability for any one facet must not match.
-    function test_verifyChainRoutingRejectsFreezabilityMismatch() public {
+    function test_chainRoutingRejectsFreezabilityMismatch() public {
         // Control: the same manifest builder, unflipped, describes the live chain.
         ReleaseManifest memory manifest = _releaseManifest(address(0), address(testnetVerifier), 0);
         CTMRelease unflipped = new CTMRelease(manifest);
-        assertTrue(unflipped.verifyChainRouting(chainAddress), "the unflipped manifest must match the live chain");
+        assertTrue(
+            ChainRouting.matchesRelease(ICTMRelease(address(unflipped)), chainAddress),
+            "the unflipped manifest must match the live chain"
+        );
 
         for (uint256 i = 0; i < manifest.genesisFacets.length; ++i) {
             ReleaseManifest memory flippedManifest = _releaseManifest(address(0), address(testnetVerifier), 0);
@@ -508,7 +528,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
                 "the live diamond must carry the original freezability"
             );
             assertFalse(
-                flipped.verifyChainRouting(chainAddress),
+                ChainRouting.matchesRelease(ICTMRelease(address(flipped)), chainAddress),
                 "a release with one facet's freezability flipped must not match"
             );
         }

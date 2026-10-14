@@ -33,6 +33,11 @@ address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
 
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
+/// @dev Separates the CTM-domain `ProxyAdmin`'s CREATE2 salt from the ecosystem's: both are deployed
+///      for the same owner under the same run salt, and the two domains' admins must be distinct
+///      objects (each is held by its own upgrade executor).
+bytes32 constant CTM_PROXY_ADMIN_SALT_DOMAIN = keccak256("ctm-domain-proxy-admin");
+
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error
 struct PrepareL1L2TransactionParams {
     uint256 l1GasPrice;

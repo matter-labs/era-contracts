@@ -11,7 +11,11 @@ enum UpgradeKind {
     ChainRelease,
     // Ecosystem and CTM-domain singletons behind their proxies, and nothing else: no transition,
     // no upgrade engine, and nothing chain-facing moves.
-    InfrastructureOnly
+    InfrastructureOnly,
+    // The replacement of a transition already committed for a departed version
+    // (`ChainTypeManager.replaceUpgradeTransition`): a transition onto an existing release, and no
+    // version or release of the CTM moves. See `DefaultTransitionReplacement`.
+    TransitionReplacement
 }
 
 /// @notice Parameters for the ecosystem upgrade entry point.
