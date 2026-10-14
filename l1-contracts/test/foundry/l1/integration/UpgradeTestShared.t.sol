@@ -30,6 +30,9 @@ abstract contract UpgradeIntegrationTestBase is Test {
     using LogFinder for Vm.Log[];
 
     uint256 internal constant NEW_CHAIN_ID = 555;
+    /// @dev Differs from the salt the fixture was deployed with, as a real upgrade's does, so a contract the upgrade
+    ///      must reuse can't pass for reused by being redeployed to the same address.
+    bytes32 internal constant UPGRADE_CREATE2_FACTORY_SALT = keccak256("UpgradeIntegrationTestBase");
 
     uint256 internal chainId;
 
@@ -383,7 +386,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
                 bridgehubProxyAddress: bridgehubProxy,
                 ctmProxy: ctmProxy,
                 rollupDAManager: rollupDAManager,
-                create2FactorySalt: bytes32(0),
+                create2FactorySalt: UPGRADE_CREATE2_FACTORY_SALT,
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,
                 governance: governance,

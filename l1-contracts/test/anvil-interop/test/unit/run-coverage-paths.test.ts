@@ -10,8 +10,13 @@
  */
 
 import * as assert from "assert/strict";
+import * as path from "path";
+import { discoverSpecs } from "../../src/core/specs";
 import { createSuite } from "./harness";
 import {
+  MAX_SHARDS_PER_RUN,
+  PORT_OFFSET_PER_WORKER,
+  RUN_PORT_SPAN,
   applyPortOffset,
   shouldShardRun,
   assertDisjointPortRange,
@@ -23,6 +28,10 @@ import {
 } from "../../run-coverage";
 
 const { test, run } = createSuite("run-coverage-paths");
+
+/** The base of the second run, the first one a whole span away from the default run. */
+const SECOND_RUN_BASE = RUN_PORT_SPAN;
+const OVERLAPPING_SPAN = new RegExp(`multiple of ${RUN_PORT_SPAN}`);
 
 test("takes the port offset from --port-offset", () => {
   assert.equal(resolvePortOffset(["--port-offset", "500"]), 500);
@@ -61,23 +70,23 @@ test("keeps the default paths unsuffixed at offset 0, so CI and coverage:merge s
 // The second reported bug: unscoped, `rmSync(shardsDir)` in one run destroys the other's reports.
 test("scopes shard directories per run so concurrent runs cannot collide", () => {
   const first = shardsDirFor(0);
-  const second = shardsDirFor(1000);
+  const second = shardsDirFor(SECOND_RUN_BASE);
   assert.notEqual(first, second);
-  assert.ok(second.endsWith("coverage/anvil/shards-p1000"));
+  assert.ok(second.endsWith(`coverage/anvil/shards-p${SECOND_RUN_BASE}`));
 
   // A worker's directory belongs to its run's scope, not to a scope derived from its own offset:
-  // shard 3 of the offset-1000 run is at 1200, and must still live under shards-p1000.
-  const worker = shardCoverageDir(1200, 1000);
-  assert.ok(worker.endsWith("coverage/anvil/shards-p1000/p1200"), worker);
+  // shard 3 of the second run must still live under the second run's shards directory.
+  const workerOffset = SECOND_RUN_BASE + 2 * PORT_OFFSET_PER_WORKER;
+  const worker = shardCoverageDir(workerOffset, SECOND_RUN_BASE);
+  assert.ok(worker.endsWith(`coverage/anvil/shards-p${SECOND_RUN_BASE}/p${workerOffset}`), worker);
   assert.ok(worker.startsWith(second));
 
-  // ...and must not be mistaken for a worker of a run based at 1200.
-  assert.notEqual(shardCoverageDir(1200, 1000), shardCoverageDir(1200, 1200));
+  // ...and must not be mistaken for a worker of a run based at its own offset.
+  assert.notEqual(shardCoverageDir(workerOffset, SECOND_RUN_BASE), shardCoverageDir(workerOffset, workerOffset));
 });
 
 test("gives every worker of a run a distinct directory", () => {
-  const base = 1000;
-  const dirs = [0, 1, 2, 3].map((i) => shardCoverageDir(base + i * 100, base));
+  const dirs = [0, 1, 2, 3].map((i) => shardCoverageDir(SECOND_RUN_BASE + i * PORT_OFFSET_PER_WORKER, SECOND_RUN_BASE));
   assert.equal(new Set(dirs).size, dirs.length, dirs.join(", "));
 });
 
@@ -102,41 +111,45 @@ test("applyPortOffset publishes any resolved offset, including non-zero", () => 
   const key = "ANVIL_INTEROP_PORT_OFFSET";
   const previous = process.env[key];
   try {
-    applyPortOffset(1000);
-    assert.equal(process.env[key], "1000");
+    applyPortOffset(SECOND_RUN_BASE);
+    assert.equal(process.env[key], String(SECOND_RUN_BASE));
   } finally {
     if (previous === undefined) delete process.env[key];
     else process.env[key] = previous;
   }
 });
 
-// Two runs a partial span apart share ports: base 0 and base 500 both allocate 500..900, and the
-// later run's startChain kills the earlier run's Anvil processes.
+// Runs a partial span apart share ports, see RUN_PORT_SPAN.
 test("rejects a base offset that would overlap another run", () => {
-  for (const base of [100, 500, 900, 1500]) {
-    assert.throws(() => assertDisjointPortRange(base, 10), /multiple of 1000/, String(base));
+  for (const base of [PORT_OFFSET_PER_WORKER, 500, RUN_PORT_SPAN / 2, RUN_PORT_SPAN - 500]) {
+    assert.throws(() => assertDisjointPortRange(base, 10), OVERLAPPING_SPAN, String(base));
   }
 });
 
 test("accepts bases a whole span apart", () => {
-  for (const base of [0, 1000, 2000]) {
+  for (const base of [0, RUN_PORT_SPAN, 2 * RUN_PORT_SPAN]) {
     assert.doesNotThrow(() => assertDisjointPortRange(base, 10));
   }
 });
 
 test("rejects a shard count that would outgrow its reserved range", () => {
-  assert.doesNotThrow(() => assertDisjointPortRange(0, 10));
-  assert.throws(() => assertDisjointPortRange(0, 11), /reserves\s+only 1000|only 1000/);
+  assert.doesNotThrow(() => assertDisjointPortRange(0, MAX_SHARDS_PER_RUN));
+  assert.throws(() => assertDisjointPortRange(0, MAX_SHARDS_PER_RUN + 1), new RegExp(`only ${RUN_PORT_SPAN}`));
+});
+
+// The default local run shards every spec, so adding one must not outgrow the range unnoticed.
+test("reserves enough ports to shard every spec in one run", () => {
+  assert.doesNotThrow(() => assertDisjointPortRange(0, discoverSpecs(path.join(__dirname, "../hardhat")).length));
 });
 
 // Single-process runs (one spec, --serial, --fresh-deploy) wrote to the unscoped default, so two
 // otherwise-disjoint runs overwrote each other's LCOV while both reported success.
 test("scopes single-process output, keeping offset 0 at the default path", () => {
   assert.ok(singleRunCoverageDir(0).endsWith("coverage/anvil"));
-  assert.ok(singleRunCoverageDir(1000).endsWith("coverage/anvil/run-p1000"));
-  assert.notEqual(singleRunCoverageDir(0), singleRunCoverageDir(1000));
+  assert.ok(singleRunCoverageDir(SECOND_RUN_BASE).endsWith(`coverage/anvil/run-p${SECOND_RUN_BASE}`));
+  assert.notEqual(singleRunCoverageDir(0), singleRunCoverageDir(SECOND_RUN_BASE));
   // ...and must not collide with a sharded run's directories.
-  assert.notEqual(singleRunCoverageDir(1000), shardsDirFor(1000));
+  assert.notEqual(singleRunCoverageDir(SECOND_RUN_BASE), shardsDirFor(SECOND_RUN_BASE));
 });
 
 // A flag with no value is malformed input. Reading it as 0 also overrode an inherited safe offset,
@@ -145,20 +158,20 @@ test("rejects --port-offset with no value", () => {
   assert.throws(() => resolvePortOffset(["--port-offset"]), /requires a value/);
   assert.throws(() => resolvePortOffset(["--html", "--port-offset"]), /requires a value/);
   // ...and must not fall back to the environment, which would mask the mistake.
-  assert.throws(() => resolvePortOffset(["--port-offset"], "1000"), /requires a value/);
+  assert.throws(() => resolvePortOffset(["--port-offset"], String(SECOND_RUN_BASE)), /requires a value/);
 });
 
 // The range check was only reached in the sharded branch, so a one-spec, --serial or
 // --fresh-deploy run at offset 500 still collided with shard 6 of a permitted base-0 run.
 test("a single-process run needs a disjoint range too", () => {
-  assert.throws(() => assertDisjointPortRange(500, 1), /multiple of 1000/);
-  assert.doesNotThrow(() => assertDisjointPortRange(1000, 1));
+  assert.throws(() => assertDisjointPortRange(500, 1), OVERLAPPING_SPAN);
+  assert.doesNotThrow(() => assertDisjointPortRange(SECOND_RUN_BASE, 1));
 });
 
 test("scopes the HTML directory so concurrent runs cannot overwrite it", () => {
-  // Derived from the same run scope as the LCOV: coverage/anvil/html vs html-p1000.
+  // Derived from the same run scope as the LCOV: coverage/anvil/html vs html-p<base>.
   assert.equal(runScope(0), "");
-  assert.equal(runScope(1000), "-p1000");
+  assert.equal(runScope(SECOND_RUN_BASE), `-p${SECOND_RUN_BASE}`);
 });
 
 // Without snapshots each worker does its own full deployment, so sharding would run them

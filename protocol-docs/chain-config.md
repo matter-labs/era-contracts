@@ -21,6 +21,8 @@ hash from the previous five-word encoding, so the contracts and ZKsync OS runtim
 must be upgraded together with this field order. The Solidity public-input tests
 pin the shared default and flag-combination vectors from ZKsync OS's
 [`public_input.rs`](https://github.com/matter-labs/zksync-os-private/blob/ca730149b70ceb296dd2c4158823e152c90ae92b/basic_bootloader/src/bootloader/block_flow/zk/post_tx_op/public_input.rs).
+The batch output now ends with the interop fee units word ([interop-fee.md](./interop-fee.md)),
+so the pinned values differ from that revision; they match the paired ZKsync OS change.
 The vectors with exactly one flag enabled detect swaps of the boolean words.
 Batch-proving tests explicitly cover all four combinations.
 

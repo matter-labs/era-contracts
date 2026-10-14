@@ -84,6 +84,10 @@ interface IChainTypeManager {
 
     function PERMISSIONLESS_VALIDATOR() external view returns (address);
 
+    /// @notice The interop fee switch that the chains' executed batches are charged from. See
+    /// {protocol-docs/interop-fee.md}.
+    function L1_INTEROP_FEE_MANAGER() external view returns (address);
+
     function setPendingAdmin(address _newPendingAdmin) external;
 
     function acceptAdmin() external;

@@ -37,6 +37,7 @@ import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   EIP1967_ADMIN_SLOT,
   EIP1967_IMPL_SLOT,
+  ETH_TOKEN_ADDRESS,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_ATTRIBUTE_PARSER_ADDR,
   INTEROP_CENTER_ADDR,
@@ -336,6 +337,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       expectedProtocolVersion: scenario.expectedProtocolVersion,
       migrationAddr,
     });
+    await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
 
     // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
@@ -1340,6 +1342,37 @@ export async function verifyProtocolVersions(
         `Chain ${chain.chainId}: protocol version ${version.toHexString()}, expected ${expectedVersion.toHexString()}`
       );
     }
+  }
+}
+
+/**
+ * The CTM's interop fee manager must be deployed, on this bridgehub and switched off with ether as the fee token: the
+ * Executor charges through it.
+ */
+export async function verifyInteropFeeManager(
+  provider: ethers.providers.JsonRpcProvider,
+  ctmAddr: string,
+  bridgehubAddr: string
+): Promise<void> {
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), provider);
+  const feeManagerAddr: string = await ctm.L1_INTEROP_FEE_MANAGER();
+  if ((await provider.getCode(feeManagerAddr)) === "0x") {
+    throw new Error(`CTM ${ctmAddr}: no interop fee manager deployed at ${feeManagerAddr}`);
+  }
+  const feeManager = new ethers.Contract(feeManagerAddr, getAbi("L1InteropFeeManager"), provider);
+  const feeManagerBridgehub: string = await feeManager.BRIDGE_HUB();
+  if (feeManagerBridgehub.toLowerCase() !== bridgehubAddr.toLowerCase()) {
+    throw new Error(
+      `Interop fee manager ${feeManagerAddr} is on bridgehub ${feeManagerBridgehub}, expected ${bridgehubAddr}`
+    );
+  }
+  const feePerUnit: ethers.BigNumber = await feeManager.feePerUnit();
+  if (!feePerUnit.isZero()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} is switched on: feePerUnit = ${feePerUnit.toString()}`);
+  }
+  const feeToken: string = await feeManager.feeToken();
+  if (feeToken.toLowerCase() !== ETH_TOKEN_ADDRESS.toLowerCase()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} charges in ${feeToken}, expected ether`);
   }
 }
 

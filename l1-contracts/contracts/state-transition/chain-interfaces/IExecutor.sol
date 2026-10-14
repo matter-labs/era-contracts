@@ -70,6 +70,7 @@ interface IExecutor is IZKChainBase {
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
+    /// - Charging its interop fee units (see {protocol-docs/interop-fee.md})
     /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
     /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
     /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.

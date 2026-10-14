@@ -756,6 +756,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         the EIP-7702 checker the fresh MailboxFacet takes, and the force-deployments blob the
     ///         release pins.
     function deployNewCTMContracts() public virtual {
+        // Kept, not redeployed: see {protocol-docs/interop-fee.md#the-switch}.
+        require(
+            ctmAddresses.stateTransition.proxies.interopFeeManager != address(0),
+            "CTM has no L1InteropFeeManager registered; it is expected from v35 on"
+        );
         deployEIP7702Checker();
         generateFixedForceDeploymentsData();
     }
@@ -998,6 +1003,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             "state_transition",
             "committer_facet_addr",
             ctmAddresses.stateTransition.facets.committerFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.stateTransition.proxies.interopFeeManager
         );
         vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);

@@ -51,10 +51,11 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 ## Preparing an upgrade
 
 `ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v35` and `CTMUpgrade_v35`
-under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge onto registry-driven upgrades), using
-`upgrade-envs/v0.35.0-upgrade-system/local.toml` for a local upgrade. The recurring registry-driven edge,
-`CoreUpgrade_v36` and `CTMUpgrade_v36` under `l1-contracts/deploy-scripts/upgrade/v36/`, is selected with
-`--core-script-path` / `--ctm-script-path`.
+under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge onto registry-driven upgrades;
+`CTMUpgrade_v35` also deploys the `L1InteropFeeManager` proxy, see
+[the switch](../protocol-docs/interop-fee.md#the-switch)), using `upgrade-envs/v0.35.0-upgrade-system/local.toml` for a
+local upgrade. The recurring registry-driven edge, `CoreUpgrade_v36` and `CTMUpgrade_v36` under
+`l1-contracts/deploy-scripts/upgrade/v36/`, is selected with `--core-script-path` / `--ctm-script-path`.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 

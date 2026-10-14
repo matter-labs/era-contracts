@@ -129,6 +129,7 @@ pub struct L1StateTransitionOutput {
     pub genesis_upgrade_addr: Address,
     pub default_upgrade_addr: Address,
     pub bytecodes_supplier_addr: Address,
+    pub interop_fee_manager_proxy_addr: Address,
 }
 
 #[cfg(test)]
@@ -232,5 +233,26 @@ mod tests {
         assert!(serialized.contains("multi_proof_verifier = false"));
         assert!(!serialized.contains("zisk_plonk_verifier_addr"));
         assert!(!serialized.contains("zisk_range_verifier_addr"));
+    }
+
+    #[test]
+    fn interop_fee_manager_survives_the_output_round_trip() {
+        let manager = Address::repeat_byte(0x55);
+        let output: L1StateTransitionOutput = toml::from_str(&format!(
+            r#"
+            state_transition_proxy_addr = "{zero}"
+            verifier_addr = "{zero}"
+            genesis_upgrade_addr = "{zero}"
+            default_upgrade_addr = "{zero}"
+            bytecodes_supplier_addr = "{zero}"
+            interop_fee_manager_proxy_addr = "{manager}"
+            "#,
+            zero = Address::ZERO
+        ))
+        .unwrap();
+
+        let serialized = toml::to_string(&output).unwrap();
+
+        assert!(serialized.contains(&format!("interop_fee_manager_proxy_addr = \"{manager}\"")));
     }
 }

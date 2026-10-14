@@ -39,6 +39,7 @@ import {
     CTMDeployedAddresses,
     CTMAdminAddresses
 } from "./Types.sol";
+import {ProtocolVersionFeatures} from "./ProtocolVersionFeatures.sol";
 import {StateTransitionContracts, Verifiers, Facets} from "contracts/common/StateTransitionTypes.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
@@ -187,14 +188,16 @@ library AddressIntrospector {
                 serverNotifier: ctm.serverNotifierAddress(),
                 validatorTimelock: validatorTimelock,
                 bytecodesSupplier: bytecodesSupplier,
-                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
+                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR(),
+                interopFeeManager: _getInteropFeeManager(ctm)
             }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(ctmAddr),
                 serverNotifier: address(0),
                 validatorTimelock: address(0),
                 bytecodesSupplier: address(0),
-                permissionlessValidator: address(0)
+                permissionlessValidator: address(0),
+                interopFeeManager: address(0)
             }),
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
@@ -223,20 +226,7 @@ library AddressIntrospector {
         IL1Bridgehub _bridgehub
     ) public view returns (ZkChainAddresses memory info) {
         uint256 chainId = _zkChain.getChainId();
-        address l1DAValidator = address(0);
-        L2DACommitmentScheme l2DAValidatorScheme = L2DACommitmentScheme.NONE;
-
-        (, uint256 minor, ) = _zkChain.getSemverProtocolVersion();
-        if (minor > 29) {
-            (l1DAValidator, l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
-        } else {
-            (bool ok, bytes memory data) = address(_zkChain).staticcall(
-                abi.encodeWithSignature("getDAValidatorPair()")
-            );
-            if (ok && data.length >= 32) {
-                (l1DAValidator, ) = abi.decode(data, (address, address));
-            }
-        }
+        (address l1DAValidator, L2DACommitmentScheme l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
 
         IL1Bridgehub bridgehub = address(_bridgehub) == address(0) ? IL1Bridgehub(_zkChain.getBridgehub()) : _bridgehub;
 
@@ -318,6 +308,16 @@ library AddressIntrospector {
             }
         }
         return address(0);
+    }
+
+    /// @notice Returns the CTM's interop fee manager, so that a later release keeps the manager holding the chains'
+    /// prepaid balances; zero before the release that introduced it.
+    /// @param _ctm The CTM being introspected.
+    function _getInteropFeeManager(ChainTypeManager _ctm) internal view returns (address) {
+        if (!ProtocolVersionFeatures.has(_ctm.protocolVersion(), ProtocolVersionFeatures.CTM_INTEROP_FEE_MANAGER)) {
+            return address(0);
+        }
+        return _ctm.L1_INTEROP_FEE_MANAGER();
     }
 
     function _getVerifierFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (address) {

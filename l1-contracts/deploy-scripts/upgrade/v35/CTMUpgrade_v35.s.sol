@@ -194,6 +194,14 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     }
 
     function deployNewCTMContracts() public virtual override {
+        // The new CTM implementation is constructed with the `L1InteropFeeManager` proxy, so it is
+        // deployed first; see {protocol-docs/interop-fee.md#the-switch}.
+        if (ctmAddresses.stateTransition.proxies.interopFeeManager == address(0)) {
+            (
+                ctmAddresses.stateTransition.implementations.interopFeeManager,
+                ctmAddresses.stateTransition.proxies.interopFeeManager
+            ) = deployTuppWithContract("L1InteropFeeManager");
+        }
         super.deployNewCTMContracts();
 
         // The composer the L2 side names (see `authorL2Side`), deployed before that side is prepared.
