@@ -208,24 +208,7 @@ library AddressIntrospector {
         IL1Bridgehub _bridgehub
     ) public view returns (ZkChainAddresses memory info) {
         uint256 chainId = _zkChain.getChainId();
-        address l1DAValidator = address(0);
-        L2DACommitmentScheme l2DAValidatorScheme = L2DACommitmentScheme.NONE;
-
-        if (
-            ProtocolVersionFeatures.has(
-                _zkChain.getProtocolVersion(),
-                ProtocolVersionFeatures.DA_VALIDATOR_PAIR_WITH_COMMITMENT_SCHEME
-            )
-        ) {
-            (l1DAValidator, l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
-        } else {
-            (bool ok, bytes memory data) = address(_zkChain).staticcall(
-                abi.encodeWithSignature("getDAValidatorPair()")
-            );
-            if (ok && data.length >= 32) {
-                (l1DAValidator, ) = abi.decode(data, (address, address));
-            }
-        }
+        (address l1DAValidator, L2DACommitmentScheme l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
 
         IL1Bridgehub bridgehub = address(_bridgehub) == address(0) ? IL1Bridgehub(_zkChain.getBridgehub()) : _bridgehub;
 

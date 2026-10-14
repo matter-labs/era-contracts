@@ -15,8 +15,6 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {GetDiamondCutData} from "../../utils/GetDiamondCutData.sol";
-import {ProtocolVersionFeatures} from "../../utils/ProtocolVersionFeatures.sol";
-import {IAdminPreV31} from "../../interfaces/IAdminPreV31.sol";
 
 contract DefaultChainUpgrade is Script {
     struct ChainConfig {
@@ -56,15 +54,10 @@ contract DefaultChainUpgrade is Script {
     }
 
     function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public {
-        bytes memory callData = ProtocolVersionFeatures.has(
-            config.oldProtocolVersion,
-            ProtocolVersionFeatures.UPGRADE_CHAIN_FROM_VERSION_WITH_CHAIN_ADDRESS
-        )
-            ? abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
-            )
-            : abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (config.oldProtocolVersion, diamondCutData));
+        bytes memory callData = abi.encodeCall(
+            IAdmin.upgradeChainFromVersion,
+            (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
+        );
 
         Utils.adminExecute({
             _admin: IZKChain(config.chainDiamondProxyAddress).getAdmin(),

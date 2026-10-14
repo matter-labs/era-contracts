@@ -41,8 +41,6 @@ import {CTMUpgradeParams} from "./UpgradeParams.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
-import {ProtocolVersionFeatures} from "../../utils/ProtocolVersionFeatures.sol";
-import {IAdminPreV31} from "../../interfaces/IAdminPreV31.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
@@ -872,16 +870,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
-        // Pre-v31 chain diamonds only expose the legacy 2-arg selector; the v31 selector reverts with "F".
-        bytes memory upgradeCallData = ProtocolVersionFeatures.has(
-            oldProtocolVersion,
-            ProtocolVersionFeatures.UPGRADE_CHAIN_FROM_VERSION_WITH_CHAIN_ADDRESS
-        )
-            ? abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
-            )
-            : abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData));
+        bytes memory upgradeCallData = abi.encodeCall(
+            IAdmin.upgradeChainFromVersion,
+            (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
+        );
 
         calls = new Call[](1);
         calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});

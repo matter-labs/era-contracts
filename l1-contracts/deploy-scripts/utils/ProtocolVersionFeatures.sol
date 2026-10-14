@@ -9,12 +9,6 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 /// a feature checks `has(<their protocol version>, <feature>)` instead of comparing minor versions itself; a new such
 /// feature gets a row here.
 library ProtocolVersionFeatures {
-    /// @dev The chain's `getDAValidatorPair()` returns the L2 DA commitment scheme second; earlier diamonds return an
-    /// L2 DA validator address there.
-    uint32 internal constant DA_VALIDATOR_PAIR_WITH_COMMITMENT_SCHEME = 30;
-    /// @dev The chain's `upgradeChainFromVersion` takes the chain address first; earlier diamonds only have the
-    /// 2-argument selector.
-    uint32 internal constant UPGRADE_CHAIN_FROM_VERSION_WITH_CHAIN_ADDRESS = 31;
     /// @dev The production verifier exports the testnet-verifier flag (`isTestnetVerifier()`). Earlier production
     /// verifiers export no flag; v31/v32/v33 testnet verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
     uint32 internal constant VERIFIER_TESTNET_FLAG = 34;
