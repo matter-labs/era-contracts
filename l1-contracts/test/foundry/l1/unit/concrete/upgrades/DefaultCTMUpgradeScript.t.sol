@@ -23,6 +23,14 @@ import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAd
 import {TEST_CHAIN_CONFIG_UPGRADE_VERSION} from "../../../../TestConstants.sol";
 
 contract DefaultCTMUpgradeScriptTest is Test {
+    // Only `CTMUpgrade_v35` deploys the interop fee manager: a later upgrade of a CTM without one must fail
+    // before deploying anything, rather than construct a CTM whose `L1_INTEROP_FEE_MANAGER` is zero.
+    function test_deployNewCTMContracts_revertsWithoutInteropFeeManager() public {
+        CTMUpgradeHarness script = new CTMUpgradeHarness();
+        vm.expectRevert(bytes("CTM has no L1InteropFeeManager registered; it is expected from v35 on"));
+        script.deployNewCTMContracts();
+    }
+
     // The v34 upgrade is the default one: the cut runs the CTM's default `DefaultUpgradeZKsyncOS`, and the
     // L2 transaction delegates to `L2DefaultUpgrade`.
     function test_CutUsesDefaultUpgradeAndL2DefaultUpgrade() public {

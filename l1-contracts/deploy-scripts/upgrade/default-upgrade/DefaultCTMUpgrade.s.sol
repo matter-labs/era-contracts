@@ -5,7 +5,6 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -15,7 +14,6 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -44,10 +42,6 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-
-interface IAdminPreV31 {
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
-}
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -277,6 +271,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
     /// @dev Every release refreshes the same CTM-side set, so it lives here; the per-chain upgrade
     ///      contract is release-specific and comes from {deployUsedUpgradeContract}.
     function deployNewCTMContracts() public virtual {
+        // Kept, not redeployed: see {protocol-docs/interop-fee.md#the-switch}.
+        require(
+            ctmAddresses.stateTransition.proxies.interopFeeManager != address(0),
+            "CTM has no L1InteropFeeManager registered; it is expected from v35 on"
+        );
+
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
 
@@ -304,7 +304,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             "PermissionlessValidator"
         );
 
-        // The constructor receives the new BytecodesSupplier and PermissionlessValidator proxy addresses.
+        // The constructor receives the BytecodesSupplier, PermissionlessValidator and interop fee manager proxies.
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
@@ -870,14 +870,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
-        (, uint32 oldProtocolVersionMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(oldProtocolVersion));
-        // Pre-v31 chain diamonds only expose the legacy 2-arg selector; the v31 selector reverts with "F".
-        bytes memory upgradeCallData = oldProtocolVersionMinor < 31
-            ? abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData))
-            : abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
-            );
+        bytes memory upgradeCallData = abi.encodeCall(
+            IAdmin.upgradeChainFromVersion,
+            (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
+        );
 
         calls = new Call[](1);
         calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});
@@ -947,6 +943,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             "state_transition",
             "committer_facet_addr",
             ctmAddresses.stateTransition.facets.committerFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.stateTransition.proxies.interopFeeManager
         );
         vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);

@@ -18,6 +18,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
@@ -301,6 +302,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "MultisigCommitter")) {
             // Same constructor as ValidatorTimelock (it derives from it): the bridgehub immutable.
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
+        } else if (compareStrings(contractName, "L1InteropFeeManager")) {
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else {
             return
                 DeployCTML1OrGateway.getCreationCalldata(
@@ -323,7 +326,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
-                permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator
+                permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator,
+                interopFeeManager: ctmAddresses.stateTransition.proxies.interopFeeManager
             });
     }
 
@@ -355,6 +359,13 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encodeCall(BytecodesSupplier.initialize, ());
         } else if (compareStrings(contractName, "PermissionlessValidator")) {
             return abi.encodeCall(PermissionlessValidator.initialize, ());
+        } else if (compareStrings(contractName, "L1InteropFeeManager")) {
+            // Governance owns the switch from the start, and fees accrue to it until it routes them elsewhere.
+            return
+                abi.encodeCall(
+                    L1InteropFeeManager.initialize,
+                    (ctmAddresses.admin.governance, ctmAddresses.admin.governance)
+                );
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

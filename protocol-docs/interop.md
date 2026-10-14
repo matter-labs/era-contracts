@@ -93,6 +93,8 @@ Every user of interop can choose between two fee options per bundle (via `useFix
 
 Fees are **accumulated per `block.coinbase`** (`accumulatedProtocolFees` / `accumulatedZKFees`) rather than pushed, and later claimed by the coinbase via `claimProtocolFees` / `claimZKFees`. Accumulation (instead of direct transfer) prevents a malicious operator from failing sends by supplying a faulty coinbase, and avoids calls to untrusted contracts during a send.
 
+Separately from these user fees, every call of an L2→L2 bundle counts as one interop fee unit, which governance can charge the chain operator for on L1 when the batch executes. See {protocol-docs/interop-fee.md}.
+
 ## Send flow
 
 Both entry points (`sendMessage` and `sendBundle`, both `whenNotPaused nonReentrant`) funnel through the internal `_sendBundle`, which:

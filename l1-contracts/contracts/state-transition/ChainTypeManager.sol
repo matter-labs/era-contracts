@@ -66,6 +66,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Address of the permissionless validator used in Priority Mode
     address public immutable PERMISSIONLESS_VALIDATOR;
 
+    /// @inheritdoc IChainTypeManager
+    address public immutable L1_INTEROP_FEE_MANAGER;
+
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
@@ -137,12 +140,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         address _bridgehub,
         address _interopCenter,
         address _l1BytecodesSupplier,
-        address _permissionlessValidator
+        address _permissionlessValidator,
+        address _l1InteropFeeManager
     ) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         INTEROP_CENTER = _interopCenter;
         L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
         PERMISSIONLESS_VALIDATOR = _permissionlessValidator;
+        L1_INTEROP_FEE_MANAGER = _l1InteropFeeManager;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

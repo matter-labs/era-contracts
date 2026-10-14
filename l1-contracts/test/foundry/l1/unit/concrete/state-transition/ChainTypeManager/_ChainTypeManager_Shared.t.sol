@@ -119,7 +119,13 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
         newChainAdmin = makeAddr("chainadmin");
 
-        chainTypeManager = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        chainTypeManager = new ChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0),
+            address(0)
+        );
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 
