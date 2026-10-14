@@ -119,7 +119,13 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         chainAssetHandler.setAddresses();
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        chainTypeManager = new ChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0),
+            address(0)
+        );
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -199,7 +205,13 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     // ============================================================
 
     function test_constructor() public {
-        ChainTypeManager ctm = new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
+        ChainTypeManager ctm = new ChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0),
+            address(0)
+        );
         assertEq(ctm.BRIDGE_HUB(), address(bridgehub));
         assertTrue(ctm.isZKsyncOS());
     }

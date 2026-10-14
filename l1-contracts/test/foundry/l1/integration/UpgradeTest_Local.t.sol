@@ -28,7 +28,10 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @notice Test-only variant of the CTM script protocol-ops prepares with by default, skipping the
@@ -93,6 +96,9 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
     address private _serverNotifierProxyAdmin;
     address private _expectedServerNotifierProxyAdminOwner;
     bytes32 private _expectedRewrittenUpgradeTxHash;
+    address private _interopFeeManagerBeforeUpgrade;
+
+    uint256 private constant INTEROP_FEE_DEPOSIT = 1 ether;
 
     /// @notice Override to run the default core script; it needs no memory trimming.
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
@@ -169,6 +175,13 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
         console.log("setUp: Paths configured");
+        // Prepaid interop fees must survive the upgrade, asserted in `test_DefaultUpgradeZKsyncOS_Local`.
+        _interopFeeManagerBeforeUpgrade = addresses.chainTypeManager.L1_INTEROP_FEE_MANAGER();
+        IL1InteropFeeManager(_interopFeeManagerBeforeUpgrade).deposit{value: INTEROP_FEE_DEPOSIT}(
+            eraZKChainId,
+            ETH_TOKEN_ADDRESS,
+            INTEROP_FEE_DEPOSIT
+        );
         setupUpgrade();
         console.log("setUp: Upgrade setup complete");
         _snapshotExpectedZKsyncOSUpgradeTxHash();
@@ -300,6 +313,39 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
             coreUpgrade.getDiscoveredBridgehub().proxies.chainRegistrationSender,
             "Bridgehub does not know the ChainRegistrationSender"
         );
+
+        // The upgraded CTM keeps the interop fee manager it had, with the chains' prepaid balances; the manager ships
+        // switched off, owned by governance and behind the CTM's ProxyAdmin.
+        L1InteropFeeManager interopFeeManager = L1InteropFeeManager(
+            ctmUpgrade.getAddresses().stateTransition.proxies.interopFeeManager
+        );
+        assertEq(
+            address(interopFeeManager),
+            _interopFeeManagerBeforeUpgrade,
+            "Upgrade replaced the interop fee manager"
+        );
+        assertEq(
+            IChainTypeManager(ctm).L1_INTEROP_FEE_MANAGER(),
+            address(interopFeeManager),
+            "CTM points at another interop fee manager"
+        );
+        assertEq(
+            interopFeeManager.chainBalance(eraZKChainId, ETH_TOKEN_ADDRESS),
+            INTEROP_FEE_DEPOSIT,
+            "Prepaid interop fees lost"
+        );
+        address governance = ctmUpgrade.getAddresses().admin.governance;
+        assertEq(interopFeeManager.owner(), governance, "Interop fee manager not owned by governance");
+        assertEq(interopFeeManager.pendingOwner(), address(0), "Interop fee manager has a pending owner");
+        assertEq(
+            Utils.getProxyAdminAddress(address(interopFeeManager)),
+            Utils.getProxyAdminAddress(ctm),
+            "Interop fee manager not behind the CTM's ProxyAdmin"
+        );
+        assertEq(interopFeeManager.feeRecipient(), governance, "Interop fees not swept to governance");
+        assertEq(interopFeeManager.feeToken(), ETH_TOKEN_ADDRESS, "Interop fee not charged in ether");
+        assertEq(interopFeeManager.feePerUnit(), 0, "Interop fee not switched off");
+        assertEq(address(interopFeeManager.BRIDGE_HUB()), bridgehub, "Interop fee manager on another bridgehub");
 
         if (_serverNotifierProxy != address(0)) {
             assertEq(

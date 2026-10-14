@@ -37,11 +37,12 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 ### V35 upgrade
 
 The upgrade that is incoming is v35 (an in-place v34 → v35 upgrade; only ZKsync OS chains are
-supported). It has no release-specific preparation yet, so its per-chain upgrade contract is the
+supported). Its only release-specific preparation is the `L1InteropFeeManager` proxy `CTMUpgrade_v35`
+deploys for the new CTM ({protocol-docs/interop-fee.md#the-switch}), so its per-chain upgrade contract is the
 default:
 
-- DefaultUpgradeZKsyncOS.sol (deployed by `CTMUpgrade_v35`, still the plain `DefaultCTMUpgrade`; a release
-  that needs a per-chain step adds a `V35UpgradeZKsyncOS` extending it and deploys it from `CTMUpgrade_v35`)
+- DefaultUpgradeZKsyncOS.sol (deployed by `CTMUpgrade_v35`; a release that needs a per-chain step adds a
+  `V35UpgradeZKsyncOS` extending it and deploys it from `CTMUpgrade_v35`)
 
 And the corresponding L2 upgrade contract that should be used is the release-agnostic:
 

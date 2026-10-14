@@ -42,21 +42,6 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
-/// @dev Protocol version threshold (packed `major << 32`) at which the Admin
-///      facet's `upgradeChainFromVersion` gained the leading `address _chainAddress`
-///      parameter. Chains still on a version below this expose only the legacy
-///      2-arg signature; calling the v31 variant against them hits the DiamondProxy
-///      fallback and reverts with `"F"`.
-uint256 constant V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD = uint256(31) << 32;
-
-/// @notice Legacy 2-arg Admin interface used when the chain being upgraded is
-///         still on a pre-v31 protocol version (so its Admin facet only has
-///         the old selector). The abi-encoded call produced via this interface
-///         lands on the old facet; the new 3-arg selector would not.
-interface IAdminLegacy {
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
-}
-
 /// @notice Minimal interface for OZ single-step Ownable contracts (e.g. ProxyAdmin).
 ///         Avoids calling `pendingOwner()` (Ownable2Step-only) on plain Ownable.
 interface IOwnableSingleStep {
@@ -699,14 +684,10 @@ contract AdminFunctions is Script, IAdminFunctions {
             currentProtocolVersion
         );
 
-        // Select the Admin facet's `upgradeChainFromVersion` signature that
-        // actually lives on the chain we're about to call. Pre-v31 chains
-        // expose the legacy 2-arg variant; v31+ expose the new 3-arg one that
-        // carries `_chainAddress`. Using the wrong one hits the DiamondProxy
-        // fallback and reverts with `"F"`.
-        bytes memory upgradeCall = currentProtocolVersion < V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD
-            ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
-            : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
+        bytes memory upgradeCall = abi.encodeCall(
+            IAdmin.upgradeChainFromVersion,
+            (_chainAddress, currentProtocolVersion, diamondCut)
+        );
 
         uint256 callCount = 1;
         if (_params.shouldSetDaValidatorPair) {

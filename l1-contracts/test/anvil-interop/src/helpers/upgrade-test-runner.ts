@@ -8,6 +8,9 @@ import { DeploymentRunner } from "../deployment-runner";
 import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
+  EIP1967_ADMIN_SLOT,
+  EIP1967_IMPL_SLOT,
+  ETH_TOKEN_ADDRESS,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_ATTRIBUTE_PARSER_ADDR,
   INTEROP_CENTER_ADDR,
@@ -45,11 +48,6 @@ import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
 // ── Constants ────────────────────────────────────────────────────────
-
-// EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
-const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-// EIP-1967 implementation slot: keccak256("eip1967.proxy.implementation") - 1
-const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 // ContractUpgradeType enum values from IComplexUpgrader.sol
 const UPGRADE_TYPE_ZKOS_SYSTEM_PROXY = 1;
@@ -190,6 +188,8 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
     console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
     await verifyProtocolVersions(l1Provider, upgradeChainAddresses, readGenesisProtocolVersion().toHexString());
     console.log("✅ All protocol versions verified successfully!\n");
+    await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
+    console.log("✅ Upgraded CTM points at the interop fee manager, switched off\n");
   } finally {
     if (cleanupUpgradeHarnessInputs) {
       cleanupUpgradeHarnessInputs();
@@ -1117,6 +1117,37 @@ export async function verifyProtocolVersions(
         `Chain ${chain.chainId}: protocol version ${version.toHexString()}, expected ${expectedVersion.toHexString()}`
       );
     }
+  }
+}
+
+/**
+ * The CTM's interop fee manager must be deployed, on this bridgehub and switched off with ether as the fee token: the
+ * Executor charges through it.
+ */
+export async function verifyInteropFeeManager(
+  provider: ethers.providers.JsonRpcProvider,
+  ctmAddr: string,
+  bridgehubAddr: string
+): Promise<void> {
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), provider);
+  const feeManagerAddr: string = await ctm.L1_INTEROP_FEE_MANAGER();
+  if ((await provider.getCode(feeManagerAddr)) === "0x") {
+    throw new Error(`CTM ${ctmAddr}: no interop fee manager deployed at ${feeManagerAddr}`);
+  }
+  const feeManager = new ethers.Contract(feeManagerAddr, getAbi("L1InteropFeeManager"), provider);
+  const feeManagerBridgehub: string = await feeManager.BRIDGE_HUB();
+  if (feeManagerBridgehub.toLowerCase() !== bridgehubAddr.toLowerCase()) {
+    throw new Error(
+      `Interop fee manager ${feeManagerAddr} is on bridgehub ${feeManagerBridgehub}, expected ${bridgehubAddr}`
+    );
+  }
+  const feePerUnit: ethers.BigNumber = await feeManager.feePerUnit();
+  if (!feePerUnit.isZero()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} is switched on: feePerUnit = ${feePerUnit.toString()}`);
+  }
+  const feeToken: string = await feeManager.feeToken();
+  if (feeToken.toLowerCase() !== ETH_TOKEN_ADDRESS.toLowerCase()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} charges in ${feeToken}, expected ether`);
   }
 }
 

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {UpgradeUtils} from "deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
-import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "deploy-scripts/utils/Types.sol";
+import {ProtocolVersionFeatures} from "deploy-scripts/utils/ProtocolVersionFeatures.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
@@ -69,11 +69,11 @@ contract UpgradeUtilsResolveTestnetVerifierTest is Test {
     }
 
     function _flagVersionCTM(address _verifier) internal returns (IChainTypeManager) {
-        return _ctmWith(FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG, _verifier);
+        return _ctmWith(ProtocolVersionFeatures.VERIFIER_TESTNET_FLAG, _verifier);
     }
 
     function _preFlagVersionCTM(address _verifier) internal returns (IChainTypeManager) {
-        return _ctmWith(FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG - 1, _verifier);
+        return _ctmWith(ProtocolVersionFeatures.VERIFIER_TESTNET_FLAG - 1, _verifier);
     }
 
     function test_flagVersionProductionVerifier_resolvesFalse() public {

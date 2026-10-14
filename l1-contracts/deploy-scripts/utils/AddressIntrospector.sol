@@ -33,32 +33,11 @@ import {
     BridgesDeployedAddresses,
     BridgeContracts,
     CTMDeployedAddresses,
-    CTMAdminAddresses,
-    L1SpecificStateTransitionAddresses
+    CTMAdminAddresses
 } from "./Types.sol";
+import {ProtocolVersionFeatures} from "./ProtocolVersionFeatures.sol";
 import {StateTransitionContracts, Verifiers, Facets} from "contracts/common/StateTransitionTypes.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
-
-/// @dev `getDAValidatorPair()`'s second return value changed meaning when
-/// `ZKChainStorage.l2DAValidator` (an address) was replaced by the packed
-/// `l2DACommitmentScheme` enum: the getter went from returning `s.l2DAValidator` to
-/// returning `s.l2DACommitmentScheme`. Declaring the second value as `uint256` lets both
-/// layouts decode without reverting, so the caller can interpret it by release instead of
-/// having the ABI decoder reject a live chain's real answer.
-interface IZKChainDAValidatorPairRaw {
-    function getDAValidatorPair() external view returns (address l1DAValidator, uint256 l2Value);
-}
-
-/// @dev The per-chain migration onto `l2DACommitmentScheme` happens at a different release
-/// for each CTM flavour, so one boundary cannot describe both:
-///   * ZKsync-OS chains are migrated by `L1ZKsyncOSV30Upgrade`, at v30;
-///   * Era chains by `SettlementLayerV31UpgradeBase` (under `if (!s.zksyncOS)`), at v31.
-/// Below its own boundary a chain still answers with an `l2DAValidator` address and has no
-/// scheme at all. The chain cannot be asked which flavour it is — `getZKsyncOS()` was
-/// introduced in v31 and reverts on every earlier diamond, as does `ctm.isZKsyncOS()` — so
-/// v30, the one release where the two disagree, is resolved from the value itself.
-uint256 constant ZKSYNC_OS_L2_DA_SCHEME_MINOR = 30;
-uint256 constant ERA_L2_DA_SCHEME_MINOR = 31;
 
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
@@ -191,14 +170,16 @@ library AddressIntrospector {
                 serverNotifier: ctm.serverNotifierAddress(),
                 validatorTimelock: validatorTimelock,
                 bytecodesSupplier: bytecodesSupplier,
-                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
+                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR(),
+                interopFeeManager: _getInteropFeeManager(ctm)
             }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(ctmAddr),
                 serverNotifier: address(0),
                 validatorTimelock: address(0),
                 bytecodesSupplier: address(0),
-                permissionlessValidator: address(0)
+                permissionlessValidator: address(0),
+                interopFeeManager: address(0)
             }),
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
@@ -206,7 +187,6 @@ library AddressIntrospector {
             defaultUpgrade: ctm.defaultUpgrade(),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(ctmAddr)
         });
-        info.l1Specific = L1SpecificStateTransitionAddresses({legacyValidatorTimelock: ctm.validatorTimelock()});
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),
             governance: IOwnable(ctmAddr).owner(),
@@ -228,24 +208,7 @@ library AddressIntrospector {
         IL1Bridgehub _bridgehub
     ) public view returns (ZkChainAddresses memory info) {
         uint256 chainId = _zkChain.getChainId();
-        address l1DAValidator = address(0);
-        L2DACommitmentScheme l2DAValidatorScheme = L2DACommitmentScheme.NONE;
-
-        (, uint256 minor, ) = _zkChain.getSemverProtocolVersion();
-        if (minor >= ZKSYNC_OS_L2_DA_SCHEME_MINOR) {
-            // `l1DAValidator` is the first return value in both layouts; only the second
-            // one moved, so read it raw and interpret it.
-            uint256 l2Value;
-            (l1DAValidator, l2Value) = IZKChainDAValidatorPairRaw(address(_zkChain)).getDAValidatorPair();
-            l2DAValidatorScheme = l2DACommitmentSchemeFromRaw(minor, l2Value);
-        } else {
-            (bool ok, bytes memory data) = address(_zkChain).staticcall(
-                abi.encodeWithSignature("getDAValidatorPair()")
-            );
-            if (ok && data.length >= 32) {
-                (l1DAValidator, ) = abi.decode(data, (address, address));
-            }
-        }
+        (address l1DAValidator, L2DACommitmentScheme l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
 
         IL1Bridgehub bridgehub = address(_bridgehub) == address(0) ? IL1Bridgehub(_zkChain.getBridgehub()) : _bridgehub;
 
@@ -306,26 +269,6 @@ library AddressIntrospector {
         return zkChains[0];
     }
 
-    /// @notice Interpret the second value of `getDAValidatorPair()` for a chain at protocol
-    /// version minor `_minor`.
-    /// @dev From `ERA_L2_DA_SCHEME_MINOR` on, every flavour has migrated, so the value is the
-    /// scheme; an out-of-range value there means corrupt storage and the conversion reverts,
-    /// which is what we want. At `ZKSYNC_OS_L2_DA_SCHEME_MINOR` the flavours disagree: a
-    /// ZKsync-OS chain reports a scheme, an Era chain still reports its `l2DAValidator`
-    /// address. Those are separated by magnitude — a scheme is at most
-    /// `type(L2DACommitmentScheme).max`, an address that low would have to be a precompile.
-    /// An un-migrated chain has no scheme, so it is reported as `NONE`, which is also the
-    /// value its v31 upgrade will write before the chain admin sets the pair again.
-    function l2DACommitmentSchemeFromRaw(
-        uint256 _minor,
-        uint256 _l2Value
-    ) internal pure returns (L2DACommitmentScheme) {
-        if (_minor >= ERA_L2_DA_SCHEME_MINOR || _l2Value <= uint256(type(L2DACommitmentScheme).max)) {
-            return L2DACommitmentScheme(_l2Value);
-        }
-        return L2DACommitmentScheme.NONE;
-    }
-
     function getZkChainFacetAddresses(IZKChain _zkChain) public view returns (address[] memory) {
         return _zkChain.facetAddresses();
     }
@@ -379,6 +322,16 @@ library AddressIntrospector {
             }
         }
         return address(0);
+    }
+
+    /// @notice Returns the CTM's interop fee manager, so that a later release keeps the manager holding the chains'
+    /// prepaid balances; zero before the release that introduced it.
+    /// @param _ctm The CTM being introspected.
+    function _getInteropFeeManager(ChainTypeManager _ctm) internal view returns (address) {
+        if (!ProtocolVersionFeatures.has(_ctm.protocolVersion(), ProtocolVersionFeatures.CTM_INTEROP_FEE_MANAGER)) {
+            return address(0);
+        }
+        return _ctm.L1_INTEROP_FEE_MANAGER();
     }
 
     function _getVerifierFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (address) {

@@ -54,22 +54,10 @@ contract DefaultChainUpgrade is Script {
     }
 
     function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public {
-        // Chains on protocol version < v31 use the old 2-param upgradeChainFromVersion(uint256, DiamondCutData).
-        // The 3-param version with the leading address was introduced in v31.
-        uint256 oldMinor = (config.oldProtocolVersion >> 32) & 0xFFFF;
-        bytes memory callData;
-        if (oldMinor < 31) {
-            callData = abi.encodeWithSelector(
-                bytes4(0xfc57565f), // upgradeChainFromVersion(uint256,DiamondCutData)
-                config.oldProtocolVersion,
-                diamondCutData
-            );
-        } else {
-            callData = abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
-            );
-        }
+        bytes memory callData = abi.encodeCall(
+            IAdmin.upgradeChainFromVersion,
+            (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
+        );
 
         Utils.adminExecute({
             _admin: IZKChain(config.chainDiamondProxyAddress).getAdmin(),

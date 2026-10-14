@@ -370,7 +370,8 @@ contract BatchDecoderTest is Test {
                 chainId: TEST_CHAIN_ID,
                 operatorDAInput: "",
                 slChainId: 1,
-                chainConfigHash: keccak256("config")
+                chainConfigHash: keccak256("config"),
+                interopFeeUnits: 0
             });
     }
 }

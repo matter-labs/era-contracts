@@ -42,6 +42,7 @@ export interface CTMDeployedAddresses {
   verifier: string;
   validiumL1DAValidator: string;
   rollupL1DAValidator: string;
+  interopFeeManager: string;
 }
 
 export interface ChainConfig {

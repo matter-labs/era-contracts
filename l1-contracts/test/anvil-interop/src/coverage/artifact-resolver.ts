@@ -19,6 +19,7 @@ import * as path from "path";
 import type { providers } from "ethers";
 import type { ContractSourceMap } from "./source-map-decoder";
 import { loadContractSourceMap } from "./source-map-decoder";
+import { EIP1967_IMPL_SLOT } from "../core/const";
 import { createProvider } from "../core/utils";
 
 export interface ResolvedContract {
@@ -27,11 +28,6 @@ export interface ResolvedContract {
   artifactPath: string;
   sourceMap: ContractSourceMap;
 }
-
-/**
- * ERC-1967 implementation storage slot.
- */
-const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 /**
  * Scans the Forge output directory for all contract artifacts.
