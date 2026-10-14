@@ -119,8 +119,7 @@ test("applyPortOffset publishes any resolved offset, including non-zero", () => 
   }
 });
 
-// Two runs a partial span apart share ports: base 0 and base 500 both allocate 500..900, and the
-// later run's startChain kills the earlier run's Anvil processes.
+// Runs a partial span apart share ports, see RUN_PORT_SPAN.
 test("rejects a base offset that would overlap another run", () => {
   for (const base of [PORT_OFFSET_PER_WORKER, 500, RUN_PORT_SPAN / 2, RUN_PORT_SPAN - 500]) {
     assert.throws(() => assertDisjointPortRange(base, 10), OVERLAPPING_SPAN, String(base));

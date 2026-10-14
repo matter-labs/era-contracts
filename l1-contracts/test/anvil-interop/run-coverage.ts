@@ -66,8 +66,8 @@ const totalStart = Date.now();
 export const PORT_OFFSET_PER_WORKER = 100;
 
 /**
- * Ports a run reserves. Bases must be multiples of this: base 0 and base 500 both allocate 500-900,
- * and the later run's `startChain` would kill the earlier run's Anvil processes.
+ * Ports a run reserves. Bases must be multiples of this: a run at 500 would allocate the ports of shards
+ * 6 to 20 of a run at 0, and the later run's `startChain` would kill the earlier run's Anvil processes.
  */
 export const RUN_PORT_SPAN = 2000;
 export const MAX_SHARDS_PER_RUN = RUN_PORT_SPAN / PORT_OFFSET_PER_WORKER;
