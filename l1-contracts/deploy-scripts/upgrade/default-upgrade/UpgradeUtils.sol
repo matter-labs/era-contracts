@@ -2,11 +2,9 @@
 pragma solidity 0.8.28;
 
 import {Call} from "contracts/governance/Common.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
-import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "../../utils/Types.sol";
+import {ProtocolVersionFeatures} from "../../utils/ProtocolVersionFeatures.sol";
 
 /// @dev Getter that v32/v33 testnet verifiers exported as a public constant; pre-v34 production
 /// verifiers don't have it.
@@ -29,8 +27,7 @@ library UpgradeUtils {
         uint256 packedProtocolVersion = _ctm.protocolVersion();
         address verifier = _ctm.protocolVersionVerifier(packedProtocolVersion);
         require(verifier != address(0), "verifier not set for the current protocol version");
-        (, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(packedProtocolVersion));
-        if (minor >= FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG) {
+        if (ProtocolVersionFeatures.has(packedProtocolVersion, ProtocolVersionFeatures.VERIFIER_TESTNET_FLAG)) {
             return IZKsyncOSVerifier(verifier).isTestnetVerifier();
         }
         require(verifier.code.length != 0, "verifier has no code");

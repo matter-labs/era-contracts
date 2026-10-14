@@ -317,7 +317,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
         // The upgraded CTM keeps the interop fee manager it had, with the chains' prepaid balances; the manager ships
         // switched off, owned by governance and behind the CTM's ProxyAdmin.
         L1InteropFeeManager interopFeeManager = L1InteropFeeManager(
-            ctmUpgrade.getAddresses().l1Specific.interopFeeManager
+            ctmUpgrade.getAddresses().stateTransition.proxies.interopFeeManager
         );
         assertEq(
             address(interopFeeManager),

@@ -56,7 +56,7 @@ reverted batch with the same number.
 
 ## The switch
 
-`DeployCTM` deploys an `L1InteropFeeManager` proxy with the CTM, as does the CTM upgrade that introduces it; later
+`DeployCTM` deploys an `L1InteropFeeManager` proxy with the CTM, as does the v35 CTM upgrade (`CTMUpgrade_v35`); later
 upgrades keep the one the current CTM points at, which holds the chains' prepaid balances. The CTM takes it as an
 immutable, `L1_INTEROP_FEE_MANAGER()`, from v35 on. Its owner is protocol governance from initialization, and controls:
 

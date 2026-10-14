@@ -327,7 +327,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator,
-                interopFeeManager: ctmAddresses.l1Specific.interopFeeManager
+                interopFeeManager: ctmAddresses.stateTransition.proxies.interopFeeManager
             });
     }
 

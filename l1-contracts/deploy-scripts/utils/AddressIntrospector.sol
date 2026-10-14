@@ -24,8 +24,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     CoreDeployedAddresses,
     BridgehubAddresses,
@@ -35,10 +33,9 @@ import {
     BridgesDeployedAddresses,
     BridgeContracts,
     CTMDeployedAddresses,
-    CTMAdminAddresses,
-    L1SpecificStateTransitionAddresses,
-    FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE
+    CTMAdminAddresses
 } from "./Types.sol";
+import {ProtocolVersionFeatures} from "./ProtocolVersionFeatures.sol";
 import {StateTransitionContracts, Verifiers, Facets} from "contracts/common/StateTransitionTypes.sol";
 import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
@@ -173,24 +170,22 @@ library AddressIntrospector {
                 serverNotifier: ctm.serverNotifierAddress(),
                 validatorTimelock: validatorTimelock,
                 bytecodesSupplier: bytecodesSupplier,
-                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
+                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR(),
+                interopFeeManager: _getInteropFeeManager(ctm)
             }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(ctmAddr),
                 serverNotifier: address(0),
                 validatorTimelock: address(0),
                 bytecodesSupplier: address(0),
-                permissionlessValidator: address(0)
+                permissionlessValidator: address(0),
+                interopFeeManager: address(0)
             }),
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
             defaultUpgrade: ctm.defaultUpgrade(),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(ctmAddr)
-        });
-        info.l1Specific = L1SpecificStateTransitionAddresses({
-            legacyValidatorTimelock: ctm.validatorTimelock(),
-            interopFeeManager: _getInteropFeeManager(ctm)
         });
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(ctmAddr),
@@ -216,8 +211,12 @@ library AddressIntrospector {
         address l1DAValidator = address(0);
         L2DACommitmentScheme l2DAValidatorScheme = L2DACommitmentScheme.NONE;
 
-        (, uint256 minor, ) = _zkChain.getSemverProtocolVersion();
-        if (minor > 29) {
+        if (
+            ProtocolVersionFeatures.has(
+                _zkChain.getProtocolVersion(),
+                ProtocolVersionFeatures.DA_VALIDATOR_PAIR_WITH_COMMITMENT_SCHEME
+            )
+        ) {
             (l1DAValidator, l2DAValidatorScheme) = _zkChain.getDAValidatorPair();
         } else {
             (bool ok, bytes memory data) = address(_zkChain).staticcall(
@@ -346,8 +345,7 @@ library AddressIntrospector {
     /// prepaid balances; zero before the release that introduced it.
     /// @param _ctm The CTM being introspected.
     function _getInteropFeeManager(ChainTypeManager _ctm) internal view returns (address) {
-        (, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(_ctm.protocolVersion()));
-        if (minor < FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE) {
+        if (!ProtocolVersionFeatures.has(_ctm.protocolVersion(), ProtocolVersionFeatures.CTM_INTEROP_FEE_MANAGER)) {
             return address(0);
         }
         return _ctm.L1_INTEROP_FEE_MANAGER();

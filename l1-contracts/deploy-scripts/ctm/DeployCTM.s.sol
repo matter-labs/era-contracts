@@ -172,7 +172,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         // The CTM takes the fee manager as an immutable, so it has to exist first.
-        (, ctmAddresses.l1Specific.interopFeeManager) = deployTuppWithContract("L1InteropFeeManager");
+        (
+            ctmAddresses.stateTransition.implementations.interopFeeManager,
+            ctmAddresses.stateTransition.proxies.interopFeeManager
+        ) = deployTuppWithContract("L1InteropFeeManager");
 
         deployStateTransitionDiamondFacets();
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
@@ -399,7 +402,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress(
             "state_transition",
             "interop_fee_manager_proxy_addr",
-            ctmAddresses.l1Specific.interopFeeManager
+            ctmAddresses.stateTransition.proxies.interopFeeManager
         );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

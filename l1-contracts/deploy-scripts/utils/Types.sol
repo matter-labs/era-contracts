@@ -4,14 +4,6 @@ pragma solidity ^0.8.10;
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {StateTransitionDeployedAddresses, DAContracts} from "contracts/common/StateTransitionTypes.sol";
 
-/// @dev First protocol version whose production verifier exports the testnet-verifier flag
-/// (`isTestnetVerifier()`). Earlier production verifiers export no flag; v31/v32/v33 testnet
-/// verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
-uint32 constant FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG = 34;
-
-/// @dev First protocol version whose CTM exposes the L1 interop fee manager (`L1_INTEROP_FEE_MANAGER()`).
-uint32 constant FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE = 35;
-
 struct BridgehubContracts {
     address bridgehub;
     address messageRoot;
@@ -83,12 +75,6 @@ struct DataAvailabilityDeployedAddresses {
     address l1BlobsDAValidatorZKsyncOS;
 }
 
-/// @notice L1-specific state transition addresses that are not used in the Gateway context.
-struct L1SpecificStateTransitionAddresses {
-    address legacyValidatorTimelock;
-    address interopFeeManager;
-}
-
 struct CTMAdminAddresses {
     address transparentProxyAdmin;
     address governance;
@@ -108,7 +94,6 @@ struct MultiProofAddresses {
 
 struct CTMDeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
-    L1SpecificStateTransitionAddresses l1Specific;
     DataAvailabilityDeployedAddresses daAddresses;
     CTMAdminAddresses admin;
     address chainAdmin;

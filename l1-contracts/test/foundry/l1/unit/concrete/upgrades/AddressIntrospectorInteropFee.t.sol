@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {AddressIntrospector} from "deploy-scripts/utils/AddressIntrospector.sol";
-import {FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE} from "deploy-scripts/utils/Types.sol";
+import {ProtocolVersionFeatures} from "deploy-scripts/utils/ProtocolVersionFeatures.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -24,17 +24,17 @@ contract AddressIntrospectorInteropFeeTest is Test {
     }
 
     function test_reusesTheManagerOfTheCTM() public {
-        _mockProtocolVersion(ctm, FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE);
+        _mockProtocolVersion(ctm, ProtocolVersionFeatures.CTM_INTEROP_FEE_MANAGER);
         assertEq(AddressIntrospector._getInteropFeeManager(ctm), manager);
 
-        _mockProtocolVersion(ctm, FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE + 1);
+        _mockProtocolVersion(ctm, ProtocolVersionFeatures.CTM_INTEROP_FEE_MANAGER + 1);
         assertEq(AddressIntrospector._getInteropFeeManager(ctm), manager);
     }
 
     /// @dev Older CTMs have no getter: the legacy CTM here has no code, so calling it would revert.
     function test_noManagerBeforeTheReleaseThatIntroducedIt() public {
         ChainTypeManager legacyCtm = ChainTypeManager(makeAddr("legacyCtm"));
-        _mockProtocolVersion(legacyCtm, FIRST_PROTOCOL_VERSION_WITH_INTEROP_FEE - 1);
+        _mockProtocolVersion(legacyCtm, ProtocolVersionFeatures.CTM_INTEROP_FEE_MANAGER - 1);
         assertEq(AddressIntrospector._getInteropFeeManager(legacyCtm), address(0));
     }
 

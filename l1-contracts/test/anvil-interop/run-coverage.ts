@@ -63,14 +63,14 @@ export function singleRunCoverageDir(basePortOffset: number): string {
 const totalStart = Date.now();
 
 /** Ports are spaced this far apart so each worker's 6 chains never collide. */
-const PORT_OFFSET_PER_WORKER = 100;
+export const PORT_OFFSET_PER_WORKER = 100;
 
 /**
  * Ports a run reserves. Bases must be multiples of this: base 0 and base 500 both allocate 500-900,
  * and the later run's `startChain` would kill the earlier run's Anvil processes.
  */
-const RUN_PORT_SPAN = 2000;
-const MAX_SHARDS_PER_RUN = RUN_PORT_SPAN / PORT_OFFSET_PER_WORKER;
+export const RUN_PORT_SPAN = 2000;
+export const MAX_SHARDS_PER_RUN = RUN_PORT_SPAN / PORT_OFFSET_PER_WORKER;
 
 /** Throws unless a run at this base cannot overlap a run at any other permitted base. */
 export function assertDisjointPortRange(basePortOffset: number, shardCount: number): void {
