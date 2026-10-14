@@ -357,6 +357,18 @@ impl EnvConfig {
     pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
     }
+
+    /// The env's `zk_token_asset_id`, which a named env must declare: there is no canonical
+    /// network-wide value to fall back to.
+    pub fn require_zk_token_asset_id(&self) -> anyhow::Result<B256> {
+        self.zk_token_asset_id().ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} is missing top-level `zk_token_asset_id`; a named env must declare it, since \
+                 there is no canonical network-wide value",
+                self.permanent_values_path.display()
+            )
+        })
+    }
 }
 
 fn parse_upgrade_input(content: &str) -> UpgradeInputs {
@@ -600,6 +612,54 @@ mod tests {
             saw_mainnet |= env == "mainnet";
         }
         assert!(saw_mainnet, "no mainnet permanent values");
+    }
+
+    /// Every env declares a non-zero `zk_token_asset_id`: the prepare pins it in every release's
+    /// force deployments, and `verify-bootstrap --env` holds those against it.
+    #[test]
+    fn every_env_declares_a_zk_token_asset_id() {
+        let dir = resolve_l1_contracts_path()
+            .unwrap()
+            .join(PERMANENT_VALUES_DIR);
+        let mut envs = 0;
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+            let env = path.file_stem().unwrap().to_str().unwrap();
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
+            let zk_token_asset_id = cfg
+                .require_zk_token_asset_id()
+                .unwrap_or_else(|e| panic!("{e}"));
+            assert_ne!(zk_token_asset_id, B256::ZERO, "{env}");
+            envs += 1;
+        }
+        assert!(envs > 0, "no permanent values in {}", dir.display());
+    }
+
+    /// An env without `zk_token_asset_id` names the file and the key it lacks.
+    #[test]
+    fn a_missing_zk_token_asset_id_names_the_file_and_the_key() {
+        let permanent_values_path = PathBuf::from("upgrade-envs/permanent-values/scratch.toml");
+        let cfg = EnvConfig {
+            env: "scratch".to_string(),
+            permanent_values_path: permanent_values_path.clone(),
+            upgrade_input_path: PathBuf::from("scratch.toml"),
+            permanent: toml::from_str(
+                "[core_contracts]\n\
+                 bridgehub_proxy_addr = \"0x0000000000000000000000000000000000000001\"\n",
+            )
+            .unwrap(),
+            upgrade_input: None,
+            upgrade_env_dir: PathBuf::new(),
+        };
+        let message = cfg.require_zk_token_asset_id().unwrap_err().to_string();
+        assert!(
+            message.contains(&permanent_values_path.display().to_string()),
+            "{message}"
+        );
+        assert!(message.contains("`zk_token_asset_id`"), "{message}");
     }
 
     #[test]

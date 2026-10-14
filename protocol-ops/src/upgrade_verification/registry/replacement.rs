@@ -184,7 +184,6 @@ pub(crate) async fn verify<P: Provider>(
                     ctm_proxy_admin: package.reported_ctm_proxy_admin,
                     records: package.executor_records.clone(),
                 },
-                salts,
                 &mut reviewed,
             )
             .await?;

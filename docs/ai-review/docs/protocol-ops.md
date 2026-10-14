@@ -45,17 +45,18 @@ from calldata:
   `docs/registry-driven-upgrades.md`). Each object's address is re-derived from the reviewed
   creation code and the arguments it was constructed with, and compared with the address the
   package uses. For a write-once object the arguments are the manifest it serves; for the
-  lifecycle objects (the coordinator, both domain executors, the timer) and the bootstrap sequence
-  they are the original constructor arguments the package records (otherwise the reviewed
-  values), never the object's own getters. The current owner, nomination and coordinator are
-  checked separately against the reviewed governance and bindings. The creation-code bytes come
-  from the local build (`l1-contracts/out`, so the reviewed commit must be built), held against the
-  committed `evmBytecodeHash`. The salts are per prepare leg and come from `--create2-salt` (a
+  coordinator and both domain executors they are the original constructor arguments their records
+  state, and for the timer and the bootstrap sequence the reviewed values — never the object's own
+  getters. The current owner, nomination and coordinator are checked separately against the
+  reviewed governance and bindings. The creation-code bytes come from the local build
+  (`l1-contracts/out`, so the reviewed commit must be built), held against the committed
+  `evmBytecodeHash`. The salts are per prepare leg and come from `--create2-salt` (a
   package records none); with no salt the check cannot run, and that is an ERROR rather than a
   silent pass. An executor is re-derived from its `[upgrade_executors]` record — salt and ORIGINAL
   constructor arguments, written by the run that deployed it (`ecosystem init`, `ctm init` or the
   bootstrap prepares) and read from the package or `--executor-record` — so one whose owner or
-  coordinator moved since still verifies; without a record, from the current reviewed values.
+  coordinator moved since still verifies. The record is mandatory: an executor without one is
+  unverified, which is an error.
 - **Object provenance** — for the objects without constructor-set immutables, the code at each
   address, looked up in `AllContractsHashes.json`. Code attributable to a _different_ contract is
   an ERROR, and so is code attributable to NO contract: the reviewer cannot say what is deployed
@@ -72,9 +73,8 @@ from calldata:
 - **Bound authority** — the coordinator, both domain executors, the CTM and both ProxyAdmins,
   and the governance owner the whole lifecycle answers to, with no ownership nomination
   outstanding on any of them. The reviewed owner is what the executors' current ownership is
-  checked against (and their construction, where the package records no constructor arguments),
-  so for a recurring package `--expected-governance-owner` is not optional: without it every
-  executor is unverifiable, which is an error.
+  checked against, so for a recurring package `--expected-governance-owner` is not optional:
+  without it that ownership is unverifiable, which is an error.
 - **Departing state** — the version and release edge against live, and every proxy row's
   `expectedOldImpl` against the implementation actually live behind that proxy, read through the
   domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. For a bootstrap, every
@@ -84,10 +84,10 @@ from calldata:
   reviewed commit's genesis config (`configs/genesis/zksync-os/latest.json`), its index against
   zero, and every field of its force-deployments data against an independent expectation: the L1
   chain id, the live Bridgehub's asset router, chain cap and (aliased) chain-registration sender,
-  the aliased reviewed governance, the reviewed ZK token asset id (`--zk-token-asset-id`), zero for
-  the legacy fields, and the release's own table for the bytecode fields; the package's
-  `force_deployments_data` remains a cross-check. A replacement lands on an existing release and is
-  exempt.
+  the aliased reviewed governance, the reviewed ZK token asset id (the `zk_token_asset_id` of the
+  `--env` permanent values; without `--env` the run stops), zero for the legacy fields, and the
+  release's own table for the bytecode fields; the package's `force_deployments_data` remains a
+  cross-check. A replacement lands on an existing release and is exempt.
 - **Readiness**, reported apart from anything about value: the transition's L2 factory
   dependencies published on the CTM's supplier, the timer startable, no lifecycle in flight.
 
@@ -114,7 +114,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <out>/prepare/ecosystem.toml \
   --l1-rpc-url $L1_RPC \
   --expected-governance-owner 0x... \
-  --zk-token-asset-id 0x... \
+  --env <env> \
   --executor-record <the package or init output that deployed the executors> \
   --create2-salt 0x...
 ```

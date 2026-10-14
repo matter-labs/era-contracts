@@ -17,10 +17,11 @@
 //! # What it asks
 //!
 //!   1. Was every object PRODUCED by the reviewed code's constructor from its reviewed
-//!      arguments? ([`construction`]) — the manifest a write-once object serves, or the reviewed
-//!      owner and bindings a lifecycle object ([`lifecycle`]) or the bootstrap sequence was built
-//!      over. The question a runtime codehash cannot answer, and the reason the chain no longer
-//!      pretends to answer it. Every object a package names gets this check, on both paths.
+//!      arguments? ([`construction`]) — the manifest a write-once object serves, an executor's
+//!      deploy-time record ([`lifecycle`]), or the reviewed owner and bindings the timer or the
+//!      bootstrap sequence was built over. The question a runtime codehash cannot answer, and
+//!      the reason the chain no longer pretends to answer it. Every object a package names gets
+//!      this check, on both paths.
 //!   2. Does every immutable-free object run the code the reviewed commit produces?
 //!      ([`provenance`]) — the objects that set immutables cannot hash to any artifact, and
 //!      question 1 is the whole of their identity.
@@ -38,9 +39,9 @@
 //! None of it is "does an object's own fingerprint of a member match that member's code": the
 //! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
 //! Every comparison here is against the reviewed commit, the reviewed inputs, or live state the
-//! package does not control — and a construction is re-derived from the REVIEWED values, never
-//! from what the object answers (a genuine executor built for an attacker's owner answers
-//! every getter like the reviewed one).
+//! package does not control — and a construction is re-derived from the REVIEWED values or the
+//! deploying run's record, never from what the object answers (a genuine executor built for an
+//! attacker's owner answers every getter like the reviewed one).
 //!
 //! # What it deliberately does not do
 //!
@@ -53,6 +54,7 @@
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 
+use crate::common::env_config::EnvConfig;
 use crate::common::ethereum::get_provider;
 use crate::upgrade_verification::report::VerificationResult;
 
@@ -83,15 +85,16 @@ use views::CommittedUpgradeView;
 /// `expected_governance_owner` is the reviewed address the upgrade must be driven by. For a
 /// bootstrap that is the owner the CTM domain lands on permanently; otherwise it is the owner of
 /// the whole lifecycle. `executor_records` are files whose `[upgrade_executors]` records add to
-/// the package's own ([`records`]); `zk_token_asset_id` is the reviewed value an installed
-/// release's force deployments are held against ([`genesis`]).
+/// the package's own ([`records`]). `env` names the upgrade env whose permanent values hold the
+/// reviewed ZK token asset id an installed release's force deployments are held against
+/// ([`genesis`]); a replacement installs no release and does not need it.
 pub(crate) async fn verify(
     ecosystem_toml: &std::path::Path,
     l1_rpc_url: &str,
     expected_governance_owner: Option<Address>,
     extra_create2_salts: &[B256],
     executor_records: &[std::path::PathBuf],
-    zk_token_asset_id: Option<B256>,
+    env: Option<&str>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     let provider = get_provider(l1_rpc_url)?;
@@ -125,6 +128,7 @@ pub(crate) async fn verify(
             .await
         }
         RegistryPackage::Operation(package) => {
+            let zk_token_asset_id = reviewed_zk_token_asset_id(env)?;
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
@@ -144,6 +148,7 @@ pub(crate) async fn verify(
             .await
         }
         RegistryPackage::Bootstrap(package) => {
+            let zk_token_asset_id = reviewed_zk_token_asset_id(env)?;
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
@@ -163,6 +168,19 @@ pub(crate) async fn verify(
             .await
         }
     }
+}
+
+/// The ZK token asset id `env`'s reviewed permanent values declare. Required on the paths that
+/// install a release, so a missing env or key stops the run before anything is verified.
+fn reviewed_zk_token_asset_id(env: Option<&str>) -> anyhow::Result<B256> {
+    let env = env.ok_or_else(|| {
+        anyhow::anyhow!(
+            "this package installs a release whose force deployments pin the ZK token asset id: \
+             pass --env <name> to hold it against that upgrade env's permanent-values \
+             `zk_token_asset_id`"
+        )
+    })?;
+    EnvConfig::load(env)?.require_zk_token_asset_id()
 }
 
 /// The reviewed salts: whatever the package recorded, plus whatever the reviewer supplied,
@@ -238,6 +256,20 @@ mod tests {
         assert_eq!(merge_salts(&[a, b], &[b, a]), vec![a, b]);
         assert_eq!(merge_salts(&[], &[a]), vec![a]);
         assert!(merge_salts(&[], &[]).is_empty());
+    }
+
+    /// The paths that install a release cannot run without the env the ZK token is read from.
+    #[test]
+    fn the_reviewed_zk_token_asset_id_requires_an_env() {
+        let message = reviewed_zk_token_asset_id(None).unwrap_err().to_string();
+        assert!(message.contains("--env"), "{message}");
+
+        let stage = EnvConfig::load("stage").unwrap();
+        assert_eq!(
+            reviewed_zk_token_asset_id(Some("stage")).unwrap(),
+            stage.require_zk_token_asset_id().unwrap()
+        );
+        assert!(reviewed_zk_token_asset_id(Some("no-such-env")).is_err());
     }
 
     #[test]

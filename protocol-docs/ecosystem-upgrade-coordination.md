@@ -185,7 +185,10 @@ state before the vote.
 
 ## Future multi-CTM extension
 
-Multi-CTM participation is deliberately absent from this version. Restore it at these boundaries:
+Multi-CTM participation is deliberately absent from this version, so an ecosystem has exactly one
+CTM: registering a second one reverts with `CoordinatorCTMMismatch`, because registration binds the
+new CTM's executor on the coordinator (`setCTMExecutor`), which accepts only a successor governing
+the CTM already bound. Restore it at these boundaries:
 
 1. Change `OperationManifest.ctmTransition` and `ctmInfrastructure` into an ordered list of explicit
    CTM participation records (each CTM's rows beside its own transition), and update

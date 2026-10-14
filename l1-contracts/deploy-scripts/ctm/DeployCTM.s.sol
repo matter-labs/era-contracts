@@ -557,10 +557,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.writeToml(toml, outputPath);
     }
 
+    /// @dev Pins the ECOSYSTEM governance (the one the CTM executor is nominated to), not
+    ///      `ctmAddresses.admin.governance`: without `reuseGovAndAdmin` the latter is the CTM's own.
     function prepareForceDeploymentsData() internal returns (bytes memory) {
-        require(ctmAddresses.admin.governance != address(0), "Governance address is not set");
+        address governance = _coordinatorGovernance(_ecosystemCoordinator());
+        require(governance != address(0), "the coordinator has no governance");
 
-        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(ctmAddresses.admin.governance);
+        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(governance);
 
         return abi.encode(data);
     }

@@ -860,15 +860,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     let bridgehub = args.topology.resolve()?;
     let zk_token_asset_id = match env_cfg.as_ref() {
-        Some(cfg) => cfg.zk_token_asset_id().ok_or_else(|| {
-            anyhow::anyhow!(
-                "permanent-values/{}.toml is missing top-level `zk_token_asset_id`; \
-                 named envs must define it explicitly because there is no canonical network-wide value",
-                cfg.env
-            )
-        })?,
-        None => crate::types::L1Network::from_l1_rpc(&args.shared.l1_rpc_url)?
-            .zk_token_asset_id()?,
+        Some(cfg) => cfg.require_zk_token_asset_id()?,
+        None => {
+            crate::types::L1Network::from_l1_rpc(&args.shared.l1_rpc_url)?.zk_token_asset_id()?
+        }
     };
     // Declared per environment: true everywhere except mainnet. Required rather than defaulted —
     // guessing it wrong installs a verifier that accepts unproven batches.

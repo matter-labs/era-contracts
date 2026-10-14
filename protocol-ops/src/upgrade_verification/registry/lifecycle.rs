@@ -8,20 +8,17 @@
 //! executor built for an attacker's owner answers every getter like the reviewed one. The getters
 //! ARE read, but only to name in the report which argument a failed derivation disagrees on.
 //!
-//! An executor's arguments come from one of two places:
-//!
-//! * its EXECUTOR RECORD ([`super::records`]) — the salt and original arguments the run that
-//!   deployed it wrote down. The immutable bindings (the CTM, the ProxyAdmins, `CORE_EXECUTOR`)
-//!   are still held against the reviewed package values; the initial owner and the CTM executor's
-//!   constructor coordinator are only reported, since both may legitimately differ from today's
-//!   (a fresh ecosystem constructs for its deployer and nominates governance);
-//! * without a record, the CURRENT reviewed values — the governance owner (the bootstrap
-//!   manifest's `governance`, or `--expected-governance-owner`) and the reviewed coordinator. An
-//!   executor whose owner or coordinator moved since its deployment does not re-derive this way.
+//! An executor's arguments come from its EXECUTOR RECORD ([`super::records`]) — the salt and
+//! original arguments the run that deployed it wrote down — and an executor without one is
+//! unverified. The recorded immutable bindings (the CTM, the ProxyAdmins, `CORE_EXECUTOR`) are
+//! held against the reviewed package values; the initial owner and the CTM executor's
+//! constructor coordinator are only reported, since both may legitimately differ from today's (a
+//! fresh ecosystem constructs for its deployer and nominates governance). The timer has no record
+//! and is re-derived from the reviewed values.
 //!
 //! What construction does not cover is the storage that moves afterwards — an executor's current
 //! `owner()`, `pendingOwner()` and `coordinator()`. Those are live checks the verifiers keep beside
-//! the construction check, against the same reviewed values.
+//! the construction check, against the reviewed governance owner and coordinator.
 
 use std::collections::BTreeMap;
 
@@ -39,14 +36,14 @@ use super::views::{
     GovernanceUpgradeTimerView,
 };
 
-/// The reviewed values the three executors are re-derived from.
+/// The three executors' records and the reviewed values their recorded bindings are held against.
 ///
 /// An `Option` marks a value the review may lack (a package written before the prepare recorded
 /// it, or no `--expected-governance-owner`); the check that needs it is then reported as
 /// unverifiable — an ERROR — rather than run on a placeholder.
 pub(super) struct LifecycleReview {
-    /// The reviewed governance address: the live owner every executor must have, and the owner an
-    /// executor without a record is re-derived for.
+    /// The reviewed governance address: the live owner every executor must have, which a record's
+    /// initial owner is reported against.
     pub(super) owner: Option<Address>,
     pub(super) coordinator: Address,
     /// The core executor the coordinator was built over: the bootstrap manifest's `coreExecutor`,
@@ -75,7 +72,7 @@ pub(super) struct LifecycleBindings {
 }
 
 /// Verifies the construction of the coordinator, the core executor and the CTM executor from
-/// `review`, recording each verified object in `reviewed`.
+/// their records in `review`, recording each verified object in `reviewed`.
 ///
 /// Reads, in order: the coordinator's code and `CORE_EXECUTOR()`, the core executor's code and
 /// `PROXY_ADMIN()`, the CTM executor's code, `CHAIN_TYPE_MANAGER()` and `CTM_PROXY_ADMIN()`.
@@ -84,15 +81,13 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
     build: &ReviewedBuild,
     result: &mut VerificationResult,
     review: &LifecycleReview,
-    salts: &[B256],
     reviewed: &mut BTreeMap<Address, String>,
 ) -> anyhow::Result<LifecycleBindings> {
     let mut bindings = LifecycleBindings::default();
     if review.owner.is_none() {
         result.report_error(
             "no reviewed governance owner: the executors' live owner cannot be held against the \
-             review, and an executor without a record is constructed for its owner, so its \
-             construction cannot be re-derived. Pass --expected-governance-owner",
+             review. Pass --expected-governance-owner",
         );
     }
 
@@ -139,24 +134,7 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
                 },
                 reviewed,
             ),
-            None => {
-                note_no_record(result, label);
-                match (review.owner, review.core_executor) {
-                    (Some(owner), Some(core_executor)) => {
-                        construct(
-                            build,
-                            result,
-                            label,
-                            review.coordinator,
-                            "EcosystemUpgradeExecutor",
-                            constructor_args::ecosystem_upgrade_executor(owner, core_executor),
-                            salts,
-                            reviewed,
-                        );
-                    }
-                    _ => unverifiable(result, label, review.coordinator, "the reviewed owner and the core executor it was built over (`core_upgrade_executor_addr`)"),
-                }
-            }
+            None => result.report_error(&missing_record(label, review.coordinator)),
         }
     }
 
@@ -204,24 +182,7 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
                     },
                     reviewed,
                 ),
-                None => {
-                    note_no_record(result, label);
-                    match (review.owner, review.core_proxy_admin) {
-                        (Some(owner), Some(proxy_admin)) => {
-                            construct(
-                                build,
-                                result,
-                                label,
-                                core_executor_addr,
-                                "CoreUpgradeExecutor",
-                                constructor_args::core_upgrade_executor(owner, proxy_admin),
-                                salts,
-                                reviewed,
-                            );
-                        }
-                        _ => unverifiable(result, label, core_executor_addr, "the reviewed owner and the ecosystem ProxyAdmin it was built over (`transparent_proxy_admin`)"),
-                    }
-                }
+                None => result.report_error(&missing_record(label, core_executor_addr)),
             }
         }
     } else {
@@ -233,13 +194,13 @@ pub(super) async fn verify_lifecycle_construction<P: Provider>(
     }
 
     // ── the CTM executor ──
-    verify_ctm_executor_construction(provider, build, result, review, salts, reviewed).await?;
+    verify_ctm_executor_construction(provider, build, result, review, reviewed).await?;
 
     Ok(bindings)
 }
 
-/// Verifies the CTM executor's construction from `review`, recording it in `reviewed` when it
-/// re-derives.
+/// Verifies the CTM executor's construction from its record in `review`, recording it in
+/// `reviewed` when it re-derives.
 ///
 /// Reads, in order: the executor's code, `CHAIN_TYPE_MANAGER()` and `CTM_PROXY_ADMIN()`.
 async fn verify_ctm_executor_construction<P: Provider>(
@@ -247,7 +208,6 @@ async fn verify_ctm_executor_construction<P: Provider>(
     build: &ReviewedBuild,
     result: &mut VerificationResult,
     review: &LifecycleReview,
-    salts: &[B256],
     reviewed: &mut BTreeMap<Address, String>,
 ) -> anyhow::Result<()> {
     let label = "the CTM executor";
@@ -331,34 +291,7 @@ async fn verify_ctm_executor_construction<P: Provider>(
                 reviewed,
             );
         }
-        None => {
-            note_no_record(result, label);
-            match (review.owner, review.ctm, review.ctm_proxy_admin) {
-                (Some(owner), Some(ctm), Some(ctm_proxy_admin)) => {
-                    construct(
-                        build,
-                        result,
-                        label,
-                        review.ctm_executor,
-                        "CTMUpgradeExecutor",
-                        constructor_args::ctm_upgrade_executor(
-                            owner,
-                            ctm,
-                            ctm_proxy_admin,
-                            review.coordinator,
-                        ),
-                        salts,
-                        reviewed,
-                    );
-                }
-                _ => unverifiable(
-                    result,
-                    label,
-                    review.ctm_executor,
-                    "the reviewed owner, the CTM and the CTM-domain ProxyAdmin it was built over",
-                ),
-            }
-        }
+        None => result.report_error(&missing_record(label, review.ctm_executor)),
     }
     Ok(())
 }
@@ -460,12 +393,14 @@ fn construct_from_record(
     }
 }
 
-fn note_no_record(result: &mut VerificationResult, label: &str) {
-    result.print_info(&format!(
-        "  {label}: no executor record, so it is re-derived from the CURRENT reviewed owner and \
-         coordinator — one whose owner or coordinator moved since its deployment does not \
-         re-derive that way; pass --executor-record with the output of the run that deployed it"
-    ));
+/// The error for an executor the review holds no record of.
+fn missing_record(label: &str, address: Address) -> String {
+    format!(
+        "{label} at {address} has no executor record, so its construction cannot be re-derived \
+         and it is unverified. Pass --executor-record with the output of the run that deployed \
+         it: the `ecosystem init` / `ctm init` forge output, or the bootstrap package, which \
+         carries its own"
+    )
 }
 
 /// The reviewed values a timer is re-derived from.
@@ -614,7 +549,7 @@ fn binding_check<T: PartialEq + std::fmt::Display>(
         }
         (Some(live), Some(reviewed)) => result.report_error(&format!(
             "{label}: {name} is {live} but the review fixes {reviewed} ({source}): the object was \
-             not built over the reviewed value, and its construction below cannot re-derive"
+             not built over the reviewed value, so its construction below cannot establish it"
         )),
         _ => {}
     }
@@ -753,6 +688,7 @@ mod tests {
         asserter.push_success(&Bytes::from(CTM_ADMIN.abi_encode()));
     }
 
+    /// The review of `trio`'s bindings, holding no executor records.
     fn review(owner: Option<Address>, trio: &Trio) -> LifecycleReview {
         LifecycleReview {
             owner,
@@ -767,38 +703,44 @@ mod tests {
     }
 
     async fn run(trio: &Trio, review: &LifecycleReview) -> (VerificationResult, usize) {
+        let (result, reviewed) = run_reviewed(trio, review).await;
+        (result, reviewed.len())
+    }
+
+    async fn run_reviewed(
+        trio: &Trio,
+        review: &LifecycleReview,
+    ) -> (VerificationResult, BTreeMap<Address, String>) {
         let asserter = Asserter::new();
         queue_trio_answers(&asserter, trio);
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
         let mut reviewed = BTreeMap::new();
-        let bindings = verify_lifecycle_construction(
-            &provider,
-            &build(),
-            &mut result,
-            review,
-            &[SALT],
-            &mut reviewed,
-        )
-        .await
-        .expect("a mocked read is not a transport failure");
+        let bindings =
+            verify_lifecycle_construction(&provider, &build(), &mut result, review, &mut reviewed)
+                .await
+                .expect("a mocked read is not a transport failure");
         assert_eq!(bindings.core_executor, Some(trio.core_executor));
         assert_eq!(bindings.core_proxy_admin, Some(ECO_ADMIN));
         assert!(
             asserter.read_q().is_empty(),
             "every queued answer must have been consumed, or the read order drifted"
         );
-        (result, reviewed.len())
+        (result, reviewed)
     }
 
     /// The regression the executors could never pass before: a genuine trio, deployed by the
-    /// reviewed constructors from the reviewed values, verifies clean. Their runtime code
-    /// hashes to no artifact (immutables are patched in), which the retired identity check
-    /// reported as an error on every real deployment.
+    /// reviewed constructors over the reviewed bindings and recorded by the run that deployed it,
+    /// verifies clean. Their runtime code hashes to no artifact (immutables are patched in), which
+    /// the retired identity check reported as an error on every real deployment.
     #[tokio::test]
     async fn a_genuine_trio_verifies_clean() {
         let trio = genuine_trio(OWNER);
-        let (result, reviewed) = run(&trio, &review(Some(OWNER), &trio)).await;
+        let recorded = LifecycleReview {
+            records: records_of(&trio, OWNER, SALT, trio.coordinator),
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &recorded).await;
         assert_eq!(result.errors, 0, "a genuine deployment must verify");
         assert_eq!(result.warnings, 0);
         assert_eq!(
@@ -808,8 +750,8 @@ mod tests {
     }
 
     /// THE finding: a counterfeit answering every getter with the reviewed bindings — the exact
-    /// answers the retired check accepted — is rejected, because it does not sit where the
-    /// reviewed creation code lands for those bindings.
+    /// answers the retired check accepted — and carrying a record that states them is rejected,
+    /// because it does not sit where the reviewed creation code lands for those values.
     #[tokio::test]
     async fn a_counterfeit_answering_the_reviewed_bindings_is_rejected() {
         let genuine = genuine_trio(OWNER);
@@ -817,53 +759,114 @@ mod tests {
             coordinator: Address::repeat_byte(0xC0),
             ..genuine
         };
-        let mut review = review(Some(OWNER), &genuine);
+        let mut records = records_of(&genuine, OWNER, SALT, genuine.coordinator);
+        records.coordinator.as_mut().unwrap().address = counterfeit.coordinator;
+        let mut review = LifecycleReview {
+            records,
+            ..review(Some(OWNER), &genuine)
+        };
         review.coordinator = counterfeit.coordinator;
-        let (result, reviewed) = run(&counterfeit, &review).await;
-        assert!(result.errors >= 1, "the counterfeit coordinator must fail");
+        let (result, reviewed) = run_reviewed(&counterfeit, &review).await;
+        assert_eq!(result.errors, 1, "the counterfeit coordinator must fail");
         assert!(result.ensure_success().is_err());
+        assert!(!reviewed.contains_key(&counterfeit.coordinator));
         assert_eq!(
-            reviewed, 1,
-            "only the core executor, which nothing substituted, is established; the CTM \
-             executor was built answering to the genuine coordinator and so fails too"
+            reviewed.len(),
+            2,
+            "the executors nothing substituted are established; that the CTM executor still \
+             answers to the genuine coordinator is for the live `coordinator()` check to report"
         );
     }
 
-    /// A GENUINE executor built for an attacker's owner answers the same bindings and is just as
-    /// canonically constructed — for the attacker. Re-deriving from the REVIEWED owner is what
-    /// rejects it, which is why the owner never comes from the object's own `owner()`.
+    /// A GENUINE trio built for an attacker's owner answers the same bindings and is just as
+    /// canonically constructed — for the attacker. A record claiming the REVIEWED owner for it does
+    /// not re-derive, which is why the owner never comes from the object's own `owner()`. Its true
+    /// record does: a record's initial owner is only reported (a fresh ecosystem constructs for its
+    /// deployer), and whoever owns the trio NOW is held against the review by the live owner check
+    /// (`operation::verify_governance_owner`), not here.
     #[tokio::test]
-    async fn a_genuine_trio_built_for_another_owner_is_rejected() {
+    async fn a_trio_built_for_another_owner_rederives_only_from_its_true_record() {
         let trio = genuine_trio(ATTACKER);
-        let (result, reviewed) = run(&trio, &review(Some(OWNER), &trio)).await;
-        assert_eq!(result.errors, 3, "all three were built for the wrong owner");
+        let claiming_the_reviewed_owner = LifecycleReview {
+            records: records_of(&trio, OWNER, SALT, trio.coordinator),
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &claiming_the_reviewed_owner).await;
+        assert_eq!(
+            result.errors, 3,
+            "none of the three was built for the reviewed owner"
+        );
         assert_eq!(reviewed, 0);
-        // And the same objects verify for the owner they were actually built for, so the
-        // rejection above is the owner and nothing else.
-        let (result, reviewed) = run(&trio, &review(Some(ATTACKER), &trio)).await;
-        assert_eq!(result.errors, 0);
+
+        let true_record = LifecycleReview {
+            records: records_of(&trio, ATTACKER, SALT, trio.coordinator),
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &true_record).await;
+        assert_eq!(
+            result.errors, 0,
+            "the initial owner is reported, not judged"
+        );
+        assert_eq!(result.warnings, 0);
         assert_eq!(reviewed, 3);
     }
 
-    /// No reviewed owner is not a pass with a caveat: every construction is unverifiable, and
-    /// each says so as an error.
+    /// No reviewed owner and no records is not a pass with a caveat: the missing owner and every
+    /// executor without a record each say so as an error.
     #[tokio::test]
-    async fn no_reviewed_owner_fails_every_construction() {
+    async fn no_reviewed_owner_and_no_records_fail_every_executor() {
         let trio = genuine_trio(OWNER);
         let (result, reviewed) = run(&trio, &review(None, &trio)).await;
         assert_eq!(
             result.errors, 4,
-            "one for the missing owner, one per unverifiable object"
+            "one for the missing owner, one per executor without a record"
         );
         assert_eq!(reviewed, 0);
         assert!(result.ensure_success().is_err());
+    }
+
+    /// An executor without a record is unverified — an error naming the flag that supplies one —
+    /// and is not established as reviewed, while the executors that have one still are.
+    #[tokio::test]
+    async fn a_missing_record_leaves_that_executor_unverified() {
+        let trio = genuine_trio(OWNER);
+        let all = || records_of(&trio, OWNER, SALT, trio.coordinator);
+        let mut without_coordinator = all();
+        without_coordinator.coordinator = None;
+        let mut without_core_executor = all();
+        without_core_executor.core_executor = None;
+        let mut without_ctm_executor = all();
+        without_ctm_executor.ctm_executor = None;
+        for (records, missing) in [
+            (without_coordinator, trio.coordinator),
+            (without_core_executor, trio.core_executor),
+            (without_ctm_executor, trio.ctm_executor),
+        ] {
+            let partial = LifecycleReview {
+                records,
+                ..review(Some(OWNER), &trio)
+            };
+            let (result, reviewed) = run_reviewed(&trio, &partial).await;
+            assert_eq!(result.errors, 1, "{missing}");
+            assert_eq!(result.warnings, 0, "{missing}");
+            assert_eq!(reviewed.len(), 2, "{missing}");
+            assert!(!reviewed.contains_key(&missing), "{missing}");
+        }
+
+        let message = missing_record("the CTM executor", trio.ctm_executor);
+        assert!(message.contains("--executor-record"), "{message}");
+        assert!(
+            message.contains(&trio.ctm_executor.to_string()),
+            "{message}"
+        );
     }
 
     // ───────────────────────── executor records ─────────────────────────
 
     const DEPLOYER: Address = Address::repeat_byte(0xD1);
     const FIRST_COORDINATOR: Address = Address::repeat_byte(0xC1);
-    /// Deliberately NOT among the reviewed salts: a record's own salt is what it is re-derived under.
+    /// Distinct from the genuine trio's `SALT`: the lifecycle check takes no reviewed salts, so an
+    /// executor is re-derived under its record's alone.
     const RECORD_SALT: B256 = B256::repeat_byte(0x6E);
 
     /// What the run that deployed `trio` for `initial_owner` under `salt` records, the CTM
@@ -903,16 +906,19 @@ mod tests {
 
     /// THE case records exist for: a fresh ecosystem's executors, constructed for the deployer
     /// and handed to governance afterwards, the CTM executor since re-pointed from the coordinator
-    /// it was built with. Re-derived from the current owner and coordinator, none of the three is
-    /// genuine-looking; re-derived from the record, all three are.
+    /// it was built with. A record restating today's owner and coordinator re-derives none of the
+    /// three; the record of the run that deployed them re-derives all three.
     #[tokio::test]
-    async fn a_moved_executor_verifies_from_its_record_and_fails_the_current_values_derivation() {
+    async fn a_moved_executor_verifies_from_its_record_and_not_from_the_current_values() {
         let trio = trio_built(DEPLOYER, RECORD_SALT, Some(FIRST_COORDINATOR));
-        let current = review(Some(OWNER), &trio);
-        let (result, reviewed) = run(&trio, &current).await;
+        let current_values = LifecycleReview {
+            records: records_of(&trio, OWNER, RECORD_SALT, trio.coordinator),
+            ..review(Some(OWNER), &trio)
+        };
+        let (result, reviewed) = run(&trio, &current_values).await;
         assert_eq!(
             result.errors, 3,
-            "without a record each executor re-derives for today's owner, which it was not built for"
+            "no executor was built for today's owner and coordinator"
         );
         assert_eq!(reviewed, 0);
 

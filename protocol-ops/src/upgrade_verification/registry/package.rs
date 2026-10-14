@@ -206,8 +206,8 @@ impl OperationPackage {
 /// The package's record of the values the lifecycle objects — the coordinator, the two domain
 /// executors and the timer — were constructed over. Those objects set their bindings as
 /// constructor immutables, so their construction is the only identity check they get, and it is
-/// re-derived from THESE values (plus the reviewed governance owner and the bootstrap manifest)
-/// rather than from the objects' own answers.
+/// held to THESE values (plus the bootstrap manifest) rather than to the objects' own answers: the
+/// timer is re-derived from them, and the executors' recorded bindings are held against them.
 ///
 /// Each is optional at load so the report can name exactly which one an older package lacks;
 /// the construction check ERRORS on a missing one rather than skipping the object.
@@ -938,7 +938,8 @@ mod tests {
 
     /// The lifecycle objects' binding values are read from where the two prepares write them —
     /// the core output's registry and shared-admin sections, the CTM output's admin and config
-    /// sections — because the executors' and the timer's construction is re-derived from them.
+    /// sections — because the timer's construction is re-derived from them and the executors'
+    /// recorded bindings are held against them.
     #[test]
     fn the_lifecycle_inputs_are_read_from_both_prepare_outputs() {
         let RegistryPackage::Operation(package) = load_str(&ordinary_release_toml()).unwrap()

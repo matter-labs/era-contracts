@@ -136,7 +136,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --l1-rpc-url <l1-rpc-url> \
   --expected-governance-owner 0x... \
   --create2-salt 0x... \
-  --zk-token-asset-id 0x... \
+  --env <env> \
   --executor-record l1-contracts/script-out/output-deploy-l1.toml \
   --executor-record l1-contracts/script-out/output-deploy-ctm.toml
 ```
@@ -149,33 +149,33 @@ objects it runs through (the coordinator, both domain executors, the timer; for 
 also the migration and the sequence its calls are derived from). Each is held against its own
 construction: the reviewed creation code, run on that object's reviewed constructor arguments,
 must land at the object's address. For a write-once object those arguments are the manifest it
-serves; for a lifecycle object they are the reviewed governance owner and the bindings the package
-records — never the object's own getters, since a genuine executor built for an attacker's owner
-answers them exactly like the reviewed one. That is what establishes the audited CONSTRUCTOR
+serves; for an executor they are the ones its record states (below), and for the timer and the
+bootstrap sequence the reviewed governance owner and the bindings the package records — never the
+object's own getters, since a genuine executor built for an attacker's owner answers them exactly
+like the reviewed one. That is what establishes the audited CONSTRUCTOR
 produced it, which a runtime codehash cannot (and the lifecycle objects set immutables, so no
 codehash identifies them at all) — so it needs the reviewed commit built locally
 (`cd l1-contracts && forge build`) for the creation code BYTES, and the reviewed CREATE2 salts:
 the core prepare's `[contracts] create2_factory_salt` and the CTM prepare's
 `[create2_factory_salts]` entry, both passed as `--create2-salt` (a package records neither).
-An executor is re-derived from its EXECUTOR RECORD when the review has one: the `[upgrade_executors]`
+An executor is re-derived from its EXECUTOR RECORD, which is mandatory: the `[upgrade_executors]`
 table the run that deployed it wrote (the `ecosystem init` / `ctm init` forge outputs
 `script-out/output-deploy-l1.toml` / `output-deploy-ctm.toml`, or a bootstrap package, which carries
 its own), passed with the repeatable `--executor-record`. The record's salt and ORIGINAL constructor
 arguments re-derive the address; its immutable bindings are still held against the package's values,
 and its initial owner is only reported — a fresh ecosystem constructs its executors for the deployer
-and nominates governance. Without a record an executor is re-derived from the CURRENT reviewed owner
-and coordinator, under the reviewed salts, so one whose owner or coordinator moved since its
-deployment (every fresh ecosystem's) only verifies with its record. Either way the live owner,
-pending owner and coordinator are checked separately. The immutable-free objects are additionally
-identified against `AllContractsHashes.json`. Every release the package installs is held against the
-reviewed genesis: `genesisBatchHash` against the `genesis_root` of
+and nominates governance. An executor without a record is unverified, which is an error. The live
+owner, pending owner and coordinator are checked separately. The immutable-free objects are
+additionally identified against `AllContractsHashes.json`. Every release the package installs is
+held against the reviewed genesis: `genesisBatchHash` against the `genesis_root` of
 `configs/genesis/zksync-os/latest.json`, `genesisIndexRepeatedStorageChanges` against zero, and
 `fixedForceDeploymentsData` against the package's `force_deployments_data` — and decoded, with every
 field held against an independent expectation: `l1ChainId` against the RPC's chain id,
 `l1AssetRouter`, `maxNumberOfZKChains` and the aliased chain registration sender against the CTM's
 live Bridgehub, `aliasedL1Governance` against the alias of the reviewed governance, `zkTokenAssetId`
-against `--zk-token-asset-id`, the legacy and test-only addresses against zero, and each bytecode
-field against the release's own L2 bytecode table.
+against the `zk_token_asset_id` of `upgrade-envs/permanent-values/<env>.toml` for the `--env` the
+package is held against (required unless the package is a replacement), the legacy and test-only
+addresses against zero, and each bytecode field against the release's own L2 bytecode table.
 
 A transition replacement is held against the transition it replaces rather than the CTM's current
 state: the replacement's construction as for any transition, the same source release (the replaced

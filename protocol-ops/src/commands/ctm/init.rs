@@ -48,8 +48,9 @@ pub struct CtmInitArgs {
 
     // Advanced input
     /// Reuse the hub's governance and ChainAdmin. The CTM always gets its own ProxyAdmin, which
-    /// the CTM's CTMUpgradeExecutor owns together with the CTM and the ServerNotifier; the
-    /// executor itself is owned by the ecosystem governance (bridgehub.owner()) either way.
+    /// the CTM's CTMUpgradeExecutor owns together with the CTM and the ServerNotifier. Either way
+    /// the executor is owned by, and the genesis force deployments name, the ecosystem governance
+    /// (bridgehub.owner()).
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub reuse_gov_and_admin: bool,
     /// Use testnet verifier

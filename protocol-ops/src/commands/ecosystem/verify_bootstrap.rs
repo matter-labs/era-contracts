@@ -33,10 +33,10 @@ pub struct VerifyBootstrapArgs {
 
     /// The reviewed governance address the upgrade must be driven by — for a bootstrap, the
     /// owner the CTM domain lands on permanently (held against the manifest's); for a recurring
-    /// upgrade or a replacement, the owner of the whole lifecycle, and the owner an executor
-    /// without a record is re-derived for. Without it a bootstrap's owner is reported but not
-    /// checked against the review, and any other package fails — so supply it for any package
-    /// that will actually be signed.
+    /// upgrade or a replacement, the owner of the whole lifecycle, which every executor's live
+    /// owner is held against. Without it a bootstrap's owner is reported but not checked against
+    /// the review, and any other package fails — so supply it for any package that will actually
+    /// be signed.
     #[clap(long)]
     pub expected_governance_owner: Option<Address>,
 
@@ -51,19 +51,20 @@ pub struct VerifyBootstrapArgs {
 
     /// A file carrying `[upgrade_executors]` records, repeatable: the forge output of `ecosystem
     /// init` / `ctm init` (`DeployL1CoreContracts`, `DeployCTM`) or a merged bootstrap package.
-    /// An executor with a record is re-derived from the salt and ORIGINAL constructor arguments
-    /// it records, so one whose owner or coordinator moved since its deployment still verifies;
-    /// without a record it is re-derived from the current reviewed owner and coordinator. Adds to
-    /// the records the package carries; two different records of one executor are refused.
+    /// Each executor is re-derived from the salt and ORIGINAL constructor arguments its record
+    /// states, so one whose owner or coordinator moved since its deployment still verifies; an
+    /// executor with no record is unverified — an error. Adds to the records the package carries
+    /// (a bootstrap package carries its own); two different records of one executor are refused.
     #[clap(long = "executor-record")]
     pub executor_records: Vec<PathBuf>,
 
-    /// The reviewed ZK token asset id (`zk_token_asset_id` in the env's permanent values). Every
-    /// release the package installs pins it in its genesis force deployments, which are held
-    /// against this value; without it that field is unverifiable — an error. A replacement
-    /// installs no release and does not need it.
+    /// The upgrade env (`stage`, `mainnet`, ...) whose reviewed
+    /// `upgrade-envs/permanent-values/<env>.toml` the package is held against. Every release the
+    /// package installs pins that file's `zk_token_asset_id` in its genesis force deployments, so
+    /// a recurring or bootstrap package is refused without it; a replacement installs no release
+    /// and does not need it.
     #[clap(long)]
-    pub zk_token_asset_id: Option<B256>,
+    pub env: Option<String>,
 }
 
 pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
@@ -76,7 +77,7 @@ pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
         args.expected_governance_owner,
         &args.create2_salts,
         &args.executor_records,
-        args.zk_token_asset_id,
+        args.env.as_deref(),
         &mut result,
     )
     .await?;

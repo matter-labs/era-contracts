@@ -58,13 +58,13 @@ pub(crate) struct ExpectedForceDeployments {
     pub(crate) max_number_of_zk_chains: Result<U256, String>,
     /// The CTM's Bridgehub's `chainRegistrationSender()`, unaliased.
     pub(crate) chain_registration_sender: Result<Address, String>,
-    /// The reviewer's `--zk-token-asset-id`.
-    pub(crate) zk_token_asset_id: Result<B256, String>,
+    /// The reviewed env's permanent-values `zk_token_asset_id`.
+    pub(crate) zk_token_asset_id: B256,
 }
 
 impl ExpectedForceDeployments {
-    /// Before the live reads ([`Self::read_live`]): only the reviewer's ZK token is known.
-    pub(crate) fn unread(zk_token_asset_id: Option<B256>) -> Self {
+    /// Before the live reads ([`Self::read_live`]): only the reviewed ZK token is known.
+    pub(crate) fn unread(zk_token_asset_id: B256) -> Self {
         fn unread<T>() -> Result<T, String> {
             Err("not read".to_string())
         }
@@ -74,11 +74,7 @@ impl ExpectedForceDeployments {
             governance: unread(),
             max_number_of_zk_chains: unread(),
             chain_registration_sender: unread(),
-            zk_token_asset_id: zk_token_asset_id.ok_or_else(|| {
-                "no reviewed ZK token asset id: pass --zk-token-asset-id (permanent-values \
-                 `zk_token_asset_id`)"
-                    .to_string()
-            }),
+            zk_token_asset_id,
         }
     }
 
@@ -306,8 +302,8 @@ pub(crate) fn judge_force_deployments(
         &prefix,
         "zkTokenAssetId",
         data.zkTokenAssetId,
-        &expected.zk_token_asset_id,
-        "the reviewed --zk-token-asset-id",
+        &Ok(expected.zk_token_asset_id),
+        "the env's permanent-values `zk_token_asset_id`",
     );
     for (name, value) in [
         ("l2SharedBridgeLegacyImpl", data.l2SharedBridgeLegacyImpl),
@@ -542,7 +538,7 @@ mod tests {
             governance: Ok(GOVERNANCE),
             max_number_of_zk_chains: Ok(U256::from(MAX_CHAINS)),
             chain_registration_sender: Ok(REGISTRATION_SENDER),
-            zk_token_asset_id: Ok(ZK_TOKEN),
+            zk_token_asset_id: ZK_TOKEN,
         }
     }
 
@@ -630,10 +626,6 @@ mod tests {
         });
         expectations.push(ExpectedForceDeployments {
             chain_registration_sender: missing(),
-            ..expected()
-        });
-        expectations.push(ExpectedForceDeployments {
-            zk_token_asset_id: missing(),
             ..expected()
         });
         for expected in expectations {
@@ -809,7 +801,7 @@ mod tests {
         asserter.push_success(&Bytes::from(U256::from(MAX_CHAINS).abi_encode()));
         asserter.push_success(&Bytes::from(REGISTRATION_SENDER.abi_encode()));
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        let mut live = ExpectedForceDeployments::unread(Some(ZK_TOKEN));
+        let mut live = ExpectedForceDeployments::unread(ZK_TOKEN);
         live.read_live(
             &provider,
             Some(CTM),
@@ -827,7 +819,7 @@ mod tests {
         let asserter = Asserter::new();
         asserter.push_success(&alloy::primitives::U64::from(L1_CHAIN_ID));
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-        let mut live = ExpectedForceDeployments::unread(None);
+        let mut live = ExpectedForceDeployments::unread(ZK_TOKEN);
         live.read_live(&provider, None, None, "--expected-governance-owner")
             .await;
         assert!(asserter.read_q().is_empty());
@@ -842,10 +834,10 @@ mod tests {
             .governance
             .unwrap_err()
             .contains("--expected-governance-owner"));
-        assert!(live
-            .zk_token_asset_id
-            .unwrap_err()
-            .contains("--zk-token-asset-id"));
+        assert_eq!(
+            live.zk_token_asset_id, ZK_TOKEN,
+            "the live reads leave the reviewed ZK token alone"
+        );
     }
 
     #[test]

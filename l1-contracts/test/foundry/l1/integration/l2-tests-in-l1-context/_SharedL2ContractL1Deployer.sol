@@ -69,7 +69,9 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             ctmAddresses.stateTransition.proxies.serverNotifier
         ) = deployServerNotifier();
         ctmAddresses.admin.eip7702Checker = address(0);
-        initializeGeneratedData();
+        // No ecosystem (and so no coordinator) exists here for `initializeGeneratedData` to read the
+        // governance from: the blob names the harness's governance directly.
+        generatedData.forceDeploymentsData = abi.encode(_buildForceDeploymentsData(ctmAddresses.admin.governance));
         deployStateTransitionDiamondFacets();
         string memory ctmContractName = "ChainTypeManager";
         (

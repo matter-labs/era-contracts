@@ -25,9 +25,11 @@
 //! the executors, the timer, the bootstrap sequence — whose constructors set immutables. Those
 //! are the objects a runtime codehash cannot identify at all (the artifact's immutable slots are
 //! zero), so construction is the ONLY identity check they get, and its arguments come from the
-//! reviewed package and manifest rather than from the object's own getters: a genuine executor
-//! deployed with an attacker's owner is a genuine executor, and only the reviewed owner tells it
-//! apart ([`constructor_args`]).
+//! reviewed package and manifest — for an executor, from the record of the run that deployed it,
+//! its bindings held against the review ([`super::lifecycle`]) — rather than from the object's
+//! own getters: a genuine executor deployed over an attacker's arguments is a genuine executor,
+//! and only arguments from a source the object does not control tell it apart
+//! ([`constructor_args`]).
 //!
 //! # Salts
 //!
@@ -792,8 +794,8 @@ mod tests {
     }
 
     /// The owner is an argument like any other: a genuine executor built for a different owner
-    /// lands at a different address, which is exactly what makes the reviewed owner — and not
-    /// the object's own `owner()` — the right source for it.
+    /// lands at a different address, so a derivation must take the owner from a source the object
+    /// does not control — never its own `owner()`.
     #[test]
     fn an_executor_built_for_another_owner_is_a_different_object() {
         let core_executor = Address::repeat_byte(0x02);

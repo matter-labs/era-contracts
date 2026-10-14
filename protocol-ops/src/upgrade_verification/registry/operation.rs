@@ -240,15 +240,11 @@ pub(crate) async fn verify<P: Provider>(
         if reported.is_none() {
             result.report_error(&format!(
                 "the package does not name `{field}`, so {what} cannot be held against anything \
-                 the review fixes, and the CTM executor's construction cannot be re-derived"
+                 the review fixes, nor can the CTM executor's recorded binding to it"
             ));
         }
     }
 
-    // The coordinator, the core executor and the CTM executor set their bindings as constructor
-    // immutables, so their identity is their CONSTRUCTION — from their executor records when the
-    // review has them, else from the reviewed governance owner and coordinator; never from the
-    // values they answer with ([`super::lifecycle`]).
     let bindings = verify_lifecycle_construction(
         provider,
         build,
@@ -263,7 +259,6 @@ pub(crate) async fn verify<P: Provider>(
             ctm_proxy_admin: package.reported_ctm_proxy_admin,
             records: package.executor_records.clone(),
         },
-        salts,
         &mut reviewed,
     )
     .await?;

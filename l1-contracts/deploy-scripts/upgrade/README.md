@@ -100,7 +100,7 @@ bootstrap edge declares its whole one-time edge this way.
 ```sh
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x... \
-  --zk-token-asset-id <the env's zk_token_asset_id> \
+  --env <env> \
   --executor-record <the bootstrap package, or the ecosystem/ctm init outputs, that deployed the executors> \
   --create2-salt <[contracts] create2_factory_salt> --create2-salt <[create2_factory_salts] entry of the CTM>
 ```
@@ -114,8 +114,8 @@ of a committed transition (prepared by `DefaultTransitionReplacement`). It check
 construction (the write-once objects from their manifests, the timer and the bootstrap sequence
 from the reviewed owner and bindings — which is why both prepare legs' salts are inputs: a package
 records neither — and the executors from the `[upgrade_executors]` record of the run that
-deployed them), the immutable-free objects' provenance, the bound
-authority and the owner the upgrade is driven by, every row's departing implementation, readiness,
+deployed them, without which an executor is unverified), the immutable-free objects' provenance,
+the bound authority and the owner the upgrade is driven by, every row's departing implementation, readiness,
 and that the calldata governance signs invokes the reviewed upgrade and nothing else. What it
 checks and deliberately does not is in
 [`docs/ai-review/docs/protocol-ops.md`](../../../docs/ai-review/docs/protocol-ops.md).

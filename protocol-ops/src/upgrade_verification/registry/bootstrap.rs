@@ -213,10 +213,8 @@ pub(crate) async fn verify<P: Provider>(
         .await;
     }
 
-    // The lifecycle objects, from the values the manifest and the package fix for them (their
-    // records, when the package carries them, are held against the same values). The owner is
-    // the manifest's: the edge hands both domains to executors that answer to it, and it is
-    // cross-checked against the reviewed governance address below.
+    // The owner is the manifest's: the edge hands both domains to executors that answer to it,
+    // and it is cross-checked against the reviewed governance address below.
     judge_executor_records_against_manifest(result, &package.executor_records, &manifest);
     let bindings = verify_lifecycle_construction(
         provider,
@@ -232,7 +230,6 @@ pub(crate) async fn verify<P: Provider>(
             ctm_proxy_admin: Some(manifest.ctmProxyAdmin),
             records: package.executor_records.clone(),
         },
-        salts,
         &mut reviewed,
     )
     .await?;
@@ -671,8 +668,8 @@ fn judge_executor_records_against_manifest(
 ) {
     if records.is_empty() {
         result.print_info(
-            "  the package carries no executor records: the executors are re-derived from the \
-             manifest's governance and coordinator",
+            "  the package carries no executor records, though the bootstrap prepare writes them: \
+             each executor's construction needs one (reported below)",
         );
         return;
     }

@@ -306,11 +306,11 @@ The verification answers three questions for every object a package names:
    For a write-once object the arguments are the manifest it serves: the verifier reads it off the
    object, re-encodes it, and recomputes that address from the reviewed creation code. For the
    lifecycle objects — the coordinator, both domain executors, the timer — and the bootstrap
-   sequence, the arguments are the ones each was constructed with, as the package records them
-   (otherwise the reviewed values): the governance owner, the core executor, the ecosystem
-   `ProxyAdmin`, the timer delay and owner, the CTM, its `ProxyAdmin` and coordinator, the
-   prepare's `2 weeks`. Never the object's own getters: a genuine executor built for an attacker's
-   owner answers every getter like the reviewed one. What legitimately moves after construction —
+   sequence, the arguments are the ones each was constructed with (an executor's as its record
+   states them, below): the governance owner, the core executor, the ecosystem `ProxyAdmin`, the
+   timer delay and owner, the CTM, its `ProxyAdmin` and coordinator, the prepare's `2 weeks`.
+   Never the object's own getters: a genuine executor built for an attacker's owner answers every
+   getter like the reviewed one. What legitimately moves after construction —
    the current owner, a pending nomination, the coordinator — is checked live against the reviewed
    governance and bindings. A match proves the canonical constructor ran on those arguments, which
    covers the object's WHOLE state — immutables, storage and derived fields. The creation-code
@@ -322,7 +322,7 @@ The verification answers three questions for every object a package names:
    `ctm init` or the bootstrap prepares — records each one's salt and ORIGINAL constructor
    arguments in its output (`[upgrade_executors]`); a later package is verified against that
    record (`--executor-record`), so an executor whose owner or coordinator has legitimately moved
-   since still re-derives.
+   since still re-derives. The record is mandatory: an executor without one is unverified.
 2. **Does it run the reviewed code?** Live `EXTCODEHASH` against `AllContractsHashes.json` for the
    reviewed commit, for the objects without constructor-set immutables (the objects with them
    cannot hash to any artifact; question 1 is the whole of their identity). Code the commit does
