@@ -54,8 +54,8 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
             );
     }
 
-    function _clearCalldata(uint256 _peerChainId) internal pure returns (bytes memory) {
-        return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (_peerChainId, bytes32(0)));
+    function _deregistrationCalldata(uint256 _peerChainId) internal pure returns (bytes memory) {
+        return abi.encodeCall(IL2Bridgehub.deregisterChainForInterop, (_peerChainId));
     }
 
     function _allowInteropPeer() internal returns (Vm.Log[] memory logs) {
@@ -187,27 +187,28 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
-    function test_deregisterLegacyPairs_clearsEveryPair() public {
+    /// @notice Deregistering the legacy pairs, which L1 never recorded, of two chains registered on each other.
+    function test_deregisterInteropPairs_clearsEveryPair() public {
         uint256[] memory chainsRegisteredOn = new uint256[](2);
         uint256[] memory chainsToDeregister = new uint256[](2);
         (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
         (chainsRegisteredOn[1], chainsToDeregister[1]) = (peerChainId, chainId);
 
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
-        emit IChainRegistrationSender.LegacyPairDeregistered(chainId, peerChainId);
+        emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
-        emit IChainRegistrationSender.LegacyPairDeregistered(peerChainId, chainId);
+        emit IChainRegistrationSender.InteropPairDeregistered(peerChainId, chainId);
         vm.recordLogs();
         vm.prank(addresses.chainRegistrationSender.owner());
-        addresses.chainRegistrationSender.deregisterLegacyPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(_priorityTxCalldata(logs, chainId), _clearCalldata(peerChainId));
-        assertEq(_priorityTxCalldata(logs, peerChainId), _clearCalldata(chainId));
+        assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
+        assertEq(_priorityTxCalldata(logs, peerChainId), _deregistrationCalldata(chainId));
     }
 
-    /// @notice Deregistration only cleans up legacy pairs: an allowed pair stays registered.
-    function test_deregisterLegacyPairs_revertWhen_pairAllowed() public {
+    /// @notice Governance can remove a pair the admin allowed, which the admin can then allow again.
+    function test_deregisterInteropPairs_allowedPair() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         _allowInteropPeer();
@@ -215,42 +216,51 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         uint256[] memory chainsToDeregister = new uint256[](1);
         (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
 
+        vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
+        emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
+        vm.recordLogs();
         vm.prank(addresses.chainRegistrationSender.owner());
-        vm.expectRevert(abi.encodeWithSelector(InteropPeerAlreadyAllowed.selector, chainId, peerChainId));
-        addresses.chainRegistrationSender.deregisterLegacyPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
+        assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
+
+        logs = _allowInteropPeer();
+        assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
     }
 
-    function test_deregisterLegacyPairs_revertWhen_notOwner() public {
+    function test_deregisterInteropPairs_revertWhen_notOwner() public {
         uint256[] memory pairs = new uint256[](1);
         vm.prank(makeAddr("notOwner"));
         vm.expectRevert("Ownable: caller is not the owner");
-        addresses.chainRegistrationSender.deregisterLegacyPairs(pairs, pairs);
+        addresses.chainRegistrationSender.deregisterInteropPairs(pairs, pairs);
     }
 
-    function test_deregisterLegacyPairs_revertWhen_lengthMismatch() public {
+    function test_deregisterInteropPairs_revertWhen_lengthMismatch() public {
         address owner = addresses.chainRegistrationSender.owner();
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ArrayLengthMismatch.selector, 1, 2));
-        addresses.chainRegistrationSender.deregisterLegacyPairs(new uint256[](1), new uint256[](2));
+        addresses.chainRegistrationSender.deregisterInteropPairs(new uint256[](1), new uint256[](2));
     }
 
-    function test_deregisterLegacyPairs_revertWhen_pairIsSelf() public {
+    function test_deregisterInteropPairs_revertWhen_pairIsSelf() public {
         uint256[] memory pairs = new uint256[](1);
         pairs[0] = chainId;
         address owner = addresses.chainRegistrationSender.owner();
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, chainId, chainId));
-        addresses.chainRegistrationSender.deregisterLegacyPairs(pairs, pairs);
+        addresses.chainRegistrationSender.deregisterInteropPairs(pairs, pairs);
     }
 
-    function test_deregisterLegacyPairs_revertWhen_chainNotRegistered() public {
+    function test_deregisterInteropPairs_revertWhen_chainNotRegistered() public {
         uint256[] memory chainsRegisteredOn = new uint256[](1);
         uint256[] memory chainsToDeregister = new uint256[](1);
         (chainsRegisteredOn[0], chainsToDeregister[0]) = (UNREGISTERED_CHAIN_ID, chainId);
         address owner = addresses.chainRegistrationSender.owner();
         vm.prank(owner);
         vm.expectRevert(ZKChainNotRegistered.selector);
-        addresses.chainRegistrationSender.deregisterLegacyPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
     }
 
     function test_serviceTransaction_revertWhenCalledByDiamond() public {

@@ -81,8 +81,8 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// @notice Total amount of `_assetId` withdrawn from the chains with interop, moved chain balances included.
     function interopPoolTotalWithdrawn(bytes32 _assetId) external view returns (uint256);
 
-    /// @notice Sets the backfill of `_chainId` for each asset, overwriting the previous values. Reverts for an
-    /// asset whose balance is already in the interop pool. See {protocol-docs/interop-gating.md#backfill}.
+    /// @notice Sets the backfill of `_chainId` for each asset, once per chain and asset.
+    /// See {protocol-docs/interop-gating.md#backfill}.
     /// @param _chainId The chain to set the backfill for.
     /// @param _assetIds The assets to set the backfill for.
     /// @param _amounts The backfill amounts, one per entry of `_assetIds`.

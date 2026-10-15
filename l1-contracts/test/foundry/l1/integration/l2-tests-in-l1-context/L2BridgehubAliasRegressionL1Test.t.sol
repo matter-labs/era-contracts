@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {EmptyAssetId, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
@@ -187,5 +187,63 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
 
         assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), testBaseTokenAssetId);
         assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    function test_registerChainForInterop_revertWhen_emptyAssetId() public {
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.expectRevert(EmptyAssetId.selector);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(12353, bytes32(0));
+    }
+
+    function test_allowInteropPeer_revertWhen_emptyAssetId() public {
+        uint256 testChainId = 12354;
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.expectRevert(EmptyAssetId.selector);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).allowInteropPeer(testChainId, bytes32(0));
+
+        assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    /// @notice Deregistration removes an allowed peer: its base token and its allowance.
+    function test_deregisterChainForInterop_allowedPeer() public {
+        uint256 testChainId = 12355;
+        vm.prank(aliasedChainRegistrationSender);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).allowInteropPeer(testChainId, bytes32(uint256(0x8642)));
+
+        vm.prank(aliasedChainRegistrationSender);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).deregisterChainForInterop(testChainId);
+
+        assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), bytes32(0));
+        assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    /// @notice Deregistration removes a chain registered without being allowed, by the retired registration.
+    function test_deregisterChainForInterop_legacyRegistration() public {
+        uint256 testChainId = 12356;
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(testChainId, bytes32(uint256(0x7531)));
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).deregisterChainForInterop(testChainId);
+
+        assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), bytes32(0));
+        assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    function testFuzz_deregisterChainForInterop_revertWhen_unauthorized(address _caller) public {
+        vm.assume(_caller != aliasedChainRegistrationSender);
+        vm.assume(_caller != SERVICE_TRANSACTION_SENDER);
+        uint256 testChainId = 12357;
+        bytes32 testBaseTokenAssetId = bytes32(uint256(0x9753));
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).allowInteropPeer(testChainId, testBaseTokenAssetId);
+
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).deregisterChainForInterop(testChainId);
+
+        assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), testBaseTokenAssetId);
+        assertTrue(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
     }
 }

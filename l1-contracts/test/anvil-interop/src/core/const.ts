@@ -157,3 +157,7 @@ export const FAILING_INTEROP_CALL_REASON = "Intentional interop receiver failure
 // From SemVer.sol: bit offsets of the minor and major components in a packed protocol version.
 export const SEMVER_MINOR_OFFSET = 32;
 export const SEMVER_MAJOR_OFFSET = 64;
+
+// Deposit encoding version of the consent-free registration that `ChainRegistrationSender.bridgehubDeposit`
+// accepted before the interop peer whitelist, see {protocol-docs/interop-gating.md#legacy-registrations}.
+export const LEGACY_CHAIN_REGISTRATION_ENCODING_VERSION = "0x01";

@@ -90,7 +90,7 @@ deployer EOA still owns three core contracts:
 | ------------------------- | ----------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `L1InteropHandler`        | owner: deployer, pending owner: `Governance`    | `pause()` withdrawal finalization | `Governance` calls `acceptOwnership()` (signed by `owner_address`: `AdminFunctions.governanceAcceptOwner(governance, l1InteropHandler)`) |
 | `L1NativeTokenVault`      | owner: deployer, pending owner: `owner_address` | `pause()` the vault               | `owner_address` calls `acceptOwnership()` on the vault directly                                                                          |
-| `ChainRegistrationSender` | owner: deployer, no pending owner               | `deregisterLegacyPairs`           | the deployer calls `transferOwnership(governance)`, then `owner_address` runs `AdminFunctions.governanceAcceptOwner(governance, sender)` |
+| `ChainRegistrationSender` | owner: deployer, no pending owner               | `deregisterInteropPairs`          | the deployer calls `transferOwnership(governance)`, then `owner_address` runs `AdminFunctions.governanceAcceptOwner(governance, sender)` |
 
 Until these are done the ownership table below does not hold. Making `hub init` perform them
 itself is an open tooling follow-up.
