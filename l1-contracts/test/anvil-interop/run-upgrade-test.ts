@@ -13,8 +13,9 @@ runUpgradeScenario({
   // upgrade (`PreviousUpgradeNotFinalized`).
   clearGenesisUpgradeTxHash: true,
   // Gateway-settled chains are not covered: their upgrade takes the `s.settlementLayer != address(0)` path,
-  // which routes through the gateway and does not record the L2 upgrade transaction on L1. Chain 10
-  // (L1-settled) and 11 (the gateway itself, which settles on L1) are the shapes upgraded from L1.
+  // which routes through the gateway and does not record the L2 upgrade transaction on L1. The runner keeps
+  // only the chains that settle on L1 in the source states, the gateway itself included, since chains 12 and
+  // 14 settle on the gateway in the v0.34.0 states but on L1 in the current config.
   targetRoles: ["directSettled", "gateway"],
 })
   .then(() => {

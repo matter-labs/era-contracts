@@ -7,9 +7,9 @@ import { Contract, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getAbi, getBytecode, getSolidityContractName, getSoliditySourceFileName } from "../../src/core/contracts";
 import type { ContractName } from "../../src/core/contracts";
-import { createProvider } from "../../src/core/utils";
+import { createProvider, getL2RpcUrl } from "../../src/core/utils";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../../src/core/predeploys";
-import { TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../../src/core/const";
+import { L2_BRIDGEHUB_ADDR, TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../../src/core/const";
 
 /** The Solidity source under `contractsDir` that defines each contract, found by its file name, which must be unique. */
 function findSoliditySources(contractsDir: string, contractNames: readonly ContractName[]): string[] {
@@ -112,6 +112,59 @@ describe("01 - Deployment Verification", function () {
         const diamond = new Contract(chainAddr!.diamondProxy, getAbi("IZKChain"), l1Provider);
         expect((await diamond.getChainId()).toNumber()).to.equal(chainConfig.chainId);
         expect(await diamond.getChainTypeManager()).to.equal(state.ctmAddresses!.chainTypeManager);
+      });
+    }
+  });
+
+  // See {protocol-docs/interop-gating.md}.
+  describe("Interop gating", () => {
+    const l2ChainConfigs = runner.getConfig().chains.filter((c) => c.role !== "l1");
+    let l1Provider: providers.JsonRpcProvider;
+
+    before(() => {
+      l1Provider = createProvider(state.chains!.l1!.rpcUrl);
+    });
+
+    for (const chainConfig of l2ChainConfigs) {
+      const interop = chainConfig.interop === true;
+
+      it(`chain ${chainConfig.chainId} (${chainConfig.role}) has ${interop ? "" : "not "}locked its second proof system and enabled interop`, async () => {
+        const chainAddr = state.chainAddresses!.find((c) => c.chainId === chainConfig.chainId)!;
+        const diamond = new Contract(chainAddr.diamondProxy, getAbi("IZKChain"), l1Provider);
+        const messageRoot = new Contract(state.l1Addresses!.messageRoot, getAbi("L1MessageRoot"), l1Provider);
+        expect(await diamond.isSecondProofSystemLocked()).to.equal(interop);
+        expect(await messageRoot.isInteropEnabled(chainConfig.chainId)).to.equal(interop);
+      });
+
+      it(`chain ${chainConfig.chainId} (${chainConfig.role}) allows ${interop ? "exactly the other interop chains" : "no chains"} as interop peers`, async () => {
+        const sender = new Contract(
+          state.l1Addresses!.chainRegistrationSender,
+          getAbi("ChainRegistrationSender"),
+          l1Provider
+        );
+        const l1Bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
+        const l2Bridgehub = new Contract(
+          L2_BRIDGEHUB_ADDR,
+          getAbi("L2Bridgehub"),
+          createProvider(getL2RpcUrl(state, chainConfig.chainId))
+        );
+        for (const peerConfig of l2ChainConfigs.filter((c) => c.chainId !== chainConfig.chainId)) {
+          const allowed = interop && peerConfig.interop === true;
+          expect(
+            await sender.interopPeerAllowed(chainConfig.chainId, peerConfig.chainId),
+            `interopPeerAllowed[${chainConfig.chainId}][${peerConfig.chainId}]`
+          ).to.equal(allowed);
+          // The L2Bridgehub of a chain without interop can know other chains for reasons unrelated to interop.
+          if (interop) {
+            const expectedAssetId = allowed
+              ? await l1Bridgehub.baseTokenAssetId(peerConfig.chainId)
+              : ethers.constants.HashZero;
+            expect(
+              await l2Bridgehub.baseTokenAssetId(peerConfig.chainId),
+              `baseTokenAssetId(${peerConfig.chainId}) on chain ${chainConfig.chainId}`
+            ).to.equal(expectedAssetId);
+          }
+        }
       });
     }
   });
