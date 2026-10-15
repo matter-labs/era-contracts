@@ -13,12 +13,14 @@ Relevant contracts and libraries:
 
 ## Aggregation structure
 
-The `MessageRoot` contract (deployed as `L1MessageRoot` on L1 and `L2MessageRoot` on settlement-layer L2s such as Gateway) stores the cross-chain message roots of all registered chains and aggregates them into one root. From v31 onwards it also performs L2->L1 message verification directly, bypassing the `Mailbox` of individual chains.
+The `MessageRoot` contract stores the cross-chain message roots of all registered chains and aggregates
+them into one root. `L1MessageRoot` also performs L2 -> L1 message verification directly, bypassing the
+`Mailbox` of individual chains.
 
 The structure is a two-level Merkle forest plus a per-batch record:
 
 1. **Chain tree** (`chainTree[chainId]`, a `DynamicIncrementalMerkle` append-only tree) — one per registered chain. Each leaf is a **batch leaf**: `MessageHashing.batchLeafHash(chainBatchRoot, batchNumber, l1Timestamp)`.
-2. **Shared tree** (`sharedTree`, a `FullMerkle` tree) — one per settlement layer. Leaf `chainIndex[chainId]` is the **chain-id leaf**: `MessageHashing.chainIdLeafHash(chainRoot, chainId)`, where `chainRoot` is the current root of that chain's chain tree. The shared tree root is the **aggregated root** (also called the **interop root**), returned by `getAggregatedRoot`.
+2. **Shared tree** (`sharedTree`, a `FullMerkle` tree) — one per settlement layer. Leaf `chainIndex[chainId]` is the **chain-id leaf**: `MessageHashing.chainIdLeafHash(chainRoot, chainId)`, where `chainRoot` is the current root of that chain's chain tree. The shared tree root is the **multichain root** (also called the **interop root**), returned by `getAggregatedRoot`.
 3. **Flat batch record** (`chainBatchRoots[chainId][batchNumber]`) — the same chain batch root values as the chain-tree leaves, stored individually for message verification, plus `chainBatchRootTimestamp[chainId][batchNumber]` so off-chain proof builders can recover the exact `l1Timestamp` folded into each batch leaf.
 
 Leaf hash domains are separated by paddings: `BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf")` and `CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf")`.
@@ -37,7 +39,10 @@ Every shared-tree update records `historicalRoots[block.number] = StoredInteropR
 - The `timestamp` is `block.timestamp` at write time. Time-sensitive proofs (e.g. the atomic-interop timeout protocol) rely on it to show a root was created after a deadline.
 - Storage compatibility with v31: interop was not enabled in v31, so this mapping (and the chain trees) were empty on L1 at upgrade time — no backfill needed. Extending the mapping value from `bytes32` to the `StoredInteropRoot` struct is layout-safe because mapping values live at hashed locations and `root` occupies the original slot.
 
-Each update also emits `NewInteropRoot(chainId, blockNumber, logId, timestamp, sides)`. `sides` has length 1 and holds only the root (proof-based interop; pre-commit interop will later add real tree sides). `logId` (`interopRootLogId`) increments **at most once per block**: all emissions within one block share the same `logId` so the server can group them; it counts starting from v31 only.
+Each update also emits `NewInteropRoot(chainId, blockNumber, logId, timestamp, sides)`. In the current
+protocol `sides` has length 1 and holds only the root; the array shape is reserved for possible future
+proof forms. `logId` (`interopRootLogId`) increments **at most once per block**: all emissions within
+one block share the same `logId` so the server can group them; it counts starting from v31 only.
 
 ## v31 vs v33 append flows
 
@@ -59,7 +64,7 @@ For a ZKsync OS chain, the chain batch root — the value committed as the batch
 | Leaf | Content                                                                                |
 | ---- | -------------------------------------------------------------------------------------- |
 | 0    | L2 logs tree root (the batch's local L2->L1 logs tree)                                 |
-| 1    | multichain root (the chain's own aggregated `MessageRoot`; empty for now)              |
+| 1    | the chain's own multichain root (of its own `MessageRoot`; empty for now)              |
 | 2    | interop commitment tree (IMT) root **at batch begin** — before the batch's first block |
 | 3    | interop commitment tree (IMT) root **at batch end** — after the batch's last block     |
 | 4–7  | reserved (zero)                                                                        |
@@ -95,9 +100,9 @@ Because the tree is append-only and the bootloader snapshots its root at every b
 
 ## Interop-root import and the batch-execution double check
 
-Aggregated roots produced on a settlement layer reach consumer chains as follows:
+Multichain roots produced on a settlement layer reach consumer chains as follows:
 
-1. **Import (L2 side).** The bootloader (and only the bootloader) calls `L2InteropRootStorage.addSingleInteropRoot` / `addInteropRootsInBatch` with `InteropRoot {chainId, blockOrBatchNumber, timestamp, sides}` structs. The contract stores `storedInteropRoots[chainId][blockOrBatchNumber] = StoredInteropRoot({root: sides[0], timestamp})`, i.e. the full `(blockOrBatchNumber, root, timestamp)` tuple, readable via `interopRoots(chainId, blockOrBatchNumber)`. Enforced invariants: `sides.length == 1` (proof-based interop — the array holds only the root); the root is non-zero; the timestamp is non-zero (so a zero stored timestamp structurally means "nothing imported at this key"); no overwrite of an existing entry. `blockOrBatchNumber` is a block number in proof-based/pre-commit interop and a batch number in commit-based interop. This logic requires the timestamp-carrying bootloader entry points and is therefore ZKsync OS-only (not EraVM-compatible); no roots imported under earlier protocol versions exist, since interop was not activated in v31.
+1. **Import (L2 side).** The bootloader (and only the bootloader) calls `L2InteropRootStorage.addSingleInteropRoot` / `addInteropRootsInBatch` with `InteropRoot {chainId, blockOrBatchNumber, timestamp, sides}` structs. The contract stores `storedInteropRoots[chainId][blockOrBatchNumber] = StoredInteropRoot({root: sides[0], timestamp})`, i.e. the full `(blockOrBatchNumber, root, timestamp)` tuple, readable via `interopRoots(chainId, blockOrBatchNumber)`. Enforced invariants: `sides.length == 1` (the array holds only the root); the root is non-zero; the timestamp is non-zero (so a zero stored timestamp structurally means "nothing imported at this key"); no overwrite of an existing entry. `blockOrBatchNumber` is the settlement layer's block number. This logic requires the timestamp-carrying ZKsync OS bootloader entry points; no roots imported under earlier protocol versions exist, since interop was not activated in v31.
 
 2. **Double check (settlement-layer side).** When the importing chain's batch is executed, `ExecutorFacet._verifyDependencyInteropRoots` re-derives every imported root: for `interopRoot.chainId == block.chainid` (the only supported case this release — roots are imported from the settlement layer the chain settles on, L1 only) it reads `messageRoot.historicalRoot(blockOrBatchNumber)` and requires both the root (`InvalidMessageRoot`) and the timestamp (`InvalidInteropRootTimestamp`) to match; any other chain id reverts with `CommitBasedInteropNotSupported`. The verified tuples are folded into a rolling hash over `(chainId, blockOrBatchNumber, timestamp, sides)` that must equal the committed batch's `dependencyRootsRollingHash` (`DependencyRootsRollingHashMismatch` otherwise). An imported root and its timestamp are therefore exactly as trustworthy as the settlement layer's own record.
 
@@ -108,12 +113,12 @@ All verification goes through `MessageHashing._getProofData` (exposed as `Messag
 **Hop 1 — log leaf to batch root.** The leaf (an L2 log/message hash, rejected if it equals the default leaf) plus `logLeafProofLen` siblings and the leaf mask yield `batchSettlementRoot`.
 
 - If `finalProofNode` is set, verification terminates here against the verifier's local record:
-  - On the settlement layer (`MessageRootBase._proveL2LeafInclusionRecursive`): the root must equal the recorded `chainBatchRoots[chainId][batchNumber]` (never the layer's own aggregate root). Batch 0 is not provable (`BatchZeroNotAllowed`). If no root is recorded, `_noBatchFallback` applies: on L1, batches produced before the chain's `v31UpgradeChainBatchNumber` are looked up on the chain itself via `l2LogsRootHash` (trust-bounded: a malicious chain can only damage itself while L1 is the only settlement layer; once the ZKsync OS CTM's ownership is transferred to decentralized governance, the chain-reported pre-v31 batch root can be trusted completely — until then the assumption is that no ZKsync OS-based Gateway exists); on L2 it returns 0, since newer implementations guarantee all available batch roots are stored.
-  - On an L2 consumer (`L2MessageVerification`): the root must equal the imported `interopRoots(chainId, blockOrBatchNumber).root` — an L2 has no per-chain roots, only imported aggregate roots.
+  - On the settlement layer (`MessageRootBase._proveL2LeafInclusionRecursive`): the root must equal the recorded `chainBatchRoots[chainId][batchNumber]` (never the layer's own multichain root). Batch 0 is not provable (`BatchZeroNotAllowed`). If no root is recorded, `_noBatchFallback` applies: on L1, batches produced before the chain's `v31UpgradeChainBatchNumber` are looked up on the chain itself via `l2LogsRootHash`. A malicious chain can only damage itself while L1 is the only settlement layer; once the ZKsync OS CTM's ownership is transferred to decentralized governance, the chain-reported pre-v31 batch root can be trusted completely. On L2 the fallback returns 0, since newer implementations guarantee all available batch roots are stored.
+  - On an L2 consumer (`L2MessageVerification`): the root must equal the imported `interopRoots(chainId, blockOrBatchNumber).root` — an L2 has no per-chain roots, only imported multichain roots.
 
 **Hop 2 — batch leaf to chain root.** For non-final proofs the next words are `[l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]`. The verifier reconstructs the batch leaf as `batchLeafHash(batchSettlementRoot, batchNumber, l1Timestamp)` — a wrong timestamp makes the leaf mismatch the tree, which is what authenticates the proof-supplied timestamp — and hashes up to the chain root of `chainTree[chainId]`. `MessageHashing.readAggregationHopPath` is the single accessor for this section's word layout (mask + siblings); its output is trustworthy only after the same proof bytes passed the leaf verifier.
 
-**Hop 3 — chain-id leaf to aggregated root.** The chain root becomes `chainIdLeafHash(chainRoot, chainId)`, followed by two words: packed `(settlementLayerBatchNumber << 128 | settlementLayerBatchRootMask)` and `settlementLayerChainId`. `MessageHashing.readSettlementLayerReference` is the single accessor for these settlement-layer words (plus the hop-2 `l1Timestamp`); like its hop-2 sibling, its output is trustworthy only after the same proof bytes passed the leaf verifier. Verification recurses with the chain-id leaf as the new leaf: on L1, `L1MessageRoot` first checks the claimed settlement layer via `IL1ChainAssetHandler.isValidSettlementLayer`; on L2, the recursion anchors in the imported aggregate root, using the settlement layer's **block** number as `blockOrBatchNumber`. Recursion depth is capped at 1 (`DepthMoreThanOneForRecursiveMerkleProof`) — at most a single intermediate Gateway between the chain and L1.
+**Hop 3 — chain-id leaf to multichain root.** The chain root becomes `chainIdLeafHash(chainRoot, chainId)`, followed by two words: packed `(settlementLayerBatchNumber << 128 | settlementLayerBatchRootMask)` and `settlementLayerChainId`. `MessageHashing.readSettlementLayerReference` is the single accessor for these settlement-layer words (plus the hop-2 `l1Timestamp`); like its hop-2 sibling, its output is trustworthy only after the same proof bytes passed the leaf verifier. Verification recurses with the chain-id leaf as the new leaf: on L1, `L1MessageRoot` first checks the claimed settlement layer via `IL1ChainAssetHandler.isValidSettlementLayer`; on L2, the recursion anchors in the imported multichain root, using the settlement layer's **block** number as `blockOrBatchNumber`. Recursion depth is capped at 1 (`DepthMoreThanOneForRecursiveMerkleProof`).
 
 Full path, innermost to outermost:
 
@@ -123,7 +128,9 @@ L2 log leaf
   -> batchLeafHash(+batchNumber, +l1Timestamp)
   -> (batch-leaf siblings)        chain tree root
   -> chainIdLeafHash(+chainId)
-  -> (shared-tree siblings)       aggregated root == historicalRoot / imported interopRoots entry
+  -> (shared-tree siblings)       multichain root == historicalRoot / imported interopRoots entry
 ```
 
-The same aggregated-root anchoring, with `l1BatchTimestamp` read from the verified proof words and the chain-batch-root tree opened at IMT leaves 2/3, is how atomic interop authenticates IMT roots and settlement times — see {protocol-docs/atomicity/proofs.md}.
+![Message root structure and inclusion proof path](./img/message_root_structure.png)
+
+The same multichain-root anchoring, with `l1BatchTimestamp` read from the verified proof words and the chain-batch-root tree opened at IMT leaves 2/3, is how atomic interop authenticates IMT roots and settlement times — see {protocol-docs/atomicity/proofs.md}.
