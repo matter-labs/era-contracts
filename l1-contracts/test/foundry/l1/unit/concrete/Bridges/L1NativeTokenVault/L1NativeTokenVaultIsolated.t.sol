@@ -2,11 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
@@ -15,46 +14,25 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 
-import {NoFundsTransferred, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {WrongCounterpart, OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {
+    AssetIdAlreadyRegistered,
+    NoFundsTransferred,
+    Unauthorized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
+import {WrongCounterpart} from "contracts/bridge/L1BridgeContractErrors.sol";
 
-contract MockERC20 is ERC20 {
-    constructor() ERC20("MockToken", "MTK") {
-        _mint(msg.sender, 1_000_000 ether);
-    }
-
-    function mint(address to, uint256 amount) external {
-        _mint(to, amount);
-    }
-}
-
-contract MockBridgedToken is ERC20 {
-    address public ntv;
-
-    constructor(address _ntv) ERC20("BridgedToken", "BRD") {
-        ntv = _ntv;
-    }
-
-    function bridgeMint(address to, uint256 amount) external {
-        require(msg.sender == ntv, "Only NTV");
-        _mint(to, amount);
-    }
-
-    function bridgeBurn(address from, uint256 amount) external {
-        require(msg.sender == ntv, "Only NTV");
-        _burn(from, amount);
-    }
-}
-
-contract L1NativeTokenVaultExtendedTest is Test {
-    using stdStorage for StdStorage;
-
+/// @notice The vault's own state (init, registration, pause, counterpart checks, views) behind a proxy,
+/// isolated from the asset router and the nullifier, which are bare addresses here. Flows that need the
+/// real router and nullifier live in L1NativeTokenVault.t.sol.
+contract L1NativeTokenVaultIsolatedTest is Test {
     L1NativeTokenVault public l1NTV;
 
     address public owner;
@@ -64,10 +42,9 @@ contract L1NativeTokenVaultExtendedTest is Test {
     address public l1Nullifier;
     address public bridgedTokenBeacon;
 
-    MockERC20 public token;
+    TestnetERC20Token public token;
 
     uint256 public constant CHAIN_ID = 123;
-    bytes32 public baseTokenAssetId;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -76,10 +53,8 @@ contract L1NativeTokenVaultExtendedTest is Test {
         assetRouter = makeAddr("assetRouter");
         l1Nullifier = makeAddr("l1Nullifier");
 
-        token = new MockERC20();
-        baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        token = new TestnetERC20Token("MockToken", "MTK", 18);
 
-        // Create a mock bridged token beacon
         BridgedStandardERC20 bridgedTokenImpl = new BridgedStandardERC20();
         bridgedTokenBeacon = address(new UpgradeableBeacon(address(bridgedTokenImpl)));
 
@@ -98,8 +73,26 @@ contract L1NativeTokenVaultExtendedTest is Test {
         l1NTV = L1NativeTokenVault(payable(proxy));
     }
 
+    /// @dev Registration notifies the asset router, which is a bare address in this file.
+    function _mockAssetRouterRegistration() internal {
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSelector(AssetRouterBase.setAssetHandlerAddressThisChain.selector),
+            abi.encode()
+        );
+    }
+
+    function test_constructor() public view {
+        assertEq(address(l1NTV.WETH_TOKEN()), wethToken);
+        assertEq(address(l1NTV.ASSET_ROUTER()), assetRouter);
+        assertEq(address(l1NTV.L1_NULLIFIER()), l1Nullifier);
+        assertEq(l1NTV.L1_CHAIN_ID(), block.chainid);
+        assertEq(l1NTV.BASE_TOKEN_ASSET_ID(), DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS));
+    }
+
     function test_Initialize_SetsOwner() public view {
         assertEq(l1NTV.owner(), owner);
+        assertEq(address(l1NTV.bridgedTokenBeacon()), bridgedTokenBeacon);
     }
 
     function test_Initialize_RevertWhen_OwnerIsZeroAddress() public {
@@ -118,16 +111,36 @@ contract L1NativeTokenVaultExtendedTest is Test {
     }
 
     function test_RegisterEthToken() public {
-        vm.mockCall(
-            assetRouter,
-            abi.encodeWithSelector(AssetRouterBase.setAssetHandlerAddressThisChain.selector),
-            abi.encode()
-        );
+        _mockAssetRouterRegistration();
 
         l1NTV.registerEthToken();
 
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         assertEq(l1NTV.tokenAddress(ethAssetId), ETH_TOKEN_ADDRESS);
+    }
+
+    function test_RegisterToken() public {
+        _mockAssetRouterRegistration();
+
+        l1NTV.registerToken(address(token));
+
+        bytes32 tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
+        assertEq(l1NTV.assetId(address(token)), tokenAssetId);
+        assertEq(l1NTV.tokenAddress(tokenAssetId), address(token));
+        assertEq(l1NTV.originToken(tokenAssetId), address(token));
+        assertEq(l1NTV.bridgedTokensCount(), 1);
+    }
+
+    function test_RegisterToken_RevertWhen_AlreadyRegistered() public {
+        _mockAssetRouterRegistration();
+        l1NTV.registerToken(address(token));
+
+        vm.expectRevert(AssetIdAlreadyRegistered.selector);
+        l1NTV.registerToken(address(token));
+    }
+
+    function test_OriginToken_ReturnsZeroForUnknownAsset() public view {
+        assertEq(l1NTV.originToken(keccak256("unknownAsset")), address(0));
     }
 
     function test_BridgeCheckCounterpartAddress_Success() public {
@@ -157,24 +170,11 @@ contract L1NativeTokenVaultExtendedTest is Test {
         assertEq(balance, 0);
     }
 
-    function test_BridgeConfirmTransferResult_RevertWhen_NotFailure() public {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-        bytes memory data = abi.encode(uint256(1000), address(0), address(0));
-
-        vm.prank(assetRouter);
-        vm.expectRevert(OnlyFailureStatusAllowed.selector);
-        l1NTV.bridgeConfirmTransferResult(CHAIN_ID, TxStatus.Success, assetId, makeAddr("sender"), data);
-    }
-
     function test_BridgeConfirmTransferResult_RevertWhen_NoFundsTransferred() public {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
         bytes memory data = abi.encode(uint256(0), address(0), address(0)); // 0 amount
 
-        vm.mockCall(
-            assetRouter,
-            abi.encodeWithSelector(AssetRouterBase.setAssetHandlerAddressThisChain.selector),
-            abi.encode()
-        );
+        _mockAssetRouterRegistration();
 
         // Register the token
         vm.prank(assetRouter);
@@ -183,16 +183,6 @@ contract L1NativeTokenVaultExtendedTest is Test {
         vm.prank(assetRouter);
         vm.expectRevert(NoFundsTransferred.selector);
         l1NTV.bridgeConfirmTransferResult(CHAIN_ID, TxStatus.Failure, assetId, makeAddr("sender"), data);
-    }
-
-    function test_CalculateCreate2TokenAddress() public {
-        uint256 originChainId = 1;
-        address nonNativeToken = makeAddr("nonNativeToken");
-
-        address expectedAddress = l1NTV.calculateCreate2TokenAddress(originChainId, nonNativeToken);
-
-        // Just verify it returns a valid address
-        assertTrue(expectedAddress != address(0));
     }
 
     function test_Pause_Success() public {
@@ -228,27 +218,22 @@ contract L1NativeTokenVaultExtendedTest is Test {
         l1NTV.unpause();
     }
 
-    function testFuzz_CalculateCreate2TokenAddress(uint256 chainId, address tokenAddr) public view {
-        vm.assume(chainId != 0);
-        vm.assume(tokenAddr != address(0));
-
-        address result = l1NTV.calculateCreate2TokenAddress(chainId, tokenAddr);
-        assertTrue(result != address(0));
+    function testFuzz_CalculateCreate2TokenAddress(uint256 _chainId, address _token) public view {
+        address expected = vm.computeCreate2Address(
+            keccak256(abi.encode(_chainId, _token)),
+            keccak256(abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))),
+            address(l1NTV)
+        );
+        assertEq(l1NTV.calculateCreate2TokenAddress(_chainId, _token), expected);
     }
 
-    function _deployFreshNTV() internal returns (L1NativeTokenVault) {
-        L1NativeTokenVault l1NTVImpl = new L1NativeTokenVault({
-            _wethToken: wethToken,
-            _assetRouter: assetRouter,
-            _l1Nullifier: IL1Nullifier(l1Nullifier)
+    function test_GetERC20Getters() public view {
+        bytes memory expected = DataEncoding.encodeTokenData({
+            _chainId: block.chainid,
+            _name: abi.encode("MockToken"),
+            _symbol: abi.encode("MTK"),
+            _decimals: abi.encode(uint8(18))
         });
-
-        TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(l1NTVImpl),
-            proxyAdmin,
-            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, bridgedTokenBeacon)
-        );
-
-        return L1NativeTokenVault(payable(proxy));
+        assertEq(l1NTV.getERC20Getters(address(token), block.chainid), expected);
     }
 }
