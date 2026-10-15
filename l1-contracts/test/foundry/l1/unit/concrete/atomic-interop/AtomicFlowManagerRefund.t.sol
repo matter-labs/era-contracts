@@ -19,6 +19,7 @@ import {
 import {
     ManagerFlowIdMismatch,
     ManagerLegNotRevertable,
+    ManagerLegSourceChainNotAllowed,
     ProofSourceChainMismatch,
     ProofImtRootInclusionFailed
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
@@ -92,9 +93,10 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         missingLegIndex = missingIdx;
         flowId = AtomicFlowFixtures.flowId(preimage);
 
-        // The remote missing-leg source must look interop-registered to the send-side `append` (a
-        // Bridgehub registry lookup, orthogonal to the atomic proof machinery).
+        // The remote missing-leg source must look interop-registered to the send-side `append` and
+        // allowed to the refund's receive filter (Bridgehub lookups, orthogonal to the atomic proof machinery).
         _registerRemoteLegSource(MISSING_LEG_CHAIN);
+        _setLegSourceAllowed(MISSING_LEG_CHAIN, true);
 
         // Commit the real leg through the production send-side path.
         vm.prank(L2_INTEROP_CENTER_ADDR);
@@ -283,6 +285,7 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
             "the late leg is locally Committed before the refund"
         );
 
+        // The receive filter accepts this chain's own legs without a whitelist entry: none is set for it here.
         // Intrinsically LOCAL: the proven-absent leg's source is this chain, which the settlement-layer
         // MessageRoot cannot aggregate as remote — so this case forward-computes the proof and imports
         // its root directly.
@@ -340,6 +343,22 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
 
         vm.expectRevert(abi.encodeWithSelector(ProofSourceChainMismatch.selector, MISSING_LEG_CHAIN, unrelatedChainId));
         manager.authorizeRefund(_flow(), missingLegIndex, absence);
+    }
+
+    /// @notice The receive filter: this chain refunds only on the absence of a leg whose source it
+    /// accepts ({protocol-docs/interop-gating.md#receive-filter}). A genuine absence proof from a source
+    /// the chain doesn't allow leaves the committed leg `Committed`.
+    function test_RevertWhen_MissingLegSourceNotAllowed() public {
+        ImtProof memory absence = _validAbsence();
+        _setLegSourceAllowed(MISSING_LEG_CHAIN, false);
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, MISSING_LEG_CHAIN));
+        manager.authorizeRefund(_flow(), missingLegIndex, absence);
+        assertEq(
+            uint256(manager.legState(flowId, committedLeg)),
+            uint256(LegState.Committed),
+            "the committed leg must stay Committed"
+        );
     }
 
     /// @notice A `flowId` that does not match the canonicalized preimage hash is rejected: the

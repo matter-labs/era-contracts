@@ -158,16 +158,18 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 
 ## Receive filter
 
-Contracts don't enforce this rule yet. For now, the enabled chain's operator enforces it through node
-configuration, which includes force-failing L1->L2 transactions that break it. A later L2 release moves it into
-`AtomicFlowManager`. Until then, see [K2](#k2-operator-trust-until-the-on-chain-filter-ships).
-
-A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. Then:
+A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. C's
+`AtomicFlowManager` reverts with `ManagerLegSourceChainNotAllowed` otherwise:
 
 - **Finality** (`requireFlowFinalized`, {protocol-docs/atomicity/flow.md#3-finalize--requireflowfinalized}) needs
   every leg's source to be allowed.
 - **Refunds** (`authorizeRefund`, {protocol-docs/atomicity/recovery.md#authorizerefund--claimrefund}) need the
   missing leg's source to be allowed.
+
+The filter reads the whitelist when the bundle is verified, or executed if it wasn't verified first, not when it was
+sent. A bundle from a peer that is removed stays unreceived, and executes once the admin allows the peer again; one
+verified before the removal still executes. `append` doesn't apply the filter: it only needs the other legs' sources
+to be registered ({protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
 
 The message root can't tell enabled chains apart: L1 aggregates every L1-settled chain's batch roots, so a disabled
 chain's batches are as provable as any other. The filter has to cover refunds too. Otherwise a disabled chain's
@@ -211,8 +213,7 @@ Before `enableInterop(X)`:
 - check X's whole history:
   - the proof modes since the upgrade (no single-proven batches is recommended);
   - the interop X finalized or refunded while it was disabled;
-- set X's backfill for every asset X holds;
-- trust X's operator to run the [receive filter](#receive-filter).
+- set X's backfill for every asset X holds.
 
 ### Order per chain
 
@@ -228,7 +229,9 @@ Before `enableInterop(X)`:
 
 ### K1: stuck flows
 
-A flow whose legs are all present but which some chain refuses can neither finalize nor be refunded. Causes:
+A flow gets stuck when a chain's [receive filter](#receive-filter) refuses one of its legs' sources. With all legs
+present, that chain can't finalize the flow; with a leg missing, a committed leg on that chain can't be refunded.
+Causes:
 
 - a one-sided whitelist, or a pair governance removed;
 - a leg from a chain that the destination doesn't whitelist;
@@ -236,12 +239,7 @@ A flow whose legs are all present but which some chain refuses can neither final
 
 SDKs should check both whitelists on L1 before sending.
 
-### K2: operator trust until the on-chain filter ships
-
-An enabled chain's operator that doesn't run the [receive filter](#receive-filter) can pay forged legs out of the
-pool. The same holds while the chain is in permanent priority mode.
-
-### K3: undetermined backfill credits
+### K2: undetermined backfill credits
 
 A [backfill credit](#backfill-amounts) that depends on a chain that stays disabled may never be determined. Since the
 backfill is set once, governance either includes it at its own risk or leaves it out, and then the affected users

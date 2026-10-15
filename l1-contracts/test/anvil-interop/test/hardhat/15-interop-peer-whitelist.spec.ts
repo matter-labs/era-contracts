@@ -3,8 +3,7 @@ import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { InteropChainRegistrar } from "../../src/deployers/interop-chain-registrar";
 import { getAbi } from "../../src/core/contracts";
-import { L2_BRIDGEHUB_ADDR } from "../../src/core/const";
-import { getInteropSourceAddress } from "../../src/core/accounts";
+import { BundleStatus, L2_BRIDGEHUB_ADDR } from "../../src/core/const";
 import {
   createProvider,
   getChainDiamondProxy,
@@ -13,7 +12,14 @@ import {
   getL2RpcUrl,
 } from "../../src/core/utils";
 import { encodeEvmChainAddress } from "../../src/helpers/erc7930";
-import { getInteropProtocolFee, sendInteropMessage } from "../../src/helpers/interop-helpers";
+import {
+  deployDummyInteropRecipient,
+  executeBundle,
+  getBundleStatus,
+  getInteropProtocolFee,
+  sendInteropMessage,
+} from "../../src/helpers/interop-helpers";
+import type { InteropSendResult } from "../../src/helpers/interop-helpers";
 import { executeTokenTransfer, expectTokenTransfer } from "../../src/helpers/token-transfer";
 import {
   captureBalance,
@@ -48,8 +54,11 @@ describe("15 - Interop peer whitelist", function () {
   let peerProvider: ethers.providers.JsonRpcProvider;
   let chainBridgehub: ethers.Contract;
   let peerBridgehub: ethers.Contract;
+  let recipient: string;
+  /** The peer's bundle the chain rejects while the peer is removed, and executes once it is allowed again. */
+  let heldMessage: InteropSendResult;
 
-  before(() => {
+  before(async () => {
     state = runner.loadState();
     if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
@@ -71,6 +80,7 @@ describe("15 - Interop peer whitelist", function () {
     peerProvider = createProvider(getL2RpcUrl(state, peerChainId));
     chainBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), chainProvider);
     peerBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), peerProvider);
+    recipient = await deployDummyInteropRecipient(chainProvider);
   });
 
   it("governance removes an allowed peer from the chain's side only", async () => {
@@ -112,19 +122,26 @@ describe("15 - Interop peer whitelist", function () {
     );
   });
 
-  it("lets the peer still send to the chain, whose receive filter rejects it", async () => {
-    // Contracts don't enforce the receive filter yet: the chain's operator does, offchain, from the flag below
-    // ({protocol-docs/interop-gating.md#receive-filter}). So the test stops at the send, which only the
-    // peer's own side gates.
-    await sendInteropMessage({
+  it("lets the peer still send to the chain, whose receive filter rejects the bundle", async () => {
+    // Only the peer's own side gates the send ({protocol-docs/interop-gating.md#receive-filter}).
+    heldMessage = await sendInteropMessage({
       sourceProvider: peerProvider,
-      recipient: encodeEvmChainAddress(getInteropSourceAddress(), chainId),
+      recipient: encodeEvmChainAddress(recipient, chainId),
       payload: "0x",
       attributes: [],
       value: await getInteropProtocolFee(peerProvider),
     });
 
     expect(await chainBridgehub.isPeerAllowed(peerChainId), "the flag the chain's receive filter reads").to.be.false;
+    await expectRevert(
+      () => executeBundle(chainProvider, heldMessage, peerChainId),
+      "execute a bundle from a removed peer",
+      customError("AtomicFlowManager", "ManagerLegSourceChainNotAllowed(uint256)", [peerChainId]),
+      chainProvider
+    );
+    expect(await getBundleStatus(chainProvider, heldMessage.bundleHash), "the held bundle's status").to.equal(
+      BundleStatus.Unreceived
+    );
   });
 
   it("transfers from the chain to the peer once its admin allows the peer again", async () => {
@@ -141,5 +158,13 @@ describe("15 - Interop peer whitelist", function () {
       amount: randomBigNumber(TOKEN_AMOUNT_MIN, TOKEN_AMOUNT_MAX),
       logger: (line: string) => console.log(`[interop] ${line}`),
     });
+  });
+
+  it("executes the held bundle from the peer once the chain allows it again", async () => {
+    await executeBundle(chainProvider, heldMessage, peerChainId);
+
+    expect(await getBundleStatus(chainProvider, heldMessage.bundleHash), "the held bundle's status").to.equal(
+      BundleStatus.FullyExecuted
+    );
   });
 });

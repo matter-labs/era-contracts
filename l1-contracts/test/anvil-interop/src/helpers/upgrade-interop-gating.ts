@@ -1,4 +1,4 @@
-import type { providers } from "ethers";
+import type { BigNumber, providers } from "ethers";
 import { ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import {
@@ -8,13 +8,17 @@ import {
   DEFAULT_TX_GAS_LIMIT,
   L2_BRIDGEHUB_ADDR,
   LEGACY_CHAIN_REGISTRATION_ENCODING_VERSION,
+  PRE_UPGRADE_DEPOSIT_MAX_ETH,
+  PRE_UPGRADE_DEPOSIT_MIN_ETH,
 } from "../core/const";
 import { getInteropSourceAddress } from "../core/accounts";
+import { decodeBridgeBurnAmount, encodeBridgeMintData } from "../core/data-encoding";
 import type { CoreDeployedAddresses } from "../core/types";
 import { impersonateAndRun, relayPriorityRequestsToChain } from "../core/utils";
-import { customError, expectRevert } from "./balance-helpers";
+import { customError, expectRevert, randomBigNumber } from "./balance-helpers";
 import { encodeEvmChainAddress } from "./erc7930";
 import { getInteropProtocolFee, sendInteropMessage } from "./interop-helpers";
+import { depositETHToL2 } from "./l1-deposit-helper";
 
 /** An upgraded chain, with its L2. */
 export type GatedChain = { chainId: number; diamondProxy: string; provider: providers.JsonRpcProvider };
@@ -72,13 +76,29 @@ export async function registerLegacyInteropPair(
   console.log(`   ✅ Chain ${_chain.chainId}: chain ${_peer.chainId} registered the legacy way`);
 }
 
+/** Before the upgrade: deposits a random amount of ether to `_chain`, a balance governance backfills afterwards. */
+export async function depositBeforeUpgrade(_context: InteropGatingContext, _chain: GatedChain): Promise<void> {
+  await depositETHToL2({
+    l1RpcUrl: _context.l1Provider.connection.url,
+    l2RpcUrl: _chain.provider.connection.url,
+    chainId: _chain.chainId,
+    l1Addresses: _context.l1Addresses,
+    amount: randomBigNumber(
+      ethers.utils.parseEther(PRE_UPGRADE_DEPOSIT_MIN_ETH),
+      ethers.utils.parseEther(PRE_UPGRADE_DEPOSIT_MAX_ETH)
+    ),
+  });
+}
+
 /**
  * After the upgrade: takes `_chain`, which registered `_peer` with {registerLegacyInteropPair}, and `_peer` through
  * {protocol-docs/interop-gating.md#order-per-chain}. The legacy pair stops sending, governance clears it, and once
  * both chains are enabled, each admin's consent opens its own direction.
+ * @param _lastPreUpgradeBlock The last L1 block before the core upgrade, up to which the backfill is computed.
  */
 export async function runInteropGatingProcedure(
   _context: InteropGatingContext,
+  _lastPreUpgradeBlock: number,
   _chain: GatedChain,
   _peer: GatedChain
 ): Promise<void> {
@@ -86,8 +106,8 @@ export async function runInteropGatingProcedure(
   await deregisterInteropPair(_context, _chain, _peer);
   await expectSendReverts(_chain, _peer, "DestinationChainNotRegistered(uint256)", "send over the cleared pair");
 
-  await enableInterop(_context, _chain);
-  await enableInterop(_context, _peer);
+  await enableInterop(_context, _chain, _lastPreUpgradeBlock);
+  await enableInterop(_context, _peer, _lastPreUpgradeBlock);
 
   await allowInteropPeer(_context, _chain, _peer);
   await expectSend(_chain, _peer);
@@ -118,7 +138,11 @@ async function deregisterInteropPair(
   console.log(`   ✅ Chain ${_chain.chainId}: legacy pair with chain ${_peer.chainId} cleared`);
 }
 
-async function enableInterop(_context: InteropGatingContext, _chain: GatedChain): Promise<void> {
+async function enableInterop(
+  _context: InteropGatingContext,
+  _chain: GatedChain,
+  _lastPreUpgradeBlock: number
+): Promise<void> {
   const { l1Addresses, l1Provider } = _context;
   const ntv = new ethers.Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Provider);
   const l1Bridgehub = new ethers.Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Provider);
@@ -126,33 +150,118 @@ async function enableInterop(_context: InteropGatingContext, _chain: GatedChain)
   const assetIds: string[] = [
     ...new Set<string>([await ntv.BASE_TOKEN_ASSET_ID(), await l1Bridgehub.baseTokenAssetId(_chain.chainId)]),
   ];
+  const backfills: BigNumber[] = [];
+  for (const assetId of assetIds) {
+    const backfill = await preUpgradeBalance(_context, _chain.chainId, assetId, _lastPreUpgradeBlock);
+    if (backfill.lte(0)) {
+      throw new Error(`Chain ${_chain.chainId} held no asset ${assetId} before the upgrade`);
+    }
+    await expectRevert(
+      () => simulateWithdrawal(_context, ntv, _chain.chainId, assetId, backfill),
+      `withdraw the pre-upgrade balance of chain ${_chain.chainId} before the backfill`,
+      customError("L1NativeTokenVault", "ChainBalanceExceeded(uint256,bytes32,uint256,uint256)", [
+        _chain.chainId,
+        assetId,
+        (await ntv.chainTotalWithdrawn(_chain.chainId, assetId)).add(backfill),
+        await ntv.chainTotalDeposited(_chain.chainId, assetId),
+      ]),
+      l1Provider
+    );
+    backfills.push(backfill);
+  }
 
-  // Governance computes the backfill offchain ({protocol-docs/interop-gating.md#backfill-amounts}). The test
-  // withdraws none of the balance the chain had before the upgrade, so zero stands in for it.
   await asOwnerOf(_context, ntv, (signer) =>
-    ntv.connect(signer).setChainBalanceBackfill(
-      _chain.chainId,
-      assetIds,
-      assetIds.map(() => 0)
-    )
+    ntv.connect(signer).setChainBalanceBackfill(_chain.chainId, assetIds, backfills)
   );
+  for (const [i, assetId] of assetIds.entries()) {
+    const { amount, set } = await ntv.chainBalanceBackfill(_chain.chainId, assetId);
+    if (!set || !amount.eq(backfills[i])) {
+      throw new Error(`Chain ${_chain.chainId} backfill of asset ${assetId} is ${amount} (set: ${set})`);
+    }
+  }
   // The default upgrade keeps the chain's single-proof verifier, so the chain can't lock a second proof system.
   // Governance enables it without the lock, as it may for a chain it trusts for reasons checked offchain
   // ({protocol-docs/interop-gating.md#enabling-interop}). `enableInterop` belongs to the Bridgehub owner.
   await asOwnerOf(_context, l1Bridgehub, (signer) => messageRoot.connect(signer).enableInterop(_chain.chainId, false));
-  for (const assetId of assetIds) {
+  for (const [i, assetId] of assetIds.entries()) {
+    const deposited = await ntv.chainTotalDeposited(_chain.chainId, assetId);
+    const withdrawn = await ntv.chainTotalWithdrawn(_chain.chainId, assetId);
+    const poolDepositedBefore = await ntv.interopPoolTotalDeposited(assetId);
+    const poolWithdrawnBefore = await ntv.interopPoolTotalWithdrawn(assetId);
     await (await ntv.connect(_context.chainAdminOwner).moveChainBalanceToInteropPool(_chain.chainId, assetId)).wait();
+    const poolDepositedDelta = (await ntv.interopPoolTotalDeposited(assetId)).sub(poolDepositedBefore);
+    const poolWithdrawnDelta = (await ntv.interopPoolTotalWithdrawn(assetId)).sub(poolWithdrawnBefore);
+    if (
+      !(await ntv.chainBalanceInInteropPool(_chain.chainId, assetId)) ||
+      !poolDepositedDelta.eq(deposited.add(backfills[i])) ||
+      !poolWithdrawnDelta.eq(withdrawn)
+    ) {
+      throw new Error(
+        `Chain ${_chain.chainId} balance of asset ${assetId} was not moved to the interop pool: ` +
+          `pool deposits +${poolDepositedDelta}, expected +${deposited.add(backfills[i])}; ` +
+          `pool withdrawals +${poolWithdrawnDelta}, expected +${withdrawn}`
+      );
+    }
+    await simulateWithdrawal(_context, ntv, _chain.chainId, assetId, backfills[i]);
   }
 
   if (!(await messageRoot.isInteropEnabled(_chain.chainId))) {
     throw new Error(`Chain ${_chain.chainId} is not enabled for interop`);
   }
-  for (const assetId of assetIds) {
-    if (!(await ntv.chainBalanceInInteropPool(_chain.chainId, assetId))) {
-      throw new Error(`Chain ${_chain.chainId} balance of asset ${assetId} was not moved to the interop pool`);
-    }
-  }
-  console.log(`   ✅ Chain ${_chain.chainId}: interop enabled, balances moved to the pool`);
+  console.log(`   ✅ Chain ${_chain.chainId}: interop enabled, backfilled balances moved to the pool and withdrawable`);
+}
+
+/**
+ * Returns what `_chainId` held of `_assetId` at `_toBlock`: its deposits less its finalized withdrawals and claimed
+ * failed deposits, as governance computes the backfill ({protocol-docs/interop-gating.md#backfill-amounts}).
+ * Governance reads the whole history. The chain states the test starts from keep no logs, so the flows they were
+ * built with are left out, which only under-credits the chain.
+ */
+async function preUpgradeBalance(
+  _context: InteropGatingContext,
+  _chainId: number,
+  _assetId: string,
+  _toBlock: number
+): Promise<BigNumber> {
+  const { l1Addresses, l1Provider } = _context;
+  const ntv = new ethers.Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Provider);
+  const assetRouter = new ethers.Contract(l1Addresses.l1SharedBridge, getAbi("L1AssetRouter"), l1Provider);
+  const total = async (
+    _contract: ethers.Contract,
+    _event: string,
+    _amount: (_args: ethers.utils.Result) => BigNumber
+  ) =>
+    (await _contract.queryFilter(_contract.filters[_event](_chainId, _assetId), 0, _toBlock)).reduce(
+      (_sum, _log) => _sum.add(_amount(_log.args!)),
+      ethers.constants.Zero
+    );
+  const deposited = await total(ntv, "BridgeBurn", (_args) => _args.amount);
+  const withdrawn = await total(ntv, "BridgeMint", (_args) => _args.amount);
+  // L1NativeTokenVault emits nothing for a claimed failed deposit; the asset router logs the deposit's burn data.
+  const failedDepositsClaimed = await total(assetRouter, "ClaimedFailedDepositAssetRouter", (_args) =>
+    decodeBridgeBurnAmount(_args.assetData)
+  );
+  return deposited.sub(withdrawn).sub(failedDepositsClaimed);
+}
+
+/**
+ * Simulates L1AssetRouter finalizing a withdrawal of `_amount` of `_assetId` from `_chainId`, which the cap allows
+ * or not. The upgrade installs the real L1MessageRoot, which the harness's mock proofs can't finalize against.
+ */
+async function simulateWithdrawal(
+  _context: InteropGatingContext,
+  _ntv: ethers.Contract,
+  _chainId: number,
+  _assetId: string,
+  _amount: BigNumber
+): Promise<void> {
+  const receiver = _context.chainAdminOwner.address;
+  await _ntv.callStatic.bridgeMint(
+    _chainId,
+    _assetId,
+    encodeBridgeMintData(receiver, receiver, await _ntv.tokenAddress(_assetId), _amount, "0x"),
+    { from: _context.l1Addresses.l1SharedBridge }
+  );
 }
 
 async function allowInteropPeer(_context: InteropGatingContext, _chain: GatedChain, _peer: GatedChain): Promise<void> {

@@ -161,3 +161,8 @@ export const SEMVER_MAJOR_OFFSET = 64;
 // Deposit encoding version of the consent-free registration that `ChainRegistrationSender.bridgehubDeposit`
 // accepted before the interop peer whitelist, see {protocol-docs/interop-gating.md#legacy-registrations}.
 export const LEGACY_CHAIN_REGISTRATION_ENCODING_VERSION = "0x01";
+
+// Bounds, in ether, of the random deposit the upgrade test makes to each gated chain before the upgrade, which
+// governance then backfills, see {protocol-docs/interop-gating.md#backfill-amounts}.
+export const PRE_UPGRADE_DEPOSIT_MIN_ETH = "1";
+export const PRE_UPGRADE_DEPOSIT_MAX_ETH = "10";
