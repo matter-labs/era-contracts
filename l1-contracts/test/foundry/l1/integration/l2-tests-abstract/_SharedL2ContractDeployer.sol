@@ -189,11 +189,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(uint256(1)))
         );
-        // Register this chain and the harness destination in the L2 Bridgehub's interop registry
-        // through the production entry point; every other chain id reads as unregistered (bytes32(0)).
+        // Register this chain and allow the harness destination in the L2 Bridgehub's interop registry
+        // through the production entry points; every other chain id reads as unregistered (bytes32(0)).
         vm.startPrank(SERVICE_TRANSACTION_SENDER);
         l2Bridgehub.registerChainForInterop(block.chainid, L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID());
-        l2Bridgehub.registerChainForInterop(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
+        l2Bridgehub.allowInteropPeer(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
         vm.stopPrank();
 
         // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls

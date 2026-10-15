@@ -282,6 +282,14 @@ contract UtilsFacet is ZKChainBase {
         s.__DEPRECATED_precommitmentForTheLatestBatch = _precommitment;
     }
 
+    function util_getSecondProofSystemLocked() external view returns (bool) {
+        return s.secondProofSystemLocked;
+    }
+
+    function util_getDisabledProofSystems() external view returns (uint8) {
+        return s.disabledProofSystems;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

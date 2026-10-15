@@ -154,6 +154,10 @@ describe("01 - Deployment Verification", function () {
             await sender.interopPeerAllowed(chainConfig.chainId, peerConfig.chainId),
             `interopPeerAllowed[${chainConfig.chainId}][${peerConfig.chainId}]`
           ).to.equal(allowed);
+          expect(
+            await l2Bridgehub.isPeerAllowed(peerConfig.chainId),
+            `isPeerAllowed(${peerConfig.chainId}) on chain ${chainConfig.chainId}`
+          ).to.equal(allowed);
           // The L2Bridgehub of a chain without interop can know other chains for reasons unrelated to interop.
           if (interop) {
             const expectedAssetId = allowed

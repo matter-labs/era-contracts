@@ -3,27 +3,29 @@
 Interop between L1-settled chains is opt-in at two levels:
 
 - Chains are **disabled** by default. Governance (the Bridgehub owner) enables a chain manually and one-way,
-  and only after the chain has locked its second proof system.
+  normally only after the chain has locked its second proof system.
 - A chain's admin chooses its interop peers on L1. Both chains of a pair must be enabled.
 
-|                   | Disabled chain (default)                                                                       | Enabled chain                                                               |
-| ----------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| L1 escrow         | capped: the chain can withdraw only what was deposited into it ([cap](#per-chain-balance-cap)) | pooled with the other chains, uncapped                                      |
-| Interop peers     | none can be whitelisted                                                                        | enabled chains its admin whitelisted ([whitelist](#interop-peer-whitelist)) |
-| L1 asset handlers | the native token vault and the chain asset handler ([restriction](#asset-handler-restriction)) | any                                                                         |
+|                   | Disabled chain (default)                                                                       | Enabled chain                                                                                              |
+| ----------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| L1 escrow         | capped: the chain can withdraw only what was deposited into it ([cap](#per-chain-balance-cap)) | capped together: the enabled chains can withdraw only what was deposited into them ([pool](#interop-pool)) |
+| Interop peers     | none can be whitelisted                                                                        | enabled chains its admin whitelisted ([whitelist](#interop-peer-whitelist))                                |
+| L1 asset handlers | the native token vault and the chain asset handler ([restriction](#asset-handler-restriction)) | any                                                                                                        |
 
 ## Safety argument
 
-Lifting the cap at enabling already requires governance to trust the chain's whole history, so forged interop
-state is covered by the same attestation. Before enabling, a disabled chain's broken prover can only lose funds
-deposited into that chain:
+Moving a chain's balance into the [interop pool](#interop-pool) at enabling already requires governance to trust the
+chain's whole history, so forged interop state is covered by the same attestation. An enabled chain's broken prover
+can lose the pool, but not the escrow of disabled chains. Before enabling, a disabled chain's broken prover can only
+lose funds deposited into that chain:
 
 - the [cap](#per-chain-balance-cap) stops it from withdrawing more than was deposited into it;
 - the [asset handler restriction](#asset-handler-restriction) keeps it away from L1 handlers that don't apply the cap;
 - the [receive filter](#receive-filter) stops enabled chains from accepting its interop.
 
 The [second proof system lock](#second-proof-system-lock) makes every batch of an enabled chain carry both an
-Airbender and a ZiSK proof from then on, unless governance turns ZiSK off in an emergency.
+Airbender and a ZiSK proof from then on, unless governance turns ZiSK off in an emergency. Governance may waive
+the lock for a chain it trusts for reasons checked offchain ([Enabling interop](#enabling-interop)).
 
 ## Second proof system lock
 
@@ -43,26 +45,29 @@ the chain admin's hands.
 
 ## Enabling interop
 
-`L1MessageRoot.enableInterop(chainId)` is callable only by the Bridgehub owner. It requires the chain to be
-registered, to settle on L1, to have locked its second proof system (`SecondProofSystemNotLocked`) and to be in
-multi-proof mode right now, so not during an emergency ZiSK-off (`NotMultiProofMode`). It is one-way: there is no
-way to disable interop again (`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads the flag.
+`L1MessageRoot.enableInterop(chainId, requireSecondProofSystem)` is callable only by the Bridgehub owner. It
+requires the chain to be registered and to settle on L1. It is one-way: there is no way to disable interop again
+(`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads the result.
+
+With `requireSecondProofSystem`, the chain must also have locked its second proof system
+(`SecondProofSystemNotLocked`) and be in multi-proof mode right now, so not during an emergency ZiSK-off
+(`NotMultiProofMode`). Governance enables without it only a chain it trusts for reasons checked offchain.
 
 These checks are necessary, not sufficient: governance enables a chain only after the checks in
 [Before enabling](#before-enabling).
 
 ## Per-chain balance cap
 
-`L1NativeTokenVault` tracks, for every chain and every asset not native to that chain, what passed through the
-vault since the cap was introduced:
+`L1NativeTokenVault` tracks, for every disabled chain and every asset not native to that chain, what passed through
+the vault since the cap was introduced:
 
 - `chainTotalDeposited[chainId][assetId]`: everything bridged to the chain, base-token deposits included.
 - `chainTotalWithdrawn[chainId][assetId]`: everything released or minted on L1 for the chain's finalized
   withdrawals and claimed failed deposits.
 
-For a disabled chain, a withdrawal or failed-deposit claim that would make `chainTotalWithdrawn` exceed
-`chainTotalDeposited + chainBalanceBackfill` reverts with `ChainBalanceExceeded`. Enabled chains are not capped,
-and their counters keep counting.
+A withdrawal or failed-deposit claim that would make `chainTotalWithdrawn` exceed
+`chainTotalDeposited + chainBalanceBackfill` reverts with `ChainBalanceExceeded`. Once the chain is enabled, its
+flows count in the [interop pool](#interop-pool) instead, and these counters stop.
 
 - Assets native to the chain are not tracked. The chain mints them anyway, so a forged withdrawal of one only
   affects the holders of that chain's token.
@@ -70,18 +75,39 @@ and their counters keep counting.
   first, to all chains.
 - Only the vault applies the cap. Hence the [asset handler restriction](#asset-handler-restriction).
 
+## Interop pool
+
+Enabled chains share one balance per asset, because interop moves tokens between them without passing L1:
+
+- `interopPoolTotalDeposited[assetId]`: everything bridged to enabled chains since they were enabled, plus the moved
+  balances.
+- `interopPoolTotalWithdrawn[assetId]`: everything released or minted on L1 for enabled chains since they were
+  enabled, plus the withdrawals of the moved balances.
+
+A withdrawal or failed-deposit claim from an enabled chain that would make `interopPoolTotalWithdrawn` exceed
+`interopPoolTotalDeposited` reverts with `InteropPoolBalanceExceeded`.
+
+- Assets native to an enabled chain are counted but not capped: interop brings them to the other enabled chains
+  without passing L1. As for the cap, assets native to the withdrawing chain itself are not tracked.
+- A chain's balance from before it was enabled stays outside the pool until
+  `moveChainBalanceToInteropPool(chainId, assetId)` adds `chainTotalDeposited + chainBalanceBackfill` and
+  `chainTotalWithdrawn` to the pool. Anyone can call it, once per chain and asset (`ChainBalanceAlreadyInInteropPool`),
+  after the chain is enabled and once its [backfill](#backfill) for the asset is set (`ChainBalanceBackfillNotSet`).
+- Until the move, the chain's withdrawals draw only on the pool and may revert, so the backfill is set before
+  enabling and the balance is moved right after ([Order per chain](#order-per-chain)).
+
 ## Backfill
 
 The counters start at zero when the cap is introduced, while chains already hold escrow. The vault owner
-(governance) supplies each chain's pre-upgrade balance as `chainBalanceBackfill[chainId][assetId]`:
+(governance) supplies each chain's pre-upgrade balance as `chainBalanceBackfill[chainId][assetId]`, an amount and a
+flag that tells a zero backfill from none:
 
-- `setChainBalanceBackfill(chainId, assetIds, amounts)` overwrites amounts, until
-  `finalizeChainBalanceBackfill(chainId)`.
-- After finalization, `increaseChainBalanceBackfill(chainId, assetIds, amounts)` can only add to them, for credits
-  that are determined later ([K3](#k3-undetermined-backfill-credits)). A finalized backfill never decreases.
+- `setChainBalanceBackfill(chainId, assetIds, amounts)` sets the amounts, overwriting earlier ones. It reverts for an
+  asset whose balance is already in the [interop pool](#interop-pool) (`ChainBalanceAlreadyInInteropPool`).
+- There is no finalization: an owner that could abuse a later change could upgrade the vault anyway.
 
-Until a chain's backfill is set, its users can only withdraw what was deposited after the upgrade. The amounts and
-when to finalize them are in [Backfill amounts](#backfill-amounts).
+Until a chain's backfill is set, its users can only withdraw what was deposited after the upgrade, and its balance
+can't move to the pool. The amounts are in [Backfill amounts](#backfill-amounts).
 
 ## Asset handler restriction
 
@@ -97,28 +123,31 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 ## Interop peer whitelist
 
 `ChainRegistrationSender` keeps `interopPeerAllowed[chainId][peerChainId]` and mirrors it into each chain's
-`L2Bridgehub` (`baseTokenAssetId(peerChainId)`), which lets the chain send interop to the peer
-({protocol-docs/interop.md}).
+`L2Bridgehub` as `isPeerAllowed(peerChainId)`. The chain's `InteropCenter` sends only to allowed peers
+(`DestinationChainNotAllowed`, {protocol-docs/interop.md}).
 
-- **`setInteropPeer(chainId, peerChainId, allowed)`** is callable only by `chainId`'s admin. It stores the flag and
-  sends an L2 service transaction to `chainId`'s `L2Bridgehub`: it registers the peer when allowed and clears the
-  peer's entry when revoked.
-  - Both chains must be registered and settle on L1. The peer can be neither the chain itself nor L1
-    (`InvalidInteropPeer`).
-  - Allowing also requires both chains to be enabled (`InteropNotEnabled`) and the peer to have a batch in L1's
-    message root ({protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). Revoking
-    requires neither.
-- **Consent is per side.** Each admin writes only its own chain's side, and a chain accepts interop only from
-  peers on its own side ([receive filter](#receive-filter)). Two-way interop needs both admins, and a one-sided
-  whitelist can strand flows ([K1](#k1-stuck-flows)). SDKs should check both sides on L1 before sending.
+- **`allowInteropPeer(chainId, peerChainId)`** is callable only by `chainId`'s admin. It sets the flag and sends an
+  L2 service transaction to `chainId`'s `L2Bridgehub.allowInteropPeer`, which sets `isPeerAllowed` and the peer's
+  `baseTokenAssetId`.
+  - Both chains must be registered, settle on L1 and be enabled (`InteropNotEnabled`). The peer can be neither the
+    chain itself nor L1 (`InvalidInteropPeer`), and must have a batch in L1's message root
+    ({protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}).
+  - Allowing is one-way in this release (`InteropPeerAlreadyAllowed`). Revoking a peer would need handling of the
+    pair's unfinalized messages first.
+- **Consent is per side.** Each admin writes only its own chain's side, and a chain sends interop to and accepts
+  it from only the peers on its own side ([receive filter](#receive-filter)). Two-way interop needs both admins,
+  and a one-sided whitelist can strand flows ([K1](#k1-stuck-flows)). SDKs should check both sides on L1 before
+  sending.
 - **`bridgehubDeposit`** (Bridgehub two-bridges path, encoding version `0x02`, data `abi.encode(peerChainId)`)
-  re-sends a pair's current state: the registration if allowed, the clearing otherwise. Anyone can call it, and
-  the caller pays the L1->L2 transaction in the base token.
-- **`registerChain`**, the retired consent-free registration, reverts with `RegistrationRequiresConsent`. Its paid
-  counterpart, deposit encoding version `0x01`, reverts with `UnsupportedEncodingVersion`. Governance clears the
-  pairs they registered ([Legacy registrations](#legacy-registrations)).
-- **`deregisterLegacyPairs(chainsRegisteredOn, chainsToDeregister)`** is owner-only. It sends the clearing service
-  transactions and leaves `interopPeerAllowed` untouched.
+  re-sends the registration of an allowed pair, and reverts with `InteropPeerNotAllowed` for any other pair. Anyone
+  can call it, and the caller pays the L1->L2 transaction in the base token.
+- **`registerChain`**, the retired consent-free registration, is removed. Its paid counterpart, deposit encoding
+  version `0x01`, reverts with `UnsupportedEncodingVersion`.
+- **`deregisterLegacyPairs(chainsRegisteredOn, chainsToDeregister)`** is an owner-only cleanup of the pairs
+  `registerChain` registered ([Legacy registrations](#legacy-registrations)). It sends the clearing service
+  transactions and reverts for an allowed pair (`InteropPeerAlreadyAllowed`). Nothing depends on it:
+  `registerChain` set only `baseTokenAssetId`, never `isPeerAllowed`, so neither `InteropCenter` nor the
+  [receive filter](#receive-filter) accept a legacy pair.
 
 ## Receive filter
 
@@ -126,12 +155,7 @@ Contracts don't enforce this rule yet. For now, the enabled chain's operator enf
 configuration, which includes force-failing L1->L2 transactions that break it. A later L2 release moves it into
 `AtomicFlowManager`. Until then, see [K2](#k2-operator-trust-until-the-on-chain-filter-ships).
 
-A source chain S is **allowed** for a chain C if S is C, or if both of these hold:
-
-- `interopPeerAllowed[C][S]` holds on L1;
-- C's `L2Bridgehub.baseTokenAssetId(S)` is non-zero.
-
-Then:
+A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. Then:
 
 - **Finality** (`requireFlowFinalized`, {protocol-docs/atomicity/flow.md#3-finalize--requireflowfinalized}) needs
   every leg's source to be allowed.
@@ -147,8 +171,10 @@ flow while another refunds it, and a leg is paid twice.
 
 ### Legacy registrations
 
-The retired `registerChain` registered pairs without consent. Clear them with `deregisterLegacyPairs` in the first
-governance transaction after the core upgrade. To find them:
+The removed `registerChain` registered pairs without consent. Once a chain's L2 is upgraded, its `InteropCenter`
+no longer sends to them ([whitelist](#interop-peer-whitelist)), so they are cleanup, not a safety issue: clear them
+with `deregisterLegacyPairs` in the first governance transaction after the core upgrade. Governance enables a chain
+only once every legacy pair involving it is cleared; this order is enforced offchain. To find them:
 
 1. list the L1 priority transactions that call the `registerChainForInterop` selector;
 2. cross-check each pair against `baseTokenAssetId` on the target chain's `L2Bridgehub`.
@@ -165,27 +191,31 @@ For each chain D and each asset not native to D, the backfill is the sum of two 
   - credit a timed-out leg only if it is in D's subtracted set;
   - count only evidence from roots that governance trusts.
 
-Finalize D's backfill only after D's legacy clearing is confirmed on D's L2. Otherwise D can still append legs that
-are never subtracted, and its cap becomes unbacked.
+D appends legs to legacy peers until its L2 upgrade, and to no one from then until it is enabled. So set D's
+backfill after D's upgrade, or overwrite it then. Otherwise the legs appended in between are never subtracted, and
+D's cap becomes unbacked.
 
 ### Before enabling
 
 Before `enableInterop(X)`:
 
-- wait for X's second proof system lock;
+- confirm on L2 that every [legacy pair](#legacy-registrations) involving X is cleared;
+- wait for X's second proof system lock, unless governance waives it;
 - check X's whole history:
   - the proof modes since the upgrade (no single-proven batches is recommended);
   - the interop X finalized or refunded while it was disabled;
-- confirm that every legacy registration on X's L2 is cleared;
+- set X's backfill for every asset X holds;
 - trust X's operator to run the [receive filter](#receive-filter).
 
 ### Order per chain
 
 1. Chain upgrade.
-2. Backfill, then finalize it.
-3. The admin turns ZiSK on and calls `lockSecondProofSystem`.
-4. Governance calls `enableInterop`.
-5. The admin calls `setInteropPeer` for each peer.
+2. Governance deregisters the chain's legacy pairs.
+3. Backfill.
+4. The admin turns ZiSK on and calls `lockSecondProofSystem`.
+5. Governance calls `enableInterop`.
+6. Anyone calls `moveChainBalanceToInteropPool` for each asset the chain holds.
+7. The admin calls `allowInteropPeer` for each peer.
 
 ## Known issues
 
@@ -195,7 +225,6 @@ A flow whose legs are all present but which some chain refuses can neither final
 
 - a one-sided whitelist;
 - a leg from a chain that the destination doesn't whitelist;
-- a revocation that lands while the flow is in flight;
 - legacy flows that involve a chain that stays disabled.
 
 SDKs should check both whitelists on L1 before sending.
@@ -208,11 +237,13 @@ pool. The same holds while the chain is in permanent priority mode.
 ### K3: undetermined backfill credits
 
 A [backfill credit](#backfill-amounts) that depends on a chain that stays disabled may never be determined. The
-affected users can't withdraw it unless governance credits it at its own risk (`increaseChainBalanceBackfill`).
+affected users can't withdraw it unless governance credits it at its own risk, by raising the backfill before the
+balance moves to the [interop pool](#interop-pool).
 
 ### Other limitations
 
-- Enabled chains stay uncapped, even after an emergency ZiSK-off.
+- Enabled chains stay in the pool, even after an emergency ZiSK-off.
+- Assets native to an enabled chain are not capped by the pool ([interop pool](#interop-pool)).
 - Pre-upgrade history is trusted.
 - The CTM, the upgrade contracts and the verifier code are trusted.
 - Disabled chains' L2->L1 messages stay verifiable, so apps that accept them take on that chain's prover risk.

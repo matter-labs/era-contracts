@@ -58,7 +58,7 @@ abstract contract InteropGatingDeployer is L1ContractDeployer, ZKChainDeployer, 
     function _enableInterop(uint256 _chainId) internal {
         _lockSecondProofSystem(_chainId);
         vm.prank(addresses.bridgehubOwnerAddress);
-        messageRoot.enableInterop(_chainId);
+        messageRoot.enableInterop(_chainId, true);
     }
 
     /// @notice Returns the L2 calldata of the single priority transaction `_chainId`'s diamond queued in `_logs`.

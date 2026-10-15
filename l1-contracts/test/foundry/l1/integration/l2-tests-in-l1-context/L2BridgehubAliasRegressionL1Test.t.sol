@@ -139,4 +139,53 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(testChainId, testBaseTokenAssetId);
     }
+
+    /// @notice The registration sender allows a peer: its base token is registered and the peer is allowed.
+    function test_allowInteropPeer() public {
+        uint256 testChainId = 12349;
+        bytes32 testBaseTokenAssetId = bytes32(uint256(0x13579));
+
+        vm.prank(aliasedChainRegistrationSender);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).allowInteropPeer(testChainId, testBaseTokenAssetId);
+
+        assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), testBaseTokenAssetId);
+        assertTrue(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    /// @notice Service transactions from L1 allow peers too.
+    function test_allowInteropPeer_serviceTransactionSender() public {
+        uint256 testChainId = 12350;
+        bytes32 testBaseTokenAssetId = bytes32(uint256(0x2468A));
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).allowInteropPeer(testChainId, testBaseTokenAssetId);
+
+        assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), testBaseTokenAssetId);
+        assertTrue(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    /// @notice Anyone else, including the non-aliased L1 address, is rejected.
+    function testFuzz_allowInteropPeer_revertWhen_unauthorized(address _caller) public {
+        vm.assume(_caller != aliasedChainRegistrationSender);
+        vm.assume(_caller != SERVICE_TRANSACTION_SENDER);
+        uint256 testChainId = 12351;
+
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).allowInteropPeer(testChainId, bytes32(uint256(0x1)));
+
+        assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    /// @notice The legacy registration entry point registers the base token without allowing the peer.
+    function test_registerChainForInterop_doesNotAllowPeer() public {
+        uint256 testChainId = 12352;
+        bytes32 testBaseTokenAssetId = bytes32(uint256(0x97531));
+
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).registerChainForInterop(testChainId, testBaseTokenAssetId);
+
+        assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), testBaseTokenAssetId);
+        assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
 }

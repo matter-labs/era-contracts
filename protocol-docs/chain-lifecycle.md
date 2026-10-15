@@ -78,8 +78,8 @@ interop-registration time instead (next section).
 ## Interop registration (`ChainRegistrationSender`)
 
 `ChainRegistrationSender` registers a chain on another chain's `L2Bridgehub`
-(`registerChainForInterop`) for the pairs the chain admins whitelisted, and clears the registration when a
-pair is revoked. Who may whitelist which pair, and how a pair's state is re-sent, is in
+(`allowInteropPeer`) for the pairs the chain admins whitelisted. Who may whitelist which pair, and
+how a registration is re-sent, is in
 {protocol-docs/interop-gating.md#interop-peer-whitelist}. Both chains of a whitelisted pair settle on L1:
 L1 itself builds interop roots (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding
 inclusion proofs, so L1-settled chains participate in interop without a gateway.
@@ -94,7 +94,7 @@ Checks performed before sending a registration (every path that sends one builds
   timeout precondition: interop towards a chain is only enabled once the chain both has its
   `sharedTree` leaf and has a batch in its chain tree.
 
-The pairs the retired consent-free `registerChain` registered passed the same checks, so no chain is
+The pairs the removed consent-free `registerChain` registered passed the same checks, so no chain is
 registered for interop with an empty tree. Governance clears them
 ({protocol-docs/interop-gating.md#legacy-registrations}).
 

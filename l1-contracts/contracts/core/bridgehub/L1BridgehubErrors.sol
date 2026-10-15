@@ -32,6 +32,10 @@ error IncorrectSender(address prevMsgSender, address chainAdmin);
 error InteropAlreadyEnabled(uint256 chainId);
 // 0x13b3ef48
 error InteropNotEnabled(uint256 chainId);
+// 0x927cf466
+error InteropPeerAlreadyAllowed(uint256 chainId, uint256 peerChainId);
+// 0x2d958c8c
+error InteropPeerNotAllowed(uint256 chainId, uint256 peerChainId);
 // 0x04bd744b
 error InvalidInteropPeer(uint256 chainId, uint256 peerChainId);
 // 0x896555dc
@@ -74,8 +78,6 @@ error OnlyChainAssetHandler(address sender, address chainAssetHandler);
 error OnlyGateway();
 // 0x8d14ca84
 error OnlyL1();
-// 0xa5b2d8f3
-error RegistrationRequiresConsent();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x59b9bf0e

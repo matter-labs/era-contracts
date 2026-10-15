@@ -159,13 +159,18 @@ abstract contract L1NativeTokenVaultTestBase is Test {
             abi.encode(0)
         );
         // The vault is isolated from the message root, from which it only reads whether a chain's interop is
-        // enabled: it is disabled for `chainId` unless a test enables it.
+        // enabled: it is disabled for every chain unless a test enables it. The mock matches any chain ID, and
+        // `_mockInteropEnabled` overrides it for one.
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehubBase.messageRoot.selector),
             abi.encode(messageRootAddress)
         );
-        _mockInteropEnabled(chainId, false);
+        vm.mockCall(
+            messageRootAddress,
+            abi.encodeWithSelector(IL1MessageRoot.isInteropEnabled.selector),
+            abi.encode(false)
+        );
 
         // Setup L1Nullifier
         vm.prank(owner);

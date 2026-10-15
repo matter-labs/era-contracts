@@ -609,11 +609,11 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         ctx.l2Token = initializeTokenByDeposit();
         IERC20(ctx.l2Token).transfer(_depositor, BRIDGED_VALUE_LEG_AMOUNT);
 
-        // Register the different-base destination through the real registry: the one entry whose base
+        // Allow the different-base destination through the real registry: the one entry whose base
         // token differs from this chain's.
         bytes32 differentBaseAssetId = L2_NATIVE_TOKEN_VAULT.assetId(ctx.l2Token);
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.registerChainForInterop(DIFFERENT_BASE_DEST_CHAIN_ID, differentBaseAssetId);
+        l2Bridgehub.allowInteropPeer(DIFFERENT_BASE_DEST_CHAIN_ID, differentBaseAssetId);
 
         // A direct value leg built by hand: `InteropLibrary.buildSendDestinationChainBaseTokenCall` routes
         // different-base transfers indirectly (bridging THIS chain's base token as an asset); here we

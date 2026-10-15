@@ -6,6 +6,15 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
+/// @notice A governance-provided amount of an asset a chain held before its deposits and withdrawals were
+/// recorded. See {protocol-docs/interop-gating.md#backfill}.
+/// @param amount The backfill amount.
+/// @param set Whether governance set the backfill, which tells a zero backfill from none.
+struct ChainBalanceBackfill {
+    uint256 amount;
+    bool set;
+}
+
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -50,23 +59,30 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// `bridgedOut`; zero for assets that were skipped or had no legacy amount.
     function populateBridgedOut(bytes32[] calldata _assetIds) external returns (uint256[] memory populatedAmounts);
 
-    /// @notice Total amount of `_assetId` deposited into `_chainId` through this vault since the
-    /// per-chain balance cap was introduced. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
+    /// @notice Total amount of `_assetId` deposited into `_chainId` through this vault while the chain had
+    /// no interop. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
     function chainTotalDeposited(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
-    /// @notice Total amount of `_assetId` withdrawn from `_chainId`, failed-deposit claims included, since
-    /// the per-chain balance cap was introduced.
+    /// @notice Total amount of `_assetId` withdrawn from `_chainId`, failed-deposit claims included, while
+    /// the chain had no interop.
     function chainTotalWithdrawn(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
-    /// @notice Governance-provided amount of `_assetId` the chain held before the per-chain balance cap
-    /// was introduced. See {protocol-docs/interop-gating.md#backfill}.
-    function chainBalanceBackfill(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+    /// @notice Governance-provided amount of `_assetId` the chain held before its deposits and withdrawals
+    /// were recorded, and whether it was set. See {protocol-docs/interop-gating.md#backfill}.
+    function chainBalanceBackfill(uint256 _chainId, bytes32 _assetId) external view returns (uint256 amount, bool set);
 
-    /// @notice Whether the initial backfill of `_chainId` is finalized, after which it can only increase.
-    function chainBalanceBackfillFinalized(uint256 _chainId) external view returns (bool);
+    /// @notice Whether the balance of `_chainId` in `_assetId` was moved to the interop pool.
+    /// See {protocol-docs/interop-gating.md#interop-pool}.
+    function chainBalanceInInteropPool(uint256 _chainId, bytes32 _assetId) external view returns (bool);
 
-    /// @notice Sets the backfill of `_chainId` for each asset, overwriting the previous values.
-    /// Only callable before `finalizeChainBalanceBackfill`. See {protocol-docs/interop-gating.md#backfill}.
+    /// @notice Total amount of `_assetId` deposited into the chains with interop, moved chain balances included.
+    function interopPoolTotalDeposited(bytes32 _assetId) external view returns (uint256);
+
+    /// @notice Total amount of `_assetId` withdrawn from the chains with interop, moved chain balances included.
+    function interopPoolTotalWithdrawn(bytes32 _assetId) external view returns (uint256);
+
+    /// @notice Sets the backfill of `_chainId` for each asset, overwriting the previous values. Reverts for an
+    /// asset whose balance is already in the interop pool. See {protocol-docs/interop-gating.md#backfill}.
     /// @param _chainId The chain to set the backfill for.
     /// @param _assetIds The assets to set the backfill for.
     /// @param _amounts The backfill amounts, one per entry of `_assetIds`.
@@ -76,28 +92,25 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
         uint256[] calldata _amounts
     ) external;
 
-    /// @notice Permanently finalizes the initial backfill of `_chainId`.
-    /// @param _chainId The chain to finalize the backfill for.
-    function finalizeChainBalanceBackfill(uint256 _chainId) external;
-
-    /// @notice Adds to the backfill of `_chainId` for each asset. Only callable after
-    /// `finalizeChainBalanceBackfill`. See {protocol-docs/interop-gating.md#backfill}.
-    /// @param _chainId The chain to increase the backfill for.
-    /// @param _assetIds The assets to increase the backfill for.
-    /// @param _amounts The amounts to add, one per entry of `_assetIds`.
-    function increaseChainBalanceBackfill(
-        uint256 _chainId,
-        bytes32[] calldata _assetIds,
-        uint256[] calldata _amounts
-    ) external;
+    /// @notice Moves the balance of `_chainId` in `_assetId`, its backfill included, to the interop pool.
+    /// Callable by anyone once the chain has interop and its backfill for the asset is set.
+    /// See {protocol-docs/interop-gating.md#interop-pool}.
+    /// @param _chainId The chain with interop.
+    /// @param _assetId The asset to move.
+    function moveChainBalanceToInteropPool(uint256 _chainId, bytes32 _assetId) external;
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 
     /// @notice Emitted with the new backfill of `assetId` on `chainId`.
     event ChainBalanceBackfilled(uint256 indexed chainId, bytes32 indexed assetId, uint256 amount);
 
-    /// @notice Emitted when the initial backfill of `chainId` is finalized.
-    event ChainBalanceBackfillFinalized(uint256 indexed chainId);
+    /// @notice Emitted when the balance of `chainId` in `assetId` moves to the interop pool.
+    event ChainBalanceMovedToInteropPool(
+        uint256 indexed chainId,
+        bytes32 indexed assetId,
+        uint256 deposited,
+        uint256 withdrawn
+    );
 
     /// @notice Emitted for every asset folded into `bridgedOut`, including zero amounts.
     event BridgedOutPopulated(bytes32 indexed assetId, uint256 amount);
