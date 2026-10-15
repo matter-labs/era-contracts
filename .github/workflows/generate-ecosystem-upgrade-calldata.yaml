@@ -330,27 +330,23 @@ jobs:
       PROTOCOL_OPS_TAG: ${{ inputs.protocol_ops_tag }}
 
     steps:
+      # Only build-docker.yaml sets the revision label: the commit checked out below.
       - name: Pull the protocol-ops image
         id: image
         run: |
           set -euo pipefail
-          if [[ "$PROTOCOL_OPS_TAG" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            ref="ghcr.io/matter-labs/protocol-ops@$PROTOCOL_OPS_TAG"
-          elif [[ "$PROTOCOL_OPS_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
-            ref="ghcr.io/matter-labs/protocol-ops:$PROTOCOL_OPS_TAG"
-          else
-            echo "::error::invalid protocol_ops_tag '$PROTOCOL_OPS_TAG': expected a tag or sha256:<digest>"; exit 1
+          case "$PROTOCOL_OPS_TAG" in
+            sha256:*) image="ghcr.io/matter-labs/protocol-ops@$PROTOCOL_OPS_TAG" ;;
+            *) image="ghcr.io/matter-labs/protocol-ops:$PROTOCOL_OPS_TAG" ;;
+          esac
+          docker pull --quiet --platform=linux/amd64 "$image"
+          revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")"
+          if [ -z "$revision" ]; then
+            echo "::error::$image has no revision label: release it with build-docker.yaml"; exit 1
           fi
-          docker pull --quiet --platform=linux/amd64 "$ref"
-          digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$ref" | grep -m1 '^ghcr.io/matter-labs/protocol-ops@')"
-          revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$ref")"
-          if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::$ref has no revision label (org.opencontainers.image.revision): release an image with build-docker.yaml"; exit 1
-          fi
-          echo "image=$ref digest=$digest revision=$revision"
           {
-            echo "digest=$digest"
             echo "revision=$revision"
+            echo "digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
           } >> "$GITHUB_OUTPUT"
 
       # The configs protocol-ops.sh mounts into the image must be the ones it
@@ -601,18 +597,10 @@ jobs:
             echo '::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first.'
             exit 1
           fi
-          digest="$(jq -r '.protocol_ops_image.digest // empty' "$meta")"
-          if [[ ! "$digest" =~ ^ghcr\.io/matter-labs/protocol-ops@sha256:[0-9a-f]{64}$ ]]; then
-            echo "::error::The bundle names no protocol-ops image digest ('$digest')."
-            exit 1
-          fi
-          commit="$(jq -r '.contracts_commit // empty' "$meta")"
-          if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::The bundle names no contracts commit ('$commit')."
-            exit 1
-          fi
+          image="$(jq -er '.protocol_ops_image.digest | sub(".*@"; "")' "$meta")"
+          commit="$(jq -er .contracts_commit "$meta")"
           {
-            echo "image=${digest#*@}"
+            echo "image=$image"
             echo "commit=$commit"
           } >> "$GITHUB_OUTPUT"
 

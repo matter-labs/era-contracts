@@ -211,40 +211,28 @@ jobs:
           run-id: ${{ inputs.resume_deploy_run_id }}
           github-token: ${{ github.token }}
 
-      # The image is pulled by the digest the bundle records; the commit it was
-      # built from (its revision label) must be the bundle's, which the checkout
-      # below then provides for protocol-ops.sh and the upgrade's configs.
+      # The bundle names the image it was generated with, pulled by digest, and the
+      # commit that image was built from; the checkout below takes protocol-ops.sh
+      # and the upgrade's configs from that commit.
       - name: Pull the bundle's protocol-ops image
         run: |
           set -euo pipefail
-          META="$(find "$RUNNER_TEMP/deploy-inputs" -name bundle-metadata.json -print -quit)"
-          if [ -z "$META" ]; then
-            echo "::error::bundle-metadata.json not found in the downloaded deploy inputs"
-            exit 1
-          fi
-          DEPLOY_BUNDLE_DIR="$(dirname "$META")"
-          digest="$(jq -r '.protocol_ops_image.digest // empty' "$META")"
-          if [[ ! "$digest" =~ ^ghcr\.io/matter-labs/protocol-ops@sha256:[0-9a-f]{64}$ ]]; then
-            echo "::error::the bundle names no protocol-ops image digest ('$digest'): re-generate it with a released image (protocol_ops_tag)"
-            exit 1
-          fi
-          commit="$(jq -r '.contracts_commit // empty' "$META")"
-          if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::the bundle names no contracts commit ('$commit')"
-            exit 1
+          bundle="$RUNNER_TEMP/deploy-inputs"
+          digest="$(jq -r '.protocol_ops_image.digest // empty' "$bundle/bundle-metadata.json")"
+          commit="$(jq -r '.contracts_commit' "$bundle/bundle-metadata.json")"
+          if [ -z "$digest" ]; then
+            echo "::error::the bundle names no protocol-ops image: generate it with a released one"; exit 1
           fi
           docker pull --quiet --platform=linux/amd64 "$digest"
-          revision="$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$digest")"
-          if [ "$revision" != "$commit" ]; then
-            echo "::error::image $digest was built from '$revision', the bundle from $commit"
-            exit 1
+          revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$digest")"
+          if [ -z "$revision" ] || [ "$revision" != "$commit" ]; then
+            echo "::error::$digest was built from '$revision', the bundle from '$commit'"; exit 1
           fi
-          echo "Bundle image: $digest (built from $commit)"
           {
-            echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR"
+            echo "DEPLOY_BUNDLE_DIR=$bundle"
             echo "BUNDLE_IMAGE=${digest#*@}"
             echo "BUNDLE_COMMIT=$commit"
-            echo "EXTRA_MOUNTS=$DEPLOY_BUNDLE_DIR:/contracts/deploy-bundle:ro"
+            echo "EXTRA_MOUNTS=$bundle:/contracts/deploy-bundle:ro"
           } >> "$GITHUB_ENV"
 
       - name: Checkout the bundle's commit
