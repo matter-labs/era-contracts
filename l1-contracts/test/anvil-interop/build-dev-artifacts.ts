@@ -36,6 +36,14 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
     reason: "spec 14 reads the L1 interop fee manager and round-trips a chain's prepaid balance via its ABI",
   },
   {
+    contractPath: "contracts/core/message-root/L1MessageRoot.sol",
+    reason: "spec 01 reads which chains have interop enabled via its ABI",
+  },
+  {
+    contractPath: "contracts/core/chain-registration/ChainRegistrationSender.sol",
+    reason: "spec 01 reads the allowed interop peers via its ABI",
+  },
+  {
     contractPath: "lib/openzeppelin-contracts-v4/contracts/proxy/transparent/ProxyAdmin.sol",
     reason: "spec 14 reads the owner of the CTM's ProxyAdmin, which must also own the interop fee manager",
   },
