@@ -92,7 +92,7 @@ Order matters: l1 needs da artifacts, anvil-interop needs both, and `l1 build:fo
 
 ```bash
 cd l1-contracts
-yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*'
+yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*'
 ```
 
 Common foundry test failures and their root causes:

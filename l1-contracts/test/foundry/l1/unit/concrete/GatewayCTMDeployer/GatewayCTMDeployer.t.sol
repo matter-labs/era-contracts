@@ -35,7 +35,7 @@ import {
     AllDeployerResults,
     DeployedContractsComparator,
     GatewayCTMDeployerTestUtils
-} from "test/foundry/unit/utils/GatewayCTMDeployerTestUtils.sol";
+} from "./GatewayCTMDeployerTestUtils.sol";
 
 /// @notice Tester contract that deploys via the deterministic CREATE2 factory (Arachnid's)
 contract GatewayCTMDeployerTester {

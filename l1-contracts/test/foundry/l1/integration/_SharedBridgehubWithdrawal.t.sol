@@ -21,11 +21,10 @@ import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddr
 import {LogFinder} from "test-utils/LogFinder.sol";
 
 /// @title SharedBridgehubWithdrawal
-/// @notice Shared base for the Bridgehub invariant test harnesses that finalize base-token
+/// @notice Base for the Bridgehub test harness (`BridgehubTests.t.sol`) that finalizes base-token
 /// withdrawals from L2 to L1 via the new asset-router API.
-/// @dev De-duplicates helpers previously copied into both `BridgehubInvariantTests` harnesses. The
-/// shared withdrawal state (`currentUser`, `currentChainId`, `currentToken`, ...) is assigned by
-/// modifiers that remain in the subclasses (e.g. `useUser`, `useZKChain`).
+/// @dev The withdrawal state (`currentUser`, `currentChainId`, `currentToken`, ...) is assigned by
+/// modifiers in the subclass (e.g. `useUser`, `useZKChain`).
 abstract contract SharedBridgehubWithdrawal is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using LogFinder for Vm.Log[];
 

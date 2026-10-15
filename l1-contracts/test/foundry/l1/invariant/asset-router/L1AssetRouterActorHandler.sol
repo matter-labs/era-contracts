@@ -15,7 +15,7 @@ import {
     TOKEN_DEFAULT_DECIMALS,
     TOKEN_DEFAULT_NAME,
     TOKEN_DEFAULT_SYMBOL
-} from "../common/Constants.sol";
+} from "./Constants.sol";
 import {UserActorHandler} from "./UserActorHandler.sol";
 
 contract L1AssetRouterActorHandler is Test {

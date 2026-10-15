@@ -159,6 +159,10 @@ jobs:
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
 
+      # The l1-contracts tests keep a copy of this da-contracts file; it must stay identical.
+      - name: Check the da-contracts errors copy is in sync
+        run: diff da-contracts/contracts/DAContractsErrors.sol l1-contracts/test/foundry/l1/da-contracts-imports/DAContractsErrors.sol
+
       # The real-pairing ZiSK suite needs the GPL-3 PLONK backend, which this
       # repository does not ship; it skips here and runs in zksync-os-integration-tests.
       - name: Run tests

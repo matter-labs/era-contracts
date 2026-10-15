@@ -18,7 +18,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {L1_TOKEN_ADDRESS} from "../common/Constants.sol";
+import {L1_TOKEN_ADDRESS} from "./Constants.sol";
 
 contract UserActorHandler is Test {
     uint256 public ghost_totalWithdrawalAmount;
