@@ -208,7 +208,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #   2. BEFORE the block that bumped the CTM protocol versions — that is the
 #      upgrade execution itself, and past it constraint 1's gate flips.
 #   3. Rotate the salts in `upgrade-envs/<upgrade>/<env>.toml` first (the
-#      config comments say to do this every regen anyway). The previous regen's
+#      config comments say to do this every regen anyway), and release an image
+#      with them (.github/workflows/README.md#release-flow). The previous regen's
 #      CREATE2 addresses are already occupied at any post-deployment block, so a
 #      re-prepare with the old salts can only run at a block before that
 #      deployment — which violates constraint 1.
@@ -557,7 +558,7 @@ jobs:
             echo '::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first.'
             exit 1
           fi
-          image="$(jq -er '.protocol_ops_image.digest | sub(".*@"; "")' "$meta")"
+          image="$(jq -er '.protocol_ops_image.digest // error("the bundle names no protocol-ops image") | sub(".*@"; "")' "$meta")"
           commit="$(jq -er .contracts_commit "$meta")"
           {
             echo "image=$image"

@@ -255,6 +255,8 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 ## Step 3 — verify the deployment (PUVT)
 
+This step still runs a local build of `protocol_ops`, until #2525 replaces `verify-upgrade`.
+
 ```bash
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
 # ./deploy-result: step 2's local journal, or the deploy run's

@@ -14,8 +14,8 @@ Nothing is compiled per run: the image is what gets released and tested.
    and `integration_tests_run_url=<that run>`; it refuses to push without them. Before pushing, it runs
    the anvil-interop upgrade test (`run-upgrade-test.ts`: the previous release's chain states, upgraded
    with this image's `protocol_ops`) inside the image. The run summary gives the tag and digest.
-4. Pass that tag as `protocol_ops_tag` to every workflow below: `generate-ecosystem-upgrade-calldata`,
-   `deploy-ecosystem-upgrade` (which takes the image from the bundle), then the chain workflows.
+4. Pass that tag as `protocol_ops_tag` to `generate-ecosystem-upgrade-calldata` and the chain
+   workflows; `deploy-ecosystem-upgrade` runs the image its bundle names.
 
 `protocol_ops_tag` is an image tag or `sha256:<digest>`. Images without the
 `org.opencontainers.image.revision` label `build-docker` sets (such as those `build-and-push-docker`
