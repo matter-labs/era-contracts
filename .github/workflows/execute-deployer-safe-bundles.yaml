@@ -1,10 +1,10 @@
 name: "Execute Deployer Safe Bundles"
 
 # Apply Safe Transaction Builder bundles whose `target` is the ecosystem
-# deployer EOA (i.e. bundles emitted by the chain-init workflow and the
-# ecosystem upgrade-prepare workflow). The deployer's private key is pulled
-# from a per-environment secret and used to sign every tx in the bundle via
-# `protocol-ops dev execute-safe`.
+# deployer EOA (i.e. bundles emitted by the chain-init workflow). The
+# deployer's private key is pulled from a per-environment secret and used to
+# sign every tx in the bundle via `protocol-ops dev execute-safe`. Ecosystem
+# upgrade bundles go through `deploy-ecosystem-upgrade.yaml` instead.
 #
 # The workflow downloads bundles produced by a prior "generate" workflow
 # run, so it's typically dispatched after a generate workflow has been
@@ -14,16 +14,12 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment (selects DEPLOYER_PRIVATE_KEY_* secret + env dir)"
+        description: "Target environment = upgrade-envs/permanent-values/<env>.toml preset; selects the DEPLOYER_PRIVATE_KEY_* secret (stage → STAGE, testnet → SEPOLIA, mainnet → MAINNET)"
         required: true
         type: choice
-        options:
-          - stage
-          - stage-interop-tests
-          - sepolia
-          - mainnet
+        options: [stage, testnet, mainnet]
       protocol_ops_tag:
-        description: "protocol-ops Docker image tag (e.g. latest, v0.31.0)"
+        description: "protocol-ops Docker image tag"
         required: true
         type: string
       l1_rpc_url:
@@ -35,7 +31,7 @@ on:
         required: true
         type: string
       artifact_name:
-        description: "Name of the uploaded Safe-bundle artifact (e.g. safe-bundles-chain-init-my_chain-sepolia)"
+        description: "Name of the uploaded Safe-bundle artifact (e.g. safe-bundles-chain-init-270-testnet)"
         required: true
         type: string
 
@@ -48,19 +44,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      ENV_DIR: environments/${{ inputs.environment }}
       BUNDLE_DIR: bundles
+      # `dev execute-safe` reads the bundles inside the container.
+      EXTRA_MOUNTS: ${{ github.workspace }}/bundles:/contracts/bundles
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install yq + jq
-        run: |
-          sudo wget -qO /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq jq
 
       - name: Download Safe-bundle artifact
         uses: actions/download-artifact@v4
@@ -70,16 +59,30 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.source_run_id }}
 
-      - name: Resolve deployer address from ecosystem.yaml
+      - name: Select deployer private key + resolve its address
         id: deployer
+        env:
+          KEY_STAGE: ${{ secrets.DEPLOYER_PRIVATE_KEY_STAGE }}
+          KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
-          addr=$(yq -er '.deployer' "$ENV_DIR/ecosystem.yaml")
-          if [[ -z "$addr" || "$addr" == "null" ]]; then
-            echo "error: ecosystem.yaml in $ENV_DIR has no .deployer field — set it or pass the deployer explicitly" >&2
+          case "${{ inputs.environment }}" in
+            stage)   secret=STAGE   key="$KEY_STAGE" ;;
+            testnet) secret=SEPOLIA key="$KEY_SEPOLIA" ;;
+            mainnet) secret=MAINNET key="$KEY_MAINNET" ;;
+            *)       echo "unknown environment" >&2; exit 1 ;;
+          esac
+          if [[ -z "$key" ]]; then
+            echo "error: DEPLOYER_PRIVATE_KEY_$secret secret is empty" >&2
             exit 1
           fi
+          echo "::add-mask::$key"
+          addr=$(bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" cast wallet address --private-key "$key")
           echo "addr=$addr" >> "$GITHUB_OUTPUT"
-          echo "Deployer (from $ENV_DIR/ecosystem.yaml): $addr"
+          echo "Deployer (from DEPLOYER_PRIVATE_KEY_$secret): $addr"
+          # Don't echo the key into $GITHUB_OUTPUT (GH redacts, but keep it
+          # in $GITHUB_ENV which is scoped to this job only).
+          echo "DEPLOYER_KEY=$key" >> "$GITHUB_ENV"
 
       - name: Verify every bundle targets the deployer
         env:
@@ -109,28 +112,6 @@ jobs:
           fi
           echo "All bundles target the deployer EOA."
 
-      - name: Select deployer private key
-        id: key
-        env:
-          KEY_STAGE: ${{ secrets.DEPLOYER_PRIVATE_KEY_STAGE }}
-          KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
-          KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
-        run: |
-          case "${{ inputs.environment }}" in
-            stage)   key="$KEY_STAGE" ;;
-            sepolia) key="$KEY_SEPOLIA" ;;
-            mainnet) key="$KEY_MAINNET" ;;
-            *)       echo "unknown environment" >&2; exit 1 ;;
-          esac
-          if [[ -z "$key" ]]; then
-            echo "error: DEPLOYER_PRIVATE_KEY_${{ inputs.environment }} secret is empty" >&2
-            exit 1
-          fi
-          # Don't echo the key into $GITHUB_OUTPUT (GH redacts, but keep it
-          # in $GITHUB_ENV which is scoped to this job only).
-          echo "DEPLOYER_KEY=$key" >> "$GITHUB_ENV"
-          echo "::add-mask::$key"
-
       - name: Execute bundles in manifest order
         run: |
           # Iterate manifest.json in declared order; `dev execute-safe` is
@@ -143,7 +124,7 @@ jobs:
             echo ">>> dev execute-safe $file"
             bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
               dev execute-safe \
-              --safe-file "$BUNDLE_DIR/$file" \
+              --safe-file "/contracts/bundles/$file" \
               --l1-rpc-url "${{ inputs.l1_rpc_url }}" \
               --private-key "$DEPLOYER_KEY"
           done

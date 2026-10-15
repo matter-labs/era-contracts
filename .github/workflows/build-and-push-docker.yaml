@@ -25,7 +25,7 @@ jobs:
 
       # The protocol Dockerfile bakes zk-governance into the image
       # (`COPY zk-governance /zk-governance`), so it must be present in the
-      # build context. Same checkout as in build-docker.yaml.
+      # build context. build-docker.yaml pins it to a commit instead.
       - name: Checkout zk-governance
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -57,17 +57,21 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "Tags: $SHA, $BRANCH"
 
-          TAGS="ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${SHA}"
-          TAGS="${TAGS},ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${BRANCH}"
-          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "branch_tag=ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${BRANCH}" >> "$GITHUB_OUTPUT"
 
+      # On a toolchain base built from the same commit, as in build-docker.yaml.
       - name: Build and push Docker image
-        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
+        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
         with:
-          context: .
+          source: .
+          files: docker/protocol/docker-bake.hcl
+          targets: protocol
           push: true
-          platforms: linux/amd64
-          file: docker/protocol/Dockerfile
-          tags: ${{ steps.tags.outputs.tags }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          set: |
+            base.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache-base
+            base.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache-base,mode=max
+            protocol.cache-from=type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+            protocol.cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+            protocol.tags=${{ steps.tags.outputs.sha_tag }}
+            protocol.tags=${{ steps.tags.outputs.branch_tag }}
