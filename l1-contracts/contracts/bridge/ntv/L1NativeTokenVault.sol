@@ -34,9 +34,9 @@ import {
 import {
     AssetNotNativeToL1,
     ChainBalanceAlreadyInInteropPool,
+    ChainBalanceBackfillAlreadySet,
     ChainBalanceBackfillNotSet,
     ChainBalanceExceeded,
-    InteropPoolBalanceExceeded,
     OnlyFailureStatusAllowed,
     WrongCounterpart
 } from "../L1BridgeContractErrors.sol";
@@ -223,7 +223,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(assetIdsLength == _amounts.length, ArrayLengthMismatch(assetIdsLength, _amounts.length));
         for (uint256 i = 0; i < assetIdsLength; ++i) {
             bytes32 assetId = _assetIds[i];
-            require(!chainBalanceInInteropPool[_chainId][assetId], ChainBalanceAlreadyInInteropPool(_chainId, assetId));
+            require(!chainBalanceBackfill[_chainId][assetId].set, ChainBalanceBackfillAlreadySet(_chainId, assetId));
             chainBalanceBackfill[_chainId][assetId] = ChainBalanceBackfill({amount: _amounts[i], set: true});
             emit ChainBalanceBackfilled(_chainId, assetId, _amounts[i]);
         }
@@ -393,19 +393,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    /// @dev Records the outbound flow of L1-native tokens (see `bridgedOut`) and the deposit, to the
-    /// interop pool if the chain has interop and to the chain otherwise.
+    /// @dev Records the outbound flow of L1-native tokens (see `bridgedOut`) and the deposit, if the chain's
+    /// balance in the asset is tracked.
     function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         uint256 assetOriginChainId = originChainId[_assetId];
         if (assetOriginChainId == block.chainid) {
             bridgedOut[_assetId] += _amount;
         }
-        if (assetOriginChainId != _chainId) {
-            if (_messageRoot().isInteropEnabled(_chainId)) {
-                interopPoolTotalDeposited[_assetId] += _amount;
-            } else {
-                chainTotalDeposited[_chainId][_assetId] += _amount;
-            }
+        (bool tracked, mapping(bytes32 => uint256) storage deposited, , ) = _trackedBalance(
+            _chainId,
+            assetOriginChainId
+        );
+        if (tracked) {
+            deposited[_assetId] += _amount;
         }
     }
 
@@ -421,43 +421,54 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
             bridgedOut[_assetId] -= _amount;
         }
-        if (assetOriginChainId != _chainId) {
-            _recordChainWithdrawal(_chainId, _assetId, _amount, assetOriginChainId);
+        (
+            bool tracked,
+            mapping(bytes32 => uint256) storage deposited,
+            mapping(bytes32 => uint256) storage withdrawn,
+            bool hasInterop
+        ) = _trackedBalance(_chainId, assetOriginChainId);
+        if (tracked) {
+            uint256 newWithdrawn = withdrawn[_assetId] + _amount;
+            uint256 available = deposited[_assetId];
+            uint256 backfill = hasInterop ? 0 : chainBalanceBackfill[_chainId][_assetId].amount;
+            // Written as two comparisons so that a backfill close to `type(uint256).max` cannot overflow.
+            if (newWithdrawn > available && newWithdrawn - available > backfill) {
+                revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, available + backfill);
+            }
+            withdrawn[_assetId] = newWithdrawn;
         }
     }
 
-    /// @notice Records an amount leaving `_chainId` through this vault: against the interop pool if the chain
-    /// has interop, and against the chain's own balance otherwise.
-    /// See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
-    /// @param _chainId The chain the amount leaves.
-    /// @param _assetId The asset being withdrawn.
-    /// @param _amount The amount being withdrawn.
+    /// @notice Returns the totals that bound what leaves `_chainId`: the interop pool's if the chain has interop,
+    /// and the chain's own otherwise. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
+    /// @param _chainId The chain.
     /// @param _assetOriginChainId The origin chain of the asset.
-    function _recordChainWithdrawal(
+    /// @return tracked Whether the asset is tracked at all: it is not if it is native to the chain, or if both the
+    /// chain and the asset's origin have interop.
+    /// @return deposited The deposited totals, by asset.
+    /// @return withdrawn The withdrawn totals, by asset.
+    /// @return hasInterop Whether the chain has interop, so the totals are the pool's.
+    function _trackedBalance(
         uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
         uint256 _assetOriginChainId
-    ) internal {
+    )
+        internal
+        view
+        returns (
+            bool tracked,
+            mapping(bytes32 => uint256) storage deposited,
+            mapping(bytes32 => uint256) storage withdrawn,
+            bool hasInterop
+        )
+    {
         IL1MessageRoot messageRoot = _messageRoot();
-        if (messageRoot.isInteropEnabled(_chainId)) {
-            uint256 newPoolWithdrawn = interopPoolTotalWithdrawn[_assetId] + _amount;
-            uint256 poolDeposited = interopPoolTotalDeposited[_assetId];
-            // Interop brings tokens native to an interop chain into the pool without passing L1, so the
-            // pool does not bound them. See {protocol-docs/interop-gating.md#interop-pool}.
-            if (newPoolWithdrawn > poolDeposited && !messageRoot.isInteropEnabled(_assetOriginChainId)) {
-                revert InteropPoolBalanceExceeded(_assetId, newPoolWithdrawn, poolDeposited);
-            }
-            interopPoolTotalWithdrawn[_assetId] = newPoolWithdrawn;
+        hasInterop = messageRoot.isInteropEnabled(_chainId);
+        if (hasInterop) {
+            tracked = !messageRoot.isInteropEnabled(_assetOriginChainId);
+            (deposited, withdrawn) = (interopPoolTotalDeposited, interopPoolTotalWithdrawn);
         } else {
-            uint256 newWithdrawn = chainTotalWithdrawn[_chainId][_assetId] + _amount;
-            uint256 deposited = chainTotalDeposited[_chainId][_assetId];
-            uint256 backfill = chainBalanceBackfill[_chainId][_assetId].amount;
-            // Written as two comparisons so that a backfill close to `type(uint256).max` cannot overflow.
-            if (newWithdrawn > deposited && newWithdrawn - deposited > backfill) {
-                revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, deposited + backfill);
-            }
-            chainTotalWithdrawn[_chainId][_assetId] = newWithdrawn;
+            tracked = _assetOriginChainId != _chainId;
+            (deposited, withdrawn) = (chainTotalDeposited[_chainId], chainTotalWithdrawn[_chainId]);
         }
     }
 

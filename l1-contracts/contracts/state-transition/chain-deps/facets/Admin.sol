@@ -65,6 +65,7 @@ import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 import {IOwnable} from "../../../common/interfaces/IOwnable.sol";
+import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -115,6 +116,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Performs diamond cut and emits ExecuteUpgrade event
     function _executeDiamondCut(Diamond.DiamondCutData memory _diamondCut) internal {
         Diamond.diamondCut(_diamondCut);
+        // Repeats the check of `BaseZkSyncUpgrade._setVerifier`, for an upgrade that sets the verifier without it.
+        // See {protocol-docs/interop-gating.md#second-proof-system-lock}.
+        if (s.secondProofSystemLocked) {
+            uint256 proofMode = IZKsyncOSVerifier(address(s.verifier)).getProofMode(0);
+            if (proofMode != ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE) {
+                revert NotMultiProofMode(proofMode);
+            }
+        }
         emit ExecuteUpgrade(_diamondCut);
     }
 

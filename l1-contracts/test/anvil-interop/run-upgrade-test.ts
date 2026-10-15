@@ -17,6 +17,9 @@ runUpgradeScenario({
   // only the chains that settle on L1 in the source states, the gateway itself included, since chains 12 and
   // 14 settle on the gateway in the v0.34.0 states but on L1 in the current config.
   targetRoles: ["directSettled", "gateway"],
+  // Runs on the two target chains: the gateway stands in as an ordinary L1-settled peer, being the only other
+  // chain the upgrade covers.
+  checkInteropGating: true,
 })
   .then(() => {
     process.exit(0);

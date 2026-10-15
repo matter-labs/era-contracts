@@ -6,7 +6,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
-import {Unauthorized} from "../../common/L1ContractErrors.sol";
+import {EmptyAssetId, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
@@ -91,17 +91,23 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
     }
 
-    /// @notice used to register chains on L2 for the purpose of interop.
-    /// @param _chainId the chainId of the chain to be registered.
-    /// @param _baseTokenAssetId the base token asset id of the chain.
+    /// @inheritdoc IL2Bridgehub
     function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+        require(_baseTokenAssetId != bytes32(0), EmptyAssetId());
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
     }
 
     /// @inheritdoc IL2Bridgehub
     function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+        require(_baseTokenAssetId != bytes32(0), EmptyAssetId());
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
         isPeerAllowed[_chainId] = true;
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function deregisterChainForInterop(uint256 _chainId) external onlyChainRegistrationSender {
+        delete baseTokenAssetId[_chainId];
+        delete isPeerAllowed[_chainId];
     }
 
     /*//////////////////////////////////////////////////////////////

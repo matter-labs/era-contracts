@@ -83,6 +83,42 @@ export class InteropChainRegistrar {
     console.log(`   ✅ Chain ${chainId}: chain ${peerChainId} allowed as interop peer`);
   }
 
+  /**
+   * Governance removes the pair (`chainId`, `peerChainId`) from `chainId`'s side, see
+   * {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+   */
+  async deregisterInteropPair(
+    chainId: number,
+    peerChainId: number,
+    diamondProxy: string,
+    l2Provider: providers.JsonRpcProvider
+  ): Promise<void> {
+    const sender = new ethers.Contract(
+      this.l1Addresses.chainRegistrationSender,
+      getAbi("ChainRegistrationSender"),
+      this.l1Wallet
+    );
+    const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), l2Provider);
+
+    const owner: string = await sender.owner();
+    if (owner !== this.l1Wallet.address) {
+      throw new Error(`ChainRegistrationSender owner is ${owner}, not the default Anvil account`);
+    }
+    const l1Receipt = await (await sender.deregisterInteropPairs([chainId], [peerChainId])).wait();
+    await relayPriorityRequestsToChain(l1Receipt, diamondProxy, l2Provider);
+
+    if (await sender.interopPeerAllowed(chainId, peerChainId)) {
+      throw new Error(`Chain ${chainId} still records chain ${peerChainId} as an allowed peer`);
+    }
+    if (
+      (await l2Bridgehub.baseTokenAssetId(peerChainId)) !== ethers.constants.HashZero ||
+      (await l2Bridgehub.isPeerAllowed(peerChainId))
+    ) {
+      throw new Error(`Chain ${peerChainId} is still registered on the L2Bridgehub of chain ${chainId}`);
+    }
+    console.log(`   ✅ Chain ${chainId}: chain ${peerChainId} deregistered`);
+  }
+
   private async requireChainAdmin(zkChain: ethers.Contract): Promise<void> {
     const admin: string = await zkChain.getAdmin();
     if (admin !== this.l1Wallet.address) {

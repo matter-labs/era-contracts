@@ -96,7 +96,7 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IChainRegistrationSender
-    function deregisterLegacyPairs(
+    function deregisterInteropPairs(
         uint256[] calldata _chainsRegisteredOn,
         uint256[] calldata _chainsToDeregister
     ) external onlyOwner nonReentrant {
@@ -109,16 +109,16 @@ contract ChainRegistrationSender is
             uint256 chainRegisteredOn = _chainsRegisteredOn[i];
             uint256 chainToDeregister = _chainsToDeregister[i];
             _checkPeerPair(chainRegisteredOn, chainToDeregister);
-            require(
-                !interopPeerAllowed[chainRegisteredOn][chainToDeregister],
-                InteropPeerAlreadyAllowed(chainRegisteredOn, chainToDeregister)
-            );
             address zkChain = BRIDGE_HUB.getZKChain(chainRegisteredOn);
             require(zkChain != address(0), ZKChainNotRegistered());
 
-            emit LegacyPairDeregistered(chainRegisteredOn, chainToDeregister);
+            delete interopPeerAllowed[chainRegisteredOn][chainToDeregister];
+            emit InteropPairDeregistered(chainRegisteredOn, chainToDeregister);
             // slither-disable-next-line unused-return
-            IMailbox(zkChain).requestL2ServiceTransaction(L2_BRIDGEHUB_ADDR, _getL2ClearCalldata(chainToDeregister));
+            IMailbox(zkChain).requestL2ServiceTransaction(
+                L2_BRIDGEHUB_ADDR,
+                abi.encodeCall(IL2Bridgehub.deregisterChainForInterop, (chainToDeregister))
+            );
         }
     }
 
@@ -172,17 +172,16 @@ contract ChainRegistrationSender is
         return abi.encodeCall(IL2Bridgehub.allowInteropPeer, (_peerChainId, baseTokenAssetId));
     }
 
-    /// @notice Returns the L2 Bridgehub calldata removing `_peerChainId` from the chains known for interop.
-    /// @param _peerChainId The chain to remove.
-    function _getL2ClearCalldata(uint256 _peerChainId) internal pure returns (bytes memory) {
-        return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (_peerChainId, bytes32(0)));
-    }
-
-    /// @notice Rejects pairs whose L2 Bridgehub entry must never change: the chain itself and L1.
+    /// @notice Rejects pairs whose L2 Bridgehub entry must never change: the chain itself, L1, and a chain
+    /// settling on the chain, which the chain's L2 Bridgehub registered as a settlement layer.
     /// @param _chainId The chain whose L2 Bridgehub is written.
     /// @param _peerChainId The chain whose entry is written.
     function _checkPeerPair(uint256 _chainId, uint256 _peerChainId) internal view {
-        if (_peerChainId == _chainId || _peerChainId == block.chainid) {
+        if (
+            _peerChainId == _chainId ||
+            _peerChainId == block.chainid ||
+            BRIDGE_HUB.settlementLayer(_peerChainId) == _chainId
+        ) {
             revert InvalidInteropPeer(_chainId, _peerChainId);
         }
     }
