@@ -9,6 +9,7 @@ use clap::Subcommand;
 
 use crate::{
     commands::ecosystem::broadcast::UpgradeBroadcastArgs,
+    commands::ecosystem::bundle::{RehearseUpgradeArgs, ReplayBundleArgs, VerifyBundleArgs},
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
@@ -16,6 +17,7 @@ use crate::{
 };
 
 pub mod broadcast;
+pub mod bundle;
 pub mod init;
 pub mod simulator;
 pub mod upgrade;
@@ -52,11 +54,26 @@ pub enum EcosystemCommands {
     /// signed by its declared `target`. Direct EOA broadcast — no Safe UI.
     #[command(name = "upgrade-broadcast")]
     UpgradeBroadcast(UpgradeBroadcastArgs),
+    /// Fork L1, run the release's `upgrade-prepare-all` (or a `forge-script` upgrade's own
+    /// script, per `upgrade-envs/<upgrade>/upgrade.toml`), pack the deploy bundle, replay every
+    /// bundle under impersonation and run the upgrade's checks (PUVT for `prepare-all`).
+    /// Nothing is signed; the fork is stopped afterwards.
+    RehearseUpgrade(RehearseUpgradeArgs),
+    /// Consume a deploy bundle: rehearse it on a fresh fork, broadcast the deployer's bundles
+    /// for real, or only run PUVT against a chain it was already broadcast to.
+    ReplayBundle(ReplayBundleArgs),
+    /// Check a deploy bundle's files against the digests in its `bundle-metadata.json`.
+    VerifyBundle(VerifyBundleArgs),
     /// Print a starter `--ctm-config` TOML by enumerating every CTM
     /// registered on the supplied bridgehub. Use this on stage / mainnet to
     /// discover the Atlas CTM address without having to look it up by hand.
     #[command(name = "list-ctms")]
     ListCtms(ListCtmsArgs),
+    /// Convert a protocol-ops Safe-bundle manifest (e.g. from `chain upgrade`) into a
+    /// transaction-simulator scenario.
+    #[command(name = "manifest-to-simulator")]
+    ManifestToSimulator(simulator::ManifestToSimulatorArgs),
+
     /// Convert a protocol-ops governance TOML into transaction-simulator JSON.
     #[command(name = "governance-toml-to-simulator")]
     GovernanceTomlToSimulator(GovernanceTomlToSimulatorArgs),
@@ -66,9 +83,15 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
     match args {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
+        EcosystemCommands::ManifestToSimulator(args) => {
+            simulator::run_manifest_to_simulator(args).await
+        }
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
+        EcosystemCommands::RehearseUpgrade(args) => bundle::run_rehearse_upgrade(args).await,
+        EcosystemCommands::ReplayBundle(args) => bundle::run_replay_bundle(args).await,
+        EcosystemCommands::VerifyBundle(args) => bundle::run_verify_bundle(args),
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
     }

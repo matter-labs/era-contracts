@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {L2_BASE_TOKEN_HOLDER, L2_NATIVE_TOKEN_VAULT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {InteropHandlerBase} from "./InteropHandlerBase.sol";
+import {V31_INTEROP_HANDLER_L1_CHAIN_ID_SLOT} from "../InteropConstants.sol";
 import {IL2InteropHandler} from "./IL2InteropHandler.sol";
 import {IAtomicFlowManager} from "../../atomic-interop/IAtomicFlowManager.sol";
 import {AtomicFinalityProof} from "../../atomic-interop/IAtomicInterop.sol";
@@ -31,6 +32,15 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
     /// @dev The handler holds no configurable state; this only locks the guard (which also prevents a second
     /// initialization via `SlotOccupied`).
     function initL2() public reentrancyGuardInitializer onlyUpgrader {}
+
+    /// @notice Clears the L1 chain id that mainnet v31's handler left outside the current storage layout.
+    /// @dev See {protocol-docs/interop/architecture.md#l2interophandler-storage-across-the-v31--v33-upgrade}.
+    function updateL2() public onlyUpgrader {
+        uint256 v31L1ChainIdSlot = V31_INTEROP_HANDLER_L1_CHAIN_ID_SLOT;
+        assembly {
+            sstore(v31L1ChainIdSlot, 0)
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
                     Atomic execution / verification

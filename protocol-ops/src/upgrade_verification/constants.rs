@@ -2,6 +2,9 @@ use alloy::primitives::{address, Address};
 
 pub const EIP1967_PROXY_ADMIN_SLOT: &str =
     "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+/// `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
+pub const EIP1967_IMPLEMENTATION_SLOT: &str =
+    "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 /// Builds an L2 built-in address from a 16-bit offset into the
 /// `BUILT_IN_CONTRACTS_OFFSET` range (`0x10000..=0x1ffff`).
@@ -62,7 +65,7 @@ pub const L2_MESSAGE_ROOT_ADDR: Address = l2_addr(0x05);
 /// implementation for `EmptyContract` (see `getRemovedTrackerNeutralizations`).
 pub const L2_REMOVED_GW_ASSET_TRACKER_ADDR: Address = l2_addr(0x10);
 pub const SLOAD_CONTRACT_ADDR: Address = l2_addr(0x06);
-// v31 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
+// v33 no longer force-deploys the WrappedBaseToken, so this address is only referenced by the
 // address-consistency test below; keep it as part of the canonical L2 address map.
 #[allow(dead_code)]
 pub const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR: Address = l2_addr(0x07);

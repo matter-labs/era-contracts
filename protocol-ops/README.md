@@ -86,16 +86,17 @@ Every command that generates Safe bundles runs **exclusively against a temporary
 of `--l1-rpc-url`. The real L1 is **never modified** by the CLI. The fork exists only for
 the duration of the command and stops when it exits.
 
-To apply the generated Safe bundles to a real chain, use `dev execute-manifest` (or any
-Safe-bundle-aware executor) with the keys from `wallets.yaml`.
+To apply the generated Safe bundles to a real chain, use `ecosystem upgrade-broadcast --manifest
+<out>/manifest.json` (one `--key` per signer in the manifest), `dev execute-safe` per bundle, or
+any Safe-bundle-aware executor.
 
 ## Running the Protocol Upgrade Verification Tool (PUVT)
 
-> **Not ported to v34 yet.** On this line `verify-upgrade` still runs the v31 verifier
-> (`upgrade_verification/versions/v31`), which is pinned to the 0.31.0 → 0.32.0 transition and rejects a
-> v34 bundle (0.33.x → 0.34.0) in stage 1. The working v33 verifier lives on
-> `release/v0.33.0-atomic-interop` (`versions/v33`); porting it to v34 must also move the cut-initializer
-> check to `v34_upgrade_addr`.
+> The verifier is reconciled with v35's contracts and default upgrade scripts. It accepts v0.34.x
+> source versions, reads the target version from genesis, and checks the cut initializer and the
+> stored default against `default_upgrade_addr` (the generic `DefaultUpgradeZKsyncOS`). The Solidity-payload
+> regression below exercises the ABI and force-deployment checks; it does not exercise live RPC state
+> or the full governance ceremony.
 
 `ecosystem verify-upgrade` re-derives and cross-checks the calldata produced by
 `ecosystem upgrade-prepare-all` for a **ZKsync OS upgrade**. It is
@@ -124,17 +125,32 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
 
 ## Output
 
-Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a successful run:
+Commands that support **`--out`** write, into that directory, one Safe Transaction Builder JSON
+file per consecutive run of transactions by the same signer, plus a **`manifest.json`**:
 
-| Field              | Meaning                                                                                                                      |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| **`command`**      | CLI path id (e.g. `chain.init`, `ecosystem.upgrade`).                                                                        |
-| **`version`**      | Envelope format version (currently `1`).                                                                                     |
-| **`runs`**         | One entry per Forge script: `script` (path) and `run` (broadcast JSON for that script).                                      |
-| **`transactions`** | Flat array in execution order: `{ "to", "data", "value" }` for replay (normalized like `cast send`). Built from every `run`. |
-| **`input`**        | Serialized command input (may be `{}` if the command passes an empty object).                                                |
-| **`output`**       | Command-specific result object (may be `{}`).                                                                                |
+| Field          | Meaning                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **`bundles`**  | One entry per bundle file, in execution order: `index`, `file`, `target` (the signer), `steps`, `tx_count`.                         |
+| **`metadata`** | One entry per command run into this directory: `command` (CLI path id, e.g. `chain.init`), `input` and `output` (both may be `{}`). |
+
+Without `--out` no bundles are written, unless the command derives a default from `--env`:
+`upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`),
+`upgrade-governance` and `chain upgrade` do.
 
 ## Requirements
 
 You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract artifacts as expected by the scripts this tool wraps. From the repo root, `l1-contracts` must be built (`forge build`).
+
+### Checking the upgrade-verifier ABI against Solidity
+
+After building L1/DA artifacts and refreshing `AllContractsHashes.json`, run with the pinned
+Foundry version on `PATH`:
+
+```bash
+cargo test accepts_solidity_release_payload_and_rejects_corrupted_deployments -- --ignored
+```
+
+This runs the release's Solidity payload builder and checks its force deployments, factory dependencies,
+and `IL2DefaultUpgrade` calldata with the Rust verifier. It also rejects a missing ComplexUpgrader
+upgrade and corrupted delegate bytecode descriptors. RPC state and governance execution are covered
+separately by the upgrade integration tests.

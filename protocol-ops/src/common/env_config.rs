@@ -30,6 +30,22 @@ use serde::Deserialize;
 use crate::common::forge::scripts::CURRENT_UPGRADE_ENV_DIR;
 use crate::common::paths::resolve_l1_contracts_path;
 
+/// The release's upgrade: the directory under `upgrade-envs/` that `upgrade-prepare-all`,
+/// PUVT and the generate / replay pipeline (`ecosystem rehearse-upgrade`, `replay-bundle`)
+/// target when none is named. The last segment of [`CURRENT_UPGRADE_ENV_DIR`].
+pub const DEFAULT_UPGRADE: &str = last_path_segment(CURRENT_UPGRADE_ENV_DIR);
+
+const fn last_path_segment(path: &'static str) -> &'static str {
+    let bytes = path.as_bytes();
+    let mut start = bytes.len();
+    while start > 0 && bytes[start - 1] != b'/' {
+        start -= 1;
+    }
+    match std::str::from_utf8(bytes.split_at(start).1) {
+        Ok(segment) => segment,
+        Err(_) => panic!("upgrade-env dir is not UTF-8"),
+    }
+}
 /// The release's upgrade-env directory. Salts, per-env inputs and the canonical output
 /// directory all live here. It is the same directory the prepare defaults use, so it moves with each
 /// release rather than trailing an older one.
@@ -71,7 +87,7 @@ pub struct OwnableProxyEntry {
 #[serde(rename_all = "snake_case")]
 pub enum OwnableProxyKind {
     /// Legacy ZKsync `Governance.sol` (Ownable2Step + delay-gated). Wrap as
-    /// `scheduleTransparent(op, 0)` + `executeInstant(op)` from the EOA owner.
+    /// `scheduleTransparent(op, 0)` + `execute(op)` from the EOA owner.
     LegacyGovernance,
     /// OZ `ChainAdmin` (Ownable2Step). Wrap as `multicall([call], true)`
     /// from the EOA owner.
@@ -349,6 +365,25 @@ impl EnvConfig {
     }
 }
 
+/// Default output dir for an env, e.g. `<upgrade-env dir>/output/<env>/`, without loading the env.
+pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
+    Ok(resolve_l1_contracts_path()?
+        .join(upgrade_env_dir())
+        .join("output")
+        .join(env))
+}
+
+/// `upgrade-envs/<upgrade>/output/<env>/`: where generating `upgrade` for `env` writes.
+/// For [`DEFAULT_UPGRADE`] this is [`default_protocol_ops_out_dir`].
+pub fn protocol_ops_out_dir(upgrade: &str, env: &str) -> anyhow::Result<PathBuf> {
+    crate::common::upgrade_descriptor::validate_upgrade_name(upgrade)?;
+    Ok(resolve_l1_contracts_path()?
+        .join("upgrade-envs")
+        .join(upgrade)
+        .join("output")
+        .join(env))
+}
+
 fn parse_upgrade_input(content: &str) -> UpgradeInputs {
     let mut out = UpgradeInputs::default();
     for line in content.lines() {
@@ -514,7 +549,10 @@ mod tests {
         let mut envs = 0;
         for entry in fs::read_dir(&release_dir).unwrap() {
             let path = entry.unwrap().path();
-            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+            if path.extension().and_then(|e| e.to_str()) != Some("toml")
+                || path.file_name().and_then(|n| n.to_str())
+                    == Some(crate::common::upgrade_descriptor::UPGRADE_DESCRIPTOR_FILE)
+            {
                 continue;
             }
             let env = path.file_stem().unwrap().to_str().unwrap().to_string();
@@ -531,10 +569,11 @@ mod tests {
         assert!(envs > 0, "no release inputs in {}", release_dir.display());
     }
 
-    /// Every env declares `testnet_verifier`, and only mainnet runs the production verifier: the flag decides
-    /// whether an upgrade installs a verifier that accepts unproven batches.
+    /// Every env declares `testnet_verifier`, and only the Ethereum-mainnet ecosystems (ours and adi's) run the
+    /// production verifier: the flag decides whether an upgrade installs a verifier that accepts unproven batches.
     #[test]
-    fn every_env_declares_testnet_verifier_and_only_mainnet_is_production() {
+    fn every_env_declares_testnet_verifier_and_only_mainnet_ecosystems_are_production() {
+        const PRODUCTION_ENVS: [&str; 2] = ["mainnet", "adi"];
         let dir = resolve_l1_contracts_path()
             .unwrap()
             .join(PERMANENT_VALUES_DIR);
@@ -549,7 +588,7 @@ mod tests {
                 toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
             assert_eq!(
                 values.testnet_verifier,
-                Some(env != "mainnet"),
+                Some(!PRODUCTION_ENVS.contains(&env)),
                 "{env} has a missing or wrong testnet_verifier"
             );
             saw_mainnet |= env == "mainnet";
@@ -559,15 +598,25 @@ mod tests {
 
     #[test]
     fn missing_release_input_fails_closed() {
-        // This line's copy of the v33 release dir has no testnet input (release/v0.33.0-atomic-interop does).
-        let cfg =
-            EnvConfig::load_from_upgrade_env_dir("testnet", "upgrade-envs/v0.33.0-atomic-interop")
-                .expect("permanent values alone still load");
+        let missing_release = tempfile::tempdir().unwrap();
+        let cfg = EnvConfig::load_from_upgrade_env_dir(
+            "testnet",
+            missing_release.path().to_str().unwrap(),
+        )
+        .expect("permanent values alone still load");
         assert_ne!(cfg.bridgehub(), Address::ZERO);
         assert!(cfg.owner_address().is_err());
         assert!(cfg.era_chain_id().is_err());
         assert!(cfg.create2_factory_salt_for_upgrade().is_err());
         assert!(cfg.create2_factory_salt_for_upgrade_per_ctm().is_err());
+    }
+
+    /// The generate / replay pipeline's default upgrade and the directory every release
+    /// command reads its inputs from and writes its outputs to must name the same upgrade,
+    /// or `rehearse-upgrade` would pack one release's inputs under another's output dir.
+    #[test]
+    fn default_upgrade_is_the_release_env_dir() {
+        assert_eq!(upgrade_env_dir(), format!("upgrade-envs/{DEFAULT_UPGRADE}"));
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the
