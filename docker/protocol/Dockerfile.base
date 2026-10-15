@@ -8,15 +8,15 @@
 #   - foundry vanilla anvil, state-compatible with committed chain states
 #   - Rust toolchain (rustup + target + cargo-chef)
 #
-# Rebuilt on `Dockerfile.base` change, weekly cron, or manual dispatch
-# (see `.github/workflows/build-docker-base.yaml`). The main
-# `docker/protocol/Dockerfile` consumes this via
-# `FROM ghcr.io/matter-labs/protocol-ops-base:latest AS build` instead of
-# re-running these ~10 minutes of installs every build.
+# The image workflows (build-docker.yaml, build-and-push-docker.yaml) build it
+# from the same commit as the main `docker/protocol/Dockerfile`
+# (`docker-bake.hcl`, layers cached), so a toolchain bump takes effect in the
+# next image. `.github/workflows/build-docker-base.yaml` also publishes it as
+# `ghcr.io/matter-labs/protocol-ops-base:latest`, the Dockerfile's default
+# base for local builds.
 #
 # To bump a toolchain version: edit the ARG default below (or, for the foundry
-# pins, `.github/foundry-versions.env`), push, and the base-image workflow will
-# rebuild + tag `:latest`. Subsequent main builds pick it up automatically.
+# pins, `.github/foundry-versions.env`).
 
 ARG FOUNDRY_ARCH=linux_amd64
 ARG NODE_MAJOR=20

@@ -1,9 +1,9 @@
 name: Build Docker Base Image
 
-# Builds + pushes the `protocol-ops-base` image consumed by `build-docker.yaml`.
-# Rebuilt only on Dockerfile.base / workflow changes, weekly cron, or manual
-# dispatch — none of which fire per-PR — so the main image build can `FROM` it
-# and skip ~10 min of toolchain installs each run.
+# Builds + pushes `protocol-ops-base:latest`, the default base of
+# `docker/protocol/Dockerfile` for local builds. `build-docker.yaml` and
+# `build-and-push-docker.yaml` build their own base from the same commit
+# (`docker/protocol/docker-bake.hcl`).
 on:
   push:
     branches: [main, kl/anvil-hardening]

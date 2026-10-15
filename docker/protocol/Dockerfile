@@ -4,9 +4,11 @@ ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
-# Pre-baked toolchain base for the build stages (see Dockerfile.base +
-# build-docker-base.yaml). Must be a global ARG so it's visible in the
-# `FROM ${BUILD_BASE_IMAGE}` lines below.
+# Toolchain base for the build stages (Dockerfile.base). The image workflows
+# build it from the same commit (docker-bake.hcl); the default is the
+# prebuilt one from build-docker-base.yaml, which the Foundry check in
+# forge-builder rejects if its pins differ. Must be a global ARG so it's
+# visible in the `FROM ${BUILD_BASE_IMAGE}` lines below.
 ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
 
 ########################################
@@ -140,6 +142,18 @@ RUN yarn install --frozen-lockfile
 # the container always starts from a fresh build dir.
 COPY . /contracts
 
+# Refuse to compile with any Foundry other than the repository's pin
+# (AllContractsHashes.json is built with it): a prebuilt base can predate it.
+RUN . /contracts/.github/foundry-versions.env && \
+    for tool in forge cast anvil; do \
+      expected="$tool Version: ${FOUNDRY_VERSION#v}-${FOUNDRY_VERSION}"; \
+      found="$($tool --version | head -n 1)"; \
+      if [ "$found" != "$expected" ]; then \
+        echo "the base image has '$found', .github/foundry-versions.env pins '$expected': build with docker/protocol/docker-bake.hcl, or rebuild BUILD_BASE_IMAGE" >&2; \
+        exit 1; \
+      fi; \
+    done
+
 # === Copy zk-governance source ===
 # protocol-ops's PUH/Guardians redeploy step (`ecosystem upgrade-prepare-all`
 # on PUH-governed envs like stage / mainnet) shells out to a forge script
@@ -223,8 +237,26 @@ COPY --from=forge-builder /contracts/AllContractsHashes.json /contracts/AllContr
 # resolves it correctly via `<era>/../../zk-governance`.
 COPY --from=forge-builder /zk-governance /zk-governance
 
+# The wrapper in local mode, for harnesses that call `./protocol-ops.sh` from
+# the contracts root (build-docker.yaml rehearses the anvil-interop upgrade
+# test inside the image).
+COPY --from=forge-builder /contracts/protocol-ops.sh /contracts/protocol-ops.sh
+
+# The upgrade inputs as built. Workflows mount the host's upgrade-envs over
+# /contracts/l1-contracts/upgrade-envs, and `ecosystem rehearse-upgrade` marks
+# the deploy bundle dirty when the mounted inputs differ from this copy.
+COPY --from=forge-builder /contracts/l1-contracts/upgrade-envs /opt/protocol-ops/upgrade-envs
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help && \
     zksync-os-genesis-gen --help && wallets-gen --help && upgrade-readiness-checker --help && \
     node --version && yarn --version
+
+# Provenance recorded in deploy bundles (the image has no git). Last, so a new
+# commit only invalidates this layer.
+ARG CONTRACTS_COMMIT=""
+ARG ZK_GOVERNANCE_COMMIT=""
+ENV PROTOCOL_OPS_BIN=/contracts/protocol-ops/protocol_ops \
+    PROTOCOL_OPS_IMAGE_UPGRADE_ENVS=/opt/protocol-ops/upgrade-envs \
+    PROTOCOL_OPS_CONTRACTS_COMMIT=${CONTRACTS_COMMIT} \
+    PROTOCOL_OPS_ZK_GOVERNANCE_COMMIT=${ZK_GOVERNANCE_COMMIT}

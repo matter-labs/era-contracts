@@ -5,7 +5,7 @@
 # `ghcr.io/matter-labs/protocol-ops` Docker image.
 #
 # Usage:
-#   ./protocol-ops.sh [--tag <docker-tag>] <command> [args...]
+#   ./protocol-ops.sh [--tag <docker-tag> | --tag sha256:<digest>] <command> [args...]
 #
 # <command>:
 #   - forge | cast          → runs that binary
@@ -14,6 +14,10 @@
 # Mode:
 #   - no --tag              → local mode: uses this era-contracts checkout
 #   - --tag <tag>           → docker mode: runs inside ghcr.io/matter-labs/protocol-ops:<tag>
+#   - --tag sha256:<digest> → docker mode: runs inside ghcr.io/matter-labs/protocol-ops@sha256:<digest>
+#     In docker mode the image reference and its registry digest are passed into the
+#     container (PROTOCOL_OPS_IMAGE / PROTOCOL_OPS_IMAGE_DIGEST); `ecosystem
+#     rehearse-upgrade` records them in the deploy bundle.
 #
 # Examples:
 #   ./protocol-ops.sh chain init --l1-rpc-url http://localhost:8545 …
@@ -32,6 +36,10 @@
 #                      binary. If unset, the wrapper runs `cargo build
 #                      --release` inside protocol-ops/ and uses the resulting
 #                      target/release binary.
+#   ETHERSCAN_API_KEY, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID,
+#   RUNNER_OS        — Docker mode: passed into the container when set
+#                      (`forge verify-contract`; the run a deploy bundle
+#                      records as `generated_by`).
 #
 set -euo pipefail
 
@@ -42,7 +50,7 @@ ERA_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat >&2 <<'EOF'
-Usage: protocol-ops.sh [--tag <docker-tag>] <command> [args...]
+Usage: protocol-ops.sh [--tag <docker-tag> | --tag sha256:<digest>] <command> [args...]
 
 <command>:
   forge | cast          runs that binary
@@ -51,6 +59,7 @@ Usage: protocol-ops.sh [--tag <docker-tag>] <command> [args...]
 Mode:
   no --tag              local mode (uses this era-contracts checkout)
   --tag <tag>           docker mode (ghcr.io/matter-labs/protocol-ops:<tag>)
+  --tag sha256:<digest> docker mode (ghcr.io/matter-labs/protocol-ops@sha256:<digest>)
 
 Examples:
   protocol-ops.sh chain init --l1-rpc-url http://localhost:8545 …
@@ -116,7 +125,20 @@ fi
 # ──────────────────────────────────────────────────────────────────────
 # Docker mode
 # ──────────────────────────────────────────────────────────────────────
-IMAGE="${IMAGE_REPO}:${TAG}"
+if [[ "$TAG" == sha256:* ]]; then
+  IMAGE="${IMAGE_REPO}@${TAG}"
+else
+  IMAGE="${IMAGE_REPO}:${TAG}"
+fi
+
+# The registry digest of the image, so a run records exactly which image it was
+# even when started by a (mutable) tag. Pull output goes to stderr: callers
+# capture this wrapper's stdout (e.g. `cast wallet address`).
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  docker pull --quiet --platform=linux/amd64 "$IMAGE" >&2
+fi
+IMAGE_DIGEST="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
+  | grep -m1 "^${IMAGE_REPO}@" || true)"
 
 # Mount the host's `l1-contracts/upgrade-envs/` over the container's so
 # `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml) land
@@ -143,6 +165,8 @@ docker_args=(
   run --rm
   --platform=linux/amd64
   -e FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+  -e PROTOCOL_OPS_IMAGE="${IMAGE}"
+  -e PROTOCOL_OPS_IMAGE_DIGEST="${IMAGE_DIGEST}"
   -v "${HOST_UPGRADE_ENVS}:/contracts/l1-contracts/upgrade-envs"
   -v "${HOST_SCRIPT_OUT}:/contracts/l1-contracts/script-out"
 )
@@ -163,6 +187,14 @@ else
   done
   run_args=("${rewritten[@]}")
 fi
+
+# Passed through when set: the Etherscan key (`forge verify-contract`) and the
+# GitHub Actions run a deploy bundle records as `generated_by`.
+for var in ETHERSCAN_API_KEY GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID RUNNER_OS; do
+  if [[ -n "${!var:-}" ]]; then
+    docker_args+=(-e "$var")
+  fi
+done
 
 # Extra mounts from env (space-separated "host:container" pairs).
 for mount in ${EXTRA_MOUNTS:-}; do
