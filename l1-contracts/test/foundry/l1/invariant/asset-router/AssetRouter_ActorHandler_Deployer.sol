@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.20;
 
-import {AssetRouterProperties} from "../properties/AssetRouterProperties.sol";
-import {UserActorHandler} from "../handlers/UserActorHandler.sol";
-import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
+import {AssetRouterProperties} from "./AssetRouterProperties.sol";
+import {UserActorHandler} from "./UserActorHandler.sol";
+import {L1AssetRouterActorHandler} from "./L1AssetRouterActorHandler.sol";
 
 abstract contract AssetRouterActorHandlerDeployer is AssetRouterProperties {
     function deployActorHandlers() internal {

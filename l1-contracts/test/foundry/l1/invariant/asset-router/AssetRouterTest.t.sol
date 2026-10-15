@@ -2,14 +2,17 @@
 
 pragma solidity ^0.8.20;
 
-import {AssetRouterActorHandlerDeployer} from "../deployers/AssetRouter_ActorHandler_Deployer.sol";
-import {INITIAL_DEPOSIT_AMOUNT, INITIAL_WITHDRAWAL_AMOUNT, L1_TOKEN_ADDRESS} from "../common/Constants.sol";
+import {AssetRouterActorHandlerDeployer} from "./AssetRouter_ActorHandler_Deployer.sol";
+import {INITIAL_DEPOSIT_AMOUNT, INITIAL_WITHDRAWAL_AMOUNT, L1_TOKEN_ADDRESS} from "./Constants.sol";
 
-import {SharedL2ContractL1Deployer} from "../../foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractL1Deployer.sol";
+import {SharedL2ContractL1Deployer} from "../../integration/l2-tests-in-l1-context/_SharedL2ContractL1Deployer.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
+/// forge-config: default.invariant.runs = 64
+/// forge-config: default.invariant.depth = 64
+/// forge-config: default.invariant.fail_on_revert = true
 contract AssetRouterTest is SharedL2ContractL1Deployer, AssetRouterActorHandlerDeployer {
     function setUp() public virtual override {
         super.setUp();
