@@ -477,7 +477,9 @@ Whenever an agent makes changes in a PR, it **MUST** update the PR description t
 
 ### Pushing and Creating PRs
 
-Agents do **not** have push access to the main repository. Always push to a **fork** and create PRs from there. Do not attempt to push directly to `matter-labs/era-contracts`.
+If the credentials you run with have push access to `matter-labs/era-contracts`, push your branch there and open the PR from it. Otherwise, push to a **fork** and open the PR from the fork.
+
+Either way, push only to your own feature branch: never push directly to `main`, `draft/*` or release branches; changes to them go through a PR.
 
 ### Never Force Push
 

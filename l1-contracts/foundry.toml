@@ -56,21 +56,5 @@ allow_internal_expect_revert = true
 cbor_metadata = false
 bytecode_hash = "none"
 
-[profile.invariant_tests_l1context]
-test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
-optimizer = false
-[profile.invariant_tests_l1context.invariant]
-runs = 10
-depth = 1000
-
-[profile.invariant_tests_l1context_ci]
-test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
-optimizer = false
-[profile.invariant_tests_l1context_ci.invariant]
-runs = 10
-depth = 10000
-
 [lint]
 lint_on_build = false
