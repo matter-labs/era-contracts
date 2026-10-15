@@ -41,6 +41,7 @@ use super::lifecycle::{verify_lifecycle_construction, LifecycleReview};
 use super::package::OperationPackage;
 use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
 use super::rows::verify_rows;
+use super::shell::verify_shell_kept;
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView,
     CommittedUpgradeView, CoreTransitionView, CoreUpgradeExecutorView, CtmView,
@@ -424,11 +425,25 @@ pub(crate) async fn verify<P: Provider>(
         result.report_ok("no transition: no L2 bytecodes need to be published");
     }
 
-    // ── 5. The calldata governance will actually sign ──
+    // ── 5. The L2 proxy logic chains crossing the edge keep ──
+    if let Some(edge) = &transition_manifest {
+        result.print_info("\n== L2 system-proxy shell ==");
+        verify_shell_kept(
+            provider,
+            identity,
+            genesis.image.as_ref().ok(),
+            result,
+            &ctm,
+            &edge.manifest,
+        )
+        .await;
+    }
+
+    // ── 6. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
     verify_execute_call(package, result);
 
-    // ── 6. The calls no object describes ──
+    // ── 7. The calls no object describes ──
     if package.external_actions.is_empty() {
         result.report_ok(
             "the prepare declared no external actions: this upgrade is entirely described by the \

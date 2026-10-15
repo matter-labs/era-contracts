@@ -185,7 +185,10 @@ field held against an independent expectation: `l1ChainId` against the RPC's cha
 live Bridgehub, `aliasedL1Governance` against the alias of the reviewed governance, `zkTokenAssetId`
 against the `zk_token_asset_id` of `upgrade-envs/permanent-values/<env>.toml` for the `--env` the
 package is held against (required unless the package is a replacement), the legacy and test-only
-addresses against zero, and each bytecode field against the release's own L2 bytecode table.
+addresses against zero, and each bytecode field against the release's own L2 bytecode table. The
+arriving release's system-proxy shell is compared with the departing one's, compiler metadata
+stripped: a logic change fails unless the edge ships a delegate the reviewed commit builds other
+than the stock `L2DefaultUpgrade`, which is then reported for the reviewer to confirm.
 
 A transition replacement is held against the transition it replaces rather than the CTM's current
 state: the replacement's construction as for any transition, the same source release (the replaced

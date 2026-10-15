@@ -20,6 +20,7 @@ use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::ReviewedBuild;
 use super::format_semver;
+use super::genesis::GenesisImage;
 use super::lifecycle::{verify_lifecycle_construction, LifecycleReview};
 use super::operation::{
     cross_check, expect_domains_answer_to, verify_bytecodes_published, verify_governance_owner,
@@ -27,13 +28,16 @@ use super::operation::{
 };
 use super::package::{DeadlineChange, RecoveredReplacement, ReplacementPackage};
 use super::provenance::{expect_code_present, tolerate, CodeIdentity};
+use super::shell::verify_shell_kept;
 use super::views::{CTMTransitionView, CtmView, EcosystemUpgradeExecutorView};
 
 /// Verify a transition replacement against the live L1 it targets.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,
     build: &ReviewedBuild,
+    image: Option<&GenesisImage>,
     package: &ReplacementPackage,
     expected_governance_owner: Option<Address>,
     salts: &[B256],
@@ -108,7 +112,7 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
-    let replacement = replacement_edge.map(|edge| TransitionFacts {
+    let replacement = replacement_edge.as_ref().map(|edge| TransitionFacts {
         address: forward.replacement,
         old_version: edge.old_version,
         new_version: edge.new_version,
@@ -250,7 +254,13 @@ pub(crate) async fn verify<P: Provider>(
     result.print_info("\n== Readiness ==");
     verify_bytecodes_published(provider, result, &ctm, forward.replacement).await?;
 
-    // ── 5. The calldata governance will actually sign ──
+    // ── 5. The L2 proxy logic chains crossing the edge keep ──
+    if let Some(edge) = &replacement_edge {
+        result.print_info("\n== L2 system-proxy shell ==");
+        verify_shell_kept(provider, identity, image, result, &ctm, &edge.manifest).await;
+    }
+
+    // ── 6. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
     judge_replacement_calls(
         result,

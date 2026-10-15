@@ -33,7 +33,8 @@
 //!   6. Does every proxy row depart from the implementation that is actually live, read through
 //!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — completion does not
 //!      re-read implementations (`protocol-docs/ecosystem-upgrade-coordination.md`).
-//!   7. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
+//!   7. Do chains crossing an edge keep the system-proxy logic new chains get? ([`shell`])
+//!   8. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
 //!      address — and nothing else?
 //!
 //! None of it is "does an object's own fingerprint of a member match that member's code": the
@@ -68,6 +69,7 @@ pub(crate) mod provenance;
 pub(crate) mod records;
 pub(crate) mod replacement;
 pub(crate) mod rows;
+pub(crate) mod shell;
 pub(crate) mod views;
 
 use construction::ReviewedBuild;
@@ -121,6 +123,7 @@ pub(crate) async fn verify(
                 &provider,
                 &identity,
                 &build,
+                genesis_image.as_ref().ok(),
                 &package,
                 expected_governance_owner,
                 &salts,

@@ -393,18 +393,26 @@ fn system_proxy_implementation_address(bytecode_info: &Bytes) -> Address {
     Address::from_word(keccak256(preimage))
 }
 
-/// Why `code` is not what the ZKsync OS `bytecode_info` describes — an ABI-encoded
-/// `(bytes32 blake2s, uint32 length, bytes32 keccak256)` whose keccak and length are compared —
-/// or `None` when it is.
+/// The length and `keccak256` of the code a ZKsync OS bytecode info describes — an ABI-encoded
+/// `(bytes32 blake2s, uint32 length, bytes32 keccak256)` — or `None` for a non-canonical info.
+pub(super) fn decode_bytecode_info(bytecode_info: &Bytes) -> Option<(U256, B256)> {
+    (bytecode_info.len() == 96).then(|| {
+        (
+            U256::from_be_slice(&bytecode_info[32..64]),
+            B256::from_slice(&bytecode_info[64..96]),
+        )
+    })
+}
+
+/// Why `code` is not what the ZKsync OS `bytecode_info` describes — its keccak and length are
+/// compared — or `None` when it is.
 fn code_mismatch(code: Option<&Bytes>, bytecode_info: &Bytes) -> Option<&'static str> {
     let Some(code) = code else {
         return Some("is absent, so it is not");
     };
-    if bytecode_info.len() != 96 {
+    let Some((length, observable)) = decode_bytecode_info(bytecode_info) else {
         return Some("cannot be held against a non-canonical bytecode info for");
-    }
-    let length = U256::from_be_slice(&bytecode_info[32..64]);
-    let observable = B256::from_slice(&bytecode_info[64..96]);
+    };
     if U256::from(code.len()) == length && keccak256(code) == observable {
         None
     } else {

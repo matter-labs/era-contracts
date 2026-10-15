@@ -514,9 +514,13 @@ nothing: `updateZKsyncOSContract` deploys a shell only at a system address with 
 new shell reaches the members first populated after the edge, and new chains through the genesis
 image, but never an existing member's proxy. The shell is rebuilt with every release and its bytes
 change with its compiler metadata, so it is not frozen across edges: a change to the shell's logic
-needs its own migration of existing proxies, which no transition derives. A row for a member with
-no fixed address — a proxy, a
-bridged-token template, the `L2DefaultUpgrade` delegate (deployed from the authored plan below) —
+needs its own migration of existing proxies, which no transition derives. The chain cannot tell a
+rebuild from such a change, so `verify-package` compares the departing and arriving releases'
+shells with their compiler metadata stripped. It refuses a changed shell on an edge whose delegate
+is absent, the stock `L2DefaultUpgrade` or code the reviewed commit does not build, and asks the
+reviewer to confirm any other delegate migrates the existing proxies. A compiler bump that
+changes the shell's code counts as a change. The bootstrap edge has no departing release and is
+not checked. A row for a member with no fixed address — a proxy, a bridged-token template, the `L2DefaultUpgrade` delegate (deployed from the authored plan below) —
 is refused at transition construction (`RegistryMemberHasNoFixedAddress`).
 
 The reviewed input outside that table is `AuthoredL2Plan`: delegate bytecode info, extra bytecode

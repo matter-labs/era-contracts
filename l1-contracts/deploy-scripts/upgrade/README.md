@@ -123,7 +123,8 @@ construction (the write-once objects from their manifests, the bootstrap sequenc
 it was constructed over — which is why both prepare legs' salts are inputs: a package records
 neither — and the executors from the `[upgrade_executors]` record of the run that
 deployed them, without which an executor is unverified), the immutable-free objects' provenance,
-the bound authority and the owner the upgrade is driven by, every row's departing implementation, readiness,
+the bound authority and the owner the upgrade is driven by, every row's departing implementation,
+that chains crossing the edge keep the system-proxy logic new chains get, readiness,
 and that the calldata governance signs invokes the reviewed upgrade and nothing else. What it
 checks and deliberately does not is in
 [`docs/ai-review/docs/protocol-ops.md`](../../../docs/ai-review/docs/protocol-ops.md).
