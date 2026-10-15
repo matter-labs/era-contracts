@@ -111,15 +111,21 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
     const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
-    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
-    if (upgradeChainAddresses.length === 0) {
-      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
-    }
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
     const l1Provider = createProvider(l1Chain.rpcUrl);
+    const upgradeChainAddresses = await selectUpgradeChains(
+      l1Provider,
+      l1Addresses.bridgehub,
+      chainAddresses,
+      chains.config,
+      scenario.targetRoles
+    );
+    if (upgradeChainAddresses.length === 0) {
+      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
+    }
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
 
     // ── Transfer L1 contract ownership to governance ──
@@ -1277,17 +1283,31 @@ function buildAddressToContract(): ReadonlyMap<string, ContractName> {
   return new Map(entries);
 }
 
-function selectUpgradeChains(
+/**
+ * Chains with one of `targetRoles` that settle on L1 in the loaded states. The roles come from the current
+ * config, whose topology can differ from that of an older release's states, so the settlement layer is read
+ * on-chain.
+ */
+async function selectUpgradeChains(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  bridgehubAddr: string,
   chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
   chainConfigs: Array<{ chainId: number; role: ChainRole }>,
   targetRoles: ChainRole[]
-): Array<{ chainId: number; diamondProxy: string }> {
+): Promise<Array<{ chainId: number; diamondProxy: string }>> {
   const roles = new Map(chainConfigs.map((c) => [c.chainId, c.role]));
-  return chainAddresses.filter((chain) => {
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  const selected: Array<{ chainId: number; diamondProxy: string }> = [];
+  for (const chain of chainAddresses) {
     const role = roles.get(chain.chainId);
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
-    return targetRoles.includes(role);
-  });
+    if (!targetRoles.includes(role)) continue;
+    if ((await bridgehub.settlementLayer(chain.chainId)).eq(l1ChainId)) {
+      selected.push(chain);
+    }
+  }
+  return selected;
 }
 
 export function readEcosystemOutput(outputPath: string): Record<string, unknown> {

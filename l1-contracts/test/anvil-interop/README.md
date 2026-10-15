@@ -1,6 +1,6 @@
 # Multi-Chain Anvil Interop Tests
 
-End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop transfers, and gateway setup with chain migration.
+End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract deployment, L1<->L2 bridging (ETH + ERC20), L2<->L2 interop between L1-settled chains, and gateway setup with chain migration.
 
 ## Chain Topology
 
@@ -10,16 +10,18 @@ End-to-end tests for ZKsync interoperability across 6 Anvil chains: L1 contract 
 │  settlement  │
 └──────┬───────┘
        │
-       ├──► L2  (10)  port 4050 — settled directly on L1
+       ├──► L2  (10)  port 4050 — settled on L1, interop
+       ├──► L2  (12)  port 4052 — settled on L1, interop
+       ├──► L2  (14)  port 4054 — custom-base-token chain settled on L1, interop
        │
-       ├──► GW  (11)  port 4051 — gateway chain (settled on L1, settlement layer for L2A/L2B/L2C)
-       │     │
-       │     ├──► L2A (12)  port 4052 — settled via GW
-       │     ├──► L2B (13)  port 4053 — settled via GW
-       │     └──► L2C (14)  port 4054 — custom-base-token chain settled via GW
-       │
-       └──► (L2A, L2B, and L2C also registered on L1 but migrated to GW)
+       └──► GW  (11)  port 4051 — gateway chain (settled on L1, settlement layer for chain 13)
+             │
+             └──► L2  (13)  port 4053 — registered on L1, migrated to GW
 ```
+
+Setup enables interop for the chains marked `interop` in `config/anvil-config.json` and allows each of them as an
+interop peer of the others, following {protocol-docs/interop-gating.md#order-per-chain}. Interop is tested between
+those chains only; the GW-settled chain covers deposits and withdrawals through the gateway.
 
 ## Quick Start
 
@@ -132,19 +134,18 @@ Live environment variables:
 
 ## Test Specs
 
-| Spec                         | What it tests                                                                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-deployment-verification` | L1 core contracts wired together, CTM registered, all 5 L2 chains registered on L1 with chain ID + CTM, exact predeploy runtimes, test token decimals/supply |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal, and an L1-native ERC20 round trip, on chain 10 (direct L1 settlement), net flow assertions                       |
-| `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                    |
-| `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
-| `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW)                                                                                            |
-| `06-gateway-interop`         | L2A<->L2B interop transfers between GW-settled L2 chains                                                                                                     |
-| `07-interop-bundles`         | Direct, indirect, and mixed bundles; fees, replay protection, and execution-address checks                                                                   |
-| `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                        |
-| `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                |
-| `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                         |
-| `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                          |
+| Spec                         | What it tests                                                                                                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `01-deployment-verification` | L1 core contracts wired together, CTM registered, all 5 L2 chains registered on L1 with chain ID + CTM, interop enabled and peers allowed for exactly the interop chains, exact predeploy runtimes, test token decimals/supply |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal, and an L1-native ERC20 round trip, on chain 10 (direct L1 settlement), net flow assertions                                                                                         |
+| `03-interop-transfer`        | Interop transfers between the interop chains; routes involving a chain without interop revert                                                                                                                                  |
+| `04-gateway-setup`           | GW chain contracts deployed, the GW-settled chain registered on GW L2Bridgehub, GW designated as settlement layer on L1                                                                                                        |
+| `05-gateway-bridge`          | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 13 (via GW)                                                                                                                                                                |
+| `07-interop-bundles`         | Direct, indirect, and mixed bundles; fees, replay protection, and execution-address checks                                                                                                                                     |
+| `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                                                                                          |
+| `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                                                                                  |
+| `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                                                                                           |
+| `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                                                                                            |
 
 ## Coverage
 
@@ -253,7 +254,7 @@ test/anvil-interop/
 ├── run-upgrade-test.ts            # Latest default upgrade test
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
-│   ├── anvil-config.json          # Chain IDs, ports, gateway designation
+│   ├── anvil-config.json          # Chain IDs, ports, settlement, interop chains
 │   ├── l1-deployment.toml         # L1 contract deployment params
 │   ├── ctm-deployment.toml        # ChainTypeManager params
 │   ├── permanent-values.toml      # Immutable protocol values
@@ -277,6 +278,7 @@ test/anvil-interop/
 │   │   ├── deployer.ts            # L1 contract deployment via forge scripts
 │   │   ├── chain-registry.ts      # Register L2 chains on L1 CTM + capture genesis priority txs
 │   │   ├── l2-genesis-upgrade-deployer.ts  # Pre-deploy mocks + relay real genesis priority tx
+│   │   ├── interop-chain-registrar.ts      # Enable interop + allow interop peers
 │   │   ├── gateway-setup.ts       # Gateway designation + chain migration
 │   │   └── gateway-deployer.ts    # Verify GW system contracts
 │   ├── daemons/
@@ -293,7 +295,6 @@ test/anvil-interop/
 │   ├── 03-interop-transfer.spec.ts
 │   ├── 04-gateway-setup.spec.ts
 │   ├── 05-gateway-bridge.spec.ts
-│   ├── 06-gateway-interop.spec.ts
 │   ├── 07-interop-bundles.spec.ts
 │   ├── 08-interop-messages.spec.ts
 │   ├── 09-interop-unbundle.spec.ts
@@ -331,19 +332,20 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 
 ### Impersonation
 
-| What                          | Who                      | Production equivalent                 |
-| ----------------------------- | ------------------------ | ------------------------------------- |
-| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx        |
-| Interop chain registration    | Default Anvil EOA        | Real L1 service-tx flow relayed to L2 |
-| GW chain registration         | `ChainAssetHandler`      | Governance flow                       |
-| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start             |
-| Governance calls              | Governance contract      | Multi-sig / timelock                  |
-| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment     |
+| What                          | Who                      | Production equivalent             |
+| ----------------------------- | ------------------------ | --------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx    |
+| Interop enabling and peers    | Default Anvil EOA        | Governance and chain admins       |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                   |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start         |
+| Governance calls              | Governance contract      | Multi-sig / timelock              |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment |
 
 ### Other Shortcuts
 
 - **GW L2Bridgehub ownership transfer**: CTM deploys a per-chain Governance, but `fullRegistration` sends from ecosystem Governance. The test transfers ownership before relay.
-- **Interop registration scope**: the harness only intentionally registers GW-settled L2 chains for interop. Routes involving the gateway chain or a direct-settled chain revert in the harness.
+- **Interop scope**: the harness only enables interop for the chains marked `interop`, all of which settle on L1. Routes involving the gateway chain or the GW-settled chain revert in the harness.
+- **ZiSK verifier stand-in**: the CTM uses the multi-proof verifier so that chains can lock their second proof system. Its ZiSK Plonk verifier is an `EmptyContract`, since the harness submits no proofs.
 - **L2 genesis deployment via anvil_setCode**: System contracts are bootstrapped at hardcoded addresses, not via real genesis state. Production chains get that state directly from genesis.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
