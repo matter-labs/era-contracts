@@ -449,9 +449,9 @@ async function main(): Promise<void> {
   applyPortOffset(portOffset);
 
   // Workers are given a run suffix by the parent; a non-worker run has to set its own, or
-  // DeploymentRunner and cleanup.sh both fall back to outputs/state and outputs/anvil-pids.json.
-  // Two runs at disjoint offsets would then share those, and one would delete the other's
-  // chains.json — leaving the tests or the collector pointed at the wrong chains.
+  // DeploymentRunner and cleanup.sh both fall back to outputs/state. Two runs at disjoint offsets
+  // would then share it, and one would delete the other's chains.json — leaving the tests or the
+  // collector pointed at the wrong chains.
   if (!workerMode && portOffset && !process.env.ANVIL_INTEROP_RUN_SUFFIX) {
     process.env.ANVIL_INTEROP_RUN_SUFFIX = `-p${portOffset}`;
   }

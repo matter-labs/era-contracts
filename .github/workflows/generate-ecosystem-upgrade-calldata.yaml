@@ -2,7 +2,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 
 # Generic over the `upgrade` input: `upgrade-envs/<upgrade>/upgrade.toml` says how that upgrade is
 # prepared and checked (protocol-ops/src/common/upgrade_descriptor.rs). The notes below describe
-# the default, v0.33.0-atomic-interop (`upgrade-prepare-all` + PUVT; only the release's own
+# the default, v0.34.0-chain-config (`upgrade-prepare-all` + PUVT; only the release's own
 # upgrade directory can use `prepare-all`).
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -21,9 +21,9 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #
 #   gh workflow run update-generated-artifacts.yaml --ref <branch> -f pr_number=<PR#>
 #
-# It builds da → l1 → l2 → system-contracts on a clean runner (the order
-# `recompute_hashes.sh` prescribes), runs `calculate-hashes:fix`, regenerates the
-# anvil-interop chain states, and pushes the result to the PR branch. Needs the
+# It builds da and l1 on a clean runner, runs `calculate-hashes:fix`, refreshes the
+# selectors, zkstack-out and the ZKsync OS genesis, regenerates the anvil-interop
+# chain states, and pushes the result to the PR branch. Needs the
 # `RELEASE_TOKEN` secret, and the PR's head must live in this repo (not a fork of
 # it). `git pull --ff-only` afterwards.
 #
@@ -122,13 +122,6 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # full workflow → `protocol_ops` subcommand map.
 #
 # ── TROUBLESHOOTING ───────────────────────────────────────────────────────
-# `default aa hash factory dep mismatch`      → the system-contracts build did not
-#                                               reproduce the pinned DefaultAccount.
-#                                               The builds must run under exactly
-#                                               the toolchain l1-contracts-ci's
-#                                               `build` job uses (foundry-zksync
-#                                               only, upstream Foundry installed
-#                                               only afterwards); check that order.
 # prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
 # `old protocol version must be ...`            pin `fork_block` and rotate the
 # `.owner() mismatch: expected governance`      env's salts. See ALREADY-UPGRADED
@@ -267,16 +260,16 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                    that impersonates the deployer and signs
 #                                    nothing)
 #   GW_RPC_URL                    — Gateway RPC, passed to PUVT as
-#                                   `--gw-rpc-url` when set (v33's PUVT has no
+#                                   `--gw-rpc-url` when set (the PUVT has no
 #                                   Gateway-side checks and ignores it).
 
 on:
   workflow_dispatch:
     inputs:
       upgrade:
-        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.33.0-atomic-interop is the release's prepare-all + PUVT flow; a forge-script upgrade runs its declared script and checks."
+        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.34.0-chain-config is the release's prepare-all + PUVT flow; a forge-script upgrade runs its declared script and checks."
         required: false
-        default: "v0.33.0-atomic-interop"
+        default: "v0.34.0-chain-config"
         type: string
       environment:
         description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/<upgrade>/<env>.toml. Today: stage, testnet, mainnet. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
@@ -286,11 +279,6 @@ on:
         description: "L1 RPC URL (optional override; BLANK = use repo secret. NOTE: a typed value is visible in the run summary — not secret-grade)"
         required: false
         default: ""
-        type: string
-      zksync_foundry_version:
-        description: "foundry-zksync version (forge --zksync)"
-        required: false
-        default: "v0.1.5"
         type: string
       zk_governance_commit:
         description: "Full zk-governance commit SHA for checkout and PUVT bytecode metadata (PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard)."
@@ -333,10 +321,8 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Install foundry-zksync (for forge --zksync)
-        uses: ./.github/actions/install-zksync-foundry
-        with:
-          version: ${{ inputs.zksync_foundry_version }}
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -352,30 +338,12 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # Build ALL FOUR packages in the order `recompute_hashes.sh` and
-      # `update-hashes-on-demand.yaml` use to produce the committed
-      # `AllContractsHashes.json` — da → l1 → l2 → system-contracts. Keeping the
-      # calldata generation on the same sequence as the artifact generation is the
-      # cheapest way to not have to wonder whether a difference came from here.
+      # Build in the order `update-hashes-on-demand.yaml` uses to produce the committed
+      # `AllContractsHashes.json` (da → l1), with the same pinned Foundry.
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
-      - name: Build l1-contracts artifacts (EVM + zkout)
+      - name: Build l1-contracts artifacts
         run: yarn l1 build:foundry
-      - name: Build l2-contracts artifacts
-        run: yarn l2 build:foundry
-      - name: Build system-contracts artifacts
-        run: yarn sc build:foundry
-
-      # Upstream Foundry supplies anvil. Installed only now, after every contract build,
-      # so the builds see exactly the toolchain l1-contracts-ci's `build` job uses
-      # (foundry-zksync alone, no second forge or restored solc cache on PATH). That job's
-      # artifacts reproduce AllContractsHashes.json, and so does this build: run
-      # 33860270077 produced the pinned DefaultAccount hash unchanged.
-      - name: Install Foundry (for Anvil)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
-          cache: false
 
       - name: Build protocol_ops
         working-directory: protocol-ops
@@ -479,8 +447,6 @@ jobs:
           ZK_GOVERNANCE_DIR: ${{ github.workspace }}/zk-governance
           # Optional fork-block pin (blank = tip).
           FORK_BLOCK: ${{ inputs.fork_block }}
-          # Recorded in the deploy bundle's metadata (part of the bytecode identity).
-          ZKSYNC_FOUNDRY_VERSION: ${{ inputs.zksync_foundry_version }}
         run: |
           set -euo pipefail
           # L1_FORK_URL (masked), DEPLOYER_ADDR and GW_RPC_URL come from $GITHUB_ENV.
@@ -491,7 +457,6 @@ jobs:
           args+=(--zk-governance-commit "$ZK_GOVERNANCE_COMMIT")
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
           [ -z "$FORK_BLOCK" ] || args+=(--fork-block "$FORK_BLOCK")
-          [ -z "$ZKSYNC_FOUNDRY_VERSION" ] || args+=(--foundry-zksync-version "$ZKSYNC_FOUNDRY_VERSION")
           ./protocol-ops/target/release/protocol_ops ecosystem rehearse-upgrade "${args[@]}"
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
@@ -574,7 +539,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Proof that the published deploy bundle is SUFFICIENT on its own.
   #
-  # This job deliberately does NOT build the contracts (no foundry-zksync, no
+  # This job deliberately does NOT build the contracts (no
   # `yarn l1 build:foundry`): it has only the artifact, this checkout and
   # `protocol_ops` — exactly what an operator downloading the bundle has. It
   # forks L1 at the height recorded in `bundle-metadata.json`, replays every
@@ -621,12 +586,9 @@ jobs:
           fi
 
       # Foundry supplies anvil + cast and `protocol_ops` supplies the replay. There is
-      # no forge --zksync or contract build: PUVT reads committed configuration,
-      # never `out/` or `zkout/`.
+      # no contract build: PUVT reads committed configuration, never `out/`.
       - name: Install Foundry (anvil + cast)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
+        uses: ./.github/actions/install-foundry
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master

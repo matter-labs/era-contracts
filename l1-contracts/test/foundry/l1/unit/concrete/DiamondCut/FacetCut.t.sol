@@ -17,8 +17,7 @@ import {
     RemoveFunctionFacetAddressNotZero,
     RemoveFunctionFacetAddressZero,
     ReplaceFunctionFacetAddressZero,
-    SelectorsMustAllHaveSameFreezability,
-    ZeroAddress
+    SelectorsMustAllHaveSameFreezability
 } from "contracts/common/L1ContractErrors.sol";
 
 contract FacetCutTest is DiamondCutTest {
@@ -26,7 +25,7 @@ contract FacetCutTest is DiamondCutTest {
     ExecutorFacet private executorFacet1;
     ExecutorFacet private executorFacet2;
 
-    uint256 eraChainId;
+    uint256 internal eraChainId;
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);

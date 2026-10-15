@@ -55,10 +55,8 @@ as in `hub init`. See `protocol-ops/README.md` for the execution model.
 | Chain | `chain init` (CI: `generate-chain-init-calldata` workflow) | `ctm/RegisterZKChain.s.sol`, `chain/FinalizeChainInit.s.sol` | deployer EOA; Bridgehub admin owner; chain owner (ChainAdmin) |
 
 All scripts live under `l1-contracts/deploy-scripts/`. They need the contracts built first (`yarn
-da build:foundry && yarn sc build:foundry && yarn l1 build:foundry` from the repository root), since
-chain creation embeds the compiled L2 built-ins as factory dependencies. An EraVM `chain init` that
-deploys its L2 contracts (no `--skip-priority-txs`) also needs `yarn l2 build:foundry`, since it
-reads `l2-contracts/zkout/`.
+da build:foundry && yarn l1 build:foundry` from the repository root), since chain creation embeds the
+compiled L2 built-ins as factory dependencies.
 
 ## Hub: the core contracts
 

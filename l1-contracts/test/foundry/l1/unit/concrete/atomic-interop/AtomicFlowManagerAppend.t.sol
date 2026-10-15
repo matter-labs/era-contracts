@@ -77,14 +77,14 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         bytes32 _localLeg,
         bytes32 _remoteLeg
     ) internal view returns (AtomicFlowPreimage memory preimage) {
-        (preimage, , ) = AtomicFlowFixtures.twoLegPreimage(
-            _localLeg,
-            block.chainid,
-            _remoteLeg,
-            OTHER_CHAIN_ID,
-            DEADLINE,
-            L1_CHAIN_ID
-        );
+        (preimage, , ) = AtomicFlowFixtures.twoLegPreimage({
+            _legA: _localLeg,
+            _chainA: block.chainid,
+            _legB: _remoteLeg,
+            _chainB: OTHER_CHAIN_ID,
+            _deadline: DEADLINE,
+            _settlementLayerChainId: L1_CHAIN_ID
+        });
     }
 
     function _appendAsInteropCenter(bytes32 _bundleHash, AtomicFlowPreimage memory _preimage) internal {
@@ -171,7 +171,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
     /// @notice Pins the v1 version literal: it is mirrored off-chain by hand in
     /// `test/anvil-interop/src/helpers/imt-engine-lib.ts`, so a bump must break something here.
-    function test_atomicFlowPreimageVersion_isPinnedToV1() public {
+    function test_atomicFlowPreimageVersion_isPinnedToV1() public pure {
         assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
     }
 

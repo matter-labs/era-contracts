@@ -47,7 +47,7 @@ genesis-versus-upgrade consistency rules are spelled out in
 | Role                 | Who                                                                                                                                           | Signs                                                                                      |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Deployer             | any funded EOA                                                                                                                                | the CREATE2 deployments and bytecode publication                                           |
-| Post-governance      | any funded EOA (not necessarily the deployer)                                                                                                 | release-specific post-governance steps such as `stage3`                                    |
+| Post-governance      | any funded EOA (not necessarily the deployer)                                                                                                 | release-specific post-governance steps, if the release has any (v34 has none)              |
 | Ecosystem governance | the owner of the core proxies, the CTMs and the `ProxyAdmin` (`ProtocolUpgradeHandler` on the public ecosystems, `Governance` on a fresh one) | governance stages 0, 1 and 2                                                               |
 | CTM admin            | the CTM's `ChainAdmin`                                                                                                                        | operational CTM-side calls emitted by the prepare (for example the `ServerNotifier` proxy) |
 | Chain admin          | each chain's `ChainAdmin`                                                                                                                     | the chain's upgrade timestamp and diamond cut                                              |
@@ -60,20 +60,20 @@ calldata.
 
 ## Artifacts and inputs
 
-| Path                                                              | Role                                                                                                                                                                                           |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| the release branch's build artifacts                              | built with the default Foundry profile (`yarn da build:foundry && yarn sc build:foundry && yarn l1 build:foundry`); the deployed bytecode                                                      |
-| `AllContractsHashes.json`                                         | the registry of every contract's bytecode hashes; verification identifies deployments by it, so it must be regenerated with the release                                                        |
-| `SystemConfig.json`                                               | the system and fee constants (batch overhead, pubdata and L1 transaction gas parameters) the scripts read                                                                                      |
-| `configs/genesis/<vm>/latest.json`                                | the target protocol version and the chain creation parameters (genesis root, initial contracts) of the release                                                                                 |
-| `l1-contracts/upgrade-envs/permanent-values/<env>.toml`           | the environment's fact sheet: L1 chain id, Bridgehub, CTMs (with VM type), governance kind, testnet-verifier flag, ZK token asset id, legacy gateway history; independent of the release       |
-| `l1-contracts/upgrade-envs/<release>/<env>.toml`                  | the release × environment input: owner, Era chain id, governance timer delay, `[legacy_gateway] chain_id`, `pre_v32_introspection`, CREATE2 salts; `protocol_ops --env <env>` reads both files |
-| `l1-contracts/upgrade-envs/<release>/output/<env>/ecosystem.toml` | **the artifact**: every new address plus the hex-encoded governance calls of stages 0, 1 and 2; what reviewers diff and what every downstream tool reads                                       |
-| `…/output/<env>/transactions.txt`                                 | the L1 transaction hashes of the deployer's broadcast, appended on every run; verification reconstructs the deployment provenance from it                                                      |
-| `…/output/<env>/extra-verification-logs.txt`                      | one `forge verify-contract` line per deployed contract, constructor arguments included                                                                                                         |
-| `…/output/<env>/sim-inputs/`, `…/simulator/`                      | the transaction-simulator inputs and scenarios                                                                                                                                                 |
-| `…/output/<env>/chain-upgrades/<chain-id>/`                       | the per-chain bundles                                                                                                                                                                          |
-| `…/output/<env>/prepare/`                                         | git-ignored: the per-run Safe bundles and `manifest.json` the prepare emits                                                                                                                    |
+| Path                                                              | Role                                                                                                                                                             |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the release branch's build artifacts                              | built with the default Foundry profile (`yarn da build:foundry && yarn l1 build:foundry`); the deployed bytecode                                                 |
+| `AllContractsHashes.json`                                         | the registry of every contract's bytecode hashes; verification identifies deployments by it, so it must be regenerated with the release                          |
+| `SystemConfig.json`                                               | the system and fee constants (batch overhead, pubdata and L1 transaction gas parameters) the scripts read                                                        |
+| `configs/genesis/<vm>/latest.json`                                | the target protocol version and the chain creation parameters (genesis root, initial contracts) of the release                                                   |
+| `l1-contracts/upgrade-envs/permanent-values/<env>.toml`           | the environment's fact sheet: L1 chain id, Bridgehub, CTMs (with VM type), governance kind, testnet-verifier flag, ZK token asset id; independent of the release |
+| `l1-contracts/upgrade-envs/<release>/<env>.toml`                  | the release × environment input: owner, Era chain id, governance timer delay, CREATE2 salts; `protocol_ops --env <env>` reads both files                         |
+| `l1-contracts/upgrade-envs/<release>/output/<env>/ecosystem.toml` | **the artifact**: every new address plus the hex-encoded governance calls of stages 0, 1 and 2; what reviewers diff and what every downstream tool reads         |
+| `…/output/<env>/transactions.txt`                                 | the L1 transaction hashes of the deployer's broadcast, appended on every run; verification reconstructs the deployment provenance from it                        |
+| `…/output/<env>/extra-verification-logs.txt`                      | one `forge verify-contract` line per deployed contract, constructor arguments included                                                                           |
+| `…/output/<env>/sim-inputs/`, `…/simulator/`                      | the transaction-simulator inputs and scenarios                                                                                                                   |
+| `…/output/<env>/chain-upgrades/<chain-id>/`                       | the per-chain bundles                                                                                                                                            |
+| `…/output/<env>/prepare/`                                         | git-ignored: the per-run Safe bundles and `manifest.json` the prepare emits                                                                                      |
 
 Everything else (CTM addresses, bytecodes supplier, DA manager, chain admins, verifier, and the old
 protocol version, which the CTM script reads from the CTM) is read from L1 at run time rather than
@@ -99,7 +99,7 @@ flowchart LR
 | 2. Deploy          | `ecosystem upgrade-broadcast`                                                                           | deployer, CTM admin  | yes                 |
 | 3. Verify          | `ecosystem verify-upgrade`, `ecosystem governance-toml-to-simulator`, `ecosystem manifest-to-simulator` | none                 | no                  |
 | 4. Governance      | `ecosystem upgrade-governance` or the governance's own proposal flow                                    | ecosystem governance | yes                 |
-| 5. Post-governance | release-specific, e.g. `ecosystem stage3` (emits a bundle)                                              | any EOA              | yes                 |
+| 5. Post-governance | release-specific, if any (none in v34)                                                                  | any EOA              | yes                 |
 | 6. Per chain       | `chain set-upgrade-timestamp`, `chain upgrade` (emit bundles)                                           | each chain admin     | yes                 |
 | 7. Close-out       | `ChainTypeManager.setProtocolVersionDeadline`                                                           | ecosystem governance | yes                 |
 
@@ -117,11 +117,10 @@ and have to be updated before they can run these phases; until then the commands
 but read the Bridgehub and the deployer from `environments/<env>/ecosystem.yaml`, which is
 committed only for `stage-interop-tests` (with a placeholder deployer).
 
-`l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh <env>` chains phases 1 and 3 (prepare,
-rehearse the bundles on the fork, run the verifier) into one command; the
-`regenerate-upgrade-calldata` skill under `.claude/skills/` is the step-by-step runbook, and
-`l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/testnet/README.md` is a complete worked
-example of one environment's rollout.
+`protocol_ops ecosystem rehearse-upgrade --env <env>` chains phases 1 and 3 (prepare, rehearse the
+bundles on the fork, run the verifier) into one command and packs the deploy bundle;
+`docs/ecosystem-upgrade-deploy.md` walks through it and the `generate-ecosystem-upgrade-calldata`
+workflow that runs it in CI.
 
 ### 1. Prepare
 
@@ -159,8 +158,8 @@ Two properties of the prepare decide whether the rest of the pipeline can work:
 An ecosystem whose upgrade already executed cannot be re-prepared at the chain tip: the CTM script
 refuses a CTM that is already on the new protocol version, the governance timer is already armed,
 and the CREATE2 targets are occupied. Pin the fork to a block before the ceremony instead.
-`upgrade-prepare-all` has no fork-block flag: pin it with `FORK_BLOCK` in
-`regen-upgrade-calldata.sh`, or pass an Anvil fork already pinned to that block as `--l1-rpc-url`.
+`upgrade-prepare-all` has no fork-block flag: pin it with `rehearse-upgrade --fork-block`, or pass
+an Anvil fork already pinned to that block as `--l1-rpc-url`.
 
 ### 2. Deploy
 
@@ -212,10 +211,11 @@ The calls the scripts assemble, with the release-specific hooks marked:
   it); `ProxyAdmin.upgrade` for each of the eight core proxies; the release's core-side wiring
   (for example `setL1InteropHandler` on the nullifier and asset router in v33); then per CTM:
   `GovernanceUpgradeTimer.checkDeadline()`, `UpgradeStageValidator.checkMigrationsPaused()`, the
-  four CTM-side proxy upgrades, `ChainTypeManager.setDefaultUpgrade`, `setChainCreationParams`,
-  `setNewVersionUpgrade(cut, oldVersion, oldVersionDeadline, newVersion, verifier)` and the
-  release's CTM-side additions (the DA-validator whitelisting hook, `prepareDAValidatorCall`, is
-  currently empty).
+  four CTM-side proxy upgrades, `ChainTypeManager.setDefaultUpgrade`,
+  `setNewVersionUpgrade(cut, oldVersion, oldVersionDeadline, newVersion, verifier)`,
+  `setChainCreationParams` (after `setNewVersionUpgrade`, which advances the version it is keyed
+  on) and the release's CTM-side additions (the DA-validator whitelisting hook,
+  `prepareDAValidatorCall`, is currently empty).
 - **Stage 2.** The release's stage-2 additions; `unpauseMigration()`; per CTM,
   `UpgradeStageValidator.checkProtocolUpgradePresence()` and `checkMigrationsUnpaused()`.
 
@@ -243,11 +243,8 @@ every chain created afterwards starts on the new version.
 ### 5. Release-specific post-governance steps
 
 Some releases need work after governance and before the chains move, signed by any EOA because it
-carries no privilege. In v33 that is `protocol_ops ecosystem stage3 --env <env> --l1-rpc-url <l1> --sender <EOA>`,
-whose bundle, once that EOA executes it, populates `L1NativeTokenVault.bridgedOut` for every
-L1-native asset in the vault's `bridgedTokens` list. Legacy tokens missing from that list must be
-backfilled into it first with the vault's permissionless `addLegacyTokenToBridgedTokensList(token)`,
-otherwise their pre-upgrade escrow stays unwithdrawable (see
+carries no privilege. v34 has none. v33's was `protocol_ops ecosystem stage3`, which populated
+`L1NativeTokenVault.bridgedOut` (see
 [Populating `bridgedOut` during an in-place upgrade](./bridging.md#populating-bridgedout-during-an-in-place-upgrade)).
 Such steps are described in the release's output README and, being broadcasts rather than
 calldata, are not covered by the verifier.
@@ -261,18 +258,14 @@ return for the node. Both `chain` commands below only write a bundle
 default admin when `--access-control-restriction` is passed); each step happens when that bundle is
 executed on L1, and the timestamp bundle must be executed before the cut bundle. With `--env`,
 `chain upgrade` writes its bundle to `output/<env>/chain-upgrades/<id>/` by default; `chain
-set-upgrade-timestamp` and `chain record-priority-op-lower-bound` write one only when `--out` is
-given, and produce no bundle otherwise.
+set-upgrade-timestamp` writes one only when `--out` is given, and produces no bundle otherwise.
 
 1. **Check the cut's preconditions first.** The cut reverts unless they hold on the chain: the
    chain is on exactly the old version, every committed batch has been executed (the release
    installs a new verifier, and batches awaiting proof under the old one would stop being
    provable; this is the one step 3 waits for), the previous upgrade transaction has been
-   consumed, and whatever the release adds. For v33, `V32UpgradeZKsyncOS` checks three things: the
-   base-token total supply backfill of v31 has happened (`baseTokenHasTotalSupply`), a priority-op
-   lower bound has been recorded
-   (`protocol_ops chain record-priority-op-lower-bound`, in its own earlier transaction), and the
-   priority queue has been drained past that bound.
+   consumed, and whatever the release adds. v34's `V34UpgradeZKsyncOS` adds no precondition of its
+   own.
 2. `protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --upgrade-timestamp <ts>
 --l1-rpc-url <l1> --out <dir>` prepares the call to `ServerNotifier.setUpgradeTimestamp`, keyed on the chain's current version; `1` means
    "immediately" (0 is rejected). On this event the node injects the L2 upgrade transaction into
@@ -292,12 +285,9 @@ given, and produce no bundle otherwise.
    built-ins are force-deployed and the L2 upgrade contract initializes them. The chain is on the
    new version for good once that batch has been executed on L1.
 
-`protocol_ops` checks only two of the preconditions explicitly: `chain set-upgrade-timestamp`
-refuses a v31 chain whose priority-op lower bound has not been recorded and drained, and `chain
-upgrade` refuses to leave a validium-priced chain in an unrecommended DA state. Everything else is
-covered only by the fork replay when the bundle is prepared, which reflects the chain's state at
-that moment. The per-chain preconditions and the DA choices are worked through in
-`l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/testnet/chain-upgrades/README.md`.
+`protocol_ops` checks only one of the preconditions explicitly: `chain upgrade` refuses to leave a
+validium-priced chain in an unrecommended DA state. Everything else is covered only by the fork
+replay when the bundle is prepared, which reflects the chain's state at that moment.
 
 ### 7. Close-out
 
@@ -324,12 +314,13 @@ and what one release adds:
   CTM stages. A release overrides `deployUsedUpgradeContract` (its per-chain upgrade contract),
   `getAdditionalUniversalForceDeployments` and `getAdditionalFactoryDependencyContracts` (its new
   L2 built-ins), `getZKsyncOSL2UpgradeTargetAndData` (its L2 upgrade contract and calldata), and,
-  where it needs them, `encodePostUpgradeCalldata` and the CTM stage hooks (`CTMUpgrade_v33`
+  where it needs them, `encodePostUpgradeCalldata` and the CTM stage hooks (`CTMUpgrade_v34`
   overrides neither).
 - `AdminFunctions.s.sol` drives the per-chain cut in `protocol_ops`;
   `default-upgrade/DefaultChainUpgrade.s.sol` is only used by tests.
-- `v<N>/CoreUpgrade_v<N>.s.sol` and `v<N>/CTMUpgrade_v<N>.s.sol` are the release's overrides, plus
-  any one-off script the release needs (`v33/RecordPriorityOpLowerBound.s.sol`).
+- `v<N>/` holds the release's overrides (`CoreUpgrade_v<N>.s.sol`, `CTMUpgrade_v<N>.s.sol`) and any
+  one-off script the release needs. v34 has only `CTMUpgrade_v34.s.sol` and runs
+  `DefaultCoreUpgrade` as is.
 - `SystemContractsProcessing.s.sol` is the list of L2 built-ins a release force-deploys or
   neutralizes.
 
@@ -338,19 +329,20 @@ contracts: `DefaultUpgrade` and `DefaultUpgradeZKsyncOS` for releases without on
 one-shot contract otherwise, all on `BaseZkSyncUpgrade`) and `l1-contracts/contracts/l2-upgrades/`
 (`L2ComplexUpgrader`, which executes the L2 upgrade transaction, and the release's L2 upgrade
 contract). The one-shot contracts are named after the version they were introduced for, not the
-release number: v33 uses `V32UpgradeZKsyncOS` and `L2V32Upgrade`.
+release number (v33 used `V32UpgradeZKsyncOS`). v34 ships `V34UpgradeZKsyncOS` and no L2 upgrade
+contract of its own.
 
 The CTM should keep the generic contract as its `defaultUpgrade` even when the release ships a
 one-shot one, because verifier-only upgrades reuse it later and a one-shot contract's
 preconditions only hold while a chain crosses that one release. This is not automatic: by default
 the CTM stores whatever `deployUsedUpgradeContract` returns, so a release with a one-shot contract
-must also deploy a generic one and assign it to `ctmStoredDefaultUpgrade`, as `CTMUpgrade_v33`
-does.
+keeps returning the generic one there and points the cut's `initAddress` at the one-shot in
+`generateUpgradeCutData`, as `CTMUpgrade_v34` does.
 
-A release also adds: its `upgrade-envs/<release>/` directory (inputs per environment; the
-`UPGRADE_ENV_DIR` constant in `protocol-ops/src/common/env_config.rs` and the release's script
-paths and env directory in `protocol-ops/src/common/forge/scripts/mod.rs` move to it), the
-verifier expectations under `protocol-ops/src/upgrade_verification/versions/v<N>/`, a regenerated
+A release also adds: its `upgrade-envs/<release>/` directory (inputs per environment, created by
+`yarn new-release`, which also moves `current_upgrade_env_dir!` in
+`protocol-ops/src/common/forge/scripts/mod.rs` to it; the release's script paths there move by
+hand), the verifier expectations under `protocol-ops/src/upgrade_verification/versions/v<N>/`, a regenerated
 genesis config and `AllContractsHashes.json`, and its entry in the anvil-interop upgrade test
 (`l1-contracts/test/anvil-interop/docs/upgrade-test-runner.md`), which runs the release's scripts
 (through `*ForTests` subclasses) end to end against the previous release's chain-state snapshots

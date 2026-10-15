@@ -8,12 +8,13 @@ import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Note: In our CTM we have a single implementation of ValidatorTimelock for everyone,
-/// so the interface must remain backwards compatible as the same timelock is utilized
-/// for chains with different protocol versions.
+/// @dev The same upgradeable timelock serves chains on different protocol versions, so its external
+/// interface must remain backwards compatible.
 interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
-    /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
+    /// @param rotatePrecommitterRole Whether to rotate the retired PRECOMMITTER_ROLE. The role gates nothing
+    /// any more; the flag is still honoured so grants made before the precommit path was removed can be
+    /// revoked (`removeValidator` revokes it, `addValidator` does not grant it).
     /// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
     /// @param rotateReverterRole Whether to rotate the REVERTER_ROLE.
     /// @param rotateProverRole Whether to rotate the PROVER_ROLE.
@@ -28,10 +29,16 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
         bool rotateUpgraderRole;
     }
 
-    /// @notice The delay between committing and executing batches is changed.
+    /// @notice The ecosystem-wide delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
-    /// @notice Role hash for addresses allowed to precommit batches on a chain.
+    /// @notice The chain-specific delay between committing and executing batches is changed.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy) the delay belongs to.
+    /// @param _newExecutionDelay The new chain-specific execution delay.
+    event NewChainExecutionDelay(address indexed _chainAddress, uint256 _newExecutionDelay);
+
+    /// @notice Retired role hash: gates nothing since precommits were removed. Kept so existing grants
+    /// can still be enumerated and revoked.
     function PRECOMMITTER_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to commit batches on a chain.
     function COMMITTER_ROLE() external view returns (bytes32);
@@ -43,8 +50,7 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     function EXECUTOR_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to upgrade chains.
     function UPGRADER_ROLE() external view returns (bytes32);
-    /// @notice Optional admin role hash for managing PRECOMMITTER_ROLE assignments.
-    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
+    /// @notice Deprecated optional admin role hash retained for ABI compatibility.
     function OPTIONAL_PRECOMMITTER_ADMIN_ROLE() external view returns (bytes32);
     /// @notice Optional admin role hash for managing COMMITTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
@@ -64,8 +70,16 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
 
     /// @notice The address of the bridgehub
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
-    /// @dev The delay between committing and executing batches.
+    /// @notice The maximal execution delay that either the ecosystem owner or a chain admin can set.
+    function MAX_EXECUTION_DELAY() external view returns (uint32);
+    /// @dev The ecosystem-wide delay between committing and executing batches. A lower bound per chain.
     function executionDelay() external view returns (uint32);
+    /// @dev The chain-specific delay, `0` if unset. Use `getExecutionDelay` for the enforced value.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    function chainExecutionDelay(address _chainAddress) external view returns (uint32);
+    /// @notice The delay enforced for `_chainAddress`: `max(executionDelay, chainExecutionDelay)`.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    function getExecutionDelay(address _chainAddress) external view returns (uint32);
     /// @dev Part of the IBase interface. Not used in this contract.
     function getName() external pure returns (string memory);
 
@@ -74,20 +88,30 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @param _initialOwner The initial owner of the Validator timelock.
     /// @param _initialExecutionDelay The initial execution delay, i.e. minimal time between a batch is committed and executed.
     function initialize(address _initialOwner, uint32 _initialExecutionDelay) external;
-    /// @dev Set the delay between committing and executing batches.
+    /// @dev Set the ecosystem-wide delay. Owner only, capped by `MAX_EXECUTION_DELAY`.
     function setExecutionDelay(uint32 _executionDelay) external;
+    /// @notice Raises the execution delay of a single chain. Chain admin only.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    /// @param _newExecutionDelay The new delay. Must exceed `getExecutionDelay` and not `MAX_EXECUTION_DELAY`.
+    /// @dev Only ever increases. Lowering it again requires the owner via `setChainExecutionDelay`.
+    function increaseChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external;
+    /// @notice Sets a chain's execution delay to any value, including a lower one. Owner only.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    /// @param _newExecutionDelay The new delay, capped by `MAX_EXECUTION_DELAY`.
+    /// @dev The only way to decrease a delay a chain admin has increased.
+    function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external;
     /// @dev Returns the timestamp when `_l2BatchNumber` was committed.
     function getCommittedBatchTimestamp(address _chainAddress, uint256 _l2BatchNumber) external view returns (uint256);
 
     /// @notice Revokes the specified validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
-    /// @param params Flags indicating which roles to revoke.
+    /// @param _params Flags indicating which roles to revoke.
     /// @dev Note that the access control is managed by the inner `revokeRole` functions.
     function removeValidatorRoles(
         address _chainAddress,
         address _validator,
-        ValidatorRotationParams memory params
+        ValidatorRotationParams memory _params
     ) external;
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
@@ -100,11 +124,11 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Grants the specified validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
-    /// @param params Flags indicating which roles to grant.
+    /// @param _params Flags indicating which roles to grant.
     function addValidatorRoles(
         address _chainAddress,
         address _validator,
-        ValidatorRotationParams memory params
+        ValidatorRotationParams memory _params
     ) external;
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
@@ -121,8 +145,6 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) external view returns (bool);
 
     // Chain interaction functions
-    /// @dev Make a call to the zkChain diamond contract with the same calldata.
-    function precommitSharedBridge(address _chainAddress, uint256 _l2BlockNumber, bytes calldata _l2Block) external;
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkChain diamond contract with the same calldata.
     function commitBatchesSharedBridge(

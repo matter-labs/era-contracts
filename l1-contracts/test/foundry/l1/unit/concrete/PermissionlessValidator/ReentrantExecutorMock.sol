@@ -30,14 +30,14 @@ contract ReentrantExecutorMock {
         }
 
         attemptReenter = false;
-        validator.settleBatchesSharedBridge(
-            address(this),
-            _processFrom,
-            _processTo,
-            _commitData,
-            storedProveData,
-            storedExecuteData
-        );
+        validator.settleBatchesSharedBridge({
+            _chainAddress: address(this),
+            _processBatchFrom: _processFrom,
+            _processBatchTo: _processTo,
+            _commitData: _commitData,
+            _proveData: storedProveData,
+            _executeData: storedExecuteData
+        });
     }
 
     function proveBatchesSharedBridge(address, uint256, uint256, bytes calldata) external {}

@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
-// solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
@@ -15,10 +13,8 @@ import {
     L2_BASE_TOKEN_HOLDER,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_INTEROP_HANDLER,
@@ -29,7 +25,6 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
@@ -54,14 +49,12 @@ import {
     INTEROP_CALL_VERSION,
     InteropBundle,
     InteropCall,
-    InteropCallStarter,
     L2Message,
     MessageInclusionProof
 } from "contracts/common/Messaging.sol";
 
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
-import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -149,7 +142,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         assertTrue(result, "Message verification should succeed");
     }
 
-    function test_l2MessageInclusion() public {
+    function test_l2MessageInclusion() public pure {
         // Real proof captured for chainId 271, L1 batch 26, message index 0.
         // Encoded as abi.encode of proveL2MessageInclusionShared's argument tuple:
         // (uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, L2Message message, bytes32[] proof).
@@ -173,11 +166,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
@@ -229,11 +217,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             "finality gate must be skipped once Verified"
         );
         vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
-        vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
@@ -253,11 +236,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         bytes memory bundle = abi.encode(interopBundle);
         AtomicFinalityProof memory finality;
         _mockRequireFlowFinalized();
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
@@ -495,57 +473,30 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         L2InteropHandler(L2_INTEROP_HANDLER_ADDR).verifyAtomicBundle(bundle, finality);
     }
 
-    /// @notice Test pause functionality in InteropCenter
-    function test_interopCenter_pause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+    /// @notice L2 chain freezing replaces InteropCenter's former owner-operated pause controls.
+    function testFuzz_interopCenter_removedPauseControls(address _caller, bool _unpause) public {
+        InteropCenter center = InteropCenter(L2_INTEROP_CENTER_ADDR);
+        address originalOwner = center.owner();
+        assertFalse(center.paused(), "InteropCenter should start unpaused");
 
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
-
-        bytes memory recipient = abi.encodePacked(uint256(271), address(0x123));
-        bytes memory payload = abi.encode("test");
-        bytes[] memory attributes = new bytes[](0);
-
-        // The whenNotPaused modifier reverts before the atomic-attribute check, so no attributes needed.
-        vm.expectRevert("Pausable: paused");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
+        // Call the removed entry points through the deployed proxy to verify that
+        // neither arbitrary callers nor the owner can change pause state.
+        bytes memory data = _unpause ? abi.encodeWithSignature("unpause()") : abi.encodeWithSignature("pause()");
+        vm.recordLogs();
+        vm.prank(_caller);
+        (bool success, ) = L2_INTEROP_CENTER_ADDR.call(data);
+        assertFalse(success, "Removed pause controls should revert");
+        assertEq(vm.getRecordedLogs().length, 0, "Rejected calls should not emit events");
+        assertFalse(center.paused(), "Pause state must remain unchanged");
+        assertEq(center.owner(), originalOwner, "Owner must remain unchanged");
     }
 
-    /// @notice Test unpause functionality in InteropCenter
-    function test_interopCenter_unpause() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
-
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
-
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
-
-        assertFalse(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be unpaused");
+    function test_interopCenter_ownerCannotPause() public {
+        testFuzz_interopCenter_removedPauseControls(InteropCenter(L2_INTEROP_CENTER_ADDR).owner(), false);
     }
 
-    /// @notice Test that only owner can pause InteropCenter
-    function test_interopCenter_pause_onlyOwner() public {
-        address nonOwner = makeAddr("nonOwner");
-
-        vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-    }
-
-    /// @notice Test that only owner can unpause InteropCenter
-    function test_interopCenter_unpause_onlyOwner() public {
-        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
-        vm.prank(interopCenterOwner);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
-
-        address nonOwner = makeAddr("nonOwner");
-        vm.prank(nonOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+    function test_interopCenter_ownerCannotUnpause() public {
+        testFuzz_interopCenter_removedPauseControls(InteropCenter(L2_INTEROP_CENTER_ADDR).owner(), true);
     }
 
     /// @notice `verifyAtomicBundle` marks the bundle `Verified` and emits `BundleVerified`, and does so
@@ -595,11 +546,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encode(GATEWAY_CHAIN_ID)
         );
 
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),

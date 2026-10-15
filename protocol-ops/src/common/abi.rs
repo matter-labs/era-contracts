@@ -118,33 +118,6 @@ pub mod i_register_zk_chain {
 }
 pub use i_register_zk_chain::IRegisterZKChainAbi;
 
-pub mod i_deploy_l2_contracts {
-    alloy::sol!(
-        #[sol(rpc)]
-        IDeployL2ContractsAbi,
-        "../l1-contracts/zkstack-out/IDeployL2Contracts.sol/IDeployL2Contracts.json"
-    );
-}
-pub use i_deploy_l2_contracts::IDeployL2ContractsAbi;
-
-pub mod i_deploy_paymaster {
-    alloy::sol!(
-        #[sol(rpc)]
-        IDeployPaymasterAbi,
-        "../l1-contracts/zkstack-out/IDeployPaymaster.sol/IDeployPaymaster.json"
-    );
-}
-pub use i_deploy_paymaster::IDeployPaymasterAbi;
-
-pub mod i_gateway_vote_preparation {
-    alloy::sol!(
-        #[sol(rpc)]
-        IGatewayVotePreparationAbi,
-        "../l1-contracts/zkstack-out/IGatewayVotePreparation.sol/IGatewayVotePreparation.json"
-    );
-}
-pub use i_gateway_vote_preparation::IGatewayVotePreparationAbi;
-
 pub mod admin_functions {
     alloy::sol!(
         #[sol(rpc)]
@@ -153,33 +126,6 @@ pub mod admin_functions {
     );
 }
 pub use admin_functions::AdminFunctionsAbi;
-
-pub mod i_enable_evm_emulator {
-    alloy::sol!(
-        #[sol(rpc)]
-        IEnableEvmEmulatorAbi,
-        "../l1-contracts/zkstack-out/IEnableEvmEmulator.sol/IEnableEvmEmulator.json"
-    );
-}
-pub use i_enable_evm_emulator::IEnableEvmEmulatorAbi;
-
-pub mod deploy_gateway_transaction_filterer {
-    alloy::sol!(
-        #[sol(rpc)]
-        DeployGatewayTransactionFiltererAbi,
-        "../l1-contracts/zkstack-out/IDeployGatewayTransactionFilterer.sol/IDeployGatewayTransactionFilterer.json"
-    );
-}
-pub use deploy_gateway_transaction_filterer::DeployGatewayTransactionFiltererAbi;
-
-pub mod gateway_utils {
-    alloy::sol!(
-        #[sol(rpc)]
-        GatewayUtilsAbi,
-        "../l1-contracts/zkstack-out/IGatewayUtils.sol/IGatewayUtils.json"
-    );
-}
-pub use gateway_utils::GatewayUtilsAbi;
 
 pub mod i_deploy_ctm {
     alloy::sol!(
@@ -276,6 +222,8 @@ pub mod testnet_verifier {
     alloy::sol!(
         #[sol(rpc)]
         interface ITestnetVerifier {
+            function isTestnetVerifier() external view returns (bool);
+            // Legacy pre-v34 name (a public constant on testnet verifiers of those versions).
             function IS_TESTNET_VERIFIER() external view returns (bool);
         }
     );
@@ -301,15 +249,6 @@ pub mod i_core_upgrade {
 }
 pub use i_core_upgrade::ICoreUpgradeAbi;
 
-pub mod i_core_upgrade_v33 {
-    alloy::sol!(
-        #[sol(rpc)]
-        ICoreUpgradeV33Abi,
-        "../l1-contracts/zkstack-out/ICoreUpgradeV33.sol/ICoreUpgradeV33.json"
-    );
-}
-pub use i_core_upgrade_v33::ICoreUpgradeV33Abi;
-
 pub mod i_ctm_upgrade {
     alloy::sol!(
         #[sol(rpc)]
@@ -318,15 +257,6 @@ pub mod i_ctm_upgrade {
     );
 }
 pub use i_ctm_upgrade::ICTMUpgradeAbi;
-
-pub mod i_record_priority_op_lower_bound {
-    alloy::sol!(
-        #[sol(rpc)]
-        IRecordPriorityOpLowerBoundAbi,
-        "../l1-contracts/zkstack-out/IRecordPriorityOpLowerBound.sol/IRecordPriorityOpLowerBound.json"
-    );
-}
-pub use i_record_priority_op_lower_bound::IRecordPriorityOpLowerBoundAbi;
 
 pub mod i_finalize_chain_init {
     // Hand-declared: the artifact JSON's `enum L2DACommitmentScheme`

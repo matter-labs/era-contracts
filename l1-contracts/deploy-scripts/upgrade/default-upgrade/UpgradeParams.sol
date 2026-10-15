@@ -3,13 +3,11 @@ pragma solidity 0.8.28;
 
 /// @notice Parameters for the ecosystem upgrade entry point.
 ///         Passed as a struct to avoid stack-depth issues as the parameter list grows.
-// solhint-disable-next-line gas-struct-packing
 struct EcosystemUpgradeParams {
     address bridgehubProxyAddress;
     address ctmProxy;
     address bytecodesSupplier;
     address rollupDAManager;
-    bool isZKsyncOS;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
     string ecosystemOutputPath;
@@ -22,23 +20,18 @@ struct EcosystemUpgradeParams {
 }
 
 /// @notice Parameters for the standalone core upgrade entry point.
-// solhint-disable-next-line gas-struct-packing
 struct CoreUpgradeParams {
     address bridgehubProxyAddress;
-    bool isZKsyncOS;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
     string outputPath;
 }
 
 /// @notice Parameters for the standalone CTM upgrade entry point.
-///         Used by `CTMUpgrade_v31.noGovernancePrepare` when running per-CTM in a multi-CTM
-///         ecosystem (e.g. ZKsyncOS + EraVM on stage).
-// solhint-disable-next-line gas-struct-packing
+///         Used by `CTMUpgrade_v31.noGovernancePrepare` when running once per target CTM.
 struct CTMUpgradeParams {
     address ctmProxy;
     address bytecodesSupplier;
-    bool isZKsyncOS;
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;

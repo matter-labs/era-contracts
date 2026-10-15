@@ -65,7 +65,7 @@ library DynamicIncrementalMerkle {
      */
     function reset(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
         clear(self);
-        setup(self, zero);
+        return setup(self, zero);
     }
 
     /**

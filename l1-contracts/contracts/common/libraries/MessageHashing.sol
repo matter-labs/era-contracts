@@ -63,7 +63,6 @@ library MessageHashing {
 
     function getLeafHashFromLog(L2Log memory _log) internal pure returns (bytes32 hashedLog) {
         hashedLog = keccak256(
-            // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
     }
@@ -73,7 +72,7 @@ library MessageHashing {
     /// @param batchNumber The number of the batch.
     /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated.
     /// Bound into the leaf so the timestamp is provable via the same inclusion proof; see
-    /// {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    /// {protocol-docs/message-root.md#v31-vs-v33-append-flows}.
     function batchLeafHash(
         bytes32 batchRoot,
         uint256 batchNumber,

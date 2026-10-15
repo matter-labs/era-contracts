@@ -76,6 +76,11 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         revert MockVerifierNotSupported();
     }
 
+    /// @inheritdoc IZKsyncOSVerifier
+    function isTestnetVerifier() external pure virtual returns (bool) {
+        return false;
+    }
+
     /// @inheritdoc IVerifier
     /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
@@ -93,6 +98,11 @@ contract ZKsyncOSVerifier is IVerifier, IZKsyncOSVerifier {
         else {
             revert UnknownVerifierType();
         }
+    }
+
+    /// @inheritdoc IZKsyncOSVerifier
+    function getProofMode(uint8) external pure returns (uint256) {
+        return ZKSYNC_OS_PLONK_VERIFICATION_TYPE;
     }
 
     function _extractZKsyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {

@@ -52,12 +52,10 @@ contract MockRecordingAssetTracker {
         fromChainCalls++;
     }
 
-    // solhint-disable-next-line func-name-mixedcase
     function L1_CHAIN_ID() external pure returns (uint256) {
         return MOCK_L1_CHAIN_ID;
     }
 
-    // solhint-disable-next-line func-name-mixedcase
     function BASE_TOKEN_ASSET_ID() external pure returns (bytes32) {
         return MOCK_BASE_TOKEN_ASSET_ID;
     }

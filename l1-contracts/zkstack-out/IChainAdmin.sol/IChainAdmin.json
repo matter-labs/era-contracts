@@ -136,12 +136,6 @@
   },
   {
     "type": "event",
-    "name": "EnableEvmEmulator",
-    "inputs": [],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "RestrictionAdded",
     "inputs": [
       {

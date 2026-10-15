@@ -1,16 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// solhint-disable no-console
-
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-
-// It's required to disable lints to force the compiler to compile the contracts
-// solhint-disable no-unused-import
-
-// solhint-disable no-unused-import
-import {WETH9} from "contracts/dev-contracts/WETH9.sol";
 
 import {MintFailed} from "../utils/ZkSyncScriptErrors.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";

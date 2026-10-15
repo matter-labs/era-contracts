@@ -10,7 +10,7 @@ import {
     L2_BRIDGEHUB_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2ToL1MessengerEra} from "contracts/common/l2-helpers/IL2ToL1MessengerEra.sol";
+import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     InvalidPubdataSource,
@@ -19,16 +19,16 @@ import {
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract RelayedSLDAValidatorTest is Test {
-    uint256 constant CHAIN_ID = 193;
-    address constant CHAIN_ADDRESS = address(0x1234);
-    RelayedSLDAValidator daValidator;
+    uint256 internal constant CHAIN_ID = 193;
+    address internal constant CHAIN_ADDRESS = address(0x1234);
+    RelayedSLDAValidator internal daValidator;
 
     function setUp() public {
         daValidator = new RelayedSLDAValidator();
         vm.etch(address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR), abi.encode(address(daValidator)));
         vm.mockCall(
             address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeWithSelector(IL2ToL1MessengerEra.sendToL1.selector),
+            abi.encodeWithSelector(IL2ToL1Messenger.sendToL1.selector),
             abi.encode(bytes32(0))
         );
         vm.mockCall(

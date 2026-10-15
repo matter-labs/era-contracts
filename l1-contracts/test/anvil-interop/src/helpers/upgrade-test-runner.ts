@@ -5,7 +5,6 @@ import { parse as parseToml } from "toml";
 import { ethers } from "ethers";
 import { AnvilManager } from "../daemons/anvil-manager";
 import { DeploymentRunner } from "../deployment-runner";
-import { runForgeScript } from "../core/forge";
 import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -34,23 +33,18 @@ import {
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
   NTV_WETH_TOKEN_SLOT,
   NTV_L1_CHAIN_ID_SLOT,
-  NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT,
+  SEMVER_MAJOR_OFFSET,
+  SEMVER_MINOR_OFFSET,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
-import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import { forceBatchExecutedEqualsCommitted, modelV31BackfillPrerequisite, transferOwnable2Step } from "./harness-shims";
+import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun, createProvider } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
 // ── Constants ────────────────────────────────────────────────────────
-
-// Protocol version this release upgrades chains to. The upgrade inputs under `config/` carry it as a
-// literal too, since TOML cannot import it.
-// v33 (0x21 << 32). The scripts derive the target from the genesis config; this is what the
-// harness asserts the chains reached.
-export const TARGET_PROTOCOL_VERSION = "0x2100000000";
 
 // EIP-1967 admin slot: keccak256("eip1967.proxy.admin") - 1
 const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
@@ -58,47 +52,55 @@ const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6
 const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 // ContractUpgradeType enum values from IComplexUpgrader.sol
-const UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT = 0;
 const UPGRADE_TYPE_ZKOS_SYSTEM_PROXY = 1;
 const UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY = 2;
 
 const anvilInteropDir = path.resolve(__dirname, "../..");
 const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 const contractsRootDir = path.resolve(l1ContractsDir, "..");
-// Memory-trimmed test variants of CoreUpgrade_v33 / CTMUpgrade_v33 used as
-// `--core-script-path` / `--ctm-script-path` overrides for `upgrade-prepare-all`.
-// Stage 3 still runs as a direct `forge script` invocation (no protocol-ops command),
-// against the same Core test variant which provides a no-arg `stage3()` wrapper.
-const CORE_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CoreUpgradeV33ForTests";
-const CTM_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV33ForTests.sol:CTMUpgradeV33ForTests";
+// The genesis config the default upgrade scripts read their target version from.
+const ZKSYNC_OS_GENESIS_PATH = path.join(contractsRootDir, "configs", "genesis", "zksync-os", "latest.json");
 
-// Function selectors for the ComplexUpgrader entry points.
+// Function selector for the ComplexUpgrader entry point.
 // Used to decode the final L2 upgrade tx data (output of getL2UpgradeTxData).
 const SELECTORS = {
-  // forceDeployAndUpgrade((bytes32,address,bool,uint256,bytes)[],address,bytes) — Era
-  eraForceDeployAndUpgrade: "0x480d1185",
-  // forceDeployAndUpgradeUniversal((uint8,bytes,address)[],address,bytes) — ZKsyncOS
+  // forceDeployAndUpgradeUniversal((uint8,bytes,address)[],address,bytes)
   zkosForceDeployAndUpgradeUniversal: "0xd8cfca80",
 } as const;
 
 // ── Public types ─────────────────────────────────────────────────────
 
-export type V31UpgradeScenario = {
+export type UpgradeScenario = {
   label: string;
+  // Chain-states folder the scenario boots from: the previous release's ecosystem.
   stateVersion: string;
-  permanentValuesTemplatePath: string;
-  upgradeInputTemplatePath: string;
-  isZKsyncOS: boolean;
   targetRoles: ChainRole[];
-  // Protocol version the chains must report once the upgrade has been applied.
-  expectedProtocolVersion: string;
   clearGenesisUpgradeTxHash?: boolean;
-  transferL1ChainAssetHandlerOwnership?: boolean;
 };
+
+/**
+ * Protocol version the default upgrade targets: the one in the ZKsync OS genesis config, which
+ * `DefaultCoreUpgrade` / `DefaultCTMUpgrade` read as their new version. Packed like `SemVer.packSemVer`.
+ */
+export function readGenesisProtocolVersion(): ethers.BigNumber {
+  const genesis = JSON.parse(fs.readFileSync(ZKSYNC_OS_GENESIS_PATH, "utf-8")) as {
+    protocol_semantic_version: { major: number; minor: number; patch: number };
+  };
+  const { major, minor, patch } = genesis.protocol_semantic_version;
+  return ethers.BigNumber.from(major)
+    .shl(SEMVER_MAJOR_OFFSET)
+    .or(ethers.BigNumber.from(minor).shl(SEMVER_MINOR_OFFSET))
+    .or(patch);
+}
 
 // ── Main entry point ─────────────────────────────────────────────────
 
-export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promise<void> {
+/**
+ * Upgrade the previous release's ecosystem (`scenario.stateVersion`) with the upgrade protocol-ops prepares by
+ * default — its default scripts and input, no overrides — and check every target chain reaches the genesis
+ * version.
+ */
+export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<void> {
   const anvilManager = new AnvilManager();
   const runner = new DeploymentRunner();
   let cleanupUpgradeHarnessInputs: (() => void) | null = null;
@@ -124,7 +126,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
 
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
-    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses, scenario);
+    await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses);
 
     // ── Deploy ChainAdmin for each upgrade target ──
     console.log("\n── Deploying temporary ChainAdminOwnable contracts ──");
@@ -134,7 +136,6 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     const upgradeHarnessInputs = prepareUpgradeHarnessInputs(scenario, {
       l1Addresses,
       ctmAddresses,
-      chainAddresses: upgradeChainAddresses,
     });
     cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
 
@@ -177,48 +178,17 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
     }
-    // ── Stage 3: post-governance migration ──
-    // ── Stage 3: post-governance bridgedOut population ──
-    // Runs BEFORE the per-chain upgrades, matching production sequencing (see protocol-ops
-    // `ecosystem stage3`): every withdrawable L1-native asset must be populated by the time a
-    // chain's diamond upgrade lands.
-    console.log("\n── Running stage3 post-governance population ──");
-    await runForgeScript({
-      scriptPath: CORE_UPGRADE_TEST_SCRIPT,
-      envVars: upgradeHarnessInputs.envVars,
-      rpcUrl: l1Chain.rpcUrl,
-      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-      projectRoot: l1ContractsDir,
-      sig: "stage3()",
-    });
-
     // ── Run per-chain upgrades (L1) and relay to L2 ──
-    // `default_upgrade_addr` lives in the per-CTM output TOML written by
-    // `CTMUpgradeV33ForTests.saveOutput` directly to `script-out/` (forge
-    // writes it there; protocol-ops no longer copies it into `prepare/`).
-    const ctmTomlPath = path.join(
-      l1ContractsDir,
-      "script-out",
-      `v33-upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
-    );
-    const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
-    const settlementLayerUpgradeAddr = readNestedString(
-      ctmOutputToml,
-      ["state_transition", "default_upgrade_addr"],
-      "per-chain upgrade contract address"
-    );
     await runChainUpgradesAndRelayL2({
       l1Provider,
       anvilManager,
       bridgehubAddr: l1Addresses.bridgehub,
-      settlementLayerUpgradeAddr,
       ctmAddr: ctmAddresses.chainTypeManager,
       upgradeChainAddresses,
-      isZKsyncOS: scenario.isZKsyncOS,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
     });
     console.log("\n── Chain upgrades complete, verifying final protocol versions ──");
-    await verifyProtocolVersions(l1Provider, upgradeChainAddresses, scenario.expectedProtocolVersion);
+    await verifyProtocolVersions(l1Provider, upgradeChainAddresses, readGenesisProtocolVersion().toHexString());
     console.log("✅ All protocol versions verified successfully!\n");
   } finally {
     if (cleanupUpgradeHarnessInputs) {
@@ -241,10 +211,8 @@ async function transferL1Ownership(
     l1SharedBridge: string;
     l1NativeTokenVault: string;
     l1NullifierProxy?: string;
-    l1ChainAssetHandler?: string;
   },
-  ctmAddresses: { chainTypeManager: string },
-  scenario: V31UpgradeScenario
+  ctmAddresses: { chainTypeManager: string }
 ): Promise<void> {
   const gov = l1Addresses.governance;
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.bridgehub);
@@ -256,11 +224,11 @@ async function transferL1Ownership(
   if (l1Addresses.l1NullifierProxy) {
     await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NullifierProxy);
   }
-  // The fixture leaves the ChainAssetHandler owned by its deployer, and this upgrade reuses that proxy
-  // in place. Governance must own it to run the stage-0 pauseMigration() governance call.
-  if (scenario.transferL1ChainAssetHandlerOwnership && l1Addresses.l1ChainAssetHandler) {
-    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1ChainAssetHandler);
-  }
+  // The fixture leaves the ChainAssetHandler owned by its deployer, and the upgrade reuses that proxy in
+  // place. Governance must own it to run the stage-0 pauseMigration() governance call. Read from the
+  // bridgehub: older fixtures' `addresses.json` do not record it.
+  const bridgehub = new ethers.Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), provider);
+  await transferOwnership2Step(provider, defaultSigner, gov, await bridgehub.chainAssetHandler());
   await normalizeProxyAdminOwnerToEoa(provider, defaultSigner, ctmAddresses.chainTypeManager);
 }
 
@@ -269,8 +237,8 @@ async function transferL1Ownership(
  *
  * For the upgrade scripts to issue calls from a contract owner, that owner has to be listed in
  * `ownable_proxies`, which reaches them only through protocol-ops' `--env` config — not available to this
- * harness, which passes addresses explicitly. So every owner has to be an EOA instead. In the v31 fixture
- * the CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol` instance.
+ * harness, which passes addresses explicitly. So every owner has to be an EOA instead. In the anvil
+ * fixtures the CTM deployment leaves its ProxyAdmin owned by its own `Governance.sol` instance.
  */
 async function normalizeProxyAdminOwnerToEoa(
   provider: ethers.providers.JsonRpcProvider,
@@ -429,7 +397,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
  * etc. We override only the ones that change per fork run: `--out` (temp dir)
  * and `--l1-rpc-url` (the forked anvil instance).
  *
- * Uses the production CoreUpgrade_v33 / CTMUpgrade_v33 forge scripts via
+ * Uses the current release's production upgrade scripts and per-env input via
  * protocol-ops defaults. Returns the dir the prepare phase wrote to.
  */
 export async function runEcosystemUpgradeScriptsForEnv(params: {
@@ -456,126 +424,10 @@ export async function runEcosystemUpgradeScriptsForEnv(params: {
     "--additional-args=--memory-limit=536870912",
   ]);
 
-  // protocol-ops runs forge against its own *nested* anvil that forks
-  // `params.rpcUrl` and dies on process exit — none of the state writes it
-  // made (including the GW-prep ZK funding) survive on the test harness's
-  // anvil. The deployer's Safe bundle contains GatewayVotePreparation's
-  // L1→L2 priority txs, each of which charges the GW base token (ZK) from
-  // the bundle's impersonated sender. So before bundle replay, give that
-  // sender enough ZK on *this* anvil via the same real-flow path —
-  // impersonate the canonical NTV (the only `bridgeMint` caller) and mint.
   if (params.executeBundles) {
-    await fundDeployerZkForBundleReplay({
-      rpcUrl: params.rpcUrl,
-      envName: params.envName,
-      bridgehubAddress: params.bridgehubAddress,
-      prepareOutDir,
-    });
     await executeSafeBundles(prepareOutDir, params.rpcUrl);
   }
   return { prepareOutDir };
-}
-
-/// 1e30 wei (1B tokens for 18-decimal ZK) — matches the Rust side
-/// `ZK_FUNDING_WEI_HEX` in `new_gateway_prepare.rs`. Comfortably covers
-/// the ~580 ZK each GatewayVotePreparation priority tx charges.
-const ZK_FUNDING_WEI = ethers.BigNumber.from("0xc9f2c9cd04674edea40000000");
-
-/// Read `permanent-values/<env>.toml` and pull (a) whether a `[new_gateway]`
-/// block is present and (b) the top-level `zk_token_asset_id` hex.
-function readPermanentValuesForGwFunding(envName: string): {
-  hasNewGateway: boolean;
-  zkTokenAssetId: string | null;
-} {
-  const permPath = path.join(l1ContractsDir, "upgrade-envs", "permanent-values", `${envName}.toml`);
-  if (!fs.existsSync(permPath)) {
-    return { hasNewGateway: false, zkTokenAssetId: null };
-  }
-  const raw = fs.readFileSync(permPath, "utf8");
-  let parsed: { new_gateway?: unknown; zk_token_asset_id?: unknown };
-  try {
-    parsed = parseToml(raw) as typeof parsed;
-  } catch {
-    return { hasNewGateway: false, zkTokenAssetId: null };
-  }
-  const zk = typeof parsed.zk_token_asset_id === "string" ? parsed.zk_token_asset_id : null;
-  return { hasNewGateway: parsed.new_gateway != null, zkTokenAssetId: zk };
-}
-
-/// Read all bundle targets from `<prepareOutDir>/manifest.json` in bundle
-/// order. `executeSafeBundles` impersonates each one in turn, so any of them
-/// could be the `msg.sender` for a GW priority tx — we fund all to avoid
-/// special-casing which bundle holds the GatewayVotePreparation deploys.
-function bundleTargetsFromManifest(prepareOutDir: string): string[] {
-  const manifestPath = path.join(prepareOutDir, "manifest.json");
-  if (!fs.existsSync(manifestPath)) {
-    return [];
-  }
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
-    bundles?: Array<{ index?: number; target?: string }>;
-  };
-  const seen = new Set<string>();
-  return (manifest.bundles ?? [])
-    .filter((b): b is { index: number; target: string } => typeof b.index === "number" && typeof b.target === "string")
-    .sort((a, b) => a.index - b.index)
-    .map((b) => b.target.toLowerCase())
-    .filter((t) => {
-      if (seen.has(t)) return false;
-      seen.add(t);
-      return true;
-    });
-}
-
-/// Mint ZK to every bundle target on the harness anvil via real-contract-call —
-/// impersonate the NTV (only `onlyNTV` caller for `bridgeMint`) and call
-/// `BridgedStandardERC20.bridgeMint(target, ZK_FUNDING_WEI)` per target.
-/// No-ops silently when the env has no `[new_gateway]` (no GW priority txs
-/// to fund) or no `zk_token_asset_id` (older envs).
-async function fundDeployerZkForBundleReplay(params: {
-  rpcUrl: string;
-  envName: string;
-  bridgehubAddress: string;
-  prepareOutDir: string;
-}): Promise<void> {
-  const { hasNewGateway, zkTokenAssetId } = readPermanentValuesForGwFunding(params.envName);
-  if (!hasNewGateway || !zkTokenAssetId) {
-    return;
-  }
-  const targets = bundleTargetsFromManifest(params.prepareOutDir);
-  if (targets.length === 0) {
-    throw new Error(`Cannot fund bundle senders ZK: no usable bundle targets in ${params.prepareOutDir}/manifest.json`);
-  }
-
-  const provider = createProvider(params.rpcUrl);
-  const bridgehub = new ethers.Contract(params.bridgehubAddress, getAbi("L1Bridgehub"), provider);
-  const assetRouterAddr: string = await bridgehub.assetRouter();
-  const assetRouter = new ethers.Contract(assetRouterAddr, getAbi("L1AssetRouter"), provider);
-  const ntvAddr: string = await assetRouter.nativeTokenVault();
-  const ntv = new ethers.Contract(ntvAddr, getAbi("L1NativeTokenVault"), provider);
-  const zkTokenAddr: string = await ntv.tokenAddress(zkTokenAssetId);
-  if (!zkTokenAddr || zkTokenAddr === ethers.constants.AddressZero) {
-    throw new Error(`NTV.tokenAddress(${zkTokenAssetId}) returned zero on ${params.rpcUrl}`);
-  }
-
-  await provider.send("anvil_impersonateAccount", [ntvAddr]);
-  await provider.send("anvil_setBalance", [ntvAddr, "0x21e19e0c9bab2400000"]); // 10k ETH for gas
-  try {
-    const ntvSigner = provider.getSigner(ntvAddr);
-    const zkToken = new ethers.Contract(zkTokenAddr, getAbi("BridgedStandardERC20"), ntvSigner);
-    for (const target of targets) {
-      console.log(
-        `  Funding bundle sender ${target} with ${ZK_FUNDING_WEI.toString()} wei ZK ` +
-          `at ${zkTokenAddr} via NTV ${ntvAddr}.bridgeMint`
-      );
-      const tx = await zkToken.bridgeMint(target, ZK_FUNDING_WEI, { gasLimit: 1_000_000 });
-      const receipt = await tx.wait();
-      if (receipt.status !== 1) {
-        throw new Error(`bridgeMint(${target}) reverted (tx ${receipt.transactionHash})`);
-      }
-    }
-  } finally {
-    await provider.send("anvil_stopImpersonatingAccount", [ntvAddr]);
-  }
 }
 
 export async function runEcosystemUpgradeScripts(params: {
@@ -586,40 +438,24 @@ export async function runEcosystemUpgradeScripts(params: {
   const prepareOutDir = path.join(params.upgradeHarnessInputs.protocolOpsOutDir, "prepare");
   fs.rmSync(prepareOutDir, { recursive: true, force: true });
 
-  // Passed explicitly rather than auto-resolved from the CTM: a fork run may target an ecosystem whose
-  // getters predate v31, and the snapshot config is authoritative for it.
-  runProtocolOps(
-    [
-      "ecosystem",
-      "upgrade-prepare-all",
-      "--bridgehub",
-      params.upgradeHarnessInputs.bridgehubAddress,
-      "--l1-rpc-url",
-      params.rpcUrl,
-      "--out",
-      prepareOutDir,
-      "--deployer-address",
-      ANVIL_DEFAULT_ACCOUNT_ADDR,
-      "--ctm-proxy",
-      params.upgradeHarnessInputs.ctmProxyAddress,
-      "--bytecodes-supplier-address",
-      params.upgradeHarnessInputs.bytecodesSupplierAddress,
-      "--rollup-da-manager-address",
-      params.upgradeHarnessInputs.rollupDaManagerAddress,
-      "--is-zk-sync-os",
-      String(params.upgradeHarnessInputs.isZKsyncOS),
-      "--create2-factory-salt",
-      params.upgradeHarnessInputs.create2FactorySalt,
-      "--upgrade-input-path",
-      params.upgradeHarnessInputs.upgradeInputArg,
-      "--core-script-path",
-      CORE_UPGRADE_TEST_SCRIPT,
-      "--ctm-script-path",
-      CTM_UPGRADE_TEST_SCRIPT,
-      "--additional-args=--memory-limit=536870912",
-    ],
-    params.upgradeHarnessInputs.envVars
-  );
+  // Only the topology is passed. The scripts and the upgrade input are protocol-ops' defaults, so this always
+  // prepares the upgrade the current release ships; the bytecodes supplier and rollup DA manager are
+  // auto-resolved from the CTM, as for a real ecosystem.
+  runProtocolOps([
+    "ecosystem",
+    "upgrade-prepare-all",
+    "--bridgehub",
+    params.upgradeHarnessInputs.bridgehubAddress,
+    "--l1-rpc-url",
+    params.rpcUrl,
+    "--out",
+    prepareOutDir,
+    "--deployer-address",
+    ANVIL_DEFAULT_ACCOUNT_ADDR,
+    "--ctm-proxy",
+    params.upgradeHarnessInputs.ctmProxyAddress,
+    "--additional-args=--memory-limit=536870912",
+  ]);
 
   if (params.executeBundles) {
     await executeSafeBundles(prepareOutDir, params.rpcUrl);
@@ -666,27 +502,11 @@ export async function runChainUpgradesAndRelayL2(params: {
   l1Provider: ethers.providers.JsonRpcProvider;
   anvilManager: AnvilManager;
   bridgehubAddr: string;
-  settlementLayerUpgradeAddr: string;
   ctmAddr: string;
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
-  isZKsyncOS: boolean;
   protocolOpsOutDir: string;
 }): Promise<void> {
-  const {
-    l1Provider,
-    anvilManager,
-    bridgehubAddr,
-    settlementLayerUpgradeAddr,
-    upgradeChainAddresses,
-    isZKsyncOS,
-    protocolOpsOutDir,
-  } = params;
-
-  const settlementLayerUpgrade = new ethers.Contract(
-    settlementLayerUpgradeAddr,
-    getAbi("V32UpgradeZKsyncOS"),
-    l1Provider
-  );
+  const { l1Provider, anvilManager, bridgehubAddr, upgradeChainAddresses, protocolOpsOutDir } = params;
   const l1Chain = anvilManager.getL1Chain()!;
 
   for (const chain of upgradeChainAddresses) {
@@ -694,21 +514,10 @@ export async function runChainUpgradesAndRelayL2(params: {
     const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
     fs.rmSync(chainOutDir, { recursive: true, force: true });
 
-    // The v31 per-chain upgrade required `totalBatchesCommitted ==
-    // totalBatchesExecuted`. On a forked chain that has uncommitted-but-pending
-    // batches at fork time, copy committed onto executed to model the
-    // "all batches executed" prerequisite without running the executor.
+    // `DefaultUpgradeZKsyncOS` requires `totalBatchesCommitted == totalBatchesExecuted`. On a forked
+    // chain that has uncommitted-but-pending batches at fork time, copy committed onto executed to model
+    // the "all batches executed" prerequisite without running the executor.
     await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
-
-    // ZKsync OS chains must additionally have the v31 base-token backfill behind them
-    // (flag + executed-priority-op lower bound); model the missing history on the fork.
-    if (isZKsyncOS) {
-      await modelV31BackfillPrerequisite({
-        l1Provider,
-        diamondProxyAddr: chain.diamondProxy,
-        settlementLayerUpgradeAddr,
-      });
-    }
 
     runProtocolOps([
       "chain",
@@ -730,15 +539,20 @@ export async function runChainUpgradesAndRelayL2(params: {
 
     await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
 
-    // Decode the L2 upgrade tx from the protocol-ops Safe bundle.
-    const { tx: originalUpgradeTx, paramType: upgradeTxParamType } = decodeLatestL2UpgradeTx(safeBundles[0].file);
+    // Decode the L2 upgrade tx and the cut's initializer from the protocol-ops Safe bundle.
+    const {
+      tx: originalUpgradeTx,
+      paramType: upgradeTxParamType,
+      initAddress,
+    } = decodeLatestL2UpgradeTx(safeBundles[0].file);
     const originalUpgradeTxData = originalUpgradeTx.data as string;
 
-    // Rewrite the L2 upgrade tx with per-chain data, the same way the per-chain upgrade contract does.
-    const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
+    // Rewrite the L2 upgrade tx with per-chain data through the cut's own initializer: the
+    // `DefaultUpgradeZKsyncOS` the CTM defaults to, or a release-specific subclass of it.
+    const perChainUpgrade = new ethers.Contract(initAddress, getAbi("DefaultUpgradeZKsyncOS"), l1Provider);
+    const rewrittenUpgradeTxData = await perChainUpgrade["getL2UpgradeTxData(address,uint256,bytes)"](
       bridgehubAddr,
       chain.chainId,
-      isZKsyncOS,
       originalUpgradeTxData
     );
 
@@ -761,7 +575,7 @@ export async function runChainUpgradesAndRelayL2(params: {
     }
     const l2Provider = createProvider(l2Chain.rpcUrl);
 
-    const l2TxHash = await prepareAndRelayL2Upgrade(l2Provider, rewrittenUpgradeTxData, isZKsyncOS);
+    const l2TxHash = await prepareAndRelayL2Upgrade(l2Provider, rewrittenUpgradeTxData);
     console.log(`  ✅ L2 upgrade relay tx: ${l2TxHash}`);
     printCastRunTrace(l2TxHash, l2Chain.rpcUrl);
 
@@ -772,16 +586,11 @@ export async function runChainUpgradesAndRelayL2(params: {
 
 /**
  * Multi-CTM aware variant of `runChainUpgradesAndRelayL2`. Used by env-preset
- * fork tests (e.g. stage) where the bridgehub has both an Era CTM and an
- * Atlas (zkOS) CTM, each with its own per-chain upgrade contract address. This release only produces one
- * for the ZKsync OS CTM (`CTMUpgrade_v33.deployUsedUpgradeContract` refuses Era), so the Era half of the
- * grouping stays empty here and is exercised only by fork runs against older ecosystems.
+ * fork tests where target chains can belong to different CTMs. This release
+ * produces per-chain upgrades only for ZKsync OS CTMs.
  *
- * Groups chains by their on-chain CTM, looks up the per-CTM
- * `script-out/v33-upgrade-ctm-<ctm>.toml` (written by
- * `CTMUpgrade_v33.noGovernancePrepare`) to get the settlement-layer-upgrade
- * address + isZKsyncOS flag, then delegates to `runChainUpgradesAndRelayL2`
- * per group.
+ * Groups chains by their on-chain CTM, then delegates to
+ * `runChainUpgradesAndRelayL2` per group.
  *
  * Pass `skipL2Relay: true` to exercise the L1 chain-upgrade Safe bundle
  * without spinning up L2 forks (useful for L1-only smoke tests).
@@ -800,7 +609,7 @@ export async function runChainUpgradesPerCtm(params: {
 
   const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
 
-  // Group chains by their CTM. On stage / mainnet there are 2 (Era + Atlas).
+  // Group the selected ZKsync OS chains by their on-chain CTM.
   const groups = new Map<string, Array<{ chainId: number; diamondProxy: string }>>();
   for (const chain of upgradeChainAddresses) {
     const ctm: string = await bridgehub.chainTypeManager(chain.chainId);
@@ -816,8 +625,7 @@ export async function runChainUpgradesPerCtm(params: {
     console.log(`\n── CTM ${ctmAddr}: running chain-upgrades for ${chains.length} chain(s) ──`);
 
     if (skipL2Relay) {
-      // L1-only path: just emit + execute the per-chain Safe bundle. No
-      // settlement-layer-upgrade lookup, no L2 relay.
+      // L1-only path: just emit + execute the per-chain Safe bundle. No L2 relay.
       const l1Chain = anvilManager.getL1Chain()!;
       for (const chain of chains) {
         const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
@@ -841,28 +649,12 @@ export async function runChainUpgradesPerCtm(params: {
       continue;
     }
 
-    // Full path: read per-CTM toml for the settlement-layer-upgrade addr
-    // + isZKsyncOS flag, then delegate to the existing single-CTM helper.
-    const ctmTomlPath = path.join(contractsRootDir, "l1-contracts", "script-out", `v33-upgrade-ctm-${ctmAddr}.toml`);
-    if (!fs.existsSync(ctmTomlPath)) {
-      throw new Error(`Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run for this CTM?`);
-    }
-    const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
-    const settlementLayerUpgradeAddr = readNestedString(
-      ctmOutputToml,
-      ["state_transition", "default_upgrade_addr"],
-      "per-chain upgrade contract address"
-    );
-    const isZKsyncOS = (ctmOutputToml as { is_zk_sync_os?: boolean }).is_zk_sync_os === true;
-
     await runChainUpgradesAndRelayL2({
       l1Provider,
       anvilManager,
       bridgehubAddr,
-      settlementLayerUpgradeAddr,
       ctmAddr,
       upgradeChainAddresses: chains,
-      isZKsyncOS,
       protocolOpsOutDir,
     });
   }
@@ -871,27 +663,23 @@ export async function runChainUpgradesPerCtm(params: {
 /**
  * Deploy all L2 system contracts, then relay the upgrade tx.
  *
- * On Anvil EVM, neither the Era ContractDeployer nor ZKsyncOS bytecode deployer
- * infrastructure works. Instead we:
+ * The ZKsync OS bytecode-deployer infrastructure does not run on Anvil EVM. Instead we:
  *   1. Pre-deploy all known contracts via anvil_setCode
  *   2. Place a MockContractDeployer at 0x8006
  */
 async function prepareAndRelayL2Upgrade(
   l2Provider: ethers.providers.JsonRpcProvider,
-  upgradeTxData: string,
-  isZKsyncOS: boolean
+  upgradeTxData: string
 ): Promise<string> {
   // Decode to extract addresses for pre-deployment, then send the ORIGINAL calldata.
-  // MockContractDeployer (no-op) handles the force deployment calls from both the outer
-  // ComplexUpgrader iteration and the inner performForceDeployedContractsInit calls.
+  // MockContractDeployer handles the outer ComplexUpgrader force-deployment calls.
   const { forceDeployEntries, delegateTo } = decodeUpgradeTxData(upgradeTxData);
 
   // Pre-deploy all L2 contracts via anvil_setCode
-  await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo, isZKsyncOS);
+  await deployL2Contracts(l2Provider, forceDeployEntries, delegateTo);
 
-  // Send the original upgrade calldata to ComplexUpgrader.
-  // The outer force deployments no-op (MockContractDeployer), then upgrade() delegatecalls
-  // to L2V32Upgrade which runs performForceDeployedContractsInit (inner deploys also no-op).
+  // Send the original upgrade calldata to ComplexUpgrader. The outer force deployments no-op
+  // through MockContractDeployer, then upgrade() delegatecalls to L2DefaultUpgrade for initialization.
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({
       to: L2_COMPLEX_UPGRADER_ADDR,
@@ -918,7 +706,7 @@ async function prepareAndRelayL2Upgrade(
  * production upgrade deploys to. We place EVM bytecodes at those addresses
  * (and a few extra addresses called during the upgrade but not in the force
  * deployment list). A MockContractDeployer at 0x8006 no-ops the actual
- * force-deploy calls from both ComplexUpgrader and performForceDeployedContractsInit.
+ * force-deploy calls from ComplexUpgrader.
  *
  * For ZKsyncOS chains, contracts with ZKsyncOSSystemProxyUpgrade type are deployed
  * behind SystemContractProxy (matching production genesis layout):
@@ -930,16 +718,15 @@ async function prepareAndRelayL2Upgrade(
 async function deployL2Contracts(
   l2Provider: ethers.providers.JsonRpcProvider,
   forceDeployEntries: ForceDeployEntry[],
-  delegateTo: string,
-  isZKsyncOS: boolean
+  delegateTo: string
 ): Promise<void> {
-  // MockContractDeployer: no-op fallback at ContractDeployer address so that
-  // forceDeployEra() and conductContractUpgrade() calls succeed silently.
+  // MockContractDeployer: typed no-op `setBytecodeDetailsEVM` at the ContractDeployer address so
+  // conductContractUpgrade() calls succeed. It implements the production ISystemContractDeployer
+  // interface and has no fallback, so any call with a stale or unexpected selector reverts loudly.
   await l2Provider.send("anvil_setCode", [L2_CONTRACT_DEPLOYER_ADDR, getBytecode("MockContractDeployer")]);
 
-  // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner().
-  // For ZKsyncOS: use real SystemContractProxyAdmin — proper proxy setup means upgrade() works.
-  // For Era: use real SystemContractProxyAdmin (upgrade() is not called by outer loop).
+  // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner(). Use the real
+  // contract because the system proxies below rely on its upgrade path.
   await l2Provider.send("anvil_setCode", [
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     getBytecode("SystemContractProxyAdmin"),
@@ -952,30 +739,20 @@ async function deployL2Contracts(
 
   // Deploy EVM bytecodes at all addresses from the force deployment calldata.
   // For ZKsyncOS SystemProxyUpgrade entries, deploy behind a real SystemContractProxy.
-  const contractMap = buildAddressToContract(isZKsyncOS);
+  const contractMap = buildAddressToContract();
   for (const entry of forceDeployEntries) {
-    // ZKsyncOSUnsafeForceDeployment entries are direct deployments (e.g. the SystemContractProxyAdmin
-    // at L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, and L2V32Upgrade at a random delegate address).
-    // Both are already set up above (anvil_setCode for the proxy admin, and the delegateTo code
-    // is set separately below), so we skip them here.
+    // The only ZKsyncOSUnsafeForceDeployment entry is L2DefaultUpgrade at its derived delegate
+    // address; its code is set (and the entry checked) separately below.
     if (entry.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY) {
       continue;
     }
 
     const contractName = contractMap.get(entry.address.toLowerCase());
     if (!contractName) {
-      // Era force deployments include the EmptyContract placeholder (0x0000), the EraVM
-      // precompiles (0x0001..0x0008), and the system contracts at 0x800x (AccountCodeStorage,
-      // NonceHolder, etc.). These are either not exercised by the anvil harness (precompiles)
-      // or are already present in the loaded chain state, so we do not need to deploy
-      // their bytecode via anvil_setCode. Skip silently for entries we do not know about.
-      if (entry.upgradeType === UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT) {
-        continue;
-      }
       throw new Error(`No contract mapping for ZKsyncOS force deploy address ${entry.address}`);
     }
 
-    if (isZKsyncOS && entry.upgradeType === UPGRADE_TYPE_ZKOS_SYSTEM_PROXY) {
+    if (entry.upgradeType === UPGRADE_TYPE_ZKOS_SYSTEM_PROXY) {
       if (!entry.deployedBytecodeInfo) {
         throw new Error(`ZKsyncOSSystemProxyUpgrade entry ${entry.address} missing deployedBytecodeInfo`);
       }
@@ -985,27 +762,25 @@ async function deployL2Contracts(
     }
   }
 
-  // Deploy the delegateTo target (L2V32Upgrade).
-  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V32Upgrade")]);
+  // Deploy the delegateTo target (L2DefaultUpgrade), but only after checking that the upgrade itself
+  // force-deploys it there: exactly one unsafe entry, at `delegateTo`, carrying this bytecode.
+  const l2DefaultUpgradeBytecode = getBytecode("L2DefaultUpgrade");
+  assertDelegateDeployment(forceDeployEntries, delegateTo, l2DefaultUpgradeBytecode);
+  await l2Provider.send("anvil_setCode", [delegateTo, l2DefaultUpgradeBytecode]);
 
-  // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
-  // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.
-  if (!isZKsyncOS) {
-    await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
-  }
+  // L2BaseToken is in the force deployment list as ZKsyncOSSystemProxyUpgrade, handled above.
 
   // L2BaseToken.initL2 (called on the genesis path of performForceDeployedContractsInit) mints an initial balance into the
-  // BaseTokenHolder. For Era it reads the pre-existing __DEPRECATED_totalSupply; for ZKsyncOS it
-  // mints via the MINT_BASE_TOKEN_HOOK system hook, which is a no-op mock in the anvil harness.
-  // In both cases L2BaseToken then transfers ETH to the holder, so it needs a non-zero balance
-  // on the anvil chain or the transfer reverts with "Address: insufficient balance".
+  // BaseTokenHolder. For ZKsyncOS it mints via the MINT_BASE_TOKEN_HOOK system hook, which is a
+  // no-op mock in the anvil harness. L2BaseToken then transfers ETH to the holder, so it needs a
+  // non-zero balance on the anvil chain or the transfer reverts with "Address: insufficient balance".
   await l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
 
   // Seed critical storage values on L2 contracts that were deployed via anvil_setCode
   // but never initialized. performForceDeployedContractsInit reads these before calling
   // updateL2, which reverts if WETH_TOKEN is zero.
-  // Storage slots found via forge: NTV.WETH_TOKEN=251, NTV.L2_TOKEN_PROXY_BYTECODE_HASH=255,
-  // NTV.L2_LEGACY_SHARED_BRIDGE=254, NTV.L1_CHAIN_ID=253, AR.L2_LEGACY_SHARED_BRIDGE=255.
+  // Storage slots found via forge: NTV.WETH_TOKEN=251, NTV.L2_LEGACY_SHARED_BRIDGE=254,
+  // NTV.L1_CHAIN_ID=253, AR.L2_LEGACY_SHARED_BRIDGE=255.
   //
   // For ZKsyncOS, these contracts live behind SystemContractProxy, so storage writes go to the
   // proxy address (which delegates to the implementation). The storage layout is the same because
@@ -1025,12 +800,6 @@ async function deployL2Contracts(
     toSlot(NTV_L1_CHAIN_ID_SLOT),
     ethers.utils.hexZeroPad(ethers.utils.hexlify(runtimeConfig.l1ChainId), 32),
   ]);
-  // NTV: set L2_TOKEN_PROXY_BYTECODE_HASH to a non-zero placeholder
-  await l2Provider.send("anvil_setStorageAt", [
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    toSlot(NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT),
-    ethers.utils.hexZeroPad("0x01", 32),
-  ]);
   // AR: L2_LEGACY_SHARED_BRIDGE is zero (no legacy bridge) — no need to set
 }
 
@@ -1047,6 +816,32 @@ async function deployL2Contracts(
  * (setup-and-dump-state.ts) so that the pre-generated states already have proper
  * SystemContractProxy layout at 0x800x addresses, matching production ZKsyncOS genesis.
  */
+function assertDelegateDeployment(
+  forceDeployEntries: ForceDeployEntry[],
+  delegateTo: string,
+  expectedBytecode: string
+): void {
+  const unsafeEntries = forceDeployEntries.filter((e) => e.upgradeType === UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY);
+  if (unsafeEntries.length !== 1 || unsafeEntries[0].address.toLowerCase() !== delegateTo.toLowerCase()) {
+    throw new Error(
+      `Expected exactly one unsafe force deployment, at the delegate target ${delegateTo}; got ` +
+        JSON.stringify(unsafeEntries.map((e) => e.address))
+    );
+  }
+  // ZKsync OS bytecode info: abi.encode(bytecodeHash, bytecodeLength, observableBytecodeHash).
+  // The Blake hash is left to the protocol-ops upgrade verifier, which checks the whole tuple.
+  const [, bytecodeLength, observableHash] = ethers.utils.defaultAbiCoder.decode(
+    ["bytes32", "uint32", "bytes32"],
+    unsafeEntries[0].deployedBytecodeInfo ?? "0x"
+  );
+  if (
+    observableHash !== ethers.utils.keccak256(expectedBytecode) ||
+    bytecodeLength !== ethers.utils.hexDataLength(expectedBytecode)
+  ) {
+    throw new Error(`Delegate target ${delegateTo} is not force-deployed with the L2DefaultUpgrade bytecode`);
+  }
+}
+
 async function deployBehindSystemProxy(
   provider: ethers.providers.JsonRpcProvider,
   systemAddress: string,
@@ -1110,22 +905,6 @@ function decodeUpgradeTxData(upgradeTxData: string): {
   const payload = "0x" + upgradeTxData.slice(10);
   const abiCoder = ethers.utils.defaultAbiCoder;
 
-  if (selector === SELECTORS.eraForceDeployAndUpgrade) {
-    const [deployments, delegateTo, innerCalldata] = abiCoder.decode(
-      ["tuple(bytes32,address,bool,uint256,bytes)[]", "address", "bytes"],
-      payload
-    );
-    const entries: ForceDeployEntry[] = deployments.map((fd: { 1: string }) => ({
-      address: fd[1],
-      upgradeType: UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT,
-    }));
-    return {
-      forceDeployEntries: entries,
-      delegateTo,
-      innerCalldata,
-    };
-  }
-
   if (selector === SELECTORS.zkosForceDeployAndUpgradeUniversal) {
     const [deployments, delegateTo, innerCalldata] = abiCoder.decode(
       ["tuple(uint8,bytes,address)[]", "address", "bytes"],
@@ -1156,6 +935,7 @@ function decodeUpgradeTxData(upgradeTxData: string): {
 function decodeLatestL2UpgradeTx(broadcastPath: string): {
   tx: Record<string, unknown>;
   paramType: ethers.utils.ParamType;
+  initAddress: string;
 } {
   const broadcast = JSON.parse(fs.readFileSync(broadcastPath, "utf8")) as {
     transactions?: Array<Record<string, unknown>>;
@@ -1167,10 +947,7 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
 
   const chainAdminIface = new ethers.utils.Interface(getAbi("ChainAdminOwnable"));
   const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
-  // Legacy ABI: v29/v30 states have upgradeChainFromVersion(uint256, DiamondCutData) (2 params).
-  // Current ABI has upgradeChainFromVersion(address, uint256, DiamondCutData) (3 params).
-  const legacyAdminIface = new ethers.utils.Interface(LEGACY_ADMIN_ABI);
-  const settlementLayerIface = new ethers.utils.Interface(getAbi("V32UpgradeZKsyncOS"));
+  const settlementLayerIface = new ethers.utils.Interface(getAbi("DefaultUpgradeZKsyncOS"));
 
   const errors: string[] = [];
 
@@ -1188,16 +965,10 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
         continue;
       }
 
-      // Try current ABI (3-param) then legacy (2-param).
-      // The DiamondCutData tuple is (facetCuts[], initAddress, initCalldata) — initCalldata is at index 2.
-      let initCalldata: string;
-      try {
-        const diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
-        initCalldata = diamondCut.initCalldata ?? diamondCut[2];
-      } catch {
-        const diamondCut = legacyAdminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[1];
-        initCalldata = diamondCut.initCalldata ?? diamondCut[2];
-      }
+      // The DiamondCutData tuple is (facetCuts[], initAddress, initCalldata).
+      const diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
+      const initAddress: string = diamondCut.initAddress ?? diamondCut[1];
+      const initCalldata: string = diamondCut.initCalldata ?? diamondCut[2];
 
       const [proposedUpgrade] = settlementLayerIface.decodeFunctionData("upgrade", initCalldata);
       const proposedUpgradeType = settlementLayerIface.getFunction("upgrade").inputs[0];
@@ -1205,7 +976,7 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
       if (!txParamType) {
         throw new Error("ProposedUpgrade ABI has no l2ProtocolUpgradeTx component");
       }
-      return { tx: proposedUpgrade.l2ProtocolUpgradeTx, paramType: txParamType };
+      return { tx: proposedUpgrade.l2ProtocolUpgradeTx, paramType: txParamType, initAddress };
     } catch (e) {
       errors.push(`tx decode failed: ${e instanceof Error ? e.message.slice(0, 120) : String(e)}`);
       continue;
@@ -1416,94 +1187,26 @@ async function transferOwnership2Step(
   await transferOwnable2Step(provider, contractAddr, getAbi("Ownable2Step"), currentOwner, governanceAddr);
 }
 
-// ── TOML config helpers ──────────────────────────────────────────────
-
-function replaceTomlStringValue(contents: string, key: string, value: string): string {
-  // eslint-disable-next-line no-useless-escape
-  const pattern = new RegExp(`^(${key}\\s*=\\s*\").*(\")$`, "m");
-  return pattern.test(contents) ? contents.replace(pattern, `$1${value}$2`) : contents;
-}
-
-function replaceTomlBareValue(contents: string, key: string, value: string): string {
-  const pattern = new RegExp(`^(${key}\\s*=\\s*).*$`, "m");
-  return pattern.test(contents) ? contents.replace(pattern, `$1${value}`) : `${key} = ${value}\n${contents}`;
-}
+// ── Harness inputs ───────────────────────────────────────────────────
 
 export function prepareUpgradeHarnessInputs(
-  scenario: V31UpgradeScenario,
+  scenario: UpgradeScenario,
   state: {
-    l1Addresses: { bridgehub: string; governance: string };
+    l1Addresses: { bridgehub: string };
     ctmAddresses: { chainTypeManager: string };
-    chainAddresses: Array<{ chainId: number }>;
   }
 ): {
-  envVars: Record<string, string>;
-  ecosystemOutputPath: string;
-  governanceTomlPath: string;
   bridgehubAddress: string;
   protocolOpsOutDir: string;
-  upgradeInputArg: string;
-  ecosystemOutputArg: string;
-  bytecodesSupplierAddress: string;
-  rollupDaManagerAddress: string;
-  create2FactorySalt: string;
-  isZKsyncOS: boolean;
   ctmProxyAddress: string;
   cleanup: () => void;
 } {
   const tempDir = path.join(anvilInteropDir, "outputs", `upgrade-harness-inputs-${scenario.label}`);
   fs.mkdirSync(tempDir, { recursive: true });
 
-  const permanentValuesPath = path.join(tempDir, `${scenario.label}-permanent-values.toml`);
-  const upgradeInputPath = path.join(tempDir, `${scenario.label}-upgrade-input.toml`);
-  const ecosystemOutputPath = path.join(tempDir, `${scenario.label}-upgrade-ecosystem.toml`);
-  const governanceTomlPath = path.join(tempDir, `${scenario.label}-governance.toml`);
-  const protocolOpsOutDir = path.join(tempDir, "protocol-ops");
-
-  const primaryChainId = state.chainAddresses[0]?.chainId;
-  if (!primaryChainId) throw new Error(`No chains loaded for ${scenario.label}`);
-
-  let permanentValues = fs.readFileSync(path.join(l1ContractsDir, scenario.permanentValuesTemplatePath), "utf8");
-  permanentValues = replaceTomlBareValue(permanentValues, "era_chain_id", String(primaryChainId));
-  permanentValues = replaceTomlStringValue(permanentValues, "bridgehub_proxy_addr", state.l1Addresses.bridgehub);
-  permanentValues = replaceTomlStringValue(permanentValues, "ctm_proxy_addr", state.ctmAddresses.chainTypeManager);
-  permanentValues = replaceTomlBareValue(permanentValues, "is_zk_sync_os", scenario.isZKsyncOS ? "true" : "false");
-  fs.writeFileSync(permanentValuesPath, permanentValues);
-
-  let upgradeInput = fs.readFileSync(path.join(l1ContractsDir, scenario.upgradeInputTemplatePath), "utf8");
-  upgradeInput = replaceTomlBareValue(upgradeInput, "era_chain_id", String(primaryChainId));
-  upgradeInput = replaceTomlStringValue(upgradeInput, "bridgehub_proxy_address", state.l1Addresses.bridgehub);
-  upgradeInput = replaceTomlStringValue(upgradeInput, "owner_address", state.l1Addresses.governance);
-  upgradeInput = replaceTomlBareValue(upgradeInput, "sample_chain_id", String(primaryChainId));
-  fs.writeFileSync(upgradeInputPath, upgradeInput);
-
-  const permanentValuesToml = parseToml(permanentValues) as {
-    ctm_contracts?: {
-      l1_bytecodes_supplier_addr?: string;
-      rollup_da_manager?: string;
-    };
-    permanent_contracts?: {
-      create2_factory_salt?: string;
-    };
-  };
-
   return {
-    envVars: {
-      PERMANENT_VALUES_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, permanentValuesPath)}`,
-      UPGRADE_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
-      UPGRADE_ECOSYSTEM_OUTPUT_OVERRIDE: `/${path.relative(l1ContractsDir, ecosystemOutputPath)}`,
-    },
-    ecosystemOutputPath,
-    governanceTomlPath,
     bridgehubAddress: state.l1Addresses.bridgehub,
-    protocolOpsOutDir,
-    upgradeInputArg: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
-    ecosystemOutputArg: `/${path.relative(l1ContractsDir, ecosystemOutputPath)}`,
-    bytecodesSupplierAddress:
-      permanentValuesToml.ctm_contracts?.l1_bytecodes_supplier_addr ?? ethers.constants.AddressZero,
-    rollupDaManagerAddress: permanentValuesToml.ctm_contracts?.rollup_da_manager ?? ethers.constants.AddressZero,
-    create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
-    isZKsyncOS: scenario.isZKsyncOS,
+    protocolOpsOutDir: path.join(tempDir, "protocol-ops"),
     ctmProxyAddress: state.ctmAddresses.chainTypeManager,
     cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
   };
@@ -1512,12 +1215,12 @@ export function prepareUpgradeHarnessInputs(
 // ── Misc helpers ─────────────────────────────────────────────────────
 
 /** Build the address→contract map for the given VM type. */
-function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, ContractName> {
+function buildAddressToContract(): ReadonlyMap<string, ContractName> {
   const entries: Array<[string, ContractName]> = [
     [L2_MESSAGE_ROOT_ADDR.toLowerCase(), "L2MessageRoot"],
     [L2_BRIDGEHUB_ADDR.toLowerCase(), "L2Bridgehub"],
     [L2_ASSET_ROUTER_ADDR.toLowerCase(), "L2AssetRouter"],
-    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault"],
+    [L2_NATIVE_TOKEN_VAULT_ADDR.toLowerCase(), "L2NativeTokenVault"],
     [L2_CHAIN_ASSET_HANDLER_ADDR.toLowerCase(), "L2ChainAssetHandler"],
     [L2_ASSET_TRACKER_ADDR.toLowerCase(), "L2AssetTracker"],
     [INTEROP_CENTER_ADDR.toLowerCase(), "InteropCenter"],
@@ -1528,19 +1231,18 @@ function buildAddressToContract(isZKsyncOS: boolean): ReadonlyMap<string, Contra
     [L2_MESSAGE_VERIFICATION_ADDR.toLowerCase(), "L2MessageVerification"],
     [L2_INTEROP_ROOT_STORAGE_ADDR.toLowerCase(), "L2InteropRootStorage"],
   ];
-  if (isZKsyncOS) {
-    entries.push(
-      // Atomic-interop built-ins: force-deployed by this release's upgrade on ZKsync OS chains.
-      [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
-      [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
-      [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseTokenZKOS"],
-      [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1MessengerZKOS"],
-      [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
-      [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ZKOSContractDeployer"],
-      // The removed v31 GWAssetTracker: the upgrade swaps its proxy's implementation for EmptyContract.
-      [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
-    );
-  }
+  entries.push(
+    // Atomic-interop built-ins: force-deployed by this release's upgrade on ZKsync OS chains.
+    [L2_INTEROP_COMMITMENT_TREE_ADDR.toLowerCase(), "L2InteropCommitmentTree"],
+    [L2_ATOMIC_FLOW_MANAGER_ADDR.toLowerCase(), "AtomicFlowManager"],
+    [L2_BASE_TOKEN_ADDR.toLowerCase(), "L2BaseToken"],
+    [L2_TO_L1_MESSENGER_ADDR.toLowerCase(), "L1Messenger"],
+    [SYSTEM_CONTEXT_ADDR.toLowerCase(), "SystemContext"],
+    [L2_COMPLEX_UPGRADER_ADDR.toLowerCase(), "L2ComplexUpgrader"],
+    [L2_CONTRACT_DEPLOYER_ADDR.toLowerCase(), "ContractDeployer"],
+    // The removed v31 GWAssetTracker: the upgrade swaps its proxy's implementation for EmptyContract.
+    [L2_REMOVED_GW_ASSET_TRACKER_ADDR.toLowerCase(), "EmptyContract"]
+  );
   return new Map(entries);
 }
 
@@ -1555,20 +1257,6 @@ function selectUpgradeChains(
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
     return targetRoles.includes(role);
   });
-}
-
-export function readNestedString(obj: Record<string, unknown>, path: string[], label: string): string {
-  let current: unknown = obj;
-  for (const key of path) {
-    if (!current || typeof current !== "object" || !(key in current)) {
-      throw new Error(`Missing ${label} at ${path.join(".")}`);
-    }
-    current = (current as Record<string, unknown>)[key];
-  }
-  if (typeof current !== "string" || current.length === 0) {
-    throw new Error(`Invalid ${label} at ${path.join(".")}`);
-  }
-  return current;
 }
 
 export function readEcosystemOutput(outputPath: string): Record<string, unknown> {

@@ -15,19 +15,6 @@
   },
   {
     "type": "function",
-    "name": "allowEvmEmulation",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "canonicalTxHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "baseTokenGasPriceMultiplierDenominator",
     "inputs": [],
     "outputs": [
@@ -238,6 +225,36 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "disabledProofSystems",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct DisabledProofSystems",
+        "components": [
+          {
+            "name": "boojum",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "airbender",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "zisk",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -624,45 +641,6 @@
   },
   {
     "type": "function",
-    "name": "getL2BootloaderBytecodeHash",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getL2DefaultAccountBytecodeHash",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getL2EvmEmulatorBytecodeHash",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getL2SystemContractsUpgradeBatchNumber",
     "inputs": [],
     "outputs": [
@@ -755,6 +733,19 @@
   {
     "type": "function",
     "name": "getPriorityTxMaxGasLimit",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProofMode",
     "inputs": [],
     "outputs": [
       {
@@ -976,6 +967,19 @@
   },
   {
     "type": "function",
+    "name": "getZKsyncOSChainConfigHash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getZKsyncOSMaxTxGasLimit",
     "inputs": [],
     "outputs": [
@@ -1096,6 +1100,32 @@
   },
   {
     "type": "function",
+    "name": "isZKsyncOSL1TxFilteringEnabled",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isZKsyncOSLargeContractsEnabled",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "l2LogsRootHash",
     "inputs": [
       {
@@ -1173,29 +1203,6 @@
     "type": "function",
     "name": "permanentlyAllowPriorityMode",
     "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "precommitSharedBridge",
-    "inputs": [
-      {
-        "name": "_chainAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_batchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_precommitData",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -1413,19 +1420,6 @@
   },
   {
     "type": "function",
-    "name": "setPorterAvailability",
-    "inputs": [
-      {
-        "name": "_zkPorterIsAvailable",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setPriorityModeTransactionFilterer",
     "inputs": [
       {
@@ -1445,6 +1439,24 @@
         "name": "_newPriorityTxMaxGasLimit",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setProofSystemStatus",
+    "inputs": [
+      {
+        "name": "_proofSystem",
+        "type": "uint8",
+        "internalType": "enum ProofSystem"
+      },
+      {
+        "name": "_enabled",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -1518,6 +1530,32 @@
       },
       {
         "name": "_active",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setZKsyncOSL1TxFiltering",
+    "inputs": [
+      {
+        "name": "_enabled",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setZKsyncOSLargeContractsEnabled",
+    "inputs": [
+      {
+        "name": "_enabled",
         "type": "bool",
         "internalType": "bool"
       }
@@ -1632,31 +1670,6 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "BatchPrecommitmentSet",
-    "inputs": [
-      {
-        "name": "batchNumber",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "untrustedLastL2BlockNumberHint",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "precommitment",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "event",
@@ -1805,12 +1818,6 @@
   },
   {
     "type": "event",
-    "name": "EnableEvmEmulator",
-    "inputs": [],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "ExecuteUpgrade",
     "inputs": [
       {
@@ -1869,19 +1876,6 @@
   },
   {
     "type": "event",
-    "name": "IsPorterAvailableStatusUpdate",
-    "inputs": [
-      {
-        "name": "isPorterAvailable",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "MigrationComplete",
     "inputs": [],
     "anonymous": false
@@ -1932,6 +1926,25 @@
         "type": "uint128",
         "indexed": false,
         "internalType": "uint128"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewDisabledProofSystems",
+    "inputs": [
+      {
+        "name": "oldDisabledProofSystems",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
+      },
+      {
+        "name": "newDisabledProofSystems",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "uint8"
       }
     ],
     "anonymous": false
@@ -2311,6 +2324,44 @@
         "type": "address",
         "indexed": false,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewZKsyncOSL1TxFiltering",
+    "inputs": [
+      {
+        "name": "oldEnabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "newEnabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewZKsyncOSLargeContracts",
+    "inputs": [
+      {
+        "name": "oldEnabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "newEnabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
       }
     ],
     "anonymous": false

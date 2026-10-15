@@ -22,13 +22,18 @@ async function main(): Promise<void> {
     // can be started with --dump-state flags from the beginning.
     const version = runner.getProtocolVersionString();
     const stateDir = path.join(__dirname, "chain-states", version);
+    // The version is validated by getProtocolVersionString(), so this removes only the selected fixture set.
+    // Starting empty ensures chains removed from config do not survive as stale snapshots.
+    fs.rmSync(stateDir, { recursive: true, force: true });
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
-    // Run full deployment + test tokens + TBM in deterministic mode:
+    // Run full deployment + test tokens + TBM with pinned inputs:
     // - blockTime 1 = match the fresh-deploy harness's known-good mining cadence
     // - timestamp 1 = fixed genesis timestamp
     // - dumpStatePaths = Anvil will dump state to these files on exit
-    // This ensures state is fully deterministic regardless of wall clock.
+    // Contract bytecode and addresses are deterministic. Interval mining makes the final block height
+    // and block-indexed state wall-clock-dependent; compare-chain-states.ts normalizes that documented
+    // drift in CI.
     const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithTBM(anvilManager, {
       startChainOptions: { blockTime: 1, timestamp: 1, dumpStatePaths },
     });

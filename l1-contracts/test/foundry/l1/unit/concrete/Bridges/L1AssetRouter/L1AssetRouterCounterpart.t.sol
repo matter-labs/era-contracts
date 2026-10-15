@@ -12,13 +12,7 @@ import {L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBri
 /// @dev Exposes the internal counterpart-set path + a test-only tracker setter so the counterpart-auth guard
 /// can be unit-tested in isolation (the full `bridgehubDeposit` path is covered by the integration suites).
 contract L1AssetRouterCounterpartHarness is L1AssetRouter {
-    constructor(
-        address _weth,
-        address _bridgehub,
-        address _nullifier,
-        uint256 _eraChainId,
-        address _eraDiamond
-    ) L1AssetRouter(_weth, _bridgehub, _nullifier, _eraChainId, _eraDiamond) {}
+    constructor(address _weth, address _bridgehub, address _nullifier) L1AssetRouter(_weth, _bridgehub, _nullifier) {}
 
     function exposedSetAssetHandlerAddressOnCounterpart(
         uint256 _chainId,
@@ -53,19 +47,12 @@ contract MockAssetDeploymentTracker {
 contract L1AssetRouterCounterpartTest is Test {
     L1AssetRouterCounterpartHarness internal router;
 
-    uint256 internal constant ERA_CHAIN_ID = 270;
     uint256 internal constant DEST_CHAIN_ID = 271;
     address internal caller = makeAddr("caller");
     address internal handlerOnCounterpart = makeAddr("handlerOnCounterpart");
 
     function setUp() public {
-        router = new L1AssetRouterCounterpartHarness(
-            makeAddr("weth"),
-            makeAddr("bridgehub"),
-            makeAddr("nullifier"),
-            ERA_CHAIN_ID,
-            makeAddr("eraDiamond")
-        );
+        router = new L1AssetRouterCounterpartHarness(makeAddr("weth"), makeAddr("bridgehub"), makeAddr("nullifier"));
     }
 
     function test_revertsWhenAssetDeploymentTrackerUnset() external {

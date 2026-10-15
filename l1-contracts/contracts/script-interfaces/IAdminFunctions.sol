@@ -51,6 +51,8 @@ interface IAdminFunctions {
 
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) external;
 
+    function chainAdminAcceptOwner(ChainAdmin _chainAdmin, address _target) external;
+
     function chainSetTokenMultiplierSetter(
         address chainAdmin,
         address accessControlRestriction,
@@ -91,7 +93,6 @@ interface IAdminFunctions {
     /// {PubdataContent}) so this struct stays encodable from the generated ABI: a Solidity enum
     /// inside a struct reaches the artifact JSON as a named type that ABI-driven bindings cannot
     /// resolve. Both are cast on use, and encode identically either way.
-    // solhint-disable-next-line gas-struct-packing
     struct ChainUpgradeParams {
         address chainAddress;
         address adminAddr;
@@ -128,31 +129,12 @@ interface IAdminFunctions {
 
     function setPubdataPricingMode(ChainAdmin chainAdmin, address target, PubdataPricingMode pricingMode) external;
 
-    function notifyServerMigrationToGateway(address bridgehub, uint256 chainId, bool shouldSend) external;
-
-    function notifyServerMigrationFromGateway(address bridgehub, uint256 chainId, bool shouldSend) external;
-
-    function prepareUpgradeZKChainOnGateway(
-        uint256 l1GasPrice,
-        uint256 oldProtocolVersion,
-        bytes calldata upgradeCutData,
-        address chainDiamondProxyOnGateway,
-        uint256 gatewayChainId,
-        uint256 chainId,
-        address bridgehub,
-        address l1AssetRouterProxy,
-        address refundRecipient,
-        bool shouldSend
-    ) external;
-
     function grantGatewayWhitelist(
         address bridgehub,
         uint256 chainId,
         address[] calldata grantees,
         bool shouldSend
     ) external;
-
-    function revokeGatewayWhitelist(address bridgehub, uint256 chainId, address toRevoke, bool shouldSend) external;
 
     function setTransactionFilterer(
         address bridgehub,
@@ -190,37 +172,32 @@ interface IAdminFunctions {
         bool shouldSend
     ) external;
 
-    function migrateChainToGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        string calldata gatewayRpcUrl,
-        address refundRecipient,
-        bool shouldSend
+    /// @notice Prepares or sends the admin transaction for ZKsync OS L1 transaction filtering.
+    /// @param _bridgehub Bridgehub on the chain's settlement layer.
+    /// @param _accessControlRestriction Access control restriction used by the chain admin.
+    /// @param _chainId Chain to configure.
+    /// @param _enabled Whether L1 transaction filtering is enabled.
+    /// @param _shouldSend Whether to broadcast the transaction.
+    function setZKsyncOSL1TxFiltering(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        bool _enabled,
+        bool _shouldSend
     ) external;
 
-    function setDAValidatorPairWithGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        address l1DAValidator,
-        L2DACommitmentScheme l2DACommitmentScheme,
-        address chainDiamondProxyOnGateway,
-        address refundRecipient,
-        bool shouldSend
-    ) external;
-
-    function enableValidatorViaGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        address validatorAddress,
-        address gatewayValidatorTimelock,
-        address refundRecipient,
-        bool shouldSend
+    /// @notice Prepares or sends the admin transaction for ZKsync OS large contracts.
+    /// @param _bridgehub Bridgehub on the chain's settlement layer.
+    /// @param _accessControlRestriction Access control restriction used by the chain admin.
+    /// @param _chainId Chain to configure.
+    /// @param _enabled Whether large contracts are enabled.
+    /// @param _shouldSend Whether to broadcast the transaction.
+    function setZKsyncOSLargeContractsEnabled(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        bool _enabled,
+        bool _shouldSend
     ) external;
 
     function enableValidator(
@@ -228,16 +205,6 @@ interface IAdminFunctions {
         uint256 l2ChainId,
         address validatorAddress,
         address validatorTimelock,
-        bool shouldSend
-    ) external;
-
-    function startMigrateChainFromGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        bytes calldata l1DiamondCutData,
-        address refundRecipient,
         bool shouldSend
     ) external;
 

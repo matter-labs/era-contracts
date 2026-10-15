@@ -4,33 +4,7 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 // solhint-disable-next-line no-unused-import
-import {MAX_NUMBER_OF_BLOBS, SystemLogKey} from "system-contracts/contracts/Constants.sol";
-
-struct LogProcessingOutput {
-    uint256 numberOfLayer1Txs;
-    uint256 numberOfLayer2Txs;
-    bytes32 chainedPriorityTxsHash;
-    bytes32 previousBatchHash;
-    bytes32 pubdataHash;
-    bytes32 stateDiffHash;
-    bytes32 l2LogsTreeRoot;
-    uint256 packedBatchAndL2BlockTimestamp;
-    bytes32 l2DAValidatorOutputHash;
-    bytes32 l2TxsStatusRollingHash;
-    bytes32 dependencyRootsRollingHash;
-}
-
-/// @dev Maximal value that SystemLogKey variable can have.
-uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
-
-/// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
-uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
-
-/// @dev Offset used to pull Key From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address)
-uint256 constant L2_LOG_KEY_OFFSET = 24;
-
-/// @dev Offset used to pull Value From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address) + 32 (bytes for key)
-uint256 constant L2_LOG_VALUE_OFFSET = 56;
+import {MAX_NUMBER_OF_BLOBS} from "../../common/Config.sol";
 
 /// @dev The number of blobs that must be present in the commitment to a batch.
 /// It represents the maximal number of blobs that circuits can support and can be larger
@@ -49,7 +23,8 @@ interface IExecutor is IZKChainBase {
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
     /// @param timestamp Rollup batch timestamp, have the same format as Ethereum batch constant. For ZKsync OS not used, always set to 0
-    /// @param commitment Verified input for the ZKsync circuit. For ZKsync OS batches we'll store batch output hash here
+    /// @param commitment For ZKsync OS batches from v34, the full, untruncated batch public-input hash;
+    /// earlier ZKsync OS batches store the batch-output hash.
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
@@ -60,7 +35,7 @@ interface IExecutor is IZKChainBase {
         bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
         uint256 timestamp; // For ZKsync OS not used, always set to 0
-        bytes32 commitment; // For ZKsync OS batches we'll store batch output hash here
+        bytes32 commitment; // ZKsync OS: full public-input hash from v34; batch-output hash before v34.
     }
 
     /// @notice Legacy StoredBatchInfo struct
@@ -111,8 +86,6 @@ interface IExecutor is IZKChainBase {
     /// @notice Reverts unexecuted batches
     /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _newLastBatch batch number after which batches should be reverted
-    /// @dev When the _newLastBatch is equal to the number of committed batches,
-    /// only the precommitment is erased.
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
     function revertBatchesSharedBridge(address _chainAddress, uint256 _newLastBatch) external;

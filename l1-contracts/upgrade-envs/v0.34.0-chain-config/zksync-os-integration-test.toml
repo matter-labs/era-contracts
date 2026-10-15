@@ -1,0 +1,4 @@
+# Upgrade input for the zksync-os-integration-test environment on the v34 release. See protocol-ops/README.md "Environment inputs".
+
+era_chain_id = 6565
+governance_upgrade_timer_initial_delay = 0

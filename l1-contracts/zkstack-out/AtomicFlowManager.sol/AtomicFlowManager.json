@@ -1020,7 +1020,7 @@
     "name": "Unauthorized",
     "inputs": [
       {
-        "name": "",
+        "name": "caller",
         "type": "address",
         "internalType": "address"
       }

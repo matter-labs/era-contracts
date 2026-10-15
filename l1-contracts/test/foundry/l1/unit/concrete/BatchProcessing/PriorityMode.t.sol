@@ -3,26 +3,20 @@ pragma solidity 0.8.28;
 
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
-import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
-import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
     InvalidTxCountInPriorityMode,
-    OnlyNormalMode,
+    NotCompatibleWithPriorityMode,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
     PriorityOpsRequestTimestampMissing,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {PRIORITY_EXPIRATION} from "contracts/common/Config.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
-    function isZKsyncOS() internal pure override returns (bool) {
-        return true;
-    }
-
     function test_revertWhen_activatePriorityMode_notAllowed() public {
         vm.expectRevert(PriorityModeIsNotAllowed.selector);
         admin.activatePriorityMode();
@@ -44,6 +38,50 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(PriorityOpsRequestTimestampMissing.selector, 0));
         admin.permanentlyAllowPriorityMode();
+    }
+
+    /// @dev Regression test for AIH-431: Priority Mode can't be allowed while deposits are paused.
+    function test_revertWhen_permanentlyAllowPriorityMode_depositsPaused() public {
+        vm.prank(owner);
+        admin.makePermanentRollup();
+        _requestPriorityOp();
+
+        vm.prank(owner);
+        migrator.pauseDepositsBeforeInitiatingMigration();
+        assertEq(utilsFacet.util_getPausedDepositsTimestamp(), block.timestamp);
+
+        vm.prank(owner);
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        admin.permanentlyAllowPriorityMode();
+
+        assertFalse(utilsFacet.util_getPriorityModeCanBeActivated());
+    }
+
+    /// @dev After unpausing, Priority Mode can be allowed, and deposits can't be paused again.
+    function test_permanentlyAllowPriorityMode_afterDepositsUnpaused() public {
+        vm.prank(owner);
+        admin.makePermanentRollup();
+        _requestPriorityOp();
+
+        vm.prank(owner);
+        migrator.pauseDepositsBeforeInitiatingMigration();
+
+        // `unpauseDeposits` asks the bridgehub's chain asset handler whether a migration is in progress.
+        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
+        vm.prank(owner);
+        migrator.unpauseDeposits();
+        assertEq(utilsFacet.util_getPausedDepositsTimestamp(), 0);
+
+        vm.expectEmit(true, true, true, true, address(admin));
+        emit IAdmin.PriorityModeAllowed();
+        vm.prank(owner);
+        admin.permanentlyAllowPriorityMode();
+        assertTrue(utilsFacet.util_getPriorityModeCanBeActivated());
+
+        vm.prank(owner);
+        vm.expectRevert(NotCompatibleWithPriorityMode.selector);
+        migrator.pauseDepositsBeforeInitiatingMigration();
+        assertEq(utilsFacet.util_getPausedDepositsTimestamp(), 0);
     }
 
     function test_revertWhen_activatePriorityMode_tooEarly() public {
@@ -69,14 +107,6 @@ contract PriorityModeExecutorTest is ExecutorTest {
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validator));
         committer.commitBatchesSharedBridge(address(0), 0, 0, "");
-    }
-
-    function test_revertWhen_precommitInPriorityMode() public {
-        _activatePriorityMode();
-
-        vm.prank(validator);
-        vm.expectRevert(OnlyNormalMode.selector);
-        committer.precommitSharedBridge(address(0), 1, "");
     }
 
     function test_revertWhen_priorityModeBatchHasL2Txs() public {
@@ -132,43 +162,5 @@ contract PriorityModeExecutorTest is ExecutorTest {
         admin.permanentlyAllowPriorityMode();
         vm.warp(block.timestamp + PRIORITY_EXPIRATION + 1);
         admin.activatePriorityMode();
-    }
-
-    function _requestPriorityOp() internal returns (uint256 requestTimestamp) {
-        address prioritySender = makeAddr("prioritySender");
-        uint256 l2GasLimit = 1_000_000;
-        uint256 baseCost = mailbox.l2TransactionBaseCost(10_000_000, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA);
-        vm.deal(prioritySender, baseCost);
-        requestTimestamp = block.timestamp;
-        vm.prank(prioritySender);
-        dummyBridgehub.requestL2TransactionDirect{value: baseCost}(
-            L2TransactionRequestDirect({
-                chainId: l2ChainId,
-                mintValue: baseCost,
-                l2Contract: makeAddr("l2Contract"),
-                l2Value: 0,
-                l2Calldata: "",
-                l2GasLimit: l2GasLimit,
-                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                factoryDeps: new bytes[](0),
-                refundRecipient: prioritySender
-            })
-        );
-    }
-
-    function _mockDAForCommit(uint256 batchNumber) internal {
-        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        L1DAValidatorOutput memory daOutput = L1DAValidatorOutput({
-            stateDiffHash: bytes32(0),
-            blobsLinearHashes: blobHashes,
-            blobsOpeningCommitments: blobCommitments
-        });
-        // Match any checkDA call for this batch regardless of DA input encoding
-        vm.mockCall(
-            rollupL1DAValidator,
-            abi.encodeWithSelector(IL1DAValidator.checkDA.selector, l2ChainId, batchNumber),
-            abi.encode(daOutput)
-        );
     }
 }

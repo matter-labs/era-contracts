@@ -383,8 +383,8 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     );
   });
 
-  it("can send custom base token from a custom-base-token chain to an ETH chain (custom → era)", async function () {
-    // Reverse of the era → custom test above: send the custom base token FROM chain 14
+  it("can send custom base token from a custom-base-token chain to an ETH chain (custom → ETH)", async function () {
+    // Reverse of the ETH → custom test above: send the custom base token FROM chain 14
     // TO an ETH-based chain. On the destination (ETH) chain, the custom base token
     // arrives as a bridged ERC20 via the AssetRouter.
     if (!customBaseTokenChainId || !customBaseTokenProvider) {
@@ -422,7 +422,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(result.txHash).to.be.a("string").and.not.equal("");
     expect(result.interopBundle).to.not.be.null;
 
-    console.log(`   Custom→ERA message sent: ${result.txHash}`);
+    console.log(`   Custom→ETH message sent: ${result.txHash}`);
 
     // ── Execute on destination (ETH chain) ──
     let bridgedTokenAddr = await getTokenAddressForAsset(destProvider, customBaseTokenAssetId);
@@ -438,11 +438,11 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(bridgedTokenAddr).to.not.equal(ethers.constants.AddressZero, "bridged custom token should be deployed");
 
     const recipientBalAfter = await getTokenBalance(destProvider, bridgedTokenAddr, getInteropRecipientAddress());
-    expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "custom→era: recipient bridged token");
+    expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "custom→ETH: recipient bridged token");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
     console.log(
-      `   Custom→ERA received: +${ethers.utils.formatEther(balDelta)} bridged custom token at ${bridgedTokenAddr}`
+      `   Custom→ETH received: +${ethers.utils.formatEther(balDelta)} bridged custom token at ${bridgedTokenAddr}`
     );
   });
 

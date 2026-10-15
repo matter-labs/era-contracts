@@ -50,7 +50,10 @@ contract ChainRegistrationSender is
         _;
     }
 
-    constructor(IBridgehubBase _bridgehub) {
+    /// @dev Contract is expected to be used as proxy implementation on L1.
+    /// @notice to avoid parity hack
+    constructor(IBridgehubBase _bridgehub) reentrancyGuardInitializer {
+        _disableInitializers();
         BRIDGE_HUB = _bridgehub;
     }
 
@@ -133,7 +136,7 @@ contract ChainRegistrationSender is
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 
-    /// @notice Checks that both chains are settling on the same settlement layer. As of v32 both
+    /// @notice Checks that both chains are settling on the same settlement layer. As of v33 both
     /// settling directly on L1 is permitted — see {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on

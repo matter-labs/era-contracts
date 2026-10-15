@@ -8,7 +8,7 @@ import {RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
 import {RegisterZKChainConfig as ChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -19,7 +19,7 @@ import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.s
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 
-    RegisterZKChainScript deployScript;
+    RegisterZKChainScript internal deployScript;
 
     struct ZKChainDescription {
         uint256 zkChainChainId;
@@ -32,13 +32,12 @@ contract ZKChainDeployer is L1ContractDeployer {
         address validatorSenderOperatorExecute;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
-        bool allowEvmEmulator;
     }
 
     ChainConfig internal eraConfig;
 
-    uint256 currentZKChainId = 10;
-    uint256 eraZKChainId = 9;
+    uint256 internal currentZKChainId = 10;
+    uint256 internal eraZKChainId = 9;
     uint256[] public zkChainIds;
 
     function _deployEra() internal {
@@ -123,7 +122,7 @@ contract ZKChainDeployer is L1ContractDeployer {
 
     function _processGenesisUpgrade(uint256 _chainId) internal {
         IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(_chainId));
-        // Slot 34 is "l2SystemContractsUpgradeBatchNumber" in ZKChainStorage
+        // Slot 34 is "l2SystemContractsUpgradeTxHash" in ZKChainStorage
         vm.store(address(chain), bytes32(uint256(34)), bytes32(0));
     }
 
@@ -142,7 +141,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 __chainId,
         address __baseToken,
         uint256 __salt
-    ) internal returns (ZKChainDescription memory description) {
+    ) internal pure returns (ZKChainDescription memory description) {
         description = ZKChainDescription({
             zkChainChainId: __chainId,
             baseToken: __baseToken,
@@ -153,14 +152,11 @@ contract ZKChainDeployer is L1ContractDeployer {
             validatorSenderOperatorProve: address(2),
             validatorSenderOperatorExecute: address(3),
             baseTokenGasPriceMultiplierNominator: uint128(1),
-            baseTokenGasPriceMultiplierDenominator: uint128(1),
-            allowEvmEmulator: false
+            baseTokenGasPriceMultiplierDenominator: uint128(1)
         });
     }
 
     function saveZKChainConfig(ZKChainDescription memory description) public {
-        string memory serialized;
-
         vm.serializeAddress("toml1", "owner_address", 0x70997970C51812dc3A010C7d01b50e0d17dc79C8);
         vm.serializeUint("chain", "chain_chain_id", description.zkChainChainId);
         vm.serializeAddress("chain", "base_token_addr", description.baseToken);
@@ -188,8 +184,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         );
         vm.serializeUint("chain", "governance_min_delay", 0);
         vm.serializeAddress("chain", "governance_security_council_address", address(0));
-
-        vm.serializeBool("chain", "allow_evm_emulator", description.allowEvmEmulator);
 
         string memory single_serialized = vm.serializeUint(
             "chain",
@@ -234,7 +228,6 @@ contract ZKChainDeployer is L1ContractDeployer {
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
         address _bridgehub,
-        address _interopCenter,
         address _chainTypeManager
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
@@ -246,16 +239,16 @@ contract ZKChainDeployer is L1ContractDeployer {
 
         {
             // stack too deep
-            // InitializeData layout includes bridgehub, interop center, and CTM for v31+ init calldata.
+            // InitializeData layout includes bridgehub and CTM for v33+ init calldata.
             initData1 = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),
                 bytes32(uint256(uint160(address(_bridgehub)))),
-                bytes32(uint256(uint160(address(_interopCenter)))),
                 bytes32(uint256(uint160(_chainTypeManager)))
             );
         }
         {
+            // solhint-disable-next-line func-named-parameters
             initData2 = bytes.concat(
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),

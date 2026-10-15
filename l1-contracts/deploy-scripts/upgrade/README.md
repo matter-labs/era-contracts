@@ -10,50 +10,51 @@ covers the scripts themselves.
 The scripts are not run with `forge script` directly in a rollout. `protocol_ops` (see
 [protocol-ops/README.md](../../../protocol-ops/README.md)) invokes their entry points on an Anvil
 fork and turns the recorded broadcasts into Safe bundles. `ecosystem upgrade-prepare-all` calls
-`CoreUpgrade_v<N>.noGovernancePrepare` once and `CTMUpgrade_v<N>.noGovernancePrepare` once per
-CTM; `chain upgrade` and `chain set-upgrade-timestamp` go through `AdminFunctions.s.sol`.
+the core script's `noGovernancePrepare` once (`DefaultCoreUpgrade` itself when the release has no
+`CoreUpgrade_v<N>`, as in v34) and `CTMUpgrade_v<N>.noGovernancePrepare` once per CTM;
+`chain upgrade` and `chain set-upgrade-timestamp` go through `AdminFunctions.s.sol`.
 
 ## Layout
 
-| Path                                                                                                                                                                                    | Purpose                                                                                                                                                                                                                                                                                         |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `default-upgrade/DefaultCoreUpgrade.s.sol`                                                                                                                                              | The ecosystem-wide half every release runs: refreshes all core implementations, assembles the core calls of governance stages 0, 1 and 2. Releases override the `deployVersionSpecific…` and `prepareVersionSpecificStage…` hooks.                                                              |
-| `default-upgrade/DefaultCTMUpgrade.s.sol`                                                                                                                                               | The per-CTM half: CTM-side implementations, stage validator and governance timer, force deployments, L2 upgrade transaction, diamond cut, CTM stage calls. Releases override `deployUsedUpgradeContract` and the additional-force-deployment hooks.                                             |
-| `default-upgrade/CTMUpgradeBase.sol`, `DefaultL2UpgradeStrategy.sol`, `EraForceDeploymentsLib.sol`, `FacetCutsLib.sol`, `UpgradeHelperLib.sol`, `UpgradeParams.sol`, `UpgradeUtils.sol` | Shared building blocks of the two scripts above: cut generation, L2 upgrade transaction composition, facet cuts, parameter structs.                                                                                                                                                             |
-| `default-upgrade/DefaultChainUpgrade.s.sol`                                                                                                                                             | Per-chain cut driver used by tests and by hand; the rollout uses `AdminFunctions.s.sol`.                                                                                                                                                                                                        |
-| `default-upgrade/DefaultGatewayUpgrade.s.sol`                                                                                                                                           | The Gateway-side upgrade script, base of `gateway/GatewayVotePreparation.s.sol`. Its gateway deploys are disabled in v33, and it uses Era bytecodes directly, so it is not ZKsync OS compatible (see its "consider deleting" FIXME).                                                            |
-| `default-upgrade/BridgedOutPopulationLib.sol`, `PopulateBridgedOut.s.sol` (the latter in this directory)                                                                                | The v33 post-governance `bridgedOut` population (`ecosystem stage3`) and its standalone entry point for resuming it.                                                                                                                                                                            |
-| `v33/`                                                                                                                                                                                  | The current release's overrides: `CoreUpgrade_v33`, `CTMUpgrade_v33`, and `RecordPriorityOpLowerBound` (the per-chain precondition of the v33 cut).                                                                                                                                             |
-| `SystemContractsProcessing.s.sol`                                                                                                                                                       | The list of L2 built-ins a release force-deploys, and the neutralizations of removed ones.                                                                                                                                                                                                      |
-| `FinalizeUpgrade.s.sol`                                                                                                                                                                 | Post-upgrade initialization helper from older releases (chains and tokens); kept for the environments that still need it.                                                                                                                                                                       |
-| `ValidatorTimelockUpgrade.sol`, `DecentralizeGovernanceUpgradeScript.s.sol`, `AppendProtocolUpgradeHandlerUpgrade.s.sol`                                                                | One-off governance helpers: a `ValidatorTimelock` implementation upgrade plus its shared-validator and signing-set calls, a CTM implementation upgrade and pending-admin change through the legacy `Governance`, and appending a `ProtocolUpgradeHandler` implementation upgrade to a proposal. |
-| `EmergencyStageUpgradeCalldata.s.sol`, `EmergencyValidatorTimelockRestore.s.sol`                                                                                                        | Emergency-path calldata for the stage environment: executing the governance stages through the emergency upgrade board, and a one-off emergency upgrade.                                                                                                                                        |
-| `SecurityCouncilApproveStageUpgrade.s.sol`, `SecurityCouncilEmergencyStageUpgrade.s.sol`                                                                                                | Not calldata emitters: both sign and send with `PRIVATE_KEY` against the stage `ProtocolUpgradeHandler`. The first is a normal-path Security Council approval of an upgrade id; the second executes an empty emergency upgrade.                                                                 |
-| `VerifyStage1Pause.s.sol`, `VerifyEmergencyApproveHash.s.sol`                                                                                                                           | Fork-only checks that the emergency path executes end to end.                                                                                                                                                                                                                                   |
+| Path                                                                                                                                                      | Purpose                                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `default-upgrade/DefaultCoreUpgrade.s.sol`                                                                                                                | The ecosystem-wide half every release runs: refreshes all core implementations, assembles the core calls of governance stages 0, 1 and 2. Releases override the `deployVersionSpecific…` and `prepareVersionSpecificStage…` hooks.                  |
+| `default-upgrade/DefaultCTMUpgrade.s.sol`                                                                                                                 | The per-CTM half: CTM-side implementations, stage validator and governance timer, force deployments, L2 upgrade transaction, diamond cut, CTM stage calls. Releases override `deployUsedUpgradeContract` and the additional-force-deployment hooks. |
+| `default-upgrade/CTMUpgradeBase.sol`, `DefaultL2UpgradeStrategy.sol`, `FacetCutsLib.sol`, `UpgradeHelperLib.sol`, `UpgradeParams.sol`, `UpgradeUtils.sol` | Shared building blocks of the two scripts above: cut generation, L2 upgrade transaction composition, facet cuts, parameter structs.                                                                                                                 |
+| `default-upgrade/DefaultChainUpgrade.s.sol`                                                                                                               | Per-chain cut driver used by tests and by hand; the rollout uses `AdminFunctions.s.sol`.                                                                                                                                                            |
+| `v34/`                                                                                                                                                    | The current release's overrides: `CTMUpgrade_v34`, whose cut runs `V34UpgradeZKsyncOS` on each chain. The core half runs `DefaultCoreUpgrade` unchanged.                                                                                            |
+| `SystemContractsProcessing.s.sol`                                                                                                                         | The list of L2 built-ins a release force-deploys, and the neutralizations of removed ones.                                                                                                                                                          |
+| `FinalizeUpgrade.s.sol`                                                                                                                                   | Post-upgrade initialization helper from older releases (chains and tokens); kept for the environments that still need it.                                                                                                                           |
+| `DecentralizeGovernanceUpgradeScript.s.sol`                                                                                                               | One-off governance helper: a CTM implementation upgrade and pending-admin change through the legacy `Governance`.                                                                                                                                   |
+| `EmergencyStageUpgradeCalldata.s.sol`, `EmergencyValidatorTimelockRestore.s.sol`                                                                          | Emergency-path calldata for the stage environment: executing the governance stages through the emergency upgrade board, and a one-off emergency upgrade.                                                                                            |
+| `SecurityCouncilApproveStageUpgrade.s.sol`, `SecurityCouncilEmergencyStageUpgrade.s.sol`                                                                  | Not calldata emitters: both sign and send with `PRIVATE_KEY` against the stage `ProtocolUpgradeHandler`. The first is a normal-path Security Council approval of an upgrade id; the second executes an empty emergency upgrade.                     |
+| `VerifyStage1Pause.s.sol`, `VerifyEmergencyApproveHash.s.sol`                                                                                             | Fork-only checks that the emergency path executes end to end.                                                                                                                                                                                       |
 
 ## Adding a release
 
-1. Create `v<N>/CoreUpgrade_v<N>.s.sol` extending `DefaultCoreUpgrade` and
-   `v<N>/CTMUpgrade_v<N>.s.sol` extending `DefaultCTMUpgrade`. Start from the previous release's
+1. Create `v<N>/CTMUpgrade_v<N>.s.sol` extending `DefaultCTMUpgrade`, and
+   `v<N>/CoreUpgrade_v<N>.s.sol` extending `DefaultCoreUpgrade` only if the core half needs an
+   override (v34 has none). Point protocol-ops' script paths in
+   `protocol-ops/src/common/forge/scripts/mod.rs` at them. Start from the previous release's
    files and keep only the overrides the new release needs: everything a release does not change
    is already in the default scripts, and a hook left empty is the intended way to say "nothing
    version-specific here".
-2. Point `deployUsedUpgradeContract` at the release's per-chain upgrade contract
-   (`l1-contracts/contracts/upgrades/`): the generic `DefaultUpgradeZKsyncOS` when the release
-   has no one-time work, a one-shot `V<N>Upgrade…` otherwise. In the latter case also deploy a
-   generic one and assign it to `ctmStoredDefaultUpgrade` (as `CTMUpgrade_v33` does), otherwise
-   the CTM stores the one-shot contract as its `defaultUpgrade`.
+2. Pick the release's per-chain upgrade contract (`l1-contracts/contracts/upgrades/`): the
+   generic `DefaultUpgradeZKsyncOS` when the release has no one-time work, a one-shot
+   `V<N>Upgrade…` otherwise. The CTM stores whatever `deployUsedUpgradeContract` returns as its
+   `defaultUpgrade`, which should stay the generic one, so a one-shot contract is deployed there in
+   addition and set as the cut's `initAddress` in `generateUpgradeCutData`, as `CTMUpgrade_v34`
+   does.
 3. Register new L2 built-ins in `SystemContractsProcessing.s.sol` and, for the genesis path, in
    the genesis generator, so that upgraded and freshly created chains match
    (`docs/ai-review/docs/genesis-and-upgrades.md`).
-4. Create `l1-contracts/upgrade-envs/v<release>/` with one input TOML per environment and move
-   `UPGRADE_ENV_DIR` in `protocol-ops/src/common/env_config.rs` to it; add the verifier
-   expectations under `protocol-ops/src/upgrade_verification/versions/v<N>/`.
+4. Create `l1-contracts/upgrade-envs/v<release>/` with `yarn new-release <name>` (repo root),
+   which copies the per-environment input TOMLs with fresh salts and moves
+   `current_upgrade_env_dir!` in `protocol-ops/src/common/forge/scripts/mod.rs` to it; add the
+   verifier expectations under `protocol-ops/src/upgrade_verification/versions/v<N>/`.
 5. Rotate the CREATE2 salts in the input TOMLs before every regeneration, build with the default
-   Foundry profile, and rehearse with
-   `l1-contracts/test/anvil-interop/regen-upgrade-calldata.sh <env>` before broadcasting anything.
-   `l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/testnet/README.md` documents one
-   complete rollout.
+   Foundry profile, and rehearse with `protocol_ops ecosystem rehearse-upgrade --env <env>` before
+   broadcasting anything. `docs/ecosystem-upgrade-deploy.md` covers the deploy that follows.
 
 A patch release that touches only some contracts follows the same shape: the default scripts
 refresh every implementation regardless, which is what keeps the deployed contracts equal to the

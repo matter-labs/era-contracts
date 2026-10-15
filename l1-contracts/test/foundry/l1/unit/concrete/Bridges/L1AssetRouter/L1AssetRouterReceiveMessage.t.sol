@@ -40,19 +40,12 @@ contract L1AssetRouterReceiveMessageTest is Test {
     address internal owner = makeAddr("owner");
     address internal interopHandler = makeAddr("interopHandler");
 
-    uint256 internal constant ERA_CHAIN_ID = 9;
     uint256 internal constant SOURCE_CHAIN_ID = 271;
 
     function setUp() public {
         // The bridgehub/nullifier/vault deps are never reached on the access-control rejection paths, so mock
         // addresses suffice for this focused unit test.
-        L1AssetRouter impl = new L1AssetRouter(
-            makeAddr("weth"),
-            makeAddr("bridgehub"),
-            makeAddr("nullifier"),
-            ERA_CHAIN_ID,
-            makeAddr("eraDiamond")
-        );
+        L1AssetRouter impl = new L1AssetRouter(makeAddr("weth"), makeAddr("bridgehub"), makeAddr("nullifier"));
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(impl),
             proxyAdmin,

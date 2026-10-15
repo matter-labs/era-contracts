@@ -8,14 +8,25 @@ Never run `pkill -f anvil`, `killall anvil`, or any blanket kill command for Anv
 
 Instead, use the `cleanup.sh` script in the anvil-interop directory, which targets only processes on known ports.
 
+## Gateway is softly deprecated
+
+v33 onwards deploys no Gateway, and its ceremony tooling is gone. The Gateway contracts, the scripts that stand one up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04–06) remain only so the Gateway could be brought back in a working state; removing them is tracked in EVM-1729. Beyond keeping those tests passing, nothing depends on the Gateway.
+
+Unless the user explicitly asks about the Gateway:
+
+- Don't reason about the Gateway, Gateway-settled chains or chain migration while designing, implementing or reviewing a change, and don't add Gateway cases to new tests or docs.
+- Don't extend, refactor or rename Gateway code. Gateway-named identifiers in the core contracts (`ERA_GATEWAY_CHAIN_ID`, `migrateToGateway`, …) are ABI and stay as they are.
+- If a change breaks an existing Gateway test, the smallest fix that keeps it passing is enough.
+
 ## Code style requirements
 
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
-2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`, `Constants.sol` in `system-contracts`, etc). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
+2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
 3. Function parameters must be prefixed with `_` (e.g. `_value`, `_owner`). This convention applies to all functions across all contracts.
 4. Always use `{ }` for `if` blocks — never inline the body (`if (cond) revert X();` is forbidden; write `if (cond) { revert X(); }`). The same applies to `for`/`while` bodies.
-5. Never write doc comments (`///` natspec) for custom errors — error files contain only the `// 0x<selector>` lines maintained by the errors lint. Put any rationale at the revert site instead. When a new file with errors is added, it MUST be registered in the errors lint (`CONTRACTS_DIRECTORIES` in `l1-contracts/scripts/errors-lint.ts`) and `yarn errors-lint --fix` must be run.
-6. All L2 contracts inherit `PausableUpgradeable` for the purpose of potential future use. However, at the moment none of these actually use it as the intended flow of pausing chains is the freezing mechanism: <TODO: link to the zknation doc about freezing>. This is not a strict rule: some shared bases are used on both L1 and L2, and for ease of implementation the pausability defined there may leak into the L2 version. New L2-only contracts should avoid `whenNotPaused` and `pause` / `unpause` externals.
+5. Declare custom errors in the dedicated error file for the component, never inside contracts or interfaces.
+6. Never write doc comments (`///` natspec) for custom errors — error files contain only the `// 0x<selector>` lines maintained by the errors lint. Put any rationale at the revert site instead. When a new file with errors is added, it MUST be registered in the errors lint (`CONTRACTS_DIRECTORIES` in `l1-contracts/scripts/errors-lint.ts`) and `yarn errors-lint --fix` must be run.
+7. New L2 contracts inherit `PausableUpgradeable` for the purpose of potential future use. Adding it to an existing L2 contract is a storage-layout change: inherited storage is laid out before the contract's own, so listing it ahead of a base that holds storage shifts that storage in the deployed proxy or built-in. That is why `L2InteropHandler` doesn't inherit it ({protocol-docs/interop/architecture.md#l2interophandler-storage-across-the-v31--v33-upgrade}). At the moment none of the L2 contracts actually use it as the intended flow of pausing chains is the freezing mechanism: <TODO: link to the zknation doc about freezing>. This is not a strict rule: some shared bases are used on both L1 and L2, and for ease of implementation the pausability defined there may leak into the L2 version. New L2-only contracts should avoid `whenNotPaused` and `pause` / `unpause` externals.
 
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
@@ -143,7 +154,9 @@ Do not write comments that explain how Solidity works, or that preempt a misread
 
 Sometimes an environment needs a protocol version that server `dev` already uses for something else. Example (2026-09):
 stage's Era chains got v0.33.0 = compiler only (zksolc 1.5.17 + DSE bootloader, from `draft-v31`), while server `dev`
-used Version33 for the undeployed force-fail/Airbender release. Terms used below:
+used Version33 for the undeployed force-fail/Airbender release. The procedure is written for the EraVM line: the Era
+paths it names (`configs/genesis/era/`, `upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml`) do not exist on the
+ZKsync OS-only `draft/v0.34.0` line. Terms used below:
 
 - **Deployment candidate:** the exact era-contracts commit going to the environment (here `draft-v31` at v0.33.0).
 - **Dev integration:** the contracts commit server `dev` checks out after the change: `dev`'s current `contracts` pin
@@ -305,18 +318,28 @@ When debugging Solidity compilation or script failures:
 
 ## Running Foundry Tests
 
-### Installing foundry-zksync
+### Installing Foundry
 
-The tests require `foundry-zksync` (ZKSync's fork of Foundry) to be installed. Download the specific version used in CI:
+The repository builds and tests with upstream Foundry (ordinary EVM, no `--zksync`). One pinned
+version covers forge, cast and anvil alike, and it lives in
+[`.github/foundry-versions.env`](.github/foundry-versions.env) — CI installs it through
+`.github/actions/install-foundry`, `recompute_hashes.sh` reads the same file, and the Docker base
+image takes it as a build arg. Install it with:
 
 ```bash
-mkdir ./foundry-zksync
-curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
-tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
-chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-rm foundry_zksync_v0.0.30_linux_amd64.tar.gz
-export PATH="$PWD/foundry-zksync:$PATH"
+curl -L https://foundry.paradigm.xyz | bash
+foundryup --install "$(. .github/foundry-versions.env && echo "$FOUNDRY_VERSION")"
 ```
+
+Note the version must be upstream Foundry, not the `foundry-zksync` fork: both report a `1.x.y`
+version, and building or generating `selectors` with the fork mismatches CI in both directions
+without saying so.
+
+Never bump the pin in a workflow directly — change it in `.github/foundry-versions.env` and
+regenerate whatever it invalidates. A bump changes solc metadata in every artifact, so
+`AllContractsHashes.json` always needs regenerating (`zkstack-out` and `selectors` are ABI-derived
+and unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
+committed anvil-interop chain states; regenerate those too if a bump changes it.
 
 ### Building Artifacts
 
@@ -328,12 +351,6 @@ yarn da build:foundry
 
 # Build l1-contracts
 yarn l1 build:foundry
-
-# Build system-contracts
-yarn sc build:foundry
-
-# Build l2-contracts
-yarn l2 build:foundry
 ```
 
 ### Running Tests
@@ -341,10 +358,6 @@ yarn l2 build:foundry
 ```bash
 # Run l1-contracts foundry tests
 cd l1-contracts
-yarn test:foundry
-
-# Run system-contracts foundry tests
-cd system-contracts
 yarn test:foundry
 ```
 
@@ -366,7 +379,7 @@ ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
 ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop
 ```
 
-After modifying mock system contracts (e.g., `MockL2ToL1Messenger`, `MockMintBaseTokenHook`), regenerate chain states:
+After modifying mock system contracts (e.g., `MockL1MessengerHook`, `MockMintBaseTokenHook`), regenerate chain states:
 
 ```bash
 cd l1-contracts
@@ -377,7 +390,7 @@ npx ts-node setup-and-dump-state.ts
 
 ### Common Issues
 
-1. **Missing zkout files**: If tests fail with "zkout/BeaconProxy.sol/BeaconProxy.json not found", ensure you've built all artifacts with the steps above.
+1. **Stale compilation cache**: after large batches of file restores/deletions, forge's incremental cache can go inconsistent (e.g. a deployer's embedded `type(X).creationCode` differing from X's own artifact). Run `rm -rf cache out` (or `forge clean`) and rebuild before chasing phantom failures, and always clean-build before hash checks.
 
 2. **Config lock errors**: Some tests may fail with "Can't acquire config lock". This is usually a transient issue - try running the tests again.
 
@@ -388,7 +401,7 @@ npx ts-node setup-and-dump-state.ts
    ```bash
    cd l1-contracts
    forge build
-   yarn copy-to-zkstack-out.ts
+   yarn copy-to-zkstack-out
    cd ..
    yarn prettier:fix  # Required to add trailing newlines to JSON files
    ```
@@ -421,14 +434,33 @@ yarn lint:ts --fix
 
 # Fix formatting issues
 yarn prettier:fix
+
+# Check solc warnings (needs forge; ~5s each)
+yarn l1 solc-warnings && yarn da solc-warnings
 ```
+
+### solc warnings
+
+`forge build` is not the warning gate: `ignored_error_codes` in `foundry.toml` only filters what it
+prints, and a full `l1-contracts` build exceeds solc's cap of 256 reported warnings, so later ones are
+silently dropped. `yarn l1 solc-warnings` (`scripts/solc-warnings.ts`) is what CI enforces. It
+compiles every `.sol` under the project's `roots` without generating bytecode, which removes the
+code-size warnings (production sizes are checked by the `contract-size` CI job). Every other warning
+fails the check unless the project's `solc-warnings.json` lists it under `exceptions`, keyed by file,
+code and the first line of the flagged source. The check prints the entry to paste for each new
+warning, and fails on exceptions solc no longer reports.
+
+Fix the warning rather than adding an exception: an unused parameter an interface requires loses its
+name (`uint256,`), and a contract with a payable `fallback` gets a `receive` running the same logic.
 
 ### Pre-Push Checklist
 
 1. **Run linting fixes**: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
-2. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
-3. **Verify no uncommitted changes**: `git status`
-4. **Commit and push**: Only after all checks pass
+2. **Check solc warnings**: `yarn l1 solc-warnings && yarn da solc-warnings`
+3. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
+4. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
+5. **Verify no uncommitted changes**: `git status`
+6. **Commit and push**: Only after all checks pass
 
 ### Common Linting Issues
 
@@ -445,7 +477,9 @@ Whenever an agent makes changes in a PR, it **MUST** update the PR description t
 
 ### Pushing and Creating PRs
 
-Agents do **not** have push access to the main repository. Always push to a **fork** and create PRs from there. Do not attempt to push directly to `matter-labs/era-contracts`.
+If the credentials you run with have push access to `matter-labs/era-contracts`, push your branch there and open the PR from it. Otherwise, push to a **fork** and open the PR from the fork.
+
+Either way, push only to your own feature branch: never push directly to `main`, `draft/*` or release branches; changes to them go through a PR.
 
 ### Never Force Push
 

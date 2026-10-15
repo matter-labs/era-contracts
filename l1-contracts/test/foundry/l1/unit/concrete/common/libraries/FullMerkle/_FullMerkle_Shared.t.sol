@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {FullMerkleTest as FullMerkleTestContract} from "contracts/dev-contracts/test/FullMerkleTest.sol";
 import {FullMerkleMemory} from "contracts/common/libraries/FullMerkleMemory.sol";
-import {console2 as console} from "forge-std/console2.sol";
 
 contract FullMerkleTest is Test {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
@@ -14,10 +13,10 @@ contract FullMerkleTest is Test {
     function test() internal {}
 
     FullMerkleTestContract internal merkleTest;
-    bytes32 constant zeroHash = keccak256(abi.encodePacked("ZERO"));
+    bytes32 internal constant ZERO_HASH = keccak256(abi.encodePacked("ZERO"));
 
     function setUp() public {
-        merkleTest = new FullMerkleTestContract(zeroHash);
+        merkleTest = new FullMerkleTestContract(ZERO_HASH);
     }
 
     // ### Helper functions ###
@@ -25,10 +24,10 @@ contract FullMerkleTest is Test {
         return keccak256(abi.encodePacked(left, right));
     }
 
-    function _setupMemoryTree(uint256 _maxLeafNumber) internal view returns (FullMerkleMemory.FullTree memory) {
+    function _setupMemoryTree(uint256 _maxLeafNumber) internal pure returns (FullMerkleMemory.FullTree memory) {
         FullMerkleMemory.FullTree memory memoryTree;
         memoryTree.createTree(_maxLeafNumber);
-        memoryTree.setup(zeroHash);
+        memoryTree.setup(ZERO_HASH);
         return memoryTree;
     }
 }

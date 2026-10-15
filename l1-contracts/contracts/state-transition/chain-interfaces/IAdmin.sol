@@ -7,7 +7,7 @@ import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
+import {ProofSystem, L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
@@ -26,21 +26,25 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external;
 
-    /// @notice Change zk porter availability
-    /// @param _zkPorterIsAvailable The availability of zk porter shard
-    function setPorterAvailability(bool _zkPorterIsAvailable) external;
-
     /// @notice Change the max L2 gas limit for L1 -> L2 transactions
-    /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
+    /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions,
+    /// at most `PRIORITY_TX_MAX_GAS_LIMIT`.
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
     /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).
-    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The limit is
-    /// part of the runtime chain config committed into each batch proof public input, so it can only
-    /// change when all committed batches are verified.
+    /// @dev Callable on the active settlement layer instance after all committed batches are verified.
+    /// See {protocol-docs/chain-config.md} for the configuration-update policy.
     /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
     /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
     function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
+
+    /// @notice Enables or disables operator filtering of ZKsync OS priority transactions.
+    /// @param _enabled Whether L1 transaction filtering is enabled.
+    function setZKsyncOSL1TxFiltering(bool _enabled) external;
+
+    /// @notice Enables or disables the larger ZKsync OS contract size limits.
+    /// @param _enabled Whether to enable large contracts.
+    function setZKsyncOSLargeContractsEnabled(bool _enabled) external;
 
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
@@ -61,9 +65,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// However, for some chains (e.g., Prividium or Gateway), a custom filterer may be required
     /// for correct system operation. This function allows ZK Governance to set it.
     function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external;
-
-    /// @notice Allow EVM emulation on chain
-    function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
     function permanentlyAllowPriorityMode() external;
@@ -119,11 +120,15 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Sets the pubdata content. Orthogonal to the DA commitment scheme: it selects whether
     /// the whole pubdata (`FULL_PUBDATA`) or only the mandatory L2->L1 log region (`LOGS_ONLY`) is
-    /// committed. Committed into the ZKsync OS batch public input via the chain config hash, so it is
-    /// enforced by the batch proof. Callable only for ZKsync OS chains — the setting has no meaning on
-    /// Era-VM chains.
+    /// committed. Committed into the batch public input via the chain config hash, so it is enforced by
+    /// the batch proof.
     /// @param _pubdataContent The new pubdata content.
     function setPubdataContent(PubdataContent _pubdataContent) external;
+
+    /// @notice Enables or disables one proof system for a ZKsync OS chain.
+    /// @param _proofSystem Proof system to configure; only ProofSystem.Zisk is supported on ZKsync OS.
+    /// @param _enabled Whether the selected proof system is enabled.
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;
 
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be
@@ -131,9 +136,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// and tries to set the DA validator pair to something which does not publish DA to Ethereum.
     /// @dev DANGEROUS: once activated, there is no way back!
     function makePermanentRollup() external;
-
-    /// @notice Porter availability status changes
-    event IsPorterAvailableStatusUpdate(bool isPorterAvailable);
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
@@ -150,6 +152,12 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
     event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
+
+    /// @notice ZKsync OS L1 transaction filtering changed.
+    event NewZKsyncOSL1TxFiltering(bool oldEnabled, bool newEnabled);
+
+    /// @notice ZKsync OS large-contract support changed.
+    event NewZKsyncOSLargeContracts(bool oldEnabled, bool newEnabled);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
@@ -180,9 +188,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @notice Emitted when the contract is unfrozen.
     event Unfreeze();
 
-    /// @notice The EVM emulator has been enabled
-    event EnableEvmEmulator();
-
     /// @notice New L2 DA commitment scheme set
     event NewL2DACommitmentScheme(
         L2DACommitmentScheme indexed oldL2DACommitmentScheme,
@@ -191,6 +196,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice New pubdata content set
     event NewPubdataContent(PubdataContent indexed oldPubdataContent, PubdataContent indexed newPubdataContent);
+
+    /// @notice The set of proof systems the chain does not require changed
+    event NewDisabledProofSystems(uint8 indexed oldDisabledProofSystems, uint8 indexed newDisabledProofSystems);
 
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 

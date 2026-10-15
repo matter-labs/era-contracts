@@ -10,7 +10,7 @@ import {NotHistoricalRoot} from "contracts/state-transition/L1StateTransitionErr
 bytes32 constant ZERO_LEAF_HASH = keccak256("");
 
 contract PriorityTreeTest is PriorityTreeSharedTest {
-    function test_gets() public {
+    function test_gets() public view {
         assertEq(0, priorityTree.getSize());
         assertEq(0, priorityTree.getFirstUnprocessedPriorityTx());
         assertEq(0, priorityTree.getTotalPriorityTxs());

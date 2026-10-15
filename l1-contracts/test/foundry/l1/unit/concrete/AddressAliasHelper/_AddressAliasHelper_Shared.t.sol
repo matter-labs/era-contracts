@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {AddressAliasHelperTest} from "contracts/dev-contracts/test/AddressAliasHelperTest.sol";
 
 contract AddressAliasHelperSharedTest is Test {
-    AddressAliasHelperTest addressAliasHelper;
+    AddressAliasHelperTest internal addressAliasHelper;
 
     function setUp() public {
         addressAliasHelper = new AddressAliasHelperTest();

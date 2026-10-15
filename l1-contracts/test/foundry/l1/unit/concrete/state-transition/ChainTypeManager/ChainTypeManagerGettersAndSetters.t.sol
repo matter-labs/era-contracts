@@ -41,7 +41,7 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
     }
 
     // Test getZKChainLegacy - returns from deprecated map
-    function test_getZKChainLegacy() public {
+    function test_getZKChainLegacy() public view {
         // Since the deprecated map is not populated in normal flow,
         // this should return address(0)
         address result = chainContractAddress.getZKChainLegacy(chainId);

@@ -69,7 +69,7 @@ sol! {
     // `commands::ecosystem::zk_governance` (the generator side).
     function initialize(address _securityCouncil, address _guardians, address _emergencyUpgradeBoard);
 
-    /// Decoded by stage 0 when it walks the deferred `acceptOwnership` tail.
+    // Decoded by stage 0 to spot the PUH `acceptOwnership` hand-over.
     function acceptOwnership();
 
     #[sol(rpc)]

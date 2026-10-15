@@ -13,25 +13,28 @@ The upgrade can be safely finalized on L1 once:
    included it in L2 block **N**), and
 2. Block **N-1** is finalized on the settlement layer — its batch has been
    executed. In zksync-os the `"finalized"` block tag resolves to
-   `last_executed_block`, so we compare `finalized >= N - 1`. For direct
-   L1-settling chains this corresponds to batch execution on L1; for
-   gateway-settling chains, on the gateway.
+   `last_executed_block`, so we compare `finalized >= N - 1`, i.e. batch
+   execution on the settlement layer.
 
 ## How it works
 
 1. Resolves `ChainTypeManager` via
-   `Bridgehub.chainTypeManager(chainId)` on the settlement layer (L1 for direct
-   chains, gateway L2 for gateway-settling chains).
+   `Bridgehub.chainTypeManager(chainId)` on the settlement layer.
 2. Scans for `NewUpgradeCutData(targetProtocolVersion, ...)` on the CTM and
    decodes the embedded `L2CanonicalTransaction` from the diamond cut init
    calldata.
-3. Computes the canonical tx hash: `keccak256(tx.abi_encode())`.
+3. Replays the per-chain upgrade-data rewrite for v31+ upgrades (trying the current ABI,
+   then the legacy ABI used by already-published upgrades) and computes the canonical tx
+   hash: `keccak256(tx.abi_encode())`.
 4. Polls the chain's L2 RPC:
    - `eth_getTransactionReceipt(hash)` — once present, we have block **N**.
    - `eth_getBlockByNumber("finalized", false)` — waits until the returned
      block number is ≥ N-1.
 5. The tool blocks indefinitely until finalization. The surrounding workflow
    owns any upper-bound timeout and user-facing notifications (Slack).
+
+Verifier-only upgrades have no L2 receipt to monitor, so the checker exits
+with an explicit diagnostic instead of waiting for a transaction that cannot appear.
 
 ## Running locally
 
@@ -48,10 +51,3 @@ cargo run --release -- \
 The minor/patch pair is packed into the u256 the CTM stores (`(minor << 32) | patch`).
 
 All flags also accept environment variables (see `--help`).
-
-## Running from GitHub Actions
-
-See [`.github/workflows/upgrade-readiness-check.yaml`](../../.github/workflows/upgrade-readiness-check.yaml).
-Manually triggered; posts to Slack when the tool exits (success or failure).
-The Slack webhook is read from the `UPGRADE_READINESS_SLACK_WEBHOOK_URL` repo
-secret.

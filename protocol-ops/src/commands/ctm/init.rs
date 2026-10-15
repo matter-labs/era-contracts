@@ -9,10 +9,10 @@ use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
 use crate::common::forge::scripts::deploy_ctm::DeployCTMOutput;
+use crate::common::l1_contracts::resolve_ownable_owner;
 use crate::common::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
-use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -30,9 +30,6 @@ pub struct CtmInitArgs {
     /// from `permanent-values/<env>.toml`).
     #[clap(long, help_heading = "Input")]
     pub bridgehub: Option<Address>,
-    /// VM type: zksyncos or eravm
-    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
-    pub vm_type: VMOption,
 
     /// Owner address (default: sender, or env's `owner_address` when `--env`
     /// is set).
@@ -56,6 +53,15 @@ pub struct CtmInitArgs {
     /// Use testnet verifier
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
+    /// Deploy the Airbender + ZiSK multi-proof verifier lane.
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
+    pub multi_proof_verifier: bool,
+    /// Pre-deployed snarkJS Plonk verifier used by the ZiSK verifier.
+    #[clap(long, help_heading = "Advanced input")]
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    /// Optional pre-deployed ZiSK range verifier override.
+    #[clap(long, help_heading = "Advanced input")]
+    pub zisk_range_verifier_addr: Option<Address>,
     /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
     /// `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
@@ -77,9 +83,11 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
         .bridgehub
         .or_else(|| env_cfg.as_ref().map(|c| c.bridgehub()))
         .ok_or_else(|| anyhow::anyhow!("--bridgehub or --env must be supplied"))?;
-    let owner_override = args
-        .owner
-        .or_else(|| env_cfg.as_ref().and_then(|c| c.owner_address()));
+    let owner_override = match (args.owner, env_cfg.as_ref()) {
+        (Some(owner), _) => Some(owner),
+        (None, Some(cfg)) => cfg.owner_address()?,
+        (None, None) => None,
+    };
     let zk_token_asset_id = args
         .zk_token_asset_id
         .or_else(|| env_cfg.as_ref().and_then(|c| c.zk_token_asset_id()));
@@ -113,9 +121,11 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     let ctm_input = CtmInitInput {
         bridgehub,
         owner: owner.address,
-        vm_type: args.vm_type,
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
+        multi_proof_verifier: args.multi_proof_verifier,
+        zisk_plonk_verifier_addr: args.zisk_plonk_verifier_addr,
+        zisk_range_verifier_addr: args.zisk_range_verifier_addr,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
     };
@@ -151,9 +161,11 @@ pub async fn ctm_init(
     let deploy_input = CtmDeployInput {
         bridgehub: input.bridgehub,
         owner: input.owner,
-        vm_type: input.vm_type,
         reuse_gov_and_admin: input.reuse_gov_and_admin,
         with_testnet_verifier: input.with_testnet_verifier,
+        multi_proof_verifier: input.multi_proof_verifier,
+        zisk_plonk_verifier_addr: input.zisk_plonk_verifier_addr,
+        zisk_range_verifier_addr: input.zisk_range_verifier_addr,
         zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_salt: input.create2_factory_salt,
     };
@@ -163,6 +175,11 @@ pub async fn ctm_init(
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
     logger::step("Accepting ownership of CTM contracts...");
+    // The ChainAdmin steps must be sent by its owner; standalone `ctm init` passes the ChainAdmin itself as `admin`.
+    let chain_admin_owner = runner
+        .prepare_sender(resolve_ownable_owner(&runner.rpc_url, deployed.chain_admin).await?)
+        .await?;
+    let ctm_owner = runner.prepare_sender(input.owner).await?;
     let accept_scripts = [
         runner
             .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
@@ -176,8 +193,29 @@ pub async fn ctm_init(
                 _chainAdmin: deployed.chain_admin,
                 _target: ctm_proxy,
             })
-            .with_wallet(owner)
+            .with_wallet(&chain_admin_owner)
             .with_timing_label("ctm.accept_admin"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerCall {
+                _governor: deployed.governance_addr,
+                _target: deployed.l1_rollup_da_manager,
+            })
+            .with_wallet(owner)
+            .with_timing_label("ctm.accept_rollup_da_manager_owner"),
+        runner
+            .script_call(AdminFunctionsAbi::chainAdminAcceptOwnerCall {
+                _chainAdmin: deployed.chain_admin,
+                _target: deployed.server_notifier_proxy_addr,
+            })
+            .with_wallet(&chain_admin_owner)
+            .with_timing_label("ctm.accept_server_notifier_owner"),
+        runner
+            .script_call(AdminFunctionsAbi::governanceAcceptOwnerConditionalCall {
+                _governor: input.owner,
+                _target: deployed.validator_timelock_addr,
+            })
+            .with_wallet(&ctm_owner)
+            .with_timing_label("ctm.accept_validator_timelock_owner"),
     ];
     runner.run_scripts(accept_scripts)?;
 
@@ -200,9 +238,11 @@ pub async fn ctm_init(
 pub struct CtmInitInput {
     pub bridgehub: Address,
     pub owner: Address,
-    pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
+    pub multi_proof_verifier: bool,
+    pub zisk_plonk_verifier_addr: Option<Address>,
+    pub zisk_range_verifier_addr: Option<Address>,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
 }

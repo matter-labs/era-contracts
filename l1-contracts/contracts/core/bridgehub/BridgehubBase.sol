@@ -56,11 +56,11 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _ethTokenAssetId() internal view virtual returns (bytes32);
+    function _getEthTokenAssetId() internal view virtual returns (bytes32);
 
-    function _maxNumberOfZKChains() internal view virtual returns (uint256);
+    function _getMaxNumberOfZKChains() internal view virtual returns (uint256);
 
-    function _l1ChainId() internal view virtual returns (uint256);
+    function _getL1ChainId() internal view virtual returns (uint256);
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     IAssetRouterBase public assetRouter;
@@ -168,8 +168,8 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
     /// @notice Initializes the contract
     function _initializeInner() internal {
-        assetIdIsRegistered[_ethTokenAssetId()] = true;
-        whitelistedSettlementLayers[_l1ChainId()] = true;
+        assetIdIsRegistered[_getEthTokenAssetId()] = true;
+        whitelistedSettlementLayers[_getL1ChainId()] = true;
     }
 
     //// Initialization and registration
@@ -268,7 +268,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @param _assetAddress the asset handler address
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external {
         // It is a simplified version of the logic used by the AssetRouter to manage asset handlers.
-        // CTM's assetId is `keccak256(abi.encode(_l1ChainId(), l1CtmDeployer, ctmAddress))`.
+        // CTM's assetId is `keccak256(abi.encode(_getL1ChainId(), l1CtmDeployer, ctmAddress))`.
         // And the l1CtmDeployer is considered the deployment tracker for the CTM asset.
         //
         // The l1CtmDeployer will call this method to set the asset handler address for the assetId.
@@ -278,7 +278,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         // it is double checked that `assetId` is indeed derived from the `l1CtmDeployer`.
         // TODO(EVM-703): This logic should be revised once interchain communication with aliasing (either standard trigger or shadow accounts) is implemented.
 
-        address sender = _l1ChainId() == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
+        address sender = _getL1ChainId() == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by l1CtmDeployer only
         if (sender != address(l1CtmDeployer)) {
             revert Unauthorized(sender);
@@ -287,7 +287,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
             revert CTMNotRegistered();
         }
 
-        bytes32 ctmAssetId = DataEncoding.encodeAssetId(_l1ChainId(), _additionalData, sender);
+        bytes32 ctmAssetId = DataEncoding.encodeAssetId(_getL1ChainId(), _additionalData, sender);
         ctmAssetIdToAddress[ctmAssetId] = _assetAddress;
         ctmAssetIdFromAddress[_assetAddress] = ctmAssetId;
         emit AssetRegistered(ctmAssetId, _assetAddress, _additionalData, msg.sender);
@@ -302,7 +302,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
-        if (_checkMaxNumberOfZKChains && zkChainMap.length() > _maxNumberOfZKChains()) {
+        if (_checkMaxNumberOfZKChains && zkChainMap.length() > _getMaxNumberOfZKChains()) {
             revert ZKChainLimitReached();
         }
     }
@@ -313,15 +313,15 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
     /// @notice baseToken function, which takes chainId as input, reads assetHandler from AR, and tokenAddress from AH
     function baseToken(uint256 _chainId) public view returns (address) {
-        bytes32 baseTokenAssetId = baseTokenAssetId[_chainId];
-        address assetHandlerAddress = IAssetRouterBase(assetRouter).assetHandlerAddress(baseTokenAssetId);
+        bytes32 chainBaseTokenAssetId = baseTokenAssetId[_chainId];
+        address assetHandlerAddress = IAssetRouterBase(assetRouter).assetHandlerAddress(chainBaseTokenAssetId);
 
         // It is possible that the asset handler is not deployed for a chain on the current layer.
         // In this case we throw an error.
         if (assetHandlerAddress == address(0)) {
-            revert AssetHandlerNotRegistered(baseTokenAssetId);
+            revert AssetHandlerNotRegistered(chainBaseTokenAssetId);
         }
-        return IBaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
+        return IBaseTokenAssetHandler(assetHandlerAddress).tokenAddress(chainBaseTokenAssetId);
     }
 
     /// @notice Returns all the registered zkChain addresses

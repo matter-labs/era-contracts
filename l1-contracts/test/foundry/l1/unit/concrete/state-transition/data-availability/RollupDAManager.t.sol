@@ -12,15 +12,15 @@ import {InvalidL2DACommitmentScheme, ZeroAddress} from "contracts/common/L1Contr
 
 contract RollupDAManagerTest is Test {
     // Instance of the contract under test
-    RollupDAManager rollupDAManager;
+    RollupDAManager internal rollupDAManager;
 
     // Addresses used in tests
-    address owner;
-    address newOwner;
-    address nonOwner;
-    address l1DAValidator1;
-    address l1DAValidator2;
-    address zeroAddress = address(0);
+    address internal owner;
+    address internal newOwner;
+    address internal nonOwner;
+    address internal l1DAValidator1;
+    address internal l1DAValidator2;
+    address internal zeroAddress = address(0);
 
     // Events from the RollupDAManager contract
     event DAPairUpdated(address indexed l1DAValidator, L2DACommitmentScheme indexed l2DACommitmentScheme, bool status);

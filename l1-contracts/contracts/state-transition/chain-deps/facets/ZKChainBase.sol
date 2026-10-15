@@ -6,14 +6,13 @@ import {FeeParams, PriorityModeInformation, PubdataPricingMode, ZKChainStorage} 
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {NotSettlementLayer, NotZKsyncOS} from "../../L1StateTransitionErrors.sol";
+import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {
     BatchHashMismatch,
     BaseTokenGasPriceDenominatorNotSet,
     Unauthorized,
     OnlyNormalMode,
-    OnlyPriorityMode,
-    MustBeEraChain
+    OnlyPriorityMode
 } from "../../../common/L1ContractErrors.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
@@ -21,13 +20,11 @@ import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {
     L1_GAS_PER_PUBDATA_BYTE,
-    PRIORITY_OPERATION_L2_TX_TYPE,
-    SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    L2DACommitmentScheme,
-    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
+    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
+    L2DACommitmentScheme
 } from "../../../common/Config.sol";
 import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
@@ -69,18 +66,6 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Ensures Priority Mode is active.
     modifier onlyPriorityMode() {
         require(s.priorityModeInfo.activated, OnlyPriorityMode());
-        _;
-    }
-
-    /// @notice Ensures that the chain uses EraVM
-    modifier onlyEra() {
-        require(!s.zksyncOS, MustBeEraChain());
-        _;
-    }
-
-    /// @notice Ensures that the chain uses ZKsync OS
-    modifier onlyZKsyncOS() {
-        require(s.zksyncOS, NotZKsyncOS());
         _;
     }
 
@@ -169,9 +154,6 @@ contract ZKChainBase is ReentrancyGuard {
     modifier onlyServiceTransaction() {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
         if (
-            /// Purposes.
-            /// 1. Allow EVM emulation.
-            msg.sender != address(this) &&
             /// For registering chains in the L2Bridgehub. This is used for interop initiation.
             msg.sender != bridgehub.chainRegistrationSender() &&
             /// For sending the deposit-pause request to the settlement layer's L2ChainAssetHandler
@@ -205,12 +187,27 @@ contract ZKChainBase is ReentrancyGuard {
         return s.priorityTree.getTotalPriorityTxs();
     }
 
-    function _getPriorityTxType() internal view returns (uint256) {
-        return s.zksyncOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
+    function _getPriorityTxType() internal pure returns (uint256) {
+        return ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE;
     }
 
-    function _getUpgradeTxType() internal view returns (uint256) {
-        return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+    function _getUpgradeTxType() internal pure returns (uint256) {
+        return ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
+    /// @notice Returns the current runtime configuration hash. See {protocol-docs/chain-config.md}.
+    function _getZKsyncOSChainConfigHash() internal view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    s.chainId,
+                    ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
+                    uint256(_getZKsyncOSMaxTxGasLimit()),
+                    uint256(s.pubdataContent),
+                    uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0),
+                    uint256(s.zksyncOSLargeContractsEnabled ? 1 : 0)
+                )
+            );
     }
 
     /// @notice Returns the effective ZKsync OS single-transaction gas limit (EIP-7825).
@@ -309,7 +306,7 @@ contract ZKChainBase is ReentrancyGuard {
         s.l2DACommitmentScheme = _l2DACommitmentScheme;
     }
 
-    /// @notice Reverts uncommitted batches
+    /// @notice Reverts committed, unexecuted batches.
     /// @param _newLastBatch The batch number after which batches should be reverted.
     function _revertBatches(uint256 _newLastBatch) internal {
         if (s.totalBatchesCommitted < _newLastBatch) {
@@ -318,8 +315,6 @@ contract ZKChainBase is ReentrancyGuard {
         if (_newLastBatch < s.totalBatchesExecuted) {
             revert CantRevertExecutedBatch();
         }
-
-        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
 
         if (_newLastBatch < s.totalBatchesVerified) {
             s.totalBatchesVerified = _newLastBatch;

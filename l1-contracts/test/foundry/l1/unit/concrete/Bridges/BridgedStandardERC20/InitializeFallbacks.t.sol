@@ -7,10 +7,10 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
 
-contract BridgedStandardERC20_InitializeFallbacks_Test is Test {
-    BridgedStandardERC20 implementation;
-    address originToken = address(0xBEEF);
-    bytes32 assetId = keccak256(abi.encode("assetId"));
+contract BridgedStandardERC20InitializeFallbacksTest is Test {
+    BridgedStandardERC20 internal implementation;
+    address internal originToken = address(0xBEEF);
+    bytes32 internal assetId = keccak256(abi.encode("assetId"));
 
     function setUp() public {
         implementation = new BridgedStandardERC20();

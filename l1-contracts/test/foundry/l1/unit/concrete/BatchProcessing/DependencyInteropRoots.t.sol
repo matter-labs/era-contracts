@@ -120,7 +120,6 @@ contract DependencyInteropRootsTest is Test {
     function _rollingHashStep(bytes32 _previous, InteropRoot memory _root) internal pure returns (bytes32) {
         return
             keccak256(
-                // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(_previous, _root.chainId, _root.blockOrBatchNumber, _root.timestamp, _root.sides)
             );
     }

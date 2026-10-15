@@ -10,8 +10,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -20,25 +19,20 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {AddressNotZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {
-    DepositsPaused,
-    NotZKChain,
-    NotL1,
-    NotSettlementLayer
-} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotL1} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract MailboxOnGatewayTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
-    address bridgehub;
-    address chainAssetHandler;
-    uint256 constant eraChainId = 9;
-    uint256 constant l1ChainId = 1;
-    uint256 constant gatewayChainId = 505; // Different from L1
+    address internal bridgehub;
+    address internal chainAssetHandler;
+    uint256 internal constant ERA_CHAIN_ID = 9;
+    uint256 internal constant L1_CHAIN_ID = 1;
+    uint256 internal constant GATEWAY_CHAIN_ID = 505; // Different from L1
 
     function setUp() public {
         // Set up on a non-L1 chain (Gateway)
-        vm.chainId(gatewayChainId);
+        vm.chainId(GATEWAY_CHAIN_ID);
 
         bridgehub = makeAddr("bridgehub");
         chainAssetHandler = makeAddr("chainAssetHandler");
@@ -46,7 +40,9 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         // Deploy without EIP7702Checker since we're not on L1
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(l1ChainId, address(chainAssetHandler), IEIP7702Checker(address(0)), false)),
+            facet: address(
+                new MailboxFacet(L1_CHAIN_ID, address(chainAssetHandler), IEIP7702Checker(address(0)), false)
+            ),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()
@@ -70,7 +66,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
             abi.encode(1)
         );
 
-        address testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        address testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
         mockChainTypeManagerVerifier(testnetVerifier);
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, bridgehub);
 
@@ -78,7 +74,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
         utilsFacet = UtilsFacet(diamondProxy);
 
         utilsFacet.util_setBridgehub(bridgehub);
-        utilsFacet.util_setChainId(eraChainId);
+        utilsFacet.util_setChainId(ERA_CHAIN_ID);
     }
 
     function test_onlyL1Modifier_RevertsOnGateway() public {
@@ -91,7 +87,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
             abi.encode(address(this))
         );
 
-        vm.expectRevert(abi.encodeWithSelector(NotL1.selector, gatewayChainId));
+        vm.expectRevert(abi.encodeWithSelector(NotL1.selector, GATEWAY_CHAIN_ID));
         IMailbox(address(mailboxFacet)).requestL2ServiceTransaction(address(0x123), bytes(""));
     }
 }

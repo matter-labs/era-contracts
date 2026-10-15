@@ -1,6 +1,6 @@
 # Message Root: Aggregation, Chain Batch Roots, and Interop Root Import
 
-This document is the single source of truth for the message-root subsystem: how chain batch roots are aggregated into a global interop root, what a v33 chain batch root and batch leaf contain, the Indexed Merkle Tree (IMT) data structure, how multichain roots are imported into chains and re-verified at batch execution, and how inclusion proofs traverse the whole structure.
+This document is the single source of truth for the message-root subsystem: how chain batch roots are aggregated into a global interop root, what a v33 chain batch root and batch leaf contain, the Indexed Merkle Tree (IMT) data structure, how aggregated roots are imported into chains and re-verified at batch execution, and how inclusion proofs traverse the whole structure.
 
 For how atomic interop _consumes_ these primitives (commit values, finalize/timeout branches, soundness and completeness arguments), see {protocol-docs/atomicity/proofs.md}. That flow is documented there, not here.
 
@@ -44,20 +44,18 @@ protocol `sides` has length 1 and holds only the root; the array shape is reserv
 proof forms. `logId` (`interopRootLogId`) increments **at most once per block**: all emissions within
 one block share the same `logId` so the server can group them; it counts starting from v31 only.
 
-<a id="v31-vs-v32-append-flows"></a>
-
 ## v31 vs v33 append flows
 
 Two entry points exist on `MessageRootBase`, both restricted to the chain's own diamond (its `ExecutorFacet` calls them directly while settling; asset correctness across chains is guaranteed by ZK proofs):
 
 - **`addChainBatchRoot`** — the v31 flow, record-only. It runs the shared validation (chain registered, root non-zero, not yet recorded, batch number exactly `currentChainBatchNumber + 1`) and stores the root in `chainBatchRoots`, but does **not** touch the chain tree or shared tree. Kept so pre-upgrade (v31) executor facets continue to work; `currentChainBatchNumber` still advances, so numbering continues seamlessly once the chain upgrades.
-- **`addChainBatchRootV32`** — the v33 flow: same recording, then the interop half:
-  1. `l1Timestamp = block.timestamp` is stored in `chainBatchRootTimestamp` and folded into the batch leaf via `MessageHashing.batchLeafHash(chainBatchRoot, batchNumber, l1Timestamp)`. Binding the timestamp into the leaf makes the settlement timestamp provable by the same inclusion proof as the root — a single multichain root proves many chain batch roots, each with its own settlement time.
+- **`addChainBatchRootV32`** — the v33 flow (the selector keeps the name it got before the atomic-interop release was renumbered from v32 to v33): same recording, then the interop half:
+  1. `l1Timestamp = block.timestamp` is stored in `chainBatchRootTimestamp` and folded into the batch leaf via `MessageHashing.batchLeafHash(chainBatchRoot, batchNumber, l1Timestamp)`. Binding the timestamp into the leaf makes the settlement timestamp provable by the same inclusion proof as the root — a single aggregated root proves many chain batch roots, each with its own settlement time.
   2. The batch leaf is pushed into `chainTree[chainId]` (event `AppendedChainBatchRoot`).
   3. The chain's shared-tree leaf is updated to `chainIdLeafHash(newChainRoot, chainId)` (event `NewChainRoot`).
   4. The new shared root is emitted (`NewInteropRoot`) and recorded in `historicalRoots`.
 
-Only v33 executors call the v33 entry point, so the interop trees contain v33-format roots exclusively — a non-empty chain tree implies the chain uses the current chain-batch-root format. On L1 the executor appends the committed `l2LogsTreeRoot` via `addChainBatchRootV32` (`ExecutorFacet._appendMessageRoot`).
+Only v33 executors call the v33 entry point, so the interop trees contain v33-format roots exclusively — a non-empty chain tree implies the chain uses the current chain-batch-root format. On both L1 and Gateway the executor appends the committed `l2LogsTreeRoot` via `addChainBatchRootV32` (`ExecutorFacet._appendMessageRoot`); on Gateway that value is already the chain batch root (it commits to an empty multichain batch root), so the paths are identical and no per-batch log reconstruction or balance accounting is performed.
 
 ## Chain batch root (ZKsync OS)
 
@@ -79,7 +77,7 @@ The IMT snapshots (leaves 2 and 3) are what make a chain's interop-commitment-tr
 
 `ChainBatchRootTree.genesisChainBatchRoot()` is the chain batch root of batch 0: zero logs root, zero multichain root, and `EMPTY_IMT_ROOT` (the root of a freshly seeded IMT — the hash of the `{0,0,0}` sentinel leaf, i.e. keccak256 of 96 zero bytes) at both batch boundaries.
 
-Freshly created ZKsync OS chains get this genesis root into the aggregation structure at creation time: the chain stores it as `l2LogsRootHash(0)` in its DiamondInit, and the Bridgehub calls `MessageRootBase.seedGenesisRoot(chainId)` right after registration within the same `createNewChain` transaction. `seedGenesisRoot`:
+Freshly created chains get this genesis root into the aggregation structure at creation time: the chain stores it as `l2LogsRootHash(0)` in its DiamondInit, and the Bridgehub calls `MessageRootBase.seedGenesisRoot(chainId)` right after registration within the same `createNewChain` transaction. `seedGenesisRoot`:
 
 - requires the chain to be registered with `currentChainBatchNumber == 0` and no batch-0 root recorded — this rules out chains onboarded at a non-zero starting batch and chains that already pushed real batches;
 - records the root under batch 0 and pushes it into the interop trees via the v33 push path, while `currentChainBatchNumber` stays 0 so the first real batch continues at 1.

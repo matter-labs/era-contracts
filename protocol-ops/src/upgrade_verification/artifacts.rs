@@ -10,21 +10,17 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// Raw `[core]` table from the merged ecosystem TOML.
     pub(crate) core: toml::Value,
     pub(crate) governance_calls: GovernanceCalls,
-    /// One entry per `[ctms.<flavor>]` section in the merged TOML, in the
-    /// order encountered. `era` always sorts before `zksync_os` for
-    /// deterministic ordering.
+    /// One entry per `[ctms.<flavor>]` section in the merged TOML, in
+    /// sorted-key order. Only the `zksync_os` flavor is supported on this
+    /// OS-only build; `[ctms.era]` input is rejected at parse time.
     pub(crate) ctms: Vec<CtmArtifact>,
-    /// Optional `[zk_governance]` table emitted on PUH-governed v33 upgrades.
+    /// Optional `[zk_governance]` table emitted on PUH-governed v31 upgrades.
     /// It names the four zk-governance contracts deployed via L1 CREATE2 so
     /// provenance verification can stay decoupled from stage-0 calldata
     /// decoding; stage-0 verification binds decoded calls back to these values.
     pub(crate) zk_governance: Option<ZkGovernanceArtifact>,
     /// Raw top-level `[misc]` table for shared metadata that does not belong to
-    /// core or a particular CTM. Parsed so the artifact round-trips and the
-    /// section is rejected if malformed; no v33 check reads it today —
-    /// `deployer_addr`, its only entry, stopped being an expected constructor
-    /// argument once the kept proxies moved off deployer-then-transfer
-    /// initialization.
+    /// core or a particular CTM.
     #[allow(dead_code)]
     pub(crate) misc: toml::Value,
 }
@@ -37,13 +33,7 @@ pub(crate) struct ZkGovernanceArtifact {
     pub(crate) new_emergency_upgrade_board: Address,
 }
 
-/// The CTM flavors a v33 artifact can describe.
-///
-/// v33 is a ZKsync OS-only release: `CTMUpgrade_v33.noGovernancePrepare`
-/// refuses an EraVM CTM before anything is deployed, so no v33 artifact can
-/// carry a `[ctms.era]` block. The enum is kept as a single variant rather
-/// than removed so the flavor stays explicit at every call site and a future
-/// release that reintroduces Era has one place to add it back.
+/// Supported CTM flavors on this OS-only build.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CtmFlavor {
     ZksyncOs,
@@ -60,8 +50,8 @@ impl CtmFlavor {
         match label {
             "zksync_os" => Ok(Self::ZksyncOs),
             "era" => anyhow::bail!(
-                "v33 is a ZKsync OS-only release, but the artifact carries a `[ctms.era]` block; \
-                 the upgrade scripts refuse EraVM CTMs, so this artifact was not produced by them"
+                "[ctms.era] is not supported: Era CTM verification was removed from this \
+                 ZKsync OS-only build; only `[ctms.zksync_os]` can be verified"
             ),
             other => anyhow::bail!("unknown CTM flavor `{other}`; expected `zksync_os`"),
         }
@@ -155,7 +145,7 @@ impl EcosystemUpgradeArtifact {
             anyhow::bail!("[ctms] must contain at least one CTM section");
         }
 
-        // Deterministic ordering: era first, then zksync_os.
+        // Deterministic ordering by sorted section key.
         let mut flavor_keys: Vec<String> = ctms_table.keys().cloned().collect();
         flavor_keys.sort();
 
@@ -187,15 +177,6 @@ impl EcosystemUpgradeArtifact {
                 value: raw,
             });
         }
-
-        // v33 ecosystems have no Gateway — not a new one to bring up and not a legacy one to
-        // decommission — so an artifact carrying `[new_gateway]` was not produced by these
-        // scripts and none of the checks a Gateway needs exist here any more.
-        anyhow::ensure!(
-            !root.contains_key("new_gateway"),
-            "artifact carries a [new_gateway] table, but v33 brings up no Gateway and this tool \
-             has no Gateway verification"
-        );
 
         let zk_governance = match root.remove("zk_governance") {
             Some(value) => {
@@ -310,7 +291,7 @@ mod tests {
     /// v33 accepts only ZKsync OS CTMs; an artifact carrying `[ctms.era]` was
     /// not produced by the v33 scripts, which refuse EraVM CTMs outright.
     #[test]
-    fn rejects_era_ctm_artifact() {
+    fn rejects_era_ctm_section_with_clear_error() {
         let toml = r#"
             [governance_calls]
             stage0_calls = "0x"
@@ -331,8 +312,8 @@ mod tests {
         "#;
         let err = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap_err();
         assert!(
-            err.to_string().contains("ZKsync OS-only"),
-            "unexpected error: {err}"
+            format!("{err:#}").contains("[ctms.era] is not supported"),
+            "unexpected error: {err:#}"
         );
     }
 

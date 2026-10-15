@@ -41,7 +41,7 @@ contract MerklePathTest is FullMerkleTest {
 
         // Check proofs again
         bytes32 node10 = keccak(leaf0, leaf1);
-        bytes32 node11 = keccak(leaf2, zeroHash);
+        bytes32 node11 = keccak(leaf2, ZERO_HASH);
 
         proofFor0 = merkleTest.merklePath(0);
         expectedProof = new bytes32[](2);
@@ -55,7 +55,7 @@ contract MerklePathTest is FullMerkleTest {
         assertEq(proofFor1, expectedProof, "Incorrect proof for leaf #1 in tree with 3 leaves");
 
         bytes32[] memory proofFor2 = merkleTest.merklePath(2);
-        expectedProof[0] = zeroHash;
+        expectedProof[0] = ZERO_HASH;
         expectedProof[1] = node10;
         assertEq(proofFor2, expectedProof, "Incorrect proof for leaf #2 in tree with 3 leaves");
     }

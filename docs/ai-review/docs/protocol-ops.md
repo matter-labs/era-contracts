@@ -3,12 +3,12 @@
 ## Relevant files
 
 - `protocol-ops/src/main.rs` — top-level CLI dispatcher.
-- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `stage3`, `list-ctms`, `governance-toml-to-simulator`, …).
+- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `list-ctms`, `governance-toml-to-simulator`, …).
 - `protocol-ops/src/commands/ecosystem/v31_upgrade_inner.rs` — canonical v31 prepare-phase orchestration (`V31UpgradeInner::prepare`).
 - `protocol-ops/src/commands/ecosystem/v31_upgrade_full.rs` — `V31UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`).
 - `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`) and the free `replay_governance_stages` helper.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — converts prepared governance TOMLs into transaction-simulator JSON.
-- `protocol-ops/src/commands/chain/` — per-chain commands (`chain upgrade`, `chain gateway convert`, `chain gateway migrate-to`, …).
+- `protocol-ops/src/commands/chain/` — per-chain commands (`chain init`, `chain upgrade`, `chain set-da-validator-pair`, …).
 - `protocol-ops/src/commands/dev/execute_safe.rs` — executes a Gnosis Safe Transaction Builder JSON bundle by signing each tx with a supplied private key and sending raw transactions to the given RPC URL.
 - `protocol-ops/src/common/forge/runner.rs` — `ForgeRunner`: owns the anvil fork lifecycle and records every broadcast tx into `runner.runs()` for per-sender Safe-bundle emission.
 - `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, bytecodes supplier, validator timelock, etc.) — read live state directly from L1.
@@ -18,7 +18,7 @@
 
 ## What protocol-ops is
 
-protocol-ops is a Rust CLI that drives privileged ecosystem operations (upgrades, gateway migrations, validator changes, …) by:
+protocol-ops is a Rust CLI that drives privileged ecosystem operations (upgrades, chain bring-up, validator changes, …) by:
 
 1. Spinning up a local **anvil fork** of L1 (the `ForgeRunner` owns this).
 2. Running production forge-script commands against the fork, with permissioned senders **impersonated** via anvil auto-impersonation (`--sender --unlocked`).
@@ -31,7 +31,9 @@ So the main protocol-ops commands are **simulator + bundle emitters**, not direc
 
 `ecosystem governance-toml-to-simulator` is the transaction-simulator bridge: it reads a prepared protocol-ops governance TOML, decodes `stage0_calls` / `stage1_calls` / `stage2_calls`, and emits the simulator's JSON transaction list.
 
-Sharp edge: filename handling is not fully unified. Existing stage prepare output and `governance-toml-to-simulator --env` use `<out>/prepare/governance.toml`; the current `upgrade-governance --env` auto-discovery path in `upgrade.rs` looks for `<out>/prepare/ecosystem.toml`. Until that is normalized, pass `--governance-toml` explicitly when replaying governance stages.
+`upgrade-prepare-all` writes the canonical merged artifact to `<env-out>/ecosystem.toml`.
+Both `upgrade-governance --env` and `governance-toml-to-simulator --env` discover that path; use
+`--governance-toml` only to replay an explicitly selected artifact.
 
 ## High-level architecture
 

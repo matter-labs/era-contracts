@@ -6,7 +6,7 @@ import {PriorityQueueSharedTest} from "./_PriorityQueue_Shared.t.sol";
 import {QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 
 contract OnEmptyQueueTest is PriorityQueueSharedTest {
-    function test_gets() public {
+    function test_gets() public view {
         assertEq(0, priorityQueue.getSize());
         assertEq(0, priorityQueue.getFirstUnprocessedPriorityTx());
         assertEq(0, priorityQueue.getTotalPriorityTxs());
