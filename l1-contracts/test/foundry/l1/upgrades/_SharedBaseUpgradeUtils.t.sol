@@ -50,6 +50,18 @@ contract BaseUpgradeUtils is ZKChainBase {
         s.disabledProofSystems = _disabledProofSystems;
     }
 
+    function getSecondProofSystemLocked() public view returns (bool) {
+        return s.secondProofSystemLocked;
+    }
+
+    function getDisabledProofSystems() public view returns (uint8) {
+        return s.disabledProofSystems;
+    }
+
+    function getProofMode() public view returns (uint256) {
+        return _getProofMode();
+    }
+
     function setProtocolVersion(uint256 _protocolVersion) public {
         s.protocolVersion = _protocolVersion;
     }

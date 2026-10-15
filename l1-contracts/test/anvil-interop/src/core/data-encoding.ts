@@ -32,6 +32,11 @@ export function encodeBridgeBurnData(amount: BigNumber, remoteReceiver: string, 
   return abiCoder.encode(["uint256", "address", "address"], [amount, remoteReceiver, maybeTokenAddress]);
 }
 
+/** Returns the amount of `DataEncoding.decodeBridgeBurnData(data)`. */
+export function decodeBridgeBurnAmount(data: string): BigNumber {
+  return abiCoder.decode(["uint256", "address", "address"], data)[0];
+}
+
 /**
  * Matches `DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, transferData)`.
  *

@@ -17,6 +17,7 @@ import {
     ManagerFlowIdMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
+    ManagerLegSourceChainNotAllowed,
     ProofSourceChainMismatch,
     ProofDeadlineExceeded
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
@@ -71,6 +72,9 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
 
         legFirstIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legFirst));
         legSecondIndex = _insertCommit(AtomicFlowFixtures.commitValue(flowId, legSecond));
+
+        _setLegSourceAllowed(CHAIN_A, true);
+        _setLegSourceAllowed(CHAIN_B, true);
     }
 
     /// @dev A finality proof with a genuine in-time inclusion proof per leg; `_tsFirst`/`_tsSecond` are
@@ -160,6 +164,17 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
         (finality.proofs[0], finality.proofs[1]) = (finality.proofs[1], finality.proofs[0]);
 
         vm.expectRevert(abi.encodeWithSelector(ProofSourceChainMismatch.selector, CHAIN_A, CHAIN_B));
+        _requireFinalizedAsHandler(legFirst, finality);
+    }
+
+    /// @notice The receive filter: a flow finalizes only if this chain accepts every leg's source
+    /// ({protocol-docs/interop-gating.md#receive-filter}). A leg from a source the chain doesn't allow
+    /// fails the gate even with a genuine in-time inclusion proof.
+    function test_RevertWhen_LegSourceNotAllowed() public {
+        AtomicFinalityProof memory finality = _validFinality();
+        _setLegSourceAllowed(CHAIN_B, false);
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, CHAIN_B));
         _requireFinalizedAsHandler(legFirst, finality);
     }
 

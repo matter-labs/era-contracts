@@ -140,20 +140,23 @@ contract SecondProofSystemLockTest is InteropGatingDeployer {
         assertEq(IGetters(chain).getVerifier(), verifierBefore);
     }
 
-    /// @notice The check reads what the verifier supports, not the chain's flags: a locked chain whose ZiSK
-    /// governance switched off still upgrades to a multi-proof verifier.
     function test_afterLock_upgradeSetsMultiProofVerifier() public {
         _lock();
+        _assertLockedChainUpgradesToMultiProofVerifier();
+
+        assertFalse(IGetters(chain).disabledProofSystems().zisk, "the upgrade must keep ZiSK on");
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE);
+    }
+
+    /// @notice The check reads what the verifier supports, not the chain's flags: a locked chain whose ZiSK
+    /// governance switched off still upgrades to a multi-proof verifier, and ZiSK stays off.
+    function test_afterLock_upgradeAfterEmergencyZiskOffSetsMultiProofVerifier() public {
+        _lock();
         _setZiskStatus(governance, false);
-        address newVerifier = address(
-            new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
-        );
-        Diamond.DiamondCutData memory cut = _verifierOverwrite(newVerifier);
+        _assertLockedChainUpgradesToMultiProofVerifier();
 
-        vm.prank(_ctmOwner());
-        addresses.chainTypeManager.executeUpgrade(zkChainIds[0], cut);
-
-        assertEq(IGetters(chain).getVerifier(), newVerifier);
+        assertTrue(IGetters(chain).disabledProofSystems().zisk, "the upgrade must keep ZiSK off");
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_PLONK_VERIFICATION_TYPE);
     }
 
     function test_beforeLock_upgradeSetsSingleProofVerifier() public {
@@ -164,6 +167,19 @@ contract SecondProofSystemLockTest is InteropGatingDeployer {
         addresses.chainTypeManager.executeUpgrade(zkChainIds[0], cut);
 
         assertEq(IGetters(chain).getVerifier(), newVerifier);
+    }
+
+    function _assertLockedChainUpgradesToMultiProofVerifier() internal {
+        address newVerifier = address(
+            new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
+        );
+        Diamond.DiamondCutData memory cut = _verifierOverwrite(newVerifier);
+
+        vm.prank(_ctmOwner());
+        addresses.chainTypeManager.executeUpgrade(zkChainIds[0], cut);
+
+        assertEq(IGetters(chain).getVerifier(), newVerifier);
+        assertTrue(IGetters(chain).isSecondProofSystemLocked(), "the upgrade must keep the lock");
     }
 
     function _verifierOverwrite(address _verifier) internal returns (Diamond.DiamondCutData memory) {

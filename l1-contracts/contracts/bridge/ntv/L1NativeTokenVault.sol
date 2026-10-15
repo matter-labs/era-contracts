@@ -69,9 +69,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles finalize withdrawal and confirm l2 tx mappings
     IL1Nullifier public immutable L1_NULLIFIER;
 
-    /// @dev Maps token balances for each chain. Deprecated: per-chain balance accounting was removed;
-    ///      correctness of transfers is guaranteed by ZK proofs (plus 2FA on ZKsync OS chains).
-    ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
+    /// @dev Maps token balances for each chain. Deprecated: this exact-balance mapping is no longer written, and
+    ///      `chainBalance` returns its stale values for backwards compatibility only. Per-chain accounting now lives in
+    ///      `chainTotalDeposited`, `chainTotalWithdrawn` and `chainBalanceBackfill`.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 

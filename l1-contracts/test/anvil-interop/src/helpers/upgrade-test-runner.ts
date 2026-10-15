@@ -47,7 +47,7 @@ import { impersonateAndRun, createProvider } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 import type { GatedChain } from "./upgrade-interop-gating";
-import { registerLegacyInteropPair, runInteropGatingProcedure } from "./upgrade-interop-gating";
+import { depositBeforeUpgrade, registerLegacyInteropPair, runInteropGatingProcedure } from "./upgrade-interop-gating";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -137,6 +137,10 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
     if (gatedChains) {
       console.log("\n── Registering a legacy interop pair ──");
       await registerLegacyInteropPair(gatingContext, ...gatedChains);
+      console.log("\n── Depositing to the gated chains before the upgrade ──");
+      for (const chain of gatedChains) {
+        await depositBeforeUpgrade(gatingContext, chain);
+      }
     }
 
     // ── Transfer L1 contract ownership to governance ──
@@ -179,6 +183,7 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
     }
 
     // ── Execute governance calls (stages 0-2) via protocol-ops bundle ──
+    const lastPreUpgradeBlock = await l1Provider.getBlockNumber();
     console.log("\n── Replaying governance upgrade bundles ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
@@ -209,7 +214,7 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
     console.log("✅ Upgraded CTM points at the interop fee manager, switched off\n");
     if (gatedChains) {
       console.log("── Replacing the legacy interop pair with an allowed one ──");
-      await runInteropGatingProcedure(gatingContext, ...gatedChains);
+      await runInteropGatingProcedure(gatingContext, lastPreUpgradeBlock, ...gatedChains);
       console.log("✅ Interop gating procedure verified\n");
     }
   } finally {

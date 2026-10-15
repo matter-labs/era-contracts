@@ -146,6 +146,7 @@ Live environment variables:
 | `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                                                                                  |
 | `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                                                                                           |
 | `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                                                                                            |
+| `15-interop-peer-whitelist`  | Governance removes an allowed peer from one side: that chain can't send to the peer and its receive filter rejects the peer's bundle; once the admin allows the peer again, both directions work and the held bundle executes  |
 
 ## Coverage
 

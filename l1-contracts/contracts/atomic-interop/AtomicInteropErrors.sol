@@ -31,6 +31,8 @@ error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
 error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actual);
 // 0xe1a77fd3
 error ManagerLegSourceChainIdsLengthMismatch(uint256 legs, uint256 chainIds);
+// 0x36657c01
+error ManagerLegSourceChainNotAllowed(uint256 legSourceChainId);
 // 0x62c42f1d
 error ManagerLegSourceChainNotRegistered(uint256 legSourceChainId);
 // 0x4dbe1536

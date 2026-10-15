@@ -75,25 +75,14 @@ compiled L2 built-ins as factory dependencies.
 It then wires them: the asset router and nullifier learn the vault and the interop handler, the
 vault registers ETH, and `L1Bridgehub.setAddresses` records the asset router, CTM deployment
 tracker, message root, chain asset handler and chain registration sender. Finally it starts the
-ownership hand-off: the Bridgehub, asset router, nullifier, interop handler, CTM deployment tracker
-and chain asset handler are transferred (two-step) to `Governance`, the native token vault to the
-configured owner, and `ChainAdminOwnable` is set as the Bridgehub's pending admin.
-`ChainRegistrationSender` is initialized with the deployer as its owner and is not transferred.
+ownership hand-off: the Bridgehub, asset router, nullifier, native token vault, interop handler, CTM
+deployment tracker, chain asset handler and `ChainRegistrationSender` are transferred (two-step) to
+`Governance`, and `ChainAdminOwnable` is set as the Bridgehub's pending admin.
 
-`hub init` accepts part of the hand-off as the owner: `AdminFunctions.chainAdminAcceptAdmin`
-accepts the Bridgehub admin role and `AdminFunctions.governanceAcceptOwnerAggregated` accepts the
-pending ownership of the Bridgehub, asset router, nullifier, CTM deployment tracker and chain
-asset handler on behalf of `Governance`. It does not complete the rest, so after `hub init` the
-deployer EOA still owns three core contracts:
-
-| Contract                  | State after `hub init`                          | Deployer can still                | Manual step to complete the hand-off                                                                                                     |
-| ------------------------- | ----------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `L1InteropHandler`        | owner: deployer, pending owner: `Governance`    | `pause()` withdrawal finalization | `Governance` calls `acceptOwnership()` (signed by `owner_address`: `AdminFunctions.governanceAcceptOwner(governance, l1InteropHandler)`) |
-| `L1NativeTokenVault`      | owner: deployer, pending owner: `owner_address` | `pause()` the vault               | `owner_address` calls `acceptOwnership()` on the vault directly                                                                          |
-| `ChainRegistrationSender` | owner: deployer, no pending owner               | `deregisterInteropPairs`          | the deployer calls `transferOwnership(governance)`, then `owner_address` runs `AdminFunctions.governanceAcceptOwner(governance, sender)` |
-
-Until these are done the ownership table below does not hold. Making `hub init` perform them
-itself is an open tooling follow-up.
+`hub init` completes the hand-off as the owner: `AdminFunctions.chainAdminAcceptAdmin` accepts the
+Bridgehub admin role and `AdminFunctions.governanceAcceptOwnerAggregated` accepts every pending
+ownership above on behalf of `Governance`, so none of them stays with the deployer EOA. In particular,
+only `Governance` can call `ChainRegistrationSender.deregisterInteropPairs`.
 
 Two inputs are immutable once deployed and therefore must be right the first time: the L1 WETH
 address (baked into the asset router and vault implementations; resolved from the L1 chain id when
@@ -282,10 +271,10 @@ the start: every power in the table above flows from it.
   `yarn verify-contracts <log-file> --chain <stage|testnet|mainnet>`, where the log file holds the
   `forge verify-contract` lines the scripts print. It only targets mainnet (`mainnet`) and Sepolia (`stage`, `testnet`);
   on any other L1, run those lines with that explorer's verifier settings.
-- Check ownership once the manual steps listed under "Hub" and "CTM" have been executed:
+- Check ownership once the manual steps listed under "CTM" have been executed:
   `owner()` must be the governance contract for the Bridgehub, asset router, nullifier, interop
   handler, CTM deployment tracker, chain asset handler, `ChainRegistrationSender`,
-  `RollupDAManager` and the CTM; `owner_address` for the native token vault and
+  `RollupDAManager`, the native token vault and the CTM; `owner_address` for the
   `ValidatorTimelock`; the `ChainAdminOwnable` for `ServerNotifier`. No `pendingOwner()` may be
   left dangling, and the Bridgehub's and the CTM's `admin()` must be the `ChainAdminOwnable`.
 

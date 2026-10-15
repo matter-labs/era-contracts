@@ -37,14 +37,16 @@ interface IAtomicFlowManager {
     ) external;
 
     /// @notice Reverts unless every leg of the flow was committed in time (per-leg IMT inclusion
-    /// proofs — see the {AtomicInteropProof} library header) and the executing bundle is a leg of the
+    /// proofs — see the {AtomicInteropProof} library header) on a source this chain accepts
+    /// ({protocol-docs/interop-gating.md#receive-filter}), and the executing bundle is a leg of the
     /// flow. Callable only by the {InteropHandler}.
     /// @param _executingBundleHash The bundle hash the handler is about to execute.
     /// @param _finality The flow definition + per-leg inclusion proofs.
     function requireFlowFinalized(bytes32 _executingBundleHash, AtomicFinalityProof calldata _finality) external view;
 
     /// @notice Mark this chain's committed source legs `Revertable` for a flow that can no longer
-    /// finalize, proven by a timeout for one leg. Permissionless.
+    /// finalize, proven by a timeout for one leg whose source this chain accepts
+    /// ({protocol-docs/interop-gating.md#receive-filter}). Permissionless.
     /// @param _flow The flow definition ({AtomicFlow}). The absence proof must target
     /// `_flow.preimage.legSourceChainIds[_missingLegIndex]`.
     /// @param _missingLegIndex Index into `_flow.preimage.legBundleHashes` of the leg proven absent.

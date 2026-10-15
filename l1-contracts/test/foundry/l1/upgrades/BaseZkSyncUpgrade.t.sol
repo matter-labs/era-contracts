@@ -13,6 +13,7 @@ import {
     PRIORITY_TX_MAX_GAS_LIMIT,
     ProofSystem,
     UPGRADE_TX_MAX_GAS_LIMIT,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
     ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
@@ -377,7 +378,7 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
     }
 
     /// @notice The lock checks what the new verifier supports, not the chain's current disable flags, so a
-    /// locked chain still upgrades after governance switched ZiSK off.
+    /// locked chain still upgrades after governance switched ZiSK off, and ZiSK stays off.
     function test_LockedChainUpgradesAfterEmergencyZiskOff() public {
         _assertLockedChainUpgradesToMultiProofVerifier(uint8(1 << uint8(ProofSystem.Zisk)));
     }
@@ -407,6 +408,12 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         assertEq(baseZkSyncUpgrade.getVerifier(), multiProofVerifier);
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertTrue(baseZkSyncUpgrade.getSecondProofSystemLocked(), "the upgrade must keep the lock");
+        assertEq(baseZkSyncUpgrade.getDisabledProofSystems(), _disabledProofSystems, "the upgrade keeps the flags");
+        assertEq(
+            baseZkSyncUpgrade.getProofMode(),
+            _disabledProofSystems == 0 ? ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE : ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+        );
     }
 
     function _singleProofVerifier() internal returns (address) {

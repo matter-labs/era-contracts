@@ -7,7 +7,11 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
-import {ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/Config.sol";
+import {
+    ProofSystem,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+} from "contracts/common/Config.sol";
 import {NotMultiProofMode} from "contracts/common/L1ContractErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -56,16 +60,32 @@ contract DefaultUpgradeTest is BaseUpgrade {
     }
 
     function test_LockedChainRunsVerifierOnlyUpgradeToMultiProofVerifier() public {
+        _assertLockedChainRunsVerifierOnlyUpgrade(0);
+    }
+
+    /// @notice After an emergency ZiSK-off, the verifier-only upgrade keeps both the lock and ZiSK off.
+    function test_LockedChainRunsVerifierOnlyUpgradeAfterEmergencyZiskOff() public {
+        _assertLockedChainRunsVerifierOnlyUpgrade(uint8(1 << uint8(ProofSystem.Zisk)));
+    }
+
+    function _assertLockedChainRunsVerifierOnlyUpgrade(uint8 _disabledProofSystems) internal {
         address multiProofVerifier = address(
             new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
         );
         baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, multiProofVerifier);
         baseZkSyncUpgrade.setSecondProofSystemLocked(true);
+        baseZkSyncUpgrade.setDisabledProofSystems(_disabledProofSystems);
 
         bytes32 result = baseZkSyncUpgrade.upgradeVerifierOnly(protocolVersion);
 
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
         assertEq(baseZkSyncUpgrade.getVerifier(), multiProofVerifier);
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
+        assertTrue(baseZkSyncUpgrade.getSecondProofSystemLocked(), "the upgrade must keep the lock");
+        assertEq(baseZkSyncUpgrade.getDisabledProofSystems(), _disabledProofSystems, "the upgrade keeps the flags");
+        assertEq(
+            baseZkSyncUpgrade.getProofMode(),
+            _disabledProofSystems == 0 ? ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE : ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+        );
     }
 }
