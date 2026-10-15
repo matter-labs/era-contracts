@@ -106,6 +106,24 @@
   },
   {
     "type": "function",
+    "name": "allowInteropPeer",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_baseTokenAssetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "assetIdIsRegistered",
     "inputs": [
       {
@@ -490,6 +508,25 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isPeerAllowed",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
