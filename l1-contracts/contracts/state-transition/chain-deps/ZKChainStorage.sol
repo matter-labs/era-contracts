@@ -298,4 +298,8 @@ struct ZKChainStorage {
     /// See {protocol-docs/interop-fee.md}.
     /// @dev STORAGE SLOT: 69
     mapping(uint256 batchNumber => uint256 units) interopFeeUnits;
+    /// @dev Whether the chain has permanently locked its second proof system (ZiSK).
+    /// See {protocol-docs/interop-gating.md#second-proof-system-lock}.
+    /// @dev STORAGE SLOT: 70
+    bool secondProofSystemLocked;
 }

@@ -18,7 +18,7 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
+import {AssetHandlerNotAllowed, NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {
     AddressAlreadySet,
     AssetDeploymentTrackerNotSet,
@@ -29,6 +29,7 @@ import {
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
@@ -262,6 +263,22 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @inheritdoc AssetRouterBase
+    /// @dev Chains without interop may only use the native token vault and the chain asset handler.
+    /// See {protocol-docs/interop-gating.md#asset-handler-restriction}.
+    function _checkAssetHandlerAllowed(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _assetHandler
+    ) internal view override {
+        if (_assetHandler == address(nativeTokenVault) || _assetHandler == BRIDGE_HUB.chainAssetHandler()) {
+            return;
+        }
+        if (!IL1MessageRoot(address(BRIDGE_HUB.messageRoot())).isInteropEnabled(_chainId)) {
+            revert AssetHandlerNotAllowed(_chainId, _assetId, _assetHandler);
+        }
+    }
+
+    /// @inheritdoc AssetRouterBase
     function finalizeDeposit(
         uint256 _sourceChainId,
         bytes32 _assetId,
@@ -283,6 +300,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         bytes calldata _assetData
     ) external override onlyNullifier nonReentrant whenNotPaused {
+        _checkAssetHandlerAllowed(_chainId, _assetId, _resolveAssetHandler(_assetId, address(nativeTokenVault)));
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeConfirmTransferResult({
             _chainId: _chainId,
             _txStatus: _txStatus,

@@ -4,7 +4,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::{IFinalizeChainInitAbi, IRegisterOnAllChainsAbi, IRegisterZKChainAbi};
+use crate::common::abi::{IFinalizeChainInitAbi, IRegisterZKChainAbi};
 use crate::common::addresses::{ETH_ADDRESS, ZERO_ADDRESS};
 use crate::common::forge::scripts::{
     register_chain::{NewChainParams, RegisterChainL1Config, RegisterChainOutput},
@@ -101,11 +101,6 @@ pub struct ChainInitArgs {
     /// Make the chain a permanent rollup (irreversible)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub make_permanent_rollup: bool,
-    /// Register the chain for interop with every other chain of the ecosystem (and vice versa) once it
-    /// is initialized. Permissionless and once-per-ordered-pair; pairs that are not registrable yet are
-    /// skipped, see `RegisterOnAllChains.s.sol`.
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub register_for_interop: bool,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -150,7 +145,6 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         l1_da_validator: args.l1_da_validator,
         chain_params,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
-        register_for_interop: args.register_for_interop,
         create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
         make_permanent_rollup: args.make_permanent_rollup,
@@ -251,21 +245,6 @@ pub async fn chain_init(
             .with_wallet(owner),
     )?;
 
-    // Register the chain for interop with the rest of the ecosystem (if requested). Kept last: the
-    // script requires the chain to be registered on the Bridgehub with a batch leaf in the message
-    // root, which `register_chain` above establishes (a fresh ZKsync OS chain gets its genesis leaf
-    // seeded by `MessageRootBase.seedGenesisRoot`), and its service transactions need deposits
-    // unpaused, which `finalizeChainInit` does.
-    if input.register_for_interop {
-        logger::step("Registering the chain for interop on all other chains...");
-        register_on_all_chains_step(
-            runner,
-            deployer,
-            input.bridgehub,
-            input.chain_params.chain_id.as_u64(),
-        )?;
-    }
-
     Ok(full_output)
 }
 
@@ -330,26 +309,6 @@ fn parse_ratio(s: &str) -> anyhow::Result<(u64, u64)> {
     Ok((num, den))
 }
 
-/// Registers the chain on every other chain of the ecosystem and vice versa, through
-/// `ChainRegistrationSender`. Both directions of a pair are registrable as of v33 even when both chains
-/// settle directly on L1.
-fn register_on_all_chains_step(
-    runner: &mut ForgeRunner,
-    auth: &Wallet,
-    bridgehub: Address,
-    chain_id: u64,
-) -> anyhow::Result<()> {
-    let forge = runner
-        .script_call(IRegisterOnAllChainsAbi::registerOnOtherChainsCall {
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-        })
-        .with_wallet(auth);
-
-    runner.run(forge)?;
-    Ok(())
-}
-
 // ── Internal structs ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
@@ -359,10 +318,6 @@ pub struct ChainInitInput {
     pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
-    /// Run the interop registration step (see `register_on_all_chains_step`). Off by default: on a
-    /// production ecosystem which chains may talk to each other is a deliberate decision, not a
-    /// side effect of creating one.
-    pub register_for_interop: bool,
     pub create2_factory_salt: Option<B256>,
     pub pause_deposits: bool,
     pub make_permanent_rollup: bool,

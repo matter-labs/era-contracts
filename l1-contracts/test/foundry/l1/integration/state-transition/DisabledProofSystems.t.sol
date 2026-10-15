@@ -36,6 +36,7 @@ import {
 } from "contracts/common/Config.sol";
 import {
     InvalidProofSystem,
+    NotMultiProofMode,
     Unauthorized,
     UnknownProofType,
     AirbenderVerificationFailed,
@@ -195,6 +196,16 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         _prove(singleChain, genesis, batch);
     }
 
+    /// @notice A chain whose verifier has no second proof system can't lock it.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-lock}.
+    function test_lockSecondProofSystem_revertWhen_singleProofVerifier() public {
+        address singleChain = _deployChain(11, address(new ZKsyncOSVerifier(IVerifier(airbenderPlonk))));
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
+        IAdmin(singleChain).lockSecondProofSystem();
+        assertFalse(IGetters(singleChain).isSecondProofSystemLocked());
+    }
+
     function test_testnet_realProofs_followDiamondModeAndRemainChainLocal() public {
         MultiProofTestnetVerifier wrapper = new MultiProofTestnetVerifier(verifier);
         address firstChain = _deployChain(11, address(wrapper));
@@ -265,9 +276,10 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         );
 
         Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](4);
-        bytes4[] memory selectors = new bytes4[](2);
+        bytes4[] memory selectors = new bytes4[](3);
         selectors[0] = IAdmin.setProofSystemStatus.selector;
         selectors[1] = IAdmin.setDAValidatorPair.selector;
+        selectors[2] = IAdmin.lockSecondProofSystem.selector;
         cuts[0] = _cut(address(new AdminFacet(block.chainid, RollupDAManager(address(0)))), selectors);
         selectors = new bytes4[](1);
         selectors[0] = ICommitter.commitBatchesSharedBridge.selector;
@@ -275,13 +287,14 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         selectors = new bytes4[](1);
         selectors[0] = IExecutor.proveBatchesSharedBridge.selector;
         cuts[2] = _cut(address(new ExecutorFacet()), selectors);
-        selectors = new bytes4[](6);
+        selectors = new bytes4[](7);
         selectors[0] = IGetters.disabledProofSystems.selector;
         selectors[1] = IGetters.getTotalBatchesCommitted.selector;
         selectors[2] = IGetters.getTotalBatchesVerified.selector;
         selectors[3] = IGetters.getVerifier.selector;
         selectors[4] = IGetters.getChainId.selector;
         selectors[5] = IGetters.getProofMode.selector;
+        selectors[6] = IGetters.isSecondProofSystemLocked.selector;
         cuts[3] = _cut(address(new GettersFacet()), selectors);
         result = address(
             new DiamondProxy(

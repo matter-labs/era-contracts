@@ -1,5 +1,6 @@
 owner_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 testnet_verifier = true
+multi_proof_verifier = true
 zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
 
 [contracts]

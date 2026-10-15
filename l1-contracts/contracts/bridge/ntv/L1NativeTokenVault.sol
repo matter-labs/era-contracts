@@ -23,6 +23,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 import {
+    ArrayLengthMismatch,
     AssetIdAlreadyRegistered,
     InsufficientChainBalance,
     NoFundsTransferred,
@@ -30,10 +31,18 @@ import {
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {AssetNotNativeToL1, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {
+    AssetNotNativeToL1,
+    ChainBalanceBackfillAlreadyFinalized,
+    ChainBalanceBackfillNotFinalized,
+    ChainBalanceExceeded,
+    OnlyFailureStatusAllowed,
+    WrongCounterpart
+} from "../L1BridgeContractErrors.sol";
 import {ILegacyL1AssetTracker} from "../asset-tracker/ILegacyL1AssetTracker.sol";
 
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
+import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -75,6 +84,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @inheritdoc IL1NativeTokenVault
     mapping(bytes32 assetId => bool populated) public bridgedOutPopulated;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public chainTotalDeposited;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public chainTotalWithdrawn;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public chainBalanceBackfill;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => bool finalized) public chainBalanceBackfillFinalized;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -177,6 +198,48 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
                 populatedAmounts[i] = legacyAmount;
             }
             emit BridgedOutPopulated(assetIdToPopulate, legacyAmount);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Per-chain balance backfill
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IL1NativeTokenVault
+    function setChainBalanceBackfill(
+        uint256 _chainId,
+        bytes32[] calldata _assetIds,
+        uint256[] calldata _amounts
+    ) external onlyOwner {
+        require(!chainBalanceBackfillFinalized[_chainId], ChainBalanceBackfillAlreadyFinalized(_chainId));
+        uint256 assetIdsLength = _assetIds.length;
+        require(assetIdsLength == _amounts.length, ArrayLengthMismatch(assetIdsLength, _amounts.length));
+        for (uint256 i = 0; i < assetIdsLength; ++i) {
+            chainBalanceBackfill[_chainId][_assetIds[i]] = _amounts[i];
+            emit ChainBalanceBackfilled(_chainId, _assetIds[i], _amounts[i]);
+        }
+    }
+
+    /// @inheritdoc IL1NativeTokenVault
+    function finalizeChainBalanceBackfill(uint256 _chainId) external onlyOwner {
+        require(!chainBalanceBackfillFinalized[_chainId], ChainBalanceBackfillAlreadyFinalized(_chainId));
+        chainBalanceBackfillFinalized[_chainId] = true;
+        emit ChainBalanceBackfillFinalized(_chainId);
+    }
+
+    /// @inheritdoc IL1NativeTokenVault
+    function increaseChainBalanceBackfill(
+        uint256 _chainId,
+        bytes32[] calldata _assetIds,
+        uint256[] calldata _amounts
+    ) external onlyOwner {
+        require(chainBalanceBackfillFinalized[_chainId], ChainBalanceBackfillNotFinalized(_chainId));
+        uint256 assetIdsLength = _assetIds.length;
+        require(assetIdsLength == _amounts.length, ArrayLengthMismatch(assetIdsLength, _amounts.length));
+        for (uint256 i = 0; i < assetIdsLength; ++i) {
+            uint256 newBackfill = chainBalanceBackfill[_chainId][_assetIds[i]] + _amounts[i];
+            chainBalanceBackfill[_chainId][_assetIds[i]] = newBackfill;
+            emit ChainBalanceBackfilled(_chainId, _assetIds[i], newBackfill);
         }
     }
 
@@ -329,10 +392,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    /// @dev Records the outbound flow of L1-native tokens; see `bridgedOut`.
-    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
-        if (originChainId[_assetId] == block.chainid) {
+    /// @dev Records the outbound flow of L1-native tokens (see `bridgedOut`) and the chain's deposits.
+    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
+        uint256 assetOriginChainId = originChainId[_assetId];
+        if (assetOriginChainId == block.chainid) {
             bridgedOut[_assetId] += _amount;
+        }
+        if (assetOriginChainId != _chainId) {
+            chainTotalDeposited[_chainId][_assetId] += _amount;
         }
     }
 
@@ -341,11 +408,37 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// bridged representations of the asset were forged somewhere upstream, so such a transfer
     /// is blocked rather than recorded.
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
-        if (originChainId[_assetId] == block.chainid) {
+        uint256 assetOriginChainId = originChainId[_assetId];
+        if (assetOriginChainId == block.chainid) {
             if (bridgedOut[_assetId] < _amount) {
                 revert InsufficientChainBalance(_chainId, _assetId, _amount);
             }
             bridgedOut[_assetId] -= _amount;
         }
+        if (assetOriginChainId != _chainId) {
+            _recordChainWithdrawal(_chainId, _assetId, _amount);
+        }
+    }
+
+    /// @notice Records an amount leaving `_chainId` through this vault, capping it for chains without interop.
+    /// See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
+    /// @param _chainId The chain the amount leaves.
+    /// @param _assetId The asset being withdrawn.
+    /// @param _amount The amount being withdrawn.
+    function _recordChainWithdrawal(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        uint256 newWithdrawn = chainTotalWithdrawn[_chainId][_assetId] + _amount;
+        uint256 deposited = chainTotalDeposited[_chainId][_assetId];
+        uint256 backfill = chainBalanceBackfill[_chainId][_assetId];
+        // Written as two comparisons so that a backfill close to `type(uint256).max` cannot overflow.
+        // The message root is only read when the cap is exceeded, keeping the common path cheap.
+        if (newWithdrawn > deposited && newWithdrawn - deposited > backfill) {
+            IL1MessageRoot messageRoot = IL1MessageRoot(
+                address(IBridgehubBase(address(L1_NULLIFIER.BRIDGE_HUB())).messageRoot())
+            );
+            if (!messageRoot.isInteropEnabled(_chainId)) {
+                revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, deposited + backfill);
+            }
+        }
+        chainTotalWithdrawn[_chainId][_assetId] = newWithdrawn;
     }
 }

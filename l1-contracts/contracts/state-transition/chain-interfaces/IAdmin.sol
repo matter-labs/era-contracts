@@ -126,6 +126,8 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     function setPubdataContent(PubdataContent _pubdataContent) external;
 
     /// @notice Enables or disables one proof system for a ZKsync OS chain.
+    /// @dev Callable by the chain admin, except that disabling on a chain whose second proof system is
+    /// locked is reserved for the Bridgehub owner. See {protocol-docs/interop-gating.md#second-proof-system-lock}.
     /// @param _proofSystem Proof system to configure; only ProofSystem.Zisk is supported on ZKsync OS.
     /// @param _enabled Whether the selected proof system is enabled.
     function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external;
@@ -136,6 +138,11 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// and tries to set the DA validator pair to something which does not publish DA to Ethereum.
     /// @dev DANGEROUS: once activated, there is no way back!
     function makePermanentRollup() external;
+
+    /// @notice Permanently locks the chain's second proof system, a precondition for enabling interop.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-lock}.
+    /// @dev DANGEROUS: once activated, there is no way back!
+    function lockSecondProofSystem() external;
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(address indexed validatorAddress, bool isActive);
@@ -210,4 +217,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Emitted when Priority Mode is activated for the chain.
     event PriorityModeActivated();
+
+    /// @notice The chain permanently locked its second proof system.
+    event SecondProofSystemLocked();
 }
