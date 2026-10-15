@@ -1,0 +1,33 @@
+name: "Execute Deployer Safe Bundles"
+
+# Registration stub, same pattern as `generate-ecosystem-upgrade-calldata.yaml`
+# (#2264) and `deploy-ecosystem-upgrade.yaml` (#2358): `workflow_dispatch` only
+# lists workflows whose file exists on the DEFAULT branch, so the file has to be
+# here for the job to be dispatchable at all. The implementation, inputs
+# included, lives on the draft/release branches (e.g. draft/v0.35.0), and
+# differs between them. Dispatch it on the branch of the release you operate:
+#
+#   gh workflow run execute-deployer-safe-bundles.yaml --ref <draft-or-release-branch> -f ...
+#
+# This body only ever runs if someone dispatches it on `main`, where there is
+# nothing for it to do.
+#
+# The real workflow applies Safe bundles whose `target` is the ecosystem
+# deployer EOA (e.g. the chain-init workflow's), signed with the
+# per-environment deployer key.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Explain that the implementation lives on the draft branch
+        run: |
+          echo "This is the dispatch-registration stub on the default branch."
+          echo "Dispatch it with --ref <draft-or-release-branch> (e.g. draft/v0.35.0) to run it."
