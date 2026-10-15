@@ -10,6 +10,7 @@ import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
 import {
@@ -46,6 +47,7 @@ import {
     AtomicBundleToL1NotSupported,
     InteropPreviewHash,
     CannotInitiateInteropOnL1,
+    DestinationChainNotAllowed,
     DestinationChainNotRegistered,
     DirectCallToL1NotSupported,
     IndirectCallCannotCarryValue,
@@ -689,10 +691,15 @@ contract InteropCenter is
         return InteropDataEncoding.encodeInteropBundleHash(abi.encode(_bundle));
     }
 
-    /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.
+    /// @notice Returns the base token asset ID for the destination chain, which must be an allowed interop peer.
+    /// Override for pre-v31 chains.
     function _getDestinationBaseTokenAssetId(uint256 _destinationChainId) internal view virtual returns (bytes32) {
         bytes32 assetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         require(assetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
+        require(
+            IL2Bridgehub(address(L2_BRIDGEHUB)).isPeerAllowed(_destinationChainId),
+            DestinationChainNotAllowed(_destinationChainId)
+        );
         return assetId;
     }
 

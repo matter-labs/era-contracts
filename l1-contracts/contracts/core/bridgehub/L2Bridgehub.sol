@@ -39,6 +39,9 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
+    /// @inheritdoc IL2Bridgehub
+    mapping(uint256 chainId => bool) public isPeerAllowed;
+
     modifier onlyChainRegistrationSender() {
         if (
             /// Note on the L2 the chainRegistrationSender is aliased.
@@ -93,6 +96,12 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @param _baseTokenAssetId the base token asset id of the chain.
     function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+        baseTokenAssetId[_chainId] = _baseTokenAssetId;
+        isPeerAllowed[_chainId] = true;
     }
 
     /*//////////////////////////////////////////////////////////////

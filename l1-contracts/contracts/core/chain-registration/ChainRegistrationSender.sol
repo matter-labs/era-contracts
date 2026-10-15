@@ -21,14 +21,15 @@ import {
     ChainHasNoBatchesInMessageRoot,
     ChainNotSettlingOnL1,
     InteropNotEnabled,
+    InteropPeerAlreadyAllowed,
+    InteropPeerNotAllowed,
     InvalidInteropPeer,
     NoEthAllowed,
-    RegistrationRequiresConsent,
     ZKChainNotRegistered
 } from "../bridgehub/L1BridgehubErrors.sol";
 import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
-/// @dev The encoding version of `bridgehubDeposit` data that re-sends a pair's current whitelist state.
+/// @dev The encoding version of `bridgehubDeposit` data that re-sends the registration of an allowed pair.
 /// The retired version `0x01` registered any pair without consent.
 bytes1 constant CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION = 0x02;
 
@@ -74,33 +75,24 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IChainRegistrationSender
-    function registerChain(uint256, uint256) external pure {
-        revert RegistrationRequiresConsent();
-    }
-
-    /// @inheritdoc IChainRegistrationSender
-    function setInteropPeer(uint256 _chainId, uint256 _peerChainId, bool _allowed) external nonReentrant {
+    function allowInteropPeer(uint256 _chainId, uint256 _peerChainId) external nonReentrant {
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
         require(msg.sender == IGetters(zkChain).getAdmin(), Unauthorized(msg.sender));
         _checkPeerPair(_chainId, _peerChainId);
         require(BRIDGE_HUB.getZKChain(_peerChainId) != address(0), ZKChainNotRegistered());
+        require(!interopPeerAllowed[_chainId][_peerChainId], InteropPeerAlreadyAllowed(_chainId, _peerChainId));
         _checkSettlesOnL1(_chainId);
         _checkSettlesOnL1(_peerChainId);
-        if (_allowed) {
-            IL1MessageRoot messageRoot = IL1MessageRoot(address(BRIDGE_HUB.messageRoot()));
-            require(messageRoot.isInteropEnabled(_chainId), InteropNotEnabled(_chainId));
-            require(messageRoot.isInteropEnabled(_peerChainId), InteropNotEnabled(_peerChainId));
-        }
+        IL1MessageRoot messageRoot = IL1MessageRoot(address(BRIDGE_HUB.messageRoot()));
+        require(messageRoot.isInteropEnabled(_chainId), InteropNotEnabled(_chainId));
+        require(messageRoot.isInteropEnabled(_peerChainId), InteropNotEnabled(_peerChainId));
 
-        interopPeerAllowed[_chainId][_peerChainId] = _allowed;
-        emit InteropPeerSet(_chainId, _peerChainId, _allowed);
+        interopPeerAllowed[_chainId][_peerChainId] = true;
+        emit InteropPeerAllowed(_chainId, _peerChainId);
 
         // slither-disable-next-line unused-return
-        IMailbox(zkChain).requestL2ServiceTransaction(
-            L2_BRIDGEHUB_ADDR,
-            _allowed ? _getL2RegistrationCalldata(_peerChainId) : _getL2ClearCalldata(_peerChainId)
-        );
+        IMailbox(zkChain).requestL2ServiceTransaction(L2_BRIDGEHUB_ADDR, _getL2RegistrationCalldata(_peerChainId));
     }
 
     /// @inheritdoc IChainRegistrationSender
@@ -117,6 +109,10 @@ contract ChainRegistrationSender is
             uint256 chainRegisteredOn = _chainsRegisteredOn[i];
             uint256 chainToDeregister = _chainsToDeregister[i];
             _checkPeerPair(chainRegisteredOn, chainToDeregister);
+            require(
+                !interopPeerAllowed[chainRegisteredOn][chainToDeregister],
+                InteropPeerAlreadyAllowed(chainRegisteredOn, chainToDeregister)
+            );
             address zkChain = BRIDGE_HUB.getZKChain(chainRegisteredOn);
             require(zkChain != address(0), ZKChainNotRegistered());
 
@@ -127,7 +123,7 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IL1CrossChainSender
-    /// @dev Re-sends the current whitelist state of a pair via a normal deposit: anyone can trigger it
+    /// @dev Re-sends the registration of an allowed pair via a normal deposit: anyone can trigger it
     /// (via the Bridgehub), but the caller provides the base tokens.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
@@ -145,14 +141,15 @@ contract ChainRegistrationSender is
         }
 
         uint256 peerChainId = abi.decode(_data[1:], (uint256));
-        _checkPeerPair(_chainRegisteredOn, peerChainId);
+        require(
+            interopPeerAllowed[_chainRegisteredOn][peerChainId],
+            InteropPeerNotAllowed(_chainRegisteredOn, peerChainId)
+        );
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
             l2Contract: L2_BRIDGEHUB_ADDR,
-            l2Calldata: interopPeerAllowed[_chainRegisteredOn][peerChainId]
-                ? _getL2RegistrationCalldata(peerChainId)
-                : _getL2ClearCalldata(peerChainId),
+            l2Calldata: _getL2RegistrationCalldata(peerChainId),
             factoryDeps: new bytes[](0),
             // `txDataHash` exists so token bridges can recover funds after a failed L2 leg; nothing
             // to recover here, so `bytes32(0)` is fine.
@@ -160,7 +157,7 @@ contract ChainRegistrationSender is
         });
     }
 
-    /// @notice Returns the L2 Bridgehub calldata registering `_peerChainId` for interop.
+    /// @notice Returns the L2 Bridgehub calldata allowing interop with `_peerChainId`.
     /// @dev Also enforces the atomic-interop timeout precondition: the peer must already have at least
     /// one batch inside this layer's message root. See {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
     /// @param _peerChainId The chain to register.
@@ -172,7 +169,7 @@ contract ChainRegistrationSender is
         if (BRIDGE_HUB.messageRoot().chainTreeLeafCount(_peerChainId) == 0) {
             revert ChainHasNoBatchesInMessageRoot(_peerChainId);
         }
-        return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (_peerChainId, baseTokenAssetId));
+        return abi.encodeCall(IL2Bridgehub.allowInteropPeer, (_peerChainId, baseTokenAssetId));
     }
 
     /// @notice Returns the L2 Bridgehub calldata removing `_peerChainId` from the chains known for interop.

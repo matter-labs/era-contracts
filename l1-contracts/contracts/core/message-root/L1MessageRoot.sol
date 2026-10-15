@@ -44,7 +44,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     mapping(uint256 chainId => uint256 batchNumber) public v31UpgradeChainBatchNumber;
 
     /// @notice Whether governance enabled interop for the chain. See {protocol-docs/interop-gating.md}.
-    mapping(uint256 chainId => bool enabled) public interopEnabled;
+    mapping(uint256 chainId => bool enabled) internal interopEnabled;
 
     /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
@@ -66,19 +66,19 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
 
-    /// @notice Enables interop for a chain. One-way: there is no way to disable it.
-    /// See {protocol-docs/interop-gating.md#enabling-interop}.
-    /// @param _chainId The chain to enable interop for.
-    function enableInterop(uint256 _chainId) external {
+    /// @inheritdoc IL1MessageRoot
+    function enableInterop(uint256 _chainId, bool _requireSecondProofSystem) external {
         require(msg.sender == IOwnable(BRIDGE_HUB).owner(), Unauthorized(msg.sender));
         address zkChain = IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
         uint256 settlementLayer = IBridgehubBase(BRIDGE_HUB).settlementLayer(_chainId);
         require(settlementLayer == block.chainid, ChainNotSettlingOnL1(_chainId, settlementLayer));
         require(!interopEnabled[_chainId], InteropAlreadyEnabled(_chainId));
-        require(IGetters(zkChain).isSecondProofSystemLocked(), SecondProofSystemNotLocked(_chainId));
-        uint256 proofMode = IGetters(zkChain).getProofMode();
-        require(proofMode == ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE, NotMultiProofMode(proofMode));
+        if (_requireSecondProofSystem) {
+            require(IGetters(zkChain).isSecondProofSystemLocked(), SecondProofSystemNotLocked(_chainId));
+            uint256 proofMode = IGetters(zkChain).getProofMode();
+            require(proofMode == ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE, NotMultiProofMode(proofMode));
+        }
 
         interopEnabled[_chainId] = true;
         emit InteropEnabled(_chainId);

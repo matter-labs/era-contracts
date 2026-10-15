@@ -17,8 +17,9 @@ import {
     ChainHasNoBatchesInMessageRoot,
     ChainNotSettlingOnL1,
     InteropNotEnabled,
+    InteropPeerAlreadyAllowed,
+    InteropPeerNotAllowed,
     InvalidInteropPeer,
-    RegistrationRequiresConsent,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
@@ -48,7 +49,7 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
     function _registrationCalldata(uint256 _peerChainId) internal view returns (bytes memory) {
         return
             abi.encodeCall(
-                IL2Bridgehub.registerChainForInterop,
+                IL2Bridgehub.allowInteropPeer,
                 (_peerChainId, addresses.bridgehub.baseTokenAssetId(_peerChainId))
             );
     }
@@ -57,65 +58,51 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (_peerChainId, bytes32(0)));
     }
 
-    function _setInteropPeer(bool _allowed) internal returns (Vm.Log[] memory logs) {
+    function _allowInteropPeer() internal returns (Vm.Log[] memory logs) {
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
-        emit IChainRegistrationSender.InteropPeerSet(chainId, peerChainId, _allowed);
+        emit IChainRegistrationSender.InteropPeerAllowed(chainId, peerChainId);
         vm.recordLogs();
         vm.prank(chainAdmin);
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, _allowed);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
         logs = vm.getRecordedLogs();
-        assertEq(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId), _allowed);
-    }
-
-    /// @notice Consent-free registration is retired.
-    function test_registerChain_reverts() public {
-        vm.expectRevert(RegistrationRequiresConsent.selector);
-        addresses.chainRegistrationSender.registerChain(peerChainId, chainId);
+        assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
     }
 
     /// @notice Allowing a peer queues a service transaction registering it on the chain's L2 Bridgehub, and
     /// only on that chain: the peer's own L2 Bridgehub is written only once the peer's admin consents too.
-    function test_setInteropPeer_allow_registersPeer() public {
+    function test_allowInteropPeer_registersPeer() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         uint256 peerPriorityTxs = IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs();
 
-        Vm.Log[] memory logs = _setInteropPeer(true);
+        Vm.Log[] memory logs = _allowInteropPeer();
 
         assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
         assertEq(IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs(), peerPriorityTxs);
         assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(peerChainId, chainId));
     }
 
-    /// @notice Revoking clears the peer on the chain's L2 Bridgehub, and needs neither chain to have interop.
-    function test_setInteropPeer_revoke_clearsPeer() public {
+    /// @notice Allowing is one-way, so a second call has nothing to do.
+    function test_allowInteropPeer_revertWhen_alreadyAllowed() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
-        _setInteropPeer(true);
+        _allowInteropPeer();
 
-        Vm.Log[] memory logs = _setInteropPeer(false);
-
-        assertEq(_priorityTxCalldata(logs, chainId), _clearCalldata(peerChainId));
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InteropPeerAlreadyAllowed.selector, chainId, peerChainId));
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
-    function test_setInteropPeer_revoke_withoutInterop() public {
-        assertFalse(messageRoot.isInteropEnabled(chainId));
-
-        Vm.Log[] memory logs = _setInteropPeer(false);
-
-        assertEq(_priorityTxCalldata(logs, chainId), _clearCalldata(peerChainId));
-    }
-
-    function test_setInteropPeer_revertWhen_notChainAdmin() public {
+    function test_allowInteropPeer_revertWhen_notChainAdmin() public {
         address notAdmin = makeAddr("notAdmin");
         vm.prank(notAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAdmin));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, false);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
     /// @notice The admin of the peer cannot write the chain's whitelist. The harness deploys both chains
     /// with the same admin, so the peer gets its own admin first.
-    function test_setInteropPeer_revertWhen_peerAdmin() public {
+    function test_allowInteropPeer_revertWhen_peerAdmin() public {
         address peer = getZKChainAddress(peerChainId);
         address peerAdmin = makeAddr("peerAdmin");
         vm.prank(chainAdmin);
@@ -126,67 +113,67 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
 
         vm.prank(peerAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, peerAdmin));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, false);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
-    function test_setInteropPeer_revertWhen_chainNotRegistered() public {
+    function test_allowInteropPeer_revertWhen_chainNotRegistered() public {
         vm.expectRevert(ZKChainNotRegistered.selector);
-        addresses.chainRegistrationSender.setInteropPeer(UNREGISTERED_CHAIN_ID, peerChainId, false);
+        addresses.chainRegistrationSender.allowInteropPeer(UNREGISTERED_CHAIN_ID, peerChainId);
     }
 
-    function test_setInteropPeer_revertWhen_peerNotRegistered() public {
+    function test_allowInteropPeer_revertWhen_peerNotRegistered() public {
         vm.prank(chainAdmin);
         vm.expectRevert(ZKChainNotRegistered.selector);
-        addresses.chainRegistrationSender.setInteropPeer(chainId, UNREGISTERED_CHAIN_ID, false);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, UNREGISTERED_CHAIN_ID);
     }
 
-    function test_setInteropPeer_revertWhen_peerIsSelf() public {
+    function test_allowInteropPeer_revertWhen_peerIsSelf() public {
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, chainId, chainId));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, chainId, false);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, chainId);
     }
 
-    function test_setInteropPeer_revertWhen_peerIsL1() public {
+    function test_allowInteropPeer_revertWhen_peerIsL1() public {
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, chainId, block.chainid));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, block.chainid, false);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, block.chainid);
     }
 
-    function test_setInteropPeer_revertWhen_chainNotEnabled() public {
+    function test_allowInteropPeer_revertWhen_chainNotEnabled() public {
         _enableInterop(peerChainId);
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(InteropNotEnabled.selector, chainId));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, true);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
-    function test_setInteropPeer_revertWhen_peerNotEnabled() public {
+    function test_allowInteropPeer_revertWhen_peerNotEnabled() public {
         _enableInterop(chainId);
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(InteropNotEnabled.selector, peerChainId));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, true);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
-    /// @notice Revoking is rejected too while one of the chains settles elsewhere. The settlement layer is
-    /// mocked to isolate this check from the separately-tested migration machinery.
-    function test_setInteropPeer_revertWhen_chainNotSettlingOnL1() public {
+    /// @notice The settlement layer is mocked to isolate this check from the separately-tested migration
+    /// machinery.
+    function test_allowInteropPeer_revertWhen_chainNotSettlingOnL1() public {
         _mockSettlementLayer(chainId, GATEWAY_CHAIN_ID);
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, chainId, GATEWAY_CHAIN_ID));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, false);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
-    /// @dev See `test_setInteropPeer_revertWhen_chainNotSettlingOnL1` for why the settlement layer is mocked.
-    function test_setInteropPeer_revertWhen_peerNotSettlingOnL1() public {
+    /// @dev See `test_allowInteropPeer_revertWhen_chainNotSettlingOnL1` for why the settlement layer is mocked.
+    function test_allowInteropPeer_revertWhen_peerNotSettlingOnL1() public {
         _mockSettlementLayer(peerChainId, GATEWAY_CHAIN_ID);
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, peerChainId, GATEWAY_CHAIN_ID));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, false);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
     /// @notice A peer with an empty tree in the MessageRoot cannot be registered (see
     /// {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}). Fresh chains have a
     /// seeded genesis leaf; this test mocks the invalid empty-tree state.
-    function test_setInteropPeer_revertWhen_peerHasNoBatchesInMessageRoot() public {
+    function test_allowInteropPeer_revertWhen_peerHasNoBatchesInMessageRoot() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         vm.mockCall(
@@ -197,21 +184,7 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
 
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(ChainHasNoBatchesInMessageRoot.selector, peerChainId));
-        addresses.chainRegistrationSender.setInteropPeer(chainId, peerChainId, true);
-    }
-
-    /// @notice The empty-tree check guards registrations only: clearing a peer never needs its batches.
-    /// See `test_setInteropPeer_revertWhen_peerHasNoBatchesInMessageRoot` for why the leaf count is mocked.
-    function test_setInteropPeer_revoke_ignoresEmptyMessageRootTree() public {
-        vm.mockCall(
-            address(messageRoot),
-            abi.encodeWithSelector(IMessageRootBase.chainTreeLeafCount.selector, peerChainId),
-            abi.encode(uint256(0))
-        );
-
-        Vm.Log[] memory logs = _setInteropPeer(false);
-
-        assertEq(_priorityTxCalldata(logs, chainId), _clearCalldata(peerChainId));
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
     function test_deregisterLegacyPairs_clearsEveryPair() public {
@@ -231,6 +204,20 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
 
         assertEq(_priorityTxCalldata(logs, chainId), _clearCalldata(peerChainId));
         assertEq(_priorityTxCalldata(logs, peerChainId), _clearCalldata(chainId));
+    }
+
+    /// @notice Deregistration only cleans up legacy pairs: an allowed pair stays registered.
+    function test_deregisterLegacyPairs_revertWhen_pairAllowed() public {
+        _enableInterop(chainId);
+        _enableInterop(peerChainId);
+        _allowInteropPeer();
+        uint256[] memory chainsRegisteredOn = new uint256[](1);
+        uint256[] memory chainsToDeregister = new uint256[](1);
+        (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
+
+        vm.prank(addresses.chainRegistrationSender.owner());
+        vm.expectRevert(abi.encodeWithSelector(InteropPeerAlreadyAllowed.selector, chainId, peerChainId));
+        addresses.chainRegistrationSender.deregisterLegacyPairs(chainsRegisteredOn, chainsToDeregister);
     }
 
     function test_deregisterLegacyPairs_revertWhen_notOwner() public {
@@ -281,7 +268,7 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
     function test_resubmission_allowedPeer_registersPeer() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
-        _setInteropPeer(true);
+        _allowInteropPeer();
 
         Vm.Log[] memory logs = _resubmit(
             bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(peerChainId))
@@ -290,33 +277,11 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
     }
 
-    /// @notice A resubmission for a pair that was never allowed, or was revoked, clears the peer.
-    function test_resubmission_disallowedPeer_clearsPeer() public {
-        Vm.Log[] memory logs = _resubmit(
-            bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(peerChainId))
+    function test_resubmission_revertWhen_peerNotAllowed() public {
+        _expectResubmissionRevert(
+            bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(peerChainId)),
+            abi.encodeWithSelector(InteropPeerNotAllowed.selector, chainId, peerChainId)
         );
-
-        assertEq(_priorityTxCalldata(logs, chainId), _clearCalldata(peerChainId));
-    }
-
-    /// @notice A resubmission queued before a newer decision is processed first on L2, so the pair ends in the
-    /// newer state; a later resubmission re-sends that state.
-    function test_resubmission_staleThenNewerDecision_endsInNewerState() public {
-        _enableInterop(chainId);
-        _enableInterop(peerChainId);
-        _setInteropPeer(true);
-        bytes memory resubmission = bytes.concat(
-            CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION,
-            abi.encode(peerChainId)
-        );
-
-        (uint256 staleTxId, bytes memory staleCalldata) = _priorityTx(_resubmit(resubmission), chainId);
-        (uint256 revokeTxId, bytes memory revokeCalldata) = _priorityTx(_setInteropPeer(false), chainId);
-
-        assertEq(staleCalldata, _registrationCalldata(peerChainId));
-        assertEq(revokeCalldata, _clearCalldata(peerChainId));
-        assertGt(revokeTxId, staleTxId, "the newer decision is processed last");
-        assertEq(_priorityTxCalldata(_resubmit(resubmission), chainId), _clearCalldata(peerChainId));
     }
 
     /// @notice The retired consent-free encoding is rejected.
@@ -330,7 +295,7 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
     function test_resubmission_revertWhen_peerIsSelf() public {
         _expectResubmissionRevert(
             bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(chainId)),
-            abi.encodeWithSelector(InvalidInteropPeer.selector, chainId, chainId)
+            abi.encodeWithSelector(InteropPeerNotAllowed.selector, chainId, chainId)
         );
     }
 

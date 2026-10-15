@@ -6,7 +6,8 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
+import {DestinationChainNotAllowed, DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
+import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -47,6 +48,32 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
 
         // Attempt to send the bundle - should revert with DestinationChainNotRegistered
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
+        L2_INTEROP_CENTER.sendBundle(
+            InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
+            calls,
+            _withAtomicBundle(bundleAttributes)
+        );
+    }
+
+    /// @notice A chain registered without being allowed, as the retired consent-free registration did,
+    /// can't be sent to.
+    function test_sendToRegisteredButNotAllowedChainReverts() public {
+        bytes32 legacyBaseTokenAssetId = bytes32(uint256(0xABCDEF));
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.registerChainForInterop(UNREGISTERED_CHAIN_ID, legacyBaseTokenAssetId);
+        assertEq(l2Bridgehub.baseTokenAssetId(UNREGISTERED_CHAIN_ID), legacyBaseTokenAssetId);
+        assertFalse(l2Bridgehub.isPeerAllowed(UNREGISTERED_CHAIN_ID));
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(makeAddr("someTarget")),
+            data: hex"1234",
+            callAttributes: new bytes[](0)
+        });
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
+
+        vm.expectRevert(abi.encodeWithSelector(DestinationChainNotAllowed.selector, UNREGISTERED_CHAIN_ID));
         L2_INTEROP_CENTER.sendBundle(
             InteroperableAddress.formatEvmV1(UNREGISTERED_CHAIN_ID),
             calls,

@@ -39,11 +39,26 @@ contract EnableInteropTest is InteropGatingDeployer {
         vm.expectEmit(true, true, true, true, address(messageRoot));
         emit IL1MessageRoot.InteropEnabled(chainId);
         vm.prank(governance);
-        messageRoot.enableInterop(chainId);
+        messageRoot.enableInterop(chainId, true);
 
-        assertTrue(messageRoot.interopEnabled(chainId));
         assertTrue(messageRoot.isInteropEnabled(chainId));
         assertFalse(messageRoot.isInteropEnabled(zkChainIds[1]), "other chains stay disabled");
+    }
+
+    /// @notice Governance may enable a chain it trusts for reasons checked offchain: without the flag, a chain
+    /// that neither locked its second proof system nor runs in multi-proof mode is enabled.
+    function test_enableInterop_withoutSecondProofSystem() public {
+        vm.prank(_chainAdmin(chainId));
+        IAdmin(chain).setProofSystemStatus(ProofSystem.Zisk, false);
+
+        vm.expectEmit(true, true, true, true, address(messageRoot));
+        emit IL1MessageRoot.InteropEnabled(chainId);
+        vm.prank(governance);
+        messageRoot.enableInterop(chainId, false);
+
+        assertTrue(messageRoot.isInteropEnabled(chainId));
+        assertFalse(IGetters(chain).isSecondProofSystemLocked(), "the chain stays unlocked");
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_PLONK_VERIFICATION_TYPE, "the chain stays single-proof");
     }
 
     /// @notice Enabling is one-way: a later emergency ZiSK-off leaves the chain enabled, and it can't be
@@ -56,7 +71,7 @@ contract EnableInteropTest is InteropGatingDeployer {
 
         vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(InteropAlreadyEnabled.selector, chainId));
-        messageRoot.enableInterop(chainId);
+        messageRoot.enableInterop(chainId, false);
     }
 
     function test_enableInterop_revertWhen_notGovernance() public {
@@ -124,6 +139,16 @@ contract EnableInteropTest is InteropGatingDeployer {
         _expectEnableInteropRevert(governance, chainId, bytes("F"));
     }
 
+    /// @dev Without the flag the getter missing on an old diamond is never read, so such a chain can be enabled.
+    function test_enableInterop_withoutSecondProofSystem_oldDiamond() public {
+        vm.mockCallRevert(chain, abi.encodeCall(IGetters.isSecondProofSystemLocked, ()), bytes("F"));
+
+        vm.prank(governance);
+        messageRoot.enableInterop(chainId, false);
+
+        assertTrue(messageRoot.isInteropEnabled(chainId));
+    }
+
     function testFuzz_isInteropEnabled_unknownChain(uint256 _chainId) public view {
         vm.assume(_chainId != chainId && _chainId != zkChainIds[1]);
         assertFalse(messageRoot.isInteropEnabled(_chainId));
@@ -132,7 +157,7 @@ contract EnableInteropTest is InteropGatingDeployer {
     function _expectEnableInteropRevert(address _caller, uint256 _chainId, bytes memory _revertData) internal {
         vm.prank(_caller);
         vm.expectRevert(_revertData);
-        messageRoot.enableInterop(_chainId);
+        messageRoot.enableInterop(_chainId, true);
         assertFalse(messageRoot.isInteropEnabled(_chainId));
     }
 
