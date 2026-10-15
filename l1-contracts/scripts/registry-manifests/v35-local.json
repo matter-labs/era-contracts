@@ -15,7 +15,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x9d3e2A1815d9EDd609a546818B3ccEce93f1681e",
+      "ctmProxy": "0x6D6d3a4454BBD3EB5Aa3Ee73e7C0695bF9977628",
       "release": {
         "diamondInit": {
           "address": "0x12Bcb546bC60fF39F1Adfc7cE4605d5Bd6a6A876"
@@ -80,14 +80,14 @@
         "l2SystemProxyBytecodeInfo": "0xd2d320093ea21ac35cff65bd1601515035b29624030b0eb11caba684d45fa4560000000000000000000000000000000000000000000000000000000000000e0ee61ea0282a915e938986905a27354508baffb74332a1d66eefe823b228fcc0fb",
         "genesis": {
           "genesisUpgrade": {
-            "address": "0x40c4eeF3Bf878080B835a355827881069fD3A417"
+            "address": "0x1ef6c6D335634E197359797bF7F9BcF8Ac829204"
           },
           "batchHash": "0x0000000000000000000000000000000000000000000000000000000000000001",
           "indexRepeatedStorageChanges": 54
         }
       },
       "transition": {
-        "fromRelease": "0x2013F415CD12CCC676D8e95A3E937EF3D5d3726E",
+        "fromRelease": "0x723F570f91cfdbA1E961644A90e840aBcDC4bc36",
         "upgradeEngine": {
           "address": "0xeF31027350Be2c7439C1b0BE022d49421488b72C"
         },
