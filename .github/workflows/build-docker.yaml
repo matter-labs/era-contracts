@@ -66,7 +66,7 @@ jobs:
             echo "::error::An image is released only for a ref that passed zksync-os-integration-tests: set tested_with_integration_tests."
             exit 1
           fi
-          if [[ ! "$RUN_URL" =~ ^https://github\.com/matter-labs/zksync-os-integration-tests/actions/runs/[0-9]+(/.*)?$ ]]; then
+          if [[ ! "$RUN_URL" =~ ^https://github\.com/matter-labs/zksync-os-integration-tests/actions/runs/[0-9]+(/[^[:space:]]*)?$ ]]; then
             echo "::error::integration_tests_run_url must be a run of matter-labs/zksync-os-integration-tests, got '$RUN_URL'."
             exit 1
           fi

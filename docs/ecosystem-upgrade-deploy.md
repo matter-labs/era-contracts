@@ -285,7 +285,7 @@ EXTRA_MOUNTS="$PWD/deploy-result:/contracts/deploy-result" \
   --transactions-log /contracts/deploy-result/transactions.txt \
   --reference-transactions-log "$OUT/transactions.txt" \
   --l1-rpc-url <l1-rpc> --gw-rpc-url <l1-rpc> \
-  --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
+  --zk-governance-commit "$(jq -r .zk_governance_commit "$OUT/deploy-bundle/bundle-metadata.json")"
 ```
 
 `--transactions-log` is salt-gated, so it must be this deployment's own journal.
