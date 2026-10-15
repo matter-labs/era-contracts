@@ -1260,6 +1260,22 @@
   },
   {
     "type": "error",
+    "name": "ChainBalanceBackfillAlreadySet",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ChainBalanceBackfillNotSet",
     "inputs": [
       {
@@ -1342,27 +1358,6 @@
     "inputs": [
       {
         "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InteropPoolBalanceExceeded",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "totalWithdrawn",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "totalDeposited",
         "type": "uint256",
         "internalType": "uint256"
       }
