@@ -206,21 +206,31 @@
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "set",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "chainBalanceBackfillFinalized",
+    "name": "chainBalanceInInteropPool",
     "inputs": [
       {
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -301,19 +311,6 @@
   },
   {
     "type": "function",
-    "name": "finalizeChainBalanceBackfill",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "getERC20Getters",
     "inputs": [
       {
@@ -338,26 +335,41 @@
   },
   {
     "type": "function",
-    "name": "increaseChainBalanceBackfill",
+    "name": "interopPoolTotalDeposited",
     "inputs": [
       {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_assetIds",
-        "type": "bytes32[]",
-        "internalType": "bytes32[]"
-      },
-      {
-        "name": "_amounts",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "interopPoolTotalWithdrawn",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -390,6 +402,24 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "moveChainBalanceToInteropPool",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -580,19 +610,6 @@
   },
   {
     "type": "event",
-    "name": "ChainBalanceBackfillFinalized",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "ChainBalanceBackfilled",
     "inputs": [
       {
@@ -609,6 +626,37 @@
       },
       {
         "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ChainBalanceMovedToInteropPool",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "deposited",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "withdrawn",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
