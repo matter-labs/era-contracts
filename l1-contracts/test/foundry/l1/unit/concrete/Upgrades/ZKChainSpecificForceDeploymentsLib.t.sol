@@ -149,39 +149,29 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         assertEq(chainData.baseTokenL1Address, address(token));
         assertEq(chainData.baseTokenMetadata.name, "Test Token");
         assertEq(chainData.baseTokenMetadata.symbol, "TTK");
-        // Not the token's own 6: a conforming 32-byte `decimals()` answer is filtered by the
-        // `bytes32` guard the probes share, so the ERC20 default stands for every token.
+        // Not the token's own 6: every base token gets 18, which is what every live chain has.
         assertEq(chainData.baseTokenMetadata.decimals, 18);
     }
 
-    /// @dev Tolerance, not leniency for its own sake: a chain may be created on a token that serves
-    ///      no metadata, and every later upgrade recomposes these same values.
-    function test_baseTokenWithoutMetadataFallsBackToTheDefaults() public {
+    /// @dev Typed reads: a token that serves no metadata fails the build instead of getting defaults.
+    function test_revertWhen_baseTokenHasNoMetadata() public {
         MockERC20TokenWithoutMetadata token = new MockERC20TokenWithoutMetadata();
         _setBaseToken(address(token), address(token));
 
-        ZKChainSpecificForceDeploymentsData memory chainData = _build();
-
-        assertEq(chainData.baseTokenL1Address, address(token));
-        assertEq(chainData.baseTokenMetadata.name, "Base Token");
-        assertEq(chainData.baseTokenMetadata.symbol, "BT");
-        assertEq(chainData.baseTokenMetadata.decimals, 18);
+        vm.expectRevert();
+        lib.build(bridgehubMock, CHAIN_ID);
     }
 
-    /// @dev A `bytes32`-returning (Maker-style) token is treated as having no string metadata.
-    function test_baseTokenReturningBytes32MetadataFallsBackToTheDefaults() public {
+    /// @dev A `bytes32`-returning (Maker-style) token does not decode as a `string`.
+    function test_revertWhen_baseTokenReturnsBytes32Metadata() public {
         MockERC20TokenWithBytes32Metadata token = new MockERC20TokenWithBytes32Metadata(
             bytes32("Maker"),
             bytes32("MKR")
         );
         _setBaseToken(address(token), address(token));
 
-        ZKChainSpecificForceDeploymentsData memory chainData = _build();
-
-        assertEq(chainData.baseTokenL1Address, address(token));
-        assertEq(chainData.baseTokenMetadata.name, "Base Token");
-        assertEq(chainData.baseTokenMetadata.symbol, "BT");
-        assertEq(chainData.baseTokenMetadata.decimals, 18);
+        vm.expectRevert();
+        lib.build(bridgehubMock, CHAIN_ID);
     }
 
     // ─────────────────────────── the base token's recorded address ───────────────────────────

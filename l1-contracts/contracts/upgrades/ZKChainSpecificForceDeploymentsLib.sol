@@ -53,92 +53,23 @@ library ZKChainSpecificForceDeploymentsLib {
             );
     }
 
-    /// @notice The base token's name, symbol and decimals, with the ERC20 defaults substituted for
-    ///         a token that serves no usable metadata.
-    /// @dev Tolerant by design: a chain may be created on a base token without metadata, and the
-    ///      same values are recomposed on every later upgrade (`L2NativeTokenVault.updateL2`
-    ///      rewrites them), so a strict read would make such a chain upgradeable only by first
-    ///      changing its base token.
-    function _baseTokenMetadata(address _baseTokenAddress) private view returns (TokenMetadata memory tokenData) {
+    /// @notice The base token's name, symbol and decimals.
+    /// @dev Typed reads: a base token without `name()`/`symbol()`, or answering them with a
+    ///      Maker-style `bytes32`, reverts the chain's genesis and every upgrade composed for it:
+    ///      such a chain can be neither created nor upgraded.
+    /// @dev `decimals` is 18 for every base token. The probe this read replaced filtered out
+    ///      every conforming `decimals()` answer, so every chain created so far has 18 in its L2
+    ///      vault, and `L2NativeTokenVault.updateL2` rewrites the value on every upgrade: reading
+    ///      the token's own would redenominate a live chain's base token.
+    function _baseTokenMetadata(address _baseTokenAddress) private view returns (TokenMetadata memory) {
         if (_baseTokenAddress == ETH_TOKEN_ADDRESS) {
             return TokenMetadata({name: string("Ether"), symbol: string("ETH"), decimals: 18});
         }
-
-        (string memory stringResult, bool success) = _safeCallTokenMetadataString(
-            _baseTokenAddress,
-            abi.encodeCall(IERC20Metadata.name, ())
-        );
-        tokenData.name = success ? stringResult : string("Base Token");
-
-        (stringResult, success) = _safeCallTokenMetadataString(
-            _baseTokenAddress,
-            abi.encodeCall(IERC20Metadata.symbol, ())
-        );
-        // "BT" is an acronym for "Base Token"
-        tokenData.symbol = success ? stringResult : string("BT");
-
-        // A conforming `decimals()` answers with exactly 32 bytes, which the `bytes32` guard below
-        // filters out, so a conforming token lands on the ERC20 default of 18 and the probe only
-        // ever bites on a token answering with some other width. That is what every chain created
-        // so far has in its L2 vault, and `L2NativeTokenVault.updateL2` rewrites these values on
-        // every upgrade — reading the real value here would silently redenominate a live chain's
-        // base token, so it is deliberately left as is rather than "fixed" in passing.
-        (uint256 uintResult, bool decimalsSuccess) = _safeCallTokenMetadataUint256(
-            _baseTokenAddress,
-            abi.encodeCall(IERC20Metadata.decimals, ())
-        );
-        tokenData.decimals = decimalsSuccess ? uintResult : 18;
-    }
-
-    /// @notice Calls a token's metadata method.
-    /// @dev For the sake of simplicity, we expect that either of the
-    /// following is true:
-    /// 1. The token does not support metadata methods
-    /// 2. The token supports it and returns a `bytes32` string there.
-    /// 3. The token supports it and returns a correct `string` as a returndata.
-    ///
-    /// For all other cases, this function will panic and so such chains would not be
-    /// deployable.
-    /// @dev The `staticcall` the repository otherwise forbids is the mechanism itself here: it is
-    /// what distinguishes "this token serves no metadata" from a genuine failure, and there is no
-    /// typed call that can express the `bytes32`-returning (Maker-style) token.
-    function _safeCallTokenMetadataBytes(address _token, bytes memory _data) private view returns (bytes memory, bool) {
-        // We are not afraid if token returns large calldata, since it affects
-        // only the deployment of the chain that uses such a malicious token.
-        (bool callSuccess, bytes memory returnData) = _token.staticcall(_data);
-
-        // The failed call most likely means that this method is not supported.
-        if (!callSuccess) {
-            return ("", false);
-        }
-
-        // This case covers non-standard tokens, such as Maker (MKR), that return `bytes32` instead of `string`
-        if (returnData.length == 32) {
-            return ("", false);
-        }
-
-        return (returnData, true);
-    }
-
-    function _safeCallTokenMetadataString(
-        address _token,
-        bytes memory _data
-    ) private view returns (string memory, bool) {
-        (bytes memory returnData, bool success) = _safeCallTokenMetadataBytes(_token, _data);
-        if (!success) {
-            return ("", false);
-        }
-
-        // Note, that the following line will panic in case the token has more non-standard behavior.
-        return (abi.decode(returnData, (string)), true);
-    }
-
-    function _safeCallTokenMetadataUint256(address _token, bytes memory _data) private view returns (uint256, bool) {
-        (bytes memory returnData, bool success) = _safeCallTokenMetadataBytes(_token, _data);
-        if (!success) {
-            return (0, false);
-        }
-
-        return (abi.decode(returnData, (uint256)), true);
+        return
+            TokenMetadata({
+                name: IERC20Metadata(_baseTokenAddress).name(),
+                symbol: IERC20Metadata(_baseTokenAddress).symbol(),
+                decimals: 18
+            });
     }
 }

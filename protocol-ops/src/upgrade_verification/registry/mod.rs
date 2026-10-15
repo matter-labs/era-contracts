@@ -101,6 +101,7 @@ pub(crate) async fn verify(
     let identity = CodeIdentity::from_local_hashes()?;
     let build = ReviewedBuild::load(&identity);
     let genesis_root = genesis::reviewed_genesis_root();
+    let genesis_image = genesis::reviewed_genesis_image();
 
     let mut package = RegistryPackage::load(ecosystem_toml)?;
     let held = match &mut package {
@@ -132,6 +133,7 @@ pub(crate) async fn verify(
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
+                image: genesis_image,
                 force_deployments_data: package.force_deployments_data.clone(),
                 force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };
@@ -152,6 +154,7 @@ pub(crate) async fn verify(
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
+                image: genesis_image,
                 force_deployments_data: package.force_deployments_data.clone(),
                 force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };

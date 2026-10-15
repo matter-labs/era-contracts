@@ -75,8 +75,8 @@ abstract contract RegistryObjectsFixture is Test {
     address internal ctmDeployerStub = makeAddr("ctmDeployer");
     address internal erc20OriginToken = makeAddr("erc20OriginToken");
     TestnetERC20Token internal erc20LocalToken;
-    /// @dev Base tokens the metadata probe must tolerate rather than revert on — a chain may be
-    ///      created on either, and every later upgrade recomposes the same data for it.
+    /// @dev Base tokens without usable metadata: composing for a chain based on either reverts
+    ///      (see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`).
     NoMetadataToken internal noMetadataToken;
     Bytes32MetadataToken internal bytes32MetadataToken;
 
@@ -101,15 +101,11 @@ abstract contract RegistryObjectsFixture is Test {
     bytes32 internal constant ERC20_BASE_TOKEN_ASSET_ID = keccak256("erc20BaseTokenAssetId");
     bytes32 internal constant NO_METADATA_BASE_TOKEN_ASSET_ID = keccak256("noMetadataBaseTokenAssetId");
     bytes32 internal constant BYTES32_METADATA_BASE_TOKEN_ASSET_ID = keccak256("bytes32MetadataBaseTokenAssetId");
-    /// @dev What the probe substitutes for a token it cannot read a string out of.
-    string internal constant DEFAULT_BASE_TOKEN_NAME = "Base Token";
-    string internal constant DEFAULT_BASE_TOKEN_SYMBOL = "BT";
     string internal constant ERC20_NAME = "Local Token";
     string internal constant ERC20_SYMBOL = "LOC";
     uint256 internal constant ERC20_DECIMALS = 6;
-    /// @dev What the composition actually records for any token: the tolerant metadata probe
-    ///      filters a conforming 32-byte `decimals()` answer, so the ERC20 default stands — see
-    ///      `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
+    /// @dev What the composition records for every base token, whatever its `decimals()` answers —
+    ///      see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
     uint256 internal constant COMPOSED_DECIMALS = 18;
 
     function _setUpRegistryObjects(bytes memory _fixedDelegateCalldata) internal {
@@ -384,7 +380,7 @@ abstract contract RegistryObjectsFixture is Test {
         // ERC20 chain is a different contract from its origin token.
         address localToken;
         address originToken;
-        uint256 originChainId = block.chainid;
+        uint256 originChainId;
         bytes32 assetId;
         TokenMetadata memory metadata;
         if (_chainId == ETH_CHAIN_ID) {
@@ -403,28 +399,6 @@ abstract contract RegistryObjectsFixture is Test {
                 ERC20_BASE_TOKEN_ASSET_ID
             );
             metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: COMPOSED_DECIMALS});
-        } else if (_chainId == NO_METADATA_CHAIN_ID) {
-            (localToken, originToken, assetId) = (
-                address(noMetadataToken),
-                address(noMetadataToken),
-                NO_METADATA_BASE_TOKEN_ASSET_ID
-            );
-            metadata = TokenMetadata({
-                name: DEFAULT_BASE_TOKEN_NAME,
-                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
-                decimals: COMPOSED_DECIMALS
-            });
-        } else {
-            (localToken, originToken, assetId) = (
-                address(bytes32MetadataToken),
-                address(bytes32MetadataToken),
-                BYTES32_METADATA_BASE_TOKEN_ASSET_ID
-            );
-            metadata = TokenMetadata({
-                name: DEFAULT_BASE_TOKEN_NAME,
-                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
-                decimals: COMPOSED_DECIMALS
-            });
         }
         return
             abi.encode(

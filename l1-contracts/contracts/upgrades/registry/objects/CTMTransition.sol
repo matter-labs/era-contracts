@@ -100,10 +100,10 @@ contract CTMTransition is ICTMTransition {
         if (!hasL2Side) {
             // An empty DERIVED deployment list is not enough on its own: it only proves the two
             // L2 bytecode tables agree. The rest of the release's L2/genesis description — the
-            // force-deployment blob and the genesis batch a new chain starts from — is never
-            // executed on an existing chain, so changing it on an edge that sends existing chains
-            // nothing would leave chains created after the edge describing a different L2 state
-            // from the ones that crossed it.
+            // force-deployment blob, the genesis upgrade and the genesis batch a new chain starts
+            // from — is never executed on an existing chain, so changing it on an edge that sends
+            // existing chains nothing would leave chains created after the edge describing a
+            // different L2 state from the ones that crossed it.
             _requireL2StateKept(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
         }
 
@@ -133,11 +133,10 @@ contract CTMTransition is ICTMTransition {
         ) {
             revert L1OnlyEdgeChangesL2State();
         }
-        // slither-disable-next-line unused-return
-        (, bytes32 fromBatchHash, uint64 fromIndex) = _fromRelease.genesisParams();
-        // slither-disable-next-line unused-return
-        (, bytes32 newBatchHash, uint64 newIndex) = _newRelease.genesisParams();
-        if (fromBatchHash != newBatchHash || fromIndex != newIndex) {
+        // The genesis upgrade counts as L2 state: it composes a new chain's L2 genesis transaction.
+        (address fromGenesisUpgrade, bytes32 fromBatchHash, uint64 fromIndex) = _fromRelease.genesisParams();
+        (address newGenesisUpgrade, bytes32 newBatchHash, uint64 newIndex) = _newRelease.genesisParams();
+        if (fromGenesisUpgrade != newGenesisUpgrade || fromBatchHash != newBatchHash || fromIndex != newIndex) {
             revert L1OnlyEdgeChangesL2State();
         }
     }

@@ -198,13 +198,15 @@ contract UpgradeChainFromVersionTest is AdminTest {
         // the subject here is the facet's time gate, not the registry objects the engine reads.
         DefaultUpgrade defaultUpgrade = new DefaultUpgrade();
         address transition = makeAddr("transition");
-        Utils.mockL1OnlyTransition(
-            transition,
-            makeAddr("newRelease"),
-            oldProtocolVersion,
-            newProtocolVersion,
-            mockVerifier
-        );
+        Utils.mockL1OnlyTransition({
+            _transition: transition,
+            _fromRelease: makeAddr("fromRelease"),
+            _departingRouting: diamondRouting(),
+            _newRelease: makeAddr("newRelease"),
+            _oldProtocolVersion: oldProtocolVersion,
+            _newProtocolVersion: newProtocolVersion,
+            _verifier: mockVerifier
+        });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),

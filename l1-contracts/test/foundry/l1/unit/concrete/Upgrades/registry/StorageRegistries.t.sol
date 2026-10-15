@@ -550,6 +550,19 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
+    /// @dev The genesis upgrade composes a new chain's L2 genesis transaction, so replacing it
+    ///      changes the L2 state chains created after the edge start from.
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheGenesisUpgrade() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesisUpgrade = _deployedStub("otherGenesisUpgrade");
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
     /// @dev The same release change on a minor edge WITH an L2 side: the authored delegate is what
     ///      brings existing chains to the new description, so the edge constructs.
     function test_minorEdgeWithAnL2SideMayChangeTheGenesis() public {
@@ -1413,9 +1426,9 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_transitionDerivesTowardSelectorCollision() public {
-        // A selector routed twice constructs as a release (pinned data, no routing ownership) but
-        // is rejected when a transition derives toward it — pre-commit, so a malformed routing
-        // can never strand chains behind a bumped CTM version.
+        // A selector routed twice constructs as a release (the routing lives in the facets' code)
+        // but fails the `validate()` a transition runs on both releases at construction —
+        // pre-commit, so a malformed routing can never strand chains behind a bumped CTM version.
         // The colliding facet self-describes a selector facetFrozen also carries (0x20).
         address collidingFacet = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         ReleaseManifest memory manifest = _newReleaseManifest();

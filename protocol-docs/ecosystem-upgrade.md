@@ -209,9 +209,12 @@ Three independent checks, all read-only:
   alias `verify-package`; the runbook's "Verify" has the full invocation) re-derives every
   object's CREATE2 address from the reviewed creation code and the arguments it was constructed with
   (for a write-once object, the manifest it serves), checks live runtime code against
-  `AllContractsHashes.json`, checks the executors' bindings and the owner the upgrade is driven by,
-  and checks that the governance calls are `execute(operation)` or declared external actions and
-  nothing else. It is mandatory before every vote; what it establishes and what it does not is
+  `AllContractsHashes.json`, holds the genesis data and L2 bytecode table of the release the edge
+  installs against the reviewed `configs/genesis/zksync-os/latest.json` (its root, and the proxy,
+  implementation slot and implementation code at each member's fixed address), checks the
+  executors' bindings and the owner the upgrade is driven by, and checks that the governance calls
+  are `execute(operation)` or declared external actions and nothing else. It is mandatory before
+  every vote; what it establishes and what it does not is
   [Provenance and validation](../docs/registry-driven-upgrades.md#provenance-and-validation).
 - **The transaction simulator** (`matter-labs/transaction-simulator`) replays the governance call
   and the per-chain bundles against a fork of the L1 tip. `ecosystem governance-toml-to-simulator`

@@ -477,7 +477,11 @@ the chain — the chain's Admin facet takes only the departing version and reads
 CTM. The chain diamond still treats the cut it reads as opaque bytes and stays unaware of
 transitions.
 
-On the chain, `DefaultUpgrade.upgradeFromTransition` applies `transition.facetCuts()` verbatim, then
+On the chain, `DefaultUpgrade.upgradeFromTransition` first requires the chain's live routing to be
+exactly the departing release's (`LiveRoutingDiverged`): the derived cuts remove that release's
+routing, not the live one, so a chain a CTM-owner `executeUpgrade` recovery left elsewhere would keep
+the recovery's routing under the new release, or fail mid-cut. Such a recovery ends by restoring the
+release's routing. It then applies `transition.facetCuts()` verbatim, then
 runs the shared storage part (`BaseZkSyncUpgrade._upgrade`) with inputs read straight from the same
 object: the version edge and schedule from the transition, the verifier of its TARGET release (never
 the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction composed from its L2
@@ -497,15 +501,21 @@ from the releases on every call and never stored.
 ## What the derivation guarantees
 
 For any representable release pair, the L1-side guarantee is that **the facet routing and verifier
-an existing chain ends up with are byte-for-byte what a fresh chain at `newRelease` gets**. The
+an existing chain ends up with are byte-for-byte what a fresh chain at `newRelease` gets**, given
+the live-routing check above. The
 upgrade path and the genesis path resolve to the same release, so they cannot drift. There
 is no second mechanism for any part of installed chain state.
 
 The **L2 force deployments are derived too**: only changed, nonempty target rows of the
 `l2BytecodeInfos` table are deployed at their member’s fixed address (`L2InventoryLib`). The release
 stores each implementation descriptor and one shared system-proxy shell; derivation joins them
-into the executable descriptor. A changed shell also changes the corresponding target rows.
-Unchanged rows are not reinstalled. A row for a member with no fixed address — a proxy, a
+into the executable descriptor. Unchanged rows are not reinstalled. A changed shell alone derives
+nothing: `updateZKsyncOSContract` deploys a shell only at a system address with no code yet, so a
+new shell reaches the members first populated after the edge, and new chains through the genesis
+image, but never an existing member's proxy. The shell is rebuilt with every release and its bytes
+change with its compiler metadata, so it is not frozen across edges: a change to the shell's logic
+needs its own migration of existing proxies, which no transition derives. A row for a member with
+no fixed address — a proxy, a
 bridged-token template, the `L2DefaultUpgrade` delegate (deployed from the authored plan below) —
 is refused at transition construction (`RegistryMemberHasNoFixedAddress`).
 
@@ -522,7 +532,9 @@ bytecode hash names an auditable artifact, not a behavior.
 
 **Release shape.** Nonempty facet array; every facet row has selectors; exactly one row per facet
 address (`Diamond._addOneFunction` requires uniform freezability per facet); a selector appears in at
-most one row. The release names each L2 implementation twice — in `l2BytecodeInfos`, which
+most one row. The selector rules read the facets' code, so `validate()` checks them, on every path
+that installs a release: the bootstrap and `ChainTypeManager.initialize` install one without cutting
+a diamond, so a collision would otherwise surface only when chains execute. The release names each L2 implementation twice — in `l2BytecodeInfos`, which
 transitions read, and in `fixedForceDeploymentsData`, which genesis reads — so each bytecode-info
 field of the latter must equal `abi.encode(row, l2SystemProxyBytecodeInfo)` for its member's table
 row (empty for an empty row), and the genesis and upgrade paths cannot describe different L2 code.
@@ -544,11 +556,15 @@ which release it names: no L2 side (derived or authored).
 
 **L2 description.** Every edge without an L2 side — every patch, and a minor edge that only moves
 L1 members — must carry the departing release's L2 description over to the target release: the
-implementation table and shared proxy shell, the force-deployment blob and the genesis batch.
-Existing chains receive no L2 transaction on such an edge, so a new chain created at the target
-release must start from the same L2 state they are in (`L1OnlyEdgeChangesL2State`). An edge that
-changes the L2 description must carry an L2 side — at least an authored delegate that brings
-existing chains there — and so is a minor edge. A patch that changes nothing but the version names a copy of the departing release one
+implementation table and shared proxy shell, the force-deployment blob, the genesis upgrade (it
+composes a new chain's L2 genesis transaction) and the genesis batch. Existing chains receive no L2
+transaction on such an edge, so a new chain created at the target release must start from the same
+L2 state they are in (`L1OnlyEdgeChangesL2State`). An edge that changes the L2 description must
+carry an L2 side — at least an authored delegate that brings existing chains there — and so is a
+minor edge. The prepare rebuilds the L2 bytecode and reuses the live genesis upgrade only when its
+code is identical, so such an edge is built from a tree in which they compile to the departing
+release's bytes: an edit to a source they share with L1 (an error added to `L1ContractErrors.sol`,
+say) changes their metadata, and the edge then needs an L2 side, so a minor version. A patch that changes nothing but the version names a copy of the departing release one
 patch version up, and derives nothing.
 
 A verifier rotation is therefore: deploy the verifier, publish release B copying release A except

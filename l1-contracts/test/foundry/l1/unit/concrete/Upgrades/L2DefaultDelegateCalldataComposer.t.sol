@@ -116,30 +116,13 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     }
 
     /// @dev A chain whose base token serves no usable metadata — none at all, or Maker-style
-    ///      `bytes32` — is still composable here. Genesis deliberately permits such a base token,
-    ///      and the upgrade path probes it the same tolerant way, so the chain does not become
-    ///      unupgradeable the moment its metadata has to be recomposed.
-    function test_composesForBaseTokensWithoutUsableMetadata() public view {
-        assertEq(
-            defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
-            abi.encodeCall(
-                IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(NO_METADATA_CHAIN_ID))
-            ),
-            "a token without metadata must compose the defaults"
-        );
-        assertEq(
-            defaultComposer.composeDelegateCalldata(
-                ICTMRelease(address(release)),
-                bridgehub,
-                BYTES32_METADATA_CHAIN_ID
-            ),
-            abi.encodeCall(
-                IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
-            ),
-            "a bytes32-returning token must compose the defaults too"
-        );
+    ///      `bytes32` — is not composable: the read reverts rather than substituting defaults.
+    function test_revertWhen_baseTokenHasNoUsableMetadata() public {
+        vm.expectRevert();
+        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID);
+
+        vm.expectRevert();
+        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, BYTES32_METADATA_CHAIN_ID);
     }
 
     /// @dev Nothing is cached in the composer: a different release or a Bridgehub naming another

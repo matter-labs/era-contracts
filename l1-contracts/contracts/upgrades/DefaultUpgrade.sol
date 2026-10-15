@@ -9,6 +9,7 @@ import {ICommittedUpgrade} from "./registry/objects/ICommittedUpgrade.sol";
 import {ICTMRelease} from "./registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "./registry/objects/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "./registry/libraries/CTMUpgradeComposer.sol";
+import {LiveRoutingReader} from "./registry/libraries/LiveRoutingReader.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 
 /// @author Matter Labs
@@ -28,9 +29,14 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         _requireAllBatchesExecuted();
         ICTMTransition transition = ICTMTransition(_transition);
-        // The facet cuts MUST stay the first step. The legacy engine replaced the facets and ran
-        // the upgrade inside one diamond cut, so the upgrade always executed against the new
-        // routing; applying the derived cut first is what keeps that order.
+        // The derived cuts remove the departing RELEASE's routing, not the live one: a chain whose
+        // routing drifted from it (a CTM-owner `executeUpgrade` recovery cut) would keep the drift
+        // under the new release, or fail mid-cut. Restoring the release's routing is the last
+        // step of such a recovery.
+        LiveRoutingReader.requireReleaseRouting(ICTMRelease(transition.fromRelease()));
+        // The facet cuts MUST stay the first step that changes state. The legacy engine replaced
+        // the facets and ran the upgrade inside one diamond cut, so the upgrade always executed
+        // against the new routing; applying the derived cut first is what keeps that order.
         _applyDerivedFacetCuts(transition.facetCuts());
         _upgradeFromCommittedObject(transition);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

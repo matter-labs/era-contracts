@@ -8,14 +8,18 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
-import {RegistryEmptySelectors, RegistryTargetHasNoCode} from "contracts/common/L1ContractErrors.sol";
+import {
+    RegistryDuplicateSelector,
+    RegistryEmptySelectors,
+    RegistryTargetHasNoCode
+} from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 
 /// @notice The CTM keeps no genesis-param checks of its own: the release it installs refuses a
 ///         zero genesis batch hash at construction, and the release's `validate()` — which the CTM
-///         runs before installing any release — refuses a codeless member and a selector-less
-///         facet. These tests initialize a CTM over REAL releases (unlike the rest of this suite,
+///         runs before installing any release — refuses a codeless member, a selector-less
+///         facet and a selector two facets route. These tests initialize a CTM over REAL releases (unlike the rest of this suite,
 ///         which mocks the release) to show that coverage holds through the CTM: a release that
 ///         fails it is never installed, so `DiamondInit` never builds a chain from one.
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
@@ -98,6 +102,20 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
         CTMRelease release = new CTMRelease(manifest);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
+        new TransparentUpgradeableProxy(address(chainTypeManager), admin, _initializeData(address(release)));
+    }
+
+    /// @dev Every chain created from such a release would revert in `DiamondInit` (`FacetExists`),
+    ///      and no transition could depart from it. The CTM refuses to install it at all.
+    function test_RevertWhen_releaseRoutesASelectorTwice() public {
+        ReleaseManifest memory manifest = _validReleaseManifest();
+        bytes4 shared = facetCuts[1].selectors[0];
+        bytes4[] memory colliding = new bytes4[](1);
+        colliding[0] = shared;
+        manifest.genesisFacets[0].facet = address(new MockSelfDescribingFacet(colliding));
+        CTMRelease release = new CTMRelease(manifest);
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, shared));
         new TransparentUpgradeableProxy(address(chainTypeManager), admin, _initializeData(address(release)));
     }
 }

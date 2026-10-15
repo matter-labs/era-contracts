@@ -9,6 +9,7 @@ import {FixedForceDeploymentsData} from "../../../state-transition/l2-deps/IL2Ge
 import {
     GenesisBatchHashZero,
     RegistryDuplicateFacetRow,
+    RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     ReleaseForceDeploymentMismatch,
@@ -65,12 +66,8 @@ contract CTMRelease is ICTMRelease {
             revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
         _requireForceDeploymentsMatchTable(_manifest);
-        // NO routing validation here — the release does not own the routing concept at all. It
-        // names facet rows; the selectors live in the facets' own self-description, and routing
-        // well-formedness is enforced where routing actually executes: `Diamond.diamondCut`
-        // rejects duplicate or empty routing when a chain is created, and `TransitionDerivationLib`
-        // re-walks both releases' routing when a transition derives its delta — both before
-        // anything is committed.
+        // NO routing validation here: the selectors live in the facets' own self-description,
+        // which needs the facets' code, so `validate()` checks the routing.
         encodedManifest = abi.encode(_manifest);
     }
 
@@ -128,18 +125,24 @@ contract CTMRelease is ICTMRelease {
         ObjectAnchorLib.requireCode(m.verifier);
         _requireUniqueFacetRows(m.genesisFacets);
         uint256 facetsLength = m.genesisFacets.length;
+        bytes4[][] memory routing = new bytes4[][](facetsLength);
         for (uint256 i = 0; i < facetsLength; ++i) {
             address facet = m.genesisFacets[i].facet;
             // Not merely defensive: the facets are the one member set this contract READS
             // through (`ISelfDescribingFacet.selectors()`), and a codeless target answers that
             // read with an empty revert instead of a usable failure.
             ObjectAnchorLib.requireCode(facet);
+            routing[i] = ISelfDescribingFacet(facet).selectors();
             // A selector-less row would reach the installing paths (`DiamondInit`, the bootstrap
             // engine) as an empty `Add` cut, which `Diamond.diamondCut` rejects on every chain.
-            if (ISelfDescribingFacet(facet).selectors().length == 0) {
+            if (routing[i].length == 0) {
                 revert RegistryEmptySelectors(facet);
             }
         }
+        // Same reason: the installing paths add every facet's routing, and `Diamond.diamondCut`
+        // rejects a selector added twice. The bootstrap and `ChainTypeManager.initialize` install
+        // a release without cutting a diamond, so this is where a collision has to be caught.
+        _requireNoDuplicateSelectors(routing);
     }
 
     /// @dev The genesis force-deployments blob names the implementation of each table member a
@@ -193,6 +196,35 @@ contract CTMRelease is ICTMRelease {
                 if (_facets[j].facet == facet) {
                     revert RegistryDuplicateFacetRow(facet);
                 }
+            }
+        }
+    }
+
+    /// @dev An open-addressing set over the release's selectors: `validate()` runs on every chain
+    ///      creation, where a pairwise scan of the ~a hundred selectors costs ~0.9M gas. A slot holds
+    ///      `selector + 1`, so zero marks it empty; the table is never more than half full, so a
+    ///      probe always ends at an empty slot.
+    function _requireNoDuplicateSelectors(bytes4[][] memory _routing) private pure {
+        uint256 routingLength = _routing.length;
+        uint256 total = 0;
+        for (uint256 i = 0; i < routingLength; ++i) {
+            total += _routing[i].length;
+        }
+        uint256 tableSize = 2 * total + 1;
+        uint256[] memory table = new uint256[](tableSize);
+        for (uint256 i = 0; i < routingLength; ++i) {
+            bytes4[] memory selectors = _routing[i];
+            uint256 selectorsLength = selectors.length;
+            for (uint256 j = 0; j < selectorsLength; ++j) {
+                uint256 entry = uint256(uint32(selectors[j])) + 1;
+                uint256 slot = entry % tableSize;
+                while (table[slot] != 0) {
+                    if (table[slot] == entry) {
+                        revert RegistryDuplicateSelector(selectors[j]);
+                    }
+                    slot = (slot + 1) % tableSize;
+                }
+                table[slot] = entry;
             }
         }
     }

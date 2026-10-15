@@ -266,6 +266,8 @@ error L2PlanNeedsDelegate();
 error L2PlanTooManyFactoryDeps(uint256 count, uint256 max);
 // 0xfb5c22e6
 error L2TimestampTooBig();
+// 0x5d5571a8
+error LiveRoutingDiverged();
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
 // 0x9bb54c35

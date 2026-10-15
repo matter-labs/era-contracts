@@ -335,7 +335,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
 
     /// @dev A release at `_protocolVersion` describing the chain's routing with the AdminFacet
     ///      swapped for `_adminFacet` when nonzero, the given verifier, and the fixture's (empty) L2
-    ///      table.
+    ///      table behind its shell.
     function _release(address _adminFacet, address _verifier, uint256 _protocolVersion) internal returns (CTMRelease) {
         return
             new CTMRelease(
@@ -351,7 +351,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
                         genesisIndexRepeatedStorageChanges: 54
                     }),
                     l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
-                    l2SystemProxyBytecodeInfo: ""
+                    l2SystemProxyBytecodeInfo: L2PlanFixtures.bytecodeInfo(L2_SYSTEM_PROXY_CODE)
                 })
             );
     }

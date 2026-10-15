@@ -213,37 +213,7 @@ impl<'a> UpgradeInner<'a> {
         ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
 
         let ctm_proxy = ctm.proxy;
-
-        // Find a chain on this CTM as a witness for rollup-DA-manager auto-
-        // resolution.
-        let chain_ids =
-            crate::common::l1_contracts::resolve_all_chain_ids(&runner.rpc_url, self.bridgehub)
-                .await
-                .context("Failed to query registered chain IDs from bridgehub")?;
-        let mut representative_chain: Option<u64> = None;
-        for &cid in &chain_ids {
-            let chain_ctm = crate::common::l1_contracts::resolve_ctm_proxy(
-                &runner.rpc_url,
-                self.bridgehub,
-                cid,
-            )
-            .await
-            .with_context(|| format!("resolving CTM for chain {cid}"))?;
-            if chain_ctm == ctm_proxy {
-                representative_chain = Some(cid);
-                break;
-            }
-        }
-        let representative_chain = representative_chain.with_context(|| {
-            format!(
-                "No registered chain uses CTM {ctm_proxy:#x}. Auto-resolution of \
-                 rollup DA manager requires at least one registered chain on the \
-                 target CTM."
-            )
-        })?;
-        logger::info(format!(
-            "CTM proxy: {ctm_proxy:#x} (representative chain {representative_chain})"
-        ));
+        logger::info(format!("CTM proxy: {ctm_proxy:#x}"));
 
         let rollup_da_manager = match ctm.rollup_da_manager {
             Some(addr) => {
@@ -251,6 +221,8 @@ impl<'a> UpgradeInner<'a> {
                 addr
             }
             None => {
+                let representative_chain =
+                    find_representative_chain(&runner.rpc_url, self.bridgehub, ctm_proxy).await?;
                 let zk_chain = crate::common::l1_contracts::resolve_zk_chain(
                     &runner.rpc_url,
                     self.bridgehub,
@@ -381,6 +353,31 @@ impl<'a> UpgradeInner<'a> {
 
         Ok(ctm_output_path)
     }
+}
+
+/// A chain registered on `ctm_proxy`, the witness the rollup DA manager is auto-resolved from.
+/// Only searched for when no override is given, so an override works on a CTM with no chains.
+async fn find_representative_chain(
+    rpc_url: &str,
+    bridgehub: Address,
+    ctm_proxy: Address,
+) -> anyhow::Result<u64> {
+    let chain_ids = crate::common::l1_contracts::resolve_all_chain_ids(rpc_url, bridgehub)
+        .await
+        .context("Failed to query registered chain IDs from bridgehub")?;
+    for cid in chain_ids {
+        let chain_ctm = crate::common::l1_contracts::resolve_ctm_proxy(rpc_url, bridgehub, cid)
+            .await
+            .with_context(|| format!("resolving CTM for chain {cid}"))?;
+        if chain_ctm == ctm_proxy {
+            return Ok(cid);
+        }
+    }
+    anyhow::bail!(
+        "No registered chain uses CTM {ctm_proxy:#x}. Auto-resolution of rollup DA manager \
+         requires at least one registered chain on the target CTM; pass \
+         --rollup-da-manager-address (or `rollup_da_manager` in --ctm-config) otherwise."
+    )
 }
 
 fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Address> {

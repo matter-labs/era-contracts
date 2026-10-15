@@ -19,6 +19,7 @@ import {IL2DelegateCalldataComposer} from "contracts/upgrades/registry/objects/I
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
+import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
@@ -64,6 +65,7 @@ import {
     L2PlanTooManyFactoryDeps,
     PatchCannotCarryL2Upgrade,
     ProxyUpgradeRowMismatch,
+    RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryTargetHasNoCode,
     RegistryDuplicateProxyRow,
@@ -1742,6 +1744,24 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         RegistryBootstrapMigration authorized = _deployAndAuthorize(manifest);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
+        authorized.migrate();
+        assertFalse(authorized.executed(), "a refused edge must stay unspent");
+        assertEq(chainContractAddress.protocolVersion(), manifest.expectedProtocolVersion, "the CTM did not move");
+    }
+
+    /// @dev The bootstrap installs the release without cutting a diamond, so a selector two facets
+    ///      route would surface only in every chain's crossing (`FacetExists`). The migration
+    ///      refuses the release before it spends itself.
+    function test_revertWhen_releaseRoutesASelectorTwice() public {
+        bytes4 shared = ISelfDescribingFacet(facetCuts[1].facet).selectors()[0];
+        bytes4[] memory colliding = new bytes4[](1);
+        colliding[0] = shared;
+        facetCuts[0].facet = address(new MockSelfDescribingFacet(colliding));
+        BootstrapManifest memory manifest = _manifest();
+        manifest.currentRelease = address(_deployRelease(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)));
+        RegistryBootstrapMigration authorized = _deployAndAuthorize(manifest);
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, shared));
         authorized.migrate();
         assertFalse(authorized.executed(), "a refused edge must stay unspent");
         assertEq(chainContractAddress.protocolVersion(), manifest.expectedProtocolVersion, "the CTM did not move");
