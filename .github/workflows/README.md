@@ -17,14 +17,13 @@ Nothing is compiled per run: the image is what gets released and tested.
 4. Pass that tag as `protocol_ops_tag` to every workflow below: `generate-ecosystem-upgrade-calldata`,
    `deploy-ecosystem-upgrade` (which takes the image from the bundle), then the chain workflows.
 
-`protocol_ops_tag` is an image tag or `sha256:<digest>`. The ecosystem workflow checks out the commit
-the image was built from (its `org.opencontainers.image.revision` label), so images without that label
-(those `build-and-push-docker` pushes for zksync-os-integration-tests) are refused there. Its deploy
-bundle records the image digest, and `verify-bundle-handoff` and `deploy-ecosystem-upgrade` run that
-digest. The chain workflows and `execute-deployer-safe-bundles` refuse unlabeled images too
-(`PROTOCOL_OPS_REQUIRE_RELEASE` in `protocol-ops.sh`), but run on the dispatched branch: its
-`upgrade-envs/` (the `permanent-values` presets) is mounted over the image's copy. The step-by-step
-runbook is in [`docs/ecosystem-upgrade-deploy.md`](../../docs/ecosystem-upgrade-deploy.md).
+`protocol_ops_tag` is an image tag or `sha256:<digest>`. Images without the
+`org.opencontainers.image.revision` label `build-docker` sets (such as those `build-and-push-docker`
+pushes for zksync-os-integration-tests) are refused. The ecosystem workflow checks out the commit the
+image was built from, and its deploy bundle records the image digest, which `verify-bundle-handoff`
+and `deploy-ecosystem-upgrade` run. The chain workflows run on the dispatched branch, whose
+`upgrade-envs/` is mounted into the image. The step-by-step runbook is in
+[`docs/ecosystem-upgrade-deploy.md`](../../docs/ecosystem-upgrade-deploy.md).
 
 ## Mapping
 

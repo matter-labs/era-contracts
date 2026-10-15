@@ -30,19 +30,15 @@ on:
         description: "The zksync-os-integration-tests run that tested this ref: https://github.com/matter-labs/zksync-os-integration-tests/actions/runs/<id>"
         type: string
         required: true
-      zk_governance_commit:
-        description: "Full zksync-association/zk-governance commit SHA baked into the image (PUH/Guardians redeploy, PUVT). Default: the one protocol-ops pins."
-        type: string
-        required: false
-        default: "9b06a16159cd58add109f25598e79731450d1772"
 
 concurrency:
   group: build-docker-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Push and PR builds use the default.
-  ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit || '9b06a16159cd58add109f25598e79731450d1772' }}
+  # The zk-governance commit baked into the image (PUH/Guardians redeploy, PUVT).
+  # build-and-push-docker.yaml and bundle.rs's DEFAULT_ZK_GOVERNANCE_COMMIT use the same one.
+  ZK_GOVERNANCE_COMMIT: 9b06a16159cd58add109f25598e79731450d1772
 
 jobs:
   build-image:
@@ -71,13 +67,6 @@ jobs:
             exit 1
           fi
 
-      - name: Validate the zk-governance commit
-        run: |
-          if [[ ! "$ZK_GOVERNANCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::zk_governance_commit must be a full commit SHA, got '$ZK_GOVERNANCE_COMMIT'."
-            exit 1
-          fi
-
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -101,7 +90,6 @@ jobs:
         id: meta
         shell: bash
         env:
-          RUN_URL: ${{ inputs.integration_tests_run_url }}
           IMAGE_TAG_OVERRIDE: ${{ inputs.image_tag_override }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$IMAGE_TAG_OVERRIDE" ]; then
@@ -119,9 +107,6 @@ jobs:
           {
             echo "revision=$(git rev-parse HEAD)"
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "hashes=$(sha256sum AllContractsHashes.json | cut -d' ' -f1)"
-            echo "zk_governance=$(git -C zk-governance rev-parse HEAD)"
-            echo "tested_with=${RUN_URL:-}"
           } >> "$GITHUB_OUTPUT"
 
       # Built into the runner's docker, not pushed: the rehearsal below runs
@@ -148,14 +133,12 @@ jobs:
             protocol.cache-to=type=gha,mode=max,scope=protocol-ops
             protocol.tags=${{ env.IMAGE }}
             protocol.args.CONTRACTS_COMMIT=${{ steps.meta.outputs.revision }}
-            protocol.args.ZK_GOVERNANCE_COMMIT=${{ steps.meta.outputs.zk_governance }}
+            protocol.args.ZK_GOVERNANCE_COMMIT=${{ env.ZK_GOVERNANCE_COMMIT }}
             protocol.labels.org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             protocol.labels.org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}
             protocol.labels.org.opencontainers.image.created=${{ steps.meta.outputs.created }}
             protocol.labels.org.opencontainers.image.version=${{ env.IMAGE_TAG }}
-            protocol.labels.io.matter-labs.protocol-ops.all-contracts-hashes-sha256=${{ steps.meta.outputs.hashes }}
-            protocol.labels.io.matter-labs.protocol-ops.zk-governance-commit=${{ steps.meta.outputs.zk_governance }}
-            protocol.labels.io.matter-labs.protocol-ops.tested-with=${{ steps.meta.outputs.tested_with }}
+            protocol.labels.io.matter-labs.protocol-ops.tested-with=${{ inputs.integration_tests_run_url }}
 
       # The anvil-interop upgrade test (anvil-interop-ci.yaml's `upgrade-test`)
       # run entirely from the image: its protocol_ops, forge, anvil and
@@ -180,21 +163,7 @@ jobs:
 
       - name: Push Docker Image
         if: github.event_name == 'workflow_dispatch'
-        env:
-          REVISION: ${{ steps.meta.outputs.revision }}
-          TESTED_WITH: ${{ steps.meta.outputs.tested_with }}
         run: |
           docker push "$IMAGE"
           digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")
-          {
-            echo "### protocol-ops image"
-            echo
-            echo "| | |"
-            echo "|---|---|"
-            echo "| tag | \`$IMAGE\` |"
-            echo "| digest | \`$digest\` |"
-            echo "| revision | \`$REVISION\` |"
-            echo "| tested with | $TESTED_WITH |"
-            echo
-            echo "Pass \`protocol_ops_tag=$IMAGE_TAG\` to the calldata workflows."
-          } >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed \`$digest\`: pass \`protocol_ops_tag=$IMAGE_TAG\` to the calldata workflows." >> "$GITHUB_STEP_SUMMARY"

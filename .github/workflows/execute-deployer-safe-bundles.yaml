@@ -47,7 +47,6 @@ jobs:
       BUNDLE_DIR: bundles
       # `dev execute-safe` reads the bundles inside the container.
       EXTRA_MOUNTS: ${{ github.workspace }}/bundles:/contracts/bundles
-      # Refuse images build-docker.yaml did not release (no revision label).
       PROTOCOL_OPS_REQUIRE_RELEASE: "1"
     steps:
       - name: Checkout repository

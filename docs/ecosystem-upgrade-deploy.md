@@ -54,23 +54,8 @@ Then `ecosystem verify-upgrade` (PUVT) consumes `ecosystem.toml` +
 ## Releasing the image
 
 Every ecosystem and chain workflow runs the image named by its `protocol_ops_tag`
-input; nothing is compiled per run, so the image is what gets tested and released:
-
-1. **Merge** the PRs that generate the upgrade: its scripts and inputs under
-   `l1-contracts/upgrade-envs/<upgrade>/`, `AllContractsHashes.json` and the anvil-interop
-   chain states.
-2. **Test** that commit with zksync-os-integration-tests.
-3. **Build the image through the gate**: dispatch `build-docker.yaml` on that commit with
-   `tested_with_integration_tests=true` and `integration_tests_run_url=<that run>`; it refuses
-   to push without them. Before pushing it runs the anvil-interop upgrade test inside the image:
-   the previous release's chain states (`upgradeSourceStateVersion` in
-   `l1-contracts/test/anvil-interop/config/anvil-config.json`) upgraded with the image's own
-   `protocol_ops`, `forge` and artifacts. The image is labelled with its commit
-   (`org.opencontainers.image.revision`), the `AllContractsHashes.json` SHA-256, the
-   zk-governance commit and the integration-test run; the run summary gives its tag and digest.
-4. **Use that tag everywhere**: `protocol_ops_tag=<tag>` for step 1 below (which checks out the
-   image's commit and records the image digest in the deploy bundle), step 2 (which runs the
-   bundle's digest), and then every chain workflow (`generate-chain-*-calldata`).
+input; how an image is tested and released is the
+[release flow](../.github/workflows/README.md#release-flow).
 
 The same image runs the local commands below. `./protocol-ops.sh --tag <tag>` (or
 `--tag sha256:<digest>`) pulls it and mounts the checkout's `l1-contracts/upgrade-envs/`, so

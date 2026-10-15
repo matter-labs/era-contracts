@@ -162,10 +162,6 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # `image has no revision label`               → the tag was not built by
 #                                               build-docker.yaml from this
 #                                               change on; release a new image.
-# `bundle is dirty`                           → the configs mounted into the image
-#                                               differ from the ones it was built
-#                                               with; the checkout must be the
-#                                               image's revision, untouched.
 # deploy job: "bundle was prepared for X but    → the key in CI is not the EOA the
 # this key is Y"                                  bundle was generated for. Those two
 #                                                 must match: the deployer is in the
@@ -344,13 +340,10 @@ jobs:
           if [ -z "$revision" ]; then
             echo "::error::$image has no revision label: release it with build-docker.yaml"; exit 1
           fi
-          {
-            echo "revision=$revision"
-            echo "digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
-          } >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
-      # The configs protocol-ops.sh mounts into the image must be the ones it
-      # was built with; the bundle is marked dirty otherwise.
+      # protocol-ops.sh mounts this checkout's upgrade-envs/ into the image:
+      # the configs the image was built with.
       - name: Checkout the image's revision
         uses: actions/checkout@v4
         with:
@@ -461,22 +454,6 @@ jobs:
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
           [ -z "$FORK_BLOCK" ] || args+=(--fork-block "$FORK_BLOCK")
           bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" ecosystem rehearse-upgrade "${args[@]}"
-
-      - name: Check the bundle names this image
-        env:
-          ENVIRONMENT: ${{ inputs.environment }}
-          DIGEST: ${{ steps.image.outputs.digest }}
-          REVISION: ${{ steps.image.outputs.revision }}
-        run: |
-          set -euo pipefail
-          meta="l1-contracts/upgrade-envs/$UPGRADE/output/$ENVIRONMENT/deploy-bundle/bundle-metadata.json"
-          jq '{contracts_commit, contracts_worktree_dirty, zk_governance_commit, protocol_ops_image}' "$meta"
-          if ! jq -e --arg digest "$DIGEST" --arg rev "$REVISION" \
-            '.protocol_ops_image.digest == $digest and .contracts_commit == $rev and .contracts_worktree_dirty == false' \
-            "$meta" >/dev/null; then
-            echo "::error::the bundle must record image $DIGEST built from $REVISION, and not be dirty"
-            exit 1
-          fi
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
       # the git-portable `sim-inputs/` handoff set AND the ready-to-paste

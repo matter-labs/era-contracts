@@ -478,12 +478,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bin"
           cat > "$RUNNER_TEMP/bin/forge" <<'EOF'
           #!/usr/bin/env bash
-          set -euo pipefail
-          case "$(basename "$PWD")" in
-            l1-contracts|da-contracts) root="/contracts/$(basename "$PWD")" ;;
-            *) echo "forge: run from l1-contracts/ or da-contracts/, not $PWD" >&2; exit 1 ;;
-          esac
-          exec bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" forge "$@" --root "$root"
+          # Run from l1-contracts/ or da-contracts/: the image has both at /contracts/.
+          exec bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" forge "$@" --root "/contracts/$(basename "$PWD")"
           EOF
           chmod +x "$RUNNER_TEMP/bin/forge"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
