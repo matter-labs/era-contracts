@@ -1,16 +1,30 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use alloy::dyn_abi::{DynSolType, DynSolValue};
 use alloy::hex;
-use alloy::primitives::Address;
+use alloy::primitives::{Address, U256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::execution_runbook;
 use crate::common::governance_calls::decode_calls;
 use crate::common::logger;
+
+alloy::sol! {
+    struct ChainAdminCall {
+        address target;
+        uint256 value;
+        bytes data;
+    }
+
+    interface ChainAdminAbi {
+        function multicall(ChainAdminCall[] _calls, bool _requireSuccess) external payable;
+    }
+}
 
 /// Optional human-description registry. Loaded from a TOML at
 /// `<env>/sim-descriptions.toml` (auto-discovered from `--env`) or via an
@@ -64,6 +78,8 @@ struct RawSimDescriptionEntry {
 #[derive(Debug, Default)]
 struct SimDescriptionRegistry {
     entries: Vec<SimDescriptionEntry>,
+    /// `[labels]` inverted: the names this file gives addresses (several joined by ` / `).
+    labels: BTreeMap<Address, String>,
 }
 
 #[derive(Debug)]
@@ -113,6 +129,17 @@ fn resolve_address(
 fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescriptionRegistry> {
     use anyhow::Context;
     let labels = &raw.labels;
+    let mut names: BTreeMap<Address, Vec<&str>> = BTreeMap::new();
+    for (name, address) in labels {
+        names.entry(*address).or_default().push(name);
+    }
+    let labels_by_address = names
+        .into_iter()
+        .map(|(address, mut names)| {
+            names.sort_unstable();
+            (address, names.join(" / "))
+        })
+        .collect();
     let mut entries = Vec::with_capacity(raw.entries.len());
     for (i, e) in raw.entries.into_iter().enumerate() {
         let target = resolve_address(&e.target, labels)
@@ -134,7 +161,10 @@ fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescripti
             desc: e.desc,
         });
     }
-    Ok(SimDescriptionRegistry { entries })
+    Ok(SimDescriptionRegistry {
+        entries,
+        labels: labels_by_address,
+    })
 }
 
 impl SimDescriptionRegistry {
@@ -193,7 +223,7 @@ impl SimDescriptionRegistry {
 }
 
 /// For wrapper calls — `ChainAdmin.multicall`, `Governance.scheduleTransparent`,
-/// `Governance.executeInstant` — return the first inner `Call`'s target and
+/// `Governance.executeInstant` / `Governance.execute` — return the first inner `Call`'s target and
 /// 4-byte selector. Returns `None` for unrecognised wrappers (the registry
 /// then falls back to plain `(target, selector)` matching).
 fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
@@ -236,8 +266,10 @@ fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
                 .into_iter()
                 .next()?
         }
-        // executeInstant((Call[], bytes32, bytes32))
-        0x95218ecd => {
+        // executeInstant((Call[], bytes32, bytes32)) / execute((Call[], bytes32, bytes32))
+        // Same ABI (a single `Operation` tuple param) — only the selector differs
+        // (executeInstant = onlySecurityCouncil, execute = onlyOwnerOrSecurityCouncil).
+        0x95218ecd | 0x74da756b => {
             let params = DynSolType::Tuple(vec![operation_type])
                 .abi_decode_params(body)
                 .ok()?;
@@ -364,7 +396,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// broadcasts them to real Sepolia; the sim's fork inherits their effects
     /// from chain tip. Re-running them in the sim would revert (legacy-Gov
     /// `OperationMustBePending()`, already-deployed CREATE2 collisions, …).
-    /// See `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
+    /// See `contracts/.claude/skills/regenerate-upgrade-calldata/SKILL.md`
     /// ("Core principle") for the full reasoning.
     ///
     /// Defaults to `<env-out>/prepare/manifest.json` when `--env` is set and
@@ -381,6 +413,19 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// the CREATE2 deployer, but an explicit list is safer).
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
+
+    /// Acknowledge a checked tag that this artifact deliberately does not carry.
+    ///
+    /// Emits an empty-calldata marker transaction tagged `ack_<tag>`. The transaction-simulator's
+    /// era-contracts provenance check accepts the marker in place of a derived entry, recording
+    /// that the reviewer knows the work exists elsewhere — for v33 that is the per-chain upgrade,
+    /// which `protocol_ops chain upgrade` produces as its own bundle because it needs
+    /// preconditions (a recorded priority-op lower bound, an upgrade timestamp) that a single
+    /// generated call cannot express.
+    ///
+    /// Repeatable: `--ack test_upgrade_chain_zkos`.
+    #[clap(long = "ack", num_args = 1..)]
+    pub acks: Vec<String>,
 
     /// Optional path to a `sim-descriptions.toml` that overrides each
     /// emitted tx's `description` field with a human-readable string keyed by
@@ -408,6 +453,7 @@ pub struct GovernanceTomlToSimulatorArgs {
 #[derive(Debug, Deserialize)]
 struct CtmAdminCallsSection {
     chain_admin: Address,
+    server_notifier_upgrade: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -421,7 +467,7 @@ struct GovernanceCallsToml {
     governance_calls: GovernanceCalls,
     #[serde(default)]
     test_upgrade_calls: BTreeMap<String, String>,
-    /// Per-CTM flavor sections — only `ctm_admin_calls.chain_admin` is consumed
+    /// Per-CTM flavor sections used to label ChainAdmin manifest bundles.
     #[serde(default)]
     ctms: BTreeMap<String, CtmFlavorSection>,
 }
@@ -432,20 +478,56 @@ const CTM_ADMIN_CALLS_FLAVOR_TAGS: &[(&str, &str)] = &[
     ("zksync_os", "ctm_admin_calls_zkos"),
 ];
 
-/// Builds a `chain_admin → simulator tag` map from the parsed TOML.
-/// Keyed by the ChainAdmin address (`tx.to` in the bundle) rather than the
-/// signer (`bundle.target`), because the same EOA signs many bundles but each
-/// ChainAdmin address is unique to one ctm_admin_calls entry.
-fn build_ctm_admin_calls_tag_map(parsed: &GovernanceCallsToml) -> HashMap<Address, String> {
-    let mut map = HashMap::new();
+type CtmAdminCallsTagKey = (Address, String);
+type CtmAdminCallsTags = Vec<(CtmAdminCallsTagKey, String)>;
+
+/// Builds `(chain_admin, multicall_calldata) → simulator tag` entries from the parsed TOML.
+/// Testnet uses the same ChainAdmin for multiple CTM flavors, so the address
+/// alone is not enough to distinguish Era and ZKsync OS admin-call bundles.
+fn build_ctm_admin_calls_tags(parsed: &GovernanceCallsToml) -> anyhow::Result<CtmAdminCallsTags> {
+    let mut tags = Vec::new();
     for (flavor, tag) in CTM_ADMIN_CALLS_FLAVOR_TAGS {
         if let Some(ctm) = parsed.ctms.get(*flavor) {
             if let Some(ref section) = ctm.ctm_admin_calls {
-                map.insert(section.chain_admin, tag.to_string());
+                tags.push((
+                    (
+                        section.chain_admin,
+                        encode_chain_admin_multicall(&section.server_notifier_upgrade)
+                            .with_context(|| {
+                                format!("encoding ctm_admin_calls for flavor {flavor}")
+                            })?,
+                    ),
+                    tag.to_string(),
+                ));
             }
         }
     }
-    map
+    Ok(tags)
+}
+
+fn encode_chain_admin_multicall(calls_hex: &str) -> anyhow::Result<String> {
+    let calls = decode_calls(calls_hex)?;
+    let calls = calls
+        .into_iter()
+        .map(|call| ChainAdminCall {
+            target: call.target,
+            value: call.value,
+            data: call.data.into(),
+        })
+        .collect();
+    let calldata = ChainAdminAbi::multicallCall {
+        _calls: calls,
+        _requireSuccess: true,
+    }
+    .abi_encode();
+
+    Ok(format!("0x{}", hex::encode(calldata)))
+}
+
+fn ctm_admin_calls_tag<'a>(tags: &'a CtmAdminCallsTags, tx: &SafeBundleTx) -> Option<&'a str> {
+    tags.iter()
+        .find(|((to, data), _)| *to == tx.to && data == &tx.data)
+        .map(|(_, tag)| tag.as_str())
 }
 
 #[derive(Debug, Deserialize)]
@@ -485,6 +567,14 @@ struct SimulatorTransaction {
         skip_serializing_if = "Option::is_none"
     )]
     emulate_all_batches_executed: Option<bool>,
+    /// DiamondProxy whose batch counters the simulator should override. Needed when the diamond
+    /// cut is wrapped — a real per-chain upgrade goes through `ChainAdmin.multicall`, so `to` is
+    /// the ChainAdmin and the counters live somewhere else entirely.
+    #[serde(
+        rename = "emulateAllBatchesExecutedFor",
+        skip_serializing_if = "Option::is_none"
+    )]
+    emulate_all_batches_executed_for: Option<String>,
     tag: String,
 }
 
@@ -504,12 +594,17 @@ const CHECK_DEADLINE_TIME_INCREASE_SECS: u64 = 200_000;
 /// belongs to phase 2 (real-chain broadcast), not the sim.
 const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
 
-/// ETH (wei) minted to the governance sender (PUH) at the first stage-2 call
-/// so the `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}`
-/// priority requests have msg.value coverage. 10 ETH is well above the
-/// aggregate `priority_txs_l2_gas_limit * max_expected_l1_gas_price` budget
-/// across the v31 stage's stage-2 L1→L2 chain.
-const STAGE2_PUH_FUND_WEI: &str = "10000000000000000000";
+/// ETH minted to the governance sender (PUH) at the first stage-2 call so the
+/// `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}` priority
+/// requests have msg.value coverage. Well above the aggregate
+/// `priority_txs_l2_gas_limit * max_expected_l1_gas_price` budget of a
+/// release whose stage 2 chains L1→L2 requests (v31 stage did; v33 has no
+/// Gateway and so no stage-2 priority txs, leaving this a harmless top-up).
+///
+/// Denominated in **whole ETH**, like `valueToMint` itself: the simulator
+/// reads that field with `ethers.parseEther`. The previous value was the same
+/// amount written in wei, which `parseEther` then scaled by another 1e18.
+const STAGE2_PUH_FUND_ETH: &str = "10";
 
 /// Subset of `prepare/manifest.json` needed to walk every Safe bundle.
 #[derive(Debug, Deserialize)]
@@ -620,18 +715,19 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             )
         })?;
         write_sim_inputs(manifest, &args.camp_a_signers, sim_inputs_dir)?;
+        write_sim_inputs_runbook(sim_inputs_dir, env_cfg.as_ref(), &descriptions)?;
         return Ok(());
     }
 
-    // Parse the ecosystem TOML once up-front to build the ctm_admin_calls tag
-    // map — used below to give manifest bundles their proper flavor tag instead
-    // of the generic `bundle_<index>`.
-    let ctm_admin_calls_tags: HashMap<Address, String> = {
+    // Parse the ecosystem TOML once up-front to identify CTM admin calls by
+    // exact ChainAdmin calldata. This keeps shared-ChainAdmin environments
+    // distinguishable and lets us emit CTM calls in TOML flavor order.
+    let ctm_admin_calls_tags: CtmAdminCallsTags = {
         let content = fs::read_to_string(&governance_toml)
             .with_context(|| format!("failed to read {}", governance_toml.display()))?;
         let parsed: GovernanceCallsToml = toml::from_str(&content)
             .with_context(|| format!("failed to parse {}", governance_toml.display()))?;
-        build_ctm_admin_calls_tag_map(&parsed)
+        build_ctm_admin_calls_tags(&parsed)?
     };
 
     // Manifest bundles come FIRST (Camp-B setup the sim impersonates), then
@@ -662,6 +758,34 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
                 )
             })?;
     transactions.extend(governance);
+
+    // Acknowledgement markers, appended last. Empty calldata is load-bearing: the simulator
+    // rejects an `ack_` entry that carries any, precisely so it can never smuggle in a real call,
+    // and skips executing it. `to` is the governance sender so the entry is well-formed without
+    // naming a contract it does not touch.
+    for tag in &args.acks {
+        let tag = tag.trim_start_matches("ack_");
+        logger::info(format!("Acknowledging absent tag {tag}"));
+        transactions.push(SimulatorTransaction {
+            description: format!(
+                "ACK: {tag} is deliberately absent from this artifact and is covered outside it. \
+                 The reviewer is responsible for checking wherever it is covered."
+            ),
+            network: network.to_string(),
+            from: format!("{from:#x}"),
+            to: format!("{from:#x}"),
+            data: "0x".to_string(),
+            value: "0".to_string(),
+            value_to_mint: None,
+            time_increase: None,
+            emulate_all_batches_executed: None,
+            emulate_all_batches_executed_for: None,
+            tag: format!("ack_{tag}"),
+        });
+    }
+
+    reject_unlabelled(&transactions, descriptions_path.as_deref())?;
+
     let body = serde_json::to_string_pretty(&transactions)?;
 
     if let Some(out) = args.out {
@@ -778,6 +902,230 @@ fn write_sim_inputs(
     Ok(())
 }
 
+/// Args for `ecosystem manifest-to-simulator`.
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct ManifestToSimulatorArgs {
+    /// One or more `manifest.json` files produced by protocol-ops commands that emit Safe
+    /// bundles. Repeat to compose a scenario from several steps, in the order given — the
+    /// per-chain upgrade is `chain set-upgrade-timestamp` followed by `chain upgrade`, and the
+    /// simulator replays them in sequence on one fork.
+    #[clap(long, num_args = 1..)]
+    pub manifest: Vec<PathBuf>,
+
+    /// Transaction-simulator network name.
+    #[clap(long, default_value = "sepolia")]
+    pub network: String,
+
+    /// Tag applied to every emitted transaction, e.g. `chain_upgrade_8022833`.
+    #[clap(long)]
+    pub tag: String,
+
+    /// EOAs we hold keys for. Their bundles are dropped: the fork inherits their effect from
+    /// chain tip, and replaying them reverts. See `--camp-a-signers` on
+    /// `governance-toml-to-simulator`.
+    #[clap(long, value_delimiter = ',', num_args = 1..)]
+    pub camp_a_signers: Vec<Address>,
+
+    /// Path to a `sim-descriptions.toml` giving each emitted transaction a human-readable
+    /// description. Without it every entry reads `[unlabelled] …`, which is exactly what a
+    /// reviewer cannot act on.
+    #[clap(long)]
+    pub descriptions: Option<PathBuf>,
+
+    /// DiamondProxy whose batch counters the simulator should override before each emitted
+    /// transaction.
+    ///
+    /// A per-chain upgrade's diamond cut reverts `NotAllBatchesExecuted()` on a fork of a live
+    /// chain, which normally has a few committed-but-unexecuted batches; a real rollout waits for
+    /// them. The simulator can paper over that, but its helper overrides storage on the
+    /// transaction's `to`, and a real per-chain upgrade is wrapped in `ChainAdmin.multicall` — so
+    /// the diamond has to be named here.
+    #[clap(long)]
+    pub emulate_all_batches_executed_for: Option<Address>,
+
+    /// Output JSON path. Printed to stdout when omitted.
+    #[clap(long)]
+    pub out: Option<PathBuf>,
+}
+
+/// Marker the emitters use when no `sim-descriptions.toml` entry matched a call.
+const UNLABELLED: &str = "[unlabelled]";
+
+/// Refuses to emit a scenario in which any call is still `[unlabelled]`.
+///
+/// Passing `--descriptions` is a statement that every call should be named, so a leftover
+/// `[unlabelled]` is a gap in that file, not an acceptable default. It is also silent: the usual
+/// cause is a label whose address rotated with the CREATE2 salts, which still parses and still
+/// matches nothing, so the scenario emits fine and the missing description is only noticed by
+/// someone reading the JSON. Failing here turns that into an error at generation time, with the
+/// target and selector needed to write the entry.
+fn reject_unlabelled(
+    transactions: &[SimulatorTransaction],
+    descriptions: Option<&Path>,
+) -> anyhow::Result<()> {
+    let Some(descriptions) = descriptions else {
+        return Ok(());
+    };
+    let gaps: Vec<&SimulatorTransaction> = transactions
+        .iter()
+        .filter(|t| t.description.contains(UNLABELLED))
+        .collect();
+    if gaps.is_empty() {
+        return Ok(());
+    }
+    let mut msg = format!(
+        "{} call(s) matched no entry in {} — add one per line below, or drop --descriptions to \
+         accept auto-generated text:",
+        gaps.len(),
+        descriptions.display()
+    );
+    for t in gaps {
+        let selector = t.data.get(..10).unwrap_or("0x");
+        msg.push_str(&format!(
+            "\n  target = \"{}\"  selector = \"{selector}\"   (tag {})",
+            t.to, t.tag
+        ));
+    }
+    anyhow::bail!(msg)
+}
+
+/// `1e18`, as the divisor between wei and whole ETH.
+const WEI_PER_ETH: u64 = 1_000_000_000_000_000_000;
+
+/// Render a wei amount as the decimal-ETH string the transaction-simulator expects.
+///
+/// The simulator parses this field with `ethers.parseEther`, i.e. it reads it as whole ETH — the
+/// sibling `valueToMint: "1"` means one ETH, not one wei. Everything upstream of here counts in
+/// wei: Safe bundles serialise `value` as a decimal wei string and governance `Call.value` is a
+/// `U256` of wei. Passing either through unconverted multiplies it by 1e18, so a one-wei call
+/// would simulate as a one-ETH call. Every call this tool emits today is value-0, where the bug
+/// is invisible; this makes it correct for the ones that are not.
+fn wei_to_eth_decimal(wei: U256) -> String {
+    let divisor = U256::from(WEI_PER_ETH);
+    let whole = wei / divisor;
+    let frac = wei % divisor;
+    if frac.is_zero() {
+        return whole.to_string();
+    }
+    // 18 fractional digits, zero-padded, then trimmed — exact, no floating point.
+    let frac = format!("{frac:018}");
+    format!("{whole}.{}", frac.trim_end_matches('0'))
+}
+
+/// Same, for a Safe bundle's `value` field: a decimal (or `0x`-prefixed) wei string.
+fn safe_bundle_value_to_eth_decimal(raw: Option<&str>) -> anyhow::Result<String> {
+    let Some(raw) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok("0".to_string());
+    };
+    let wei = if let Some(hex) = raw.strip_prefix("0x").or_else(|| raw.strip_prefix("0X")) {
+        U256::from_str_radix(hex, 16)
+    } else {
+        U256::from_str_radix(raw, 10)
+    }
+    .with_context(|| format!("Safe bundle `value` is not a wei amount: {raw:?}"))?;
+    Ok(wei_to_eth_decimal(wei))
+}
+
+/// Convert a protocol-ops Safe-bundle manifest straight into a transaction-simulator scenario.
+///
+/// `governance-toml-to-simulator` builds a scenario out of an ecosystem artifact. A per-chain
+/// upgrade has no artifact — it is generated per chain by `chain upgrade`, whose output is a Safe
+/// bundle — so this converts that bundle directly. The result is not covered by the era-contracts
+/// provenance check (there is no TOML to re-derive it from); the ecosystem scenario acknowledges
+/// the gap with an `ack_` marker and the reviewer checks this file on its own terms.
+pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow::Result<()> {
+    let descriptions = load_descriptions(args.descriptions.as_deref());
+    let mut transactions = Vec::new();
+    for manifest in &args.manifest {
+        let mut batch = manifest_to_simulator_transactions(
+            manifest,
+            &args.network,
+            &args.camp_a_signers,
+            &descriptions,
+            // A per-chain manifest carries no `ctm_admin_calls` entry to tag.
+            &CtmAdminCallsTags::new(),
+        )?;
+        anyhow::ensure!(
+            !batch.is_empty(),
+            "no Camp-B bundles in {} — every bundle was classified Camp A, so there is nothing \
+             for the simulator to impersonate",
+            manifest.display()
+        );
+        logger::info(format!(
+            "{}: {} transaction(s)",
+            manifest.display(),
+            batch.len()
+        ));
+        transactions.append(&mut batch);
+    }
+    for tx in &mut transactions {
+        tx.tag = args.tag.clone();
+        if let Some(diamond) = args.emulate_all_batches_executed_for {
+            tx.emulate_all_batches_executed = Some(true);
+            tx.emulate_all_batches_executed_for = Some(format!("{diamond:#x}"));
+        }
+    }
+    reject_unlabelled(&transactions, args.descriptions.as_deref())?;
+
+    let body = serde_json::to_string_pretty(&transactions)?;
+    match args.out {
+        Some(out) => {
+            if let Some(parent) = out.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(&out, format!("{body}\n"))?;
+            logger::info(format!(
+                "Wrote {} transaction(s) to {}",
+                transactions.len(),
+                out.display()
+            ));
+        }
+        None => println!("{body}"),
+    }
+    Ok(())
+}
+
+/// Write `EXECUTE.md` next to the sim-inputs directory: the copy-into-MetaMask runbook of the
+/// Camp-B bundles, which their signers send by hand. Txs are labelled with their
+/// `sim-descriptions.toml` description and addresses named with its `[labels]` and the env's
+/// permanent values. Nothing is written when no Camp-B bundle is left.
+fn write_sim_inputs_runbook(
+    sim_inputs_dir: &Path,
+    env_cfg: Option<&crate::common::env_config::EnvConfig>,
+    descriptions: &SimDescriptionRegistry,
+) -> anyhow::Result<()> {
+    let manifest_path = sim_inputs_dir.join("manifest.json");
+    let manifest: PrepareManifest = serde_json::from_str(
+        &fs::read_to_string(&manifest_path)
+            .with_context(|| format!("failed to read {}", manifest_path.display()))?,
+    )
+    .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
+    if manifest.bundles.is_empty() {
+        logger::info("No Camp-B bundles, so no execution runbook");
+        return Ok(());
+    }
+    let path = execution_runbook::default_runbook_path(sim_inputs_dir)?;
+    let mut names = env_cfg
+        .map(execution_runbook::env_names)
+        .unwrap_or_default();
+    names.extend(descriptions.labels.clone());
+    let options = execution_runbook::LoadOptions {
+        chain_id: env_cfg.and_then(|cfg| cfg.l1_chain_id()),
+        env: env_cfg.map(|cfg| cfg.env.clone()),
+        names,
+        ..Default::default()
+    };
+    let mut runbook = execution_runbook::load(sim_inputs_dir, &path, &options)?;
+    for tx in &mut runbook.txs {
+        if let Some(description) = descriptions.lookup(tx.to, &format!("{:#x}", tx.data)) {
+            tx.label = description;
+        }
+    }
+    execution_runbook::write(&runbook, &path)?;
+    logger::info(format!("Wrote execution runbook {}", path.display()));
+    Ok(())
+}
+
 /// Walk `manifest.json`, drop every Camp-A bundle entirely, then emit one
 /// [`SimulatorTransaction`] per Camp-B tx with `from = bundle.target` (sim
 /// impersonates) and `tag = "bundle_<index>"`. Bundle and intra-bundle order
@@ -794,7 +1142,7 @@ fn manifest_to_simulator_transactions(
     network: &str,
     explicit_camp_a: &[Address],
     descriptions: &SimDescriptionRegistry,
-    ctm_admin_calls_tags: &HashMap<Address, String>,
+    ctm_admin_calls_tags: &CtmAdminCallsTags,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let manifest_dir = manifest_path.parent().ok_or_else(|| {
         anyhow::anyhow!("manifest path has no parent: {}", manifest_path.display())
@@ -877,7 +1225,21 @@ fn manifest_to_simulator_transactions(
         } else {
             bundle.steps.join(",")
         };
+        let ordered_ctm_admin_txs: Vec<&SafeBundleTx> = ctm_admin_calls_tags
+            .iter()
+            .filter_map(|((expected_to, expected_data), _)| {
+                kept.iter()
+                    .copied()
+                    .find(|tx| tx.to == *expected_to && tx.data == *expected_data)
+            })
+            .collect();
+        let mut ordered_ctm_admin_txs = ordered_ctm_admin_txs.into_iter();
         for (idx, tx) in kept.into_iter().enumerate() {
+            let tx = if ctm_admin_calls_tag(ctm_admin_calls_tags, tx).is_some() {
+                ordered_ctm_admin_txs.next().unwrap_or(tx)
+            } else {
+                tx
+            };
             let value_to_mint = if funded_signers.insert(bundle.target) {
                 Some("1".to_string())
             } else {
@@ -899,13 +1261,13 @@ fn manifest_to_simulator_transactions(
                 from: format!("{:#x}", bundle.target),
                 to: format!("{:#x}", tx.to),
                 data: tx.data.clone(),
-                value: tx.value.clone().unwrap_or_else(|| "0".to_string()),
+                value: safe_bundle_value_to_eth_decimal(tx.value.as_deref())?,
                 value_to_mint,
                 time_increase: None,
                 emulate_all_batches_executed: None,
-                tag: ctm_admin_calls_tags
-                    .get(&tx.to)
-                    .cloned()
+                emulate_all_batches_executed_for: None,
+                tag: ctm_admin_calls_tag(ctm_admin_calls_tags, tx)
+                    .map(str::to_string)
                     .unwrap_or_else(|| format!("bundle_{}", bundle.index)),
             });
         }
@@ -924,6 +1286,9 @@ fn governance_toml_to_simulator_transactions(
     let parsed: GovernanceCallsToml =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path.display()))?;
 
+    // A `chain` scenario runs on the fork an `ecosystem` scenario already advanced, so it must
+    // not replay the ceremony: stage 0 would revert `TimerAlreadyStarted`, and stage 1 would
+    // re-point proxies that already carry the new implementations.
     let stages = [
         (0u8, parsed.governance_calls.stage0_calls.as_str()),
         (1u8, parsed.governance_calls.stage1_calls.as_str()),
@@ -938,7 +1303,7 @@ fn governance_toml_to_simulator_transactions(
         for (idx, call) in calls.into_iter().enumerate() {
             let data_hex = format!("0x{}", hex::encode(&call.data));
             // Mint logic:
-            //   - First stage-2 call → top up PUH with `STAGE2_PUH_FUND_WEI`
+            //   - First stage-2 call → top up PUH with `STAGE2_PUH_FUND_ETH`
             //     so subsequent L1→L2 priority requests have msg.value.
             //   - Otherwise, first-ever call → seed PUH with 1 wei so the
             //     anvil account exists.
@@ -946,7 +1311,7 @@ fn governance_toml_to_simulator_transactions(
             let value_to_mint = if stage == 2 && stage2_topup_pending {
                 stage2_topup_pending = false;
                 should_fund_sender = false;
-                Some(STAGE2_PUH_FUND_WEI.to_string())
+                Some(STAGE2_PUH_FUND_ETH.to_string())
             } else if should_fund_sender {
                 should_fund_sender = false;
                 Some("1".to_string())
@@ -978,10 +1343,11 @@ fn governance_toml_to_simulator_transactions(
                 from: format!("{from:#x}"),
                 to: format!("{:#x}", call.target),
                 data: data_hex,
-                value: call.value.to_string(),
+                value: wei_to_eth_decimal(call.value),
                 value_to_mint,
                 time_increase,
                 emulate_all_batches_executed: None,
+                emulate_all_batches_executed_for: None,
                 tag: format!("stage{stage}"),
             });
         }
@@ -1031,14 +1397,98 @@ fn append_test_upgrade_calls(
                 from: format!("{caller:#x}"),
                 to: format!("{:#x}", call.target),
                 data: data_hex,
-                value: call.value.to_string(),
+                value: wei_to_eth_decimal(call.value),
                 value_to_mint: Some("1".to_string()),
                 time_increase: None,
                 emulate_all_batches_executed,
+                emulate_all_batches_executed_for: None,
                 tag: tag.to_string(),
             });
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod value_conversion_tests {
+    use super::*;
+
+    /// The case from the PR review: a Safe call carrying one wei must not
+    /// simulate as one ETH.
+    #[test]
+    fn one_wei_is_not_one_eth() {
+        assert_eq!(
+            safe_bundle_value_to_eth_decimal(Some("1")).unwrap(),
+            "0.000000000000000001"
+        );
+    }
+
+    #[test]
+    fn zero_and_absent_both_render_zero() {
+        assert_eq!(safe_bundle_value_to_eth_decimal(None).unwrap(), "0");
+        assert_eq!(safe_bundle_value_to_eth_decimal(Some("0")).unwrap(), "0");
+        assert_eq!(safe_bundle_value_to_eth_decimal(Some("  ")).unwrap(), "0");
+        assert_eq!(wei_to_eth_decimal(U256::ZERO), "0");
+    }
+
+    #[test]
+    fn whole_eth_has_no_fractional_part() {
+        assert_eq!(wei_to_eth_decimal(U256::from(WEI_PER_ETH)), "1");
+        assert_eq!(
+            wei_to_eth_decimal(U256::from(WEI_PER_ETH) * U256::from(42)),
+            "42"
+        );
+    }
+
+    #[test]
+    fn fractional_amounts_are_exact_and_trimmed() {
+        // 1.5 ETH
+        assert_eq!(
+            wei_to_eth_decimal(U256::from(1_500_000_000_000_000_000u64)),
+            "1.5"
+        );
+        // 0.1 ETH — the classic binary-float trap; must be exact.
+        assert_eq!(
+            wei_to_eth_decimal(U256::from(100_000_000_000_000_000u64)),
+            "0.1"
+        );
+    }
+
+    #[test]
+    fn hex_values_are_accepted() {
+        // Safe bundles are decimal, but tolerate 0x rather than parsing it wrongly.
+        assert_eq!(
+            safe_bundle_value_to_eth_decimal(Some("0xde0b6b3a7640000")).unwrap(),
+            "1"
+        );
+    }
+
+    #[test]
+    fn a_non_numeric_value_is_an_error_not_a_silent_zero() {
+        assert!(safe_bundle_value_to_eth_decimal(Some("1 ether")).is_err());
+    }
+
+    /// Round-trips through the simulator's own reading of the field: whatever
+    /// we emit, `parseEther` must give back the wei we started from.
+    #[test]
+    fn round_trips_through_parse_ether_semantics() {
+        for wei in [
+            0u64,
+            1,
+            999,
+            100_000_000_000_000_000,
+            WEI_PER_ETH,
+            2_500_000_000_000_000_001,
+        ] {
+            let s = wei_to_eth_decimal(U256::from(wei));
+            let (whole, frac) = match s.split_once('.') {
+                Some((w, f)) => (w, format!("{f:0<18}")),
+                None => (s.as_str(), "0".repeat(18)),
+            };
+            let back = U256::from_str_radix(whole, 10).unwrap() * U256::from(WEI_PER_ETH)
+                + U256::from_str_radix(&frac, 10).unwrap();
+            assert_eq!(back, U256::from(wei), "round-trip failed for {wei} -> {s}");
+        }
+    }
 }

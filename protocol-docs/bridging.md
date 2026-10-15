@@ -50,6 +50,8 @@ Registration flows:
   deliberately permissionless (`registerToken`, `ensureTokenIsRegistered`) so bridging native tokens never
   needs an allowlist.
 
+![Custom asset handler registration](./img/custom_asset_handler_registration.png)
+
 ## Asset routing: burn / mint
 
 All transfers follow one pattern: the source-side asset handler's `bridgeBurn` locks or burns the funds and
@@ -88,6 +90,10 @@ ZKsync OS does not support factory dependencies in priority transactions. The Ma
 `factoryDeps` to be empty. The shared canonical transaction format retains the field because system
 upgrade transactions use it to identify bytecode preimages. Contract deployment in ordinary priority
 transactions uses EVM execution.
+
+![Token deposit via requestL2TransactionTwoBridges](./img/deposit_two_bridges.png)
+
+![Base-token deposit via requestL2TransactionDirect](./img/deposit_direct.png)
 
 ### Refund-recipient resolution
 
@@ -182,7 +188,7 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
   `chainBalance(chainId, assetId)` getter remains for backwards compatibility and will revert in the next release.
 - **Pausability**: inherited by both vaults from the base. On L1 it is part of the emergency controls; on
   L2 it exists only for shared-code reasons and should not be used as an emergency mechanism — future L2
-  logic should rely on the L1/Gateway freeze flow.
+  logic should rely on L1-governed emergency controls.
 
 ### Populating `bridgedOut` during an in-place upgrade
 
@@ -364,11 +370,11 @@ mintData)` on the asset handler registered for the asset (`assetHandlerAddress[a
   [Finalization (destination side)](#finalization-destination-side)). Numerous
   `__DEPRECATED_*` storage slots remain across `L1AssetRouter`, `L2AssetRouter`, `L1Nullifier`,
   `L2NativeTokenVault`, `L1NativeTokenVault` and `L2AssetTracker` solely to preserve the upgradeable
-  storage layouts of already-deployed proxies; they must not be reused. Three are still read:
-  `L1NativeTokenVault.__DEPRECATED_l1AssetTracker`, which locates the legacy accounting for the
-  `bridgedOut` population, and `L1Nullifier`'s `__DEPRECATED_l2BridgeAddress` (the sender check on the
-  legacy withdrawal path) and `__DEPRECATED_chainBalance` (its getter, and the nullification the NTV
-  triggers).
+  storage layouts of already-deployed proxies; they must not be reused.
+  `L1NativeTokenVault.__DEPRECATED_l1AssetTracker` is still read to locate legacy accounting while
+  populating `bridgedOut`. `L1Nullifier.__DEPRECATED_l2BridgeAddress` and
+  `L1Nullifier.__DEPRECATED_chainBalance` remain declarations with generated compatibility getters;
+  production withdrawal authentication and accounting no longer use them.
 - Legacy bridged tokens on L2 may predate the NTV: `BridgedStandardERC20.onlyNTV` lazily migrates them by
   setting `nativeTokenVault` to `L2_NATIVE_TOKEN_VAULT_ADDR` and deriving the asset ID on first use.
   `addLegacyTokenToBridgedTokensList` backfills such tokens into the vault's `bridgedTokens` enumeration,

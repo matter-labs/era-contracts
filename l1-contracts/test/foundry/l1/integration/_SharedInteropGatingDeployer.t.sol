@@ -26,15 +26,14 @@ abstract contract InteropGatingDeployer is L1ContractDeployer, ZKChainDeployer, 
     /// never reach the ZiSK Plonk verifier, so any code there serves.
     address internal constant ZISK_PLONK_VERIFIER = address(0xFe11);
 
-    L1MessageRoot internal messageRoot;
+    string internal constant MULTI_PROOF_CTM_CONFIG_PATH =
+        "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm-multi-proof.toml";
 
-    function _ctmConfigPath() internal pure override returns (string memory) {
-        return "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm-multi-proof.toml";
-    }
+    L1MessageRoot internal messageRoot;
 
     function _deployInteropGatingEcosystem() internal {
         vm.etch(ZISK_PLONK_VERIFIER, hex"fe");
-        _deployL1Contracts();
+        _deployL1Contracts(MULTI_PROOF_CTM_CONFIG_PATH);
         _deployTokens();
         _registerNewTokens(tokens);
 

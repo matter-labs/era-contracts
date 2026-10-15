@@ -179,6 +179,7 @@ script_calls! {
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::executeChainAdminMulticallCall                   => ADMIN_FUNCTIONS_INVOCATION,
     // Other scripts
     IFinalizeChainInitAbi::finalizeChainInitCall                        => FINALIZE_CHAIN_INIT_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,

@@ -398,6 +398,19 @@ pub struct UpgradePrepareAllArgs {
     /// representative ZK chain on the CTM when omitted.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
+
+    /// Also redeploy the zk-governance set (ProtocolUpgradeHandler impl,
+    /// Guardians, SecurityCouncil, EmergencyUpgradeBoard) from the sibling
+    /// `zk-governance` checkout and fold the four calls that wire it into the
+    /// live PUH proxy into stage 0.
+    ///
+    /// Off by default, and deliberately not implied by `governance_kind =
+    /// "puh"`: swapping the governance set is release-specific work that v31
+    /// happened to carry (its CREATE2 salt seed is `b"v31:gov"`), not a step
+    /// every protocol upgrade wants. A release that only moves the protocol
+    /// version must leave the live handler alone. Requires a PUH-governed env.
+    #[clap(long, default_value_t = false)]
+    pub redeploy_zk_governance: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -573,8 +586,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // works on a fork via `anvil_impersonateAccount`; on a real chain
         // nobody can sign as that contract. The caller must pass
         // `--deployer-address <real-EOA>` (or derive it from the broadcast
-        // signer's private key — see `regen-and-verify-stage.sh` for an
-        // example using `cast wallet address`).
+        // signer's private key — use `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
         // (see `per_env_upgrade_input`).
         if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
@@ -606,9 +618,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // script the prepare flow spawns. `Utils.executeCalls` / `executeUpgrade`
     // read this via `vm.envOr("LEGACY_GOV_SALT", bytes32(0))`. Child
     // processes inherit env vars from this process, so a single `set_var`
-    // here covers every script in the pipeline. See
-    // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
-    // ("Core principle") for why a per-regen salt is required.
+    // here covers every script in the pipeline.
     if let Some(cfg) = env_cfg.as_ref() {
         if let Some(salt) = cfg.v31_legacy_gov_salt()? {
             logger::info(format!(
@@ -770,7 +780,11 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // Every prepared CTM is ZKsync OS (prepare rejects anything else); the first
     // one in input order is the representative passed to the PUH redeploy.
     let zksync_os_ctm_proxy = prepared.ctm_tomls.first().map(|e| e.proxy);
-    let puh_outcome = if is_puh_governed {
+    anyhow::ensure!(
+        !args.redeploy_zk_governance || is_puh_governed,
+        "--redeploy-zk-governance requires a PUH-governed environment"
+    );
+    let puh_outcome = if args.redeploy_zk_governance {
         let mut puh_inputs =
             crate::commands::ecosystem::zk_governance::ZkGovernanceInputs::from_env(
                 env_cfg.as_ref(),
@@ -786,6 +800,13 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .await
             .context("PUH/Guardians redeploy step")?,
         )
+    } else if is_puh_governed {
+        logger::info(
+            "Skipping PUH/Guardians redeploy: this release does not ship a new zk-governance \
+             set, so the live ProtocolUpgradeHandler is left as-is. Pass \
+             --redeploy-zk-governance to include it.",
+        );
+        None
     } else {
         logger::info(
             "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
@@ -1103,12 +1124,11 @@ fn write_merged_ecosystem_toml(
     Ok(())
 }
 
-/// Walk every safe.json bundle under `prepare_dir` and rewrite each
-/// `transferOwnership(address)` tx whose `to` is in `targets` so the address
-/// argument points at `new_pending_owner` instead of whatever ChainAdmin
 /// Read the `acceptOwnership()` Call list written by
 /// `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
-/// (in `<l1-contracts>/script-out/pre-governance-accept-ownerships.toml`).
+/// (in `<l1-contracts>/script-out/pre-governance-accept-ownerships.toml`):
+/// one per CTM, and one per CTM ValidatorTimelock, whose `pendingOwner` is
+/// governance after the prepare pre-step.
 /// Returns an empty vector when the file doesn't exist (e.g. a prior regen
 /// without this step) — the merge step then has nothing to fold and the
 /// behavior matches the pre-refactor "no extra stage-0 calls" path.
@@ -1166,6 +1186,90 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
         .collect();
 
     Ok(ctms)
+}
+
+// ─── forge-script upgrades ───────────────────────────────────────────────────────
+
+/// Prepare a `forge-script` upgrade (see `upgrade_descriptor`): run its entry point on
+/// `l1_rpc_url` as `deployer` and write the deployer's transactions as Safe bundles plus
+/// `manifest.json` under `out` — the packaging `upgrade-prepare-all` uses, so the deploy
+/// bundle, its replay and its broadcast are shared with the `prepare-all` flow.
+///
+/// The script runs as a dry run: forge records the transactions without sending them, so
+/// the fork stays at its pre-upgrade state and the caller can replay the packed bundle on it.
+pub async fn run_forge_script_prepare(
+    upgrade_name: &str,
+    upgrade: &crate::common::upgrade_descriptor::ForgeScriptUpgrade,
+    env: &str,
+    l1_rpc_url: &str,
+    deployer: Address,
+    out: &Path,
+) -> anyhow::Result<()> {
+    let shared = crate::common::SharedRunArgs {
+        l1_rpc_url: l1_rpc_url.to_string(),
+        out: Some(out.to_path_buf()),
+        subdir: None,
+        forge_args: Default::default(),
+    };
+    let mut runner = ForgeRunner::new(&shared)?;
+    let wallet = runner.prepare_sender(deployer).await?;
+    let script = runner
+        .script_path_from_root(
+            &crate::common::paths::resolve_l1_contracts_path()?,
+            upgrade.script_path(),
+        )
+        .with_calldata(&Bytes::from(upgrade.calldata(env)?))
+        .with_ffi()
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&wallet);
+    logger::step(format!("Running {} for {env} (dry run)", upgrade.script));
+    runner
+        .run(script)
+        .with_context(|| format!("failed to execute {}", upgrade.script))?;
+    crate::common::output::write_output_if_requested(
+        &format!("ecosystem.prepare.{upgrade_name}"),
+        &shared,
+        &runner,
+        &serde_json::json!({
+            "upgrade": upgrade_name,
+            "env": env,
+            "script": upgrade.script,
+            "signature": upgrade.signature,
+            "args": upgrade.args_for(env),
+        }),
+        &serde_json::json!({}),
+    )
+    .await
+}
+
+/// Run a `forge-script` upgrade's `[execution]` script for `env` on `l1_rpc_url` (read-only: a
+/// simulation without a sender), which writes `output/<env>/<execution.output>`.
+pub fn run_execution_script(
+    execution: &crate::common::upgrade_descriptor::ExecutionScript,
+    env: &str,
+    l1_rpc_url: &str,
+) -> anyhow::Result<()> {
+    let shared = crate::common::SharedRunArgs {
+        l1_rpc_url: l1_rpc_url.to_string(),
+        out: None,
+        subdir: None,
+        forge_args: Default::default(),
+    };
+    let mut runner = ForgeRunner::new(&shared)?;
+    let script = runner
+        .script_path_from_root(
+            &crate::common::paths::resolve_l1_contracts_path()?,
+            execution.script_path(),
+        )
+        .with_calldata(&Bytes::from(execution.calldata(env)?))
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+    logger::step(format!(
+        "Running {} for {env} (read-only)",
+        execution.script
+    ));
+    runner
+        .run(script)
+        .with_context(|| format!("failed to execute {}", execution.script))
 }
 
 #[cfg(test)]

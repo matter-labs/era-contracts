@@ -32,6 +32,7 @@ import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -70,6 +71,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     L1InteropFeeManager internal interopFeeManager;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
+    MigratorFacet internal migrator;
     // UtilsFacet is attached to every diamond by default (see constructor) so tests can manipulate chain state.
     UtilsFacet internal utilsFacet;
     bytes32 internal newCommittedBlockBatchHash;
@@ -297,6 +299,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         executor = new TestExecutor();
         committer = new TestCommitter();
         mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
+        migrator = new MigratorFacet(block.chainid, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         // The CTM stub has no interop fee manager; it points at the real one above.
@@ -353,7 +356,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](7);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(admin),
             action: Diamond.Action.Add,
@@ -390,6 +393,12 @@ contract ExecutorTest is UtilsCallMockerTest {
             isFreezable: true,
             selectors: Utils.getUtilsFacetSelectors()
         });
+        facetCuts[6] = Diamond.FacetCut({
+            facet: address(migrator),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getMigratorSelectors()
+        });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -404,6 +413,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         committer = TestCommitter(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
+        migrator = MigratorFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
         utilsFacet = UtilsFacet(address(diamondProxy));
         chainTypeManager.setZKChain(address(diamondProxy));

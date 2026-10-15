@@ -326,6 +326,8 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
+
+        L2InteropHandler(L2_INTEROP_HANDLER_ADDR).updateL2();
     }
 
     function _finalizeDeployments(

@@ -14,7 +14,7 @@ use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-        versions::v31::utils::{
+        versions::v33::utils::{
             address_verifier::AddressVerifier,
             apply_l2_to_l1_alias,
             bytecode_verifier::BytecodeVerifier,
@@ -61,9 +61,38 @@ impl GenesisConfigKind {
 }
 
 impl Verifiers {
-    /// Creates a v31 verifier context from the single ecosystem TOML.
+    #[cfg(test)]
+    pub(crate) fn offline_v34() -> Self {
+        Self {
+            env: VerifyUpgradeEnv::Testnet,
+            bridgehub_address: Address::ZERO,
+            bridgehub_owner: Address::ZERO,
+            address_verifier: AddressVerifier {
+                address_to_name: Default::default(),
+                name_to_address: Default::default(),
+            },
+            bytecode_verifier: BytecodeVerifier::init_from_local().unwrap(),
+            network_verifier: NetworkVerifier {
+                l1_provider: alloy::providers::RootProvider::new_http(
+                    "http://127.0.0.1:1".parse().unwrap(),
+                ),
+                l1_chain_id: 1,
+                create2_known_bytecodes: Default::default(),
+                create2_constructor_params: Default::default(),
+            },
+            zksync_os_genesis_config: GenesisConfig::init_v33_from_local(
+                GenesisConfigKind::ZksyncOs,
+            )
+            .unwrap(),
+            era_chain_id: 0,
+            expected_l1_chain_id: 1,
+            zk_token_asset_id: FixedBytes::ZERO,
+        }
+    }
+
+    /// Creates a v33 verifier context from the single ecosystem TOML.
     #[allow(clippy::too_many_arguments)]
-    pub async fn new_v31(
+    pub async fn new_v33(
         env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
@@ -93,8 +122,8 @@ impl Verifiers {
             &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
         )?;
         let bytecode_verifier =
-            BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
-        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into()).await?;
+            BytecodeVerifier::init_v33(contracts_commit, zk_governance_commit).await?;
+        let network_verifier = NetworkVerifier::new_v33(l1_rpc.into()).await?;
 
         // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
         // PUH-governed envs). It is the authoritative source for the
@@ -117,7 +146,7 @@ impl Verifiers {
         })?;
         let aliased_bridgehub_owner = apply_l2_to_l1_alias(bridgehub_owner);
 
-        let mut address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+        let mut address_verifier = AddressVerifier::new_v33_from_artifact(artifact)?;
         address_verifier.add_address(bridgehub_owner, "protocol_upgrade_handler_proxy");
         address_verifier.add_address(
             aliased_bridgehub_owner,
@@ -125,7 +154,7 @@ impl Verifiers {
         );
 
         let zksync_os_genesis_config =
-            GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
+            GenesisConfig::init_v33(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
 
         Ok(Self {
             env,
@@ -151,21 +180,23 @@ impl Verifiers {
 #[derive(Debug, Clone, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
+    pub protocol_semantic_version:
+        crate::upgrade_verification::versions::v33::elements::protocol_version::ProtocolVersion,
 }
 
 impl GenesisConfig {
-    pub async fn init_v31(
+    pub async fn init_v33(
         kind: GenesisConfigKind,
         contracts_commit: Option<&str>,
     ) -> anyhow::Result<Self> {
         if let Some(contracts_commit) = contracts_commit {
-            return Self::init_v31_from_github(kind, contracts_commit).await;
+            return Self::init_v33_from_github(kind, contracts_commit).await;
         }
 
-        Self::init_v31_from_local(kind)
+        Self::init_v33_from_local(kind)
     }
 
-    fn init_v31_from_local(kind: GenesisConfigKind) -> anyhow::Result<Self> {
+    fn init_v33_from_local(kind: GenesisConfigKind) -> anyhow::Result<Self> {
         let path = repo_relative_path(kind.local_path());
         let data = fs::read_to_string(&path)
             .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
@@ -173,7 +204,7 @@ impl GenesisConfig {
             .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
     }
 
-    async fn init_v31_from_github(kind: GenesisConfigKind, commit: &str) -> anyhow::Result<Self> {
+    async fn init_v33_from_github(kind: GenesisConfigKind, commit: &str) -> anyhow::Result<Self> {
         let path = kind.local_path();
         let data = get_contents_from_github(commit, "matter-labs/era-contracts", path).await;
         serde_json::from_str(&data).map_err(|e| {
@@ -187,6 +218,11 @@ pub(crate) struct VerificationResult {
     pub(crate) result: String,
     pub(crate) warnings: u64,
     pub(crate) errors: u64,
+    /// CREATE2 deployments whose *init code* was verified, i.e. whose constructor params were
+    /// compared against an independently declared expectation. Deliberately not populated by
+    /// runtime-bytecode checks: runtime code cannot see a constructor suffix, so counting those
+    /// as coverage would reproduce the gap that let a phantom argument reach mainnet.
+    pub(crate) verified_create2: std::collections::HashSet<Address>,
 }
 
 impl VerificationResult {
@@ -326,6 +362,7 @@ impl VerificationResult {
         expected_file: &str,
         report_ok: bool,
     ) -> bool {
+        self.verified_create2.insert(*address);
         let deployed_file = match verifiers
             .network_verifier
             .create2_known_bytecodes
@@ -376,6 +413,47 @@ impl VerificationResult {
         true
     }
 
+    /// Verifies a proxy this upgrade did **not** deploy.
+    ///
+    /// Some proxies are kept across releases and only have their
+    /// implementation swapped, so they carry no CREATE2 provenance in this
+    /// upgrade's transaction log. What is checkable is that the address is a
+    /// live proxy under the expected `ProxyAdmin`, and that the implementation
+    /// the governance calls point it at was deployed here — the latter is
+    /// verified by the stage-1 payload pass, which reads the call rather than
+    /// the pre-upgrade storage slot.
+    pub(crate) async fn expect_preexisting_proxy(
+        &mut self,
+        verifiers: &Verifiers,
+        address: &Address,
+        expected_admin: Address,
+        label: &str,
+    ) {
+        if verifiers
+            .network_verifier
+            .get_bytecode_hash_at(address)
+            .await
+            == FixedBytes::ZERO
+        {
+            self.report_error(&format!(
+                "{label} proxy {address} is expected to pre-exist, but has no code on L1"
+            ));
+            return;
+        }
+
+        let admin = verifiers.network_verifier.get_proxy_admin(*address).await;
+        if admin != expected_admin {
+            self.report_error(&format!(
+                "{label} proxy {address} is administered by {admin}, expected {expected_admin}"
+            ));
+            return;
+        }
+
+        self.report_ok(&format!(
+            "{label} proxy {address} pre-exists under the expected ProxyAdmin"
+        ));
+    }
+
     /// Verifies create2 parameters for a proxy contract that uses a separate implementation.
     pub(crate) async fn expect_create2_params_proxy_with_bytecode(
         &mut self,
@@ -387,7 +465,7 @@ impl VerificationResult {
         expected_file: &str,
     ) {
         let transparent_proxy_key = FixedBytes::from_hex(
-            "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
+            crate::upgrade_verification::constants::EIP1967_IMPLEMENTATION_SLOT,
         )
         .expect("Invalid transparent proxy key hex literal");
 
@@ -428,6 +506,96 @@ impl VerificationResult {
     }
 }
 
+impl VerificationResult {
+    /// Every CREATE2 deployment of this upgrade should have had its constructor params checked by
+    /// some element above. Anything left over was deployed and never verified — the state
+    /// RollupL1DAValidator was in, which is why its 32 phantom bytes went unnoticed.
+    ///
+    /// The transactions logs also hold earlier broadcasts (a reference log, superseded bundles)
+    /// whose contracts this upgrade does not use. `historical` lists them for envs where a real
+    /// run enumerated the set: there every other unverified deployment is an error. Envs without
+    /// a list keep the warning until a real run enumerates theirs.
+    pub(crate) fn report_unverified_create2_deployments(
+        &mut self,
+        verifiers: &Verifiers,
+        historical: Option<&[Address]>,
+    ) {
+        let unverified: Vec<(Address, String)> = verifiers
+            .network_verifier
+            .create2_known_bytecodes
+            .iter()
+            .filter(|(address, _)| !self.verified_create2.contains(*address))
+            .map(|(address, file)| (*address, file.clone()))
+            .collect();
+        let (level, message) =
+            init_code_coverage(self.verified_create2.len(), unverified, historical);
+        match level {
+            CoverageLevel::Ok => self.report_ok(&message),
+            CoverageLevel::Warn => self.report_warn(&message),
+            CoverageLevel::Error => self.report_error(&message),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum CoverageLevel {
+    Ok,
+    Warn,
+    Error,
+}
+
+/// Pure part of `report_unverified_create2_deployments`: the finding for `verified` checked
+/// deployments and the `unverified` ones (address, contract file), given the env's list of
+/// `historical` deployments, if it has one.
+fn init_code_coverage(
+    verified: usize,
+    mut unverified: Vec<(Address, String)>,
+    historical: Option<&[Address]>,
+) -> (CoverageLevel, String) {
+    unverified.sort();
+    let describe = |list: &[(Address, String)]| {
+        list.iter()
+            .map(|(address, file)| format!("{address} ({file})"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let (listed, unexpected): (Vec<_>, Vec<_>) = match historical {
+        Some(historical) => unverified
+            .into_iter()
+            .partition(|(address, _)| historical.contains(address)),
+        None => (Vec::new(), unverified),
+    };
+    if !unexpected.is_empty() {
+        let level = if historical.is_some() {
+            CoverageLevel::Error
+        } else {
+            CoverageLevel::Warn
+        };
+        return (
+            level,
+            format!(
+                "Init-code coverage: {} CREATE2 deployment(s) were never checked against a declared constructor expectation, so their addresses are unverified: {}",
+                unexpected.len(),
+                describe(&unexpected)
+            ),
+        );
+    }
+    let historical_note = if listed.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "; {} historical deployment(s) from earlier broadcasts are not part of this upgrade",
+            listed.len()
+        )
+    };
+    (
+        CoverageLevel::Ok,
+        format!(
+            "Init-code coverage: all {verified} CREATE2 deployments had their constructor params verified{historical_note}"
+        ),
+    )
+}
+
 impl Display for VerificationResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.errors > 0 {
@@ -450,5 +618,41 @@ impl Display for VerificationResult {
         } else {
             write!(f, "{} - result: {}", style("OK").green(), self.result)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloy::primitives::Address;
+
+    use super::{init_code_coverage, CoverageLevel};
+
+    /// Without a historical list, unverified deployments stay a warning. With one, listed
+    /// deployments are noted as history and anything else is an error naming only itself.
+    #[test]
+    fn coverage_is_strict_only_for_envs_with_a_historical_list() {
+        let old = Address::repeat_byte(0xaa);
+        let new = Address::repeat_byte(0xbb);
+        let unverified = vec![
+            (new, "l1-contracts/New".to_string()),
+            (old, "l1-contracts/Old".to_string()),
+        ];
+
+        let (level, message) = init_code_coverage(5, unverified.clone(), None);
+        assert_eq!(level, CoverageLevel::Warn);
+        assert!(message.contains(&old.to_string()) && message.contains(&new.to_string()));
+
+        let (level, message) = init_code_coverage(5, unverified.clone(), Some(&[old, new]));
+        assert_eq!(level, CoverageLevel::Ok);
+        assert!(message.contains("all 5 CREATE2 deployments"), "{message}");
+        assert!(message.contains("2 historical deployment(s)"), "{message}");
+
+        let (level, message) = init_code_coverage(5, unverified, Some(&[old]));
+        assert_eq!(level, CoverageLevel::Error);
+        assert!(message.contains(&new.to_string()), "{message}");
+        assert!(!message.contains(&old.to_string()), "{message}");
+
+        let (level, _) = init_code_coverage(5, Vec::new(), None);
+        assert_eq!(level, CoverageLevel::Ok);
     }
 }
