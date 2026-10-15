@@ -8,7 +8,7 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
+import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "contracts/common/L1ContractErrors.sol";
 
 contract RevertingTest is ExecutorTest {
     uint256 private constant MAX_REVERT_BATCHES_GAS = 300_000;
@@ -65,5 +65,46 @@ contract RevertingTest is ExecutorTest {
         uint256 gasUsed = gasBefore - gasleft();
 
         assertLt(gasUsed, MAX_REVERT_BATCHES_GAS, "revertBatchesSharedBridge gas too high");
+    }
+
+    function test_RevertWhen_RevertingExecutedBatch() public {
+        utilsFacet.util_setTotalBatchesCommitted(5);
+        utilsFacet.util_setTotalBatchesExecuted(3);
+
+        vm.prank(validator);
+        vm.expectRevert(CantRevertExecutedBatch.selector);
+        executor.revertBatchesSharedBridge(address(0), 2);
+    }
+
+    function test_RevertBatches_ResetsUpgradeBatchNumber() public {
+        utilsFacet.util_setTotalBatchesCommitted(5);
+        utilsFacet.util_setL2SystemContractsUpgradeBatchNumber(3);
+
+        vm.prank(validator);
+        executor.revertBatchesSharedBridge(address(0), 2);
+
+        assertEq(utilsFacet.util_getL2SystemContractsUpgradeBatchNumber(), 0);
+    }
+
+    function test_RevertBatches_ResetsVerifiedBatches() public {
+        utilsFacet.util_setTotalBatchesCommitted(5);
+        utilsFacet.util_setTotalBatchesVerified(3);
+
+        vm.prank(validator);
+        executor.revertBatchesSharedBridge(address(0), 2);
+
+        assertEq(utilsFacet.util_getTotalBatchesVerified(), 2);
+        assertEq(getters.getTotalBatchesCommitted(), 2);
+    }
+
+    function test_RevertBatches_KeepsVerifiedBatchesBelowNewLastBatch() public {
+        utilsFacet.util_setTotalBatchesCommitted(5);
+        utilsFacet.util_setTotalBatchesVerified(2);
+
+        vm.prank(validator);
+        executor.revertBatchesSharedBridge(address(0), 4);
+
+        assertEq(utilsFacet.util_getTotalBatchesVerified(), 2);
+        assertEq(getters.getTotalBatchesCommitted(), 4);
     }
 }

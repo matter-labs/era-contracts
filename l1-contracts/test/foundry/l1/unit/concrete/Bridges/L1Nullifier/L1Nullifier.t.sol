@@ -91,11 +91,8 @@ contract L1NullifierTest is Test {
         );
     }
 
-    function test_BRIDGE_HUB() public view {
+    function test_constructor() public view {
         assertEq(address(l1Nullifier.BRIDGE_HUB()), bridgehub);
-    }
-
-    function test_MESSAGE_ROOT() public view {
         assertEq(address(l1Nullifier.MESSAGE_ROOT()), messageRoot);
     }
 

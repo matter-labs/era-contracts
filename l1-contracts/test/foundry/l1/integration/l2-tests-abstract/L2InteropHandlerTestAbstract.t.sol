@@ -398,7 +398,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     // authenticates via the AtomicFlowManager IMT gate rather than the message sender. The InteropCenter-as-
     // author authentication is NOT dropped — it moves to `AtomicFlowManager.append` being `onlyInteropCenter`
     // (only the InteropCenter can commit a bundle to the IMT, so only its bundles can be finalized here). That
-    // gate is covered by AtomicFlowManagerAccessControl.t.sol; the L1 message-sender check for withdrawals is
+    // gate is covered by AtomicFlowManagerAppend.t.sol; the L1 message-sender check for withdrawals is
     // covered by L1InteropHandler.t.sol (test_ExecuteBundle_RevertWhen_UnauthorizedMessageSender).
 
     /// @notice Regression: bundles can only be verified on their declared destination chain.

@@ -8,12 +8,12 @@ import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MerkleWrongIndex} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for FullMerkle library
-contract FullMerkleTest is Test {
+contract FullMerkleLibraryTest is Test {
     using FullMerkle for FullMerkle.FullTree;
 
     FullMerkle.FullTree internal tree;
 
-    bytes32 internal constant ZERO = bytes32(0);
+    bytes32 internal constant ZERO = keccak256("ZERO");
 
     // ============ setup Tests ============
 
@@ -22,14 +22,9 @@ contract FullMerkleTest is Test {
 
         assertEq(initialRoot, ZERO);
         assertEq(tree.root(), ZERO);
-    }
-
-    function test_setup_withNonZeroValue() public {
-        bytes32 customZero = keccak256("custom_zero");
-        bytes32 initialRoot = tree.setup(customZero);
-
-        assertEq(initialRoot, customZero);
-        assertEq(tree.root(), customZero);
+        assertEq(tree._height, 0);
+        assertEq(tree._leafNumber, 0);
+        assertEq(tree._zeros[0], ZERO);
     }
 
     // ============ pushNewLeaf Tests ============
@@ -42,6 +37,9 @@ contract FullMerkleTest is Test {
 
         assertEq(newRoot, leaf);
         assertEq(tree.root(), leaf);
+        assertEq(tree._height, 0);
+        assertEq(tree._leafNumber, 1);
+        assertEq(tree._nodes[0][0], leaf);
     }
 
     function test_pushNewLeaf_twoLeaves() public {
@@ -55,6 +53,12 @@ contract FullMerkleTest is Test {
 
         bytes32 expectedRoot = Merkle.efficientHash(leaf1, leaf2);
         assertEq(newRoot, expectedRoot);
+        assertEq(tree._height, 1);
+        assertEq(tree._leafNumber, 2);
+        assertEq(tree._nodes[0][0], leaf1);
+        assertEq(tree._nodes[0][1], leaf2);
+        assertEq(tree._nodes[1][0], expectedRoot);
+        assertEq(tree._zeros[1], Merkle.efficientHash(ZERO, ZERO));
     }
 
     function test_pushNewLeaf_fourLeaves() public {
@@ -94,21 +98,18 @@ contract FullMerkleTest is Test {
         bytes32 expectedRoot = Merkle.efficientHash(hash12, hash3Zero);
 
         assertEq(newRoot, expectedRoot);
-    }
-
-    function test_pushNewLeaf_expandsTreeHeight() public {
-        tree.setup(ZERO);
-
-        // Push leaves until tree needs to expand
-        bytes32 leaf = keccak256("leaf");
-        tree.pushNewLeaf(leaf); // height stays 0
-        tree.pushNewLeaf(leaf); // height becomes 1
-        tree.pushNewLeaf(leaf); // height stays 1
-        tree.pushNewLeaf(leaf); // height stays 1
-        tree.pushNewLeaf(leaf); // height becomes 2
-
-        // Tree should have expanded to accommodate 5 leaves
-        assertEq(tree.root(), tree.root()); // Just verify it doesn't revert
+        assertEq(tree._height, 2);
+        assertEq(tree._leafNumber, 3);
+        assertEq(tree._nodes[0].length, 3);
+        assertEq(tree._nodes[1].length, 2);
+        assertEq(tree._nodes[2].length, 1);
+        assertEq(tree._nodes[0][2], leaf3);
+        assertEq(tree._nodes[1][0], hash12);
+        assertEq(tree._nodes[1][1], hash3Zero);
+        assertEq(tree._nodes[2][0], expectedRoot);
+        bytes32 zero1 = Merkle.efficientHash(ZERO, ZERO);
+        assertEq(tree._zeros[1], zero1);
+        assertEq(tree._zeros[2], Merkle.efficientHash(zero1, zero1));
     }
 
     // ============ updateLeaf Tests ============
@@ -156,6 +157,9 @@ contract FullMerkleTest is Test {
 
         bytes32 expectedRoot = Merkle.efficientHash(leaf1, newLeaf);
         assertEq(newRoot, expectedRoot);
+        assertEq(tree._nodes[0][0], leaf1);
+        assertEq(tree._nodes[0][1], newLeaf);
+        assertEq(tree._nodes[1][0], expectedRoot);
     }
 
     function test_updateLeaf_revertsOnInvalidIndex() public {
@@ -191,55 +195,67 @@ contract FullMerkleTest is Test {
         assertEq(newRoot, expectedRoot);
     }
 
-    // ============ root Tests ============
+    // ============ merklePath Tests ============
 
-    function test_root_afterSetup() public {
-        bytes32 zero = keccak256("zero");
-        tree.setup(zero);
+    function test_merklePath_revertsOnInvalidIndex() public {
+        tree.setup(ZERO);
+        tree.pushNewLeaf(keccak256("leaf1"));
+        tree.pushNewLeaf(keccak256("leaf2"));
 
-        assertEq(tree.root(), zero);
+        vm.expectRevert(abi.encodeWithSelector(MerkleWrongIndex.selector, 2, 1));
+        tree.merklePath(2);
     }
 
-    function test_root_afterPush() public {
+    function test_merklePath() public {
         tree.setup(ZERO);
+        bytes32 leaf0 = keccak256("leaf0");
+        bytes32 leaf1 = keccak256("leaf1");
+        tree.pushNewLeaf(leaf0);
+        tree.pushNewLeaf(leaf1);
 
-        bytes32 leaf = keccak256("leaf");
-        tree.pushNewLeaf(leaf);
+        bytes32[] memory expectedProof = new bytes32[](1);
+        expectedProof[0] = leaf1;
+        assertEq(tree.merklePath(0), expectedProof, "Incorrect proof for leaf #0 in tree with 2 leaves");
+        expectedProof[0] = leaf0;
+        assertEq(tree.merklePath(1), expectedProof, "Incorrect proof for leaf #1 in tree with 2 leaves");
 
-        assertEq(tree.root(), leaf);
-    }
+        bytes32 leaf2 = keccak256("leaf2");
+        tree.pushNewLeaf(leaf2);
+        bytes32 node10 = Merkle.efficientHash(leaf0, leaf1);
+        bytes32 node11 = Merkle.efficientHash(leaf2, ZERO);
 
-    function test_root_afterUpdate() public {
-        tree.setup(ZERO);
+        expectedProof = new bytes32[](2);
+        expectedProof[0] = leaf1;
+        expectedProof[1] = node11;
+        assertEq(tree.merklePath(0), expectedProof, "Incorrect proof for leaf #0 in tree with 3 leaves");
 
-        tree.pushNewLeaf(keccak256("original"));
+        expectedProof[0] = leaf0;
+        assertEq(tree.merklePath(1), expectedProof, "Incorrect proof for leaf #1 in tree with 3 leaves");
 
-        bytes32 newLeaf = keccak256("updated");
-        tree.updateLeaf(0, newLeaf);
-
-        assertEq(tree.root(), newLeaf);
+        expectedProof[0] = ZERO;
+        expectedProof[1] = node10;
+        assertEq(tree.merklePath(2), expectedProof, "Incorrect proof for leaf #2 in tree with 3 leaves");
     }
 
     // ============ Fuzz Tests ============
 
-    function testFuzz_pushAndUpdate(bytes32 leaf1, bytes32 leaf2, bytes32 update) public {
+    function testFuzz_pushAndUpdate(bytes32 _leaf1, bytes32 _leaf2, bytes32 _update) public {
         tree.setup(ZERO);
 
-        tree.pushNewLeaf(leaf1);
-        tree.pushNewLeaf(leaf2);
+        tree.pushNewLeaf(_leaf1);
+        tree.pushNewLeaf(_leaf2);
 
         bytes32 rootBefore = tree.root();
 
-        tree.updateLeaf(0, update);
+        tree.updateLeaf(0, _update);
 
         bytes32 rootAfter = tree.root();
 
-        // Root should change unless update equals leaf1
-        if (update != leaf1) {
+        if (_update != _leaf1) {
             assertTrue(rootBefore != rootAfter);
         }
 
-        bytes32 expectedRoot = Merkle.efficientHash(update, leaf2);
+        bytes32 expectedRoot = Merkle.efficientHash(_update, _leaf2);
         assertEq(rootAfter, expectedRoot);
     }
 
@@ -248,7 +264,6 @@ contract FullMerkleTest is Test {
     function test_multipleOperations() public {
         tree.setup(ZERO);
 
-        // Push several leaves
         bytes32 leaf1 = keccak256("leaf1");
         bytes32 leaf2 = keccak256("leaf2");
         bytes32 leaf3 = keccak256("leaf3");
@@ -259,14 +274,12 @@ contract FullMerkleTest is Test {
         tree.pushNewLeaf(leaf3);
         tree.pushNewLeaf(leaf4);
 
-        // Update some leaves
         bytes32 newLeaf1 = keccak256("updated1");
         bytes32 newLeaf3 = keccak256("updated3");
 
         tree.updateLeaf(0, newLeaf1);
         tree.updateLeaf(2, newLeaf3);
 
-        // Calculate expected root
         bytes32 hash12 = Merkle.efficientHash(newLeaf1, leaf2);
         bytes32 hash34 = Merkle.efficientHash(newLeaf3, leaf4);
         bytes32 expectedRoot = Merkle.efficientHash(hash12, hash34);

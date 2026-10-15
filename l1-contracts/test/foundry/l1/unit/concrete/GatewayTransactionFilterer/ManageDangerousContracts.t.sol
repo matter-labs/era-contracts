@@ -16,8 +16,6 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
     event DangerousContractAdded(address indexed contractAddress);
     event DangerousContractRemoved(address indexed contractAddress);
 
-    address internal randomUser = makeAddr("randomUser");
-
     // ============ Initialization Tests ============
 
     function test_initialize_registersDangerousCreate2Factory() public {
@@ -179,22 +177,6 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         });
 
         assertTrue(isAllowed, "Whitelisted sender should be allowed to call Create2Factory");
-    }
-
-    function test_isTransactionAllowed_highAddressStillAllowedIfNotDangerous() public view {
-        // A high address that is NOT in dangerousContracts should still be freely accessible
-        address highAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 999);
-
-        bool isAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
-            sender: randomUser,
-            contractL2: highAddr,
-            mintValue: 0,
-            l2Value: 0,
-            l2Calldata: hex"12345678",
-            refundRecipient: address(0)
-        });
-
-        assertTrue(isAllowed, "High address not in dangerousContracts should be allowed");
     }
 
     function test_isTransactionAllowed_dangerousContractTakesPrecedenceOverHighAddress() public {

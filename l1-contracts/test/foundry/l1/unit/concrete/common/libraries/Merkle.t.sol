@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
+import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MerkleTreeNoSort} from "./MerkleTreeNoSort.sol";
 import {
     MerkleIndexOrHeightMismatch,
@@ -32,25 +33,25 @@ contract MerkleTestTest is Test {
         root = merkleTree.getRoot(elements);
     }
 
-    function testElements(uint256 i) public view {
-        vm.assume(i < elements.length);
-        bytes32 leaf = elements[i];
-        bytes32[] memory proof = merkleTree.getProof(elements, i);
+    function testElements(uint256 _i) public view {
+        vm.assume(_i < elements.length);
+        bytes32 leaf = elements[_i];
+        bytes32[] memory proof = merkleTree.getProof(elements, _i);
 
-        bytes32 rootFromContract = merkleTest.calculateRoot(proof, i, leaf);
+        bytes32 rootFromContract = merkleTest.calculateRoot(proof, _i, leaf);
 
         assertEq(rootFromContract, root);
     }
 
     function prepareRangeProof(
-        uint256 start,
-        uint256 end
+        uint256 _start,
+        uint256 _end
     ) public view returns (bytes32[] memory, bytes32[] memory, bytes32[] memory) {
-        bytes32[] memory left = merkleTree.getProof(elements, start);
-        bytes32[] memory right = merkleTree.getProof(elements, end);
-        bytes32[] memory leaves = new bytes32[](end - start + 1);
-        for (uint256 i = start; i <= end; ++i) {
-            leaves[i - start] = elements[i];
+        bytes32[] memory left = merkleTree.getProof(elements, _start);
+        bytes32[] memory right = merkleTree.getProof(elements, _end);
+        bytes32[] memory leaves = new bytes32[](_end - _start + 1);
+        for (uint256 i = _start; i <= _end; ++i) {
+            leaves[i - _start] = elements[i];
         }
 
         return (left, right, leaves);
@@ -77,7 +78,7 @@ contract MerkleTestTest is Test {
         bytes32[] memory proof = merkleTree.getProof(elements, 0);
 
         vm.expectRevert(MerkleIndexOutOfBounds.selector);
-        merkleTest.calculateRoot(proof, 2 ** 255, leaf);
+        merkleTest.calculateRoot(proof, 1 << proof.length, leaf);
     }
 
     function testProofLengthTooLarge_shouldRevert() public {
@@ -86,6 +87,37 @@ contract MerkleTestTest is Test {
 
         vm.expectRevert(MerklePathOutOfBounds.selector);
         merkleTest.calculateRoot(proof, 0, leaf);
+    }
+
+    function testMaxPathLength_shouldSucceed() public view {
+        bytes32 leaf = elements[0];
+        bytes32[] memory path = new bytes32[](255);
+        bytes32[] memory leaves = new bytes32[](1);
+        leaves[0] = leaf;
+
+        bytes32 expectedRoot = leaf;
+        for (uint256 i = 0; i < path.length; ++i) {
+            expectedRoot = Merkle.efficientHash(expectedRoot, bytes32(0));
+        }
+        assertEq(merkleTest.calculateRoot(path, 0, leaf), expectedRoot);
+        assertEq(merkleTest.calculateRoot(path, path, 0, leaves), expectedRoot);
+    }
+
+    function testElementsMemory(uint256 _index) public view {
+        _index = bound(_index, 0, elements.length - 1);
+        bytes32[] memory proof = merkleTree.getProof(elements, _index);
+
+        assertEq(Merkle.calculateRootMemory(proof, _index, elements[_index]), root);
+    }
+
+    function testEmptyProofMemory_shouldSucceed() public view {
+        bytes32[] memory proof;
+
+        assertEq(Merkle.calculateRootMemory(proof, 0, elements[0]), elements[0]);
+    }
+
+    function testEfficientHash(bytes32 _lhs, bytes32 _rhs) public pure {
+        assertEq(Merkle.efficientHash(_lhs, _rhs), keccak256(abi.encodePacked(_lhs, _rhs)));
     }
 
     function testRangeProof() public view {
@@ -115,12 +147,28 @@ contract MerkleTestTest is Test {
 
         vm.expectRevert(MerklePathEmpty.selector);
         merkleTest.calculateRoot(left, right, 10, leaves);
+
+        // Either condition alone must revert: several leaves at index 0, one leaf at a non-zero index.
+        vm.expectRevert(MerklePathEmpty.selector);
+        merkleTest.calculateRoot(left, right, 0, leaves);
+
+        vm.expectRevert(MerklePathEmpty.selector);
+        merkleTest.calculateRoot(left, right, 1, new bytes32[](1));
+    }
+
+    function testRangeProofPathTooLong_shouldRevert() public {
+        bytes32[] memory left = new bytes32[](256);
+        bytes32[] memory right = new bytes32[](256);
+        bytes32[] memory leaves = new bytes32[](1);
+
+        vm.expectRevert(MerklePathOutOfBounds.selector);
+        merkleTest.calculateRoot(left, right, 0, leaves);
     }
 
     function testRangeProofWrongIndex_shouldRevert() public {
         (bytes32[] memory left, bytes32[] memory right, bytes32[] memory leaves) = prepareRangeProof(10, 13);
         vm.expectRevert(MerkleIndexOrHeightMismatch.selector);
-        merkleTest.calculateRoot(left, right, 128, leaves);
+        merkleTest.calculateRoot(left, right, 125, leaves);
     }
 
     function testRangeProofSingleLeaf() public view {

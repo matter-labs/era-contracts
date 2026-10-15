@@ -23,7 +23,7 @@ import {
 
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L1MessageRootDev} from "contracts/dev-contracts/L1MessageRootDev.sol";
-import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
+import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/MerkleTreeNoSort.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
