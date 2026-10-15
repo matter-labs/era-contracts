@@ -96,6 +96,8 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IChainRegistrationSender
+    // The call to a pair's ZK chain precedes the next pair's write; the function is `nonReentrant`.
+    // slither-disable-next-line reentrancy-no-eth
     function deregisterInteropPairs(
         uint256[] calldata _chainsRegisteredOn,
         uint256[] calldata _chainsToDeregister
