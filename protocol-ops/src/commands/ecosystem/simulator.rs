@@ -1262,6 +1262,18 @@ fn governance_toml_to_simulator_transactions(
     Ok(out)
 }
 
+/// The tags of the simulator transactions an `ecosystem.toml` becomes, in order.
+#[cfg(test)]
+pub(super) fn simulator_transaction_tags(path: &PathBuf) -> anyhow::Result<Vec<String>> {
+    let txs = governance_toml_to_simulator_transactions(
+        path,
+        "l1",
+        Address::ZERO,
+        &SimDescriptionRegistry::default(),
+    )?;
+    Ok(txs.into_iter().map(|tx| tx.tag).collect())
+}
+
 /// One simulator transaction per call of the governance bundle, sent by `from`. The first one
 /// mints [`GOVERNANCE_SENDER_FUND_ETH`] to the sender; no other mints.
 fn governance_bundle_transactions(

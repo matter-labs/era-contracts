@@ -1026,6 +1026,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// [governance_calls]              # the one bundle: extras, core actions, the DERIVED
 /// calls = "0x..."                 # execute(operation) (registry-driven only), CTM actions
 ///
+/// [test_upgrade_calls]            # the CTM prepare's simulator probes, when it wrote any
+/// test_create_chain_zkos = "0x..."
+/// test_create_chain_zkos_caller = "0x..."
+/// test_upgrade_chain_zkos = "0x..."
+/// test_upgrade_chain_zkos_caller = "0x..."
+///
 /// [operation]                     # registry-driven upgrades only: the operation the CTM
 /// operation_addr = "0x..."        # prepare deployed, and the coordinator its executor call
 /// coordinator_addr = "0x..."      # is derived on
@@ -1033,7 +1039,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// [core]                          # whole core TOML minus its [governance_calls]
 /// ...
 ///
-/// [ctms.zksync_os]                # whole CTM TOML minus its [governance_calls];
+/// [ctms.zksync_os]                # whole CTM TOML minus its [governance_calls] and probes;
 /// ...                             # one section per ZKsyncOS CTM.
 /// ...
 ///
@@ -1084,12 +1090,7 @@ fn write_merged_ecosystem_toml(
             "new_emergency_upgrade_board".into(),
             Value::String(format!("{:#x}", zk_governance.new_emergency_upgrade_board)),
         );
-        // `[misc]` stays last.
-        let misc = doc.remove("misc");
         doc.insert("zk_governance".into(), Value::Table(table));
-        if let Some(misc) = misc {
-            doc.insert("misc".into(), misc);
-        }
     }
 
     let body = format!(
@@ -1115,6 +1116,21 @@ fn write_merged_ecosystem_toml(
         dst.display()
     ));
     Ok(())
+}
+
+/// A ZKsync OS CTM's probes under the simulator's tags: `test_<probe>` becomes `test_<probe>_zkos`
+/// and its `test_<probe>_caller` becomes `test_<probe>_zkos_caller`.
+fn zksync_os_probe_tags(probes: toml::value::Table) -> toml::value::Table {
+    probes
+        .into_iter()
+        .map(|(key, value)| {
+            let tag = match key.strip_suffix("_caller") {
+                Some(probe) => format!("{probe}_zkos_caller"),
+                None => format!("{key}_zkos"),
+            };
+            (tag, value)
+        })
+        .collect()
 }
 
 /// One prepare output split into its body, its governance bundle and its declared actions.
@@ -1152,9 +1168,10 @@ fn load_prepare_output(path: &Path) -> anyhow::Result<PrepareOutputParts> {
     })
 }
 
-/// The merged document of [`write_merged_ecosystem_toml`] minus `[zk_governance]`, in the
-/// order `toml::to_string` writes it: `external_actions`, `[governance_calls]`, `[core]`,
-/// `[ctms.*]`, the optional `[operation]`, and `[misc]` last.
+/// The merged document of [`write_merged_ecosystem_toml`] minus `[zk_governance]`:
+/// `external_actions`, `[governance_calls]`, the optional `[test_upgrade_calls]`, `[core]`,
+/// `[ctms.*]`, the optional `[operation]` and `[misc]`. `toml::to_string` writes the keys in
+/// alphabetical order.
 fn merge_prepare_outputs(
     core: PrepareOutputParts,
     ctms: Vec<(Address, PrepareOutputParts)>,
@@ -1212,6 +1229,7 @@ fn merge_prepare_outputs(
     // reaches the merge is ZKsync OS. The merge keys per-CTM sections by the fixed
     // `zksync_os` label, so two CTMs in one upgrade collide here.
     let mut ctms_table = Table::new();
+    let mut test_upgrade_calls: Option<Table> = None;
     for (proxy, ctm) in ctms {
         let label = "zksync_os";
         if ctms_table.contains_key(label) {
@@ -1225,7 +1243,17 @@ fn merge_prepare_outputs(
             &ctm.external_actions,
         )?;
         external_actions.extend(ctm.external_actions);
-        ctms_table.insert(label.to_string(), Value::Table(ctm.body));
+        let mut body = ctm.body;
+        // The simulator reads the probes at the top level only, under ZKsync OS tags.
+        test_upgrade_calls = match body.remove("test_upgrade_calls") {
+            Some(Value::Table(probes)) => Some(zksync_os_probe_tags(probes)),
+            Some(other) => anyhow::bail!(
+                "[test_upgrade_calls] in CTM prepare {proxy:#x} must be a table (got {})",
+                other.type_str()
+            ),
+            None => None,
+        };
+        ctms_table.insert(label.to_string(), Value::Table(body));
         chunks.push(ctm.gov.calls);
     }
 
@@ -1246,6 +1274,9 @@ fn merge_prepare_outputs(
         "governance_calls".into(),
         Value::Table(governance_calls_table),
     );
+    if let Some(probes) = test_upgrade_calls {
+        doc.insert("test_upgrade_calls".into(), Value::Table(probes));
+    }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
     if let Some(body) = operation_body {
@@ -1603,6 +1634,44 @@ mod tests {
         assert_eq!(
             doc["operation"]["operation_addr"].as_str().unwrap(),
             format!("{operation:#x}")
+        );
+    }
+
+    /// The CTM prepare's probes reach the simulator: the merge lifts them out of
+    /// `[ctms.zksync_os]`, where the simulator does not look, to the top level under ZKsync OS tags.
+    #[test]
+    fn the_ctm_prepare_probes_reach_the_simulator() {
+        let governance = call(0xc1, &[0x02]);
+        let mut ctm = prepare_output(std::slice::from_ref(&governance));
+        let mut probes = toml::value::Table::new();
+        for probe in ["test_create_chain", "test_upgrade_chain"] {
+            probes.insert(probe.into(), bundle_hex(&[call(0x51, &[0x04])]).into());
+            probes.insert(
+                format!("{probe}_caller"),
+                format!("{:#x}", Address::repeat_byte(0xad)).into(),
+            );
+        }
+        ctm.body
+            .insert("test_upgrade_calls".into(), toml::Value::Table(probes));
+        let doc = merge_prepare_outputs(
+            prepare_output(&[]),
+            vec![(Address::repeat_byte(0x77), ctm)],
+            None,
+            &[],
+        )
+        .unwrap();
+        assert!(doc["ctms"]["zksync_os"].get("test_upgrade_calls").is_none());
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ecosystem.toml");
+        fs::write(&path, toml::to_string(&doc).unwrap()).unwrap();
+        assert_eq!(
+            crate::commands::ecosystem::simulator::simulator_transaction_tags(&path).unwrap(),
+            [
+                "governance",
+                "test_create_chain_zkos",
+                "test_upgrade_chain_zkos"
+            ]
         );
     }
 

@@ -350,6 +350,17 @@ impl<'a> UpgradeInner<'a> {
         runner
             .run(simulation)
             .context("Failed to generate chain upgrade/creation simulator probes")?;
+        let package: toml::Table = toml::from_str(
+            &fs::read_to_string(&ctm_output_path)
+                .with_context(|| format!("reading {}", ctm_output_path.display()))?,
+        )
+        .with_context(|| format!("parsing {}", ctm_output_path.display()))?;
+        if !package.contains_key("test_upgrade_calls") {
+            logger::warn(format!(
+                "No chain on CTM {ctm_proxy:#x} is at its protocol version: the package carries \
+                 no chain upgrade/creation simulator probes"
+            ));
+        }
 
         Ok(ctm_output_path)
     }

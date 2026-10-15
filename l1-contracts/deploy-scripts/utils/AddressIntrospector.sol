@@ -277,9 +277,20 @@ library AddressIntrospector {
     }
 
     function getUptoDateZkChainAddresses(IChainTypeManager _ctm) public view returns (ZkChainAddresses memory info) {
-        IBridgehubBase _bridgehub = IBridgehubBase(_ctm.BRIDGE_HUB());
+        address zkChain = getUptoDateZkChainAddress(_ctm);
+        if (zkChain == address(0)) {
+            revert NoUptoDateZkChainFound();
+        }
+        return getZkChainAddresses(IZKChain(zkChain));
+    }
+
+    /// @notice The first chain of `_ctm` at the CTM's protocol version.
+    /// @param _ctm The CTM whose chains are searched.
+    /// @return The chain's diamond, or `address(0)` when no chain of `_ctm` is at its version.
+    function getUptoDateZkChainAddress(IChainTypeManager _ctm) public view returns (address) {
+        IBridgehubBase bridgehub = IBridgehubBase(_ctm.BRIDGE_HUB());
         uint256 protocolVersion = _ctm.protocolVersion();
-        address[] memory zkChains = _bridgehub.getAllZKChains();
+        address[] memory zkChains = bridgehub.getAllZKChains();
 
         for (uint256 i = 0; i < zkChains.length; i++) {
             IZKChain zkChain = IZKChain(zkChains[i]);
@@ -290,10 +301,10 @@ library AddressIntrospector {
                 continue;
             }
             if (chainCTM == address(_ctm) && zkChain.getProtocolVersion() == protocolVersion) {
-                return getZkChainAddresses(zkChain);
+                return address(zkChain);
             }
         }
-        revert NoUptoDateZkChainFound();
+        return address(0);
     }
 
     /// @notice A registered chain to read ecosystem-wide values off (its rollup L1 DA validator and
@@ -346,27 +357,6 @@ library AddressIntrospector {
 
     // ============ Private Helpers ============
 
-    function _getUptoDateZkChainAddress(ChainTypeManager _ctm) internal view returns (address) {
-        IBridgehubBase bridgehub = IBridgehubBase(_ctm.BRIDGE_HUB());
-        uint256 protocolVersion = _ctm.protocolVersion();
-        address[] memory zkChains = bridgehub.getAllZKChains();
-        address ctmAddr = address(_ctm);
-
-        for (uint256 i = 0; i < zkChains.length; i++) {
-            IZKChain zkChain = IZKChain(zkChains[i]);
-            address chainCTM;
-            try zkChain.getChainTypeManager() returns (address result) {
-                chainCTM = result;
-            } catch {
-                continue;
-            }
-            if (chainCTM == ctmAddr && zkChain.getProtocolVersion() == protocolVersion) {
-                return address(zkChain);
-            }
-        }
-        return address(0);
-    }
-
     /// @notice Returns the CTM's interop fee manager, so that a later release keeps the manager holding the chains'
     /// prepaid balances; zero before the release that introduced it.
     /// @param _ctm The CTM being introspected.
@@ -378,7 +368,7 @@ library AddressIntrospector {
     }
 
     function _getVerifierFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (address) {
-        address zkChainAddr = _getUptoDateZkChainAddress(_ctm);
+        address zkChainAddr = getUptoDateZkChainAddress(_ctm);
         if (zkChainAddr == address(0)) {
             return address(0);
         }
@@ -402,7 +392,7 @@ library AddressIntrospector {
     }
 
     function _getFacetsFromUptoDateZkChain(ChainTypeManager _ctm) private view returns (Facets memory facets) {
-        address zkChainAddr = _getUptoDateZkChainAddress(_ctm);
+        address zkChainAddr = getUptoDateZkChainAddress(_ctm);
         if (zkChainAddr == address(0)) {
             return facets;
         }

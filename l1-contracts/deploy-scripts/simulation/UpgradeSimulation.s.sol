@@ -23,7 +23,13 @@ contract UpgradeSimulation is Script {
         string memory outputPath = vm.envString("UPGRADE_SIMULATION_OUTPUT");
         string memory output = vm.readFile(outputPath);
         require(!output.keyExists(".test_upgrade_calls"), "simulation calls already exist; rerun prepare first");
-        ZkChainAddresses memory witness = AddressIntrospector.getUptoDateZkChainAddresses(ChainTypeManager(ctm));
+        address witnessChain = AddressIntrospector.getUptoDateZkChainAddress(ChainTypeManager(ctm));
+        // Both probes need a chain at the CTM's version (one upgrades it, the other copies its base
+        // token). Without one the package carries no probes; the simulator accepts that.
+        if (witnessChain == address(0)) {
+            return;
+        }
+        ZkChainAddresses memory witness = AddressIntrospector.getZkChainAddresses(IZKChain(witnessChain));
         // The witness chain's generation decides the call shape, and only the legacy one is handed
         // a cut — so the package's cut is read for that shape alone (see {UpgradeChainCall}).
         uint256 witnessProtocolVersion = ChainTypeManager(ctm).protocolVersion();
