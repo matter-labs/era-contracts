@@ -1081,6 +1081,19 @@
   },
   {
     "type": "function",
+    "name": "isSecondProofSystemLocked",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isValidator",
     "inputs": [
       {
@@ -1171,6 +1184,13 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lockSecondProofSystem",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -2528,6 +2548,12 @@
         "internalType": "uint64"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SecondProofSystemLocked",
+    "inputs": [],
     "anonymous": false
   },
   {

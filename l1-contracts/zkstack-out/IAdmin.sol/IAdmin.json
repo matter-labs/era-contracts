@@ -180,6 +180,13 @@
   },
   {
     "type": "function",
+    "name": "lockSecondProofSystem",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "makePermanentRollup",
     "inputs": [],
     "outputs": [],
@@ -898,6 +905,12 @@
         "internalType": "enum PubdataPricingMode"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SecondProofSystemLocked",
+    "inputs": [],
     "anonymous": false
   },
   {

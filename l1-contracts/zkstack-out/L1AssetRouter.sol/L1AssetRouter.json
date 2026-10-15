@@ -791,6 +791,27 @@
   },
   {
     "type": "error",
+    "name": "AssetHandlerNotAllowed",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "assetHandler",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AssetIdNotSupported",
     "inputs": [
       {
