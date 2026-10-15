@@ -1,0 +1,4 @@
+# How the generate / replay / deploy pipeline handles this upgrade
+# (protocol-ops/src/common/upgrade_descriptor.rs): `upgrade-prepare-all` and the verifier
+# of the line that shipped it. Only the release's own directory can use `prepare-all` here.
+prepare = "prepare-all"

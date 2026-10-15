@@ -2,7 +2,10 @@
 
 - The protocol itself — flows, motivations, security arguments — is documented once in
   [`protocol-docs/`](../protocol-docs/README.md); code comments reference those pages instead of restating them.
-  The upgrade coordinator's execution semantics are one of those pages:
+  Start with [the system architecture](../protocol-docs/system/README.md); the operational guides for
+  [deploying an ecosystem](../protocol-docs/ecosystem-deployment.md) and
+  [upgrading an ecosystem](../protocol-docs/ecosystem-upgrade.md) sit next to it. The upgrade coordinator's
+  execution semantics are one of those pages:
   [ecosystem-upgrade-coordination.md](../protocol-docs/ecosystem-upgrade-coordination.md).
 - This folder holds design documents for the repository's own machinery:
   - [registry-driven-upgrades.md](./registry-driven-upgrades.md) — the canonical upgrade architecture: write-once

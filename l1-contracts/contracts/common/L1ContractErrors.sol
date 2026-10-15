@@ -155,6 +155,10 @@ error EmptyProofLength();
 error EmptyPublicInputsLength();
 // 0x61733a89
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x23298bd1
+error ExecutionDelayNotIncreased(uint32 currentDelay, uint32 newDelay);
+// 0xedfc1f1c
+error ExecutionDelayTooLarge(uint32 delay, uint32 maxDelay);
 // 0x8bd334a8
 error ExecutorCoordinatorMismatch(address expected, address actual);
 // 0xac4a3f98

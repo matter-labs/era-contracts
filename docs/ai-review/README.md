@@ -15,6 +15,11 @@ docs/ai-review/
 ├── pre-push.md
 ├── regen-artifacts.md
 └── upgrade-script.md
+
+.claude/skills/
+└── ai-review/          ← /ai-review: fresh-context review of a change or PR
+.agents/skills/
+└── ai-review           → symlink to the same skill, for Codex ($ai-review)
 ```
 
 The rules are the following:

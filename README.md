@@ -28,11 +28,13 @@ live ecosystems still depend on them.
 
 ## Documentation
 
-- [`protocol-docs/`](./protocol-docs/README.md) is the single source of truth for the protocol: interop, atomic
-  interop, bridging, the message root, and the chain lifecycle. Code comments point here instead of restating it.
+- [`protocol-docs/`](./protocol-docs/README.md) is the single source of truth for the protocol. Start with the
+  [system architecture](./protocol-docs/system/README.md); the guides for
+  [deploying](./protocol-docs/ecosystem-deployment.md) and [upgrading](./protocol-docs/ecosystem-upgrade.md) an
+  ecosystem sit next to it, with the flow documents (interop, atomic interop, bridging, the message root, the chain
+  lifecycle). Code comments point here instead of restating it.
 - [`docs/registry-driven-upgrades.md`](./docs/registry-driven-upgrades.md) describes the upgrade model: write-once
   release / transition objects, bound executors, and the one-time bootstrap edge into it.
-- Wider system specs live in the [zksync-era repository](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts).
 - Working conventions for contributors and AI agents are in [`AGENTS.md`](./AGENTS.md).
 
 ## Reviewing registry-driven upgrades

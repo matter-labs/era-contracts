@@ -267,7 +267,7 @@ git add l1-contracts/zkstack-out
 
 Most commonly out of date when you've added/changed:
 
-- A function or event on an interface that protocol-ops imports (via `abigen!` in `protocol-ops/src/abi.rs`).
+- A function or event on an interface that protocol-ops imports (via `alloy::sol!` in `protocol-ops/src/common/abi.rs`).
 - A new `IFoo.sol` interface that needs to be picked up.
 
 If you forget `yarn prettier:fix`, `check-zkstack-out` will still fail because the committed JSON has trailing newlines and your regenerated file doesn't.

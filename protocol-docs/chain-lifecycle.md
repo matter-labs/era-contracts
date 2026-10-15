@@ -31,6 +31,10 @@ callable by the Bridgehub owner or admin). In one transaction it:
 5. Seeds the chain's genesis batch root (`messageRoot.seedGenesisRoot(_chainId)`, see below) and
    emits `NewChain`.
 
+End-to-end chain creation on L1 and the genesis upgrade on the new chain's L2:
+
+![Chain deployment and genesis (ZKsync OS)](./img/chain_deployment.png)
+
 ### Genesis chain state (`DiamondInit`)
 
 `DiamondInit` initializes the diamond's storage: verifier(s), admin, base-token asset id, protocol
@@ -95,7 +99,7 @@ Checks performed before sending the registration:
 - Both chains settle on the **same** settlement layer (`ChainsSettlementLayerMismatch` otherwise).
   Both settling directly on L1 is permitted as of v33: L1 itself builds interop roots
   (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding inclusion proofs, so
-  L1-settled chains participate in interop without a gateway. (In v31 this case was rejected with
+  L1-settled chains participate in interop directly. (In v31 this case was rejected with
   the now-removed `ChainsSettlingOnL1` error.)
 - The chain to be registered has at least one batch leaf in this layer's message root
   (`messageRoot.chainTreeLeafCount(chainId) > 0`), else it reverts with
@@ -200,6 +204,9 @@ not follow from swapping implementations are:
   {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}.
 - **Atomic-interop built-ins** exist on ZKsync OS chains only. New chains get them from genesis and
   pre-existing ones from this upgrade's force deployments (next section).
+- **`L2InteropHandler` storage** shifts on an ecosystem whose v31 handler inherits `PausableUpgradeable`
+  (mainnet): v33 does not read that handler's bundle and call statuses. See
+  {protocol-docs/interop/architecture.md#l2interophandler-storage-across-the-v31--v33-upgrade}.
 
 Scope of this release's upgrade: **ZKsync OS chains that settle on L1**. `DefaultCTMUpgrade.initializeConfig`
 rejects non-OS CTMs. Gateway-settled chains are also outside this scope: their upgrade takes the

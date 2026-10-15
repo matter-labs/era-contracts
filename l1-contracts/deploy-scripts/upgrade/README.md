@@ -4,8 +4,15 @@ How a registry-driven upgrade is prepared, composed, verified, replayed and how 
 Why the pieces look the way they do is in
 [the architecture document](../../../docs/registry-driven-upgrades.md); what the coordinator's
 `execute` does on-chain is in
-[the coordinator spec](../../../protocol-docs/ecosystem-upgrade-coordination.md). Start a security
+[the coordinator spec](../../../protocol-docs/ecosystem-upgrade-coordination.md). The roles, the
+artifacts and the order of the phases are in
+[protocol-docs/ecosystem-upgrade.md](../../../protocol-docs/ecosystem-upgrade.md). Start a security
 review from the [root README review guide](../../../README.md#reviewing-registry-driven-upgrades).
+
+The Forge scripts in this directory are not run with `forge script` directly in a rollout:
+`protocol_ops` (see [protocol-ops/README.md](../../../protocol-ops/README.md)) invokes their entry
+points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `chain upgrade` and
+`chain set-upgrade-timestamp` go through `AdminFunctions.s.sol`.
 
 ## Layout
 
@@ -209,6 +216,13 @@ and verified before rollout.
 
 ## Preparing the scripts for a new upgrade
 
+Open the release with `yarn new-release <name>` (repo root): it bumps the genesis protocol version,
+creates `upgrade-envs/v0.<minor>.0-<name>/` from the current release's inputs with fresh salts,
+moves `current_upgrade_env_dir!` and the prepare's default script paths
+(`protocol-ops/src/common/forge/scripts/mod.rs`), and generates `v<minor>/CoreUpgrade_v<minor>` and
+`CTMUpgrade_v<minor>` as plain subclasses of the default scripts unless the branch already carries
+them. The header of `scripts/new-release.ts` lists what it changes and what it leaves to you.
+
 Start from `v36/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
 contracts the release changes, name every release member you replace in `changedReleaseMembers()`,
 and keep everything else derived.
@@ -236,6 +250,10 @@ artifacts needed to publish the constructed plan’s factory dependencies — `C
 changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the
 coordinator's `execute` call is a `declareExternalAction`.
 
+Register new L2 built-ins in `SystemContractsProcessing.s.sol` and, for the genesis path, in the
+genesis generator, so that upgraded and freshly created chains match
+([`docs/ai-review/docs/genesis-and-upgrades.md`](../../../docs/ai-review/docs/genesis-and-upgrades.md)).
+
 ## Testing an upgrade end to end
 
 - `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the bootstrap edge through the real
@@ -257,3 +275,12 @@ coordinator's `execute` call is a `declareExternalAction`.
 
 Script retirement — what tooling still decides and the batches that move it on-chain — is
 tracked in [the retirement plan](../../../docs/upgrade-script-retirement.md).
+
+## Rules
+
+- Never use `try`/`catch` or `staticcall` in these scripts. A revert means the script is being
+  run at the wrong time or against the wrong state; fix that instead of masking it.
+- Read addresses from L1 (through the Bridgehub) rather than adding input fields; the inputs a
+  release needs are listed in [`upgrade-envs/README.md`](../../upgrade-envs/README.md).
+- Every release ships with the anvil-interop upgrade test (`test/anvil-interop/run-upgrade-test.ts`,
+  above), which runs these scripts end to end on the previous release's chain states.
