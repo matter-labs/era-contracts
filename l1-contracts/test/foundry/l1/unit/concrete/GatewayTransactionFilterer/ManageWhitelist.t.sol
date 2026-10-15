@@ -3,11 +3,14 @@ pragma solidity 0.8.28;
 
 import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shared.t.sol";
 
+import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {AlreadyWhitelisted, NotWhitelisted} from "contracts/common/L1ContractErrors.sol";
 
-contract ManageWhitelistTest is GatewayTransactionFiltererTest {
+contract GatewayTransactionFiltererManageWhitelistTest is GatewayTransactionFiltererTest {
     function test_GrantingWhitelistToSender() public {
         vm.startPrank(owner);
+        vm.expectEmit(true, false, false, false, address(transactionFiltererProxy));
+        emit GatewayTransactionFilterer.WhitelistGranted(sender);
         transactionFiltererProxy.grantWhitelist(sender);
 
         assertEq(
@@ -26,6 +29,8 @@ contract ManageWhitelistTest is GatewayTransactionFiltererTest {
         transactionFiltererProxy.revokeWhitelist(sender);
 
         transactionFiltererProxy.grantWhitelist(sender);
+        vm.expectEmit(true, false, false, false, address(transactionFiltererProxy));
+        emit GatewayTransactionFilterer.WhitelistRevoked(sender);
         transactionFiltererProxy.revokeWhitelist(sender);
 
         assertEq(
@@ -33,5 +38,20 @@ contract ManageWhitelistTest is GatewayTransactionFiltererTest {
             false,
             "Revoking the sender from whitelist was not successful"
         );
+    }
+
+    function test_grantWhitelist_revertsIfNotOwner() public {
+        vm.prank(randomUser);
+        vm.expectRevert("Ownable: caller is not the owner");
+        transactionFiltererProxy.grantWhitelist(sender);
+    }
+
+    function test_revokeWhitelist_revertsIfNotOwner() public {
+        vm.prank(owner);
+        transactionFiltererProxy.grantWhitelist(sender);
+
+        vm.prank(randomUser);
+        vm.expectRevert("Ownable: caller is not the owner");
+        transactionFiltererProxy.revokeWhitelist(sender);
     }
 }

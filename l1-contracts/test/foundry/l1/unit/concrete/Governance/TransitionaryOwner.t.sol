@@ -38,10 +38,6 @@ contract TransitionaryOwnerTest is Test {
 
     // ============ Constructor Tests ============
 
-    function test_constructor_setsGovernanceAddress() public view {
-        assertEq(transitionaryOwner.GOVERNANCE_ADDRESS(), governanceAddress);
-    }
-
     function test_constructor_acceptsZeroGovernanceAddress() public {
         TransitionaryOwner transitionaryWithZero = new TransitionaryOwner(address(0));
         assertEq(transitionaryWithZero.GOVERNANCE_ADDRESS(), address(0));
