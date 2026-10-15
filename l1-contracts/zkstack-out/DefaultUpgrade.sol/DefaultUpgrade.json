@@ -399,6 +399,11 @@
   },
   {
     "type": "error",
+    "name": "LiveRoutingDiverged",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NewProtocolMajorVersionNotZero",
     "inputs": []
   },
