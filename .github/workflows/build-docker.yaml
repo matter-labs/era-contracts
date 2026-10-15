@@ -1,10 +1,7 @@
 name: Build Docker Image
 
-# Builds `ghcr.io/matter-labs/protocol-ops`, the image every ecosystem and chain
-# calldata workflow runs (release flow: .github/workflows/README.md). Pushes and
-# PRs only build the image and rehearse an upgrade in it; a dispatch also pushes
-# it, and only when it names the zksync-os-integration-tests run that tested the
-# ref.
+# Builds the protocol-ops image the calldata workflows run and rehearses an
+# upgrade in it; a dispatch also releases it (.github/workflows/README.md#release-flow).
 
 on:
   push:
@@ -109,15 +106,9 @@ jobs:
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_OUTPUT"
 
-      # Built into the runner's docker, not pushed: the rehearsal below runs
-      # this exact image, and only then is it pushed. The toolchain base is
-      # built from this commit's Dockerfile.base (docker-bake.hcl), not pulled.
-      #
-      # GitHub Actions buildx cache, one scope per image. `mode=max` caches
-      # every layer (not just the final ones), so the base, cargo-chef cooks
-      # and forge builds are reused across runs whenever their inputs haven't
-      # changed (~25 min cold; ~5–10 min when only Rust source changes; ~3–5 min
-      # when only contracts change).
+      # Loaded, not pushed: the rehearsal below runs this exact image. The base is
+      # built from this commit's Dockerfile.base (docker-bake.hcl). `mode=max`
+      # caches every layer, in one GitHub Actions cache scope per image.
       - name: Build Docker Image
         uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
         with:
@@ -133,7 +124,6 @@ jobs:
             protocol.cache-to=type=gha,mode=max,scope=protocol-ops
             protocol.tags=${{ env.IMAGE }}
             protocol.args.CONTRACTS_COMMIT=${{ steps.meta.outputs.revision }}
-            protocol.args.ZK_GOVERNANCE_COMMIT=${{ env.ZK_GOVERNANCE_COMMIT }}
             protocol.labels.org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             protocol.labels.org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}
             protocol.labels.org.opencontainers.image.created=${{ steps.meta.outputs.created }}

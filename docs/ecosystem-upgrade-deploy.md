@@ -15,9 +15,9 @@ locally and in CI:
 2. **Deploy** — broadcast the deployer bundles to a real L1, producing
    `transactions.txt`, then verify the deployed contracts on Etherscan.
 
-Both run in a released `ghcr.io/matter-labs/protocol-ops` image, locally and in CI
-alike (`./protocol-ops.sh --tag <tag>`) — CI is only a wrapper around the commands
-below. Release the image first: [Releasing the image](#releasing-the-image).
+Both run in a released `ghcr.io/matter-labs/protocol-ops` image
+([release flow](../.github/workflows/README.md#release-flow)), locally and in CI
+alike — CI is only a wrapper around the commands below.
 
 **Step 1 output is a handoff, not a recipe.** Solidity output is not byte-stable
 across build environments (the default foundry profile embeds path-dependent CBOR
@@ -51,16 +51,13 @@ Then `ecosystem verify-upgrade` (PUVT) consumes `ecosystem.toml` +
 
 ---
 
-## Releasing the image
+## Running the image
 
-Every ecosystem and chain workflow runs the image named by its `protocol_ops_tag`
-input; how an image is tested and released is the
-[release flow](../.github/workflows/README.md#release-flow).
-
-The same image runs the local commands below. `./protocol-ops.sh --tag <tag>` (or
+The local commands below run the image too. `./protocol-ops.sh --tag <tag>` (or
 `--tag sha256:<digest>`) pulls it and mounts the checkout's `l1-contracts/upgrade-envs/`, so
 outputs land in the checkout; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
-Run them from a checkout of the image's commit.
+Run them from a checkout of the image's commit: a bundle packed in the image records that commit as
+clean, whatever `upgrade-envs/` is mounted.
 
 ---
 
@@ -86,8 +83,7 @@ Nothing touches real L1 — the deployer is impersonated.
 
 ```bash
 TAG=<tag>   # the released protocol-ops image
-# 1a) fork + prepare + PUVT (writes ecosystem.toml + prepare/ + extra-verification-logs.txt).
-#     PUVT checks governance against the zk-governance commit the image was built with.
+# 1a) fork + prepare + PUVT (writes ecosystem.toml + prepare/ + extra-verification-logs.txt)
 ./protocol-ops.sh --tag "$TAG" ecosystem rehearse-upgrade --env mainnet \
   --fork-url <l1-rpc> --deployer-address <deployer-eoa>
 
@@ -263,14 +259,13 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
 # ./deploy-result: step 2's local journal, or the deploy run's
 # `ecosystem-upgrade-deploy-result-<env>` artifact downloaded there.
-EXTRA_MOUNTS="$PWD/deploy-result:/contracts/deploy-result" \
-  ./protocol-ops.sh --tag "$TAG" ecosystem verify-upgrade \
+./protocol-ops/target/release/protocol_ops ecosystem verify-upgrade \
   --env mainnet \
   --ecosystem-toml "$OUT/ecosystem.toml" \
-  --transactions-log /contracts/deploy-result/transactions.txt \
+  --transactions-log ./deploy-result/transactions.txt \
   --reference-transactions-log "$OUT/transactions.txt" \
   --l1-rpc-url <l1-rpc> --gw-rpc-url <l1-rpc> \
-  --zk-governance-commit "$(jq -r .zk_governance_commit "$OUT/deploy-bundle/bundle-metadata.json")"
+  --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
 ```
 
 `--transactions-log` is salt-gated, so it must be this deployment's own journal.

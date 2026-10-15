@@ -60,7 +60,7 @@ const OPTIONAL_BUNDLE_FILES: [&str; 2] =
 const TRANSACTIONS_LOG: &str = "transactions.txt";
 
 /// The reviewed zk-governance commit PUVT verifies governance bytecodes against by default
-/// outside the protocol-ops image (the image's is build-docker.yaml's `ZK_GOVERNANCE_COMMIT`).
+/// (the one build-docker.yaml checks out into the image).
 const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
@@ -95,9 +95,8 @@ const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
 ];
 
 /// Set in the protocol-ops image (`docker/protocol/Dockerfile`): the commit its sources were
-/// built from and the zk-governance commit of its `/zk-governance` checkout.
+/// built from.
 const IMAGE_CONTRACTS_COMMIT_ENV: &str = "PROTOCOL_OPS_CONTRACTS_COMMIT";
-const IMAGE_ZK_GOVERNANCE_COMMIT_ENV: &str = "PROTOCOL_OPS_ZK_GOVERNANCE_COMMIT";
 /// Set by `protocol-ops.sh --tag`: the image reference it ran and that image's registry digest.
 const IMAGE_REFERENCE_ENV: &str = "PROTOCOL_OPS_IMAGE";
 const IMAGE_DIGEST_ENV: &str = "PROTOCOL_OPS_IMAGE_DIGEST";
@@ -141,6 +140,8 @@ pub struct DeployBundleMetadata {
     pub upgrade: String,
     pub env: String,
     pub contracts_commit: String,
+    /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in the
+    /// protocol-ops image, which records its own commit and does not check the mounted `upgrade-envs/`.
     pub contracts_worktree_dirty: bool,
     pub all_contracts_hashes_sha256: String,
     pub l1: L1Provenance,
@@ -281,8 +282,7 @@ fn contracts_commit(repository_root: &Path) -> String {
 /// The sources that decide the bundle's bytes and differ from [`contracts_commit`], one per
 /// line (empty when none do), or `None` when that cannot be told.
 fn source_changes(repository_root: &Path, upgrade: &str) -> Option<String> {
-    // The image has no git: its bundles record the image's commit as clean, without comparing the
-    // upgrade-envs/ mounted into it (the generate workflow mounts a checkout of that commit).
+    // The image has no git (the generate workflow mounts a checkout of the image's commit).
     if env_value(IMAGE_CONTRACTS_COMMIT_ENV).is_some() {
         return Some(String::new());
     }
@@ -851,11 +851,9 @@ pub struct RehearseUpgradeArgs {
     /// keep working, and ignored: the release's PUVT has no Gateway-side checks.
     #[clap(long, hide = true)]
     pub gw_rpc_url: Option<String>,
-    /// zk-governance commit PUVT verifies the governance bytecodes against; recorded in the
-    /// bundle. Defaults to the one the protocol-ops image was built with, outside the image to
-    /// the reviewed default.
-    #[clap(long)]
-    pub zk_governance_commit: Option<String>,
+    /// zk-governance commit PUVT verifies the governance bytecodes against; recorded in the bundle.
+    #[clap(long, default_value = DEFAULT_ZK_GOVERNANCE_COMMIT)]
+    pub zk_governance_commit: String,
     /// foundry-zksync version used for the build; recorded in the bundle (part of the bytecode identity).
     #[clap(long)]
     pub foundry_zksync_version: Option<String>,
@@ -864,11 +862,6 @@ pub struct RehearseUpgradeArgs {
 /// Fork L1, prepare the upgrade, pack the deploy bundle, replay it and run PUVT.
 pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<()> {
     warn_ignored_gw_rpc_url(args.gw_rpc_url.as_deref());
-    let zk_governance_commit = args
-        .zk_governance_commit
-        .clone()
-        .or_else(|| env_value(IMAGE_ZK_GOVERNANCE_COMMIT_ENV))
-        .unwrap_or_else(|| DEFAULT_ZK_GOVERNANCE_COMMIT.to_string());
     let env_cfg = EnvConfig::load(&args.env)?;
     let descriptor = UpgradeDescriptor::load(&args.upgrade)?;
     anyhow::ensure!(
@@ -959,7 +952,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &BundleProvenance {
             deployer: Some(args.deployer_address),
             forked_at_block: Some(forked_at_block),
-            zk_governance_commit: Some(zk_governance_commit.clone()),
+            zk_governance_commit: Some(args.zk_governance_commit.clone()),
             foundry_zksync_version: args.foundry_zksync_version.clone(),
         },
     )?;
@@ -993,7 +986,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         CheckTarget::Fork,
         &env_cfg,
         &rpc_url,
-        &zk_governance_commit,
+        &args.zk_governance_commit,
         &paths,
         None,
     )
@@ -1423,6 +1416,27 @@ mod tests {
         let dir = valid_bundle();
         let metadata = verify_bundle_integrity(dir.path()).unwrap();
         assert_eq!(metadata.files.len(), 3);
+    }
+
+    #[test]
+    fn image_provenance_is_optional_in_the_metadata() {
+        let bundle = tempfile::tempdir().unwrap();
+        let mut metadata = write_metadata(bundle.path(), &[]);
+        let json = serde_json::to_value(&metadata).unwrap();
+        assert!(json.get("protocol_ops_image").is_none());
+        let parsed: DeployBundleMetadata = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.protocol_ops_image, None);
+
+        metadata.protocol_ops_image = Some(ImageProvenance {
+            reference: "ghcr.io/matter-labs/protocol-ops:tag".into(),
+            digest: Some(format!(
+                "ghcr.io/matter-labs/protocol-ops@sha256:{}",
+                "a".repeat(64)
+            )),
+        });
+        let parsed: DeployBundleMetadata =
+            serde_json::from_value(serde_json::to_value(&metadata).unwrap()).unwrap();
+        assert_eq!(parsed.protocol_ops_image, metadata.protocol_ops_image);
     }
 
     #[test]

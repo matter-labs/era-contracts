@@ -469,22 +469,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 90
 
-      # The verify step runs `forge` from l1-contracts/ or da-contracts/; this
-      # one runs in the bundle's image, against the artifacts the bundle was
-      # generated with.
-      - name: Run forge from the bundle's image
-        if: ${{ inputs.run_verify }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/bin"
-          cat > "$RUNNER_TEMP/bin/forge" <<'EOF'
-          #!/usr/bin/env bash
-          # Run from l1-contracts/ or da-contracts/: the image has both at /contracts/.
-          exec bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" forge "$@" --root "/contracts/$(basename "$PWD")"
-          EOF
-          chmod +x "$RUNNER_TEMP/bin/forge"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-
       # Etherscan verification. Replays the `forge verify-contract` commands step
       # 1 logged — which already carry the exact `--constructor-args <hex>` taken
       # from the CREATE2 init code, so nothing is guessed. Etherscan read APIs lag
@@ -495,7 +479,6 @@ jobs:
         continue-on-error: ${{ !inputs.verify_only }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        working-directory: l1-contracts
         run: |
           set -uo pipefail
           if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
@@ -515,28 +498,30 @@ jobs:
           # already emits the exact `--constructor-args <hex>` for every contract
           # that has them (derived from the CREATE2 init code it deployed — see
           # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
-          # guess. We only append the chain + `--watch`; the key comes from
-          # $ETHERSCAN_API_KEY in the env. `--retries/--delay` ride out Etherscan
-          # indexing freshly-deployed code. Report partial failures explicitly;
+          # guess. We only run it in the bundle's image with that image's `--root`
+          # and append the chain + `--watch`; the key comes from $ETHERSCAN_API_KEY
+          # in the env. `--retries/--delay` ride out Etherscan indexing
+          # freshly-deployed code. Report partial failures explicitly;
           # normal deployments tolerate them, verification-only runs do not.
           verified=0
           failed=0
           readonly verification_attempts=3
           readonly verification_retry_delay=10
+          po() { bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" "$@"; }
           while IFS= read -r cmd; do
             echo "--- $cmd"
             # These contracts are built by da-contracts, not l1-contracts.
             # Keep the recorded address and constructor arguments unchanged.
             read -r _forge _verify _address contract _rest <<< "$cmd"
-            verification_root="$PWD"
+            verification_root=/contracts/l1-contracts
             case "$contract" in
-              EIP7702Checker|RollupL1DAValidator) verification_root="../da-contracts" ;;
+              EIP7702Checker|RollupL1DAValidator) verification_root=/contracts/da-contracts ;;
             esac
             success=false
             for ((attempt=1; attempt<=verification_attempts; attempt++)); do
               # --retries covers verification polling, but not an initial ABI
               # request timeout. Retry the complete idempotent submission too.
-              if (cd "$verification_root" && eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"); then
+              if eval "po $cmd --root $verification_root --chain $CHAIN --watch --retries 8 --delay 20"; then
                 success=true
                 break
               fi

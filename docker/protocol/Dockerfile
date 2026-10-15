@@ -222,7 +222,5 @@ RUN forge --version && cast --version && anvil --version && protocol_ops --help 
 # Provenance recorded in deploy bundles (the image has no git). Last, so a new
 # commit only invalidates this layer.
 ARG CONTRACTS_COMMIT=""
-ARG ZK_GOVERNANCE_COMMIT=""
 ENV PROTOCOL_OPS_BIN=/contracts/protocol-ops/protocol_ops \
-    PROTOCOL_OPS_CONTRACTS_COMMIT=${CONTRACTS_COMMIT} \
-    PROTOCOL_OPS_ZK_GOVERNANCE_COMMIT=${ZK_GOVERNANCE_COMMIT}
+    PROTOCOL_OPS_CONTRACTS_COMMIT=${CONTRACTS_COMMIT}

@@ -20,10 +20,10 @@ Nothing is compiled per run: the image is what gets released and tested.
 `protocol_ops_tag` is an image tag or `sha256:<digest>`. Images without the
 `org.opencontainers.image.revision` label `build-docker` sets (such as those `build-and-push-docker`
 pushes for zksync-os-integration-tests) are refused. The ecosystem workflow checks out the commit the
-image was built from, and its deploy bundle records the image digest, which `verify-bundle-handoff`
-and `deploy-ecosystem-upgrade` run. The chain workflows run on the dispatched branch, whose
-`upgrade-envs/` is mounted into the image. The step-by-step runbook is in
-[`docs/ecosystem-upgrade-deploy.md`](../../docs/ecosystem-upgrade-deploy.md).
+image was built from, so its configs are the image's: a change to `upgrade-envs/<upgrade>/<env>.toml`
+(salts, owners) needs a new image. Its deploy bundle records the image digest, which
+`verify-bundle-handoff` and `deploy-ecosystem-upgrade` run. The chain workflows run on the dispatched
+branch, whose `upgrade-envs/` is mounted into the image.
 
 ## Mapping
 
@@ -43,10 +43,10 @@ and `deploy-ecosystem-upgrade` run. The chain workflows run on the dispatched br
 
 ## Ecosystem-upgrade workflows
 
-| Workflow                              | Purpose                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `generate-ecosystem-upgrade-calldata` | Step 1: `ecosystem rehearse-upgrade` in the `protocol_ops_tag` image: regenerate the release's calldata on a fork, PUVT it, and publish the **deploy bundle** (`ecosystem-upgrade-deploy-inputs-<env>`). Its `verify-bundle-handoff` job replays that bundle from the image it names, proving it is self-sufficient. |
-| `deploy-ecosystem-upgrade`            | Step 2: broadcast the bundle's deployer calls to a real L1, then verify on Etherscan, all in the bundle's image. Takes the step-1 run id.                                                                                                                                                                            |
+| Workflow                              | Purpose                                                                                                                                                                                                                                                                |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generate-ecosystem-upgrade-calldata` | Step 1: regenerate the release's calldata on a fork, PUVT it, and publish the **deploy bundle** (`ecosystem-upgrade-deploy-inputs-<env>`). Its `verify-bundle-handoff` job re-deploys + re-verifies that bundle with no contract build, proving it is self-sufficient. |
+| `deploy-ecosystem-upgrade`            | Step 2: broadcast the bundle's deployer calls to a real L1, then verify on Etherscan. Takes the step-1 run id.                                                                                                                                                         |
 
 See [`docs/ecosystem-upgrade-deploy.md`](../../docs/ecosystem-upgrade-deploy.md)
 for the local equivalents (`protocol_ops ecosystem rehearse-upgrade` and
