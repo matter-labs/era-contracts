@@ -61,7 +61,7 @@ contract ZKsyncOSVerifierTest is Test {
 
     // ============ Constructor Tests ============
 
-    function test_constructor_setsPlonkVerifier() public view {
+    function test_constructor() public view {
         assertEq(address(verifier.PLONK_VERIFIER()), address(plonkVerifier));
     }
 

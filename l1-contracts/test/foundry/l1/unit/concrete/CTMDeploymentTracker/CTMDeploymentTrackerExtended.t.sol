@@ -52,11 +52,8 @@ contract CTMDeploymentTrackerExtendedTest is Test {
         assertEq(ctmDeploymentTracker.owner(), owner);
     }
 
-    function test_BRIDGE_HUB() public view {
+    function test_constructor() public view {
         assertEq(address(ctmDeploymentTracker.BRIDGE_HUB()), bridgehub);
-    }
-
-    function test_L1_ASSET_ROUTER() public view {
         assertEq(address(ctmDeploymentTracker.L1_ASSET_ROUTER()), assetRouter);
     }
 
