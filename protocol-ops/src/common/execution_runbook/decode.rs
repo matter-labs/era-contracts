@@ -22,7 +22,8 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     // ChainAdmin
     "multicall((address,uint256,bytes)[],bool)",
     "setUpgradeTimestamp(uint256,uint256)",
-    // ZK chain Admin facet: the current and the pre-v31 signature
+    // ZK chain Admin facet (and the ValidatorTimelock forwarding it): v35+, v31 to v34, pre-v31
+    "upgradeChainFromVersion(address,uint256)",
     "upgradeChainFromVersion(address,uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     "upgradeChainFromVersion(uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     // ChainTypeManager
@@ -134,8 +135,12 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
             protocol_version(uint(1)?),
             protocol_version(uint(3)?)
         )),
+        // The pre-v31 form leads with the version, the later ones with the chain address.
         "upgradeChainFromVersion" => {
-            let old = if args.len() == 3 { uint(1)? } else { uint(0)? };
+            let old = match args.first()? {
+                DynSolValue::Address(_) => uint(1)?,
+                _ => uint(0)?,
+            };
             Some(format!("from {}", protocol_version(old)))
         }
         // ChainAdmin's `setUpgradeTimestamp(protocolVersion, ts)` and ServerNotifier's

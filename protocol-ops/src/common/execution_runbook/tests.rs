@@ -23,6 +23,22 @@ alloy::sol! {
     function upgradeChainFromVersion(address _chain, uint256 _oldProtocolVersion, DiamondCutData _cut);
 }
 
+/// The chain upgrade call before v31 (`upgradeChainFromVersionCall` above is the v31-v34 one).
+mod pre_v31 {
+    alloy::sol! {
+        struct FacetCut { address facet; uint8 action; bool isFreezable; bytes4[] selectors; }
+        struct DiamondCutData { FacetCut[] facetCuts; address initAddress; bytes initCalldata; }
+        function upgradeChainFromVersion(uint256 _oldProtocolVersion, DiamondCutData _cut);
+    }
+}
+
+/// The cut-reading chain upgrade call of v35 on.
+mod v35 {
+    alloy::sol! {
+        function upgradeChainFromVersion(address _chain, uint256 _oldProtocolVersion);
+    }
+}
+
 /// The v0.33.0 stage upgrade: the committed emergency proposal and its runbook.
 const V33_STAGE: &str = "../l1-contracts/upgrade-envs/v0.33.0-compiler/output/stage";
 /// Chain 499's v0.33.0 ChainAdmin upgrade, written by `protocol_ops chain upgrade`.
@@ -615,6 +631,7 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0x95218ecd", "`executeInstant(...)`"),
         ("0x69340beb", "`multicall(...)`"),
         ("0xe2a9d554", "`setUpgradeTimestamp(uint256,uint256)`"),
+        ("0x03129ad9", "`upgradeChainFromVersion(address,uint256)`"),
         ("0x3b6d7534", "`upgradeChainFromVersion(...)`"),
         ("0xfc57565f", "`upgradeChainFromVersion(...)`"),
         ("0x8265f458", "`setNewVersionUpgrade(...)`"),
@@ -672,6 +689,49 @@ fn protocol_versions_unpack() {
     assert_eq!(protocol_version(U256::from(141_733_920_768u64)), "v0.33.0");
     assert_eq!(protocol_version(U256::from(1u128 << 64)), "v1.0.0");
     assert_eq!(protocol_version(U256::MAX), U256::MAX.to_string());
+}
+
+#[test]
+fn chain_upgrades_name_the_departing_version_in_every_form() {
+    let v0_34 = U256::from(34u64 << 32);
+    let v0_35 = U256::from(35u64 << 32);
+    let cut_reading = v35::upgradeChainFromVersionCall {
+        _chain: DIAMOND,
+        _oldProtocolVersion: v0_35,
+    }
+    .abi_encode();
+    let cut_taking = upgradeChainFromVersionCall {
+        _chain: DIAMOND,
+        _oldProtocolVersion: v0_34,
+        _cut: DiamondCutData {
+            facetCuts: vec![],
+            initAddress: Address::ZERO,
+            initCalldata: Bytes::new(),
+        },
+    }
+    .abi_encode();
+    // Two arguments like the cut-reading form, but the version leads.
+    let pre_v31 = pre_v31::upgradeChainFromVersionCall {
+        _oldProtocolVersion: U256::from(30u64 << 32),
+        _cut: pre_v31::DiamondCutData {
+            facetCuts: vec![],
+            initAddress: Address::ZERO,
+            initCalldata: Bytes::new(),
+        },
+    }
+    .abi_encode();
+    assert_eq!(
+        decode::annotation(&cut_reading).as_deref(),
+        Some("from v0.35.0")
+    );
+    assert_eq!(
+        decode::annotation(&cut_taking).as_deref(),
+        Some("from v0.34.0")
+    );
+    assert_eq!(
+        decode::annotation(&pre_v31).as_deref(),
+        Some("from v0.30.0")
+    );
 }
 
 #[test]

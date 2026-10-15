@@ -32,14 +32,13 @@ library VersionEdgeLib {
     /// @param _oldVersionDeadline Until when `_oldVersion` stays usable once the edge is committed.
     /// @param _upgradeTimestamp From when chains may cross the edge.
     /// @param _hasL2Side Whether the edge carries an L2 upgrade transaction.
-    /// @return isPatch Whether the edge only moves the patch component.
     function requireValidEdge(
         uint256 _oldVersion,
         uint256 _newVersion,
         uint256 _oldVersionDeadline,
         uint256 _upgradeTimestamp,
         bool _hasL2Side
-    ) internal pure returns (bool isPatch) {
+    ) internal pure {
         // A committed edge only ever moves the version forward — the same rule chains enforce at
         // execution and the CTM enforces when it commits.
         if (_newVersion <= _oldVersion) {
@@ -83,11 +82,10 @@ library VersionEdgeLib {
             revert ProtocolVersionMinorDeltaTooBig(MAX_ALLOWED_MINOR_VERSION_DELTA, minorDelta);
         }
 
-        isPatch = oldMinor == newMinor;
         // `BaseZkSyncUpgrade._setL2SystemContractUpgrade` refuses an L2 protocol upgrade transaction
         // on a patch (`PatchCantSetUpgradeTxn`), and a patch deliberately does NOT require an
         // earlier L2 upgrade to be finalized first — a pending one must survive the patch untouched.
-        if (isPatch && _hasL2Side) {
+        if (oldMinor == newMinor && _hasL2Side) {
             revert PatchCannotCarryL2Upgrade();
         }
     }

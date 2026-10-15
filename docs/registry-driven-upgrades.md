@@ -540,11 +540,16 @@ of chain-visible L2 state, and should not force a minor bump. What a patch may n
 L2 upgrade: `BaseZkSyncUpgrade` refuses an L2 protocol upgrade transaction on a patch edge, and a
 patch deliberately does NOT require an earlier L2 upgrade to be finalized first, so a pending one
 must survive it untouched. The transition therefore validates what a patch CONTAINS rather than
-which release it names: no L2 side (derived or authored), and the target release must carry over
-the departing one's L2 description — the implementation table and shared proxy shell, the
-force-deployment blob, the genesis
-batch and the VM its `DiamondInit` selects. A patch that changes nothing but the version names a
-copy of the departing release one patch version up, and derives nothing.
+which release it names: no L2 side (derived or authored).
+
+**L2 description.** Every edge without an L2 side — every patch, and a minor edge that only moves
+L1 members — must carry the departing release's L2 description over to the target release: the
+implementation table and shared proxy shell, the force-deployment blob and the genesis batch.
+Existing chains receive no L2 transaction on such an edge, so a new chain created at the target
+release must start from the same L2 state they are in (`L1OnlyEdgeChangesL2State`). An edge that
+changes the L2 description must carry an L2 side — at least an authored delegate that brings
+existing chains there — and so is a minor edge. A patch that changes nothing but the version names a copy of the departing release one
+patch version up, and derives nothing.
 
 A verifier rotation is therefore: deploy the verifier, publish release B copying release A except
 that member, publish the `0.35.0 -> 0.35.1` transition naming `A -> B` with no L2 side, execute it
@@ -583,7 +588,7 @@ deployed with their executors already bound (see [Authority](#authority)); they 
 
 `RegistryBootstrapMigration` expresses that crossing as a single write-once object. Its manifest names
 the CTM and its departing version, the CTM-domain `ProxyAdmin`, the source-checked implementation
-swaps (the CTM's own among them), the genesis `currentRelease`, the version edge and deadline, the
+swaps (the CTM's, the ServerNotifier's and the `ValidatorTimelock`'s), the genesis `currentRelease`, the version edge and deadline, the
 bootstrap engine and authored L2 plan, the `CTMUpgradeExecutor` that receives the domain,
 the `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under, the `coordinator` both answer to
 and the `governance` every one of them must already be owned by. Its notifier row is mandatory:

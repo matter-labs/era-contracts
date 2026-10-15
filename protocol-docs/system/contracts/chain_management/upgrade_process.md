@@ -39,7 +39,10 @@ from.
 1. The chain admin calls `upgradeChainFromVersion(chainAddress, oldVersion)` on the chain, or the
    crossing goes through the CTM with `CTMUpgradeExecutor.upgradeChain(transition, chainId)`, which
    the executor's owner may call at any time, the chain's admin for its own chain, and anyone else
-   once the old version's deadline has passed. The caller supplies no cut.
+   once the old version's deadline has passed. The caller supplies no cut. A validator holding
+   the chain's `UPGRADER_ROLE` on the `ValidatorTimelock` may send the same call through it once the
+   chain's ServerNotifier upgrade timestamp has passed; the timelock forwards both this form and the
+   cut-taking one chains below v35 still serve, so it needs no swap when a chain crosses v35.
 2. `AdminFacet` checks the old version, reads the cut from its CTM (`upgradeCutForVersion`) and
    executes it: the engine applies the transition's facet cuts, then installs the target release's
    verifier and the new version.

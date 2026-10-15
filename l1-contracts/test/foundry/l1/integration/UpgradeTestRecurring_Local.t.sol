@@ -29,6 +29,11 @@ import {
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
+import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {IChainAdminMulticall} from "deploy-scripts/AdminFunctions.s.sol";
+
 import {UpgradeIntegrationBootstrapFixture} from "./UpgradeTest_Local.t.sol";
 
 /*//////////////////////////////////////////////////////////////
@@ -437,6 +442,50 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             IChainTypeManager(inputs.ctm).currentRelease(),
             ICTMTransition(transition).newRelease(),
             "the CTM moved to the new release"
+        );
+    }
+
+    /// @notice A validator holding `UPGRADER_ROLE` crosses a registry-driven edge through the
+    ///         timelock once the chain's upgrade timestamp has passed: the timelock forwards the
+    ///         cut-reading call the v35+ Admin facet serves.
+    /// @dev The fixture's pre-bootstrap timelock is built from current source, so this shows the
+    ///      forwarding, not that the bootstrap's timelock swap is needed; `UpgradeTest_Local`
+    ///      asserts the swap row.
+    function test_chainReleaseEdge_isCrossedByAValidatorThroughTheTimelock() public {
+        uint256 liveVersion = IChainTypeManager(inputs.ctm).protocolVersion();
+        CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeVerifierRelease();
+        _prepareHop(core, hop, NEXT_VERSION_INPUT, "recurring-validator-crossing");
+        IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
+        _runOperation(operation);
+
+        address upgrader = makeAddr("upgrader");
+        IValidatorTimelock.ValidatorRotationParams memory upgraderOnly;
+        upgraderOnly.rotateUpgraderRole = true;
+        address serverNotifier = IChainTypeManager(inputs.ctm).serverNotifierAddress();
+        address chainAdmin = IGetters(_eraDiamond).getAdmin();
+        Call[] memory adminCalls = new Call[](2);
+        adminCalls[0] = Call({
+            target: validatorTimelockProxy,
+            value: 0,
+            data: abi.encodeCall(IValidatorTimelock.addValidatorRoles, (_eraDiamond, upgrader, upgraderOnly))
+        });
+        adminCalls[1] = Call({
+            target: serverNotifier,
+            value: 0,
+            data: abi.encodeCall(IServerNotifier.setUpgradeTimestamp, (eraZKChainId, block.timestamp))
+        });
+        vm.prank(IOwnable(chainAdmin).owner());
+        IChainAdminMulticall(chainAdmin).multicall(adminCalls, true);
+
+        vm.prank(upgrader);
+        IValidatorTimelock(validatorTimelockProxy).upgradeChainFromVersion(_eraDiamond, liveVersion);
+
+        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _nextVersion(), "the chain crossed the edge");
+        assertEq(
+            address(IGetters(_eraDiamond).getVerifier()),
+            ICTMRelease(ICTMTransition(hop.preparedTransition()).newRelease()).verifier(),
+            "the chain runs the new release's verifier"
         );
     }
 

@@ -5,6 +5,7 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
 import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
+import {Diamond} from "../../libraries/Diamond.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -173,5 +174,15 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _batchData
+    ) external;
+    /// @notice Forwards the cut-taking upgrade call of a chain whose Admin facet predates v35 to the chain.
+    /// @dev Forwarded unchanged, so the chain itself checks the cut against the one its ChainTypeManager committed.
+    /// @param _chainAddress The address of the chain being upgraded.
+    /// @param _protocolVersion The current protocol version from which upgrade is executed.
+    /// @param _cutData The diamond cut parameters that is executed in the upgrade.
+    function upgradeChainFromVersion(
+        address _chainAddress,
+        uint256 _protocolVersion,
+        Diamond.DiamondCutData calldata _cutData
     ) external;
 }

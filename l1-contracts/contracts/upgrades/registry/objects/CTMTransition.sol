@@ -10,7 +10,7 @@ import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol"
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {VersionEdgeLib} from "../libraries/VersionEdgeLib.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {PatchChangesL2GenesisState, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {L1OnlyEdgeChangesL2State, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {L2UpgradePlan, TransitionManifest, ReleaseDiff} from "../RegistryTypes.sol";
 import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
@@ -86,24 +86,25 @@ contract CTMTransition is ICTMTransition {
         // Since the edge IS the two releases' versions, the version check is also what refuses
         // the same release on both edges. A delegate is itself deployed, so a plan has an L2 side
         // exactly when it deploys.
-        bool isPatch = VersionEdgeLib.requireValidEdge({
+        bool hasL2Side = derivedPlan.deployments.length != 0;
+        VersionEdgeLib.requireValidEdge({
             _oldVersion: oldVersion,
             _newVersion: newVersion,
             _oldVersionDeadline: _manifest.oldProtocolVersionDeadline,
             _upgradeTimestamp: _manifest.upgradeTimestamp,
-            _hasL2Side: derivedPlan.deployments.length != 0
+            _hasL2Side: hasL2Side
         });
-        // A SemVer PATCH edge may name a NEW release — replacing a verifier or a facet in the
-        // snapshot is not by itself a change of chain-visible L2 state — but never the chains' L2
-        // side.
-        if (isPatch) {
+        // An edge without an L2 side (every patch among them) may name a NEW release — replacing
+        // a verifier or a facet in the snapshot is not by itself a change of chain-visible L2
+        // state — but must leave the release's L2 description as it was.
+        if (!hasL2Side) {
             // An empty DERIVED deployment list is not enough on its own: it only proves the two
             // L2 bytecode tables agree. The rest of the release's L2/genesis description — the
-            // force-deployment blob and the genesis batch a new chain starts from, and the VM the
-            // pinned DiamondInit selects — is never executed on an existing chain, so a patch
-            // changing it would leave chains created after the patch describing a different L2
-            // state from the ones that took it.
-            _requirePatchKeepsL2State(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
+            // force-deployment blob and the genesis batch a new chain starts from — is never
+            // executed on an existing chain, so changing it on an edge that sends existing chains
+            // nothing would leave chains created after the edge describing a different L2 state
+            // from the ones that crossed it.
+            _requireL2StateKept(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
         }
 
         encodedManifest = abi.encode(_manifest);
@@ -120,24 +121,24 @@ contract CTMTransition is ICTMTransition {
         }
     }
 
-    /// @dev The L2/genesis description a patch must carry over unchanged (see the constructor).
-    ///      Compared by value: a patch names a release of its own, whose snapshot may differ from
-    ///      the departing one in its L1 members only.
-    function _requirePatchKeepsL2State(ICTMRelease _fromRelease, ICTMRelease _newRelease) private view {
+    /// @dev The L2/genesis description an edge without an L2 side must carry over unchanged (see
+    ///      the constructor). Compared by value: such an edge names a release of its own, whose
+    ///      snapshot may differ from the departing one in its L1 members only.
+    function _requireL2StateKept(ICTMRelease _fromRelease, ICTMRelease _newRelease) private view {
         if (
             keccak256(abi.encode(_fromRelease.l2BytecodeInfos())) !=
                 keccak256(abi.encode(_newRelease.l2BytecodeInfos())) ||
             keccak256(_fromRelease.l2SystemProxyBytecodeInfo()) != keccak256(_newRelease.l2SystemProxyBytecodeInfo()) ||
             keccak256(_fromRelease.fixedForceDeploymentsData()) != keccak256(_newRelease.fixedForceDeploymentsData())
         ) {
-            revert PatchChangesL2GenesisState();
+            revert L1OnlyEdgeChangesL2State();
         }
         // slither-disable-next-line unused-return
         (, bytes32 fromBatchHash, uint64 fromIndex) = _fromRelease.genesisParams();
         // slither-disable-next-line unused-return
         (, bytes32 newBatchHash, uint64 newIndex) = _newRelease.genesisParams();
         if (fromBatchHash != newBatchHash || fromIndex != newIndex) {
-            revert PatchChangesL2GenesisState();
+            revert L1OnlyEdgeChangesL2State();
         }
     }
 

@@ -250,6 +250,8 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
+// 0xb55a753d
+error L1OnlyEdgeChangesL2State();
 // 0xb0966e4f
 error L2BytecodeInfoLength(uint256 actual, uint256 expected);
 // 0xb07238db
@@ -364,8 +366,6 @@ error OperationMustBeReady();
 error OriginChainIdNotFound();
 // 0x720432d4
 error PatchCannotCarryL2Upgrade();
-// 0x0f808de6
-error PatchChangesL2GenesisState();
 // 0x97da9c1c
 error PayloadTooShort();
 // 0x9b48e060

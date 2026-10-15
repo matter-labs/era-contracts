@@ -39,7 +39,7 @@ import {
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps,
     PatchCannotCarryL2Upgrade,
-    PatchChangesL2GenesisState,
+    L1OnlyEdgeChangesL2State,
     RegistryDuplicateFacetRow,
     RegistryDuplicateProxyRow,
     RegistrySelfEdgeProxyRow,
@@ -492,7 +492,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _patchManifest();
         manifest.newRelease = address(genesisRelease);
 
-        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
         new CTMTransition(manifest);
     }
 
@@ -504,7 +504,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _patchManifest();
         manifest.newRelease = address(genesisRelease);
 
-        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
         new CTMTransition(manifest);
     }
 
@@ -518,8 +518,50 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _patchManifest();
         manifest.newRelease = address(shellRelease);
 
-        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
         new CTMTransition(manifest);
+    }
+
+    /// @dev The rule follows the L2 side, not the patch component: a MINOR edge that sends existing
+    ///      chains no L2 transaction must not change the genesis a new chain starts from either.
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheForceDeploymentsBlob() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.fixedForceDeploymentsData = L2PlanFixtures.forceDeploymentsData(
+            releaseManifest.l2BytecodeInfos,
+            releaseManifest.l2SystemProxyBytecodeInfo,
+            2
+        );
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheGenesisBatch() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.genesisIndexRepeatedStorageChanges = 55;
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The same release change on a minor edge WITH an L2 side: the authored delegate is what
+    ///      brings existing chains to the new description, so the edge constructs.
+    function test_minorEdgeWithAnL2SideMayChangeTheGenesis() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.genesisBatchHash = bytes32(uint256(2));
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+
+        CTMTransition edge = new CTMTransition(manifest);
+
+        assertTrue(edge.releaseDiff().genesisBatch, "the edge changes the genesis batch");
+        assertEq(edge.l2Plan().delegateTo, L2PlanFixtures.unsafeDeployment(DELEGATE_CODE).newAddress);
     }
 
     // ─────────────────────────── releaseDiff ───────────────────────────
@@ -1144,7 +1186,9 @@ contract StorageRegistriesTest is Test {
     }
 
     /// @dev A shell change alone is not an L2 delta: an existing member's proxy is never
-    ///      redeployed by `updateZKsyncOSContract`, so only implementation rows are compared.
+    ///      redeployed by `updateZKsyncOSContract`, so only implementation rows are compared. The
+    ///      edge still needs an L2 side of its own (here the authored delegate alone) to change the
+    ///      release's L2 description — without one it is refused (`L1OnlyEdgeChangesL2State`).
     function test_transitionDerivesNoL2RowsWhenOnlyTheShellChanges() public {
         CTMRelease departing = _tableReleaseAt(OLD_VERSION);
         ReleaseManifest memory targetManifest = _tableReleaseManifest();
@@ -1154,11 +1198,26 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(departing);
         manifest.newRelease = address(target);
-        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+        manifest.l2Plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, address(delegateComposer));
 
         CTMTransition shellOnly = new CTMTransition(manifest);
 
-        assertEq(shellOnly.l2Plan().deployments.length, 0, "a shell-only change derives no L2 deployment");
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = shellOnly.l2Plan().deployments;
+        assertEq(deployments.length, 1, "a shell-only change derives no L2 deployment beyond the authored delegate");
+        assertEq(deployments[0].newAddress, L2PlanFixtures.unsafeDeployment(DELEGATE_CODE).newAddress);
+    }
+
+    function test_revertWhen_l1OnlyEdgeChangesTheShell() public {
+        ReleaseManifest memory targetManifest = _tableReleaseManifest();
+        targetManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        L2PlanFixtures.syncForceDeployments(targetManifest);
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(_tableReleaseAt(OLD_VERSION));
+        manifest.newRelease = address(new CTMRelease(targetManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
     }
 
     /// @dev The enum is append-only: a departing release built against a shorter enum has no row

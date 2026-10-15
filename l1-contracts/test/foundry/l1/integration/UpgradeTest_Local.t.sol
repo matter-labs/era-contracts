@@ -44,7 +44,8 @@ import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {BootstrapManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -651,6 +652,25 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "the notifier sits under the CTM-domain ProxyAdmin"
         );
         assertEq(IOwnable(notifierProxy).owner(), _executor, "the notifier is the CTM executor's");
+
+        // The timelock's row: the v35 Admin facet serves only the cut-reading upgrade call, which
+        // the pre-v35 timelock does not forward.
+        address timelockProxy = _bootstrap.getAddresses().stateTransition.proxies.validatorTimelock;
+        ProxyUpgradeRow memory timelockRow = migration.getManifest().ctmProxyUpgrades[
+            uint256(CTMContract.ValidatorTimelock)
+        ];
+        assertEq(timelockRow.proxy, timelockProxy, "the timelock row names the CTM's timelock");
+        assertTrue(timelockRow.implNew != timelockRow.expectedOldImpl, "the timelock row swaps its implementation");
+        assertEq(
+            DeployScriptUtils.getImplementation(timelockProxy),
+            timelockRow.implNew,
+            "the timelock runs the implementation its pinned row names"
+        );
+        assertEq(
+            timelockRow.implNew,
+            _bootstrap.getAddresses().stateTransition.implementations.validatorTimelock,
+            "the row installs the timelock the prepare deployed"
+        );
     }
 
     /// @dev Decodes an `upgradeFromBootstrap(address)` init payload; external so the selector can

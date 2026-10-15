@@ -14,6 +14,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -122,6 +123,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
+        // Read where every upgrade prepare reads it, so the genesis release and the releases after it
+        // pin the same L2 Bridgehub cap.
+        config.contracts.maxNumberOfChains = L1Bridgehub(bridgehub).MAX_NUMBER_OF_ZK_CHAINS();
 
         if (reuseGovAndAdmin) {
             ctmAddresses.admin.governance = coreAddresses.shared.governance;
