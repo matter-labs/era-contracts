@@ -232,7 +232,8 @@ jobs:
             echo "DEPLOY_BUNDLE_DIR=$bundle"
             echo "BUNDLE_IMAGE=${digest#*@}"
             echo "BUNDLE_COMMIT=$commit"
-            echo "EXTRA_MOUNTS=$bundle:/contracts/deploy-bundle:ro"
+            # Mounted at the same path, so the commands below take host paths.
+            echo "EXTRA_MOUNTS=$RUNNER_TEMP:$RUNNER_TEMP"
           } >> "$GITHUB_ENV"
 
       - name: Checkout the bundle's commit
@@ -242,7 +243,7 @@ jobs:
           persist-credentials: false
 
       - name: Validate deploy bundle integrity
-        run: bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem verify-bundle /contracts/deploy-bundle
+        run: bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
 
       # The bundle names the upgrade it was generated for; that upgrade's upgrade.toml in this
       # checkout says how its broadcast is checked (protocol-ops/src/common/upgrade_descriptor.rs).
@@ -297,7 +298,7 @@ jobs:
           RESUME_FROM_OTHER_BUNDLE: ${{ inputs.resume_from_other_bundle }}
         run: |
           set -euo pipefail
-          OUTDIR="$GITHUB_WORKSPACE/deploy-result"
+          OUTDIR="$RUNNER_TEMP/deploy-result"
           mkdir -p "$OUTDIR"
           bundle_metadata_sha256="$(sha256sum "$DEPLOY_BUNDLE_DIR/bundle-metadata.json" | awk '{print $1}')"
 
@@ -435,14 +436,15 @@ jobs:
             sepolia) pk="$PK_SEPOLIA" ;;
             *) echo "::error::No deployer key wired for L1 network '$L1_NETWORK'"; exit 1 ;;
           esac
-          EXTRA_MOUNTS="$EXTRA_MOUNTS $DEPLOY_OUTDIR:/contracts/deploy-result" \
-            bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem upgrade-broadcast \
-            --manifest /contracts/deploy-bundle/prepare/manifest.json \
+          MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
+          echo "Manifest: $MANIFEST"
+          bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem upgrade-broadcast \
+            --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
             --key "${DEPLOYER_ADDR}=${pk}" \
             --skip-unkeyed \
             --max-gas-price-gwei "$MAX_GAS_PRICE_GWEI" \
-            --out /contracts/deploy-result/deploy-executed.json
+            --out "$DEPLOY_OUTDIR/deploy-executed.json"
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
 
@@ -452,19 +454,18 @@ jobs:
         if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
         run: |
           set -euo pipefail
-          EXTRA_MOUNTS="$EXTRA_MOUNTS $DEPLOY_OUTDIR:/contracts/deploy-result" \
-            bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle \
-            --bundle /contracts/deploy-bundle \
+          bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle \
+            --bundle "$DEPLOY_BUNDLE_DIR" \
             --rpc "$L1_RPC_URL" \
             --verify-only \
-            --transactions-log /contracts/deploy-result/transactions.txt
+            --transactions-log "$TXLOG"
 
       - name: Upload transactions.txt + executed log
         if: ${{ always() && !inputs.verify_only }}
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
-          path: ${{ github.workspace }}/deploy-result
+          path: ${{ runner.temp }}/deploy-result
           if-no-files-found: warn
           retention-days: 90
 

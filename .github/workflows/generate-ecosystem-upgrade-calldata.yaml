@@ -631,10 +631,11 @@ jobs:
       - name: Replay the bundle on a fresh fork + PUVT
         env:
           BUNDLE_IMAGE: ${{ steps.bundle.outputs.image }}
-          EXTRA_MOUNTS: ${{ runner.temp }}/deploy-bundle:/contracts/deploy-bundle:ro
+          # Mounted at the same path in the image.
+          EXTRA_MOUNTS: ${{ runner.temp }}:${{ runner.temp }}
         run: |
           set -euo pipefail
           # The fork anvil runs inside the container, so nothing outlives it.
-          args=(--bundle /contracts/deploy-bundle --fork-url "$L1_FORK_URL")
+          args=(--bundle "$RUNNER_TEMP/deploy-bundle" --fork-url "$L1_FORK_URL")
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
           bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle "${args[@]}"
