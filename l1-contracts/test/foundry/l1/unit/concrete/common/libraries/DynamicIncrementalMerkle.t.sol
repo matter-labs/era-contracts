@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {DynamicIncrementalMerkle} from "contracts/common/libraries/DynamicIncrementalMerkle.sol";
+import {Merkle} from "contracts/common/libraries/Merkle.sol";
 
 /// @notice Unit tests for DynamicIncrementalMerkle library
 contract DynamicIncrementalMerkleTest is Test {
@@ -23,14 +24,6 @@ contract DynamicIncrementalMerkleTest is Test {
         assertEq(tree.root(), bytes32(0));
     }
 
-    function test_setup_with_custom_zero() public {
-        bytes32 customZero = keccak256("custom_zero");
-        bytes32 initialRoot = tree.setup(customZero);
-
-        assertEq(initialRoot, bytes32(0));
-        assertEq(tree.height(), 0);
-    }
-
     // ============ push Tests ============
 
     function test_push_single_element() public {
@@ -40,7 +33,7 @@ contract DynamicIncrementalMerkleTest is Test {
         (uint256 index, bytes32 newRoot) = tree.push(leaf);
 
         assertEq(index, 0);
-        assertTrue(newRoot != bytes32(0));
+        assertEq(newRoot, leaf);
         assertEq(tree.root(), newRoot);
     }
 
@@ -55,101 +48,12 @@ contract DynamicIncrementalMerkleTest is Test {
 
         assertEq(index1, 0);
         assertEq(index2, 1);
-        assertTrue(newRoot != bytes32(0));
+        assertEq(newRoot, Merkle.efficientHash(leaf1, leaf2));
+        assertEq(tree.root(), newRoot);
         assertEq(tree.height(), 1);
-    }
-
-    function test_push_four_elements_expands_tree() public {
-        tree.setup(ZERO);
-
-        bytes32 leaf1 = keccak256("leaf1");
-        bytes32 leaf2 = keccak256("leaf2");
-        bytes32 leaf3 = keccak256("leaf3");
-        bytes32 leaf4 = keccak256("leaf4");
-
-        tree.push(leaf1); // index=0, no expansion
-        tree.push(leaf2); // index=1, expands to height 1
-
-        // After two elements, tree height should be 1
-        assertEq(tree.height(), 1);
-
-        tree.push(leaf3); // index=2, expands to height 2
-
-        // After three elements, tree should expand
-        assertEq(tree.height(), 2);
-
-        (uint256 index4, ) = tree.push(leaf4); // index=3, no expansion
-        assertEq(index4, 3);
-        assertEq(tree.height(), 2);
-    }
-
-    function test_push_triggers_tree_expansion() public {
-        tree.setup(ZERO);
-
-        // Push enough elements to trigger multiple expansions
-        for (uint256 i = 0; i < 8; i++) {
-            tree.push(keccak256(abi.encode(i)));
-        }
-
-        // After 8 elements, tree should be height 3
-        assertEq(tree.height(), 3);
-    }
-
-    function testFuzz_push_returns_sequential_indices(uint8 numElements) public {
-        vm.assume(numElements > 0 && numElements <= 32);
-
-        tree.setup(ZERO);
-
-        for (uint256 i = 0; i < numElements; i++) {
-            (uint256 index, ) = tree.push(keccak256(abi.encode(i)));
-            assertEq(index, i);
-        }
-    }
-
-    // ============ root Tests ============
-
-    function test_root_changes_with_each_push() public {
-        tree.setup(ZERO);
-
-        bytes32 initialRoot = tree.root();
-
-        tree.push(keccak256("leaf1"));
-        bytes32 root1 = tree.root();
-
-        tree.push(keccak256("leaf2"));
-        bytes32 root2 = tree.root();
-
-        assertTrue(root1 != initialRoot);
-        assertTrue(root2 != root1);
-    }
-
-    function test_root_deterministic() public {
-        tree.setup(ZERO);
-
-        tree.push(keccak256("leaf1"));
-        tree.push(keccak256("leaf2"));
-
-        bytes32 root1 = tree.root();
-
-        // Reset and rebuild
-        DynamicIncrementalMerkle.Bytes32PushTree storage tree2 = tree;
-        tree2.clear();
-        tree2.setup(ZERO);
-
-        tree2.push(keccak256("leaf1"));
-        tree2.push(keccak256("leaf2"));
-
-        bytes32 root2 = tree2.root();
-
-        assertEq(root1, root2);
     }
 
     // ============ height Tests ============
-
-    function test_height_starts_at_zero() public {
-        tree.setup(ZERO);
-        assertEq(tree.height(), 0);
-    }
 
     function test_height_increases_correctly() public {
         tree.setup(ZERO);
@@ -189,10 +93,9 @@ contract DynamicIncrementalMerkleTest is Test {
 
         tree.clear();
 
-        // After clear, internal state should be reset
-        // Calling setup again should work
-        tree.setup(ZERO);
-        assertEq(tree.height(), 0);
+        assertEq(tree._nextLeafIndex, 0);
+        assertEq(tree._sides.length, 0);
+        assertEq(tree._zeros.length, 0);
     }
 
     // ============ reset Tests ============
@@ -202,14 +105,20 @@ contract DynamicIncrementalMerkleTest is Test {
 
         tree.push(keccak256("leaf1"));
         tree.push(keccak256("leaf2"));
-
-        assertTrue(tree.height() > 0);
+        tree.push(keccak256("leaf3"));
 
         bytes32 newZero = keccak256("new_zero");
         bytes32 initialRoot = tree.reset(newZero);
 
         assertEq(initialRoot, bytes32(0));
+        assertEq(tree.root(), bytes32(0));
+        assertEq(tree._nextLeafIndex, 0);
         assertEq(tree.height(), 0);
+        assertEq(tree._zeros.length, 1);
+        assertEq(tree._zeros[0], newZero);
+
+        tree.push(bytes32(uint256(42)));
+        assertEq(tree.root(), bytes32(uint256(42)));
     }
 
     // ============ extendUntilEnd Tests ============
@@ -220,6 +129,7 @@ contract DynamicIncrementalMerkleTest is Test {
         tree.extendUntilEnd(5);
 
         assertEq(tree.height(), 4);
+        assertEq(tree.root(), tree._zeros[4]);
     }
 
     function test_extendUntilEnd_with_elements() public {
@@ -240,7 +150,6 @@ contract DynamicIncrementalMerkleTest is Test {
     function test_extendUntilEnd_no_op_when_already_large_enough() public {
         tree.setup(ZERO);
 
-        // Push enough elements to get height 3
         for (uint256 i = 0; i < 8; i++) {
             tree.push(keccak256(abi.encode(i)));
         }
@@ -253,18 +162,21 @@ contract DynamicIncrementalMerkleTest is Test {
         assertEq(tree.height(), currentHeight);
     }
 
-    function test_extendUntilEnd_preserves_root_equivalence() public {
+    function test_extendUntilEnd_pads_root_with_zeros() public {
         tree.setup(ZERO);
 
-        tree.push(keccak256("leaf1"));
-        tree.push(keccak256("leaf2"));
+        bytes32 leaf1 = keccak256("leaf1");
+        bytes32 leaf2 = keccak256("leaf2");
+        tree.push(leaf1);
+        tree.push(leaf2);
 
-        tree.extendUntilEnd(10);
+        tree.extendUntilEnd(3);
 
-        bytes32 rootAfter = tree.root();
-
-        // Root should change after extension (as it includes zeros at higher levels)
-        assertTrue(rootAfter != bytes32(0));
+        bytes32 expectedRoot = Merkle.efficientHash(
+            Merkle.efficientHash(leaf1, leaf2),
+            Merkle.efficientHash(ZERO, ZERO)
+        );
+        assertEq(tree.root(), expectedRoot);
     }
 
     // ============ Gas and Stress Tests ============
@@ -272,7 +184,6 @@ contract DynamicIncrementalMerkleTest is Test {
     function test_push_many_elements() public {
         tree.setup(ZERO);
 
-        // Push 64 elements
         for (uint256 i = 0; i < 64; i++) {
             (uint256 index, ) = tree.push(keccak256(abi.encode(i)));
             assertEq(index, i);
@@ -280,26 +191,5 @@ contract DynamicIncrementalMerkleTest is Test {
 
         // After 64 elements, tree should be height 6
         assertEq(tree.height(), 6);
-    }
-
-    function test_sequential_operations() public {
-        tree.setup(ZERO);
-
-        // Push
-        tree.push(keccak256("a"));
-        tree.push(keccak256("b"));
-        bytes32 root1 = tree.root();
-
-        // More pushes
-        tree.push(keccak256("c"));
-        bytes32 root2 = tree.root();
-
-        // Extend
-        tree.extendUntilEnd(5);
-        bytes32 root3 = tree.root();
-
-        // All roots should be different
-        assertTrue(root1 != root2);
-        assertTrue(root2 != root3);
     }
 }
