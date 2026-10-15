@@ -251,7 +251,7 @@ handler, v33 runs as an upgrade only on adi, which has had no interop transactio
 v31 interop needs a Gateway, and only a chain that settles on one can send a bundle. Before upgrading an
 ecosystem with that handler onto v33, check that:
 
-- every chain's `Bridgehub.settlementLayer` is L1 (PUVT checks this too);
+- every chain's `Bridgehub.settlementLayer` is L1 (the v31 line's PUVT checks this too);
 - no chain's `L2_INTEROP_HANDLER_ADDR` has emitted `BundleVerified`, `BundleExecuted`, `BundleUnbundled`
   or `CallProcessed`.
 

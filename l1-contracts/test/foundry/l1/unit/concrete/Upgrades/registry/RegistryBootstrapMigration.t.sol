@@ -1181,7 +1181,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.ctmProxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(ctmDomainProxy),
             expectedOldImpl: implV31,
-            implNew: implV31,
+            implNew: implUnknown,
             callInitializeUpgrade: false
         });
 

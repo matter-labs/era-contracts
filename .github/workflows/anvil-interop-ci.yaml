@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/anvil-interop-ci.yaml"
+      - ".github/actions/setup-anvil-interop/**"
       - "l1-contracts/contracts/**"
       - "l1-contracts/deploy-scripts/**"
       - "l1-contracts/lib/**"

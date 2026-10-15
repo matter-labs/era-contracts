@@ -83,8 +83,8 @@ enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT`):
 - `CoreTransitionManifest.proxyUpgrades` is indexed by `L1EcosystemContract`.
 - `OperationManifest.ctmInfrastructure` and `BootstrapManifest.ctmProxyUpgrades` are indexed by
   `CTMContract`. Only the members behind a proxy under the CTM-domain `ProxyAdmin` can
-  participate: ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator
-  and the ServerNotifier.
+  participate: ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator,
+  the ServerNotifier and the L1InteropFeeManager.
 
 Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **"not
 upgraded" statement**. The length check means every contract of the domain HAS a slot and none can
@@ -259,7 +259,7 @@ method outside an operation, through the executor's owner-gated, logged `forward
 | `revertBatches`                                                                                                                     | `forward`                                                                         | validator (`revertBatchesSharedBridge`) |
 | `changeFeeParams`, `setTokenMultiplier`                                                                                             | `forward` only                                                                    | chain admin                             |
 | `setPendingAdmin`, `setServerNotifier`                                                                                              | `forward` only                                                                    | CTM admin (`onlyOwnerOrAdmin`)          |
-| `executeUpgrade` (arbitrary cut), legacy `setNewVersionUpgrade` / `setUpgradeDiamondCut` / `setLegacyValidatorTimelock`             | `forward` only — deliberately: the bypass the object-driven path exists to remove | —                                       |
+| `executeUpgrade` (arbitrary cut), legacy `setNewVersionUpgrade` / `setUpgradeDiamondCut`                                            | `forward` only — deliberately: the bypass the object-driven path exists to remove | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                                                          | `forward` only                                                                    | —                                       |
 
 The executors hold three more authorities, reached the same way outside an operation:

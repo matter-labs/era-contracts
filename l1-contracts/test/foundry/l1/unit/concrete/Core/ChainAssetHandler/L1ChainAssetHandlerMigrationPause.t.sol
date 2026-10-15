@@ -229,14 +229,44 @@ contract L1ChainAssetHandlerMigrationPauseTest is Test {
 
         // ctmB is not paused, so its migration clears the pause gate and fails further in, on
         // the migration data this test does not construct.
-        vm.prank(assetRouter);
-        vm.expectRevert();
-        handler.bridgeBurn(1, 0, assetB, address(0), hex"");
+        _assertClearsPauseGate(assetRouter, abi.encodeCall(handler.bridgeBurn, (1, 0, assetB, address(0), hex"")));
 
         // And once A's pause lifts, A's migration clears the gate the same way.
         _unpauseCTM(executorA, ctmA);
+        _assertClearsPauseGate(assetRouter, abi.encodeCall(handler.bridgeBurn, (1, 0, assetA, address(0), hex"")));
+    }
+
+    /// @dev The receiving side of a migration is gated the same way: a chain arriving under a
+    ///      paused CTM is refused before its mint data is read.
+    function test_bridgeMint_revertWhen_itsOwnCTMIsPaused() public {
+        address assetRouter = makeAddr("assetRouter");
+        // MOCKED: the two Bridgehub getters `setAddresses` copies.
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.messageRoot, ()), abi.encode(makeAddr("messageRoot")));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(assetRouter));
+        vm.prank(owner);
+        handler.setAddresses();
+
+        _pauseCTM(executorA, ctmA);
+
+        vm.expectRevert(MigrationPaused.selector);
         vm.prank(assetRouter);
-        vm.expectRevert();
-        handler.bridgeBurn(1, 0, assetA, address(0), hex"");
+        handler.bridgeMint(1, assetA, hex"");
+
+        // ctmB is not paused, so its mint clears the pause gate and fails further in, decoding
+        // the mint data this test does not construct.
+        _assertClearsPauseGate(assetRouter, abi.encodeCall(handler.bridgeMint, (1, assetB, hex"")));
+
+        // And once A's pause lifts, A's mint clears the gate the same way.
+        _unpauseCTM(executorA, ctmA);
+        _assertClearsPauseGate(assetRouter, abi.encodeCall(handler.bridgeMint, (1, assetA, hex"")));
+    }
+
+    /// @dev Past the gate the call still fails, on data these tests do not construct, but with an
+    ///      empty revert: `MigrationPaused` would carry its selector.
+    function _assertClearsPauseGate(address _caller, bytes memory _call) internal {
+        vm.prank(_caller);
+        (bool success, bytes memory returnData) = address(handler).call(_call);
+        assertFalse(success, "the call fails past the gate");
+        assertEq(returnData.length, 0, "the pause gate lets the call through");
     }
 }

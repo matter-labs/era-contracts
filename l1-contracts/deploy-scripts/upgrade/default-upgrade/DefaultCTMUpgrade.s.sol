@@ -466,6 +466,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             ctmAddresses.stateTransition.proxies.serverNotifier,
             ctmAddresses.stateTransition.implementations.serverNotifier
         );
+        rows[uint256(CTMContract.L1InteropFeeManager)] = _ctmRow(
+            ctmAddresses.stateTransition.proxies.interopFeeManager,
+            ctmAddresses.stateTransition.implementations.interopFeeManager
+        );
     }
 
     /// @dev The inert (all-zero) row when this run deployed no implementation for the proxy.
@@ -557,6 +561,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         impls[uint256(CTMContract.PermissionlessValidator)] = _deployedCTMImpl(
             proxies.permissionlessValidator,
             implementations.permissionlessValidator
+        );
+        impls[uint256(CTMContract.L1InteropFeeManager)] = _deployedCTMImpl(
+            proxies.interopFeeManager,
+            implementations.interopFeeManager
         );
     }
 

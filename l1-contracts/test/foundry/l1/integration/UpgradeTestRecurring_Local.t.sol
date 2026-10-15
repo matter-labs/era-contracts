@@ -20,6 +20,9 @@ import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IE
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {
     CTMContract,
     L1EcosystemContract,
@@ -88,6 +91,19 @@ contract CTMUpgradeValidatorTimelockOnly is RecurringCTMUpgradeForTests {
     function deployNewCTMContracts() public override {
         super.deployNewCTMContracts();
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("ValidatorTimelock");
+    }
+}
+
+/// @notice An infrastructure-only hop that swaps the `L1InteropFeeManager` implementation behind its
+///         CTM-domain proxy, through the inventory slot the enum gives it.
+contract CTMUpgradeInteropFeeManagerOnly is RecurringCTMUpgradeForTests {
+    function upgradeKind() public pure override returns (UpgradeKind) {
+        return UpgradeKind.InfrastructureOnly;
+    }
+
+    function deployNewCTMContracts() public override {
+        super.deployNewCTMContracts();
+        ctmAddresses.stateTransition.implementations.interopFeeManager = deploySimpleContract("L1InteropFeeManager");
     }
 }
 
@@ -343,6 +359,44 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             implNew,
             "the timelock proxy points at the new implementation"
         );
+        _assertChainFacingUnchanged(before);
+    }
+
+    /// @notice The fee manager's implementation swap is a checked row like any other CTM-domain
+    ///         proxy's: preparation puts it in the `L1InteropFeeManager` slot, and `execute` applies
+    ///         it through the CTM-domain ProxyAdmin, keeping the proxy's state.
+    function test_interopFeeManagerPrepare_swapsTheFeeManagerThroughItsSlot() public {
+        address feeManager = IChainTypeManager(inputs.ctm).L1_INTEROP_FEE_MANAGER();
+        address feeOwner = IOwnable(feeManager).owner();
+        uint256 feePerUnit = 7;
+        vm.prank(feeOwner);
+        IL1InteropFeeManager(feeManager).setFee(ETH_TOKEN_ADDRESS, feePerUnit);
+
+        CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeInteropFeeManagerOnly();
+        _prepareHop(core, hop, SAME_VERSION_INPUT, "recurring-fee-manager");
+
+        IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
+        assertEq(operation.ctmTransition(), address(0), "an infrastructure-only hop names no transition");
+        address implOld = DeployScriptUtils.getImplementation(feeManager);
+        address implNew = hop.getAddresses().stateTransition.implementations.interopFeeManager;
+        assertTrue(implNew != implOld, "the fixture must actually replace the implementation");
+        ProxyUpgradeRow memory row = operation.getManifest().ctmInfrastructure[
+            uint256(CTMContract.L1InteropFeeManager)
+        ];
+        assertEq(row.proxy, feeManager, "the slot names the CTM's fee manager proxy");
+        assertEq(row.expectedOldImpl, implOld, "the row departs from what the proxy runs today");
+        assertEq(row.implNew, implNew, "the row names the implementation this run deployed");
+        assertEq(operation.ctmInfrastructureRows().length, 1, "the fee manager row is the only one");
+
+        ChainFacingState memory before = _snapshotChainFacing();
+        vm.expectEmit(true, true, true, true, IOwnable(inputs.ctm).owner());
+        emit ProxyUpgradeRowLib.ProxyImplementationUpgraded(feeManager, implNew);
+        _runOperation(operation);
+
+        assertEq(DeployScriptUtils.getImplementation(feeManager), implNew, "the fee manager runs the new code");
+        assertEq(IOwnable(feeManager).owner(), feeOwner, "the swap keeps the owner");
+        assertEq(IL1InteropFeeManager(feeManager).feePerUnit(), feePerUnit, "the swap keeps the fee");
         _assertChainFacingUnchanged(before);
     }
 

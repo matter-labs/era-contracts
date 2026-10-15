@@ -165,6 +165,7 @@ contract CTMUpgradeExecutor is DomainUpgradeExecutorBase, ICTMUpgradeExecutor {
         }
         uint256 newProtocolVersion = _transition.newProtocolVersion();
         uint256 currentProtocolVersion = CHAIN_TYPE_MANAGER.protocolVersion();
+        // Defense in depth: a committed edge's target is never ahead of `protocolVersion`.
         if (currentProtocolVersion < newProtocolVersion) {
             revert OutdatedProtocolVersion(currentProtocolVersion, newProtocolVersion);
         }

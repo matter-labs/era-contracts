@@ -254,6 +254,8 @@ error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 error L2BytecodeInfoLength(uint256 actual, uint256 expected);
 // 0xb07238db
 error L2BytecodeNotPublished(bytes32 bytecodeHash);
+// 0x6ae0a0c5
+error L2BytecodeRowRemoved(uint256 member);
 // 0x4ef29fe3
 error L2BytecodeTableShrunk(uint256 fromLength, uint256 newLength);
 // 0x5493e4b1
@@ -410,6 +412,8 @@ error RegistryEmptySelectors(address facet);
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 // 0xb40929f4
 error RegistryMemberHasNoFixedAddress(uint256 member);
+// 0xef72ee1a
+error RegistrySelfEdgeProxyRow(address proxy);
 // 0xe89c554c
 error RegistryTargetHasNoCode(address target);
 // 0x1f20dafa

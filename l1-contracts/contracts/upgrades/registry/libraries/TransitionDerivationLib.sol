@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
-import {L2BytecodeTableShrunk, RegistryDuplicateSelector} from "../../../common/L1ContractErrors.sol";
+import {
+    L2BytecodeRowRemoved,
+    L2BytecodeTableShrunk,
+    RegistryDuplicateSelector
+} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -129,7 +133,8 @@ library TransitionDerivationLib {
 
     /// @notice The rows of `_newTable` that differ from `_fromTable` at the same member index, every
     ///         other slot empty. The enum is append-only, so a departing release built against a
-    ///         shorter enum simply has no row to compare for the appended members.
+    ///         shorter enum simply has no row to compare for the appended members, and a member
+    ///         the departing release ships cannot be dropped.
     function changedL2Rows(
         bytes[] memory _fromTable,
         bytes[] memory _newTable
@@ -144,6 +149,10 @@ library TransitionDerivationLib {
         changed = new bytes[](length);
         for (uint256 i = 0; i < length; ++i) {
             if (_newTable[i].length == 0) {
+                // Upgraded chains would keep the member's old code while new chains get none.
+                if (i < fromLength && _fromTable[i].length != 0) {
+                    revert L2BytecodeRowRemoved(i);
+                }
                 continue;
             }
             if (i >= fromLength || keccak256(_fromTable[i]) != keccak256(_newTable[i])) {

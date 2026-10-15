@@ -34,6 +34,7 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {
     L2BytecodeInfoLength,
+    L2BytecodeRowRemoved,
     L2BytecodeTableShrunk,
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps,
@@ -41,6 +42,7 @@ import {
     PatchChangesL2GenesisState,
     RegistryDuplicateFacetRow,
     RegistryDuplicateProxyRow,
+    RegistrySelfEdgeProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
@@ -1192,6 +1194,19 @@ contract StorageRegistriesTest is Test {
         this.changedL2RowsExternal(fromTable, newTable);
     }
 
+    /// @dev A member the departing release ships cannot vanish from the target: upgraded chains
+    ///      would keep its old code while chains created from the target get none.
+    function test_revertWhen_changedL2RowsDropsAMember() public {
+        bytes[] memory fromTable = new bytes[](2);
+        fromTable[0] = hex"01";
+        fromTable[1] = hex"02";
+        bytes[] memory newTable = new bytes[](2);
+        newTable[0] = hex"01";
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeRowRemoved.selector, 1));
+        this.changedL2RowsExternal(fromTable, newTable);
+    }
+
     function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
         // The shape rules run against the COMBINED plan: a derived-nonempty transition with no
         // delegate target is unexecutable on L2 even when the manifest authors NO extras.
@@ -1481,20 +1496,31 @@ contract StorageRegistriesTest is Test {
         new CoreTransition(manifest);
     }
 
+    function test_revertWhen_coreTransitionHasSelfEdgeRow() public {
+        // A row whose source is its target swaps nothing and would skip its initializer: an
+        // authoring mistake, rejected at construction.
+        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeRow memory row = manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)];
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = row.implNew;
+
+        vm.expectRevert(abi.encodeWithSelector(RegistrySelfEdgeProxyRow.selector, row.proxy));
+        new CoreTransition(manifest);
+    }
+
     // ─────────────────────────── CTM-domain inventory ───────────────────────────
 
-    /// @dev The enum is append-only and the inventory length is derived from it: the notifier
+    /// @dev The enum is append-only and the inventory length is derived from it: the fee manager
     ///      slot must be the LAST member, and the count must have grown with it.
-    function test_ctmInventoryEndsWithTheServerNotifierSlot() public pure {
+    function test_ctmInventoryEndsWithTheInteropFeeManagerSlot() public pure {
         assertEq(
-            uint256(CTMContract.ServerNotifier),
+            uint256(CTMContract.L1InteropFeeManager),
             uint256(type(CTMContract).max),
-            "ServerNotifier must be the last member"
+            "L1InteropFeeManager must be the last member"
         );
         assertEq(
             CTM_CONTRACT_COUNT,
-            uint256(CTMContract.ServerNotifier) + 1,
-            "the inventory length must cover the notifier slot"
+            uint256(CTMContract.L1InteropFeeManager) + 1,
+            "the inventory length must cover the fee manager slot"
         );
     }
 
