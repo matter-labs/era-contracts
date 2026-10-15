@@ -32,6 +32,10 @@
 #                      l1-contracts/upgrade-envs/ — which is mounted by default
 #                      so `--env <env>` writes land in
 #                      upgrade-envs/<v>/output/<env>/ on the host).
+#   PROTOCOL_OPS_REQUIRE_RELEASE=1
+#                    — Docker mode: refuse an image without the
+#                      org.opencontainers.image.revision label, i.e. one not
+#                      released by build-docker.yaml (the calldata workflows).
 #   PROTOCOL_OPS_BIN — Local mode only: path to a pre-built protocol_ops
 #                      binary. If unset, the wrapper runs `cargo build
 #                      --release` inside protocol-ops/ and uses the resulting
@@ -78,6 +82,11 @@ if [[ "${1:-}" == "--tag" ]]; then
 fi
 
 [[ $# -lt 1 ]] && usage
+
+if [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" == "1" && -z "$TAG" ]]; then
+  echo "Error: PROTOCOL_OPS_REQUIRE_RELEASE=1 needs --tag <released image>" >&2
+  exit 1
+fi
 
 # Determine which tool to run. Only forge / cast are passed through verbatim;
 # anything else is assumed to be a protocol_ops subcommand.
@@ -139,6 +148,11 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 IMAGE_DIGEST="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
   | grep -m1 "^${IMAGE_REPO}@" || true)"
+if [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" == "1" ]] && [[ -z "$(docker image inspect \
+  --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$IMAGE")" ]]; then
+  echo "Error: ${IMAGE} has no revision label (org.opencontainers.image.revision): release an image with build-docker.yaml" >&2
+  exit 1
+fi
 
 # Mount the host's `l1-contracts/upgrade-envs/` over the container's so
 # `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml) land

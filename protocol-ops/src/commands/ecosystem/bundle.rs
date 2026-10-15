@@ -60,7 +60,7 @@ const OPTIONAL_BUNDLE_FILES: [&str; 2] =
 const TRANSACTIONS_LOG: &str = "transactions.txt";
 
 /// The reviewed zk-governance commit PUVT verifies governance bytecodes against by default
-/// (same default as the generate workflow input).
+/// (same default as build-docker.yaml's `zk_governance_commit` input).
 const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
