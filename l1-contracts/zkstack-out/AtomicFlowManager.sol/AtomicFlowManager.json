@@ -703,6 +703,17 @@
   },
   {
     "type": "error",
+    "name": "ManagerLegSourceChainNotAllowed",
+    "inputs": [
+      {
+        "name": "legSourceChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ManagerLegSourceChainNotRegistered",
     "inputs": [
       {
