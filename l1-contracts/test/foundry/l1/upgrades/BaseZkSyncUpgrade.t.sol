@@ -11,7 +11,9 @@ import {
     MAX_ALLOWED_MINOR_VERSION_DELTA,
     MAX_NEW_FACTORY_DEPS,
     PRIORITY_TX_MAX_GAS_LIMIT,
+    ProofSystem,
     UPGRADE_TX_MAX_GAS_LIMIT,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -27,6 +29,7 @@ import {
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
+    NotMultiProofMode,
     PubdataGreaterThanLimit,
     TimeNotReached,
     TooManyFactoryDeps,
@@ -35,6 +38,9 @@ import {
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -349,5 +355,61 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
 
         vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
+    }
+
+    /// @notice A chain that locked its second proof system can't upgrade to a verifier without it.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-lock}.
+    function test_revertWhen_LockedChainUpgradesToSingleProofVerifier() public {
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, _singleProofVerifier());
+        baseZkSyncUpgrade.setSecondProofSystemLocked(true);
+        uint256 versionBefore = baseZkSyncUpgrade.getProtocolVersion();
+        address verifierBefore = baseZkSyncUpgrade.getVerifier();
+
+        vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), versionBefore);
+        assertEq(baseZkSyncUpgrade.getVerifier(), verifierBefore);
+    }
+
+    function test_LockedChainUpgradesToMultiProofVerifier() public {
+        _assertLockedChainUpgradesToMultiProofVerifier(0);
+    }
+
+    /// @notice The lock checks what the new verifier supports, not the chain's current disable flags, so a
+    /// locked chain still upgrades after governance switched ZiSK off.
+    function test_LockedChainUpgradesAfterEmergencyZiskOff() public {
+        _assertLockedChainUpgradesToMultiProofVerifier(uint8(1 << uint8(ProofSystem.Zisk)));
+    }
+
+    function test_UnlockedChainUpgradesToSingleProofVerifier() public {
+        address singleProofVerifier = _singleProofVerifier();
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, singleProofVerifier);
+
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getVerifier(), singleProofVerifier);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+    }
+
+    function _assertLockedChainUpgradesToMultiProofVerifier(uint8 _disabledProofSystems) internal {
+        address multiProofVerifier = address(
+            new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
+        );
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, multiProofVerifier);
+        baseZkSyncUpgrade.setSecondProofSystemLocked(true);
+        baseZkSyncUpgrade.setDisabledProofSystems(_disabledProofSystems);
+        address verifierBefore = baseZkSyncUpgrade.getVerifier();
+
+        vm.expectEmit(true, true, false, true, address(baseZkSyncUpgrade));
+        emit BaseZkSyncUpgrade.NewVerifier(verifierBefore, multiProofVerifier);
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
+
+        assertEq(baseZkSyncUpgrade.getVerifier(), multiProofVerifier);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+    }
+
+    function _singleProofVerifier() internal returns (address) {
+        return address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))));
     }
 }

@@ -50,7 +50,54 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// `bridgedOut`; zero for assets that were skipped or had no legacy amount.
     function populateBridgedOut(bytes32[] calldata _assetIds) external returns (uint256[] memory populatedAmounts);
 
+    /// @notice Total amount of `_assetId` deposited into `_chainId` through this vault since the
+    /// per-chain balance cap was introduced. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
+    function chainTotalDeposited(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    /// @notice Total amount of `_assetId` withdrawn from `_chainId`, failed-deposit claims included, since
+    /// the per-chain balance cap was introduced.
+    function chainTotalWithdrawn(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    /// @notice Governance-provided amount of `_assetId` the chain held before the per-chain balance cap
+    /// was introduced. See {protocol-docs/interop-gating.md#backfill}.
+    function chainBalanceBackfill(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    /// @notice Whether the initial backfill of `_chainId` is finalized, after which it can only increase.
+    function chainBalanceBackfillFinalized(uint256 _chainId) external view returns (bool);
+
+    /// @notice Sets the backfill of `_chainId` for each asset, overwriting the previous values.
+    /// Only callable before `finalizeChainBalanceBackfill`. See {protocol-docs/interop-gating.md#backfill}.
+    /// @param _chainId The chain to set the backfill for.
+    /// @param _assetIds The assets to set the backfill for.
+    /// @param _amounts The backfill amounts, one per entry of `_assetIds`.
+    function setChainBalanceBackfill(
+        uint256 _chainId,
+        bytes32[] calldata _assetIds,
+        uint256[] calldata _amounts
+    ) external;
+
+    /// @notice Permanently finalizes the initial backfill of `_chainId`.
+    /// @param _chainId The chain to finalize the backfill for.
+    function finalizeChainBalanceBackfill(uint256 _chainId) external;
+
+    /// @notice Adds to the backfill of `_chainId` for each asset. Only callable after
+    /// `finalizeChainBalanceBackfill`. See {protocol-docs/interop-gating.md#backfill}.
+    /// @param _chainId The chain to increase the backfill for.
+    /// @param _assetIds The assets to increase the backfill for.
+    /// @param _amounts The amounts to add, one per entry of `_assetIds`.
+    function increaseChainBalanceBackfill(
+        uint256 _chainId,
+        bytes32[] calldata _assetIds,
+        uint256[] calldata _amounts
+    ) external;
+
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
+
+    /// @notice Emitted with the new backfill of `assetId` on `chainId`.
+    event ChainBalanceBackfilled(uint256 indexed chainId, bytes32 indexed assetId, uint256 amount);
+
+    /// @notice Emitted when the initial backfill of `chainId` is finalized.
+    event ChainBalanceBackfillFinalized(uint256 indexed chainId);
 
     /// @notice Emitted for every asset folded into `bridgedOut`, including zero amounts.
     event BridgedOutPopulated(bytes32 indexed assetId, uint256 amount);

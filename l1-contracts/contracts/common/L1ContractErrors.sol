@@ -25,6 +25,8 @@ error AlreadyPermanentRollup();
 error AlreadyWhitelisted(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
+// 0xfa5dbe08
+error ArrayLengthMismatch(uint256 firstLength, uint256 secondLength);
 // 0x76fc80ad
 error AssetDeploymentTrackerNotSet(bytes32 assetId);
 // 0xfde974f4
@@ -312,6 +314,8 @@ error NotInitializedReentrancyGuard();
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0xc5441a63
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
+// 0x93ff51ed
+error NotMultiProofMode(uint256 proofMode);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0x9d7bb13f

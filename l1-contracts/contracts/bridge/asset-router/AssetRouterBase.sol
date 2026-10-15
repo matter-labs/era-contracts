@@ -102,6 +102,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     ) internal virtual {
         address assetHandler = assetHandlerAddress[_assetId];
         require(assetHandler != address(0), AssetHandlerDoesNotExist(_assetId));
+        _checkAssetHandlerAllowed(_chainId, _assetId, assetHandler);
 
         // slither-disable-next-line unused-return
         IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
@@ -148,6 +149,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
         require(_getBridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
+        _checkAssetHandlerAllowed(_chainId, assetId, _resolveAssetHandler(assetId, _nativeTokenVault));
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -271,6 +273,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         address _nativeTokenVault
     ) internal {
         address assetHandler = assetHandlerAddress[_assetId];
+        _checkAssetHandlerAllowed(_sourceChainId, _assetId, _resolveAssetHandler(_assetId, _nativeTokenVault));
 
         if (assetHandler != address(0)) {
             IAssetHandler(assetHandler).bridgeMint{value: msg.value}(_sourceChainId, _assetId, _transferData);
@@ -285,6 +288,26 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
     /*//////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the handler a transfer of `_assetId` is routed to: the registered one, or the
+    /// native token vault when none is registered yet.
+    /// @param _assetId The asset being transferred.
+    /// @param _nativeTokenVault The address of the native token vault.
+    function _resolveAssetHandler(bytes32 _assetId, address _nativeTokenVault) internal view returns (address) {
+        address assetHandler = assetHandlerAddress[_assetId];
+        return assetHandler == address(0) ? _nativeTokenVault : assetHandler;
+    }
+
+    /// @notice Reverts if `_assetHandler` may not move assets to or from `_chainId`.
+    /// @dev No restriction by default; see the L1 override.
+    /// @param _chainId The chain the transfer goes to or comes from.
+    /// @param _assetId The asset being transferred.
+    /// @param _assetHandler The handler the transfer is routed to.
+    function _checkAssetHandlerAllowed(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _assetHandler
+    ) internal view virtual {}
 
     function _setAssetHandler(bytes32 _assetId, address _assetHandlerAddress) internal {
         assetHandlerAddress[_assetId] = _assetHandlerAddress;

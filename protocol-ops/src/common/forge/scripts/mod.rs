@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
     AdminFunctionsAbi, IDeployCTMAbi, IDeployL1CoreContractsAbi, IFinalizeChainInitAbi,
-    IRegisterOnAllChainsAbi,
 };
 
 pub mod deploy_ctm;
@@ -151,14 +150,6 @@ pub static REGISTER_CHAIN_INVOCATION: ForgeScriptParams = ForgeScriptParams::new
 .with_ffi()
 .with_rpc_url();
 
-pub static REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
-    "script-config/register-on-all-chains.toml",
-    "script-out/output-register-on-all-chains.toml",
-    "deploy-scripts/ecosystem/RegisterOnAllChains.s.sol",
-)
-.with_ffi()
-.with_rpc_url();
-
 /// Links a typed [`SolCall`] to its [`ForgeScriptParams`] invocation.
 /// Implemented via the [`script_calls!`] table — do not implement by hand.
 pub trait ScriptCall: SolCall {
@@ -190,7 +181,6 @@ script_calls! {
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
     // Other scripts
     IFinalizeChainInitAbi::finalizeChainInitCall                        => FINALIZE_CHAIN_INIT_INVOCATION,
-    IRegisterOnAllChainsAbi::registerOnOtherChainsCall                  => REGISTER_ON_ALL_CHAINS_INVOCATION,
     IDeployL1CoreContractsAbi::runInnerCall                             => DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
     // DeployCTM
     IDeployCTMAbi::runInnerCall                                         => DEPLOY_CTM_INVOCATION,

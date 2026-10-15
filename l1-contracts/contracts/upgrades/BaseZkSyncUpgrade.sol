@@ -6,10 +6,16 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
 import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
+import {IZKsyncOSVerifier} from "../state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
-import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS, UPGRADE_TX_MAX_GAS_LIMIT} from "../common/Config.sol";
+import {
+    MAX_ALLOWED_MINOR_VERSION_DELTA,
+    MAX_NEW_FACTORY_DEPS,
+    UPGRADE_TX_MAX_GAS_LIMIT,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE
+} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {
     InvalidTxType,
@@ -23,7 +29,7 @@ import {
     ProtocolVersionTooSmall,
     SettlementLayerUpgradeMustPrecedeChainUpgrade
 } from "./ZkSyncUpgradeErrors.sol";
-import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {NotMultiProofMode, TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
@@ -99,6 +105,14 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         // verifier is upgraded.
         if (_newVerifier == IVerifier(address(0))) {
             revert ZeroAddress();
+        }
+        // A locked chain must keep a verifier that supports the second proof system.
+        // See {protocol-docs/interop-gating.md#second-proof-system-lock}.
+        if (s.secondProofSystemLocked) {
+            uint256 proofMode = IZKsyncOSVerifier(address(_newVerifier)).getProofMode(0);
+            if (proofMode != ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE) {
+                revert NotMultiProofMode(proofMode);
+            }
         }
 
         IVerifier oldVerifier = s.verifier;
