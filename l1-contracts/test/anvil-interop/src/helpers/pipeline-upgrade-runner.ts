@@ -275,8 +275,8 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       "under the CTM ProxyAdmin and nominating the CTM executor after the prepare"
     );
 
-    // The merge adds no extras here: governance owns the CTM outright (no pending accept) and the
-    // upgrade input does not redeploy the zk governance set, so the bundle is the derived sequence.
+    // The merge's one extra here is the ValidatorTimelock accept: governance owns the CTM outright
+    // (no pending accept) and the upgrade input does not redeploy the zk governance set.
     const bootstrapCoreTransition = mergedBootstrap.core?.registry?.core_transition_addr;
     if (!bootstrapCoreTransition || bootstrapCoreTransition === ethers.constants.AddressZero) {
       throw new Error("the core prepare did not report the bootstrap's core transition");
@@ -309,6 +309,22 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       },
       "held by the CTM executor and re-pointed by migrate() after the governance replay"
     );
+    const validatorTimelock: string = await new ethers.Contract(
+      ctmAddresses.chainTypeManager,
+      getAbi("IChainTypeManager"),
+      l1Provider
+    ).validatorTimelockPostV29();
+    const timelockOwner: string = await new ethers.Contract(
+      validatorTimelock,
+      getAbi("Ownable2Step"),
+      l1Provider
+    ).owner();
+    if (timelockOwner.toLowerCase() !== l1Addresses.governance.toLowerCase()) {
+      throw new Error(
+        `ValidatorTimelock ${validatorTimelock} is owned by ${timelockOwner}, not governance, after the replay`
+      );
+    }
+    console.log("  ✓ the ValidatorTimelock is governance-owned after the replay");
     await assertBootstrapCompleted(l1Provider, migrationAddr);
 
     // ── Prepare diamond state for chain upgrades ──

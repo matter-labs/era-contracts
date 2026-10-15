@@ -11,7 +11,7 @@
 import * as assert from "assert/strict";
 import * as fs from "fs";
 import * as path from "path";
-import { l2BytecodeInfoSlots } from "../../src/helpers/registry-manifest";
+import { l2BytecodeInfoRows, l2BytecodeInfoSlots } from "../../src/helpers/registry-manifest";
 import { createSuite } from "./harness";
 
 const { test, run } = createSuite("registry-manifest-enum");
@@ -52,6 +52,17 @@ test("keeps the members below a comment that contains braces", () => {
   const slots = l2BytecodeInfoSlots({ [last]: "0x01" });
   assert.equal(slots[slots.length - 1], "0x01", `${last} must map to the last slot`);
   assert.equal(slots.filter((s) => s === "0x01").length, 1);
+});
+
+// The anvil runner re-asserts a live release's table through the manifest: rows -> slots must
+// give back the release's slots exactly, empty slots included.
+test("reads a release's slots back as rows", () => {
+  const members = enumMembersByLine();
+  const rows = { [members[0]]: "0x01", [members[members.length - 1]]: "0x02" };
+  const slots = l2BytecodeInfoSlots(rows);
+  assert.deepEqual(l2BytecodeInfoRows(slots), rows);
+  assert.deepEqual(l2BytecodeInfoSlots(l2BytecodeInfoRows(slots)), slots);
+  assert.throws(() => l2BytecodeInfoRows(slots.slice(1)), /slots/);
 });
 
 run();

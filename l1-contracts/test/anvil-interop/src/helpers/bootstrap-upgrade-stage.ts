@@ -79,10 +79,10 @@ export async function installLegacyFacet(
 }
 
 /**
- * The bootstrap bundle `RegistryBootstrapSequence.actions()` derives, re-derived from the
- * migration's manifest and live state so the prepare output is checked against an independent
- * derivation. Read after the prepare: whether the bundle opens with the ServerNotifier accept
- * depends on the notifier's live owner.
+ * The bootstrap bundle: the merge's ValidatorTimelock accept, then the run
+ * `RegistryBootstrapSequence.actions()` derives, re-derived from the migration's manifest and live
+ * state so the prepare output is checked against an independent derivation. Read after the
+ * prepare: both accepts depend on live owners.
  * @param coreTransition The core transition the core prepare pinned (the sequence's
  *        `CORE_TRANSITION`, which the migration's manifest does not name).
  */
@@ -102,6 +102,23 @@ export async function deriveBootstrapBundle(
   const coordinator = new ethers.utils.Interface(getAbi("EcosystemUpgradeExecutor"));
 
   const bundle: ExpectedCall[] = [];
+  // The prepare's ownership normalization nominates governance (the CTM's owner until the
+  // migration) on the CTM's ValidatorTimelock, and the merge opens the bundle with its accept.
+  const ctm = new ethers.Contract(m.ctm, getAbi("IChainTypeManager"), l1Provider);
+  const governance: string = await new ethers.Contract(m.ctm, getAbi("Ownable2Step"), l1Provider).owner();
+  const validatorTimelock: string = await ctm.validatorTimelockPostV29();
+  const timelockPendingOwner: string = await new ethers.Contract(
+    validatorTimelock,
+    getAbi("Ownable2Step"),
+    l1Provider
+  ).pendingOwner();
+  if (timelockPendingOwner.toLowerCase() === governance.toLowerCase()) {
+    bundle.push({
+      label: "ValidatorTimelock.acceptOwnership()",
+      target: validatorTimelock,
+      data: ownable.encodeFunctionData("acceptOwnership"),
+    });
+  }
   if (notifierOwner.toLowerCase() !== m.ctmExecutor.toLowerCase()) {
     const accept = { target: notifier, value: 0, data: ownable.encodeFunctionData("acceptOwnership") };
     bundle.push({
