@@ -6,6 +6,8 @@
  * pre-generated anvil chain states of the departing version:
  *
  *   1. Load the frozen chain states (`chain-states/<stateVersion>`) and select target chains.
+ *      Settle one batch on each (see batch-settlement.ts): the fixtures' chains never settled one,
+ *      so their genesis upgrade is still pending and would block the upgrade.
  *   2. Normalize L1 ownership (fixtures leave contracts with the deployer; governance needs them).
  *   3. (Only when the scenario asks for it) install the pre-v35 cut-taking entrypoint
  *      (`LegacyTestAdminFacet`) on the target chains. A fixture frozen from a branch whose
@@ -70,14 +72,10 @@ import {
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
-import {
-  clearGenesisUpgradeTxHash,
-  readProxyAdmin,
-  readProxyImplementation,
-  selectUpgradeChains,
-  traceFailedTx,
-} from "./upgrade-test-utils";
+import { BatchSettler } from "./batch-settlement";
+import type { GenesisBatchParams } from "./batch-settlement";
+import { transferOwnable2Step } from "./harness-shims";
+import { readProxyAdmin, readProxyImplementation, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
 import {
   assertBootstrapBundle,
   assertBootstrapCompleted,
@@ -135,7 +133,8 @@ export type PipelineUpgradeScenario = {
    * (the anvil L2s cannot force-deploy, so the harness `anvil_setCode`s it).
    */
   l2DelegateBytecodeName: ContractName;
-  clearGenesisUpgradeTxHash?: boolean;
+  /** Genesis parameters of the CTM the `stateVersion` chains were created from (see batch-settlement.ts). */
+  sourceGenesis: GenesisBatchParams;
   /**
    * Install `LegacyTestAdminFacet` before governance. Needed ONLY for fixtures whose Admin
    * facet is the cut-READING (v35+) variant; a fixture with the real pre-v35 cut-taking facet
@@ -174,8 +173,8 @@ export type RecurringUpgradeHop = {
   /**
    * Run this hop with the previous upgrade's L2 transaction still PENDING, and assert it survives
    * untouched. Only a patch edge may do this: `BaseZkSyncUpgrade` deliberately skips the
-   * "previous upgrade finalized" check when the minor version does not change. Every other hop
-   * has the pending hash cleared first, since these sequencer-less chains never finalize it.
+   * "previous upgrade finalized" check when the minor version does not change. Before every other
+   * hop a batch carrying it is settled first.
    */
   keepsPendingL2Upgrade?: boolean;
   /** Assert this hop re-pointed the MessageRoot proxy at a freshly deployed implementation. */
@@ -211,6 +210,12 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     const ctm = new ethers.Contract(ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
     const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
     console.log(`\nDeparting protocol version: ${oldVersion.toHexString()}`);
+
+    // ── Settle the fixture chains' genesis upgrade batch ──
+    // Before the ownership handover: the default account is still the chains' admin here.
+    console.log("\n── Settling a batch on each target chain ──");
+    const settler = await BatchSettler.create(defaultSigner, upgradeChainAddresses, scenario.sourceGenesis);
+    await settler.settleNextBatch(upgradeChainAddresses);
 
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
@@ -345,12 +350,6 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     console.log("  ✓ the ValidatorTimelock is governance-owned after the replay");
     await assertBootstrapCompleted(l1Provider, migrationAddr);
 
-    // ── Prepare diamond state for chain upgrades ──
-    if (scenario.clearGenesisUpgradeTxHash) {
-      console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
-      await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
-    }
-
     // ── Per-chain legacy crossing + L2 relay ──
     await runLegacyChainLegAndRelayL2({
       l1Provider,
@@ -384,6 +383,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
         l1Addresses,
         ctmAddresses,
         upgradeChainAddresses,
+        settler,
         eip7702Checker: reportedEip7702Checker,
         executorRecords: mergedEcosystemToml,
         reviewedBuildHashes,
@@ -495,6 +495,7 @@ async function runRecurringHop(
     l1Addresses: { bridgehub: string; governance: string; messageRoot: string };
     ctmAddresses: { chainTypeManager: string };
     upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
+    settler: BatchSettler;
     /** The live EIP-7702 checker as the previous hop's prepare reported it. */
     eip7702Checker?: string;
     /** The bootstrap package: the records of the executors every hop runs through. */
@@ -509,8 +510,8 @@ async function runRecurringHop(
   const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
   console.log(`  departing protocol version: ${oldVersion.toHexString()}`);
 
-  // The previous hop's L2 leg is still "pending" on these sequencer-less chains (see module docs),
-  // which blocks a MINOR upgrade. A patch hop deliberately keeps it, to prove it survives.
+  // The previous hop's L2 leg is pending until a batch carrying it is executed, which blocks a
+  // MINOR upgrade. A patch hop deliberately keeps it, to prove it survives.
   const pendingL2TxHashes = new Map<number, string>();
   if (hop.keepsPendingL2Upgrade) {
     for (const chain of upgradeChainAddresses) {
@@ -523,7 +524,7 @@ async function runRecurringHop(
     }
     console.log("  keeping the pending L2 upgrade transaction: a patch must not disturb it");
   } else {
-    await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
+    await ctx.settler.settleNextBatch(upgradeChainAddresses);
   }
 
   const hopScenario: PipelineUpgradeScenario = {
@@ -1175,11 +1176,6 @@ async function runLegacyChainLegAndRelayL2(params: {
 
   for (const chain of params.upgradeChainAddresses) {
     console.log(`\n── Chain ${chain.chainId}: legacy handed-cut crossing ──`);
-
-    // The per-chain upgrade requires `totalBatchesCommitted == totalBatchesExecuted`. On a
-    // forked chain with uncommitted-but-pending batches at fork time, model the "all batches
-    // executed" prerequisite without running the executor.
-    await forceBatchExecutedEqualsCommitted(params.l1Provider, chain.diamondProxy);
 
     await crossBootstrapEdgeOnChains(params.l1Provider, [chain], params.oldVersion, params.cut, sendAndCheck);
 
