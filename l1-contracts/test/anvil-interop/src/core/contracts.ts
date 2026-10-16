@@ -36,6 +36,7 @@ const ARTIFACTS = {
   ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
   L1AssetRouter: "L1AssetRouter.sol/L1AssetRouter.json",
   L1Messenger: "L1Messenger.sol/L1Messenger.json",
+  L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
   L1Bridgehub: "L1Bridgehub.sol/L1Bridgehub.json",
   L1NativeTokenVault: "L1NativeTokenVault.sol/L1NativeTokenVault.json",
   L1Nullifier: "L1Nullifier.sol/L1Nullifier.json",

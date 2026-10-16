@@ -4,6 +4,15 @@ pragma solidity 0.8.28;
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
+import {
+    ProofSystem,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+} from "contracts/common/Config.sol";
+import {NotMultiProofMode} from "contracts/common/L1ContractErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -34,5 +43,49 @@ contract DefaultUpgradeTest is BaseUpgrade {
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+    }
+
+    /// @notice The second proof system requirement also applies to the verifier-only upgrade.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+    function test_revertWhen_RequiringChainRunsVerifierOnlyUpgradeToSingleProofVerifier() public {
+        address singleProofVerifier = address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))));
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, singleProofVerifier);
+        baseZkSyncUpgrade.setSecondProofSystemRequired(true);
+
+        vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
+        baseZkSyncUpgrade.upgradeVerifierOnly(protocolVersion);
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), 0);
+        assertEq(baseZkSyncUpgrade.getVerifier(), address(0));
+    }
+
+    function test_RequiringChainRunsVerifierOnlyUpgradeToMultiProofVerifier() public {
+        _assertRequiringChainRunsVerifierOnlyUpgrade(0);
+    }
+
+    /// @notice After an emergency ZiSK-off, the verifier-only upgrade keeps both the requirement and ZiSK off.
+    function test_RequiringChainRunsVerifierOnlyUpgradeAfterEmergencyZiskOff() public {
+        _assertRequiringChainRunsVerifierOnlyUpgrade(uint8(1 << uint8(ProofSystem.Zisk)));
+    }
+
+    function _assertRequiringChainRunsVerifierOnlyUpgrade(uint8 _disabledProofSystems) internal {
+        address multiProofVerifier = address(
+            new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
+        );
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, multiProofVerifier);
+        baseZkSyncUpgrade.setSecondProofSystemRequired(true);
+        baseZkSyncUpgrade.setDisabledProofSystems(_disabledProofSystems);
+
+        bytes32 result = baseZkSyncUpgrade.upgradeVerifierOnly(protocolVersion);
+
+        assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
+        assertEq(baseZkSyncUpgrade.getVerifier(), multiProofVerifier);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
+        assertTrue(baseZkSyncUpgrade.getSecondProofSystemRequired(), "the upgrade must keep the requirement");
+        assertEq(baseZkSyncUpgrade.getDisabledProofSystems(), _disabledProofSystems, "the upgrade keeps the flags");
+        assertEq(
+            baseZkSyncUpgrade.getProofMode(),
+            _disabledProofSystems == 0 ? ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE : ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+        );
     }
 }

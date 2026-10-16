@@ -11,8 +11,10 @@ import {
     ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {BundleAttributes} from "contracts/common/Messaging.sol";
+import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -97,5 +99,11 @@ abstract contract AtomicPredeployFixture is Test {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             commitmentTree.initL2();
         }
+    }
+
+    /// @dev Stubs the L2 Bridgehub's peer whitelist, which the manager's receive filter reads: these suites
+    /// isolate the manager from the whitelist, which `L2Bridgehub` and `ChainRegistrationSender` own.
+    function _setLegSourceAllowed(uint256 _chainId, bool _allowed) internal {
+        vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.isPeerAllowed, (_chainId)), abi.encode(_allowed));
     }
 }

@@ -908,6 +908,17 @@
   },
   {
     "type": "error",
+    "name": "DestinationChainNotAllowed",
+    "inputs": [
+      {
+        "name": "destinationChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "DestinationChainNotRegistered",
     "inputs": [
       {

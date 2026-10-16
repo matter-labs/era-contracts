@@ -16,7 +16,8 @@ import {
     PRIORITY_EXPIRATION,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
-    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT
+    ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE
 } from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
@@ -26,6 +27,7 @@ import {
     L1DAValidatorAddressIsZero,
     NotL1,
     PriorityModeAlreadyAllowed,
+    SecondProofSystemAlreadyRequired,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted
 } from "../../L1StateTransitionErrors.sol";
@@ -42,6 +44,7 @@ import {
     InvalidL2DACommitmentScheme,
     InvalidPubdataPricingMode,
     NonFullPubdataContentForPermanentRollup,
+    NotMultiProofMode,
     PriorityModeActivationTooEarly,
     PriorityModeIsNotAllowed,
     PriorityModeRequiresPermanentRollup,
@@ -61,6 +64,8 @@ import {
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
+import {IOwnable} from "../../../common/interfaces/IOwnable.sol";
+import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -111,6 +116,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Performs diamond cut and emits ExecuteUpgrade event
     function _executeDiamondCut(Diamond.DiamondCutData memory _diamondCut) internal {
         Diamond.diamondCut(_diamondCut);
+        // Repeats the check of `BaseZkSyncUpgrade._setVerifier`, for an upgrade that sets the verifier without it.
+        // See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+        if (s.secondProofSystemRequired) {
+            uint256 proofMode = IZKsyncOSVerifier(address(s.verifier)).getProofMode(0);
+            if (proofMode != ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE) {
+                revert NotMultiProofMode(proofMode);
+            }
+        }
         emit ExecuteUpgrade(_diamondCut);
     }
 
@@ -400,7 +413,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external onlyAdmin {
+    function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external {
+        address authorized = !_enabled && s.secondProofSystemRequired ? IOwnable(s.bridgehub).owner() : s.admin;
+        if (msg.sender != authorized) {
+            revert Unauthorized(msg.sender);
+        }
         if (_proofSystem != ProofSystem.Zisk) {
             revert InvalidProofSystem(uint8(_proofSystem));
         }
@@ -431,6 +448,20 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         s.isPermanentRollup = true;
+    }
+
+    /// @inheritdoc IAdmin
+    function permanentlyRequireSecondProofSystem() external onlyAdmin onlySettlementLayer {
+        if (s.secondProofSystemRequired) {
+            revert SecondProofSystemAlreadyRequired();
+        }
+        uint256 proofMode = _getProofMode();
+        if (proofMode != ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE) {
+            revert NotMultiProofMode(proofMode);
+        }
+
+        s.secondProofSystemRequired = true;
+        emit SecondProofSystemRequired();
     }
 
     /// @inheritdoc IAdmin

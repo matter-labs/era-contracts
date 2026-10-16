@@ -194,6 +194,13 @@
   },
   {
     "type": "function",
+    "name": "permanentlyRequireSecondProofSystem",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setDAValidatorPair",
     "inputs": [
       {
@@ -898,6 +905,12 @@
         "internalType": "enum PubdataPricingMode"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SecondProofSystemRequired",
+    "inputs": [],
     "anonymous": false
   },
   {

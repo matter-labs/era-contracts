@@ -43,6 +43,7 @@ import {
     BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
     ETH_TOKEN_ADDRESS,
     HARD_CODED_CHAIN_ID,
+    INTEROP_POOL_CHAIN_ID,
     MAINNET_CHAIN_ID,
     MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -678,6 +679,32 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(deployerAddress);
         IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _salt: salt,
+            _admin: admin,
+            _initData: bytes(""),
+            _factoryDeps: new bytes[](0)
+        });
+    }
+
+    /// @dev The interop pool's totals live under `INTEROP_POOL_CHAIN_ID` in `L1NativeTokenVault`, so no chain may
+    /// ever get it: the chain ID cap rules it out.
+    function test_RevertWhen_interopPoolChainIdOnCreate(
+        uint256 salt,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+
+        vm.expectRevert(ChainIdTooBig.selector);
+        vm.prank(deployerAddress);
+        IL1Bridgehub(address(bridgehub)).createNewChain({
+            _chainId: INTEROP_POOL_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
             _salt: salt,

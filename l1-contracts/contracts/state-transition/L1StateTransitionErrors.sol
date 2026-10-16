@@ -90,6 +90,8 @@ error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protoco
 error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitmentSize);
 // 0x9044dff9
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
+// 0x8d0254d1
+error SecondProofSystemAlreadyRequired();
 // 0x89935a14
 error SettlementLayerChainIdMismatch();
 // 0xaf390015

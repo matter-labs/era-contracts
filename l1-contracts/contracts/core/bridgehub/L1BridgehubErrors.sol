@@ -10,8 +10,6 @@ error BaseTokenOriginChainIdNotRegistered();
 error BaseTokenOriginTokenNotRegistered();
 // 0xa695b1ef
 error BatchZeroNotAllowed();
-// 0xb0b5006f
-error ChainAlreadyRegistered();
 // 0xbe263463
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 // 0x655c373c
@@ -22,14 +20,24 @@ error ChainExists();
 error ChainHasNoBatchesInMessageRoot(uint256 chainId);
 // 0xf8d5f418
 error ChainNotReadyForMigration(uint256 chainId);
-// 0x824e4e26
-error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
+// 0xdffa46a4
+error ChainNotSettlingOnL1(uint256 chainId, uint256 settlementLayer);
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
 // 0x48857c1d
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
+// 0xd107dab8
+error InteropAlreadyEnabled(uint256 chainId);
+// 0x13b3ef48
+error InteropNotEnabled(uint256 chainId);
+// 0x927cf466
+error InteropPeerAlreadyAllowed(uint256 chainId, uint256 peerChainId);
+// 0x2d958c8c
+error InteropPeerNotAllowed(uint256 chainId, uint256 peerChainId);
+// 0x04bd744b
+error InvalidInteropPeer(uint256 chainId, uint256 peerChainId);
 // 0x896555dc
 error InvalidSettlementLayerForBatch(uint256 chainId, uint256 batchNumber, uint256 claimedSettlementLayer);
 // 0x47d42b1b
@@ -72,6 +80,8 @@ error OnlyGateway();
 error OnlyL1();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
+// 0x6ad2fba2
+error SecondProofSystemNotRequired(uint256 chainId);
 // 0xefb272e2
 error SettlementLayerMustNotBeL1();
 // 0x36917565

@@ -9,7 +9,7 @@ import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
+import {ChainBalanceBackfill, IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
@@ -17,23 +17,35 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
-import {ETH_TOKEN_ADDRESS, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, INTEROP_POOL_CHAIN_ID, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 import {
+    ArrayLengthMismatch,
     AssetIdAlreadyRegistered,
     InsufficientChainBalance,
+    InvalidChainId,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {AssetNotNativeToL1, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
+import {
+    AssetNotNativeToL1,
+    ChainBalanceAlreadyInInteropPool,
+    ChainBalanceBackfillAlreadySet,
+    ChainBalanceBackfillNotSet,
+    ChainBalanceExceeded,
+    OnlyFailureStatusAllowed,
+    WrongCounterpart
+} from "../L1BridgeContractErrors.sol";
 import {ILegacyL1AssetTracker} from "../asset-tracker/ILegacyL1AssetTracker.sol";
 
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
+import {InteropNotEnabled} from "../../core/bridgehub/L1BridgehubErrors.sol";
+import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -58,9 +70,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles finalize withdrawal and confirm l2 tx mappings
     IL1Nullifier public immutable L1_NULLIFIER;
 
-    /// @dev Maps token balances for each chain. Deprecated: per-chain balance accounting was removed;
-    ///      correctness of transfers is guaranteed by ZK proofs (plus 2FA on ZKsync OS chains).
-    ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
+    /// @dev Maps token balances for each chain. Deprecated: this exact-balance mapping is no longer written, and
+    ///      `chainBalance` returns its stale values for backwards compatibility only. Per-chain accounting now lives in
+    ///      `chainTotalDeposited`, `chainTotalWithdrawn` and `chainBalanceBackfill`.
     // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
@@ -75,6 +87,18 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @inheritdoc IL1NativeTokenVault
     mapping(bytes32 assetId => bool populated) public bridgedOutPopulated;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public chainTotalDeposited;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public chainTotalWithdrawn;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => mapping(bytes32 assetId => ChainBalanceBackfill backfill)) public chainBalanceBackfill;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => mapping(bytes32 assetId => bool moved)) public chainBalanceInInteropPool;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -178,6 +202,42 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
             emit BridgedOutPopulated(assetIdToPopulate, legacyAmount);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Per-chain balances and the interop pool
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IL1NativeTokenVault
+    function setChainBalanceBackfill(
+        uint256 _chainId,
+        bytes32[] calldata _assetIds,
+        uint256[] calldata _amounts
+    ) external onlyOwner {
+        require(_chainId != INTEROP_POOL_CHAIN_ID, InvalidChainId());
+        uint256 assetIdsLength = _assetIds.length;
+        require(assetIdsLength == _amounts.length, ArrayLengthMismatch(assetIdsLength, _amounts.length));
+        for (uint256 i = 0; i < assetIdsLength; ++i) {
+            bytes32 assetId = _assetIds[i];
+            require(!chainBalanceBackfill[_chainId][assetId].set, ChainBalanceBackfillAlreadySet(_chainId, assetId));
+            chainBalanceBackfill[_chainId][assetId] = ChainBalanceBackfill({amount: _amounts[i], set: true});
+            emit ChainBalanceBackfilled(_chainId, assetId, _amounts[i]);
+        }
+    }
+
+    /// @inheritdoc IL1NativeTokenVault
+    function moveChainBalanceToInteropPool(uint256 _chainId, bytes32 _assetId) external {
+        require(_messageRoot().isInteropEnabled(_chainId), InteropNotEnabled(_chainId));
+        require(!chainBalanceInInteropPool[_chainId][_assetId], ChainBalanceAlreadyInInteropPool(_chainId, _assetId));
+        ChainBalanceBackfill memory backfill = chainBalanceBackfill[_chainId][_assetId];
+        require(backfill.set, ChainBalanceBackfillNotSet(_chainId, _assetId));
+
+        uint256 deposited = chainTotalDeposited[_chainId][_assetId] + backfill.amount;
+        uint256 withdrawn = chainTotalWithdrawn[_chainId][_assetId];
+        chainBalanceInInteropPool[_chainId][_assetId] = true;
+        chainTotalDeposited[INTEROP_POOL_CHAIN_ID][_assetId] += deposited;
+        chainTotalWithdrawn[INTEROP_POOL_CHAIN_ID][_assetId] += withdrawn;
+        emit ChainBalanceMovedToInteropPool(_chainId, _assetId, deposited, withdrawn);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -329,10 +389,16 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    /// @dev Records the outbound flow of L1-native tokens; see `bridgedOut`.
-    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256 _amount) internal override {
-        if (originChainId[_assetId] == block.chainid) {
+    /// @dev Records the outbound flow of L1-native tokens (see `bridgedOut`) and the deposit, if the chain's
+    /// balance in the asset is tracked.
+    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
+        uint256 assetOriginChainId = originChainId[_assetId];
+        if (assetOriginChainId == block.chainid) {
             bridgedOut[_assetId] += _amount;
+        }
+        (bool tracked, uint256 balanceChainId) = _trackedBalance(_chainId, assetOriginChainId);
+        if (tracked) {
+            chainTotalDeposited[balanceChainId][_assetId] += _amount;
         }
     }
 
@@ -341,11 +407,47 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// bridged representations of the asset were forged somewhere upstream, so such a transfer
     /// is blocked rather than recorded.
     function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
-        if (originChainId[_assetId] == block.chainid) {
+        uint256 assetOriginChainId = originChainId[_assetId];
+        if (assetOriginChainId == block.chainid) {
             if (bridgedOut[_assetId] < _amount) {
                 revert InsufficientChainBalance(_chainId, _assetId, _amount);
             }
             bridgedOut[_assetId] -= _amount;
         }
+        (bool tracked, uint256 balanceChainId) = _trackedBalance(_chainId, assetOriginChainId);
+        if (tracked) {
+            uint256 newWithdrawn = chainTotalWithdrawn[balanceChainId][_assetId] + _amount;
+            uint256 available = chainTotalDeposited[balanceChainId][_assetId];
+            // No backfill is ever set for `INTEROP_POOL_CHAIN_ID`, so the pool reads zero here.
+            uint256 backfill = chainBalanceBackfill[balanceChainId][_assetId].amount;
+            // Written as two comparisons so that a backfill close to `type(uint256).max` cannot overflow.
+            if (newWithdrawn > available && newWithdrawn - available > backfill) {
+                revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, available + backfill);
+            }
+            chainTotalWithdrawn[balanceChainId][_assetId] = newWithdrawn;
+        }
+    }
+
+    /// @notice Returns the chain ID whose totals bound what leaves `_chainId`: `INTEROP_POOL_CHAIN_ID` if the chain
+    /// has interop, and `_chainId` otherwise. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
+    /// @param _chainId The chain.
+    /// @param _assetOriginChainId The origin chain of the asset.
+    /// @return tracked Whether the asset is tracked at all: it is not if it is native to the chain, or if both the
+    /// chain and the asset's origin have interop.
+    /// @return balanceChainId The key of the totals in `chainTotalDeposited` and `chainTotalWithdrawn`.
+    function _trackedBalance(
+        uint256 _chainId,
+        uint256 _assetOriginChainId
+    ) internal view returns (bool tracked, uint256 balanceChainId) {
+        IL1MessageRoot messageRoot = _messageRoot();
+        if (messageRoot.isInteropEnabled(_chainId)) {
+            return (!messageRoot.isInteropEnabled(_assetOriginChainId), INTEROP_POOL_CHAIN_ID);
+        }
+        return (_assetOriginChainId != _chainId, _chainId);
+    }
+
+    /// @notice Returns the L1 message root, which records the chains with interop.
+    function _messageRoot() internal view returns (IL1MessageRoot) {
+        return IL1MessageRoot(address(IBridgehubBase(address(L1_NULLIFIER.BRIDGE_HUB())).messageRoot()));
     }
 }

@@ -46,6 +46,8 @@ import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harne
 import { impersonateAndRun, createProvider } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
+import type { GatedChain } from "./upgrade-interop-gating";
+import { depositBeforeUpgrade, registerLegacyInteropPair, runInteropGatingProcedure } from "./upgrade-interop-gating";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -74,6 +76,9 @@ export type UpgradeScenario = {
   stateVersion: string;
   targetRoles: ChainRole[];
   clearGenesisUpgradeTxHash?: boolean;
+  // Registers the first two target chains with each other before the upgrade and takes them through
+  // {protocol-docs/interop-gating.md#order-per-chain} after it.
+  checkInteropGating?: boolean;
 };
 
 /**
@@ -111,16 +116,32 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
     const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
-    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
-    if (upgradeChainAddresses.length === 0) {
-      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
-    }
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
     const l1Provider = createProvider(l1Chain.rpcUrl);
+    const upgradeChainAddresses = await selectUpgradeChains(
+      l1Provider,
+      l1Addresses.bridgehub,
+      chainAddresses,
+      chains.config,
+      scenario.targetRoles
+    );
+    if (upgradeChainAddresses.length === 0) {
+      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
+    }
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+    const gatingContext = { l1Provider, chainAdminOwner: defaultSigner, l1Addresses };
+    const gatedChains = scenario.checkInteropGating ? selectGatedChains(anvilManager, upgradeChainAddresses) : null;
+    if (gatedChains) {
+      console.log("\n── Registering a legacy interop pair ──");
+      await registerLegacyInteropPair(gatingContext, ...gatedChains);
+      console.log("\n── Depositing to the gated chains before the upgrade ──");
+      for (const chain of gatedChains) {
+        await depositBeforeUpgrade(gatingContext, chain);
+      }
+    }
 
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
@@ -162,6 +183,7 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
     }
 
     // ── Execute governance calls (stages 0-2) via protocol-ops bundle ──
+    const lastPreUpgradeBlock = await l1Provider.getBlockNumber();
     console.log("\n── Replaying governance upgrade bundles ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
@@ -190,6 +212,11 @@ export async function runUpgradeScenario(scenario: UpgradeScenario): Promise<voi
     console.log("✅ All protocol versions verified successfully!\n");
     await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
     console.log("✅ Upgraded CTM points at the interop fee manager, switched off\n");
+    if (gatedChains) {
+      console.log("── Replacing the legacy interop pair with an allowed one ──");
+      await runInteropGatingProcedure(gatingContext, lastPreUpgradeBlock, ...gatedChains);
+      console.log("✅ Interop gating procedure verified\n");
+    }
   } finally {
     if (cleanupUpgradeHarnessInputs) {
       cleanupUpgradeHarnessInputs();
@@ -1277,17 +1304,48 @@ function buildAddressToContract(): ReadonlyMap<string, ContractName> {
   return new Map(entries);
 }
 
-function selectUpgradeChains(
+/**
+ * Chains with one of `targetRoles` that settle on L1 in the loaded states. The roles come from the current
+ * config, whose topology can differ from that of an older release's states, so the settlement layer is read
+ * on-chain.
+ */
+async function selectUpgradeChains(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  bridgehubAddr: string,
   chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
   chainConfigs: Array<{ chainId: number; role: ChainRole }>,
   targetRoles: ChainRole[]
-): Array<{ chainId: number; diamondProxy: string }> {
+): Promise<Array<{ chainId: number; diamondProxy: string }>> {
   const roles = new Map(chainConfigs.map((c) => [c.chainId, c.role]));
-  return chainAddresses.filter((chain) => {
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  const selected: Array<{ chainId: number; diamondProxy: string }> = [];
+  for (const chain of chainAddresses) {
     const role = roles.get(chain.chainId);
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
-    return targetRoles.includes(role);
+    if (!targetRoles.includes(role)) continue;
+    if ((await bridgehub.settlementLayer(chain.chainId)).eq(l1ChainId)) {
+      selected.push(chain);
+    }
+  }
+  return selected;
+}
+
+function selectGatedChains(
+  anvilManager: AnvilManager,
+  upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>
+): [GatedChain, GatedChain] {
+  if (upgradeChainAddresses.length < 2) {
+    throw new Error(`The interop gating check needs two upgraded chains, got ${upgradeChainAddresses.length}`);
+  }
+  const [chain, peer] = upgradeChainAddresses.slice(0, 2).map(({ chainId, diamondProxy }) => {
+    const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chainId);
+    if (!l2Chain) {
+      throw new Error(`Missing running L2 chain ${chainId}`);
+    }
+    return { chainId, diamondProxy, provider: createProvider(l2Chain.rpcUrl) };
   });
+  return [chain, peer];
 }
 
 export function readEcosystemOutput(outputPath: string): Record<string, unknown> {

@@ -17,5 +17,18 @@ interface IL2Bridgehub is IBridgehubBase {
     //     address _chainRegistrationSender
     // ) external;
 
-    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
+    /// @notice Allows interop with a peer chain once its whitelisting on L1 arrives, see
+    /// {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+    /// @param _chainId The chain id of the peer chain.
+    /// @param _baseTokenAssetId The base token asset id of the peer chain.
+    function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external;
+
+    /// @notice Removes a chain from the chains known for interop, an allowed peer included, once its deregistration
+    /// on L1 arrives. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+    /// @param _chainId The chain id of the chain.
+    function deregisterChainForInterop(uint256 _chainId) external;
+
+    /// @notice Whether interop with the chain is allowed, see {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+    /// @param _chainId The chain id of the peer chain.
+    function isPeerAllowed(uint256 _chainId) external view returns (bool);
 }

@@ -166,6 +166,9 @@ The timeout proof relies on three preconditions, each enforced on chain:
   roots and the settlement-layer batch execution that double-checks them; atomic interop adds no trust
   assumption beyond what the interop-root channel already requires
   ({protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}).
+- **Gated sources.** The L1 message root also carries the roots of chains without interop, so `AtomicFlowManager`
+  accepts finality and timeout evidence only from the sources the chain allows
+  ({protocol-docs/interop-gating.md#receive-filter}).
 
 ## Data availability
 
