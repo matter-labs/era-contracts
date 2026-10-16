@@ -1276,7 +1276,7 @@
   },
   {
     "type": "error",
-    "name": "SecondProofSystemNotLocked",
+    "name": "SecondProofSystemNotRequired",
     "inputs": [
       {
         "name": "chainId",
