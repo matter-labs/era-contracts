@@ -9,7 +9,7 @@ inputs:
     description: >
       Which contract artifacts to build:
       "dev" — anvil-interop dev artifacts only (interop tests on preloaded state);
-      "full" — da + l1 Foundry builds (upgrade tests).
+      "full" — the l1 Foundry build, including DA validators (upgrade tests).
 
       There is deliberately no deterministic variant: the reproducible build that writes and
       verifies the committed chain-state snapshots lives in build-anvil-interop-artifacts, so

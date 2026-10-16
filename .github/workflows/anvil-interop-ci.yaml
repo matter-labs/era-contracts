@@ -39,7 +39,8 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          # Nested libraries affect solc remappings and the metadata the genesis image pins.
+          submodules: recursive
 
       - name: Install Foundry
         uses: ./.github/actions/install-foundry
@@ -100,7 +101,8 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          # Nested libraries affect solc remappings and the metadata the genesis image pins.
+          submodules: recursive
 
       # The committed chain states need a state-compatible Anvil, while the
       # release bytecode is reproduced with the `build` Forge pin.
@@ -158,7 +160,8 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          submodules: true
+          # Nested libraries affect solc remappings and the metadata the genesis image pins.
+          submodules: recursive
 
       - name: Setup anvil-interop environment
         uses: ./.github/actions/setup-anvil-interop
