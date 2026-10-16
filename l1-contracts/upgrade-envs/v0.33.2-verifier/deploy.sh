@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Broadcast the v0.33.2 CREATE2 deployments (`[deploy_calls]` of output/stage/ecosystem.toml) to Sepolia.
+# Broadcast the v0.33.2 CREATE2 deployments (`[deploy_calls]` of output/<env>/ecosystem.toml) to Sepolia.
 # Any funded EOA can send them: the addresses depend only on the salt and the init code. Idempotent: a
 # contract whose address already has code is skipped. Each sent tx hash is appended to
-# output/stage/transactions.txt.
+# output/<env>/transactions.txt.
 #
-# Usage: L1_RPC=<sepolia rpc> DEPLOYER_PK_FILE=<file holding the key> ./deploy-stage.sh
+# Usage: L1_RPC=<sepolia rpc> DEPLOYER_PK_FILE=<file holding the key> ./deploy.sh <env>
 set -euo pipefail
 
+ENV=${1:?usage: deploy.sh <env>}
 : "${L1_RPC:?set L1_RPC to a Sepolia RPC}"
 : "${DEPLOYER_PK_FILE:?set DEPLOYER_PK_FILE to a file holding the deployer key}"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-OUT=$HERE/output/stage/ecosystem.toml
-LOG=$HERE/output/stage/transactions.txt
+OUT=$HERE/output/$ENV/ecosystem.toml
+LOG=$HERE/output/$ENV/transactions.txt
 PK=$(tr -d '[:space:]' < "$DEPLOYER_PK_FILE")
 
 python3 -c "

@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
-# Rehearse the v0.33.2 verifier-only stage upgrade on a Sepolia fork, along the path it really takes,
+# Rehearse the v0.33.2 verifier-only upgrade of one environment on a Sepolia fork, along the path it really takes,
 # and assert the resulting L1 state:
 #   1. the CREATE2 deployments from `[deploy_calls]` the fork does not have yet (on Sepolia they are
-#      live, see output/stage/transactions.txt), sent by `[deploy_calls].deployer`
-#   2. governance stages 0/1/2 as the Governance owner's `scheduleTransparent` + `execute`
-#      (`[governance_operations]`), impersonated
-#   3. per chain, the committed bundles in output/stage/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
+#      live, see output/<env>/transactions.txt), sent by `[deploy_calls].deployer`
+#   2. governance stages 0/1/2: as the Governance owner's `scheduleTransparent` + `execute`, or as the
+#      Emergency Upgrade Board owner's `approveHash` txs + `executeEmergencyUpgrade`
+#      (output/<env>/emergency-upgrade-board.json), impersonated
+#   3. per chain, the committed bundles in output/<env>/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
 #      then 02 (the cut), both through the chain's ChainAdmin. A chain with committed-but-unexecuted batches at the fork
 #      block must refuse the cut (`NotAllBatchesExecuted`); every other chain must upgrade
 #   4. `[test_upgrade_calls].test_create_chain_zkos` as the bridgehub admin
 #   5. assertions: versions, verifiers, VK, stored cut hash, facets and creation params unchanged,
 #      migrations unpaused again
 #
-# Needs: foundry (forge/cast/anvil), python3, and an up-to-date output/stage/ecosystem.toml.
-# Usage: L1_FORK_URL=<sepolia rpc> ./rehearse-stage.sh      (PORT defaults to 8733)
+# Needs: foundry (forge/cast/anvil), python3, and an up-to-date output/<env>/ecosystem.toml.
+# Usage: L1_FORK_URL=<sepolia rpc> ./rehearse.sh <env>      (PORT defaults to 8733)
 # Only the anvil it starts is stopped (by PID).
 set -uo pipefail
 
 : "${L1_FORK_URL:?set L1_FORK_URL to a Sepolia RPC}"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-OUT=$HERE/output/stage/ecosystem.toml
+ENV=${1:?usage: rehearse.sh <env>}
+OUT=$HERE/output/$ENV/ecosystem.toml
 S=$(mktemp -d)
 PORT=${PORT:-8733}
 RPC=http://127.0.0.1:$PORT
@@ -88,17 +90,18 @@ chk "verifier is the testnet flavour" "$(call "$VERIFIER" 'IS_TESTNET_VERIFIER()
 chk "CTM stored default upgrade unchanged" "$(call "$CTM" 'defaultUpgrade()(address)')" "$(toml_get state_transition.ctm_stored_default_upgrade_addr)"
 
 # ---------------------------------------------------------------- 2. governance
-GOV_OWNER=$(toml_get governance_operations.governance_owner)
-chk "Governance owner" "$(call "$GOV" 'owner()(address)')" "$GOV_OWNER"
-for STAGE in 0 1 2; do
-  st=$(send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_schedule_calldata)")
-  echo "stage $STAGE scheduleTransparent: status $st"; [ "$st" = "0x1" ] || fail "stage $STAGE schedule failed"
-  st=$(send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_execute_calldata)")
-  echo "stage $STAGE execute: status $st"; [ "$st" = "0x1" ] || fail "stage $STAGE execute failed"
-  chk "stage $STAGE operation done" "$(call "$GOV" 'isOperationDone(bytes32)(bool)' "$(toml_get governance_operations.stage${STAGE}_operation_id)")" "true"
-done
-# The operations must carry exactly the [governance_calls] the simulator scenario carries.
-python3 - "$OUT" <<'PYCHECK' && echo "  OK   governance operations = [governance_calls]" || fail "governance operations differ from [governance_calls]"
+if python3 -c "import tomllib,sys; sys.exit(0 if 'governance_operations' in tomllib.load(open('$OUT','rb')) else 1)"; then
+  GOV_OWNER=$(toml_get governance_operations.governance_owner)
+  chk "Governance owner" "$(call "$GOV" 'owner()(address)')" "$GOV_OWNER"
+  for STAGE in 0 1 2; do
+    st=$(send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_schedule_calldata)")
+    echo "stage $STAGE scheduleTransparent: status $st"; [ "$st" = "0x1" ] || fail "stage $STAGE schedule failed"
+    st=$(send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_execute_calldata)")
+    echo "stage $STAGE execute: status $st"; [ "$st" = "0x1" ] || fail "stage $STAGE execute failed"
+    chk "stage $STAGE operation done" "$(call "$GOV" 'isOperationDone(bytes32)(bool)' "$(toml_get governance_operations.stage${STAGE}_operation_id)")" "true"
+  done
+  # The operations must carry exactly the [governance_calls] the simulator scenario carries.
+  python3 - "$OUT" <<'PYCHECK' && echo "  OK   governance operations = [governance_calls]" || fail "governance operations differ from [governance_calls]"
 import json, subprocess, sys, tomllib
 def cast_json(*args):
     j = json.loads(subprocess.check_output(["cast", *args, "--json"]))
@@ -112,6 +115,35 @@ for stage in range(3):
     if norm(calls[0]) != norm(op[0][0]):
         sys.exit(1)
 PYCHECK
+else
+  # ProtocolUpgradeHandler: the board owner's approveHash txs, then executeEmergencyUpgrade (stages 0-2).
+  BOARD_JSON=$HERE/output/$ENV/emergency-upgrade-board.json
+  chk "emergency proposal owner = ZK Foundation Safe owner" "$(python3 -c "import json; print(json.load(open('$BOARD_JSON'))['owner'])")" \
+    "$(cast call "$(cast call "$(python3 -c "import json; print(json.load(open('$BOARD_JSON'))['emergency_upgrade_board'])")" 'ZK_FOUNDATION_SAFE()(address)' --rpc-url "$RPC")" 'getOwners()(address[])' --rpc-url "$RPC" | tr -d '[]')"
+  python3 -c "
+import json
+for tx in json.load(open('$BOARD_JSON'))['transactions']:
+    print(tx['from'], tx['to'], tx['data'], tx['label'].replace(' ', '_'))" > "$S/board_txs.txt"
+  while read -r from to data label; do
+    st=$(send "$from" "$to" "$data"); echo "emergency upgrade $label: status $st"
+    [ "$st" = "0x1" ] || fail "emergency upgrade $label failed"
+  done < "$S/board_txs.txt"
+  # The proposal must carry exactly stages 0-2 of [governance_calls], the calls the simulator scenario carries.
+  python3 - "$OUT" "$BOARD_JSON" <<'PYCHECK' && echo "  OK   emergency proposal = [governance_calls] stages 0-2" || fail "emergency proposal differs from [governance_calls]"
+import json, subprocess, sys, tomllib
+def cast_json(*args):
+    j = json.loads(subprocess.check_output(["cast", *args, "--json"]))
+    return j["data"] if isinstance(j, dict) else j
+d = tomllib.load(open(sys.argv[1], "rb"))
+execute = json.load(open(sys.argv[2]))["transactions"][-1]
+norm = lambda cs: [(t.lower(), int(str(v), 0), x.lower()) for t, v, x in cs]
+expected = []
+for stage in range(3):
+    expected += norm(cast_json("abi-decode", "--input", "f((address,uint256,bytes)[])", d["governance_calls"][f"stage{stage}_calls"])[0])
+proposal = cast_json("calldata-decode", "executeEmergencyUpgrade((address,uint256,bytes)[],bytes32,bytes,bytes,bytes)", execute["data"])
+sys.exit(0 if norm(proposal[0]) == expected else 1)
+PYCHECK
+fi
 
 chk "upgrade timer started" "$([ "$(call "$(toml_get deployed_addresses.l1_governance_upgrade_timer)" 'deadline()(uint256)')" != "0" ] && echo yes)" "yes"
 chk "CTM protocolVersion" "$(call "$CTM" 'protocolVersion()(uint256)')" "$NEW"
@@ -134,8 +166,8 @@ for CHAIN_ID in $(python3 -c "import tomllib; print(' '.join(tomllib.load(open('
   FACETS_BEFORE=$(cast call "$CHAIN" 'facetAddresses()(address[])' --rpc-url "$RPC")
   COMMITTED=$(call "$CHAIN" 'getTotalBatchesCommitted()(uint256)')
   EXECUTED=$(call "$CHAIN" 'getTotalBatchesExecuted()(uint256)')
-  read -r TS_TO TS_DATA < <(bundle_tx "$HERE/output/stage/chain-upgrades/$CHAIN_ID/01_*.safe.json")
-  read -r CUT_TO CUT_DATA < <(bundle_tx "$HERE/output/stage/chain-upgrades/$CHAIN_ID/02_*.safe.json")
+  read -r TS_TO TS_DATA < <(bundle_tx "$HERE/output/$ENV/chain-upgrades/$CHAIN_ID/01_*.safe.json")
+  read -r CUT_TO CUT_DATA < <(bundle_tx "$HERE/output/$ENV/chain-upgrades/$CHAIN_ID/02_*.safe.json")
   chk "chain $CHAIN_ID bundles go to its ChainAdmin" "$TS_TO $CUT_TO" "$ADMIN $ADMIN"
   chk "chain $CHAIN_ID cut bundle = chain_admin_calldata" "$CUT_DATA" "$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_calldata)"
   st=$(send "$OWNER" "$ADMIN" "$TS_DATA"); [ "$st" = "0x1" ] || fail "chain $CHAIN_ID setUpgradeTimestamp failed"

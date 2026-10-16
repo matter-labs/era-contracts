@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
-# Apply the v0.33.2 ecosystem upgrade to an anvil fork, the way it really executes: the CREATE2
-# deployments from `[deploy_calls]` that the forked network does not have yet, then each governance
-# stage as the Governance owner's `scheduleTransparent` + `execute` (`[governance_operations]`). Afterwards the CTM has the cut for
+# Apply the v0.33.2 ecosystem upgrade of one environment to an anvil fork, the way it really executes: the
+# CREATE2 deployments from `[deploy_calls]` that the forked network does not have yet, then governance as
+# that ecosystem's owner sends it:
+#  - a `Governance` (`[governance_operations]`): each stage as the owner's `scheduleTransparent` + `execute`;
+#  - a ProtocolUpgradeHandler (`emergency-upgrade-board.json`): the board owner's `approveHash` txs and the
+#    `executeEmergencyUpgrade` running stages 0-2. Afterwards the CTM has the cut for
 # v0.33.0 registered, which is what the per-chain bundles consume.
 #
 # The fork must run with --auto-impersonate. Fails on the first transaction that does not succeed.
-# Usage: RPC=http://127.0.0.1:<port> ./apply-ecosystem-upgrade-to-fork.sh
+# Usage: RPC=http://127.0.0.1:<port> ./apply-ecosystem-upgrade-to-fork.sh <env>
 set -euo pipefail
 
+ENV=${1:?usage: apply-ecosystem-upgrade-to-fork.sh <env>}
 : "${RPC:?set RPC to an anvil fork started with --auto-impersonate}"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-OUT=${ECOSYSTEM_TOML:-$HERE/output/stage/ecosystem.toml}
+OUT=$HERE/output/$ENV/ecosystem.toml
+BOARD_JSON=$HERE/output/$ENV/emergency-upgrade-board.json
 
 toml_get() { python3 -c "import tomllib,sys; d=tomllib.load(open('$OUT','rb')); v=d
 for k in sys.argv[1].split('.'): v=v[k]
@@ -41,9 +46,19 @@ for name, addr, (target, value, data) in zip(d['deploy_calls']['contracts'], add
   send "$DEPLOYER" "$target" "$data" "CREATE2 deployment of $name"
 done
 
-GOV=$(cast call "$(toml_get state_transition.chain_type_manager_proxy)" 'owner()(address)' --rpc-url "$RPC")
-GOV_OWNER=$(toml_get governance_operations.governance_owner)
-for STAGE in 0 1 2; do
-  send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_schedule_calldata)" "stage $STAGE scheduleTransparent"
-  send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_execute_calldata)" "stage $STAGE execute"
-done
+if python3 -c "import tomllib,sys; sys.exit(0 if 'governance_operations' in tomllib.load(open('$OUT','rb')) else 1)"; then
+  GOV=$(cast call "$(toml_get state_transition.chain_type_manager_proxy)" 'owner()(address)' --rpc-url "$RPC")
+  GOV_OWNER=$(toml_get governance_operations.governance_owner)
+  for STAGE in 0 1 2; do
+    send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_schedule_calldata)" "stage $STAGE scheduleTransparent"
+    send "$GOV_OWNER" "$GOV" "$(toml_get governance_operations.stage${STAGE}_execute_calldata)" "stage $STAGE execute"
+  done
+else
+  [ -f "$BOARD_JSON" ] || { echo "no [governance_operations] and no $BOARD_JSON: run generate.sh $ENV"; exit 1; }
+  python3 -c "
+import json
+for tx in json.load(open('$BOARD_JSON'))['transactions']:
+    print(tx['from'], tx['to'], tx['data'], tx['label'])" | while read -r from to data label; do
+    send "$from" "$to" "$data" "emergency upgrade: $label"
+  done
+fi

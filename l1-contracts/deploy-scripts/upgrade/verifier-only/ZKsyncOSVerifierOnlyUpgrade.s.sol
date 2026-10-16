@@ -15,6 +15,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
@@ -64,12 +65,7 @@ contract ZKsyncOSVerifierOnlyUpgrade is Script, DefaultCTMUpgrade {
         verifierOnlyInput.chainIds = toml.readUintArray("$.chain_ids");
         require(IChainTypeManager(ctm).isZKsyncOS(), "vk-only: not a ZKsync OS CTM");
 
-        // The chain creation params stay as they are, so the CTM's current ones are what new chains (and the
-        // test chain) are created from.
-        (bytes memory creationCut, bytes memory forceDeployments) = GetDiamondCutData._getDiamondCutAndForceDeployment(
-            ctm
-        );
-        require(keccak256(creationCut) == IChainTypeManager(ctm).initialCutHash(), "vk-only: creation cut mismatch");
+        (bytes memory creationCut, bytes memory forceDeployments) = _currentChainCreationParams(ctm, toml);
 
         initializeWithArgs({
             ctmProxy: ctm,
@@ -99,6 +95,27 @@ contract ZKsyncOSVerifierOnlyUpgrade is Script, DefaultCTMUpgrade {
         stageCalls[2] = abi.encode(stage2);
         prepareDefaultTestUpgradeCalls();
         _saveVerifierOnlyOutput();
+    }
+
+    /// @dev The chain creation params stay as they are, so the CTM's current ones are what new chains (and the
+    /// test chain) are created from. `chain_creation_params_block` is only read when the CTM records no block
+    /// for its current version; either way the event's params are checked against the CTM's stored hashes.
+    function _currentChainCreationParams(
+        address _ctm,
+        string memory _toml
+    ) internal returns (bytes memory creationCut, bytes memory forceDeployments) {
+        uint256 paramsBlock = ChainTypeManagerBase(_ctm).newChainCreationParamsBlock(
+            IChainTypeManager(_ctm).protocolVersion()
+        );
+        if (paramsBlock == 0) {
+            paramsBlock = _toml.readUint("$.chain_creation_params_block");
+        }
+        (creationCut, forceDeployments) = GetDiamondCutData._getDiamondCutAndForceDeploymentAtBlock(_ctm, paramsBlock);
+        require(keccak256(creationCut) == IChainTypeManager(_ctm).initialCutHash(), "vk-only: creation cut mismatch");
+        require(
+            keccak256(abi.encode(forceDeployments)) == ChainTypeManagerBase(_ctm).initialForceDeploymentHash(),
+            "vk-only: force deployments mismatch"
+        );
     }
 
     // ======================== Default flow overrides ========================
