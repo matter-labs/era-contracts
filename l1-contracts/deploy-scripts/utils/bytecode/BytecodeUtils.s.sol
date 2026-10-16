@@ -10,17 +10,6 @@ library BytecodeUtils {
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     /**
-     * @dev Returns the bytecode of a given DA contract.
-     */
-    function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
-        return
-            readFoundryBytecode(
-                // solhint-disable-next-line func-named-parameters
-                string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
-            );
-    }
-
-    /**
      * @dev Read foundry bytecodes
      */
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {

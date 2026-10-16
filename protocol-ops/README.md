@@ -143,7 +143,7 @@ You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract a
 
 ### Checking the upgrade-verifier ABI against Solidity
 
-After building L1/DA artifacts and refreshing `AllContractsHashes.json`, run with the pinned
+After building L1 artifacts and refreshing `AllContractsHashes.json`, run with the pinned
 Foundry version on `PATH`:
 
 ```bash

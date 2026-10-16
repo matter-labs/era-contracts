@@ -14,14 +14,10 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {L2DACommitmentScheme, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PubdataContent} from "contracts/common/Config.sol";
-import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {InvalidPubdataHash, MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {
-    InvalidPubdataHash,
-    InvalidBlobsPublished,
-    BlobNotPublished
-} from "../../../da-contracts-imports/DAContractsErrors.sol";
-import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
+import {InvalidBlobsPublished, BlobNotPublished} from "contracts/state-transition/data-availability/DAErrors.sol";
+import {BlobsL1DAValidatorZKsyncOS} from "contracts/state-transition/data-availability/BlobsL1DAValidatorZKsyncOS.sol";
 
 contract CommittingTest is ExecutorTest {
     function setUp() public {}

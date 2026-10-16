@@ -996,8 +996,7 @@ fn verify_ctm_base_provenance(
     let verifier_plonk_file = "l1-contracts/ZKsyncOSVerifierPlonk";
     let main_verifier_file = "l1-contracts/ZKsyncOSVerifier";
     let testnet_verifier_file = "l1-contracts/ZKsyncOSTestnetVerifier";
-    // No-arg CTM contracts. `eip7702_checker_addr` lives in the da-contracts
-    // tree; everything else is l1-contracts.
+    // No-arg CTM contracts.
     let no_args: &[(&[&str], &str)] = &[
         // L1GenesisUpgrade() — no ctor args.
         (
@@ -1019,10 +1018,10 @@ fn verify_ctm_base_provenance(
             &["state_transition", "server_notifier_implementation_addr"],
             "l1-contracts/ServerNotifier",
         ),
-        // EIP7702Checker() — no ctor args; artifact comes from da-contracts.
+        // EIP7702Checker() — no ctor args.
         (
             &["state_transition", "eip7702_checker_addr"],
-            "da-contracts/EIP7702Checker",
+            "l1-contracts/EIP7702Checker",
         ),
     ];
     for (path, expected_file) in no_args {

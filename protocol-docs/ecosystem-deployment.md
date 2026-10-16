@@ -54,8 +54,8 @@ as in `hub init`. See `protocol-ops/README.md` for the execution model.
 | CTM   | `ctm init` (also the second half of `ecosystem init`)      | `ctm/DeployCTM.s.sol`, `ecosystem/RegisterCTM.s.sol`         | deployer EOA; owner (accepts ownership, registers the CTM)    |
 | Chain | `chain init` (CI: `generate-chain-init-calldata` workflow) | `ctm/RegisterZKChain.s.sol`, `chain/FinalizeChainInit.s.sol` | deployer EOA; Bridgehub admin owner; chain owner (ChainAdmin) |
 
-All scripts live under `l1-contracts/deploy-scripts/`. They need the contracts built first (`yarn
-da build:foundry && yarn l1 build:foundry` from the repository root), since chain creation embeds the
+All scripts live under `l1-contracts/deploy-scripts/`. They need the contracts built first (`yarn l1
+build:foundry` from the repository root), since chain creation embeds the
 compiled L2 built-ins as factory dependencies.
 
 ## Hub: the core contracts

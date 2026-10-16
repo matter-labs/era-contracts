@@ -2,17 +2,6 @@
 
 pragma solidity 0.8.28;
 
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
-/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
-/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
-uint256 constant BLOB_SIZE_BYTES = 126_976;
-
-/// @dev Enum used to determine the source of pubdata. At first we will support calldata and blobs but this can be extended.
-enum PubdataSource {
-    Calldata,
-    Blob
-}
-
 /// @dev BLS Modulus value defined in EIP-4844 and the magic value returned from a successful call to the
 /// point evaluation precompile
 uint256 constant BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
@@ -33,5 +22,10 @@ uint256 constant BLOB_DA_INPUT_SIZE = PUBDATA_COMMITMENT_SIZE + 32;
 /// @dev Address of the point evaluation precompile used for EIP-4844 blob verification.
 address constant POINT_EVALUATION_PRECOMPILE_ADDR = address(0x0A);
 
-/// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(0x8008);
+/// @dev The number of blocks within each we allow blob to be used for DA.
+/// On Ethereum blobs expire within 4096 epochs, i.e. 4096 * 32 blocks. We reserve
+/// half of the time in order to ensure reader's ability to read the blob's content.
+uint256 constant BLOB_EXPIRATION_BLOCKS = (4096 * 32) / 2;
+
+/// @dev The size in bytes of the versioned hash for a single blob.
+uint256 constant BLOB_VERSIONED_HASH_SIZE = 32;

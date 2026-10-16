@@ -122,10 +122,6 @@ jobs:
         working-directory: l1-contracts
         run: rm -rf zkstack-out
 
-      - name: Build da contracts
-        working-directory: da-contracts
-        run: yarn build:foundry
-
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: yarn build:foundry
@@ -199,10 +195,6 @@ jobs:
       #
       - name: Run l1 foundry tests
         working-directory: l1-contracts
-        run: yarn test:foundry
-
-      - name: Run da foundry tests
-        working-directory: da-contracts
         run: yarn test:foundry
 
       # The committed chain states expect the `anvil` pin's trace schema, while the builds above use
