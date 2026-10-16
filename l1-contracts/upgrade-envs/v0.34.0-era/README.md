@@ -4,8 +4,10 @@ v34 moves stage's Era CTM from v0.33.0 to v0.34.0. From then on every Era batch 
 Airbender proof. It also ships an operator force-fail bit for L1→L2 transactions (new bootloader), a 15M
 gas cap on user L1→L2 transactions and an EVM emulator fix.
 
-**Status:** a dummy for review. The output here is generated and checked on a fork, not executed. It
-will be regenerated before execution, so its addresses and hashes will change.
+**Status:** generated and checked on a fork, not executed. `output/stage/` comes from generate run
+[38932514728](https://github.com/matter-labs/era-contracts/actions/runs/38932514728) (commit `778bb3bb4`,
+Sepolia fork block 11928533); a local run at block 11926900 reproduced it byte for byte. It will be
+regenerated with the final inputs before execution, so its addresses and hashes will change.
 
 ## What the upgrade does
 
@@ -43,8 +45,8 @@ against the bridgehub, the CTM or the input.
 - `stage.toml`: the input. The CTM, every constructor value (each with its source), versions, the chains
   to upgrade, the salt, and the CTM's current chain-creation parameters as event data. The script checks
   the event data against the CTM's stored hashes, and every value that has a getter against live state.
-- `output/stage/ecosystem.toml`: written by the prepare. Not committed yet: the CI run's output is, once
-  reviewed, with `EXECUTE.md` and `emergency-upgrade-board.json`. By table:
+- `output/stage/ecosystem.toml`: written by the prepare, committed from the generate run with
+  `EXECUTE.md` and `emergency-upgrade-board.json`. By table:
   - `[governance_calls]`: `stage0_calls`, `stage1_calls`, `stage2_calls`, each an ABI-encoded `Call[]` of
     the emergency proposal.
   - `[ctm_admin_calls]`: the ServerNotifier upgrade, calls that the ChainAdmin `chain_admin` executes
