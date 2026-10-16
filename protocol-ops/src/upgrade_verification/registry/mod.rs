@@ -75,6 +75,8 @@ pub(crate) mod records;
 pub(crate) mod replacement;
 pub(crate) mod rows;
 pub(crate) mod shell;
+#[cfg(test)]
+mod shell_path_tests;
 pub(crate) mod views;
 
 use construction::ReviewedBuild;

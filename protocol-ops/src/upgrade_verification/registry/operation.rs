@@ -1174,6 +1174,48 @@ mod tests {
         package(vec![execute_call(COORDINATOR, OPERATION)], Vec::new())
     }
 
+    /// Exercise the real recurring verifier, not `verify_shell_kept` directly: removing its
+    /// shell call must lose the extra error for a logic change. RPC mocks isolate this wiring
+    /// from unrelated provenance/genesis checks; those findings are identical in both runs.
+    #[tokio::test]
+    async fn recurring_verification_rejects_an_incompatible_system_proxy_shell() {
+        use super::super::shell_path_tests::{ShellPathFixture, GOVERNANCE, TRANSITION};
+        use alloy::providers::ProviderBuilder;
+
+        let mut outcomes = Vec::new();
+        for change_logic in [false, true] {
+            let fixture = ShellPathFixture::new(change_logic);
+            fixture.recurring_reads(COORDINATOR);
+            let provider = ProviderBuilder::new().connect_mocked_client(fixture.asserter.clone());
+            let mut package = well_formed();
+            package.reported_ctm_transition = Some(TRANSITION);
+            let mut result = VerificationResult::default();
+            verify(
+                &provider,
+                &fixture.build,
+                &fixture.genesis,
+                &package,
+                Some(GOVERNANCE),
+                &[],
+                &mut result,
+            )
+            .await
+            .unwrap();
+            outcomes.push((result, fixture.asserter.read_q().is_empty()));
+        }
+        assert_eq!(
+            outcomes[1].0.errors,
+            outcomes[0].0.errors + 1,
+            "the real recurring path must report the shell logic change as one additional error"
+        );
+        assert_eq!(outcomes[1].0.warnings, outcomes[0].0.warnings);
+        assert!(outcomes[1].0.ensure_success().is_err());
+        assert!(
+            outcomes.iter().all(|(_, consumed)| *consumed),
+            "both controls must reach the shell check"
+        );
+    }
+
     fn extra() -> GovernanceCall {
         GovernanceCall {
             target: Address::repeat_byte(0xEE),

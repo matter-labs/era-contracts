@@ -713,6 +713,69 @@ mod tests {
     use super::*;
     use crate::upgrade_verification::registry::operation::judge_bytecode_publication;
 
+    /// Exercise the replacement verifier's own shell call. The mocked RPC transport isolates
+    /// the wiring: all unrelated findings are held fixed while real proxy logic changes.
+    #[tokio::test]
+    async fn replacement_verification_rejects_an_incompatible_system_proxy_shell() {
+        use super::super::shell_path_tests::{
+            ShellPathFixture, GOVERNANCE, NEW_RELEASE, TRANSITION,
+        };
+        use alloy::providers::ProviderBuilder;
+
+        let mut outcomes = Vec::new();
+        for change_logic in [false, true] {
+            let fixture = ShellPathFixture::new(change_logic);
+            fixture.replacement_reads();
+            let provider = ProviderBuilder::new().connect_mocked_client(fixture.asserter.clone());
+            let mut forward = recovered(0);
+            forward.replacement = TRANSITION;
+            let package = ReplacementPackage {
+                reported_replaced: Some(forward.expected),
+                reported_replacement: Some(TRANSITION),
+                reported_ctm_transition: Some(TRANSITION),
+                reported_release: Some(NEW_RELEASE),
+                reported_ctm_executor: Some(forward.executor),
+                reported_ctm: Some(forward.ctm),
+                forward,
+                ctm_key: "zksync_os".to_string(),
+                reported_coordinator: None,
+                reported_ctm_proxy_admin: None,
+                reported_core_transition: None,
+                calls: vec![the_forward()],
+                external_actions: declared_forward(),
+                create2_salts: Vec::new(),
+                lifecycle: Default::default(),
+                reported_old_version: None,
+                reported_new_version: None,
+                executor_records: Default::default(),
+            };
+            let mut result = VerificationResult::default();
+            verify(
+                &provider,
+                &fixture.build,
+                fixture.genesis.image.as_ref().ok(),
+                &package,
+                Some(GOVERNANCE),
+                &[],
+                &mut result,
+            )
+            .await
+            .unwrap();
+            outcomes.push((result, fixture.asserter.read_q().is_empty()));
+        }
+        assert_eq!(
+            outcomes[1].0.errors,
+            outcomes[0].0.errors + 1,
+            "the real replacement path must report the shell logic change as one additional error"
+        );
+        assert_eq!(outcomes[1].0.warnings, outcomes[0].0.warnings);
+        assert!(outcomes[1].0.ensure_success().is_err());
+        assert!(
+            outcomes.iter().all(|(_, consumed)| *consumed),
+            "both controls must reach the shell check"
+        );
+    }
+
     // A CTM at v0.36.0 on release R36, with v0.34.0 -> v0.35.0 (T34, R34 -> R35) and
     // v0.35.0 -> v0.36.0 (T35, R35 -> R36) committed. The replacement repairs T34.
     const V34: u64 = 0x22_0000_0000;
