@@ -3,7 +3,7 @@
 # CREATE2 deployments from `[deploy_calls]` that the forked network does not have yet, then governance as
 # that ecosystem's owner sends it:
 #  - a `Governance` (`[governance_operations]`): each stage as the owner's `scheduleTransparent` + `execute`;
-#  - a ProtocolUpgradeHandler (`emergency-upgrade-board.json`): the board owner's `approveHash` txs and the
+#  - a ProtocolUpgradeHandler (`output/<env>/execution.json`): the board owner's `approveHash` txs and the
 #    `executeEmergencyUpgrade` running stages 0-2. Afterwards the CTM has the cut for
 # v0.33.0 registered, which is what the per-chain bundles consume.
 #
@@ -15,7 +15,7 @@ ENV=${1:?usage: apply-ecosystem-upgrade-to-fork.sh <env>}
 : "${RPC:?set RPC to an anvil fork started with --auto-impersonate}"
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 OUT=$HERE/output/$ENV/ecosystem.toml
-BOARD_JSON=$HERE/output/$ENV/emergency-upgrade-board.json
+BOARD_JSON=$HERE/output/$ENV/execution.json
 
 toml_get() { python3 -c "import tomllib,sys; d=tomllib.load(open('$OUT','rb')); v=d
 for k in sys.argv[1].split('.'): v=v[k]

@@ -5,8 +5,8 @@
 #      live, see output/<env>/transactions.txt), sent by `[deploy_calls].deployer`
 #   2. governance stages 0/1/2: as the Governance owner's `scheduleTransparent` + `execute`, or as the
 #      Emergency Upgrade Board owner's `approveHash` txs + `executeEmergencyUpgrade`
-#      (output/<env>/emergency-upgrade-board.json), impersonated
-#   3. per chain, the committed bundles in output/<env>/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
+#      (output/<env>/execution.json), impersonated
+#   3. per chain, the committed bundles in <env>/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
 #      then 02 (the cut), both through the chain's ChainAdmin. A chain with committed-but-unexecuted batches at the fork
 #      block must refuse the cut (`NotAllBatchesExecuted`); every other chain must upgrade
 #   4. `[test_upgrade_calls].test_create_chain_zkos` as the bridgehub admin
@@ -16,12 +16,17 @@
 # Needs: foundry (forge/cast/anvil), python3, and an up-to-date output/<env>/ecosystem.toml.
 # Usage: L1_FORK_URL=<sepolia rpc> ./rehearse.sh <env>      (PORT defaults to 8733)
 # Only the anvil it starts is stopped (by PID).
+#
+# The generate / deploy pipeline runs it as this upgrade's `verify_fork` (see upgrade.toml) from l1-contracts/,
+# with L1_RPC_URL (its fork, the deploy bundle already replayed), ECOSYSTEM_TOML and UPGRADE_ENV set. It then
+# forks that fork, so the pipeline's own fork keeps its state. Before the chain bundles exist (the first
+# generation of an env) the per-chain step is skipped.
 set -uo pipefail
 
-: "${L1_FORK_URL:?set L1_FORK_URL to a Sepolia RPC}"
+L1_FORK_URL=${L1_FORK_URL:-${L1_RPC_URL:?set L1_FORK_URL to a Sepolia RPC}}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ENV=${1:?usage: rehearse.sh <env>}
-OUT=$HERE/output/$ENV/ecosystem.toml
+ENV=${1:-${UPGRADE_ENV:?usage: rehearse.sh <env>, or set UPGRADE_ENV}}
+OUT=${ECOSYSTEM_TOML:-$HERE/output/$ENV/ecosystem.toml}
 S=$(mktemp -d)
 PORT=${PORT:-8733}
 RPC=http://127.0.0.1:$PORT
@@ -117,7 +122,7 @@ for stage in range(3):
 PYCHECK
 else
   # ProtocolUpgradeHandler: the board owner's approveHash txs, then executeEmergencyUpgrade (stages 0-2).
-  BOARD_JSON=$HERE/output/$ENV/emergency-upgrade-board.json
+  BOARD_JSON=$HERE/output/$ENV/execution.json
   chk "emergency proposal owner = ZK Foundation Safe owner" "$(python3 -c "import json; print(json.load(open('$BOARD_JSON'))['owner'])")" \
     "$(cast call "$(cast call "$(python3 -c "import json; print(json.load(open('$BOARD_JSON'))['emergency_upgrade_board'])")" 'ZK_FOUNDATION_SAFE()(address)' --rpc-url "$RPC")" 'getOwners()(address[])' --rpc-url "$RPC" | tr -d '[]')"
   python3 -c "
@@ -159,15 +164,20 @@ chk "migrations unpaused again" "$(call "$CAH" 'migrationPaused()(bool)')" "fals
 # The single transaction of a Safe bundle: "<to> <data>".
 bundle_tx() { python3 -c "import glob,json,sys; t=json.load(open(glob.glob(sys.argv[1])[0]))['transactions']; assert len(t)==1, t; print(t[0]['to'], t[0]['data'])" "$1"; }
 UPGRADED=0
-for CHAIN_ID in $(python3 -c "import tomllib; print(' '.join(tomllib.load(open('$OUT','rb'))['chain_upgrades']))"); do
+CHAIN_IDS=$(python3 -c "import tomllib; print(' '.join(tomllib.load(open('$OUT','rb'))['chain_upgrades']))")
+if [ ! -d "$HERE/$ENV/chain-upgrades" ]; then
+  echo "no per-chain bundles in $ENV/chain-upgrades/ yet (generate-chain-upgrades.sh $ENV): chain step skipped"
+  CHAIN_IDS=""
+fi
+for CHAIN_ID in $CHAIN_IDS; do
   CHAIN=$(toml_get chain_upgrades.$CHAIN_ID.chain)
   ADMIN=$(toml_get chain_upgrades.$CHAIN_ID.chain_admin)
   OWNER=$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_owner)
   FACETS_BEFORE=$(cast call "$CHAIN" 'facetAddresses()(address[])' --rpc-url "$RPC")
   COMMITTED=$(call "$CHAIN" 'getTotalBatchesCommitted()(uint256)')
   EXECUTED=$(call "$CHAIN" 'getTotalBatchesExecuted()(uint256)')
-  read -r TS_TO TS_DATA < <(bundle_tx "$HERE/output/$ENV/chain-upgrades/$CHAIN_ID/01_*.safe.json")
-  read -r CUT_TO CUT_DATA < <(bundle_tx "$HERE/output/$ENV/chain-upgrades/$CHAIN_ID/02_*.safe.json")
+  read -r TS_TO TS_DATA < <(bundle_tx "$HERE/$ENV/chain-upgrades/$CHAIN_ID/01_*.safe.json")
+  read -r CUT_TO CUT_DATA < <(bundle_tx "$HERE/$ENV/chain-upgrades/$CHAIN_ID/02_*.safe.json")
   chk "chain $CHAIN_ID bundles go to its ChainAdmin" "$TS_TO $CUT_TO" "$ADMIN $ADMIN"
   chk "chain $CHAIN_ID cut bundle = chain_admin_calldata" "$CUT_DATA" "$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_calldata)"
   st=$(send "$OWNER" "$ADMIN" "$TS_DATA"); [ "$st" = "0x1" ] || fail "chain $CHAIN_ID setUpgradeTimestamp failed"
@@ -189,7 +199,7 @@ for CHAIN_ID in $(python3 -c "import tomllib; print(' '.join(tomllib.load(open('
     chk "chain $CHAIN_ID still on the old version" "$(call "$CHAIN" 'getProtocolVersion()(uint256)')" "$OLD"
   fi
 done
-[ "$UPGRADED" -gt 0 ] || fail "no chain was idle at the fork block, the per-chain upgrade was not exercised"
+[ -z "$CHAIN_IDS" ] || [ "$UPGRADED" -gt 0 ] || fail "no chain was idle at the fork block, the per-chain upgrade was not exercised"
 
 # ---------------------------------------------------------------- 4. test chain creation
 TC_CALLER=$(toml_get test_upgrade_calls.test_create_chain_zkos_caller)

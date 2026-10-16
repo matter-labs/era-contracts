@@ -1,6 +1,6 @@
 # Per-chain v0.33.0 → v0.33.2 calldata (stage)
 
-The ecosystem ceremony in `../ecosystem.toml` registers the cut on the ZKsync OS CTM. It does not move
+The ecosystem ceremony in `../../output/stage3/ecosystem.toml` registers the cut on the ZKsync OS CTM. It does not move
 any chain. Each chain then takes the cut itself, through its own ChainAdmin.
 
 This directory holds two bundles per chain, **in execution order**:
@@ -9,8 +9,8 @@ This directory holds two bundles per chain, **in execution order**:
 2. `02_chain.upgrade`: `upgradeChainFromVersion(chain, 0x2100000000, cut)`
 
 Both are `ChainAdmin.multicall` (`0x69340beb`), signed by that ChainAdmin's owner. Every cut bundle is
-byte-identical to `[chain_upgrades.<id>].chain_admin_calldata` in `../ecosystem.toml`;
-`generate-chain-upgrades.sh stage` and `rehearse.sh stage` both check it.
+byte-identical to `[chain_upgrades.<id>].chain_admin_calldata` in `../../output/stage3/ecosystem.toml`;
+`generate-chain-upgrades.sh stage3` and `rehearse.sh stage3` both check it.
 
 | chain | ChainAdmin (the `to`)                        | signer (ChainAdmin owner)                    | DA today (unchanged by the upgrade) |
 | ----- | -------------------------------------------- | -------------------------------------------- | ----------------------------------- |
@@ -46,18 +46,18 @@ The cut sets no DA. Every chain keeps its validator pair and pubdata content, an
 
 2729 and 27272 (⚠) are validium-priced and commit full pubdata with the `EmptyNoDA` scheme, which
 protocol-ops flags as not the recommended state. That state predates this upgrade, and the upgrade
-keeps it. Their bundles are generated with `--acknowledge-unrecommended-noda`. stage.toml lists them
+keeps it. Their bundles are generated with `--acknowledge-unrecommended-noda`. stage3.toml lists them
 in `keep_unrecommended_da_chain_ids`.
 
 ## Regenerating
 
 ```bash
-L1_FORK_URL=<sepolia rpc> ../../../generate-chain-upgrades.sh stage 2026-10-05
+L1_FORK_URL=<sepolia rpc> ../../generate-chain-upgrades.sh stage3 2026-10-05
 ```
 
 It forks Sepolia, applies the ecosystem upgrade (`apply-ecosystem-upgrade-to-fork.sh`), then runs
 `protocol_ops chain set-upgrade-timestamp --upgrade-timestamp 1` and `protocol_ops chain upgrade` per
-chain. It then emits `../simulator/<date>-v0.33.2-verifier-stage-2-chain-<id>.json` with
+chain. It then emits `../simulator/<date>-v0.33.2-verifier-stage3-2-chain-<id>.json` with
 `protocol_ops ecosystem manifest-to-simulator --emulate-all-batches-executed-for <chain diamond>`.
 
 ## Executing, and rehearsing first
@@ -68,6 +68,3 @@ send its single transaction from the ChainAdmin owner. Run `01_` before `02_`.
 The simulator walks scenario files alphabetically on one shared fork. The `-1-ecosystem` file must
 therefore run before the `-2-chain-<id>` files: setting the timestamp needs the cut registered by
 stage 1. `emulateAllBatchesExecutedFor` names the chain's diamond, because the `to` is the ChainAdmin.
-That field, and the ecosystem file's `ack_test_upgrade_chain_zkos` marker, are supported by the
-transaction-simulator branch `sb/v33-atomic-interop-testnet`, the same one the v33 testnet scenarios
-need.

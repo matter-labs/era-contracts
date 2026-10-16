@@ -9,10 +9,13 @@ It never took v0.33.1 (#2497), and `createNewVerifierOnlyUpgrade` allows skippin
 | v0.33.0 (live before the upgrade) | `0x29651d5f044e1671ff820f85018ed87b26f57402222eb31dd453206e2379bc9c` |
 | v0.33.2 (`zksync-os/latest.json`) | `0xec24ed291193c0f86d53b242e45490f05e2328817d9decb8cc4188b582682bfa` |
 
-| env       | ecosystem                                         | governance                                       | details                                              |
-| --------- | ------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
-| `stage`   | atomic-interop stage, bridgehub `0xb9415d43…`     | `Governance` `0xFF657F25…` (EOA owner)           | [output/stage/README.md](output/stage/README.md)     |
-| `testnet` | public ZKsync OS testnet, bridgehub `0xc4FD2580…` | ProtocolUpgradeHandler `0x803e5E7a…` (emergency) | [output/testnet/README.md](output/testnet/README.md) |
+| env       | ecosystem                                                | governance                                       | details                                |
+| --------- | -------------------------------------------------------- | ------------------------------------------------ | -------------------------------------- |
+| `stage3`  | atomic-interop stage ("stage3"), bridgehub `0xb9415d43…` | `Governance` `0xFF657F25…` (EOA owner)           | [stage3/README.md](stage3/README.md)   |
+| `testnet` | public ZKsync OS testnet, bridgehub `0xc4FD2580…`        | ProtocolUpgradeHandler `0x803e5E7a…` (emergency) | [testnet/README.md](testnet/README.md) |
+
+The env name is the basename of `../permanent-values/<env>.toml` and `<env>.toml` here, as everywhere in the
+generate / deploy pipeline. `stage3` is not `stage`: `permanent-values/stage.toml` is the older stage ecosystem.
 
 ## What the upgrade does
 
@@ -36,9 +39,12 @@ How the CTM owner sends the stages depends on the ecosystem:
 - a `Governance` with an EOA owner: one operation per stage, `scheduleTransparent(op, 0)` then `execute(op)`
   (`[governance_operations]` in the output);
 - a ProtocolUpgradeHandler: stages 0-2 as one emergency proposal through the Emergency Upgrade Board, the
-  board owner's `approveHash` on each member Safe then `executeEmergencyUpgrade`
-  (`emergency-upgrade-board.json`, from `EmergencyStageUpgradeCalldata.s.sol`, with its `EXECUTE.md`). One
-  proposal is equivalent to three because the timer delay is 0.
+  board owner's `approveHash` on each member Safe then `executeEmergencyUpgrade`. One proposal is equivalent
+  to three because the timer delay is 0.
+
+Either way `ZKsyncOSVerifierOnlyExecution.s.sol` writes the transactions to `output/<env>/execution.json` (for a
+ProtocolUpgradeHandler through `EmergencyStageUpgradeCalldata.s.sol`), and the pipeline renders them as
+`output/<env>/EXECUTE.md`.
 
 `createNewVerifierOnlyUpgrade` builds the cut itself: no facet cuts, `initAddress` = the stored
 `defaultUpgrade`, `initCalldata` = `upgradeVerifierOnly(0x2100000002)`. It also carries the chain creation
@@ -52,56 +58,82 @@ chain keeps its validator pair and pubdata content.
 
 ## Files
 
+- `upgrade.toml` tells the generate / deploy pipeline (`protocol-ops/src/common/upgrade_descriptor.rs`) how to
+  run this upgrade: the prepare script, the `[execution]` script, and the checks (`rehearse.sh` on a fork,
+  `check-deployment.sh` against the real chain).
 - `<env>.toml` is the input: bridgehub, CTM, the expected current version, the governance kind, the verifier
   flavour, the timer delay, the CREATE2 salt and the chain list. The script checks it against the live state.
-- `output/<env>/ecosystem.toml` is the artifact. On top of the standard `DefaultCTMUpgrade` output
-  (`[state_transition]`, `[deployed_addresses]`, `[contracts_config]`, `chain_upgrade_diamond_cut`,
-  `[governance_calls]`, `[test_upgrade_calls]` with `test_create_chain_zkos`), it carries:
-  - `[verification_key]`: the old and new VK hashes;
-  - `[deploy_calls]`: the four CREATE2 factory calls and the contract names;
-  - `[governance_operations]` (Governance-owned ecosystems): the `scheduleTransparent` / `execute` calldata;
-  - `[chain_upgrades.<id>]`: each ChainAdmin's `multicall` calldata.
-- `output/<env>/emergency-upgrade-board.json` and `EXECUTE.md` (PUH-owned ecosystems): the emergency proposal
-  and its MetaMask runbook, replayed on a fork by `protocol_ops dev execution-runbook`.
-- `output/<env>/chain-upgrades/<id>/`: the per-chain bundles from `protocol_ops chain set-upgrade-timestamp`
-  and `chain upgrade`, as for the v33 testnet chains: `01_chain.set-upgrade-timestamp_*.safe.json`,
-  `02_chain.upgrade_*.safe.json`, `manifest.json` and, for testnet, the chain's `EXECUTE.md`.
-- `output/<env>/simulator/`: the transaction-simulator scenarios, `…-<env>-1-ecosystem.json` and one
-  `…-<env>-2-chain-<id>.json` per chain.
-- `output/<env>/transactions.txt`: the Sepolia deployment hashes.
+- `output/<env>/` is what the pipeline writes; `rehearse-upgrade` clears it on every run, all but
+  `transactions.txt`:
+  - `ecosystem.toml`, the artifact. On top of the standard `DefaultCTMUpgrade` output (`[state_transition]`,
+    `[deployed_addresses]`, `[contracts_config]`, `chain_upgrade_diamond_cut`, `[governance_calls]`,
+    `[test_upgrade_calls]` with `test_create_chain_zkos`), it carries `[verification_key]` (the old and new VK
+    hashes), `[deploy_calls]` (the four CREATE2 factory calls), `[governance_operations]` (Governance-owned
+    ecosystems: the `scheduleTransparent` / `execute` calldata) and `[chain_upgrades.<id>]` (each ChainAdmin's
+    `multicall` calldata);
+  - `execution.json` and `EXECUTE.md`: the governance transactions and their MetaMask runbook;
+  - `transactions.txt`: the Sepolia deployment hashes;
+  - not committed: `deploy-bundle/` (the deployer's calls, what the deploy workflow broadcasts), `prepare/`,
+    `fork-rehearsal/`.
+- `<env>/` holds what this directory's scripts add, which the pipeline does not regenerate:
+  - `README.md`: the env's addresses, status and validation;
+  - `chain-upgrades/<id>/`: the per-chain bundles from `protocol_ops chain set-upgrade-timestamp` and
+    `chain upgrade`, as for the v33 testnet chains: `01_chain.set-upgrade-timestamp_*.safe.json`,
+    `02_chain.upgrade_*.safe.json`, `manifest.json` and, for testnet, the chain's `EXECUTE.md`;
+  - `simulator/`: the transaction-simulator scenarios, `…-<env>-1-ecosystem.json` and one
+    `…-<env>-2-chain-<id>.json` per chain.
 - `sim-descriptions-<env>.toml`: the scenarios' human-readable descriptions.
 
 Scripts, each taking the env:
 
-- `deploy.sh <env>` broadcasts the `[deploy_calls]` (idempotent) and records the hashes.
-- `generate.sh <env> [date]` regenerates `ecosystem.toml`, the emergency proposal and its runbook where they
-  apply, and the ecosystem scenario. It refuses to go past `ecosystem.toml` while a deployment is missing.
+- `generate.sh <env> [date]` runs `protocol_ops ecosystem rehearse-upgrade --upgrade v0.33.2-verifier`, the
+  command the generate workflow runs, then writes the ecosystem scenario. Once the contracts are live, set
+  `FORK_BLOCK` to a block before their deployment: the prepare deploys nothing at the tip, and the pipeline
+  refuses an empty deploy bundle.
+- `deploy.sh <env>` broadcasts the `[deploy_calls]` (idempotent) and records the hashes. The deploy workflow,
+  or `protocol_ops ecosystem replay-bundle --bundle output/<env>/deploy-bundle --rpc <l1> --key <key>`, sends
+  the same calls from the deploy bundle.
 - `generate-chain-upgrades.sh <env> [date]` regenerates the per-chain bundles and their scenarios on a fork
   where `apply-ecosystem-upgrade-to-fork.sh <env>` has applied the ecosystem upgrade.
 - `rehearse.sh <env>` replays the real execution path on a Sepolia fork and asserts the end state.
+- `check-deployment.sh <env>` checks the live deployments, read-only.
 
-The upgrade script is run without `--broadcast`: the deployments only happen on the local fork, which is
-where it checks that the deployed VK equals `configs/genesis/zksync-os/latest.json`.
+The upgrade script is never broadcast by these scripts: the deployments only happen on forks until someone
+sends the deploy bundle. The script checks there that the deployed VK equals `configs/genesis/zksync-os/latest.json`.
 
 ## Running it
 
-Build with foundry-zksync v0.1.5, the CI pin. That build reproduces `AllContractsHashes.json` for the
+In CI, on a branch with this directory:
+
+```bash
+gh workflow run generate-ecosystem-upgrade-calldata.yaml --ref <branch> -f upgrade=v0.33.2-verifier \
+  -f environment=<env> -f deployer_address=<the EOA that will deploy> [-f fork_block=<n>]
+gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> -f environment=<env> -f generate_run_id=<run id>
+```
+
+The deploy run broadcasts the deploy bundle from `DEPLOYER_PRIVATE_KEY_SEPOLIA`, which must be that
+`deployer_address`, runs `check-deployment.sh` against Sepolia and verifies the contracts on Etherscan. The
+CREATE2 addresses do not depend on the deployer.
+
+Locally, build with foundry-zksync v0.1.5, the CI pin. That build reproduces `AllContractsHashes.json` for the
 verifier contracts, so the CREATE2 addresses are reproducible.
 
 ```bash
 cd protocol-ops && cargo build --release && cd ..
 cd l1-contracts && forge build
-L1_RPC=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/generate.sh <env> <date>         # ecosystem.toml
+L1_RPC=<sepolia rpc> [FORK_BLOCK=<n>] ./upgrade-envs/v0.33.2-verifier/generate.sh <env> <date>
 L1_RPC=<sepolia rpc> DEPLOYER_PK_FILE=<file> ./upgrade-envs/v0.33.2-verifier/deploy.sh <env>
-L1_RPC=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/generate.sh <env> <date>         # + proposal, runbook, scenario
 L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/generate-chain-upgrades.sh <env> <date>
 L1_FORK_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/rehearse.sh <env>
+L1_RPC_URL=<sepolia rpc> ./upgrade-envs/v0.33.2-verifier/check-deployment.sh <env>
 ```
 
-`generate-chain-upgrades.sh` needs upstream forge >= 1.8.3 first on PATH. Sepolia has run Glamsterdam since
-2026-10-06, and forge must simulate the protocol-ops broadcasts under the Amsterdam rules
-(`FOUNDRY_HARDFORK=amsterdam`, the script's default), or it under-estimates code deposit and the fork
-rejects the transaction.
+Sepolia has run Glamsterdam since 2026-10-06. `generate.sh` and `rehearse.sh` need upstream anvil >= 1.8.3 on
+PATH after foundry-zksync, so their forks run Sepolia's rules; `generate-chain-upgrades.sh` needs upstream forge
+
+> = 1.8.3 first on PATH, and simulates the protocol-ops broadcasts under the Amsterdam rules
+> (`FOUNDRY_HARDFORK=amsterdam`, the script's default). Otherwise code deposit is under-priced and the fork or
+> the real chain rejects the transaction.
 
 ## Transaction-simulator notes
 

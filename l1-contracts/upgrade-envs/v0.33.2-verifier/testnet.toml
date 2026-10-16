@@ -3,7 +3,7 @@
 #
 # The public ZKsync OS testnet on Sepolia (`upgrade-envs/permanent-values/testnet.toml`). Its CTMs and the
 # ChainAssetHandler are owned by the ProtocolUpgradeHandler 0x803e5E7a…, so governance runs through the
-# Emergency Upgrade Board (output/testnet/emergency-upgrade-board.json). Only the ZKsync OS CTM is upgraded:
+# Emergency Upgrade Board (output/testnet/execution.json). Only the ZKsync OS CTM is upgraded:
 # the EraVM CTM (0x3Cc81628…, chain 301) has its own verifier and is not touched.
 #
 # The target version (0.33.2) and its VK hash come from configs/genesis/zksync-os/latest.json;
