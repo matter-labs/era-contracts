@@ -45,6 +45,23 @@ pub async fn set_balance(rpc_url: &str, address: Address) -> anyhow::Result<()> 
     Ok(())
 }
 
+/// Bump anvil's L1 timestamp by `seconds` and mine a new block so the
+/// increase is reflected in subsequent calls' `block.timestamp`. Used by the
+/// execution-runbook check to step over a runbook tx's declared delay (its
+/// `time_increase`), e.g. a timelock between two steps of a manual execution.
+pub async fn evm_increase_time_and_mine(rpc_url: &str, seconds: u64) -> anyhow::Result<()> {
+    let provider = get_provider(rpc_url)?;
+    provider
+        .raw_request::<_, serde_json::Value>("evm_increaseTime".into(), json!([seconds]))
+        .await
+        .with_context(|| format!("evm_increaseTime({seconds}) failed against {rpc_url}"))?;
+    provider
+        .raw_request::<_, serde_json::Value>("evm_mine".into(), json!([]))
+        .await
+        .with_context(|| format!("evm_mine failed against {rpc_url}"))?;
+    Ok(())
+}
+
 /// Take an EVM state snapshot via `evm_snapshot`. Returns the snapshot id
 /// (hex-encoded uint256) to pass back to [`evm_revert`].
 ///

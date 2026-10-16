@@ -39,6 +39,7 @@ import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   EIP1967_ADMIN_SLOT,
   EIP1967_IMPL_SLOT,
+  ETH_TOKEN_ADDRESS,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_ATTRIBUTE_PARSER_ADDR,
   INTEROP_CENTER_ADDR,
@@ -276,8 +277,8 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       "under the CTM ProxyAdmin and nominating the CTM executor after the prepare"
     );
 
-    // The merge adds no extras here: governance owns the CTM outright (no pending accept) and the
-    // upgrade input does not redeploy the zk governance set, so the bundle is the derived sequence.
+    // The merge's one extra here is the ValidatorTimelock accept: governance owns the CTM outright
+    // (no pending accept) and the upgrade input does not redeploy the zk governance set.
     const bootstrapCoreTransition = mergedBootstrap.core?.registry?.core_transition_addr;
     if (!bootstrapCoreTransition || bootstrapCoreTransition === ethers.constants.AddressZero) {
       throw new Error("the core prepare did not report the bootstrap's core transition");
@@ -324,6 +325,22 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       },
       "held by the CTM executor and re-pointed by migrate() after the governance replay"
     );
+    const validatorTimelock: string = await new ethers.Contract(
+      ctmAddresses.chainTypeManager,
+      getAbi("IChainTypeManager"),
+      l1Provider
+    ).validatorTimelockPostV29();
+    const timelockOwner: string = await new ethers.Contract(
+      validatorTimelock,
+      getAbi("Ownable2Step"),
+      l1Provider
+    ).owner();
+    if (timelockOwner.toLowerCase() !== l1Addresses.governance.toLowerCase()) {
+      throw new Error(
+        `ValidatorTimelock ${validatorTimelock} is owned by ${timelockOwner}, not governance, after the replay`
+      );
+    }
+    console.log("  ✓ the ValidatorTimelock is governance-owned after the replay");
     await assertBootstrapCompleted(l1Provider, migrationAddr);
 
     // ── Prepare diamond state for chain upgrades ──
@@ -352,6 +369,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       expectedProtocolVersion: scenario.expectedProtocolVersion,
       migrationAddr,
     });
+    await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
 
     // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
@@ -694,7 +712,7 @@ async function runRecurringHop(
     }
     const appliedRows = await verifyOperationRowsApplied(l1Provider, operation);
     console.log(
-      `  ✓ OperationExecuted emitted once; transition committed; ` +
+      "  ✓ OperationExecuted emitted once; transition committed; " +
         `${appliedRows.ctmRows} CTM-domain and ${appliedRows.ecosystemRows} ecosystem row(s) at implNew`
     );
     if (hop.expectsFreshMessageRoot) {
@@ -1436,6 +1454,37 @@ export async function verifyProtocolVersions(
         `Chain ${chain.chainId}: protocol version ${version.toHexString()}, expected ${expectedVersion.toHexString()}`
       );
     }
+  }
+}
+
+/**
+ * The CTM's interop fee manager must be deployed, on this bridgehub and switched off with ether as the fee token: the
+ * Executor charges through it.
+ */
+export async function verifyInteropFeeManager(
+  provider: ethers.providers.JsonRpcProvider,
+  ctmAddr: string,
+  bridgehubAddr: string
+): Promise<void> {
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), provider);
+  const feeManagerAddr: string = await ctm.L1_INTEROP_FEE_MANAGER();
+  if ((await provider.getCode(feeManagerAddr)) === "0x") {
+    throw new Error(`CTM ${ctmAddr}: no interop fee manager deployed at ${feeManagerAddr}`);
+  }
+  const feeManager = new ethers.Contract(feeManagerAddr, getAbi("L1InteropFeeManager"), provider);
+  const feeManagerBridgehub: string = await feeManager.BRIDGE_HUB();
+  if (feeManagerBridgehub.toLowerCase() !== bridgehubAddr.toLowerCase()) {
+    throw new Error(
+      `Interop fee manager ${feeManagerAddr} is on bridgehub ${feeManagerBridgehub}, expected ${bridgehubAddr}`
+    );
+  }
+  const feePerUnit: ethers.BigNumber = await feeManager.feePerUnit();
+  if (!feePerUnit.isZero()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} is switched on: feePerUnit = ${feePerUnit.toString()}`);
+  }
+  const feeToken: string = await feeManager.feeToken();
+  if (feeToken.toLowerCase() !== ETH_TOKEN_ADDRESS.toLowerCase()) {
+    throw new Error(`Interop fee manager ${feeManagerAddr} charges in ${feeToken}, expected ether`);
   }
 }
 

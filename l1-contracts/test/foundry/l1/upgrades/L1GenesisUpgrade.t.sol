@@ -107,7 +107,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev The inner call is the genesis one, NOT a deployment plan: a new chain has nothing
     ///      force-deployed yet, so it goes through `IComplexUpgrader.upgrade` into the L2 genesis
     ///      upgrade, with the release's fixed blob and this chain's own data.
-    function test_genesisUpgradeTx_delegatesToTheL2GenesisUpgrade() public {
+    function test_genesisUpgradeTx_delegatesToTheL2GenesisUpgrade() public view {
         L2CanonicalTransaction memory transaction = _composedGenesisTx(ETH_CHAIN_ID);
 
         assertEq(
@@ -134,7 +134,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
     /// @dev Nothing is cached: two chains of one ecosystem get transactions that differ in exactly
     ///      the per-chain half.
-    function test_genesisUpgradeTx_isComposedPerChain() public {
+    function test_genesisUpgradeTx_isComposedPerChain() public view {
         L2CanonicalTransaction memory forEthChain = _composedGenesisTx(ETH_CHAIN_ID);
         L2CanonicalTransaction memory forErc20Chain = _composedGenesisTx(ERC20_CHAIN_ID);
 
@@ -147,15 +147,11 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
 
     /// @dev The refactoring must be observably a no-op: the transaction is byte-identical to what
     ///      the pre-refactor struct literal and metadata probe produced for the same inputs (see
-    ///      {LegacyGenesisComposition}).
-    function test_genesisUpgradeTx_isByteIdenticalToTheRetiredComposition() public {
-        uint256[4] memory chainIds = [ETH_CHAIN_ID, ERC20_CHAIN_ID, NO_METADATA_CHAIN_ID, BYTES32_METADATA_CHAIN_ID];
-        bytes32[4] memory assetIds = [
-            ETH_BASE_TOKEN_ASSET_ID,
-            ERC20_BASE_TOKEN_ASSET_ID,
-            NO_METADATA_BASE_TOKEN_ASSET_ID,
-            BYTES32_METADATA_BASE_TOKEN_ASSET_ID
-        ];
+    ///      {LegacyGenesisComposition}). Base tokens without usable metadata are left out: the retired
+    ///      probe substituted defaults for them, and the composition now reverts instead.
+    function test_genesisUpgradeTx_isByteIdenticalToTheRetiredComposition() public view {
+        uint256[2] memory chainIds = [ETH_CHAIN_ID, ERC20_CHAIN_ID];
+        bytes32[2] memory assetIds = [ETH_BASE_TOKEN_ASSET_ID, ERC20_BASE_TOKEN_ASSET_ID];
         for (uint256 i = 0; i < chainIds.length; ++i) {
             L2CanonicalTransaction memory legacyTx = LegacyGenesisComposition.genesisUpgradeTx({
                 _bridgehub: mockBridgehub,
@@ -176,7 +172,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     /// @dev The two paths agree on the nonce for a reason, not by coincidence: the shared
     ///      `protocolUpgradeNonce` is `major << 32 | minor`, and genesis rejects a non-zero major,
     ///      so it equals the bare minor version the retired code used.
-    function test_genesisUpgradeTx_nonceIsTheMinorVersion() public {
+    function test_genesisUpgradeTx_nonceIsTheMinorVersion() public view {
         uint256 version = SemVer.packSemVer(0, 27, 5);
 
         // slither-disable-next-line unused-return
@@ -262,35 +258,25 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(genesisFixed, _fixedForceDeploymentsData(), "and it is the release's own blob");
     }
 
-    // ─────────────────────────── base-token tolerance ───────────────────────────
+    // ─────────────────────────── base-token metadata ───────────────────────────
 
-    /// @dev A chain created on a base token that serves no metadata: genesis composes the ERC20
-    ///      defaults rather than reverting, and the upgrade path recomposes exactly the same data,
-    ///      so such a chain is upgradeable afterwards.
-    function test_aBaseTokenWithoutMetadataComposesOnBothPaths() public {
-        _assertTolerated(NO_METADATA_CHAIN_ID, address(noMetadataToken));
+    /// @dev A base token that serves no metadata reverts genesis AND the upgrade path: no chain can
+    ///      be created on it, and a chain already on it cannot be upgraded.
+    function test_revertWhen_aBaseTokenHasNoMetadataOnBothPaths() public {
+        _assertNotComposable(NO_METADATA_CHAIN_ID);
     }
 
     /// @dev The same for a Maker-style token whose `name()`/`symbol()` answer with a `bytes32`.
-    function test_aBytes32MetadataBaseTokenComposesOnBothPaths() public {
-        _assertTolerated(BYTES32_METADATA_CHAIN_ID, address(bytes32MetadataToken));
+    function test_revertWhen_aBaseTokenServesBytes32MetadataOnBothPaths() public {
+        _assertNotComposable(BYTES32_METADATA_CHAIN_ID);
     }
 
-    /// @dev The genesis path and the upgrade path both compose for `_chainId`, and both land on the
-    ///      defaults — which is what keeps the chain's L2 base-token metadata stable across the
-    ///      upgrade that rewrites it.
-    function _assertTolerated(uint256 _chainId, address _token) internal {
-        ZKChainSpecificForceDeploymentsData memory genesisData = _genesisPerChainData(_composedGenesisTx(_chainId));
-        ZKChainSpecificForceDeploymentsData memory upgradeData = abi.decode(
-            _upgradePathPerChainData(_chainId),
-            (ZKChainSpecificForceDeploymentsData)
-        );
+    function _assertNotComposable(uint256 _chainId) internal {
+        vm.expectRevert();
+        engine.genesisUpgradeTx(address(release), mockBridgehub, _chainId, protocolVersion);
 
-        assertEq(genesisData.baseTokenL1Address, _token, "the token is recorded even without metadata");
-        assertEq(genesisData.baseTokenMetadata.name, DEFAULT_BASE_TOKEN_NAME, "wrong default name");
-        assertEq(genesisData.baseTokenMetadata.symbol, DEFAULT_BASE_TOKEN_SYMBOL, "wrong default symbol");
-        assertEq(genesisData.baseTokenMetadata.decimals, COMPOSED_DECIMALS, "wrong default decimals");
-        assertEq(abi.encode(genesisData), abi.encode(upgradeData), "the two paths must compose the same data");
+        vm.expectRevert();
+        defaultComposer.composeDelegateCalldata(release, mockBridgehub, _chainId);
     }
 
     // ─────────────────────────── genesis-only execution rules ───────────────────────────
@@ -322,15 +308,6 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     ) internal view returns (ZKChainSpecificForceDeploymentsData memory) {
         (, , , bytes memory perChainData) = this.decodeGenesisUpgrade(_innerCalldata(_transaction.data));
         return abi.decode(perChainData, (ZKChainSpecificForceDeploymentsData));
-    }
-
-    /// @dev What the default delegate composer produces for `_chainId` at the same release — the
-    ///      upgrade path's answer to the same question genesis answers.
-    function _upgradePathPerChainData(uint256 _chainId) internal view returns (bytes memory) {
-        (, , bytes memory perChainData) = this.decodeDefaultUpgrade(
-            defaultComposer.composeDelegateCalldata(release, mockBridgehub, _chainId)
-        );
-        return perChainData;
     }
 
     /// @dev The calldata inside a composed `IComplexUpgrader.upgrade` payload.

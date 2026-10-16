@@ -278,7 +278,7 @@ const findDifferences = (newHashes: ContractsInfo[], oldHashes: ContractsInfo[])
 };
 
 const USAGE =
-  `Usage: calculate-hashes.ts [--check-only | --output <path>]. Use --check-only to check without updating ` +
+  "Usage: calculate-hashes.ts [--check-only | --output <path>]. Use --check-only to check without updating " +
   `${OUTPUT_FILE_PATH}; --output writes the hashes of the current build to <path> and leaves ${OUTPUT_FILE_PATH} alone.`;
 
 const main = async () => {

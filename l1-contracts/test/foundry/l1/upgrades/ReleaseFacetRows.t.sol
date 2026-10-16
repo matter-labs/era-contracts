@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
-import {RegistryDuplicateFacetRow} from "contracts/common/L1ContractErrors.sol";
+import {RegistryDuplicateFacetRow, RegistryDuplicateSelector} from "contracts/common/L1ContractErrors.sol";
 import {GenesisFacet, ReleaseGenesisData, ReleaseManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
@@ -28,7 +28,8 @@ contract CounterfeitRelease {
     }
 }
 
-/// @notice A release's facet rows name each facet once: refused at construction and again by `validate()`.
+/// @notice A release's facet rows name each facet once — refused at construction and again by
+///         `validate()` — and route each selector once, which `validate()` checks.
 contract ReleaseFacetRowsTest is Test {
     address internal facetA;
 
@@ -64,6 +65,18 @@ contract ReleaseFacetRowsTest is Test {
         // ...and `validate()` still refuses it.
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetA));
         ICTMRelease(counterfeit).validate();
+    }
+
+    /// Two distinct facets describing one selector: construction does not read routing, so the
+    /// release pins, and `validate()` refuses it.
+    function test_validateRejectsASelectorTwoFacetsRoute() public {
+        GenesisFacet[] memory rows = new GenesisFacet[](2);
+        rows[0] = GenesisFacet({facet: facetA, isFreezable: false});
+        rows[1] = GenesisFacet({facet: address(new MockSelfDescribingFacet(_one(SEL_A))), isFreezable: false});
+        CTMRelease release = new CTMRelease(_manifest(rows));
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, SEL_A));
+        release.validate();
     }
 
     // ───────────────────────────────── helpers ─────────────────────────────────

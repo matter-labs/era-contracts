@@ -131,6 +131,7 @@ pub(crate) const MEMBER_ARTIFACTS: &[(&str, &str)] = &[
     ("BytecodesSupplier.sol", "BytecodesSupplier"),
     ("PermissionlessValidator.sol", "PermissionlessValidator"),
     ("ServerNotifier.sol", "ServerNotifier"),
+    ("L1InteropFeeManager.sol", "L1InteropFeeManager"),
 ];
 
 /// A verifier's getter that names a sub-verifier.

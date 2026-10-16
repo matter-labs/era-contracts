@@ -14,6 +14,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -122,6 +123,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
+        // Read where every upgrade prepare reads it, so the genesis release and the releases after it
+        // pin the same L2 Bridgehub cap.
+        config.contracts.maxNumberOfChains = L1Bridgehub(bridgehub).MAX_NUMBER_OF_ZK_CHAINS();
 
         if (reuseGovAndAdmin) {
             ctmAddresses.admin.governance = coreAddresses.shared.governance;
@@ -176,6 +180,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ) = deployServerNotifier();
 
         initializeGeneratedData();
+
+        // The CTM takes the fee manager as an immutable, so it has to exist first.
+        (
+            ctmAddresses.stateTransition.implementations.interopFeeManager,
+            ctmAddresses.stateTransition.proxies.interopFeeManager
+        ) = deployTuppWithContract("L1InteropFeeManager");
 
         deployStateTransitionDiamondFacets();
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
@@ -463,6 +473,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "state_transition",
             "bytecodes_supplier_impl_addr",
             ctmAddresses.stateTransition.implementations.bytecodesSupplier
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.stateTransition.proxies.interopFeeManager
         );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

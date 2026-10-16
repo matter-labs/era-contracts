@@ -6,7 +6,10 @@ restating them (see the "Documentation and Comments" section of `AGENTS.md`).
 
 | Document                                                                 | Covers                                                                                                                                                                                                                      |
 | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [system/](./system/README.md)                                            | System architecture, contracts, settlement, chain management, and system hooks                                                                                                                                              |
+| [interop/](./interop/README.md)                                          | Interoperability architecture, forms of finality, and examples                                                                                                                                                              |
 | [interop.md](./interop.md)                                               | Interop bundles and calls, ERC-7786/ERC-7930 usage, attributes, fee model, send flow, destination-side execution/unbundling, interop-root import, restrictions                                                              |
+| [interop-fee.md](./interop-fee.md)                                       | L1 interop fee switch: the proven interop fee unit counter, execute-time charging, the fee manager                                                                                                                          |
 | [atomicity/](./atomicity/README.md)                                      | Atomic multi-leg interop flows (folder): the commitment tree, the send/finalize/timeout lifecycle, the finality & timeout proofs, refund/recovery semantics, and the security model                                         |
 | [bridging.md](./bridging.md)                                             | Asset router, native token vault, L2 asset tracker, L1 nullifier, base-token handling, failed-transfer recovery, legacy compatibility                                                                                       |
 | [message-root.md](./message-root.md)                                     | Message-root aggregation, chain batch root tree, batch-leaf timestamps, the Indexed Merkle Tree, interop-root import double-check, proof paths                                                                              |
@@ -15,6 +18,12 @@ restating them (see the "Documentation and Comments" section of `AGENTS.md`).
 | [upgrade-scheduling.md](./upgrade-scheduling.md)                         | `ServerNotifier` scheduling, optional per-version precondition checkers, registration and execution-time guarantees                                                                                                         |
 | [ecosystem-upgrade-coordination.md](./ecosystem-upgrade-coordination.md) | The upgrade coordinator (`EcosystemUpgradeExecutor`): the operation commitment, its single atomic execution, domain authorization, transition replacement. The architecture around it is `docs/registry-driven-upgrades.md` |
 | [l1-transaction-gas-limit.md](./l1-transaction-gas-limit.md)             | Priority-transaction gas ceiling, chain limits, upgrade behavior, and queued-transaction compatibility                                                                                                                      |
+| [ecosystem-deployment.md](./ecosystem-deployment.md)                     | Deploying a fresh ecosystem: the hub, CTM and chain layers, what each script deploys and wires, the inputs, ownership after deployment, verification, the tooling (`protocol_ops`, CI)                                      |
+| [ecosystem-upgrade.md](./ecosystem-upgrade.md)                           | Upgrading an ecosystem to a new release: artifacts, the prepare / deploy / verify / governance / per-chain pipeline, who signs what, the emergency path                                                                     |
+
+Start with [the system architecture](./system/README.md) when reading the protocol as a
+whole. The other top-level documents are the normative descriptions of individual flows and are
+linked from that map.
 
 The `atomicity/` folder is split into a layered set of pages (start at its README):
 

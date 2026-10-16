@@ -19,8 +19,17 @@ contract PreV35ChainTypeManagerStandIn is ChainTypeManager {
         address _bridgehub,
         address _interopCenter,
         address _l1BytecodesSupplier,
-        address _permissionlessValidator
-    ) ChainTypeManager(_bridgehub, _interopCenter, _l1BytecodesSupplier, _permissionlessValidator) {}
+        address _permissionlessValidator,
+        address _l1InteropFeeManager
+    )
+        ChainTypeManager(
+            _bridgehub,
+            _interopCenter,
+            _l1BytecodesSupplier,
+            _permissionlessValidator,
+            _l1InteropFeeManager
+        )
+    {}
 
     /// @param _protocolVersion The version the verifier is recorded for.
     /// @param _verifier The verifier recorded.
@@ -57,6 +66,7 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
             address(bridgehub),
             interopCenterAddress,
             address(bytecodesSupplier),
+            address(0),
             address(0)
         );
     }

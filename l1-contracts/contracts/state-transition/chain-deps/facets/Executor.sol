@@ -11,6 +11,8 @@ import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
+import {IL1InteropFeeManager} from "../../../core/interop-fee/IL1InteropFeeManager.sol";
+import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {
     CantExecuteUnprovenBatches,
     InvalidMessageRoot,
@@ -79,6 +81,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
     /// @notice Executes one batch
     /// @dev 1. Processes all pending operations (Complete priority requests)
     /// @dev 2. Finalizes batch
+    /// @dev 3. Charges the batch's interop fee units
     /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
@@ -98,6 +101,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
+
+        // See {protocol-docs/interop-fee.md#charging-and-enforcement}.
+        uint256 interopFeeUnits = s.interopFeeUnits[currentBatchNumber];
+        if (interopFeeUnits != 0 && !s.priorityModeInfo.activated) {
+            IL1InteropFeeManager(IChainTypeManager(s.chainTypeManager).L1_INTEROP_FEE_MANAGER()).chargeInteropFee(
+                s.chainId,
+                currentBatchNumber,
+                interopFeeUnits
+            );
+        }
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.

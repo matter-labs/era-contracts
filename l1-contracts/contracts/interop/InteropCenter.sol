@@ -6,6 +6,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
@@ -20,7 +21,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 
-import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER, ETH_TOKEN_ADDRESS, INTEROP_FEE_UNITS_SLOT} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {
     L2_BOOTLOADER_ADDRESS,
@@ -195,7 +196,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
+    ) external payable nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
         // The recipient must carry a concrete address; a chain-only ERC-7930 encoding parses to address(0),
         // which would collect value up-front yet never be executable and has no refund path.
@@ -246,7 +247,7 @@ contract InteropCenter is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
+    ) external payable nonReentrant returns (bytes32 bundleHash) {
         _ensureEmptyAddress(_destinationChainId);
 
         // slither-disable-next-line unused-return
@@ -736,6 +737,9 @@ contract InteropCenter is
             _lowNullifierIndex: _atomicSend.lowNullifierIndex,
             _flowPreimage: _atomicSend.flowPreimage
         });
+
+        // Counted together with the IMT append, so every leg that can execute on its destination is counted.
+        StorageSlot.getUint256Slot(INTEROP_FEE_UNITS_SLOT).value += _bundle.calls.length;
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.
@@ -866,22 +870,13 @@ contract InteropCenter is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IInteropCenter
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @inheritdoc IInteropCenter
-    function unpause() external onlyOwner {
-        _unpause();
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             Fee Management
     //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IInteropCenter
+    function interopFeeUnits() external view returns (uint256) {
+        return StorageSlot.getUint256Slot(INTEROP_FEE_UNITS_SLOT).value;
+    }
 
     /// @inheritdoc IInteropCenter
     function setInteropFee(uint256 _fee) external onlyCallFromBootloader {

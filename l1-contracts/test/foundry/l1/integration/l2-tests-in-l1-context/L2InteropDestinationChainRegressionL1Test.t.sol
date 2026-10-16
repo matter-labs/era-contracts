@@ -8,9 +8,7 @@ import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDe
 import {L2InteropDestinationChainRegressionTestAbstract} from "../l2-tests-abstract/L2InteropDestinationChainRegressionTestAbstract.t.sol";
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 /// @title L2InteropDestinationChainRegressionL1Test
 /// @notice L1 context test for unregistered destination chain check regression (PR #1811)

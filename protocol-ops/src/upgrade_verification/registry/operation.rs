@@ -44,6 +44,7 @@ use super::members::{
 use super::package::OperationPackage;
 use super::provenance::{expect_code_identity, expect_code_present, tolerate};
 use super::rows::{participating, verify_inventory, Inventory, InventoryReview};
+use super::shell::verify_shell_kept;
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView,
     CommittedUpgradeView, CoreTransitionView, CoreUpgradeExecutorView, CtmView,
@@ -428,11 +429,25 @@ pub(crate) async fn verify<P: Provider>(
         result.report_ok("no transition: no L2 bytecodes need to be published");
     }
 
-    // ── 5. The calldata governance will actually sign ──
+    // ── 5. The L2 proxy logic chains crossing the edge keep ──
+    if let Some(edge) = &transition_manifest {
+        result.print_info("\n== L2 system-proxy shell ==");
+        verify_shell_kept(
+            provider,
+            build.identity(),
+            genesis.image.as_ref().ok(),
+            result,
+            &ctm,
+            &edge.manifest,
+        )
+        .await;
+    }
+
+    // ── 6. The calldata governance will actually sign ──
     result.print_info("\n== Governance calldata ==");
     verify_execute_call(package, result);
 
-    // ── 6. The calls no object describes ──
+    // ── 7. The calls no object describes ──
     if package.external_actions.is_empty() {
         result.report_ok(
             "the prepare declared no external actions: this upgrade is entirely described by the \
@@ -493,7 +508,7 @@ fn verify_execute_call(package: &OperationPackage, result: &mut VerificationResu
     }
 
     for call in &package.calls {
-        if call.target == package.coordinator && call.data == expected {
+        if call.target == package.coordinator && call.value.is_zero() && call.data == expected {
             continue;
         }
         let declared = package
@@ -1302,7 +1317,23 @@ mod tests {
         pkg.calls[0].value = U256::from(1);
         let mut result = VerificationResult::default();
         verify_execute_call(&pkg, &mut result);
+        // The valid execute call is missing, and the value-bearing call is undeclared.
+        assert_eq!(result.errors, 2);
+    }
+
+    /// The zero-value call is valid, but a second copy carrying value is an undeclared call
+    /// that would revert because `execute` is nonpayable.
+    #[test]
+    fn an_additional_execute_call_carrying_value_fails() {
+        let mut pkg = well_formed();
+        let mut duplicate = execute_call(COORDINATOR, OPERATION);
+        duplicate.value = U256::from(1);
+        pkg.calls.push(duplicate);
+        let mut result = VerificationResult::default();
+        verify_execute_call(&pkg, &mut result);
         assert_eq!(result.errors, 1);
+        assert_eq!(result.warnings, 0);
+        assert!(result.ensure_success().is_err());
     }
 
     #[test]

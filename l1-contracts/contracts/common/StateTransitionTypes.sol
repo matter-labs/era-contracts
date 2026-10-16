@@ -33,14 +33,16 @@ struct Verifiers {
     address verifier;
 }
 
-/// @notice Core state transition contract addresses (proxy or implementation).
-/// @dev Used as both `proxies` and `implementations` in `StateTransitionDeployedAddresses`.
+/// @notice The CTM's proxied contracts, as proxy or implementation addresses.
+/// @dev Used as both `proxies` and `implementations` in `StateTransitionDeployedAddresses`. Every proxied contract of a
+///      CTM belongs here, including one only some CTMs have: it is left zero for a CTM without it.
 struct StateTransitionContracts {
     address chainTypeManager;
     address serverNotifier;
     address validatorTimelock;
     address bytecodesSupplier;
     address permissionlessValidator;
+    address interopFeeManager;
 }
 
 /// @notice Core Data Availability contract addresses, shared by both

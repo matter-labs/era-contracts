@@ -7,7 +7,6 @@ import {Test} from "forge-std/Test.sol";
 import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
-import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
@@ -21,7 +20,6 @@ import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/Tra
 import {L2InventoryLib} from "contracts/upgrades/registry/libraries/L2InventoryLib.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -36,13 +34,15 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {
     L2BytecodeInfoLength,
+    L2BytecodeRowRemoved,
     L2BytecodeTableShrunk,
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps,
     PatchCannotCarryL2Upgrade,
-    PatchChangesL2GenesisState,
+    L1OnlyEdgeChangesL2State,
     RegistryDuplicateFacetRow,
     RegistryDuplicateProxyRow,
+    RegistrySelfEdgeProxyRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
@@ -492,7 +492,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _patchManifest();
         manifest.newRelease = address(genesisRelease);
 
-        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
         new CTMTransition(manifest);
     }
 
@@ -504,7 +504,7 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _patchManifest();
         manifest.newRelease = address(genesisRelease);
 
-        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
         new CTMTransition(manifest);
     }
 
@@ -518,8 +518,63 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _patchManifest();
         manifest.newRelease = address(shellRelease);
 
-        vm.expectRevert(PatchChangesL2GenesisState.selector);
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
         new CTMTransition(manifest);
+    }
+
+    /// @dev The rule follows the L2 side, not the patch component: a MINOR edge that sends existing
+    ///      chains no L2 transaction must not change the genesis a new chain starts from either.
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheForceDeploymentsBlob() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.fixedForceDeploymentsData = L2PlanFixtures.forceDeploymentsData(
+            releaseManifest.l2BytecodeInfos,
+            releaseManifest.l2SystemProxyBytecodeInfo,
+            2
+        );
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheGenesisBatch() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.genesisIndexRepeatedStorageChanges = 55;
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The genesis upgrade composes a new chain's L2 genesis transaction, so replacing it
+    ///      changes the L2 state chains created after the edge start from.
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheGenesisUpgrade() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesisUpgrade = _deployedStub("otherGenesisUpgrade");
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The same release change on a minor edge WITH an L2 side: the authored delegate is what
+    ///      brings existing chains to the new description, so the edge constructs.
+    function test_minorEdgeWithAnL2SideMayChangeTheGenesis() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.genesisBatchHash = bytes32(uint256(2));
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+
+        CTMTransition edge = new CTMTransition(manifest);
+
+        assertTrue(edge.releaseDiff().genesisBatch, "the edge changes the genesis batch");
+        assertEq(edge.l2Plan().delegateTo, L2PlanFixtures.unsafeDeployment(DELEGATE_CODE).newAddress);
     }
 
     // ─────────────────────────── releaseDiff ───────────────────────────
@@ -691,11 +746,11 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.upgradeTimestamp = 0;
 
-        CTMTransition transition = new CTMTransition(manifest);
+        CTMTransition newTransition = new CTMTransition(manifest);
 
-        assertEq(transition.upgradeTimestamp(), 0, "upgradeTimestamp");
+        assertEq(newTransition.upgradeTimestamp(), 0, "upgradeTimestamp");
         assertEq(
-            transition.oldProtocolVersionDeadline(),
+            newTransition.oldProtocolVersionDeadline(),
             manifest.oldProtocolVersionDeadline,
             "oldProtocolVersionDeadline"
         );
@@ -855,7 +910,7 @@ contract StorageRegistriesTest is Test {
         L2PlanFixtures.syncForceDeployments(manifest);
     }
 
-    function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public {
+    function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public pure {
         bytes[] memory table = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
         table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(BRIDGEHUB_IMPL_CODE);
         table[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(SYSTEM_CONTEXT_IMPL_CODE);
@@ -1106,9 +1161,9 @@ contract StorageRegistriesTest is Test {
         manifest.fromRelease = address(departing);
         manifest.newRelease = address(target);
         manifest.l2Plan = _l2Plan();
-        CTMTransition transition = new CTMTransition(manifest);
+        CTMTransition newTransition = new CTMTransition(manifest);
 
-        L2UpgradePlan memory plan = transition.l2Plan();
+        L2UpgradePlan memory plan = newTransition.l2Plan();
         assertEq(plan.deployments.length, 4, "only the two changed members are derived, then the authored two");
         // Derived rows follow the table (member) order: L2AssetRouter precedes SystemContext.
         assertEq(
@@ -1144,7 +1199,9 @@ contract StorageRegistriesTest is Test {
     }
 
     /// @dev A shell change alone is not an L2 delta: an existing member's proxy is never
-    ///      redeployed by `updateZKsyncOSContract`, so only implementation rows are compared.
+    ///      redeployed by `updateZKsyncOSContract`, so only implementation rows are compared. The
+    ///      edge still needs an L2 side of its own (here the authored delegate alone) to change the
+    ///      release's L2 description — without one it is refused (`L1OnlyEdgeChangesL2State`).
     function test_transitionDerivesNoL2RowsWhenOnlyTheShellChanges() public {
         CTMRelease departing = _tableReleaseAt(OLD_VERSION);
         ReleaseManifest memory targetManifest = _tableReleaseManifest();
@@ -1154,11 +1211,26 @@ contract StorageRegistriesTest is Test {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(departing);
         manifest.newRelease = address(target);
-        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+        manifest.l2Plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, address(delegateComposer));
 
         CTMTransition shellOnly = new CTMTransition(manifest);
 
-        assertEq(shellOnly.l2Plan().deployments.length, 0, "a shell-only change derives no L2 deployment");
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = shellOnly.l2Plan().deployments;
+        assertEq(deployments.length, 1, "a shell-only change derives no L2 deployment beyond the authored delegate");
+        assertEq(deployments[0].newAddress, L2PlanFixtures.unsafeDeployment(DELEGATE_CODE).newAddress);
+    }
+
+    function test_revertWhen_l1OnlyEdgeChangesTheShell() public {
+        ReleaseManifest memory targetManifest = _tableReleaseManifest();
+        targetManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        L2PlanFixtures.syncForceDeployments(targetManifest);
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(_tableReleaseAt(OLD_VERSION));
+        manifest.newRelease = address(new CTMRelease(targetManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
     }
 
     /// @dev The enum is append-only: a departing release built against a shorter enum has no row
@@ -1191,6 +1263,19 @@ contract StorageRegistriesTest is Test {
         bytes[] memory newTable = new bytes[](1);
 
         vm.expectRevert(abi.encodeWithSelector(L2BytecodeTableShrunk.selector, 2, 1));
+        this.changedL2RowsExternal(fromTable, newTable);
+    }
+
+    /// @dev A member the departing release ships cannot vanish from the target: upgraded chains
+    ///      would keep its old code while chains created from the target get none.
+    function test_revertWhen_changedL2RowsDropsAMember() public {
+        bytes[] memory fromTable = new bytes[](2);
+        fromTable[0] = hex"01";
+        fromTable[1] = hex"02";
+        bytes[] memory newTable = new bytes[](2);
+        newTable[0] = hex"01";
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeRowRemoved.selector, 1));
         this.changedL2RowsExternal(fromTable, newTable);
     }
 
@@ -1321,7 +1406,7 @@ contract StorageRegistriesTest is Test {
         manifest.genesisFacets = new GenesisFacet[](0);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
-        CTMRelease empty = new CTMRelease(manifest);
+        new CTMRelease(manifest);
     }
 
     function test_revertWhen_releaseNamesCodelessFacet() public {
@@ -1341,9 +1426,9 @@ contract StorageRegistriesTest is Test {
     }
 
     function test_revertWhen_transitionDerivesTowardSelectorCollision() public {
-        // A selector routed twice constructs as a release (pinned data, no routing ownership) but
-        // is rejected when a transition derives toward it — pre-commit, so a malformed routing
-        // can never strand chains behind a bumped CTM version.
+        // A selector routed twice constructs as a release (the routing lives in the facets' code)
+        // but fails the `validate()` a transition runs on both releases at construction —
+        // pre-commit, so a malformed routing can never strand chains behind a bumped CTM version.
         // The colliding facet self-describes a selector facetFrozen also carries (0x20).
         address collidingFacet = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         ReleaseManifest memory manifest = _newReleaseManifest();
@@ -1483,20 +1568,31 @@ contract StorageRegistriesTest is Test {
         new CoreTransition(manifest);
     }
 
+    function test_revertWhen_coreTransitionHasSelfEdgeRow() public {
+        // A row whose source is its target swaps nothing and would skip its initializer: an
+        // authoring mistake, rejected at construction.
+        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeRow memory row = manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)];
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = row.implNew;
+
+        vm.expectRevert(abi.encodeWithSelector(RegistrySelfEdgeProxyRow.selector, row.proxy));
+        new CoreTransition(manifest);
+    }
+
     // ─────────────────────────── CTM-domain inventory ───────────────────────────
 
-    /// @dev The enum is append-only and the inventory length is derived from it: the notifier
+    /// @dev The enum is append-only and the inventory length is derived from it: the fee manager
     ///      slot must be the LAST member, and the count must have grown with it.
-    function test_ctmInventoryEndsWithTheServerNotifierSlot() public pure {
+    function test_ctmInventoryEndsWithTheInteropFeeManagerSlot() public pure {
         assertEq(
-            uint256(CTMContract.ServerNotifier),
+            uint256(CTMContract.L1InteropFeeManager),
             uint256(type(CTMContract).max),
-            "ServerNotifier must be the last member"
+            "L1InteropFeeManager must be the last member"
         );
         assertEq(
             CTM_CONTRACT_COUNT,
-            uint256(CTMContract.ServerNotifier) + 1,
-            "the inventory length must cover the notifier slot"
+            uint256(CTMContract.L1InteropFeeManager) + 1,
+            "the inventory length must cover the fee manager slot"
         );
     }
 

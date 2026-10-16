@@ -30,6 +30,9 @@ abstract contract UpgradeIntegrationTestBase is Test {
     using LogFinder for Vm.Log[];
 
     uint256 internal constant NEW_CHAIN_ID = 555;
+    /// @dev Differs from the salt the fixture was deployed with, as a real upgrade's does, so a contract the upgrade
+    ///      must reuse can't pass for reused by being redeployed to the same address.
+    bytes32 internal constant UPGRADE_CREATE2_FACTORY_SALT = keccak256("UpgradeIntegrationTestBase");
 
     uint256 internal chainId;
 
@@ -314,7 +317,16 @@ abstract contract UpgradeIntegrationTestBase is Test {
 
     function executeCTMAdminCalls() internal virtual {
         require(_ctmAdminCallsPrepared, "CTM admin calls not prepared");
-        executeOwnableCallsAsCurrentOwner(_ctmAdminCalls);
+        require(_ctmAdminCalls.length != 0, "CTM admin calls are empty");
+        // Match the generated bundle: the ProxyAdmin's owner executes the whole
+        // batch, including acceptOwnership as the ServerNotifier's pending owner.
+        // Selecting each target's current owner breaks two-step ownership transfers.
+        address chainAdmin = getOwnableOwner(_ctmAdminCalls[0].target);
+        address ownerAdmin = _chainAdminMulticallOwner(chainAdmin);
+        Call[] memory calls = _ctmAdminCalls;
+        vm.startBroadcast(ownerAdmin);
+        IChainAdminMulticall(chainAdmin).multicall(calls, true);
+        vm.stopBroadcast();
     }
 
     function _cacheCTMAdminCalls(Call[] memory _calls) private {
@@ -325,28 +337,6 @@ abstract contract UpgradeIntegrationTestBase is Test {
             cachedCall.target = _calls[i].target;
             cachedCall.value = _calls[i].value;
             cachedCall.data = _calls[i].data;
-        }
-    }
-
-    function executeOwnableCallsAsCurrentOwner(Call[] storage _calls) internal {
-        for (uint256 i = 0; i < _calls.length; i++) {
-            Call memory call = _calls[i];
-            address owner = getOwnableOwner(call.target);
-
-            if (owner.code.length == 0) {
-                vm.startBroadcast(owner);
-                (bool success, ) = payable(call.target).call{value: call.value}(call.data);
-                assertTrue(success, "Ownable admin call failed");
-                vm.stopBroadcast();
-            } else {
-                Call[] memory singleCall = new Call[](1);
-                singleCall[0] = call;
-
-                address ownerAdmin = _chainAdminMulticallOwner(owner);
-                vm.startBroadcast(ownerAdmin);
-                IChainAdminMulticall(owner).multicall(singleCall, true);
-                vm.stopBroadcast();
-            }
         }
     }
 
@@ -383,7 +373,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
                 bridgehubProxyAddress: bridgehubProxy,
                 ctmProxy: ctmProxy,
                 rollupDAManager: rollupDAManager,
-                create2FactorySalt: bytes32(0),
+                create2FactorySalt: UPGRADE_CREATE2_FACTORY_SALT,
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,
                 governance: governance,

@@ -3,8 +3,6 @@ pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {console2 as console} from "forge-std/Script.sol";
-
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -194,19 +192,30 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     }
 
     function deployNewCTMContracts() public virtual override {
+        // The new CTM implementation is constructed with the `L1InteropFeeManager` proxy, so it is
+        // deployed first; see {protocol-docs/interop-fee.md#the-switch}.
+        if (ctmAddresses.stateTransition.proxies.interopFeeManager == address(0)) {
+            (
+                ctmAddresses.stateTransition.implementations.interopFeeManager,
+                ctmAddresses.stateTransition.proxies.interopFeeManager
+            ) = deployTuppWithContract("L1InteropFeeManager");
+        }
         super.deployNewCTMContracts();
 
         // The composer the L2 side names (see `authorL2Side`), deployed before that side is prepared.
         l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");
 
-        // The new ChainTypeManager implementation (per VM) — the bootstrap manifest's one
-        // participating inventory row.
+        // The new ChainTypeManager implementation (per VM), the bootstrap manifest's CTM row.
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
 
         // The bootstrap manifest's mandatory notifier row: `migrate()` swaps it through the
         // CTM-domain ProxyAdmin once the handover ({serverNotifierHandoverCalls}) has moved it there.
         ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier");
+
+        // The validator timelock row: the live timelock forwards only the cut-taking upgrade call,
+        // which the v35 Admin facet no longer serves.
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
     }
 
     /// @notice Deploys the bound executor and the write-once migration pinned to this prepare
@@ -294,9 +303,9 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         address release = ctmAddresses.stateTransition.currentRelease;
         require(release != address(0), "current release not deployed");
 
-        // The one participating slot of the enum-indexed CTM-domain inventory: the CTM's own
-        // implementation swap. Every other slot stays inert (explicitly not upgraded) — the
-        // per-CTM proxies keep their implementations across this edge.
+        // The participating slots of the enum-indexed CTM-domain inventory: the CTM's own
+        // implementation swap, the ServerNotifier and the ValidatorTimelock. Every other slot stays
+        // inert (explicitly not upgraded).
         ProxyUpgradeRow[] memory proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         proxyUpgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
             proxy: _ctmProxy,
@@ -313,6 +322,20 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             proxy: notifierProxy,
             expectedOldImpl: Utils.getImplementation(notifierProxy),
             implNew: notifierImplNew,
+            callInitializeUpgrade: false
+        });
+        address timelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
+        address timelockImplNew = ctmAddresses.stateTransition.implementations.validatorTimelock;
+        require(timelockImplNew != address(0), "new ValidatorTimelock implementation not deployed");
+        // `migrate()` reads and swaps every row through `ctmProxyAdmin`.
+        require(
+            Utils.getProxyAdminAddress(timelockProxy) == address(_ctmProxyAdmin),
+            "ValidatorTimelock is not behind the CTM-domain ProxyAdmin"
+        );
+        proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+            proxy: timelockProxy,
+            expectedOldImpl: Utils.getImplementation(timelockProxy),
+            implNew: timelockImplNew,
             callInitializeUpgrade: false
         });
 

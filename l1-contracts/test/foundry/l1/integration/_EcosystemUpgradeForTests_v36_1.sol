@@ -14,10 +14,12 @@ import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 
 /// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no `CoreTransition`
 ///      exists for the transition to name.
+// solhint-disable-next-line contract-name-capwords
 contract CoreUpgradeForTests_v36_1 is CoreUpgrade_v36 {
     function deployNewEcosystemContractsL1() public virtual override {}
 }
 
+// solhint-disable-next-line contract-name-capwords
 contract CTMUpgradeForTests_v36_1 is CTMUpgradeForTests_v36 {
     /// @notice The one change of this patch: a fresh verifier, which the release then pins and the
     ///         upgrade engine installs on every chain from the composed proposal.

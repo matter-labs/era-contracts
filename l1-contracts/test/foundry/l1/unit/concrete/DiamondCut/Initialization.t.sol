@@ -7,7 +7,6 @@ import {ReturnSomething} from "contracts/dev-contracts/ReturnSomething.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DelegateCallFailed, NonEmptyCalldata} from "contracts/common/L1ContractErrors.sol";
-import {Utils} from "../Utils/Utils.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
 contract InitializationTest is DiamondCutTest {

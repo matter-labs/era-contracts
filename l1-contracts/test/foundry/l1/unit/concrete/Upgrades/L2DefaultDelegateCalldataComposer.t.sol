@@ -90,7 +90,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     ///      bridged representation (what the Bridgehub's `baseToken` resolves to), not from
     ///      `originToken`, which may have no code on this layer; the bridging data still describes
     ///      the token on its origin chain.
-    function test_readsAnERC20BaseTokenFromItsLocalRepresentation() public {
+    function test_readsAnERC20BaseTokenFromItsLocalRepresentation() public view {
         bytes memory composed = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,
@@ -116,30 +116,13 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     }
 
     /// @dev A chain whose base token serves no usable metadata — none at all, or Maker-style
-    ///      `bytes32` — is still composable here. Genesis deliberately permits such a base token,
-    ///      and the upgrade path probes it the same tolerant way, so the chain does not become
-    ///      unupgradeable the moment its metadata has to be recomposed.
-    function test_composesForBaseTokensWithoutUsableMetadata() public {
-        assertEq(
-            defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
-            abi.encodeCall(
-                IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(NO_METADATA_CHAIN_ID))
-            ),
-            "a token without metadata must compose the defaults"
-        );
-        assertEq(
-            defaultComposer.composeDelegateCalldata(
-                ICTMRelease(address(release)),
-                bridgehub,
-                BYTES32_METADATA_CHAIN_ID
-            ),
-            abi.encodeCall(
-                IL2DefaultUpgrade.upgrade,
-                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
-            ),
-            "a bytes32-returning token must compose the defaults too"
-        );
+    ///      `bytes32` — is not composable: the read reverts rather than substituting defaults.
+    function test_revertWhen_baseTokenHasNoUsableMetadata() public {
+        vm.expectRevert();
+        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID);
+
+        vm.expectRevert();
+        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, BYTES32_METADATA_CHAIN_ID);
     }
 
     /// @dev Nothing is cached in the composer: a different release or a Bridgehub naming another
@@ -176,7 +159,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
 
     /// @dev Two chains of one ecosystem: the ecosystem-wide arguments are shared, only the
     ///      per-chain data differs.
-    function test_composesPerChain() public {
+    function test_composesPerChain() public view {
         bytes memory forEthChain = defaultComposer.composeDelegateCalldata(
             ICTMRelease(address(release)),
             bridgehub,

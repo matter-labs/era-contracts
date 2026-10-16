@@ -535,16 +535,18 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         uint256 newProtocolVersion = SemVer.packSemVer(major, minor + 1, patch);
 
         // The engine reads the edge from the committed transition; the subject here is the migrated
-        // chain executing an upgrade, so the transition and its target release are stand-ins (see
+        // chain executing an upgrade, so the transition and its releases are stand-ins (see
         // `Utils.mockL1OnlyTransition`).
         address transition = makeAddr("transition");
-        Utils.mockL1OnlyTransition(
-            transition,
-            makeAddr("newRelease"),
-            currentProtocolVersion,
-            newProtocolVersion,
-            makeAddr("newVerifier")
-        );
+        Utils.mockL1OnlyTransition({
+            _transition: transition,
+            _fromRelease: makeAddr("fromRelease"),
+            _departingRouting: _liveRouting(migratingChain),
+            _newRelease: makeAddr("newRelease"),
+            _oldProtocolVersion: currentProtocolVersion,
+            _newProtocolVersion: newProtocolVersion,
+            _verifier: makeAddr("newVerifier")
+        });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(upgradeImpl),
@@ -582,6 +584,21 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertEq(newMajor, major, "Major version should be unchanged");
         assertEq(newMinor, minor + 1, "Minor version should be incremented");
         assertEq(newPatch, patch, "Patch version should be unchanged");
+    }
+
+    /// @notice `_diamond`'s live routing, one cut per facet, read through its loupe.
+    function _liveRouting(IGetters _diamond) internal view returns (Diamond.FacetCut[] memory routing) {
+        IGetters.Facet[] memory facets = _diamond.facets();
+        uint256 facetsLength = facets.length;
+        routing = new Diamond.FacetCut[](facetsLength);
+        for (uint256 i = 0; i < facetsLength; ++i) {
+            routing[i] = Diamond.FacetCut({
+                facet: facets[i].addr,
+                action: Diamond.Action.Add,
+                isFreezable: _diamond.isFunctionFreezable(facets[i].selectors[0]),
+                selectors: facets[i].selectors
+            });
+        }
     }
 
     function test_revertWhen_finalizeDepositWithInvalidProof() public {

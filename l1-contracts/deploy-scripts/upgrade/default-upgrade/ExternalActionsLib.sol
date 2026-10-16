@@ -23,6 +23,7 @@ struct ExternalAction {
 ///         through {declare}, which is what makes the emitted bundles auditable call by call.
 library ExternalActionsLib {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     string internal constant PHASE_GOVERNANCE = "governance";
@@ -84,6 +85,7 @@ library ExternalActionsLib {
             vm.serializeAddress(key, "target", action.call.target);
             // Decimal string rather than a TOML integer: the field is a uint256 and a TOML
             // integer is signed 64-bit.
+            // solhint-disable-next-line avoid-call-value
             vm.serializeString(key, "value", vm.toString(action.call.value));
             entries[i] = vm.serializeBytes(key, "data", action.call.data);
         }

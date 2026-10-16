@@ -37,7 +37,9 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 ### V35 upgrade
 
 The incoming upgrade is v35 (the v34 -> v35 bootstrap edge into the registry-driven model; only
-ZKsync OS chains are supported). Its per-chain upgrade contract is:
+ZKsync OS chains are supported). Besides the bootstrap objects, `CTMUpgrade_v35` deploys the
+`L1InteropFeeManager` proxy the new CTM is constructed with
+({protocol-docs/interop-fee.md#the-switch}). Its per-chain upgrade contract is:
 
 - DefaultUpgrade.sol (composes the per-chain L2 upgrade transaction once, from the delegate
   composer the transition names, with the executing chain's ID and Bridgehub)

@@ -92,7 +92,7 @@ Order matters: l1 needs da artifacts, anvil-interop needs both, and `l1 build:fo
 
 ```bash
 cd l1-contracts
-yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*'
+yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*'
 ```
 
 Common foundry test failures and their root causes:
@@ -267,7 +267,7 @@ git add l1-contracts/zkstack-out
 
 Most commonly out of date when you've added/changed:
 
-- A function or event on an interface that protocol-ops imports (via `abigen!` in `protocol-ops/src/abi.rs`).
+- A function or event on an interface that protocol-ops imports (via `alloy::sol!` in `protocol-ops/src/common/abi.rs`).
 - A new `IFoo.sol` interface that needs to be picked up.
 
 If you forget `yarn prettier:fix`, `check-zkstack-out` will still fail because the committed JSON has trailing newlines and your regenerated file doesn't.

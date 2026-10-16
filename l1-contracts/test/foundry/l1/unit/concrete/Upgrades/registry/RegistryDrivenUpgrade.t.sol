@@ -16,7 +16,6 @@ import {ChainRouting} from "test-utils/ChainRouting.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
 import {
-    CTM_CONTRACT_COUNT,
     L2_ECOSYSTEM_CONTRACT_COUNT,
     L2EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
@@ -37,7 +36,8 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {PRIORITY_TX_MAX_GAS_LIMIT, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
-import {ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
+import {LiveRoutingDiverged, ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
     AuthoredL2Plan,
@@ -45,8 +45,7 @@ import {
     L2UpgradePlan,
     ReleaseGenesisData,
     ReleaseManifest,
-    TransitionManifest,
-    ProxyUpgradeRow
+    TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The first full registry-driven upgrade, end to end: a real chain diamond is taken
@@ -217,19 +216,18 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
     ///      one field and the DERIVED facet/deployment delta is empty — an L1-only upgrade. The
     ///      v33 release (nonzero `_adminFacet`) also carries one table row, the L2Bridgehub
     ///      implementation behind the shared shell, which the v33 transition derives as a
-    ///      system-proxy upgrade. A release with an empty table names no shell.
+    ///      system-proxy upgrade. Every release names the same shell, which no edge may change.
     function _releaseManifest(
         address _adminFacet,
         address _verifier,
         uint256 _protocolVersion
-    ) internal returns (ReleaseManifest memory) {
+    ) internal view returns (ReleaseManifest memory) {
         bytes[] memory l2BytecodeInfos = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
-        bytes memory l2SystemProxyBytecodeInfo;
+        bytes memory l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(L2_SYSTEM_PROXY_CODE);
         if (_adminFacet != address(0)) {
             l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
                 L2_BRIDGEHUB_IMPL_CODE
             );
-            l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(L2_SYSTEM_PROXY_CODE);
         }
         return
             ReleaseManifest({
@@ -547,6 +545,11 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
 ///         `ZKsyncOSSystemProxyUpgrade` deployment, and the registry's genesis params carry the
 ///         `genesisBatchCommitment == 1` that `ChainTypeManager` enforces.
 contract RegistryDrivenUpgradeConcreteTest is ChainTypeManagerTest, RegistryDrivenUpgradeTestBase {
+    /// @dev Positions in the fixture's `facetCuts` (`ChainTypeManagerTest.deploy`): two facets of
+    ///      equal freezability whose selectors the upgrade path never calls.
+    uint256 internal constant MAILBOX_FACET_INDEX = 4;
+    uint256 internal constant MIGRATOR_FACET_INDEX = 5;
+
     function _deployFixture() internal override {
         deploy();
     }
@@ -574,5 +577,137 @@ contract RegistryDrivenUpgradeConcreteTest is ChainTypeManagerTest, RegistryDriv
     function _registryGenesisBatchCommitment() internal pure override returns (bytes32) {
         // ChainTypeManager requires the genesis batch commitment to be exactly 1.
         return bytes32(uint256(1));
+    }
+
+    /// @dev The derived cuts remove the departing release's routing, not the live one, so a chain
+    ///      a CTM-owner recovery cut left off that routing cannot take the transition: it would keep
+    ///      the recovery's routing under the new release. Undoing the recovery unblocks it.
+    function test_revertWhen_liveRoutingDivergedFromTheDepartingRelease() public {
+        _commitHop(transitionV32);
+        bytes4[] memory extra = new bytes4[](1);
+        extra[0] = bytes4(uint32(0xdeadbeef));
+        address recoveryFacet = address(new AcceptingVerifier());
+        _recoveryCut(
+            Diamond.FacetCut({facet: recoveryFacet, action: Diamond.Action.Add, isFreezable: false, selectors: extra})
+        );
+
+        vm.prank(governor);
+        vm.expectRevert(LiveRoutingDiverged.selector);
+        ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
+
+        _recoveryCut(
+            Diamond.FacetCut({facet: address(0), action: Diamond.Action.Remove, isFreezable: false, selectors: extra})
+        );
+        vm.prank(governor);
+        ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
+        assertEq(IGetters(chainAddress).getProtocolVersion(), V32, "the restored chain takes the transition");
+    }
+
+    /// @dev The departing facets all stay live and route what they self-describe, but one also
+    ///      routes an extra selector: only the per-facet count shows it, and the reinstall, which
+    ///      removes the described selectors only, would leave it routed.
+    function test_revertWhen_aRecoveryCutAddedASelectorToAReleaseFacet() public {
+        _commitHop(transitionV32);
+        Diamond.FacetCut memory migrator = facetCuts[MIGRATOR_FACET_INDEX];
+        bytes4[] memory extra = new bytes4[](1);
+        extra[0] = bytes4(uint32(0xdeadbeef));
+        _recoveryCut(
+            Diamond.FacetCut({
+                facet: migrator.facet,
+                action: Diamond.Action.Add,
+                isFreezable: migrator.isFreezable,
+                selectors: extra
+            })
+        );
+        assertEq(IGetters(chainAddress).facetAddress(extra[0]), migrator.facet, "the recovery cut must route it");
+
+        vm.prank(governor);
+        vm.expectRevert(LiveRoutingDiverged.selector);
+        ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
+    }
+
+    /// @dev Same facets and per-facet selector counts, but two facets of equal freezability swapped
+    ///      one selector each: only the per-selector facet check tells this from the release.
+    function test_revertWhen_aRecoveryCutSwappedSelectorsBetweenReleaseFacets() public {
+        _commitHop(transitionV32);
+        Diamond.FacetCut memory migrator = facetCuts[MIGRATOR_FACET_INDEX];
+        Diamond.FacetCut memory mailbox = facetCuts[MAILBOX_FACET_INDEX];
+        assertEq(migrator.isFreezable, mailbox.isFreezable, "the swap must not change freezability");
+        bytes4[] memory toMailbox = new bytes4[](1);
+        toMailbox[0] = migrator.selectors[0];
+        bytes4[] memory toMigrator = new bytes4[](1);
+        toMigrator[0] = mailbox.selectors[0];
+        _recoveryCut(
+            Diamond.FacetCut({
+                facet: mailbox.facet,
+                action: Diamond.Action.Replace,
+                isFreezable: mailbox.isFreezable,
+                selectors: toMailbox
+            })
+        );
+        _recoveryCut(
+            Diamond.FacetCut({
+                facet: migrator.facet,
+                action: Diamond.Action.Replace,
+                isFreezable: migrator.isFreezable,
+                selectors: toMigrator
+            })
+        );
+        assertEq(IGetters(chainAddress).facetAddress(toMailbox[0]), mailbox.facet, "the first selector moved");
+        assertEq(IGetters(chainAddress).facetAddress(toMigrator[0]), migrator.facet, "the second selector moved");
+
+        vm.prank(governor);
+        vm.expectRevert(LiveRoutingDiverged.selector);
+        ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
+    }
+
+    /// @dev Same facets, selectors and routing, but one facet reinstalled with the opposite
+    ///      freezability. A single-selector `Replace` cannot do this (`Diamond` refuses mixed
+    ///      freezability within a facet), so the recovery removes the whole facet and adds it back.
+    function test_revertWhen_aRecoveryCutFlippedAReleaseFacetsFreezability() public {
+        _commitHop(transitionV32);
+        Diamond.FacetCut memory migrator = facetCuts[MIGRATOR_FACET_INDEX];
+        _recoveryCut(
+            Diamond.FacetCut({
+                facet: address(0),
+                action: Diamond.Action.Remove,
+                isFreezable: false,
+                selectors: migrator.selectors
+            })
+        );
+        _recoveryCut(
+            Diamond.FacetCut({
+                facet: migrator.facet,
+                action: Diamond.Action.Add,
+                isFreezable: !migrator.isFreezable,
+                selectors: migrator.selectors
+            })
+        );
+        assertEq(
+            IGetters(chainAddress).isFacetFreezable(migrator.facet),
+            !migrator.isFreezable,
+            "the recovery must flip the facet's freezability"
+        );
+
+        vm.prank(governor);
+        vm.expectRevert(LiveRoutingDiverged.selector);
+        ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
+    }
+
+    /// @dev A CTM-owner `executeUpgrade` on the fixture chain, through the executor's escape hatch.
+    function _recoveryCut(Diamond.FacetCut memory _cut) internal {
+        Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](1);
+        cuts[0] = _cut;
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(
+                IChainTypeManager.executeUpgrade,
+                (chainId, Diamond.DiamondCutData({facetCuts: cuts, initAddress: address(0), initCalldata: ""}))
+            )
+        });
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
     }
 }

@@ -44,7 +44,11 @@ import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {BootstrapManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 /// @notice Stands in for the genesis engine a pre-v35 CTM runs: its only entrypoint is the
 ///         six-argument `genesisUpgrade` the pre-v35 Admin facet called, not the argument-less one
@@ -70,11 +74,11 @@ contract LegacyGenesisEngineForLocalTest {
 contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
     ///      Correct length, empty rows — and no shell, since no row sits behind one.
-    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
+    function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
-    function getL2SystemProxyBytecodeInfo() internal override returns (bytes memory) {
+    function getL2SystemProxyBytecodeInfo() internal pure override returns (bytes memory) {
         return "";
     }
 
@@ -149,6 +153,12 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     /// @dev The pre-v35 genesis engine discovery reports as live (see
     ///      `CTMUpgradeForLocalTest.simulateLegacyGenesisEngine`).
     address internal legacyGenesisEngine;
+
+    /// @dev The CTM's interop fee manager before the edge, holding a prepaid balance of
+    ///      `INTEROP_FEE_DEPOSIT` for the Era chain.
+    address internal interopFeeManagerBeforeUpgrade;
+
+    uint256 internal constant INTEROP_FEE_DEPOSIT = 1 ether;
 
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
         return new CoreUpgradeForLocalTest();
@@ -284,6 +294,13 @@ abstract contract UpgradeIntegrationBootstrapFixture is
         CTM_OUTPUT = "/script-out/foundry-upgrade/local-v35-ctm.toml";
         CORE_OUTPUT = "/script-out/foundry-upgrade/local-v35-core.toml";
         console.log("setUp: Paths configured");
+        // Prepaid interop fees must survive the upgrade, asserted in `test_bootstrapUpgrade_Local`.
+        interopFeeManagerBeforeUpgrade = addresses.chainTypeManager.L1_INTEROP_FEE_MANAGER();
+        IL1InteropFeeManager(interopFeeManagerBeforeUpgrade).deposit{value: INTEROP_FEE_DEPOSIT}(
+            eraZKChainId,
+            ETH_TOKEN_ADDRESS,
+            INTEROP_FEE_DEPOSIT
+        );
         setupUpgrade();
         console.log("setUp: Upgrade setup complete");
 
@@ -312,7 +329,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     ///         from where the verifier takes it. Pinned in a real EVM over a real prepare run: a
     ///         prepare that passes an argument the constructor does not take (as this one once
     ///         did) deploys fine and is unreproducible from the constructor's own arguments.
-    function test_bootstrapObjectsAreReproducibleFromTheirReviewedArguments() public {
+    function test_bootstrapObjectsAreReproducibleFromTheirReviewedArguments() public view {
         CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
         string memory root = vm.projectRoot();
         string memory coreOutput = vm.readFile(string.concat(root, CORE_OUTPUT));
@@ -532,6 +549,43 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         );
 
         _assertBootstrapJoinsTheRegistryModel(bootstrap, ctm, bridgehub, executor);
+        _assertInteropFeeManagerKept(ctm, bridgehub);
+    }
+
+    /// @dev The upgraded CTM keeps the interop fee manager it had, with the chains' prepaid
+    ///      balances; the manager ships switched off, owned by governance and behind the CTM's
+    ///      ProxyAdmin.
+    function _assertInteropFeeManagerKept(address _ctm, address _bridgehub) private view {
+        L1InteropFeeManager interopFeeManager = L1InteropFeeManager(
+            ctmUpgrade.getAddresses().stateTransition.proxies.interopFeeManager
+        );
+        assertEq(
+            address(interopFeeManager),
+            interopFeeManagerBeforeUpgrade,
+            "Upgrade replaced the interop fee manager"
+        );
+        assertEq(
+            IChainTypeManager(_ctm).L1_INTEROP_FEE_MANAGER(),
+            address(interopFeeManager),
+            "CTM points at another interop fee manager"
+        );
+        assertEq(
+            interopFeeManager.chainBalance(eraZKChainId, ETH_TOKEN_ADDRESS),
+            INTEROP_FEE_DEPOSIT,
+            "Prepaid interop fees lost"
+        );
+        address governance = ctmUpgrade.getAddresses().admin.governance;
+        assertEq(interopFeeManager.owner(), governance, "Interop fee manager not owned by governance");
+        assertEq(interopFeeManager.pendingOwner(), address(0), "Interop fee manager has a pending owner");
+        assertEq(
+            DeployScriptUtils.getProxyAdminAddress(address(interopFeeManager)),
+            DeployScriptUtils.getProxyAdminAddress(_ctm),
+            "Interop fee manager not behind the CTM's ProxyAdmin"
+        );
+        assertEq(interopFeeManager.feeRecipient(), governance, "Interop fees not swept to governance");
+        assertEq(interopFeeManager.feeToken(), ETH_TOKEN_ADDRESS, "Interop fee not charged in ether");
+        assertEq(interopFeeManager.feePerUnit(), 0, "Interop fee not switched off");
+        assertEq(address(interopFeeManager.BRIDGE_HUB()), _bridgehub, "Interop fee manager on another bridgehub");
     }
 
     /// @dev The whole bootstrap edge — both domains — is DERIVED from `RegistryBootstrapSequence`
@@ -602,6 +656,25 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "the notifier sits under the CTM-domain ProxyAdmin"
         );
         assertEq(IOwnable(notifierProxy).owner(), _executor, "the notifier is the CTM executor's");
+
+        // The timelock's row: the v35 Admin facet serves only the cut-reading upgrade call, which
+        // the pre-v35 timelock does not forward.
+        address timelockProxy = _bootstrap.getAddresses().stateTransition.proxies.validatorTimelock;
+        ProxyUpgradeRow memory timelockRow = migration.getManifest().ctmProxyUpgrades[
+            uint256(CTMContract.ValidatorTimelock)
+        ];
+        assertEq(timelockRow.proxy, timelockProxy, "the timelock row names the CTM's timelock");
+        assertTrue(timelockRow.implNew != timelockRow.expectedOldImpl, "the timelock row swaps its implementation");
+        assertEq(
+            DeployScriptUtils.getImplementation(timelockProxy),
+            timelockRow.implNew,
+            "the timelock runs the implementation its pinned row names"
+        );
+        assertEq(
+            timelockRow.implNew,
+            _bootstrap.getAddresses().stateTransition.implementations.validatorTimelock,
+            "the row installs the timelock the prepare deployed"
+        );
     }
 
     /// @dev Decodes an `upgradeFromBootstrap(address)` init payload; external so the selector can

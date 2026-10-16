@@ -6,8 +6,8 @@ era_chain_id = 270
 owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 
 # This release replaces the ecosystem's governance set: a new ProtocolUpgradeHandler
-# implementation plus Guardians, SecurityCouncil and EmergencyUpgradeBoard, wired in by four
-# governance calls (protocol-ops `zk_governance.rs`). Declared per RELEASE, here, rather than
+# implementation plus Guardians, SecurityCouncil and EmergencyUpgradeBoard, wired in by one
+# governance call (protocol-ops `zk_governance.rs`). Declared per RELEASE, here, rather than
 # inferred from `governance_kind = "puh"` in permanent-values — that key says the ecosystem
 # HAS a PUH, which is true of every release, so inferring from it made every recurring
 # preparation redeploy the governance set. A later release omits this key and redeploys

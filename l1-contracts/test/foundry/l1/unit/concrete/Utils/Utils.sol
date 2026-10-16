@@ -28,12 +28,17 @@ import {
     ZKSYNC_OS_FRI_PROOF_VERIFICATION_DISABLED,
     PubdataContent
 } from "contracts/common/Config.sol";
-import {TEST_CHAIN_ID} from "foundry-test/TestConstants.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {AuthoredL2Plan, L2UpgradePlan, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    AuthoredL2Plan,
+    GenesisFacet,
+    L2UpgradePlan,
+    TransitionManifest
+} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -44,27 +49,42 @@ L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUB
 address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 
 library Utils {
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
     /// @dev The genesis-registry address the mocked CTM fixtures return; the registry itself is
     ///      mocked too (see `UtilsCallMocker`), pinning no facets.
     address internal constant TEST_GENESIS_REGISTRY = address(0x9E8E5157A9);
 
-    /// @notice Stands in a `CTMTransition` at `_transition` and its target release at `_newRelease`,
-    ///         answering exactly the reads `DefaultUpgrade.upgradeFromTransition` makes for an
-    ///         L1-only edge: no facet cuts, no L2 plan, the version edge and `_verifier`.
+    /// @notice Stands in a `CTMTransition` at `_transition`, its departing release at `_fromRelease`
+    ///         and its target release at `_newRelease`, answering exactly the reads
+    ///         `DefaultUpgrade.upgradeFromTransition` makes for an L1-only edge: the departing
+    ///         routing, no facet cuts, no L2 plan, the version edge and `_verifier`.
     /// @dev For tests whose subject is the CALLER of the engine (the Admin facet's gating, a
     ///      migrated chain executing an upgrade) rather than the registry objects; the engine
     ///      against real objects is covered in `test/foundry/l1/upgrades/DefaultUpgrade.t.sol`.
+    /// @param _departingRouting The diamond's live routing, one cut per facet: the departing
+    ///        release's rows, and each facet's self-description.
     function mockL1OnlyTransition(
         address _transition,
+        address _fromRelease,
+        Diamond.FacetCut[] memory _departingRouting,
         address _newRelease,
         uint256 _oldProtocolVersion,
         uint256 _newProtocolVersion,
         address _verifier
     ) internal {
+        uint256 facetsLength = _departingRouting.length;
+        GenesisFacet[] memory departingFacets = new GenesisFacet[](facetsLength);
+        for (uint256 i = 0; i < facetsLength; ++i) {
+            Diamond.FacetCut memory cut = _departingRouting[i];
+            departingFacets[i] = GenesisFacet({facet: cut.facet, isFreezable: cut.isFreezable});
+            vm.mockCall(cut.facet, abi.encodeCall(ISelfDescribingFacet.selectors, ()), abi.encode(cut.selectors));
+        }
+        vm.mockCall(_transition, abi.encodeCall(ICTMTransition.fromRelease, ()), abi.encode(_fromRelease));
+        vm.mockCall(_fromRelease, abi.encodeCall(ICTMRelease.genesisFacets, ()), abi.encode(departingFacets));
         TransitionManifest memory manifest = TransitionManifest({
-            fromRelease: address(0),
+            fromRelease: _fromRelease,
             newRelease: _newRelease,
             upgradeEngine: address(0),
             oldProtocolVersionDeadline: type(uint256).max,
@@ -193,7 +213,8 @@ library Utils {
                 chainId: TEST_CHAIN_ID,
                 operatorDAInput: abi.encodePacked(uint256(0)),
                 slChainId: block.chainid,
-                chainConfigHash: defaultChainConfigHash(TEST_CHAIN_ID)
+                chainConfigHash: defaultChainConfigHash(TEST_CHAIN_ID),
+                interopFeeUnits: 0
             });
     }
 

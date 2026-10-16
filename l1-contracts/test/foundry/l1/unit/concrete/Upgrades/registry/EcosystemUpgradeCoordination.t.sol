@@ -24,7 +24,6 @@ import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {
-    CTMContract,
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
@@ -38,8 +37,7 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     CoreTransitionManifest,
-    ProxyUpgradeRow,
-    TransitionManifest
+    ProxyUpgradeRow
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice One CTM coordinator: authority bindings, same-CTM succession and atomic core/CTM execution.

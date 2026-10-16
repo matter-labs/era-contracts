@@ -64,19 +64,23 @@ impl<'a> UpgradeFull<'a> {
         Ok(prepared)
     }
 
-    /// Pre-step hook: ensure governance owns each registered CTM + ProxyAdmin
-    /// before the prepare deploys run. The downstream governance bundle
-    /// (e.g. the bootstrap's CTM and ProxyAdmin handovers) assumes governance
-    /// ownership; this is a no-op when ownership is already correct.
+    /// Pre-step hook: ensure governance owns each registered CTM, its
+    /// ValidatorTimelock and the ProxyAdmins before the prepare deploys run.
+    /// The downstream governance bundle (e.g. the bootstrap's CTM and
+    /// ProxyAdmin handovers) assumes governance ownership; this is a no-op
+    /// when ownership is already correct. The Ownable2Step transfers (CTM, VT)
+    /// only set `pendingOwner`; their `acceptOwnership()` calls are written to
+    /// `script-out/pre-governance-accept-ownerships.toml` and the merge folds
+    /// them into the governance bundle.
     ///
     /// The outer call has no permission gating — the deployer signs it. Inner
     /// `vm.startBroadcast(<owner>)` blocks emit the actual `transferOwnership`
     /// txs as the appropriate EOA owner; those land in that EOA's Safe bundle
     /// when the harness emits per-sender bundles. Contract owners listed in
     /// the env's `[[ownable_proxies]]` registry are routed through their
-    /// wrapping shape (legacy Governance: `scheduleTransparent`+`executeInstant`,
-    /// OZ ChainAdmin: `multicall`); contract owners *not* registered cause a
-    /// hard revert.
+    /// wrapping shape (legacy Governance: `scheduleTransparent(op, 0)` +
+    /// `execute(op)` from its EOA owner, OZ ChainAdmin: `multicall`); contract
+    /// owners *not* registered cause a hard revert.
     async fn run_pre_steps(
         &self,
         runner: &mut ForgeRunner,

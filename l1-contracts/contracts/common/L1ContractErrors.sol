@@ -155,6 +155,10 @@ error EmptyProofLength();
 error EmptyPublicInputsLength();
 // 0x61733a89
 error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x23298bd1
+error ExecutionDelayNotIncreased(uint32 currentDelay, uint32 newDelay);
+// 0xedfc1f1c
+error ExecutionDelayTooLarge(uint32 delay, uint32 maxDelay);
 // 0x8bd334a8
 error ExecutorCoordinatorMismatch(address expected, address actual);
 // 0xac4a3f98
@@ -246,10 +250,14 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
+// 0xb55a753d
+error L1OnlyEdgeChangesL2State();
 // 0xb0966e4f
 error L2BytecodeInfoLength(uint256 actual, uint256 expected);
 // 0xb07238db
 error L2BytecodeNotPublished(bytes32 bytecodeHash);
+// 0x6ae0a0c5
+error L2BytecodeRowRemoved(uint256 member);
 // 0x4ef29fe3
 error L2BytecodeTableShrunk(uint256 fromLength, uint256 newLength);
 // 0x5493e4b1
@@ -258,6 +266,8 @@ error L2PlanNeedsDelegate();
 error L2PlanTooManyFactoryDeps(uint256 count, uint256 max);
 // 0xfb5c22e6
 error L2TimestampTooBig();
+// 0x5d5571a8
+error LiveRoutingDiverged();
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
 // 0x9bb54c35
@@ -358,8 +368,6 @@ error OperationMustBeReady();
 error OriginChainIdNotFound();
 // 0x720432d4
 error PatchCannotCarryL2Upgrade();
-// 0x0f808de6
-error PatchChangesL2GenesisState();
 // 0x97da9c1c
 error PayloadTooShort();
 // 0x9b48e060
@@ -406,6 +414,8 @@ error RegistryEmptySelectors(address facet);
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 // 0xb40929f4
 error RegistryMemberHasNoFixedAddress(uint256 member);
+// 0xef72ee1a
+error RegistrySelfEdgeProxyRow(address proxy);
 // 0xe89c554c
 error RegistryTargetHasNoCode(address target);
 // 0x1f20dafa

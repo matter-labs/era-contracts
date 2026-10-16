@@ -94,7 +94,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             chainId: chainId,
             operatorDAInput: bytes(""),
             slChainId: block.chainid,
-            chainConfigHash: Utils.defaultChainConfigHash(chainId)
+            chainConfigHash: Utils.defaultChainConfigHash(chainId),
+            interopFeeUnits: 0
         });
 
         bytes32 upgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
@@ -153,7 +154,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
                 _batch.l2LogsTreeRoot,
                 _upgradeTxHash,
                 _batch.dependencyRootsRollingHash,
-                _batch.slChainId
+                _batch.slChainId,
+                _batch.interopFeeUnits
             )
         );
 

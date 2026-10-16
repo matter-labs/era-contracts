@@ -74,7 +74,11 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
             address(ecosystemProxyAdmin),
             hex""
         );
-        ecosystemInventory[uint256(L1EcosystemContract.L1Bridgehub)] = _row(address(ecosystemProxy));
+        // An implementation of its own: shared with the CTM row, an emptied core implementation
+        // would be refused by the CTM row's check before the core leg is ever validated.
+        ProxyUpgradeRow memory coreRow = _row(address(ecosystemProxy));
+        coreRow.implNew = address(new ValidateTargetNew());
+        ecosystemInventory[uint256(L1EcosystemContract.L1Bridgehub)] = coreRow;
         coreTransition = new CoreTransition(CoreTransitionManifest({proxyUpgrades: ecosystemInventory}));
 
         fullTransition = _deployTransition(777);

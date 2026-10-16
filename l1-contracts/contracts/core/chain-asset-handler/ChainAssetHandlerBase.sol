@@ -461,9 +461,7 @@ abstract contract ChainAssetHandlerBase is
     ///      paused ecosystem-wide nor by that CTM's own owner.
     /// @dev Called as the first BODY statement, so it runs after `whenMigrationsEnabled`: the
     ///      release-level ban is the dominant fact when it applies, and a caller learns migrations
-    ///      are disabled outright rather than that one is paused. It cannot be a modifier —
-    ///      `bridgeBurn` has no stack room for a retained modifier parameter (see its two
-    ///      "to avoid stack too deep" blocks).
+    ///      are disabled outright rather than that one is paused.
     /// @dev A private function rather than a modifier: `bridgeBurn` is stack-tight (see its two
     ///      "to avoid stack too deep" blocks), and a modifier's locals would live for the whole
     ///      body, while this frame is released at once.

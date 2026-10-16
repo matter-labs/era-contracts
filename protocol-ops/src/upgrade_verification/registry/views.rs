@@ -277,9 +277,10 @@ sol! {
 
     /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read
     /// `L2PlanLib.requirePublished` performs when the CTM leg applies, so a zero here is the
-    /// readiness failure that would revert `execute`.
+    /// readiness failure that would revert `execute`. The event carries the published code.
     #[sol(rpc)]
     contract BytecodesSupplierView {
+        event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
@@ -363,6 +364,7 @@ sol! {
         function pendingOwner() external view returns (address);
         function currentRelease() external view returns (address);
         function L1_BYTECODES_SUPPLIER() external view returns (address);
+        function L1_INTEROP_FEE_MANAGER() external view returns (address);
         function BRIDGE_HUB() external view returns (address);
         function serverNotifierAddress() external view returns (address);
         function validatorTimelockPostV29() external view returns (address);

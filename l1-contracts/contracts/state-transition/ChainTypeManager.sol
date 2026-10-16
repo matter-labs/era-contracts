@@ -66,6 +66,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Address of the permissionless validator used in Priority Mode
     address public immutable PERMISSIONLESS_VALIDATOR;
 
+    /// @inheritdoc IChainTypeManager
+    address public immutable L1_INTEROP_FEE_MANAGER;
+
     /// @dev Deprecated chainId => zkChain map. Chains resolve through the Bridgehub now, and
     ///      the legacy readers are gone. The DECLARATION stays: this slot exists on deployed
     ///      CTMs, so removing it would shift every storage slot after it.
@@ -145,6 +148,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      to the pre-v35 upgrade engines of legacy edges. The verifier is part of the installed
     ///      chain state and is pinned by the release (`ICTMRelease.verifier`), so both the genesis
     ///      path and the upgrade path read it from the release they resolve to.
+    // Never written by THIS implementation by design — live CTMs carry pre-v35 values in it.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 protocolVersion => address) internal __DEPRECATED_protocolVersionVerifier;
 
     /// @dev Deprecated pre-v35 `defaultUpgrade` (the verifier-only upgrade engine). Slot retained
@@ -173,12 +178,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         address _bridgehub,
         address _interopCenter,
         address _l1BytecodesSupplier,
-        address _permissionlessValidator
+        address _permissionlessValidator,
+        address _l1InteropFeeManager
     ) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
         INTEROP_CENTER = _interopCenter;
         L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
         PERMISSIONLESS_VALIDATOR = _permissionlessValidator;
+        L1_INTEROP_FEE_MANAGER = _l1InteropFeeManager;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

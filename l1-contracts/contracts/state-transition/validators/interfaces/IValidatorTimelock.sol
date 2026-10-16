@@ -5,6 +5,7 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
 import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
+import {Diamond} from "../../libraries/Diamond.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -29,8 +30,13 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
         bool rotateUpgraderRole;
     }
 
-    /// @notice The delay between committing and executing batches is changed.
+    /// @notice The ecosystem-wide delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
+
+    /// @notice The chain-specific delay between committing and executing batches is changed.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy) the delay belongs to.
+    /// @param _newExecutionDelay The new chain-specific execution delay.
+    event NewChainExecutionDelay(address indexed _chainAddress, uint256 _newExecutionDelay);
 
     /// @notice Retired role hash: gates nothing since precommits were removed. Kept so existing grants
     /// can still be enumerated and revoked.
@@ -65,8 +71,16 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
 
     /// @notice The address of the bridgehub
     function BRIDGE_HUB() external view returns (IL1Bridgehub);
-    /// @dev The delay between committing and executing batches.
+    /// @notice The maximal execution delay that either the ecosystem owner or a chain admin can set.
+    function MAX_EXECUTION_DELAY() external view returns (uint32);
+    /// @dev The ecosystem-wide delay between committing and executing batches. A lower bound per chain.
     function executionDelay() external view returns (uint32);
+    /// @dev The chain-specific delay, `0` if unset. Use `getExecutionDelay` for the enforced value.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    function chainExecutionDelay(address _chainAddress) external view returns (uint32);
+    /// @notice The delay enforced for `_chainAddress`: `max(executionDelay, chainExecutionDelay)`.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    function getExecutionDelay(address _chainAddress) external view returns (uint32);
     /// @dev Part of the IBase interface. Not used in this contract.
     function getName() external pure returns (string memory);
 
@@ -75,8 +89,18 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @param _initialOwner The initial owner of the Validator timelock.
     /// @param _initialExecutionDelay The initial execution delay, i.e. minimal time between a batch is committed and executed.
     function initialize(address _initialOwner, uint32 _initialExecutionDelay) external;
-    /// @dev Set the delay between committing and executing batches.
+    /// @dev Set the ecosystem-wide delay. Owner only, capped by `MAX_EXECUTION_DELAY`.
     function setExecutionDelay(uint32 _executionDelay) external;
+    /// @notice Raises the execution delay of a single chain. Chain admin only.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    /// @param _newExecutionDelay The new delay. Must exceed `getExecutionDelay` and not `MAX_EXECUTION_DELAY`.
+    /// @dev Only ever increases. Lowering it again requires the owner via `setChainExecutionDelay`.
+    function increaseChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external;
+    /// @notice Sets a chain's execution delay to any value, including a lower one. Owner only.
+    /// @param _chainAddress The address of the ZK chain (i.e. its DiamondProxy).
+    /// @param _newExecutionDelay The new delay, capped by `MAX_EXECUTION_DELAY`.
+    /// @dev The only way to decrease a delay a chain admin has increased.
+    function setChainExecutionDelay(address _chainAddress, uint32 _newExecutionDelay) external;
     /// @dev Returns the timestamp when `_l2BatchNumber` was committed.
     function getCommittedBatchTimestamp(address _chainAddress, uint256 _l2BatchNumber) external view returns (uint256);
 
@@ -150,5 +174,15 @@ interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _batchData
+    ) external;
+    /// @notice Forwards the cut-taking upgrade call of a chain whose Admin facet predates v35 to the chain.
+    /// @dev Forwarded unchanged, so the chain itself checks the cut against the one its ChainTypeManager committed.
+    /// @param _chainAddress The address of the chain being upgraded.
+    /// @param _protocolVersion The current protocol version from which upgrade is executed.
+    /// @param _cutData The diamond cut parameters that is executed in the upgrade.
+    function upgradeChainFromVersion(
+        address _chainAddress,
+        uint256 _protocolVersion,
+        Diamond.DiamondCutData calldata _cutData
     ) external;
 }

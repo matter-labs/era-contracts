@@ -26,6 +26,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
@@ -304,7 +305,7 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
 
     function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (Diamond.DiamondCutData memory diamondCut) {
+    ) internal pure returns (Diamond.DiamondCutData memory diamondCut) {
         // The committed genesis cut is only the DiamondInit address: no `facetCuts` and no init
         // payload. `DiamondInit` reads the facet set and the base system contract hashes from
         // the CTM's pinned `currentRelease`.
@@ -362,7 +363,11 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode(ctmAddresses.daAddresses.daContracts.rollupSLDAValidator);
+            // RollupL1DAValidator declares no constructor (da-contracts/contracts/
+            // RollupL1DAValidator.sol), so canonical init code is the creation code alone.
+            // Encoding an address here appended 32 bytes the EVM ignores but CREATE2 hashes,
+            // deriving every deployment from non-canonical init code.
+            return abi.encode();
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {
@@ -424,6 +429,8 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
         } else if (compareStrings(contractName, "MultisigCommitter")) {
             // Same constructor as ValidatorTimelock (it derives from it): the bridgehub immutable.
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
+        } else if (compareStrings(contractName, "L1InteropFeeManager")) {
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else {
             return
                 DeployCTML1OrGateway.getCreationCalldata(
@@ -446,7 +453,8 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
-                permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator
+                permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator,
+                interopFeeManager: ctmAddresses.stateTransition.proxies.interopFeeManager
             });
     }
 
@@ -478,6 +486,13 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
             return abi.encodeCall(BytecodesSupplier.initialize, ());
         } else if (compareStrings(contractName, "PermissionlessValidator")) {
             return abi.encodeCall(PermissionlessValidator.initialize, ());
+        } else if (compareStrings(contractName, "L1InteropFeeManager")) {
+            // Governance owns the switch from the start, and fees accrue to it until it routes them elsewhere.
+            return
+                abi.encodeCall(
+                    L1InteropFeeManager.initialize,
+                    (ctmAddresses.admin.governance, ctmAddresses.admin.governance)
+                );
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

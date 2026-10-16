@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -12,6 +12,7 @@ import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpg
 import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
 import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
+import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {ProxyUpgradeRowMismatch, RegistryTargetHasNoCode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     CoreTransitionManifest,
@@ -68,14 +69,14 @@ contract CoreUpgradeExecutorTest is Test {
 
         proxyAdmin = new ProxyAdmin();
         bridgehubProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
-        messageRootProxy = new TransparentUpgradeableProxy(address(implOld), address(proxyAdmin), hex"");
+        messageRootProxy = new TransparentUpgradeableProxy(address(implNew), address(proxyAdmin), hex"");
 
-        // Bridgehub is a full source-checked edge (old -> new); MessageRoot pins its live
-        // implementation (the executor's live comparison must skip it). Every row must be a real,
-        // unique edge — a placeholder (all-zero) row is rejected at the registry boundary.
+        // Both rows are source-checked edges (old -> new). MessageRoot already runs its target, so
+        // the executor's live comparison must skip it. Every row must be a real, unique edge — a
+        // placeholder (all-zero) or self-edge row is rejected at the registry boundary.
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](2);
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
-        rows[1] = _row(address(messageRootProxy), address(implOld), address(implOld));
+        rows[1] = _row(address(messageRootProxy), address(implOld), address(implNew));
         coreTransition = _deployRegistry(rows);
 
         // The executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin, mirroring the
@@ -139,14 +140,27 @@ contract CoreUpgradeExecutorTest is Test {
     // ─────────────────────────── the owner path ───────────────────────────
 
     function test_applyL1Upgrade_upgradesChangedProxiesOnly() public {
+        vm.recordLogs();
         _applyL1Upgrade();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         assertEq(_liveImpl(bridgehubProxy), address(implNew), "changed implementation must be swapped");
-        assertEq(
-            _liveImpl(messageRootProxy),
-            address(implOld),
-            "proxy already pointing at the pinned implementation must be skipped"
-        );
+        assertEq(_liveImpl(messageRootProxy), address(implNew), "proxy already at its target must stay there");
+        uint256 upgraded = 0;
+        for (uint256 i = 0; i < logs.length; ++i) {
+            if (
+                logs[i].topics.length > 0 &&
+                logs[i].topics[0] == ProxyUpgradeRowLib.ProxyImplementationUpgraded.selector
+            ) {
+                assertEq(
+                    logs[i].topics[1],
+                    bytes32(uint256(uint160(address(bridgehubProxy)))),
+                    "only the changed proxy is upgraded"
+                );
+                ++upgraded;
+            }
+        }
+        assertEq(upgraded, 1, "the proxy already at its target must be skipped");
     }
 
     function test_applyL1Upgrade_isIdempotent() public {
@@ -270,7 +284,7 @@ contract CoreUpgradeExecutorTest is Test {
         coreExecutor.applyOperation(manifest);
 
         assertEq(_liveImpl(bridgehubProxy), address(implNew), "the manifest's leg must be applied");
-        assertEq(_liveImpl(messageRootProxy), address(implOld), "a row already at its target is skipped");
+        assertEq(_liveImpl(messageRootProxy), address(implNew), "a row already at its target stays there");
     }
 
     function test_revertWhen_applyOperationByNonCoordinator() public {

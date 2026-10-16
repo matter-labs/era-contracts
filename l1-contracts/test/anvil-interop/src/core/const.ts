@@ -126,10 +126,6 @@ export const FINALIZE_DEPOSIT_SIG = "finalizeDeposit(uint256,bytes32,bytes)";
 export const ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE =
   "tuple(address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, tuple(string name, string symbol, uint256 decimals) baseTokenMetadata, tuple(bytes32 assetId, uint256 originChainId, address originToken) baseTokenBridgingData)";
 
-// `FixedForceDeploymentsData` (IL2GenesisUpgrade.sol), the genesis force-deployments blob a release pins.
-export const FIXED_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE =
-  "tuple(uint256 l1ChainId, address l1AssetRouter, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes bridgehubBytecodeInfo, bytes l2AssetRouterBytecodeInfo, bytes l2NtvBytecodeInfo, bytes messageRootBytecodeInfo, bytes chainAssetHandlerBytecodeInfo, bytes interopCenterBytecodeInfo, bytes interopHandlerBytecodeInfo, bytes assetTrackerBytecodeInfo, bytes beaconDeployerInfo, bytes baseTokenHolderBytecodeInfo, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon, bytes32 zkTokenAssetId)";
-
 // WritePriorityOpParams ABI tuple type for raw decoding NewPriorityRequest events
 export const WRITE_PRIORITY_OP_PARAMS_ABI_TYPE =
   "tuple(uint256,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes,uint256[],bytes,bytes)";

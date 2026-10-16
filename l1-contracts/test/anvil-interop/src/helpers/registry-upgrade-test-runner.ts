@@ -55,7 +55,8 @@ import {
 import { createProvider, impersonateAndRun } from "../core/utils";
 import {
   coreInitArgs,
-  emptyTableForceDeploymentsData,
+  l2BytecodeInfoRows,
+  l2BytecodeInfoSlots,
   operationInitArgs,
   releaseInitArgs,
   transitionInitArgs,
@@ -473,6 +474,10 @@ type LiveUpgradeInputs = {
   ctmProxyAdmin: string;
   /** The CTM's live `currentRelease` — the transition's `fromRelease`. */
   fromRelease: string;
+  /** `fromRelease`'s L2 side, which the bump re-asserts verbatim (see buildRegistryManifest). */
+  fromL2BytecodeInfos: string[];
+  fromL2SystemProxyBytecodeInfo: string;
+  fromFixedForceDeploymentsData: string;
   oldAdminFacet: string;
   adminSelectors: string[];
   otherFacets: { name: string; address: string }[];
@@ -515,6 +520,7 @@ async function readLiveUpgradeInputs(
   if (fromRelease === ethers.constants.AddressZero) {
     throw new Error("live CTM has no currentRelease — regenerate the chain states from registry-era code");
   }
+  const fromReleaseContract = new ethers.Contract(fromRelease, getAbi("ICTMRelease"), l1Provider);
 
   const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
   const acceptAdminSelector = adminIface.getSighash(ACCEPT_ADMIN_FRAGMENT);
@@ -579,6 +585,9 @@ async function readLiveUpgradeInputs(
     newVersionString: toVersionString(newVersion),
     ctmProxyAdmin: await readAddressSlot(ctm.address, EIP1967_ADMIN_SLOT),
     fromRelease,
+    fromL2BytecodeInfos: await fromReleaseContract.l2BytecodeInfos(),
+    fromL2SystemProxyBytecodeInfo: await fromReleaseContract.l2SystemProxyBytecodeInfo(),
+    fromFixedForceDeploymentsData: await fromReleaseContract.fixedForceDeploymentsData(),
     oldAdminFacet,
     adminSelectors,
     otherFacets,
@@ -839,13 +848,11 @@ function buildRegistryManifest(
           diamondInit: { address: deployed.newDiamondInit },
           verifier: { address: deployed.newVerifier },
           genesisFacets,
-          // No chain is created at this release here, so a synthetic payload consistent with the
-          // empty L2 table below suffices.
-          fixedForceDeploymentsData: emptyTableForceDeploymentsData(),
-          // Keys are `L2EcosystemContract` member names; empty = every slot an explicit empty row,
-          // so the transition derives no L2 table deployments, and an empty table names no shell.
-          l2BytecodeInfos: {},
-          l2SystemProxyBytecodeInfo: "0x",
+          // The bump ships no L2 code: the release carries the departing release's L2 side, so the
+          // transition derives no L2 table deployments. Table keys are `L2EcosystemContract` names.
+          fixedForceDeploymentsData: live.fromFixedForceDeploymentsData,
+          l2BytecodeInfos: l2BytecodeInfoRows(live.fromL2BytecodeInfos),
+          l2SystemProxyBytecodeInfo: live.fromL2SystemProxyBytecodeInfo,
           genesis: {
             genesisUpgrade: { address: live.genesisUpgrade },
             batchHash: ethers.utils.hexZeroPad("0x01", 32),
@@ -941,6 +948,21 @@ function assertCommittedManifestMatchesLiveDeployment(
     ],
     ["ctm.release.diamondInit.address", ctm?.release?.diamondInit?.address, deployed.newDiamondInit],
     ["ctm.release.genesis.genesisUpgrade.address", ctm?.release?.genesis?.genesisUpgrade?.address, live.genesisUpgrade],
+    [
+      "ctm.release.l2BytecodeInfos",
+      JSON.stringify(l2BytecodeInfoSlots(ctm?.release?.l2BytecodeInfos ?? {})),
+      JSON.stringify(live.fromL2BytecodeInfos),
+    ],
+    [
+      "ctm.release.l2SystemProxyBytecodeInfo",
+      ctm?.release?.l2SystemProxyBytecodeInfo,
+      live.fromL2SystemProxyBytecodeInfo,
+    ],
+    [
+      "ctm.release.fixedForceDeploymentsData",
+      ctm?.release?.fixedForceDeploymentsData,
+      live.fromFixedForceDeploymentsData,
+    ],
   ];
   const mismatches = checks
     .filter(([, actual, expected]) => String(actual).toLowerCase() !== String(expected).toLowerCase())

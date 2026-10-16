@@ -36,7 +36,8 @@
 //!   6. Does every proxy row depart from the implementation that is actually live, read through
 //!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — completion does not
 //!      re-read implementations (`protocol-docs/ecosystem-upgrade-coordination.md`).
-//!   7. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
+//!   7. Do chains crossing an edge keep the system-proxy logic new chains get? ([`shell`])
+//!   8. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
 //!      address — and nothing else?
 //!
 //! None of it is "does an object's own fingerprint of a member match that member's code": the
@@ -73,6 +74,7 @@ pub(crate) mod provenance;
 pub(crate) mod records;
 pub(crate) mod replacement;
 pub(crate) mod rows;
+pub(crate) mod shell;
 pub(crate) mod views;
 
 use construction::ReviewedBuild;
@@ -118,6 +120,7 @@ pub(crate) async fn verify(
     }
     let build = ReviewedBuild::load(identity);
     let genesis_root = genesis::reviewed_genesis_root();
+    let genesis_image = genesis::reviewed_genesis_image();
 
     let mut package = RegistryPackage::load(ecosystem_toml)?;
     let held = match &mut package {
@@ -136,6 +139,7 @@ pub(crate) async fn verify(
             replacement::verify(
                 &provider,
                 &build,
+                genesis_image.as_ref().ok(),
                 &package,
                 expected_governance_owner,
                 &salts,
@@ -148,6 +152,7 @@ pub(crate) async fn verify(
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
+                image: genesis_image,
                 force_deployments_data: package.force_deployments_data.clone(),
                 force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };
@@ -167,6 +172,7 @@ pub(crate) async fn verify(
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
+                image: genesis_image,
                 force_deployments_data: package.force_deployments_data.clone(),
                 force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };

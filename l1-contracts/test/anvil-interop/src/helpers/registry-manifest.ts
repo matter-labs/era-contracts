@@ -26,7 +26,6 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
-import { FIXED_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE } from "../core/const";
 
 const l1ContractsDir = path.resolve(__dirname, "../../../..");
 
@@ -118,6 +117,21 @@ export function l2BytecodeInfoSlots(rows: Record<string, string>): string[] {
     slots[enumValue(members, name, "L2EcosystemContract")] = info;
   }
   return slots;
+}
+
+/** The inverse of {l2BytecodeInfoSlots}: a release's table as rows keyed by member name. */
+export function l2BytecodeInfoRows(slots: string[]): Record<string, string> {
+  const members = parseSolidityEnum(CONTRACT_IDENTIFIERS_SOL, "L2EcosystemContract");
+  if (slots.length !== Object.keys(members).length) {
+    throw new Error(
+      `L2 bytecode table has ${slots.length} slots, L2EcosystemContract has ${Object.keys(members).length}`
+    );
+  }
+  return Object.fromEntries(
+    Object.entries(members)
+      .filter(([, index]) => slots[index] !== "0x")
+      .map(([name, index]) => [name, slots[index]])
+  );
 }
 
 // Loose manifest typing: the JSON schema is owned by the emit side of the upgrade runner.
@@ -217,39 +231,6 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
       delegateComposer,
     },
   };
-}
-
-/**
- * A genesis force-deployments blob for a release whose L2 table is empty: `CTMRelease` requires each
- * table member's bytecode-info field to match its row, so every such field is empty here.
- */
-export function emptyTableForceDeploymentsData(): string {
-  return ethers.utils.defaultAbiCoder.encode(
-    [FIXED_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE],
-    [
-      {
-        l1ChainId: 1,
-        l1AssetRouter: ethers.constants.AddressZero,
-        aliasedL1Governance: ethers.constants.AddressZero,
-        maxNumberOfZKChains: 0,
-        bridgehubBytecodeInfo: "0x",
-        l2AssetRouterBytecodeInfo: "0x",
-        l2NtvBytecodeInfo: "0x",
-        messageRootBytecodeInfo: "0x",
-        chainAssetHandlerBytecodeInfo: "0x",
-        interopCenterBytecodeInfo: "0x",
-        interopHandlerBytecodeInfo: "0x",
-        assetTrackerBytecodeInfo: "0x",
-        beaconDeployerInfo: "0x",
-        baseTokenHolderBytecodeInfo: "0x",
-        l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
-        l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
-        aliasedChainRegistrationSender: ethers.constants.AddressZero,
-        dangerousTestOnlyForcedBeacon: ethers.constants.AddressZero,
-        zkTokenAssetId: ethers.constants.HashZero,
-      },
-    ]
-  );
 }
 
 /**

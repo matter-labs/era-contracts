@@ -27,11 +27,13 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {TestExecutor} from "contracts/dev-contracts/test/TestExecutor.sol";
 import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
+import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
 
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
@@ -66,8 +68,10 @@ contract ExecutorTest is UtilsCallMockerTest {
     AdminFacet internal admin;
     TestExecutor internal executor;
     TestCommitter internal committer;
+    L1InteropFeeManager internal interopFeeManager;
     GettersFacet internal getters;
     MailboxFacet internal mailbox;
+    MigratorFacet internal migrator;
     // UtilsFacet is attached to every diamond by default (see constructor) so tests can manipulate chain state.
     UtilsFacet internal utilsFacet;
     bytes32 internal newCommittedBlockBatchHash;
@@ -283,11 +287,27 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         admin = new AdminFacet(block.chainid, rollupDAManager);
         getters = new GettersFacet();
+        interopFeeManager = L1InteropFeeManager(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1InteropFeeManager(IBridgehubBase(address(dummyBridgehub)))),
+                    makeAddr("interopFeeManagerProxyAdmin"),
+                    abi.encodeCall(L1InteropFeeManager.initialize, (owner, makeAddr("interopFeeRecipient")))
+                )
+            )
+        );
         executor = new TestExecutor();
         committer = new TestCommitter();
         mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
+        migrator = new MigratorFacet(block.chainid, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
+        // The CTM stub has no interop fee manager; it points at the real one above.
+        vm.mockCall(
+            address(chainTypeManager),
+            abi.encodeWithSelector(IChainTypeManager.L1_INTEROP_FEE_MANAGER.selector),
+            abi.encode(address(interopFeeManager))
+        );
         vm.mockCall(
             address(chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
@@ -338,7 +358,7 @@ contract ExecutorTest is UtilsCallMockerTest {
 
         bytes memory diamondInitData = abi.encodeCall(diamondInit.initialize, (l2ChainId, owner));
 
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](6);
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](7);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(admin),
             action: Diamond.Action.Add,
@@ -375,6 +395,12 @@ contract ExecutorTest is UtilsCallMockerTest {
             isFreezable: true,
             selectors: Utils.getUtilsFacetSelectors()
         });
+        facetCuts[6] = Diamond.FacetCut({
+            facet: address(migrator),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getMigratorSelectors()
+        });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -391,6 +417,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         committer = TestCommitter(address(diamondProxy));
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
+        migrator = MigratorFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
         utilsFacet = UtilsFacet(address(diamondProxy));
         chainTypeManager.setZKChain(address(diamondProxy));
@@ -427,7 +454,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             chainId: l2ChainId,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
             slChainId: block.chainid,
-            chainConfigHash: Utils.defaultChainConfigHash(l2ChainId)
+            chainConfigHash: Utils.defaultChainConfigHash(l2ChainId),
+            interopFeeUnits: 0
         });
 
         dummyBridgehub.setZKChain(address(diamondProxy));
@@ -504,7 +532,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         });
     }
 
-    /// @dev Mirrors the `batchOutputHash` formula from Committer._commitOneBatch.
+    /// @dev Mirrors {CommitterFacet._getBatchOutputHash}.
     function _batchOutputHash(
         CommitBatchInfoZKsyncOS memory _batch,
         bytes32 _upgradeTxHash
@@ -522,7 +550,8 @@ contract ExecutorTest is UtilsCallMockerTest {
                     _batch.l2LogsTreeRoot,
                     _upgradeTxHash,
                     _batch.dependencyRootsRollingHash,
-                    _batch.slChainId
+                    _batch.slChainId,
+                    _batch.interopFeeUnits
                 )
             );
     }

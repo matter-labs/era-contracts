@@ -133,6 +133,12 @@ struct DisabledProofSystems {
 /// a non-inclusion proof. The off-chain imt-engine must use the same value.
 bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
 
+/// @dev Storage slot of the L2 `InteropCenter`'s interop fee unit counter,
+/// `bytes32(uint256(keccak256("zksync.interop-center.interop-fee-units")) - 1)` (checked by
+/// `test_interopFeeUnits_slotConstantMatchesDerivation`).
+/// Consensus-critical: the ZKsync OS bootloader reads it at batch boundaries. See {protocol-docs/interop-fee.md}.
+bytes32 constant INTEROP_FEE_UNITS_SLOT = 0xcb06feb7f26e08c2ab18254891cfbe115998e9ed512f0732aa6fc7f097a78265;
+
 /// @dev Even though the price for 1 byte of pubdata is 16 L1 gas, we have a slightly increased
 /// value.
 uint256 constant L1_GAS_PER_PUBDATA_BYTE = 17;
@@ -314,3 +320,8 @@ uint256 constant MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 = 2;
 
 /// @dev Iterated migrations are not supported; chain can migrate only to settlement layer and back once.
 uint256 constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
+
+/// @dev The maximal execution delay configurable in the `ValidatorTimelock`.
+/// @dev Footgun prevention only, not a trust guarantee: governance can upgrade the timelock, and outside
+/// stage 1 a chain admin can revoke the validator roles and stall execution anyway.
+uint32 constant MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY = 30 days;

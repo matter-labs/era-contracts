@@ -55,7 +55,7 @@ enum L2EcosystemContract {
 ///         `ProxyUpgradeRow[]` inventories of length `CTM_CONTRACT_COUNT` indexed by this enum (same slot semantics as `L1EcosystemContract`). Only the members that are
 ///         TUPPs under the CTM-domain `ProxyAdmin` can meaningfully participate
 ///         (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator,
-///         ServerNotifier), applied through the executor's bound admin. A row in a facet or
+///         ServerNotifier, L1InteropFeeManager), applied through the executor's bound admin. A row in a facet or
 ///         verifier slot can never apply.
 /// @dev APPEND-ONLY once a manifest indexed by it is deployed (see `L1EcosystemContract`).
 enum CTMContract {
@@ -84,7 +84,8 @@ enum CTMContract {
     L1GenesisUpgrade,
     BytecodesSupplier,
     PermissionlessValidator,
-    ServerNotifier
+    ServerNotifier,
+    L1InteropFeeManager
 }
 
 /// @notice How a built-in contract is deployed in ZKsyncOS upgrades.

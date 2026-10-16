@@ -9,7 +9,6 @@ import {
     TooMuchGas,
     PriorityTxPubdataExceedsMaxPubDataPerBatch,
     InvalidPubdataPricingMode,
-    HashMismatch,
     ProtocolIdMismatch,
     InvalidL2DACommitmentScheme
 } from "contracts/common/L1ContractErrors.sol";

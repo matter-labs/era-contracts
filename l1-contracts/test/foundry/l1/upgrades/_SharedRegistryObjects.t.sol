@@ -75,8 +75,8 @@ abstract contract RegistryObjectsFixture is Test {
     address internal ctmDeployerStub = makeAddr("ctmDeployer");
     address internal erc20OriginToken = makeAddr("erc20OriginToken");
     TestnetERC20Token internal erc20LocalToken;
-    /// @dev Base tokens the metadata probe must tolerate rather than revert on — a chain may be
-    ///      created on either, and every later upgrade recomposes the same data for it.
+    /// @dev Base tokens without usable metadata: composing for a chain based on either reverts
+    ///      (see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`).
     NoMetadataToken internal noMetadataToken;
     Bytes32MetadataToken internal bytes32MetadataToken;
 
@@ -101,26 +101,22 @@ abstract contract RegistryObjectsFixture is Test {
     bytes32 internal constant ERC20_BASE_TOKEN_ASSET_ID = keccak256("erc20BaseTokenAssetId");
     bytes32 internal constant NO_METADATA_BASE_TOKEN_ASSET_ID = keccak256("noMetadataBaseTokenAssetId");
     bytes32 internal constant BYTES32_METADATA_BASE_TOKEN_ASSET_ID = keccak256("bytes32MetadataBaseTokenAssetId");
-    /// @dev What the probe substitutes for a token it cannot read a string out of.
-    string internal constant DEFAULT_BASE_TOKEN_NAME = "Base Token";
-    string internal constant DEFAULT_BASE_TOKEN_SYMBOL = "BT";
     string internal constant ERC20_NAME = "Local Token";
     string internal constant ERC20_SYMBOL = "LOC";
     uint256 internal constant ERC20_DECIMALS = 6;
-    /// @dev What the composition actually records for any token: the tolerant metadata probe
-    ///      filters a conforming 32-byte `decimals()` answer, so the ERC20 default stands — see
-    ///      `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
+    /// @dev What the composition records for every base token, whatever its `decimals()` answers —
+    ///      see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
     uint256 internal constant COMPOSED_DECIMALS = 18;
 
-    function _setUpRegistryObjects(bytes memory _delegateCalldata) internal {
-        fixtureDelegateCalldata = _delegateCalldata;
+    function _setUpRegistryObjects(bytes memory _fixedDelegateCalldata) internal {
+        fixtureDelegateCalldata = _fixedDelegateCalldata;
         facetShared = address(new MockSelfDescribingFacet(_selectors2(SEL_SHARED_A, SEL_SHARED_B)));
         facetDeparting = address(new MockSelfDescribingFacet(_selectors1(SEL_DEPARTING)));
         facetArriving = address(new MockSelfDescribingFacet(_selectors1(SEL_ARRIVING)));
         diamondInit = address(new DiamondInit());
         genesisUpgradeStub = _deployedStub("genesisUpgrade");
         ctmStub = makeAddr("ctm");
-        delegateComposer = new FixedDelegateCalldataComposer(_delegateCalldata);
+        delegateComposer = new FixedDelegateCalldataComposer(_fixedDelegateCalldata);
         defaultComposer = new L2DefaultDelegateCalldataComposer();
         erc20LocalToken = new TestnetERC20Token(ERC20_NAME, ERC20_SYMBOL, uint8(ERC20_DECIMALS));
         noMetadataToken = new NoMetadataToken();
@@ -285,12 +281,12 @@ abstract contract RegistryObjectsFixture is Test {
             );
     }
 
-    /// @dev A bootstrap manifest toward `_release` (whose version the edge lands on). The CTM-side
+    /// @dev A bootstrap manifest toward `_targetRelease` (whose version the edge lands on). The CTM-side
     ///      authorities are labelled stand-ins: the engine reads only the version edge, the schedule, the release and the
     ///      L2 plan; the one participating proxy row exists because the object refuses an edge
     ///      without implementation swaps.
     function _bootstrapManifest(
-        CTMRelease _release,
+        CTMRelease _targetRelease,
         uint256 _oldProtocolVersion,
         uint256 _upgradeTimestamp,
         address _upgradeEngine,
@@ -315,7 +311,7 @@ abstract contract RegistryObjectsFixture is Test {
                 expectedProtocolVersion: _oldProtocolVersion,
                 ctmProxyAdmin: ProxyAdmin(makeAddr("ctmProxyAdmin")),
                 ctmProxyUpgrades: rows,
-                currentRelease: address(_release),
+                currentRelease: address(_targetRelease),
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeEngine: _upgradeEngine,
                 l2Plan: _plan,
@@ -361,7 +357,7 @@ abstract contract RegistryObjectsFixture is Test {
     function _expectedL2TxWithDelegateCalldata(
         L2UpgradePlan memory _plan,
         uint256 _newProtocolVersion,
-        bytes memory _delegateCalldata
+        bytes memory _expectedDelegateCalldata
     ) internal pure returns (L2CanonicalTransaction memory transaction) {
         transaction = L2CanonicalTransactionLib.emptyL2CanonicalTransaction();
         transaction.txType = ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE;
@@ -372,7 +368,7 @@ abstract contract RegistryObjectsFixture is Test {
         transaction.nonce = _newProtocolVersion >> SEMVER_MINOR_OFFSET;
         transaction.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (_plan.deployments, _plan.delegateTo, _delegateCalldata)
+            (_plan.deployments, _plan.delegateTo, _expectedDelegateCalldata)
         );
         transaction.factoryDeps = _plan.factoryDepHashes;
     }
@@ -384,7 +380,7 @@ abstract contract RegistryObjectsFixture is Test {
         // ERC20 chain is a different contract from its origin token.
         address localToken;
         address originToken;
-        uint256 originChainId = block.chainid;
+        uint256 originChainId;
         bytes32 assetId;
         TokenMetadata memory metadata;
         if (_chainId == ETH_CHAIN_ID) {
@@ -403,28 +399,6 @@ abstract contract RegistryObjectsFixture is Test {
                 ERC20_BASE_TOKEN_ASSET_ID
             );
             metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: COMPOSED_DECIMALS});
-        } else if (_chainId == NO_METADATA_CHAIN_ID) {
-            (localToken, originToken, assetId) = (
-                address(noMetadataToken),
-                address(noMetadataToken),
-                NO_METADATA_BASE_TOKEN_ASSET_ID
-            );
-            metadata = TokenMetadata({
-                name: DEFAULT_BASE_TOKEN_NAME,
-                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
-                decimals: COMPOSED_DECIMALS
-            });
-        } else {
-            (localToken, originToken, assetId) = (
-                address(bytes32MetadataToken),
-                address(bytes32MetadataToken),
-                BYTES32_METADATA_BASE_TOKEN_ASSET_ID
-            );
-            metadata = TokenMetadata({
-                name: DEFAULT_BASE_TOKEN_NAME,
-                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
-                decimals: COMPOSED_DECIMALS
-            });
         }
         return
             abi.encode(

@@ -43,6 +43,11 @@
                     "name": "permissionlessValidator",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "interopFeeManager",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -73,6 +78,11 @@
                   },
                   {
                     "name": "permissionlessValidator",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "interopFeeManager",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -407,13 +417,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "run",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

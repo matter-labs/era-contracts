@@ -68,21 +68,40 @@ alloy::sol! {
 
         /// Emitted when governance publishes the data for a new upgrade cut.
         event NewUpgradeCutData(uint256 indexed protocolVersion, DiamondCutData diamondCutData);
+
+        function getProtocolVersion(uint256 _chainId) external view returns (uint256);
+        function upgradeTransition(uint256 _oldProtocolVersion) external view returns (address);
     }
 
-    // `IBridgehub.sol` — just what we need to resolve the CTM for a given chain.
+    // `IBridgehub.sol` — just what we need to resolve the CTM and the diamond of a given chain.
     #[sol(rpc)]
     interface IBridgehub {
         function chainTypeManager(uint256 _chainId) external view returns (address);
+        function getZKChain(uint256 _chainId) external view returns (address);
     }
 
     // `IDefaultUpgrade.sol` — the engine of a registry-driven transition (v35+). The committed
-    // cut's init is `upgradeFromTransition(transition)`; the FINAL transaction it commits on a
-    // chain is served by `l2UpgradeTx(transition, bridgehub, chainId)` on the engine itself.
-    #[sol(rpc)]
+    // cut's init is `upgradeFromTransition(transition)`.
     interface IDefaultUpgrade {
         function upgradeFromTransition(address _transition) external returns (bytes32);
-        function l2UpgradeTx(address _transition, address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory);
+    }
+
+    // `ICTMTransition.sol` — a registry-driven edge (v35+); `l2UpgradeTx` serves the FINAL
+    // transaction its engine commits on a chain.
+    #[sol(rpc)]
+    interface ICTMTransition {
+        function newProtocolVersion() external view returns (uint256);
+        function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory);
+    }
+
+    // `BaseZkSyncUpgrade.sol` — emitted by the chain's diamond, which delegatecalls the upgrade.
+    // `l2UpgradeTxHash` is zero when the upgrade set no L2 transaction.
+    contract BaseZkSyncUpgrade {
+        event UpgradeComplete(
+            uint256 indexed newProtocolVersion,
+            bytes32 indexed l2UpgradeTxHash,
+            L2CanonicalTransaction l2ProtocolUpgradeTx
+        );
     }
 
     // `IBootstrapUpgrade.sol` — the engine of the v35 bootstrap edge. The committed cut's init is

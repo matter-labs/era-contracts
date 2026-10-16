@@ -35,7 +35,6 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IDomainUpgradeExecutor} from "contracts/upgrades/registry/executors/IDomainUpgradeExecutor.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {
-    AuthoredL2Plan,
     BootstrapManifest,
     CoreTransitionManifest,
     GenesisFacet,

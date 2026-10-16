@@ -73,6 +73,7 @@ impl Inventory {
             (Self::CtmDomain, "BytecodesSupplier") => &["BytecodesSupplier"],
             (Self::CtmDomain, "PermissionlessValidator") => &["PermissionlessValidator"],
             (Self::CtmDomain, "ServerNotifier") => &["ServerNotifier"],
+            (Self::CtmDomain, "L1InteropFeeManager") => &["L1InteropFeeManager"],
             _ => &[],
         }
     }
@@ -154,6 +155,10 @@ pub(super) async fn discover_slot_proxy<P: Provider>(
         (Inventory::CtmDomain, "PermissionlessValidator") => read(
             ctm.PERMISSIONLESS_VALIDATOR().call().await,
             "the CTM's PERMISSIONLESS_VALIDATOR()",
+        )?,
+        (Inventory::CtmDomain, "L1InteropFeeManager") => read(
+            ctm.L1_INTEROP_FEE_MANAGER().call().await,
+            "the CTM's L1_INTEROP_FEE_MANAGER()",
         )?,
         (Inventory::CtmDomain, "ServerNotifier") => read(
             ctm.serverNotifierAddress().call().await,
@@ -469,6 +474,7 @@ mod tests {
             "BytecodesSupplier",
             "PermissionlessValidator",
             "ServerNotifier",
+            "L1InteropFeeManager",
         ] {
             let admitted = Inventory::CtmDomain.implementations(member);
             assert!(!admitted.is_empty(), "{member} has no implementation");
@@ -727,7 +733,7 @@ mod tests {
             }
             checked += 1;
         }
-        assert_eq!(checked, L1_ECOSYSTEM_CONTRACTS.len() + 5);
+        assert_eq!(checked, L1_ECOSYSTEM_CONTRACTS.len() + 6);
     }
 
     /// The ecosystem slots resolve through the Bridgehub and the contracts it links, in the order

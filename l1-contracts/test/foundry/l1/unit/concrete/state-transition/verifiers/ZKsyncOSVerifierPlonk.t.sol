@@ -12,7 +12,7 @@ import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsync
 ///
 /// The fixture below is the proof from that EraVM suite. It is well-formed — 44 words, points on the
 /// curve — but it is *not* a valid proof for this verifier: it was produced for a 2**24 domain and
-/// `DOMAIN_SIZE` here is 2**25. That is enough for the structural checks, which all run before any
+/// `DOMAIN_SIZE` here is 2**22. That is enough for the structural checks, which all run before any
 /// domain arithmetic, and it is why the happy path is not covered.
 ///
 /// Four cases from the EraVM suite are therefore not carried over, all of which assert that
@@ -24,7 +24,7 @@ import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsync
 /// A wrong-public-input case is omitted for the same reason: with no valid proof it cannot fail,
 /// since every input already reverts with `invalid quotient evaluation`.
 ///
-/// TODO: restore those five once a proof for this verifier's 2**25 domain is available — generated
+/// TODO: restore those five once a proof for this verifier's 2**22 domain is available — generated
 /// for the committed key, or captured from a `proveBatches` call on a live ZKsync OS chain.
 contract ZKsyncOSVerifierPlonkTest is Test {
     /// @dev The BN254 base and scalar field moduli the verifier operates over. It declares both
@@ -38,7 +38,7 @@ contract ZKsyncOSVerifierPlonkTest is Test {
     /// it here ties the key the contract actually loads to the one its header claims. A rotation of
     /// the committed key is expected to fail this test: update the constant as part of that change,
     /// deliberately, rather than treating the failure as flaky.
-    bytes32 internal constant EXPECTED_VK_HASH = 0x29651d5f044e1671ff820f85018ed87b26f57402222eb31dd453206e2379bc9c;
+    bytes32 internal constant EXPECTED_VK_HASH = 0xec24ed291193c0f86d53b242e45490f05e2328817d9decb8cc4188b582682bfa;
 
     uint256[] public publicInputs;
     uint256[] public serializedProof;

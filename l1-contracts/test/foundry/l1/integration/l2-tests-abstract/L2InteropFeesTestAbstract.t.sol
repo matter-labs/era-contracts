@@ -379,6 +379,7 @@ abstract contract L2InteropFeesTestAbstract is L2InteropTestUtils {
             zkFeePerCall,
             "Coinbase should have accumulated ZK token fee"
         );
+        assertEq(l2InteropCenter.interopFeeUnits(), 1, "The call is counted for the L1 interop fee too");
     }
 
     /// @notice Test that ZK token fees scale with call count

@@ -100,6 +100,11 @@ interface IInteropCenter {
     /// @return Amount of accumulated ZK token fees.
     function accumulatedZKFees(address coinbase) external view returns (uint256);
 
+    /// @notice Returns the monotonic interop fee unit counter: one unit per call of every L2->L2 bundle sent since
+    /// the counter was introduced. See {protocol-docs/interop-fee.md}.
+    /// @return The number of interop fee units sent.
+    function interopFeeUnits() external view returns (uint256);
+
     /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
     /// @dev Can be set to 0 to disable base token fees for users.
     /// @dev Only callable by the bootloader as a system transaction, operator-controlled.
@@ -115,12 +120,6 @@ interface IInteropCenter {
     /// @dev Transfers all accumulated ZK token fees to the specified receiver.
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
-
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external;
-
-    /// @notice Unpauses the contract, re-enabling functions marked with `whenNotPaused`.
-    function unpause() external;
 
     /// @notice One-shot initialization for the InteropCenter; must never run again after v31.
     ///      See {protocol-docs/interop.md#initialization-and-versioning-notes}.

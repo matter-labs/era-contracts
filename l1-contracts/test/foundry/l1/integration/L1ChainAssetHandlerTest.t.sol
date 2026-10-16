@@ -23,7 +23,7 @@ import {
     MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
 } from "contracts/common/Config.sol";
 import {MigrationNumberMismatch, NotSystemContext} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {NotAssetRouter, MigrationPaused, ChainMigrationsDisabled} from "contracts/common/L1ContractErrors.sol";
+import {NotAssetRouter, ChainMigrationsDisabled} from "contracts/common/L1ContractErrors.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";

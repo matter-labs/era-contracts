@@ -12,13 +12,20 @@
 //! write ([`judge_force_deployments`]): the live L1 and Bridgehub, the reviewed governance and ZK
 //! token, zero where the builder writes zero, and — for the bytecode fields — the release's own
 //! L2 bytecode table (`DeployCTM._buildForceDeploymentsData`).
+//!
+//! The genesis config's state image is held against the same table and the release's proxy shell
+//! ([`judge_genesis_image`]): the root only proves the image is the reviewed one, not that it runs
+//! the code the release pins.
+
+use std::collections::HashMap;
 
 use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::SolValue;
 
 use crate::upgrade_verification::constants::{
-    FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS, L1_TO_L2_ALIAS_OFFSET,
+    EIP1967_IMPLEMENTATION_SLOT, FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS, L1_TO_L2_ALIAS_OFFSET,
+    L2_ECOSYSTEM_FIXED_ADDRESSES,
 };
 use crate::upgrade_verification::paths::repo_relative_path;
 use crate::upgrade_verification::report::VerificationResult;
@@ -37,6 +44,8 @@ pub(crate) const ZKSYNC_OS_GENESIS_INDEX_REPEATED_STORAGE_CHANGES: u64 = 0;
 pub(crate) struct ReviewedGenesis {
     /// `genesis_root` of the reviewed genesis config, or why it could not be read.
     pub(crate) genesis_root: Result<B256, String>,
+    /// The reviewed genesis config's state image, or why it could not be read.
+    pub(crate) image: Result<GenesisImage, String>,
     /// The package's `[ctms.*.contracts_config] force_deployments_data`.
     pub(crate) force_deployments_data: Option<Bytes>,
     /// The independent expectations of the blob's fields.
@@ -154,21 +163,88 @@ pub(crate) fn apply_l1_to_l2_alias(address: Address) -> Address {
 /// Reads `genesis_root` from the reviewed commit's genesis config. A failure is carried rather
 /// than raised, so the rest of the report still runs and the release check reports it.
 pub(crate) fn reviewed_genesis_root() -> Result<B256, String> {
+    read_reviewed_genesis_config(parse_genesis_root)
+}
+
+/// Reads the state image from the reviewed commit's genesis config, carrying a failure the same
+/// way as [`reviewed_genesis_root`].
+pub(crate) fn reviewed_genesis_image() -> Result<GenesisImage, String> {
+    read_reviewed_genesis_config(parse_genesis_image)
+}
+
+fn read_reviewed_genesis_config<T>(
+    parse: fn(&serde_json::Value) -> Result<T, String>,
+) -> Result<T, String> {
     let path = repo_relative_path(ZKSYNC_OS_GENESIS_CONFIG_PATH);
     let raw = std::fs::read_to_string(&path)
         .map_err(|e| format!("cannot read {} ({e})", path.display()))?;
-    parse_genesis_root(&raw).map_err(|e| format!("{}: {e}", path.display()))
+    serde_json::from_str(&raw)
+        .map_err(|e| format!("not valid JSON ({e})"))
+        .and_then(|json| parse(&json))
+        .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-fn parse_genesis_root(raw: &str) -> Result<B256, String> {
-    let json: serde_json::Value =
-        serde_json::from_str(raw).map_err(|e| format!("not valid JSON ({e})"))?;
+fn parse_genesis_root(json: &serde_json::Value) -> Result<B256, String> {
     let root = json
         .get("genesis_root")
         .and_then(|v| v.as_str())
         .ok_or("no `genesis_root` string")?;
     root.parse()
         .map_err(|e| format!("unparsable `genesis_root` {root} ({e})"))
+}
+
+/// The state a ZKsync OS genesis config describes: the code at each address
+/// (`initial_contracts`, `[address, code]` pairs) and the storage set beside it
+/// (`additional_storage`, address to slot to value).
+#[derive(Clone, Debug, Default)]
+pub(crate) struct GenesisImage {
+    pub(crate) code: HashMap<Address, Bytes>,
+    pub(crate) storage: HashMap<Address, HashMap<B256, B256>>,
+}
+
+fn parse_genesis_image(json: &serde_json::Value) -> Result<GenesisImage, String> {
+    fn parsed<T: std::str::FromStr>(value: &serde_json::Value, what: &str) -> Result<T, String> {
+        value
+            .as_str()
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| format!("unparsable {what} {value}"))
+    }
+    let mut image = GenesisImage::default();
+    let contracts = json
+        .get("initial_contracts")
+        .and_then(|v| v.as_array())
+        .ok_or("no `initial_contracts` array")?;
+    for contract in contracts {
+        let [address, code] = contract.as_array().map(Vec::as_slice).unwrap_or_default() else {
+            return Err(format!(
+                "an `initial_contracts` entry {contract} is not [address, code]"
+            ));
+        };
+        image.code.insert(
+            parsed(address, "initial_contracts address")?,
+            parsed(code, "initial_contracts code")?,
+        );
+    }
+    let storage = json
+        .get("additional_storage")
+        .and_then(|v| v.as_object())
+        .ok_or("no `additional_storage` object")?;
+    for (address, slots) in storage {
+        let address: Address = address
+            .parse()
+            .map_err(|e| format!("unparsable additional_storage address {address} ({e})"))?;
+        let slots = slots
+            .as_object()
+            .ok_or_else(|| format!("additional_storage of {address} is not an object"))?;
+        let held = image.storage.entry(address).or_default();
+        for (slot, value) in slots {
+            let slot: B256 = slot
+                .parse()
+                .map_err(|e| format!("unparsable additional_storage slot {slot} ({e})"))?;
+            held.insert(slot, parsed(value, "additional_storage value")?);
+        }
+    }
+    Ok(image)
 }
 
 /// Holds the genesis data of `release` — the release `label` names — against `reviewed`. Each
@@ -231,6 +307,117 @@ pub(crate) fn judge_release_genesis(
     }
 
     judge_force_deployments(result, label, release, &reviewed.force_deployments);
+    judge_genesis_image(result, label, release, &reviewed.image);
+}
+
+/// Holds the reviewed genesis image against the release's L2 table and proxy shell, one line per
+/// populated row: the member's fixed address holds the shell's code, its EIP-1967 implementation
+/// slot names the address `L2GenesisForceDeploymentsHelper.generateRandomAddress` derives from
+/// the row, and that address holds the row's code.
+///
+/// New chains run the image's proxy code at every member (`upgradeSystemContractProxy` never
+/// replaces code already at the address) and the image's implementation at every member the
+/// genesis force deployments do not upgrade. Image contracts outside the table are not covered.
+pub(crate) fn judge_genesis_image(
+    result: &mut VerificationResult,
+    label: &str,
+    release: &ReleaseManifest,
+    image: &Result<GenesisImage, String>,
+) {
+    let image = match image {
+        Ok(image) => image,
+        Err(why) => {
+            result.report_error(&format!(
+                "{label}: the L2 table cannot be held against the reviewed genesis image — {why}"
+            ));
+            return;
+        }
+    };
+    let shell = &release.l2SystemProxyBytecodeInfo;
+    for (slot, row) in release.l2BytecodeInfos.iter().enumerate() {
+        if row.is_empty() {
+            continue;
+        }
+        let Some((member, _, address)) = L2_ECOSYSTEM_FIXED_ADDRESSES
+            .iter()
+            .find(|(_, member_slot, _)| *member_slot == slot)
+        else {
+            result.report_error(&format!(
+                "{label}: L2 table row {slot} is populated but its member has no fixed L2 address \
+                 (`L2InventoryLib.fixedAddress`), so no genesis image can hold it"
+            ));
+            continue;
+        };
+        let implementation = system_proxy_implementation_address(row);
+        let mut problems = Vec::new();
+        if let Some(problem) = code_mismatch(image.code.get(address), shell) {
+            problems.push(format!(
+                "its proxy code {problem} the release's system-proxy shell"
+            ));
+        }
+        let held = image
+            .storage
+            .get(address)
+            .and_then(|slots| slots.get(&EIP1967_IMPLEMENTATION_SLOT))
+            .map(|value| Address::from_word(*value));
+        if held != Some(implementation) {
+            problems.push(format!(
+                "its EIP-1967 implementation slot holds {} instead of {implementation}, the \
+                 address the row derives",
+                held.map_or("nothing".to_string(), |a| a.to_string())
+            ));
+        }
+        if let Some(problem) = code_mismatch(image.code.get(&implementation), row) {
+            problems.push(format!("the code at {implementation} {problem} the row"));
+        }
+        if problems.is_empty() {
+            result.report_ok(&format!(
+                "{label}: genesis image: {member} at {address} is the release's shell over its \
+                 row's implementation at {implementation}"
+            ));
+        } else {
+            result.report_error(&format!(
+                "{label}: genesis image: {member} at {address}: {}; new chains would start from \
+                 L2 code the release does not pin",
+                problems.join("; ")
+            ));
+        }
+    }
+}
+
+/// `L2GenesisForceDeploymentsHelper.generateRandomAddress`: where `upgradeSystemContractProxy`
+/// places the implementation `bytecode_info` describes.
+fn system_proxy_implementation_address(bytecode_info: &Bytes) -> Address {
+    let mut preimage = vec![0u8; 32];
+    preimage.extend_from_slice(bytecode_info);
+    Address::from_word(keccak256(preimage))
+}
+
+/// The length and `keccak256` of the code a ZKsync OS bytecode info describes — an ABI-encoded
+/// `(bytes32 blake2s, uint32 length, bytes32 keccak256)` — or `None` for a non-canonical info.
+pub(super) fn decode_bytecode_info(bytecode_info: &Bytes) -> Option<(U256, B256)> {
+    (bytecode_info.len() == 96).then(|| {
+        (
+            U256::from_be_slice(&bytecode_info[32..64]),
+            B256::from_slice(&bytecode_info[64..96]),
+        )
+    })
+}
+
+/// Why `code` is not what the ZKsync OS `bytecode_info` describes — its keccak and length are
+/// compared — or `None` when it is.
+fn code_mismatch(code: Option<&Bytes>, bytecode_info: &Bytes) -> Option<&'static str> {
+    let Some(code) = code else {
+        return Some("is absent, so it is not");
+    };
+    let Some((length, observable)) = decode_bytecode_info(bytecode_info) else {
+        return Some("cannot be held against a non-canonical bytecode info for");
+    };
+    if U256::from(code.len()) == length && keccak256(code) == observable {
+        None
+    } else {
+        Some("is not")
+    }
 }
 
 /// Decodes the release's `fixedForceDeploymentsData` and holds every field against `expected`
@@ -462,8 +649,25 @@ mod tests {
     /// One slot past the last force-deployed member, so every member has a row.
     const TABLE_LEN: usize = 11;
 
-    fn shell() -> Bytes {
+    /// The ZKsync OS bytecode info of `code`, with a stand-in blake2s hash: only its length and
+    /// keccak are held against a genesis image.
+    fn bytecode_info(code: &Bytes) -> Bytes {
+        let mut info = B256::repeat_byte(0xB2).to_vec();
+        info.extend_from_slice(&U256::from(code.len()).to_be_bytes::<32>());
+        info.extend_from_slice(keccak256(code).as_slice());
+        Bytes::from(info)
+    }
+
+    fn shell_code() -> Bytes {
         Bytes::from_static(b"the system-proxy shell")
+    }
+
+    fn shell() -> Bytes {
+        bytecode_info(&shell_code())
+    }
+
+    fn row_code(slot: usize) -> Bytes {
+        Bytes::from(format!("row {slot}").into_bytes())
     }
 
     /// A table whose force-deployed rows are distinct, with the BaseTokenHolder row empty.
@@ -473,10 +677,38 @@ mod tests {
                 if slot == 5 {
                     Bytes::new()
                 } else {
-                    Bytes::from(format!("row {slot}").into_bytes())
+                    bytecode_info(&row_code(slot))
                 }
             })
             .collect()
+    }
+
+    fn fixed_address(slot: usize) -> Address {
+        L2_ECOSYSTEM_FIXED_ADDRESSES
+            .iter()
+            .find(|(_, member_slot, _)| *member_slot == slot)
+            .map(|(_, _, address)| *address)
+            .unwrap()
+    }
+
+    /// The genesis image [`table`] describes: the shell's code at each populated member's fixed
+    /// address, pointing at its row's code.
+    fn image() -> GenesisImage {
+        let mut image = GenesisImage::default();
+        for (slot, row) in table().iter().enumerate() {
+            if row.is_empty() {
+                continue;
+            }
+            let implementation = system_proxy_implementation_address(row);
+            image.code.insert(fixed_address(slot), shell_code());
+            image.code.insert(implementation, row_code(slot));
+            image
+                .storage
+                .entry(fixed_address(slot))
+                .or_default()
+                .insert(EIP1967_IMPLEMENTATION_SLOT, implementation.into_word());
+        }
+        image
     }
 
     /// The blob `DeployCTM._buildForceDeploymentsData` builds for `table` and the expected values.
@@ -547,6 +779,7 @@ mod tests {
             genesis_root: Ok(ROOT),
             force_deployments_data: Some(force_deployments()),
             force_deployments: expected(),
+            image: Ok(image()),
         }
     }
 
@@ -603,6 +836,12 @@ mod tests {
         };
         assert_eq!(judge(&release(), &no_force_deployments).errors, 1);
 
+        let unreadable_image = ReviewedGenesis {
+            image: Err("cannot read the config".to_string()),
+            ..reviewed()
+        };
+        assert_eq!(judge(&release(), &unreadable_image).errors, 1);
+
         // Every independent expectation, missing on its own.
         fn missing<T>() -> Result<T, String> {
             Err("unavailable".to_string())
@@ -635,6 +874,118 @@ mod tests {
             };
             assert_eq!(judge(&release(), &reviewed).errors, 1, "{expected:?}");
         }
+    }
+
+    // ───────────────────────── the genesis image ─────────────────────────
+
+    /// One part of a correct image made wrong.
+    type ImageMutation = Box<dyn Fn(&mut GenesisImage)>;
+
+    /// Each part of a member's image, wrong on its own, is one error; so are all three at once,
+    /// since a member is reported on one line.
+    #[test]
+    fn each_genesis_image_mismatch_fails() {
+        let proxy = fixed_address(0);
+        let implementation = system_proxy_implementation_address(&table()[0]);
+        let other = || Bytes::from_static(b"code the release does not pin");
+        let mutations: Vec<(&str, ImageMutation)> = vec![
+            (
+                "other proxy code",
+                Box::new(move |i| {
+                    i.code.insert(proxy, other());
+                }),
+            ),
+            (
+                "no proxy code",
+                Box::new(move |i| {
+                    i.code.remove(&proxy);
+                }),
+            ),
+            (
+                "the implementation slot naming another address",
+                Box::new(move |i| {
+                    i.storage.get_mut(&proxy).unwrap().insert(
+                        EIP1967_IMPLEMENTATION_SLOT,
+                        Address::repeat_byte(0xBA).into_word(),
+                    );
+                }),
+            ),
+            (
+                "no implementation slot",
+                Box::new(move |i| {
+                    i.storage.remove(&proxy);
+                }),
+            ),
+            (
+                "other implementation code",
+                Box::new(move |i| {
+                    i.code.insert(implementation, other());
+                }),
+            ),
+            (
+                "no implementation code",
+                Box::new(move |i| {
+                    i.code.remove(&implementation);
+                }),
+            ),
+            (
+                "everything wrong",
+                Box::new(move |i| {
+                    i.code.insert(proxy, other());
+                    i.storage.remove(&proxy);
+                    i.code.remove(&implementation);
+                }),
+            ),
+        ];
+        for (mismatch, mutate) in mutations {
+            let mut image = image();
+            mutate(&mut image);
+            let reviewed = ReviewedGenesis {
+                image: Ok(image),
+                ..reviewed()
+            };
+            assert_eq!(judge(&release(), &reviewed).errors, 1, "{mismatch}");
+        }
+    }
+
+    /// Code of the info's length whose keccak differs, or of another length, is not the code
+    /// the info describes; neither is anything, against an info that is not 96 bytes.
+    #[test]
+    fn code_is_held_by_its_length_and_keccak() {
+        let code = row_code(0);
+        let info = bytecode_info(&code);
+        assert_eq!(code_mismatch(Some(&code), &info), None);
+        assert!(code_mismatch(Some(&row_code(1)), &info).is_some());
+        assert!(code_mismatch(Some(&shell_code()), &info).is_some());
+        assert!(code_mismatch(None, &info).is_some());
+        assert!(code_mismatch(Some(&code), &Bytes::from(info[..64].to_vec())).is_some());
+    }
+
+    /// A populated row of a member without a fixed address (one of the deploy-time-only
+    /// members) cannot be in any genesis image.
+    #[test]
+    fn a_populated_row_without_a_fixed_address_fails() {
+        const BEACON_PROXY: usize = 14;
+        assert!(L2_ECOSYSTEM_FIXED_ADDRESSES
+            .iter()
+            .all(|(_, slot, _)| *slot != BEACON_PROXY));
+        let mut release = release();
+        release
+            .l2BytecodeInfos
+            .resize(BEACON_PROXY + 1, Bytes::new());
+        release.l2BytecodeInfos[BEACON_PROXY] = bytecode_info(&row_code(BEACON_PROXY));
+        assert_eq!(judge(&release, &reviewed()).errors, 1);
+    }
+
+    /// [`system_proxy_implementation_address`] transcribes the helper's derivation.
+    #[test]
+    fn the_implementation_address_is_the_helpers() {
+        const HELPER: &str = include_str!(
+            "../../../../l1-contracts/contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol"
+        );
+        assert!(HELPER.contains(
+            "return address(uint160(uint256(keccak256(bytes.concat(bytes32(0), _bytecodeInfo)))));"
+        ));
     }
 
     // ───────────────────────── the decoded force deployments ─────────────────────────
@@ -741,7 +1092,7 @@ mod tests {
             ),
             (
                 "bridgehub (the bare row, no shell)",
-                Box::new(|d| d.bridgehubBytecodeInfo = Bytes::from_static(b"row 0")),
+                Box::new(|d| d.bridgehubBytecodeInfo = table()[0].clone()),
             ),
         ];
         for (field, mutate) in mutations {
@@ -848,12 +1199,47 @@ mod tests {
 
     #[test]
     fn a_genesis_config_without_a_root_is_refused() {
-        assert!(parse_genesis_root(r#"{"genesis_root": "0x12"}"#).is_err());
-        assert!(parse_genesis_root(r#"{"execution_version": 5}"#).is_err());
+        use serde_json::json;
+        assert!(parse_genesis_root(&json!({"genesis_root": "0x12"})).is_err());
+        assert!(parse_genesis_root(&json!({"execution_version": 5})).is_err());
         assert_eq!(
-            parse_genesis_root(&format!(r#"{{"genesis_root": "{ROOT}"}}"#)),
+            parse_genesis_root(&json!({"genesis_root": ROOT.to_string()})),
             Ok(ROOT)
         );
+    }
+
+    /// The committed config holds code at every fixed address, and the proxies' implementation
+    /// slots beside it.
+    #[test]
+    fn the_committed_genesis_config_has_an_image() {
+        let image = reviewed_genesis_image().expect("the committed genesis config must parse");
+        for (member, _, address) in L2_ECOSYSTEM_FIXED_ADDRESSES {
+            assert!(image.code.contains_key(&address), "{member}");
+        }
+        assert!(image.storage[&fixed_address(0)].contains_key(&EIP1967_IMPLEMENTATION_SLOT));
+    }
+
+    #[test]
+    fn a_genesis_image_is_parsed_from_its_two_keys() {
+        use serde_json::json;
+        let address = Address::repeat_byte(0x10);
+        let image = parse_genesis_image(&json!({
+            "initial_contracts": [[address.to_string(), "0xc0de"]],
+            "additional_storage": {
+                address.to_string(): { EIP1967_IMPLEMENTATION_SLOT.to_string(): ROOT.to_string() }
+            },
+        }))
+        .unwrap();
+        assert_eq!(image.code[&address], Bytes::from_static(&[0xc0, 0xde]));
+        assert_eq!(image.storage[&address][&EIP1967_IMPLEMENTATION_SLOT], ROOT);
+
+        assert!(parse_genesis_image(&json!({"additional_storage": {}})).is_err());
+        assert!(parse_genesis_image(&json!({"initial_contracts": []})).is_err());
+        assert!(parse_genesis_image(&json!({
+            "initial_contracts": [[address.to_string()]],
+            "additional_storage": {},
+        }))
+        .is_err());
     }
 
     /// The prepare's genesis inputs are read here from its source: `genesis_root` comes from the

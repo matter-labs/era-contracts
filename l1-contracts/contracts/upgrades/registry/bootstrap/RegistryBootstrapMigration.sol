@@ -108,7 +108,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
         );
         // Held to the edge rules of a `CTMTransition`: chains cross this edge through the same
         // per-chain version checks, so an edge they would refuse must not be committable.
-        // slither-disable-next-line unused-return
         VersionEdgeLib.requireValidEdge({
             _oldVersion: _manifest.expectedProtocolVersion,
             _newVersion: newVersion,

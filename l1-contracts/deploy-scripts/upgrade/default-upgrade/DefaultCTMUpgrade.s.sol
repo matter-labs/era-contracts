@@ -466,6 +466,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             ctmAddresses.stateTransition.proxies.serverNotifier,
             ctmAddresses.stateTransition.implementations.serverNotifier
         );
+        rows[uint256(CTMContract.L1InteropFeeManager)] = _ctmRow(
+            ctmAddresses.stateTransition.proxies.interopFeeManager,
+            ctmAddresses.stateTransition.implementations.interopFeeManager
+        );
     }
 
     /// @dev The inert (all-zero) row when this run deployed no implementation for the proxy.
@@ -557,6 +561,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         impls[uint256(CTMContract.PermissionlessValidator)] = _deployedCTMImpl(
             proxies.permissionlessValidator,
             implementations.permissionlessValidator
+        );
+        impls[uint256(CTMContract.L1InteropFeeManager)] = _deployedCTMImpl(
+            proxies.interopFeeManager,
+            implementations.interopFeeManager
         );
     }
 
@@ -756,6 +764,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         the EIP-7702 checker the fresh MailboxFacet takes, and the force-deployments blob the
     ///         release pins.
     function deployNewCTMContracts() public virtual {
+        // Kept, not redeployed: see {protocol-docs/interop-fee.md#the-switch}.
+        require(
+            ctmAddresses.stateTransition.proxies.interopFeeManager != address(0),
+            "CTM has no L1InteropFeeManager registered; it is expected from v35 on"
+        );
         deployEIP7702Checker();
         generateFixedForceDeploymentsData();
     }
@@ -998,6 +1011,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             "state_transition",
             "committer_facet_addr",
             ctmAddresses.stateTransition.facets.committerFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "interop_fee_manager_proxy_addr",
+            ctmAddresses.stateTransition.proxies.interopFeeManager
         );
         vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);

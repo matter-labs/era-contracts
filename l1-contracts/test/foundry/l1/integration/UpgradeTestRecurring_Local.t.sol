@@ -20,11 +20,19 @@ import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IE
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
+import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {
     CTMContract,
     L1EcosystemContract,
     L2_ECOSYSTEM_CONTRACT_COUNT
 } from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+
+import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {IChainAdminMulticall} from "deploy-scripts/AdminFunctions.s.sol";
 
 import {UpgradeIntegrationBootstrapFixture} from "./UpgradeTest_Local.t.sol";
 
@@ -41,11 +49,11 @@ import {UpgradeIntegrationBootstrapFixture} from "./UpgradeTest_Local.t.sol";
 ///      this file tests — the declaration, the objects, the version and release invariants — runs
 ///      unmocked.
 abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
-    function getL2BytecodeInfoTable() internal override returns (bytes[] memory) {
+    function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
         return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
     }
 
-    function getL2SystemProxyBytecodeInfo() internal override returns (bytes memory) {
+    function getL2SystemProxyBytecodeInfo() internal pure override returns (bytes memory) {
         return "";
     }
 
@@ -88,6 +96,19 @@ contract CTMUpgradeValidatorTimelockOnly is RecurringCTMUpgradeForTests {
     function deployNewCTMContracts() public override {
         super.deployNewCTMContracts();
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("ValidatorTimelock");
+    }
+}
+
+/// @notice An infrastructure-only hop that swaps the `L1InteropFeeManager` implementation behind its
+///         CTM-domain proxy, through the inventory slot the enum gives it.
+contract CTMUpgradeInteropFeeManagerOnly is RecurringCTMUpgradeForTests {
+    function upgradeKind() public pure override returns (UpgradeKind) {
+        return UpgradeKind.InfrastructureOnly;
+    }
+
+    function deployNewCTMContracts() public override {
+        super.deployNewCTMContracts();
+        ctmAddresses.stateTransition.implementations.interopFeeManager = deploySimpleContract("L1InteropFeeManager");
     }
 }
 
@@ -212,7 +233,7 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 /// @dev Everything here drives `DefaultCoreUpgrade`/`DefaultCTMUpgrade` themselves; the object
 ///      layer is covered separately by `RegistryIndividualUpgrade.t.sol`, which cannot show that
 ///      PREPARATION can produce these shapes.
-contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFixture {
+contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixture {
     using stdToml for string;
 
     /// @dev The upgrade input whose `latest_protocol_version` EQUALS the version the bootstrap
@@ -346,6 +367,44 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
         _assertChainFacingUnchanged(before);
     }
 
+    /// @notice The fee manager's implementation swap is a checked row like any other CTM-domain
+    ///         proxy's: preparation puts it in the `L1InteropFeeManager` slot, and `execute` applies
+    ///         it through the CTM-domain ProxyAdmin, keeping the proxy's state.
+    function test_interopFeeManagerPrepare_swapsTheFeeManagerThroughItsSlot() public {
+        address feeManager = IChainTypeManager(inputs.ctm).L1_INTEROP_FEE_MANAGER();
+        address feeOwner = IOwnable(feeManager).owner();
+        uint256 feePerUnit = 7;
+        vm.prank(feeOwner);
+        IL1InteropFeeManager(feeManager).setFee(ETH_TOKEN_ADDRESS, feePerUnit);
+
+        CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeInteropFeeManagerOnly();
+        _prepareHop(core, hop, SAME_VERSION_INPUT, "recurring-fee-manager");
+
+        IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
+        assertEq(operation.ctmTransition(), address(0), "an infrastructure-only hop names no transition");
+        address implOld = DeployScriptUtils.getImplementation(feeManager);
+        address implNew = hop.getAddresses().stateTransition.implementations.interopFeeManager;
+        assertTrue(implNew != implOld, "the fixture must actually replace the implementation");
+        ProxyUpgradeRow memory row = operation.getManifest().ctmInfrastructure[
+            uint256(CTMContract.L1InteropFeeManager)
+        ];
+        assertEq(row.proxy, feeManager, "the slot names the CTM's fee manager proxy");
+        assertEq(row.expectedOldImpl, implOld, "the row departs from what the proxy runs today");
+        assertEq(row.implNew, implNew, "the row names the implementation this run deployed");
+        assertEq(operation.ctmInfrastructureRows().length, 1, "the fee manager row is the only one");
+
+        ChainFacingState memory before = _snapshotChainFacing();
+        vm.expectEmit(true, true, true, true, IOwnable(inputs.ctm).owner());
+        emit ProxyUpgradeRowLib.ProxyImplementationUpgraded(feeManager, implNew);
+        _runOperation(operation);
+
+        assertEq(DeployScriptUtils.getImplementation(feeManager), implNew, "the fee manager runs the new code");
+        assertEq(IOwnable(feeManager).owner(), feeOwner, "the swap keeps the owner");
+        assertEq(IL1InteropFeeManager(feeManager).feePerUnit(), feePerUnit, "the swap keeps the fee");
+        _assertChainFacingUnchanged(before);
+    }
+
     /// @notice A chain-release hop through the same pipeline still works: a fresh verifier is
     ///         pinned by a new release, a transition carries the version edge, and the engine that
     ///         composes each chain's cut is deployed and committed.
@@ -383,6 +442,50 @@ contract UpgradeIntegrationTest_Recurring_Local is UpgradeIntegrationBootstrapFi
             IChainTypeManager(inputs.ctm).currentRelease(),
             ICTMTransition(transition).newRelease(),
             "the CTM moved to the new release"
+        );
+    }
+
+    /// @notice A validator holding `UPGRADER_ROLE` crosses a registry-driven edge through the
+    ///         timelock once the chain's upgrade timestamp has passed: the timelock forwards the
+    ///         cut-reading call the v35+ Admin facet serves.
+    /// @dev The fixture's pre-bootstrap timelock is built from current source, so this shows the
+    ///      forwarding, not that the bootstrap's timelock swap is needed; `UpgradeTest_Local`
+    ///      asserts the swap row.
+    function test_chainReleaseEdge_isCrossedByAValidatorThroughTheTimelock() public {
+        uint256 liveVersion = IChainTypeManager(inputs.ctm).protocolVersion();
+        CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeVerifierRelease();
+        _prepareHop(core, hop, NEXT_VERSION_INPUT, "recurring-validator-crossing");
+        IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
+        _runOperation(operation);
+
+        address upgrader = makeAddr("upgrader");
+        IValidatorTimelock.ValidatorRotationParams memory upgraderOnly;
+        upgraderOnly.rotateUpgraderRole = true;
+        address serverNotifier = IChainTypeManager(inputs.ctm).serverNotifierAddress();
+        address chainAdmin = IGetters(_eraDiamond).getAdmin();
+        Call[] memory adminCalls = new Call[](2);
+        adminCalls[0] = Call({
+            target: validatorTimelockProxy,
+            value: 0,
+            data: abi.encodeCall(IValidatorTimelock.addValidatorRoles, (_eraDiamond, upgrader, upgraderOnly))
+        });
+        adminCalls[1] = Call({
+            target: serverNotifier,
+            value: 0,
+            data: abi.encodeCall(IServerNotifier.setUpgradeTimestamp, (eraZKChainId, block.timestamp))
+        });
+        vm.prank(IOwnable(chainAdmin).owner());
+        IChainAdminMulticall(chainAdmin).multicall(adminCalls, true);
+
+        vm.prank(upgrader);
+        IValidatorTimelock(validatorTimelockProxy).upgradeChainFromVersion(_eraDiamond, liveVersion);
+
+        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _nextVersion(), "the chain crossed the edge");
+        assertEq(
+            address(IGetters(_eraDiamond).getVerifier()),
+            ICTMRelease(ICTMTransition(hop.preparedTransition()).newRelease()).verifier(),
+            "the chain runs the new release's verifier"
         );
     }
 

@@ -155,6 +155,7 @@ library GatewayCTMDeployerHelper {
         bytes memory _l2SystemProxyBytecodeInfo
     )
         internal
+        view
         returns (
             DeployedContracts memory contracts,
             DeployerCreate2Calldata memory deployerCalldata,
@@ -180,6 +181,7 @@ library GatewayCTMDeployerHelper {
         bytes memory _l2SystemProxyBytecodeInfo
     )
         internal
+        view
         returns (
             DeployedContracts memory contracts,
             DeployerCreate2Calldata memory deployerCalldata,
@@ -513,7 +515,7 @@ library GatewayCTMDeployerHelper {
         DirectDeployedAddresses memory _direct,
         bytes[] memory _l2BytecodeInfos,
         bytes memory _l2SystemProxyBytecodeInfo
-    ) internal returns (address releaseAddr, bytes memory calldataOut) {
+    ) internal view returns (address releaseAddr, bytes memory calldataOut) {
         bytes memory manifestArgs = abi.encode(
             _predictedGenesisManifest(_direct, _config, _l2BytecodeInfos, _l2SystemProxyBytecodeInfo)
         );
@@ -658,7 +660,7 @@ library GatewayCTMDeployerHelper {
         result.chainTypeManagerImplementation = _deployInternalWithParams(
             ctmName,
             ctmFile,
-            abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0)),
+            abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0), address(0)),
             innerConfig
         );
 
@@ -719,7 +721,7 @@ library GatewayCTMDeployerHelper {
         Verifiers memory verifiersResult,
         DirectDeployedAddresses memory directAddresses,
         GatewayCTMFinalResult memory ctmResult
-    ) internal view returns (DeployedContracts memory contracts) {
+    ) internal pure returns (DeployedContracts memory contracts) {
         // From DA deployer
         contracts.daContracts.rollupDAManager = daResult.rollupDAManager;
         contracts.daContracts.validiumDAValidator = daResult.validiumDAValidator;
@@ -766,7 +768,8 @@ library GatewayCTMDeployerHelper {
                 eip7702Checker: address(0),
                 verifierFflonk: _deployedContracts.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: _deployedContracts.stateTransition.verifiers.verifierPlonk,
-                permissionlessValidator: address(0)
+                permissionlessValidator: address(0),
+                interopFeeManager: address(0)
             });
     }
 

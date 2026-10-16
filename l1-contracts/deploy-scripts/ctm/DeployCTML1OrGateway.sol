@@ -20,6 +20,7 @@ struct CTMCoreDeploymentConfig {
     address verifierFflonk;
     address verifierPlonk;
     address permissionlessValidator;
+    address interopFeeManager;
 }
 
 library DeployCTML1OrGateway {
@@ -72,7 +73,8 @@ library DeployCTML1OrGateway {
                     _config.bridgehubProxy,
                     _config.interopCenterProxy,
                     _config.l1BytecodesSupplier,
-                    _config.permissionlessValidator
+                    _config.permissionlessValidator,
+                    _config.interopFeeManager
                 );
         } else if (_contractName == CTMContract.BlobsL1DAValidatorZKsyncOS) {
             return abi.encode();
@@ -160,6 +162,7 @@ library DeployCTML1OrGateway {
         if (_c == CTMContract.ValidatorTimelock) return "ValidatorTimelock";
         if (_c == CTMContract.BlobsL1DAValidatorZKsyncOS) return "BlobsL1DAValidatorZKsyncOS";
         if (_c == CTMContract.ServerNotifier) return "ServerNotifier";
+        if (_c == CTMContract.L1InteropFeeManager) return "L1InteropFeeManager";
 
         revert("DeployCTML1OrGateway: unknown CTMContract");
     }

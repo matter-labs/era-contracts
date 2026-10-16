@@ -12,6 +12,7 @@ import {
     ProxyUpgradeRowMismatch,
     RegistryDuplicateProxyRow,
     RegistryInventoryLengthMismatch,
+    RegistrySelfEdgeProxyRow,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 
@@ -54,7 +55,7 @@ library ProxyUpgradeRowLib {
     }
 
     /// @notice Shape discipline shared by every row-carrying manifest: every row is a REAL,
-    ///         unique edge — known source, named target, one row per proxy. Placeholder rows
+    ///         unique edge — known source, a different named target, one row per proxy. Placeholder rows
     ///         (zero fields) are refused: a contract not participating in the upgrade is an
     ///         inventory slot `toRows` already dropped, never a row. Code existence is NOT
     ///         checked here (an object may be constructed alongside the implementations it
@@ -65,6 +66,9 @@ library ProxyUpgradeRowLib {
             ProxyUpgradeRow memory row = _rows[i];
             if (row.proxy == address(0) || row.expectedOldImpl == address(0) || row.implNew == address(0)) {
                 revert ZeroAddress();
+            }
+            if (row.expectedOldImpl == row.implNew) {
+                revert RegistrySelfEdgeProxyRow(row.proxy);
             }
             for (uint256 j = 0; j < i; ++j) {
                 if (_rows[j].proxy == row.proxy) {

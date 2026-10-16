@@ -51,10 +51,11 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 ## Preparing an upgrade
 
 `ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v35` and `CTMUpgrade_v35`
-under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge onto registry-driven upgrades), using
-`upgrade-envs/v0.35.0-upgrade-system/local.toml` for a local upgrade. The recurring registry-driven edge,
-`CoreUpgrade_v36` and `CTMUpgrade_v36` under `l1-contracts/deploy-scripts/upgrade/v36/`, is selected with
-`--core-script-path` / `--ctm-script-path`.
+under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge onto registry-driven upgrades;
+`CTMUpgrade_v35` also deploys the `L1InteropFeeManager` proxy, see
+[the switch](../protocol-docs/interop-fee.md#the-switch)), using `upgrade-envs/v0.35.0-upgrade-system/local.toml` for a
+local upgrade. The recurring registry-driven edge, `CoreUpgrade_v36` and `CTMUpgrade_v36` under
+`l1-contracts/deploy-scripts/upgrade/v36/`, is selected with `--core-script-path` / `--ctm-script-path`.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 
@@ -128,8 +129,9 @@ Every command that generates Safe bundles runs **exclusively against a temporary
 of `--l1-rpc-url`. The real L1 is **never modified** by the CLI. The fork exists only for
 the duration of the command and stops when it exits.
 
-To apply the generated Safe bundles to a real chain, use `dev execute-manifest` (or any
-Safe-bundle-aware executor) with the keys from `wallets.yaml`.
+To apply the generated Safe bundles to a real chain, use `ecosystem upgrade-broadcast --manifest
+<out>/manifest.json` (one `--key` per signer in the manifest), `dev execute-safe` per bundle, or
+any Safe-bundle-aware executor.
 
 ## Verifying a registry-driven upgrade before it is signed
 
@@ -184,7 +186,10 @@ field held against an independent expectation: `l1ChainId` against the RPC's cha
 live Bridgehub, `aliasedL1Governance` against the alias of the reviewed governance, `zkTokenAssetId`
 against the `zk_token_asset_id` of `upgrade-envs/permanent-values/<env>.toml` for the `--env` the
 package is held against (required unless the package is a replacement), the legacy and test-only
-addresses against zero, and each bytecode field against the release's own L2 bytecode table.
+addresses against zero, and each bytecode field against the release's own L2 bytecode table. The
+arriving release's system-proxy shell is compared with the departing one's, compiler metadata
+stripped: a logic change fails unless the edge ships a delegate the reviewed commit builds other
+than the stock `L2DefaultUpgrade`, which is then reported for the reviewer to confirm.
 
 **What the objects' members run** is held against the reviewed build too. An L1 member's live code
 is compared with the reviewed artifact of each contract its role admits, byte for byte outside the
@@ -262,16 +267,17 @@ so an unverifiable input reported as one reads, afterwards, exactly like a check
 
 ## Output
 
-Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a successful run:
+Commands that support **`--out`** write, into that directory, one Safe Transaction Builder JSON
+file per consecutive run of transactions by the same signer, plus a **`manifest.json`**:
 
-| Field              | Meaning                                                                                                                      |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| **`command`**      | CLI path id (e.g. `chain.init`, `ecosystem.upgrade`).                                                                        |
-| **`version`**      | Envelope format version (currently `1`).                                                                                     |
-| **`runs`**         | One entry per Forge script: `script` (path) and `run` (broadcast JSON for that script).                                      |
-| **`transactions`** | Flat array in execution order: `{ "to", "data", "value" }` for replay (normalized like `cast send`). Built from every `run`. |
-| **`input`**        | Serialized command input (may be `{}` if the command passes an empty object).                                                |
-| **`output`**       | Command-specific result object (may be `{}`).                                                                                |
+| Field          | Meaning                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **`bundles`**  | One entry per bundle file, in execution order: `index`, `file`, `target` (the signer), `steps`, `tx_count`.                         |
+| **`metadata`** | One entry per command run into this directory: `command` (CLI path id, e.g. `chain.init`), `input` and `output` (both may be `{}`). |
+
+Without `--out` no bundles are written, unless the command derives a default from `--env`:
+`upgrade-prepare-all` (which also rewrites the release's canonical `ecosystem.toml`),
+`upgrade-governance` and `chain upgrade` do.
 
 ## Requirements
 

@@ -702,9 +702,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // script the prepare flow spawns. `Utils.executeCalls` / `executeUpgrade`
     // read this via `vm.envOr("LEGACY_GOV_SALT", bytes32(0))`. Child
     // processes inherit env vars from this process, so a single `set_var`
-    // here covers every script in the pipeline. See
-    // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
-    // ("Core principle") for why a per-regen salt is required.
+    // here covers every script in the pipeline.
     if let Some(cfg) = env_cfg.as_ref() {
         if let Some(salt) = cfg.legacy_gov_salt_for_upgrade()? {
             logger::info(format!(
@@ -842,7 +840,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // there is nothing to do there. But that is a permanent property of the
     // ecosystem, not a statement that THIS release replaces its governance set:
     // gating on it alone made every recurring preparation on a PUH env redeploy
-    // the whole governance set and fold four wiring calls into the bundle. The
+    // the whole governance set and fold its wiring call into the bundle. The
     // release's own env input declares the intent, per env, in the directory that
     // moves with the release — so a later release simply omits the key and
     // redeploys nothing.
@@ -1028,6 +1026,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// [governance_calls]              # the one bundle: extras, core actions, the DERIVED
 /// calls = "0x..."                 # execute(operation) (registry-driven only), CTM actions
 ///
+/// [test_upgrade_calls]            # the CTM prepare's simulator probes, when it wrote any
+/// test_create_chain_zkos = "0x..."
+/// test_create_chain_zkos_caller = "0x..."
+/// test_upgrade_chain_zkos = "0x..."
+/// test_upgrade_chain_zkos_caller = "0x..."
+///
 /// [operation]                     # registry-driven upgrades only: the operation the CTM
 /// operation_addr = "0x..."        # prepare deployed, and the coordinator its executor call
 /// coordinator_addr = "0x..."      # is derived on
@@ -1035,7 +1039,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// [core]                          # whole core TOML minus its [governance_calls]
 /// ...
 ///
-/// [ctms.zksync_os]                # whole CTM TOML minus its [governance_calls];
+/// [ctms.zksync_os]                # whole CTM TOML minus its [governance_calls] and probes;
 /// ...                             # one section per ZKsyncOS CTM.
 /// ...
 ///
@@ -1086,12 +1090,7 @@ fn write_merged_ecosystem_toml(
             "new_emergency_upgrade_board".into(),
             Value::String(format!("{:#x}", zk_governance.new_emergency_upgrade_board)),
         );
-        // `[misc]` stays last.
-        let misc = doc.remove("misc");
         doc.insert("zk_governance".into(), Value::Table(table));
-        if let Some(misc) = misc {
-            doc.insert("misc".into(), misc);
-        }
     }
 
     let body = format!(
@@ -1117,6 +1116,21 @@ fn write_merged_ecosystem_toml(
         dst.display()
     ));
     Ok(())
+}
+
+/// A ZKsync OS CTM's probes under the simulator's tags: `test_<probe>` becomes `test_<probe>_zkos`
+/// and its `test_<probe>_caller` becomes `test_<probe>_zkos_caller`.
+fn zksync_os_probe_tags(probes: toml::value::Table) -> toml::value::Table {
+    probes
+        .into_iter()
+        .map(|(key, value)| {
+            let tag = match key.strip_suffix("_caller") {
+                Some(probe) => format!("{probe}_zkos_caller"),
+                None => format!("{key}_zkos"),
+            };
+            (tag, value)
+        })
+        .collect()
 }
 
 /// One prepare output split into its body, its governance bundle and its declared actions.
@@ -1154,9 +1168,10 @@ fn load_prepare_output(path: &Path) -> anyhow::Result<PrepareOutputParts> {
     })
 }
 
-/// The merged document of [`write_merged_ecosystem_toml`] minus `[zk_governance]`, in the
-/// order `toml::to_string` writes it: `external_actions`, `[governance_calls]`, `[core]`,
-/// `[ctms.*]`, the optional `[operation]`, and `[misc]` last.
+/// The merged document of [`write_merged_ecosystem_toml`] minus `[zk_governance]`:
+/// `external_actions`, `[governance_calls]`, the optional `[test_upgrade_calls]`, `[core]`,
+/// `[ctms.*]`, the optional `[operation]` and `[misc]`. `toml::to_string` writes the keys in
+/// alphabetical order.
 fn merge_prepare_outputs(
     core: PrepareOutputParts,
     ctms: Vec<(Address, PrepareOutputParts)>,
@@ -1214,6 +1229,7 @@ fn merge_prepare_outputs(
     // reaches the merge is ZKsync OS. The merge keys per-CTM sections by the fixed
     // `zksync_os` label, so two CTMs in one upgrade collide here.
     let mut ctms_table = Table::new();
+    let mut test_upgrade_calls: Option<Table> = None;
     for (proxy, ctm) in ctms {
         let label = "zksync_os";
         if ctms_table.contains_key(label) {
@@ -1227,7 +1243,17 @@ fn merge_prepare_outputs(
             &ctm.external_actions,
         )?;
         external_actions.extend(ctm.external_actions);
-        ctms_table.insert(label.to_string(), Value::Table(ctm.body));
+        let mut body = ctm.body;
+        // The simulator reads the probes at the top level only, under ZKsync OS tags.
+        test_upgrade_calls = match body.remove("test_upgrade_calls") {
+            Some(Value::Table(probes)) => Some(zksync_os_probe_tags(probes)),
+            Some(other) => anyhow::bail!(
+                "[test_upgrade_calls] in CTM prepare {proxy:#x} must be a table (got {})",
+                other.type_str()
+            ),
+            None => None,
+        };
+        ctms_table.insert(label.to_string(), Value::Table(body));
         chunks.push(ctm.gov.calls);
     }
 
@@ -1248,6 +1274,9 @@ fn merge_prepare_outputs(
         "governance_calls".into(),
         Value::Table(governance_calls_table),
     );
+    if let Some(probes) = test_upgrade_calls {
+        doc.insert("test_upgrade_calls".into(), Value::Table(probes));
+    }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
     if let Some(body) = operation_body {
@@ -1261,7 +1290,9 @@ fn merge_prepare_outputs(
 
 /// Read the `acceptOwnership()` Call list written by
 /// `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
-/// (in `<l1-contracts>/script-out/pre-governance-accept-ownerships.toml`).
+/// (in `<l1-contracts>/script-out/pre-governance-accept-ownerships.toml`):
+/// one per CTM, and one per CTM ValidatorTimelock, whose `pendingOwner` is
+/// governance after the prepare pre-step.
 /// Returns an empty vector when the file doesn't exist (e.g. a prior regen
 /// without this step) — the merge step then has nothing to prepend.
 pub(super) fn read_pre_governance_accept_ownership_calls(
@@ -1325,7 +1356,7 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
 /// Both inputs are necessary and neither is sufficient. `governance_kind` says the ecosystem HAS a
 /// `ProtocolUpgradeHandler` — a permanent property, true of every release prepared for that env, so
 /// gating on it alone made every RECURRING preparation on a PUH env redeploy the whole governance
-/// set and fold four wiring calls into the governance bundle. `redeploy_declared` is the release's
+/// set and fold its wiring call into the governance bundle. `redeploy_declared` is the release's
 /// own statement that it intends to. Declared-but-impossible is a misconfiguration to name, not to
 /// skip past: silently doing nothing would hide a release that thinks it is replacing governance.
 ///
@@ -1343,6 +1374,90 @@ fn zk_governance_redeploy_decision(
         );
     }
     Ok(is_puh_governed && redeploy_declared)
+}
+
+// ─── forge-script upgrades ───────────────────────────────────────────────────────
+
+/// Prepare a `forge-script` upgrade (see `upgrade_descriptor`): run its entry point on
+/// `l1_rpc_url` as `deployer` and write the deployer's transactions as Safe bundles plus
+/// `manifest.json` under `out` — the packaging `upgrade-prepare-all` uses, so the deploy
+/// bundle, its replay and its broadcast are shared with the `prepare-all` flow.
+///
+/// The script runs as a dry run: forge records the transactions without sending them, so
+/// the fork stays at its pre-upgrade state and the caller can replay the packed bundle on it.
+pub async fn run_forge_script_prepare(
+    upgrade_name: &str,
+    upgrade: &crate::common::upgrade_descriptor::ForgeScriptUpgrade,
+    env: &str,
+    l1_rpc_url: &str,
+    deployer: Address,
+    out: &Path,
+) -> anyhow::Result<()> {
+    let shared = crate::common::SharedRunArgs {
+        l1_rpc_url: l1_rpc_url.to_string(),
+        out: Some(out.to_path_buf()),
+        subdir: None,
+        forge_args: Default::default(),
+    };
+    let mut runner = ForgeRunner::new(&shared)?;
+    let wallet = runner.prepare_sender(deployer).await?;
+    let script = runner
+        .script_path_from_root(
+            &crate::common::paths::resolve_l1_contracts_path()?,
+            upgrade.script_path(),
+        )
+        .with_calldata(&Bytes::from(upgrade.calldata(env)?))
+        .with_ffi()
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&wallet);
+    logger::step(format!("Running {} for {env} (dry run)", upgrade.script));
+    runner
+        .run(script)
+        .with_context(|| format!("failed to execute {}", upgrade.script))?;
+    crate::common::output::write_output_if_requested(
+        &format!("ecosystem.prepare.{upgrade_name}"),
+        &shared,
+        &runner,
+        &serde_json::json!({
+            "upgrade": upgrade_name,
+            "env": env,
+            "script": upgrade.script,
+            "signature": upgrade.signature,
+            "args": upgrade.args_for(env),
+        }),
+        &serde_json::json!({}),
+    )
+    .await
+}
+
+/// Run a `forge-script` upgrade's `[execution]` script for `env` on `l1_rpc_url` (read-only: a
+/// simulation without a sender), which writes `output/<env>/<execution.output>`.
+pub fn run_execution_script(
+    execution: &crate::common::upgrade_descriptor::ExecutionScript,
+    env: &str,
+    l1_rpc_url: &str,
+) -> anyhow::Result<()> {
+    let shared = crate::common::SharedRunArgs {
+        l1_rpc_url: l1_rpc_url.to_string(),
+        out: None,
+        subdir: None,
+        forge_args: Default::default(),
+    };
+    let mut runner = ForgeRunner::new(&shared)?;
+    let script = runner
+        .script_path_from_root(
+            &crate::common::paths::resolve_l1_contracts_path()?,
+            execution.script_path(),
+        )
+        .with_calldata(&Bytes::from(execution.calldata(env)?))
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT);
+    logger::step(format!(
+        "Running {} for {env} (read-only)",
+        execution.script
+    ));
+    runner
+        .run(script)
+        .with_context(|| format!("failed to execute {}", execution.script))
 }
 
 #[cfg(test)]
@@ -1519,6 +1634,44 @@ mod tests {
         assert_eq!(
             doc["operation"]["operation_addr"].as_str().unwrap(),
             format!("{operation:#x}")
+        );
+    }
+
+    /// The CTM prepare's probes reach the simulator: the merge lifts them out of
+    /// `[ctms.zksync_os]`, where the simulator does not look, to the top level under ZKsync OS tags.
+    #[test]
+    fn the_ctm_prepare_probes_reach_the_simulator() {
+        let governance = call(0xc1, &[0x02]);
+        let mut ctm = prepare_output(std::slice::from_ref(&governance));
+        let mut probes = toml::value::Table::new();
+        for probe in ["test_create_chain", "test_upgrade_chain"] {
+            probes.insert(probe.into(), bundle_hex(&[call(0x51, &[0x04])]).into());
+            probes.insert(
+                format!("{probe}_caller"),
+                format!("{:#x}", Address::repeat_byte(0xad)).into(),
+            );
+        }
+        ctm.body
+            .insert("test_upgrade_calls".into(), toml::Value::Table(probes));
+        let doc = merge_prepare_outputs(
+            prepare_output(&[]),
+            vec![(Address::repeat_byte(0x77), ctm)],
+            None,
+            &[],
+        )
+        .unwrap();
+        assert!(doc["ctms"]["zksync_os"].get("test_upgrade_calls").is_none());
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ecosystem.toml");
+        fs::write(&path, toml::to_string(&doc).unwrap()).unwrap();
+        assert_eq!(
+            crate::commands::ecosystem::simulator::simulator_transaction_tags(&path).unwrap(),
+            [
+                "governance",
+                "test_create_chain_zkos",
+                "test_upgrade_chain_zkos"
+            ]
         );
     }
 

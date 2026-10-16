@@ -48,11 +48,6 @@ contract UpgradeChainFromVersionTest is AdminTest {
     function test_revertWhen_calledByNonAdminOrChainTypeManager() public {
         address nonAdminOrChainTypeManager = makeAddr("nonAdminOrChainTypeManager");
         uint256 oldProtocolVersion = 1;
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(0),
-            initCalldata: new bytes(0)
-        });
 
         vm.startPrank(nonAdminOrChainTypeManager);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonAdminOrChainTypeManager));
@@ -203,13 +198,15 @@ contract UpgradeChainFromVersionTest is AdminTest {
         // the subject here is the facet's time gate, not the registry objects the engine reads.
         DefaultUpgrade defaultUpgrade = new DefaultUpgrade();
         address transition = makeAddr("transition");
-        Utils.mockL1OnlyTransition(
-            transition,
-            makeAddr("newRelease"),
-            oldProtocolVersion,
-            newProtocolVersion,
-            mockVerifier
-        );
+        Utils.mockL1OnlyTransition({
+            _transition: transition,
+            _fromRelease: makeAddr("fromRelease"),
+            _departingRouting: diamondRouting(),
+            _newRelease: makeAddr("newRelease"),
+            _oldProtocolVersion: oldProtocolVersion,
+            _newProtocolVersion: newProtocolVersion,
+            _verifier: mockVerifier
+        });
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
