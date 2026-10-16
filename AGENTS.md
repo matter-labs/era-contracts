@@ -324,7 +324,7 @@ The repository builds and tests with upstream Foundry (ordinary EVM, no `--zksyn
 version covers forge, cast and anvil alike, and it lives in
 [`.github/foundry-versions.env`](.github/foundry-versions.env) — CI installs it through
 `.github/actions/install-foundry`, `recompute_hashes.sh` reads the same file, and the Docker base
-image (`docker/protocol/Dockerfile.base`) installs it. Install it with:
+image takes it as a build arg. Install it with:
 
 ```bash
 curl -L https://foundry.paradigm.xyz | bash

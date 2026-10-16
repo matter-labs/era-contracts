@@ -43,7 +43,6 @@ jobs:
       # where `--env` reads its config); the work dir is mounted so `--out`
       # inside the container lands where upload-artifact reads it.
       EXTRA_MOUNTS: ${{ github.workspace }}/protocol-ops-workdir:/contracts/work
-      # Refuse images build-docker.yaml did not release (no revision label).
       PROTOCOL_OPS_REQUIRE_RELEASE: "1"
     steps:
       - uses: actions/checkout@v4

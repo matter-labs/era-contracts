@@ -15,9 +15,9 @@ locally and in CI:
 2. **Deploy** — broadcast the deployer bundles to a real L1, producing
    `transactions.txt`, then verify the deployed contracts on Etherscan.
 
-Both run in a released `ghcr.io/matter-labs/protocol-ops` image, locally and in CI
-alike (`./protocol-ops.sh --tag <tag>`) — CI is only a wrapper around the commands
-below. Release the image first: [Releasing the image](#releasing-the-image).
+Both run in a released `ghcr.io/matter-labs/protocol-ops` image
+([release flow](../.github/workflows/README.md#release-flow)), locally and in CI
+alike — CI is only a wrapper around the commands below.
 
 **Step 1 output is a handoff, not a recipe.** Solidity output is not byte-stable
 across build environments (the default foundry profile embeds path-dependent CBOR
@@ -51,31 +51,13 @@ Then `ecosystem verify-upgrade` (PUVT) consumes `ecosystem.toml` +
 
 ---
 
-## Releasing the image
+## Running the image
 
-Every ecosystem and chain workflow runs the image named by its `protocol_ops_tag`
-input; nothing is compiled per run, so the image is what gets tested and released:
-
-1. **Merge** the PRs that generate the upgrade: its scripts and inputs under
-   `l1-contracts/upgrade-envs/<upgrade>/`, `AllContractsHashes.json` and the anvil-interop
-   chain states.
-2. **Test** that commit with zksync-os-integration-tests.
-3. **Build the image through the gate**: dispatch `build-docker.yaml` on that commit with
-   `tested_with_integration_tests=true` and `integration_tests_run_url=<that run>`; it refuses
-   to push without them. Before pushing it runs the anvil-interop upgrade test inside the image:
-   the previous release's chain states (`upgradeSourceStateVersion` in
-   `l1-contracts/test/anvil-interop/config/anvil-config.json`) upgraded with the image's own
-   `protocol_ops`, `forge` and artifacts. The image is labelled with its commit
-   (`org.opencontainers.image.revision`), the `AllContractsHashes.json` SHA-256, the
-   zk-governance commit and the integration-test run; the run summary gives its tag and digest.
-4. **Use that tag everywhere**: `protocol_ops_tag=<tag>` for step 1 below (which checks out the
-   image's commit and records the image digest in the deploy bundle), step 2 (which runs the
-   bundle's digest), and then every chain workflow (`generate-chain-*-calldata`).
-
-The same image runs the local commands below. `./protocol-ops.sh --tag <tag>` (or
+The local commands below run the image too. `./protocol-ops.sh --tag <tag>` (or
 `--tag sha256:<digest>`) pulls it and mounts the checkout's `l1-contracts/upgrade-envs/`, so
 outputs land in the checkout; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
-Run them from a checkout of the image's commit.
+Run them from a checkout of the image's commit: a bundle packed in the image records that commit as
+clean, whatever `upgrade-envs/` is mounted.
 
 ---
 
@@ -101,8 +83,7 @@ Nothing touches real L1 — the deployer is impersonated.
 
 ```bash
 TAG=<tag>   # the released protocol-ops image
-# 1a) fork + prepare + PUVT (writes ecosystem.toml + prepare/ + extra-verification-logs.txt).
-#     PUVT checks governance against the zk-governance commit the image was built with.
+# 1a) fork + prepare + PUVT (writes ecosystem.toml + prepare/ + extra-verification-logs.txt)
 ./protocol-ops.sh --tag "$TAG" ecosystem rehearse-upgrade --env mainnet \
   --fork-url <l1-rpc> --deployer-address <deployer-eoa>
 
@@ -274,18 +255,19 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 ## Step 3 — verify the deployment (PUVT)
 
+This step still runs a local build of `protocol_ops`, until #2525 replaces `verify-upgrade`.
+
 ```bash
 OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
 # ./deploy-result: step 2's local journal, or the deploy run's
 # `ecosystem-upgrade-deploy-result-<env>` artifact downloaded there.
-EXTRA_MOUNTS="$PWD/deploy-result:/contracts/deploy-result" \
-  ./protocol-ops.sh --tag "$TAG" ecosystem verify-upgrade \
+./protocol-ops/target/release/protocol_ops ecosystem verify-upgrade \
   --env mainnet \
   --ecosystem-toml "$OUT/ecosystem.toml" \
-  --transactions-log /contracts/deploy-result/transactions.txt \
+  --transactions-log ./deploy-result/transactions.txt \
   --reference-transactions-log "$OUT/transactions.txt" \
   --l1-rpc-url <l1-rpc> --gw-rpc-url <l1-rpc> \
-  --zk-governance-commit "$(jq -r .zk_governance_commit "$OUT/deploy-bundle/bundle-metadata.json")"
+  --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
 ```
 
 `--transactions-log` is salt-gated, so it must be this deployment's own journal.
