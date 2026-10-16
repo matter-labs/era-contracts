@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { readStateVersion } from "./src/core/anvil-config";
+import { V0_34_ZKSYNC_OS_GENESIS_ROOT } from "./src/core/const";
 import { runPipelineUpgradeScenario } from "./src/helpers/pipeline-upgrade-runner";
 import { packProtocolVersion, readGenesisSemVer } from "./src/helpers/upgrade-test-utils";
 
@@ -25,9 +26,7 @@ runPipelineUpgradeScenario({
   // deployed at a derived address); the anvil L2s cannot force-deploy, so the harness places
   // this bytecode at the decoded delegate target.
   l2DelegateBytecodeName: "L2DefaultUpgrade",
-  // The fixture's chains still carry the genesis-upgrade tx hash from their creation, which
-  // blocks a new upgrade (`PreviousUpgradeNotFinalized`).
-  clearGenesisUpgradeTxHash: true,
+  sourceGenesis: { genesisBatchHash: V0_34_ZKSYNC_OS_GENESIS_ROOT, genesisIndexRepeatedStorageChanges: 0 },
   // The frozen fixture's chains carry the REAL pre-registry cut-taking Admin facet, so they cross
   // the edge natively — no shim.
   installLegacyCutTakingFacet: false,
