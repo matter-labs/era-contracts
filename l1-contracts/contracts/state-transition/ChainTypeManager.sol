@@ -95,7 +95,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      which lets governance keep moving a deadline after the commit. When set (nonzero) it
     ///      takes precedence over a committed transition's pinned deadline — see
     ///      {protocolVersionDeadline}.
-    mapping(uint256 _protocolVersion => uint256) internal protocolVersionDeadlineOverride;
+    mapping(uint256 _protocolVersion => uint256) internal protocolVersionDeadlines;
 
     /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
@@ -108,7 +108,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      crossing that edge verify the handed cut bytes against it (served through the
     ///      {upgradeCutHash} view). Registry-driven edges commit only the transition
     ///      ({upgradeTransition}); chains read {upgradeCutForVersion}.
-    mapping(uint256 protocolVersion => bytes32 cutHash) internal __DEPRECATED_upgradeCutHash;
+    mapping(uint256 protocolVersion => bytes32 cutHash) internal __LEGACY_upgradeCutHash;
 
     /// @dev The address used to manage non critical updates
     address public admin;
@@ -134,7 +134,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      bootstrap edge), registry-driven commits do not — the cut is read from
     ///      {upgradeCutForVersion}, no log archaeology needed. Served read-only
     ///      ({upgradeCutDataBlock}) otherwise.
-    mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_upgradeCutDataBlock;
+    mapping(uint256 protocolVersion => uint256) internal __LEGACY_upgradeCutDataBlock;
 
     /// @dev Retained only to preserve the upgradeable storage layout. Pre-v35 code recorded the
     ///      block of a chain-creation-params change here; under the registry model the genesis
@@ -150,7 +150,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      path and the upgrade path read it from the release they resolve to.
     // Never written by THIS implementation by design — live CTMs carry pre-v35 values in it.
     // slither-disable-next-line uninitialized-state
-    mapping(uint256 protocolVersion => address) internal __DEPRECATED_protocolVersionVerifier;
+    mapping(uint256 protocolVersion => address) internal __LEGACY_protocolVersionVerifier;
 
     /// @dev Deprecated pre-v35 `defaultUpgrade` (the verifier-only upgrade engine). Slot retained
     ///      to preserve the upgradeable storage layout.
@@ -419,6 +419,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         }
         _replacement.validate();
         _requireSameDeparture(_expectedTransition, _replacement);
+        _requireSameDeadline(_expectedTransition, _replacement);
         _requireOnwardDestination(_expectedTransition, _replacement);
         L2PlanLib.requirePublished(BytecodesSupplier(L1_BYTECODES_SUPPLIER), _replacement.l2Plan().factoryDepHashes);
 
@@ -441,10 +442,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewUpgradeCutData(_newProtocolVersion, _transitionUpgradeCut(_transition));
     }
 
-    /// @dev A replacement departs exactly where the replaced transition did: the same source
-    ///      release object — and so the same version, which a transition reads from its source
-    ///      release — and the same pinned deadline (a deadline change is a separate
-    ///      {setProtocolVersionDeadline} call, so it stays explicit).
+    /// @dev See {protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition}.
     /// @param _expectedTransition The transition being replaced.
     /// @param _replacement Its replacement.
     function _requireSameDeparture(ICTMTransition _expectedTransition, ICTMTransition _replacement) private view {
@@ -453,6 +451,12 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         if (replacementSource != source) {
             revert TransitionReleaseMismatch(source, replacementSource);
         }
+    }
+
+    /// @dev Deadline changes use {setProtocolVersionDeadline} explicitly.
+    /// @param _expectedTransition The transition being replaced.
+    /// @param _replacement Its replacement.
+    function _requireSameDeadline(ICTMTransition _expectedTransition, ICTMTransition _replacement) private view {
         uint256 deadline = _expectedTransition.oldProtocolVersionDeadline();
         uint256 replacementDeadline = _replacement.oldProtocolVersionDeadline();
         if (replacementDeadline != deadline) {
@@ -515,7 +519,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      stored slot — to expire a transition-committed version immediately, set a past
     ///      nonzero timestamp.
     function protocolVersionDeadline(uint256 _protocolVersion) public view returns (uint256) {
-        uint256 storedDeadline = protocolVersionDeadlineOverride[_protocolVersion];
+        uint256 storedDeadline = protocolVersionDeadlines[_protocolVersion];
         if (storedDeadline != 0) {
             return storedDeadline;
         }
@@ -533,7 +537,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev Zero means "not set" in the stored slot (the getter falls back to the transition), so
     ///      pass a nonzero timestamp; a past one expires the version immediately.
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external onlyOwner {
-        protocolVersionDeadlineOverride[_protocolVersion] = _timestamp;
+        protocolVersionDeadlines[_protocolVersion] = _timestamp;
         emit UpdateProtocolVersionDeadline(_protocolVersion, _timestamp);
     }
 
@@ -774,7 +778,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _commitVersionEdge(_oldProtocolVersion, newProtocolVersion);
         // The departing version has no transition to resolve a deadline from, so the deadline is
         // stored directly.
-        protocolVersionDeadlineOverride[_oldProtocolVersion] = _oldProtocolVersionDeadline;
+        protocolVersionDeadlines[_oldProtocolVersion] = _oldProtocolVersionDeadline;
         emit UpdateProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
         // Emit event with backward compatible hack.
@@ -798,7 +802,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         if (upgradeTransition[_oldProtocolVersion] != address(0)) {
             revert LegacyCutForRegistryDrivenVersion(_oldProtocolVersion);
         }
-        if (__DEPRECATED_upgradeCutHash[_oldProtocolVersion] == bytes32(0)) {
+        if (__LEGACY_upgradeCutHash[_oldProtocolVersion] == bytes32(0)) {
             revert NoCommittedUpgradeCutForVersion(_oldProtocolVersion);
         }
         setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
@@ -812,8 +816,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     // TODO(v36): DELETE with {setNewVersionUpgrade}.
     function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
-        __DEPRECATED_upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        __DEPRECATED_upgradeCutDataBlock[_oldProtocolVersion] = block.number;
+        __LEGACY_upgradeCutHash[_oldProtocolVersion] = newCutHash;
+        __LEGACY_upgradeCutDataBlock[_oldProtocolVersion] = block.number;
         emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
         emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
     }
@@ -824,7 +828,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     //             {upgradeCutForVersion} instead). In practice: after every chain has crossed
     //             the bootstrap edge and the pre-v35 deadlines have passed.
     function upgradeCutHash(uint256 _protocolVersion) public view returns (bytes32) {
-        return __DEPRECATED_upgradeCutHash[_protocolVersion];
+        return __LEGACY_upgradeCutHash[_protocolVersion];
     }
 
     /// @inheritdoc IChainTypeManager
@@ -832,7 +836,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     //             version (the pre-v35 upgrade engines of those edges read the target version's
     //             verifier here; v35+ engines read it from the release).
     function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address) {
-        return __DEPRECATED_protocolVersionVerifier[_protocolVersion];
+        return __LEGACY_protocolVersionVerifier[_protocolVersion];
     }
 
     /// @notice The block of a LEGACY cut commit, where its tooling finds the
@@ -841,6 +845,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     // TODO(v36+): DELETE with {upgradeCutHash} — chain-side scripts need it only to recover a
     //             legacy-committed cut from logs (`GetDiamondCutData.getDiamondCutData`).
     function upgradeCutDataBlock(uint256 _protocolVersion) public view returns (uint256) {
-        return __DEPRECATED_upgradeCutDataBlock[_protocolVersion];
+        return __LEGACY_upgradeCutDataBlock[_protocolVersion];
     }
 }

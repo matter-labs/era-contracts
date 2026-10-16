@@ -101,7 +101,7 @@ chain — one of stage, testnet, or mainnet (default: stage)
 
 - Parses all forge verify-contract commands in the log
 
-- Locates matching .sol sources inside l1-contracts or da-contracts
+- Locates matching .sol sources inside l1-contracts
 
 - Supports fallback mappings (e.g. VerifierFflonk → L1VerifierFflonk)
 

@@ -31,9 +31,6 @@ jobs:
       - name: Warm solc build cache
         uses: ./.github/actions/warm-solc-cache
 
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
-
       - name: Build artifacts
         run: yarn l1 build:foundry
 
@@ -49,15 +46,13 @@ jobs:
         run: forge build deploy-scripts
 
       - name: Check solc warnings
-        run: yarn l1 solc-warnings && yarn da solc-warnings
+        run: yarn l1 solc-warnings
 
       - name: Create cache
         uses: actions/cache/save@v4
         with:
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
-            da-contracts/cache-forge
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
 
@@ -139,8 +134,6 @@ jobs:
           fail-on-cache-miss: true
           key: artifacts-l1-contracts-foudry-${{ github.sha }}
           path: |
-            da-contracts/cache-forge
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
 

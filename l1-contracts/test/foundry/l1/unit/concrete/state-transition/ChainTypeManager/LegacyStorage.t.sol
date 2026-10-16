@@ -34,7 +34,7 @@ contract PreV35ChainTypeManagerStandIn is ChainTypeManager {
     /// @param _protocolVersion The version the verifier is recorded for.
     /// @param _verifier The verifier recorded.
     function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external onlyOwner {
-        __DEPRECATED_protocolVersionVerifier[_protocolVersion] = _verifier;
+        __LEGACY_protocolVersionVerifier[_protocolVersion] = _verifier;
     }
 
     /// @param _defaultUpgrade The verifier-only upgrade engine recorded.

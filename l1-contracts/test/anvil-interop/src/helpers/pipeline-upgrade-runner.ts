@@ -920,7 +920,7 @@ function writeReviewedBuildHashes(outputPath: string): void {
     { cwd: contractsRootDir, stdio: "inherit" }
   );
   if (result.status !== 0) {
-    throw new Error("scripts/calculate-hashes.ts --output failed: build l1-contracts and da-contracts first");
+    throw new Error("scripts/calculate-hashes.ts --output failed: build l1-contracts first");
   }
 }
 

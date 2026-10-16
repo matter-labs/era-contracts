@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {BlobsL1DAValidatorZKsyncOS} from "../../contracts/BlobsL1DAValidatorZKsyncOS.sol";
+import {BlobsL1DAValidatorZKsyncOS} from "contracts/state-transition/data-availability/BlobsL1DAValidatorZKsyncOS.sol";
 
 /// @dev Mock contract to override _getBlobVersionedHash
 contract MockBlobsL1DAValidator is BlobsL1DAValidatorZKsyncOS {

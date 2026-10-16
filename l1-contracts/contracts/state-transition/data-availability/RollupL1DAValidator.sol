@@ -2,38 +2,31 @@
 
 pragma solidity 0.8.28;
 
-import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
+import {IL1DAValidator, L1DAValidatorOutput, PubdataSource} from "../chain-interfaces/IL1DAValidator.sol";
 
 import {CalldataDA} from "./CalldataDA.sol";
 
 import {
     BLOB_DA_INPUT_SIZE,
+    BLOB_EXPIRATION_BLOCKS,
     BLS_MODULUS,
     POINT_EVALUATION_PRECOMPILE_ADDR,
     PUBDATA_COMMITMENT_CLAIMED_VALUE_OFFSET,
     PUBDATA_COMMITMENT_COMMITMENT_OFFSET,
-    PUBDATA_COMMITMENT_SIZE,
-    PubdataSource
-} from "./DAUtils.sol";
+    PUBDATA_COMMITMENT_SIZE
+} from "./DAConstants.sol";
 
+import {InvalidPubdataSource} from "../L1StateTransitionErrors.sol";
 import {
     BlobCommitmentNotPublished,
     BlobHashCommitmentError,
     EmptyBlobVersionHash,
     InvalidPubdataCommitmentsSize,
-    InvalidPubdataSource,
     NonEmptyBlobVersionHash,
     PointEvalCallFailed,
     PointEvalFailed,
     PubdataCommitmentsEmpty
-} from "./DAContractsErrors.sol";
-
-uint256 constant BLOBS_SUPPORTED = 6;
-
-/// @dev The number of blocks within each we allow blob to be used for DA.
-/// On Ethereum blobs expire within 4096 epochs, i.e. 4096 * 32 blocks. We reserve
-/// half of the time in order to ensure reader's ability to read the blob's content.
-uint256 constant BLOB_EXPIRATION_BLOCKS = (4096 * 32) / 2;
+} from "./DAErrors.sol";
 
 contract RollupL1DAValidator is IL1DAValidator, CalldataDA {
     /// @notice The published blob commitments. Note, that the correctness of blob commitment with relation to the linear hash

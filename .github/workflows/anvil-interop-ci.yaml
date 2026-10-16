@@ -22,12 +22,6 @@ on:
       - "protocol-ops/**"
       - "protocol-ops.sh"
       - "configs/genesis/**"
-      - "da-contracts/contracts/**"
-      - "da-contracts/lib/**"
-      - "da-contracts/test/**"
-      - "da-contracts/foundry.toml"
-      - "da-contracts/hardhat.config.ts"
-      - "da-contracts/package.json"
       - "package.json"
       - "yarn.lock"
 
@@ -58,9 +52,6 @@ jobs:
 
       - name: Install dependencies
         run: yarn
-
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
 
       - name: Build anvil-interop dev artifacts
         run: yarn l1 build:anvil-interop-dev-artifacts
@@ -136,9 +127,6 @@ jobs:
       # and without the pruning a deleted contract's stale ABI would reach the upgrade harness.
       - name: Warm solc build cache
         uses: ./.github/actions/warm-solc-cache
-
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
 
       - name: Build l1-contracts artifacts
         run: yarn l1 build:foundry

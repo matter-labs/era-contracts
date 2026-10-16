@@ -37,11 +37,6 @@ runs:
       shell: bash
       run: yarn l1 build:anvil-interop-dev-artifacts
 
-    - name: Build da-contracts artifacts
-      if: ${{ inputs.artifacts == 'full' }}
-      shell: bash
-      run: yarn da build:foundry
-
     - name: Build l1-contracts artifacts
       if: ${{ inputs.artifacts == 'full' }}
       shell: bash
