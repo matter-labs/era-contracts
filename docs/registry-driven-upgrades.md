@@ -121,14 +121,22 @@ diff, never a wrong byte in offchain-authored data.
 
 ### Supporting libraries
 
-| Library                       | Role                                                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `TransitionDerivationLib`     | facet cuts and L2 deployments from a release pair                                                       |
-| `ReleaseFacetReader`          | genesis installation from a release's self-described routing                                            |
-| `CTMUpgradeComposer`          | the committed cut and the L2 protocol upgrade transaction, from a transition or the bootstrap migration |
-| `L2InventoryLib`, `L2PlanLib` | changed L2 deployments; executable plan construction from bytecode infos                                |
-| `ProxyUpgradeRowLib`          | `toRows`, `applyRows` (source-checked, then verified) over the enum-indexed inventories                 |
-| `ObjectAnchorLib`             | `requireCode` — a named object or member is deployed at all                                             |
+All twelve helpers below have only internal/private functions and compile into their callers.
+
+| Library                                                                                                         | Role                                                                               |
+| --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [TransitionDerivationLib](../l1-contracts/contracts/upgrades/registry/libraries/TransitionDerivationLib.sol)    | Facet cuts and L2 deployments from the source and target releases                  |
+| [ReleaseFacetReader](../l1-contracts/contracts/upgrades/registry/libraries/ReleaseFacetReader.sol)              | Genesis installation from a release's self-described routing                       |
+| [LiveRoutingReader](../l1-contracts/contracts/upgrades/registry/libraries/LiveRoutingReader.sol)                | Reads departing diamond routing; checks it against the source release              |
+| [CTMUpgradeComposer](../l1-contracts/contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol)              | Committed cut and L2 protocol transaction from a transition or bootstrap migration |
+| [L2InventoryLib](../l1-contracts/contracts/upgrades/registry/libraries/L2InventoryLib.sol)                      | Maps inventory members to fixed L2 addresses                                       |
+| [L2PlanLib](../l1-contracts/contracts/upgrades/registry/libraries/L2PlanLib.sol)                                | Constructs the executable L2 plan and checks bytecode publication                  |
+| [VersionEdgeLib](../l1-contracts/contracts/upgrades/registry/libraries/VersionEdgeLib.sol)                      | Checks version ordering and schedule constraints                                   |
+| [ProxyUpgradeRowLib](../l1-contracts/contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol)              | Normalizes inventory rows and applies source-checked, verified proxy swaps         |
+| [RegistryAuthorityLib](../l1-contracts/contracts/upgrades/registry/libraries/RegistryAuthorityLib.sol)          | Checks executor bindings, ownership and notifier handover                          |
+| [ObjectAnchorLib](../l1-contracts/contracts/upgrades/registry/libraries/ObjectAnchorLib.sol)                    | Checks that an object or member has code; does not attest its provenance           |
+| [L2CanonicalTransactionLib](../l1-contracts/contracts/state-transition/libraries/L2CanonicalTransactionLib.sol) | Shared construction of canonical L2 transactions                                   |
+| [ZKChainSpecificForceDeploymentsLib](../l1-contracts/contracts/upgrades/ZKChainSpecificForceDeploymentsLib.sol) | Builds the per-chain base-token and context payload                                |
 
 There is no intermediate genesis-manifest type between a build and its `ReleaseManifest`:
 `DeployCTMUtils.deployCurrentRelease` (and `deployAdditionalReleaseFacets`) assembles the
