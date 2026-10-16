@@ -21,7 +21,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #
 #   gh workflow run update-generated-artifacts.yaml --ref <branch> -f pr_number=<PR#>
 #
-# It builds da and l1 on a clean runner, runs `calculate-hashes:fix`, refreshes the
+# It builds l1 on a clean runner, runs `calculate-hashes:fix`, refreshes the
 # selectors, zkstack-out and the ZKsync OS genesis, regenerates the anvil-interop
 # chain states, and pushes the result to the PR branch. Needs the
 # `RELEASE_TOKEN` secret, and the PR's head must live in this repo (not a fork of
@@ -338,10 +338,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # Build in the order `update-hashes-on-demand.yaml` uses to produce the committed
-      # `AllContractsHashes.json` (da → l1), with the same pinned Foundry.
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
+      # Build the way `update-hashes-on-demand.yaml` produces the committed
+      # `AllContractsHashes.json`, with the same pinned Foundry.
       - name: Build l1-contracts artifacts
         run: yarn l1 build:foundry
 

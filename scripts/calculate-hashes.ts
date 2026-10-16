@@ -5,7 +5,7 @@ import os from "os";
 import { join } from "path";
 import * as blakejs from "blakejs";
 
-const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/", "da-contracts/"];
+const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
 const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test", "l1-contracts/contracts/dev-contracts"];
