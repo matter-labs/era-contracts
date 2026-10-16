@@ -55,5 +55,15 @@ allow_internal_expect_revert = true
 cbor_metadata = false
 bytecode_hash = "none"
 
+# Mutation testing (`yarn l1 mutation`, docs/mutation-testing.md). Forge copies only `src`, `test` and `script`
+# into each mutant's workspace, and the tests import deploy-scripts/. Every mutant compiles from scratch, so the
+# optimizer is off; a fixed fuzz seed keeps kills reproducible. Operator selection is passed through the
+# environment: a `[mutation]` table makes forge v1.5.1 warn on every command.
+[profile.mutation]
+script = "deploy-scripts"
+optimizer = false
+[profile.mutation.fuzz]
+seed = "0x1"
+
 [lint]
 lint_on_build = false
