@@ -24,6 +24,10 @@
 //! Multiple invocations writing into the same `--out` dir append to both
 //! arrays — `manifest.json` is read-modify-write.
 //!
+//! Chain commands (`chain.*`) also write `<dir>/EXECUTE.md`, the copy-into-MetaMask
+//! runbook of every bundle in the manifest (see `common::execution_runbook`): their
+//! bundles are sent by hand by a ChainAdmin owner.
+//!
 //! Bundles are dispatched externally — see `dev execute-safe --safe-file
 //! --private-key`. Callers that need to apply every bundle in a manifest
 //! iterate `bundles[]` and pick the matching signer per `bundles[].target`
@@ -35,9 +39,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use serde_json::{json, Value};
 
+use crate::common::execution_runbook::{self, LoadOptions, RUNBOOK_FILE};
 use crate::common::files::save_json_file;
 use crate::common::forge::{split_into_bundles, ForgeRunner, SafeBundle};
 use crate::common::logger;
+
+/// Commands whose bundles get `EXECUTE.md` next to them: chain operations, sent by hand by a
+/// ChainAdmin owner. Ecosystem prepares are left out: their manifests are mostly the
+/// deployer's contract deployments, which the deploy workflow broadcasts.
+const RUNBOOK_COMMAND_PREFIX: &str = "chain.";
 
 /// Write Safe bundles + append metadata into `manifest.json` if the user
 /// passed `--out`. No-op otherwise (used by simulation / dry-run callers).
@@ -70,6 +80,38 @@ where
         bundles.len(),
         bundle_dir.display()
     ));
+    if command.starts_with(RUNBOOK_COMMAND_PREFIX) && !bundles.is_empty() {
+        write_runbook(bundle_dir, l1_chain_id)?;
+    }
+    Ok(())
+}
+
+/// `EXECUTE.md` for every bundle in `bundle_dir/manifest.json`. The bundles are the command's
+/// deliverable and are already written, so a manifest the runbook cannot describe (e.g. a
+/// directory shared by commands against different chains) only costs the runbook: a warning,
+/// and no stale `EXECUTE.md` left behind.
+fn write_runbook(bundle_dir: &Path, l1_chain_id: u64) -> anyhow::Result<()> {
+    let path = bundle_dir.join(RUNBOOK_FILE);
+    let options = LoadOptions {
+        chain_id: Some(l1_chain_id),
+        ..Default::default()
+    };
+    match execution_runbook::load(bundle_dir, &path, &options) {
+        Ok(runbook) => {
+            execution_runbook::write(&runbook, &path)?;
+            logger::info(format!("Execution runbook written to: {}", path.display()));
+        }
+        Err(error) => {
+            logger::warn(format!(
+                "No execution runbook for {}: {error:#}",
+                bundle_dir.display()
+            ));
+            if path.is_file() {
+                std::fs::remove_file(&path)
+                    .map_err(|e| anyhow::anyhow!("remove stale {}: {e}", path.display()))?;
+            }
+        }
+    }
     Ok(())
 }
 

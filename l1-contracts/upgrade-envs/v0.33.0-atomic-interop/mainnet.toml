@@ -25,6 +25,9 @@
 # `diamond_init_*`, `v28_protocol_version`, the priority-tx gas knobs) are gone — v33 is
 # ZKsync OS-only and nothing on this path reads them. Chain-creation params come from
 # `configs/genesis/zksync-os/latest.json`.
+#
+# Before executing: run the `L2InteropHandler` storage pre-check in
+# `protocol-docs/interop/architecture.md` (mainnet's v31 handler uses different slots).
 
 era_chain_id = 324
 testnet_verifier = false

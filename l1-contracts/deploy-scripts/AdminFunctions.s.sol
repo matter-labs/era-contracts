@@ -61,6 +61,12 @@ interface IAdminLegacy {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 }
 
+/// @notice The v31 Admin facet's one-shot setter for a ZKsync OS chain's pre-v31 base-token total supply.
+/// @dev Removed from the facet in v32, so it is declared here for the chains that are still on v31.
+interface IAdminV31 {
+    function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external returns (bytes32 canonicalTxHash);
+}
+
 /// @notice Minimal interface for OZ single-step Ownable contracts (e.g. ProxyAdmin).
 ///         Avoids calling `pendingOwner()` (Ownable2Step-only) on plain Ownable.
 interface IOwnableSingleStep {
@@ -80,6 +86,12 @@ interface ILegacyGovernance {
     }
     function scheduleTransparent(LegacyOperation calldata op, uint256 delay) external;
     function executeInstant(LegacyOperation calldata op) external payable;
+    /// `execute` is `onlyOwnerOrSecurityCouncil` and only requires the op to be
+    /// ready (scheduled + delay elapsed). With `delay = 0` it is ready in the
+    /// same block, so the EOA owner can `scheduleTransparent(op, 0)` then
+    /// `execute(op)` without needing the security council (whose address is 0x0
+    /// on the mainnet Atlas Governance).
+    function execute(LegacyOperation calldata op) external payable;
     function securityCouncil() external view returns (address);
 }
 
@@ -223,7 +235,9 @@ contract AdminFunctions is Script, IAdminFunctions {
         // calls here and persist them so protocol-ops folds them into stage 0
         // of governance_calls in the merged ecosystem.toml. Sized to
         // chainIds.length (max possible), trimmed before serialization.
-        Call[] memory acceptCalls = new Call[](chainIds.length);
+        // Sized for up to two deferred accepts per CTM (the CTM proxy + its
+        // ValidatorTimelock), each Ownable2Step transfer deferring its accept.
+        Call[] memory acceptCalls = new Call[](chainIds.length * 2);
         uint256 acceptCount = 0;
 
         for (uint256 i = 0; i < chainIds.length; i++) {
@@ -249,6 +263,21 @@ contract AdminFunctions is Script, IAdminFunctions {
                     value: 0,
                     data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
                 });
+            }
+
+            // Transfer the CTM's ValidatorTimelock to governance too. Extracted
+            // to a helper (and scoped) to keep this function under the EVM
+            // stack-depth limit. The helper returns the VT address when a
+            // stage-0 acceptOwnership() is pending, else address(0).
+            {
+                address vtToAccept = _ensureValidatorTimelockOwnedByGovernance(ctm, _governance, _wraps);
+                if (vtToAccept != address(0)) {
+                    acceptCalls[acceptCount++] = Call({
+                        target: vtToAccept,
+                        value: 0,
+                        data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+                    });
+                }
             }
 
             _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
@@ -289,6 +318,32 @@ contract AdminFunctions is Script, IAdminFunctions {
         _issueAsOwner(paOwner, proxyAdmin, abi.encodeCall(IOwnableSingleStep.transferOwnership, (_governance)), _wraps);
     }
 
+    /// Helper: transfer a CTM's ValidatorTimelock (reached via
+    /// `validatorTimelockPostV29()`, since `validatorTimelock()` returns
+    /// address(0) pre-v31) to `_governance`. The VT is Ownable2Step, so the
+    /// transfer sets pendingOwner now (issued by its current owner) and the
+    /// accept is deferred to stage-0 governance. Returns the VT address when an
+    /// accept is pending (so the caller appends the deferred acceptOwnership),
+    /// else address(0). No-op when the VT is already governance-owned.
+    function _ensureValidatorTimelockOwnedByGovernance(
+        address _ctm,
+        address _governance,
+        OwnerWrap[] memory _wraps
+    ) private returns (address) {
+        address vt = IChainTypeManager(_ctm).validatorTimelockPostV29();
+        if (vt == address(0)) {
+            return address(0);
+        }
+        Ownable2Step vtOwnable = Ownable2Step(vt);
+        if (vtOwnable.owner() != _governance && vtOwnable.pendingOwner() != _governance) {
+            _issueAsOwner(vtOwnable.owner(), vt, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
+        }
+        if (vtOwnable.pendingOwner() == _governance) {
+            return vt;
+        }
+        return address(0);
+    }
+
     /// Persist the trimmed `acceptOwnership()` Call list to a TOML so
     /// `protocol_ops ecosystem upgrade-prepare-all` can fold it into stage 0
     /// of the merged governance_calls. Always written (even when empty) so
@@ -316,6 +371,28 @@ contract AdminFunctions is Script, IAdminFunctions {
             address currentOwner = IOwnableSingleStep(calls[i].target).owner();
             _issueAsOperationalOwner(currentOwner, calls[i].target, calls[i].data, _wraps);
         }
+    }
+
+    /// Execute a set of calls as a SINGLE `ChainAdmin.multicall`, broadcast by the
+    /// ChainAdmin's EOA owner. Unlike `executeOwnableCallsWithWraps` (which routes
+    /// each call by its target's `owner()`), every call here runs with
+    /// `msg.sender == _chainAdmin`. This is required for calls whose executor must
+    /// be the ChainAdmin as the *pending* owner (e.g. `acceptOwnership()` on a
+    /// ServerNotifier / verifier whose ownership was transferred to the ChainAdmin
+    /// but not yet accepted) — a plain owner-routed call would run as the stale
+    /// current owner and revert. It also mirrors exactly how the transaction
+    /// simulator encodes a `ctm_admin_calls` entry (one `ChainAdmin.multicall`),
+    /// keeping the prepare broadcast and the sim bundle byte-identical.
+    function executeChainAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        if (calls.length == 0) {
+            return;
+        }
+        address chainAdminOwner = IOwnableSingleStep(_chainAdmin).owner();
+        _anvilFund(chainAdminOwner);
+        vm.startBroadcast(chainAdminOwner);
+        IChainAdminMulticall(_chainAdmin).multicall(calls, true);
+        vm.stopBroadcast();
     }
 
     function _issueAsOperationalOwner(
@@ -404,15 +481,19 @@ contract AdminFunctions is Script, IAdminFunctions {
             predecessor: bytes32(0),
             salt: keccak256(abi.encodePacked(Utils.currentLegacyGovSalt(), _legacyGovSaltCounter++))
         });
+        // Normal `scheduleTransparent(op, 0)` + `execute(op)` path, both from the
+        // EOA owner. `delay = 0` makes the op ready in the same block, and
+        // `execute` is `onlyOwnerOrSecurityCouncil`, so we don't route through
+        // `executeInstant` (which is `onlySecurityCouncil`, and the mainnet Atlas
+        // Governance's `securityCouncil()` is 0x0 — that produced a `from = 0x0`
+        // execute tx that only works under simulator impersonation).
         address eoaOwner = IOwnableSingleStep(_gov).owner();
-        address sc = ILegacyGovernance(_gov).securityCouncil();
         _anvilFund(eoaOwner);
         vm.startBroadcast(eoaOwner);
         ILegacyGovernance(_gov).scheduleTransparent(op, 0);
         vm.stopBroadcast();
-        _anvilFund(sc);
-        vm.startBroadcast(sc);
-        ILegacyGovernance(_gov).executeInstant(op);
+        vm.startBroadcast(eoaOwner);
+        ILegacyGovernance(_gov).execute(op);
         vm.stopBroadcast();
     }
 
@@ -987,6 +1068,28 @@ contract AdminFunctions is Script, IAdminFunctions {
             target: chainInfo.diamondProxy,
             value: 0,
             data: abi.encodeCall(IAdmin.setZKsyncOSMaxTxGasLimit, (_newMaxTxGasLimit))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
+    }
+
+    /// @notice Backfills a ZKsync OS chain's pre-v31 base-token total supply (one-shot, v31 Admin facet).
+    /// @dev Targets chains still on v31: the setter is gone from the facet since v32, which a chain can only
+    ///      reach once this value is set (see `V32UpgradeZKsyncOS`). Hence the call goes through `IAdminV31`.
+    function setZKsyncOSPreV31TotalSupply(
+        address _bridgehub,
+        address _accessControlRestriction,
+        uint256 _chainId,
+        uint256 _preV31TotalSupply,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdminV31.setZKsyncOSPreV31TotalSupply, (_preV31TotalSupply))
         });
 
         saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);

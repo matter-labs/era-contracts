@@ -135,9 +135,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   },
   L2BaseToken: {
     address: "0x000000000000000000000000000000000000800a",
-    codeName: "L2BaseToken",
+    codeName: "L2BaseTokenEra",
     lang: Language.Solidity,
-    location: SourceLocation.SystemContracts,
+    location: SourceLocation.L1Contracts,
   },
   systemContext: {
     address: "0x000000000000000000000000000000000000800b",
@@ -216,7 +216,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // We do not use the same address as create2 factories on EVM, since
     // this is a zkEVM create2 factory.
     address: "0x0000000000000000000000000000000000010002",
-    codeName: "Bridgehub",
+    codeName: "L2Bridgehub",
     lang: Language.Solidity,
     location: SourceLocation.L1Contracts,
   },
@@ -243,7 +243,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // We do not use the same address as create2 factories on EVM, since
     // this is a zkEVM create2 factory.
     address: "0x0000000000000000000000000000000000010005",
-    codeName: "MessageRoot",
+    codeName: "L2MessageRoot",
     lang: Language.Solidity,
     location: SourceLocation.L1Contracts,
   },
@@ -285,7 +285,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     // We do not use the same address as create2 factories on EVM, since
     // this is a zkEVM create2 factory.
     address: "0x000000000000000000000000000000000001000e",
-    codeName: "InteropHandler",
+    codeName: "L2InteropHandler",
     lang: Language.Solidity,
     location: SourceLocation.L1Contracts,
   },

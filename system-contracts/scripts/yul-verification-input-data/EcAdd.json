@@ -1,0 +1,40 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "contracts-preprocessed/precompiles/EcAdd.yul": {
+      "content": "// SPDX-License-Identifier: MIT\n\nobject \"EcAdd\" {\n    code {\n        return(0, 0)\n    }\n    object \"EcAdd_deployed\" {\n        code {\n            ////////////////////////////////////////////////////////////////\n            //                      CONSTANTS\n            ////////////////////////////////////////////////////////////////\n\n            /// @dev The gas cost for this precompile is computed as:\n            ///      BASE_CIRCUIT_GAS / cycles_per_<precompile>_circuit\n            ///\n            /// @notice `BASE_CIRCUIT_GAS` is a protocol-level constant set to 80_000.\n            ///         This value represents the gas allocated per full ZK circuit iteration.\n            ///         It is used to align gas costs of precompiles with circuit constraints\n            ///         in the ZKSync VM (ZK-friendly execution model).\n            ///\n            /// @note The division factor (e.g. 15, 25) is derived from the number of cycles\n            ///       needed to execute one instance of the corresponding precompile in the circuit.\n            function ECADD_GAS_COST() -> ret {\n                // Current geometry: cycles_per_ecadd_circuit: 752,\n                // so 80'000 / 752 == 107\n                ret := 107\n            }\n\n            //////////////////////////////////////////////////////////////////\n            //                      HELPER FUNCTIONS\n            //////////////////////////////////////////////////////////////////\n\n            /// @dev Packs precompile parameters into one word.\n            /// Note: functions expect to work with 32/64 bits unsigned integers.\n            /// Caller should ensure the type matching before!\n            ///\n            /// @notice The layout is as follows (from least to most significant bits):\n            /// - [0..32)    uint32_inputOffsetInWords\n            /// - [32..64)   uint32_inputLengthInWords\n            /// - [64..96)   uint32_outputOffsetInWords\n            /// - [96..128)  uint32_outputLengthInWords\n            /// - [128..192) Reserved (e.g. memoryPageToRead / memoryPageToWrite) — currently unused and left as 0\n            /// - [192..256) uint64_perPrecompileInterpreted (left-aligned in the 256-bit word)\n            ///\n            /// All fields except the last are packed contiguously into the lower 128 bits.\n            /// The final `uint64_perPrecompileInterpreted` is left-aligned (i.e., stored in the top 64 bits),\n            /// as memoryPageToRead and memoryPageToWrite are assumed to be zero and not used.\n            function unsafePackPrecompileParams(\n                uint32_inputOffsetInWords,\n                uint32_inputLengthInWords,\n                uint32_outputOffsetInWords,\n                uint32_outputLengthInWords,\n                uint64_perPrecompileInterpreted\n            ) -> rawParams {\n                rawParams := uint32_inputOffsetInWords\n                rawParams := or(rawParams, shl(32, uint32_inputLengthInWords))\n                rawParams := or(rawParams, shl(64, uint32_outputOffsetInWords))\n                rawParams := or(rawParams, shl(96, uint32_outputLengthInWords))\n                // memoryPageToRead and memoryPageToWrite left as zero (bits 128..192)\n                rawParams := or(rawParams, shl(192, uint64_perPrecompileInterpreted))\n            }\n\n            /// @dev Executes the `precompileCall` opcode.\n            function precompileCall(precompileParams, gasToBurn) -> ret {\n                // Compiler simulation for calling `precompileCall` opcode\n                ret := verbatim_2i_1o(\"precompile\", precompileParams, gasToBurn)\n            }\n\n            /// @notice Burns remaining gas until revert.\n            /// @dev This function is used to burn gas in the case of a failed precompile call.\n            function burnGas() {\n                // Precompiles that do not have a circuit counterpart\n                // will burn the provided gas by calling this function.\n                precompileCall(0, gas())\n            }\n\n            ////////////////////////////////////////////////////////////////\n            //                      FALLBACK\n            ////////////////////////////////////////////////////////////////\n\n            // Copy x1, y1, x2, y2 (4 x 32 bytes) from calldata to memory\n            calldatacopy(0, 0, 128)\n\n            // We conduct all validations inside the precompileCall\n\n            let precompileParams := unsafePackPrecompileParams(\n                0, // input offset in words\n                4, // input length in words (x1, y1, x2, y2)\n                0, // output offset in words\n                3, // output length in words success, (x, y)\n                0  // No special meaning, ecadd circuit doesn't check this value\n            )\n            let gasToPay := ECADD_GAS_COST()\n\n            let success := precompileCall(precompileParams, gasToPay)\n\n            let internalSuccess := mload(0)\n\n            switch and(success, internalSuccess)\n            case 0 {\n                revert(0, 0)\n            }\n            default {\n                return(32, 64)\n            }\n        }\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "viaIR": false,
+    "codegen": "yul",
+    "remappings": [
+      "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
+      "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+      "ds-test/=lib/openzeppelin-contracts-upgradeable-v4/lib/forge-std/lib/ds-test/src/",
+      "erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/",
+      "forge-std/=lib/forge-std/src/",
+      "openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/",
+      "openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/"
+    ],
+    "evmVersion": "cancun",
+    "outputSelection": {
+      "*": {
+        "": [],
+        "*": ["abi"]
+      }
+    },
+    "optimizer": {
+      "enabled": true,
+      "mode": "3",
+      "size_fallback": false,
+      "disable_system_request_memoization": true
+    },
+    "metadata": {},
+    "libraries": {},
+    "enableEraVMExtensions": true,
+    "llvmOptions": ["-dse-memoryssa-scanlimit=0", "-dse-memoryssa-walklimit=0"],
+    "forceEVMLA": false,
+    "suppressedErrors": ["sendtransfer"]
+  }
+}

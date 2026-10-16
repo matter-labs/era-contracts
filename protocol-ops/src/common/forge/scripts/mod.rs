@@ -251,6 +251,8 @@ script_calls! {
     AdminFunctionsAbi::executeOwnableCallsWithWrapsCall                 => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::upgradeChainFromCTMCall                          => ADMIN_FUNCTIONS_INVOCATION,
     AdminFunctionsAbi::updateValidatorCall                              => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::executeChainAdminMulticallCall                   => ADMIN_FUNCTIONS_INVOCATION,
+    AdminFunctionsAbi::setZKsyncOSPreV31TotalSupplyCall                 => ADMIN_FUNCTIONS_INVOCATION,
     // GatewayUtils
     GatewayUtilsAbi::finishMigrateChainFromGatewayCall                 => GATEWAY_UTILS_INVOCATION,
     GatewayUtilsAbi::finishMigrateChainToGatewayCall                   => GATEWAY_UTILS_INVOCATION,

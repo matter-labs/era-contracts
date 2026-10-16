@@ -45,9 +45,7 @@ owner_address = "0x803e5E7aF1FDD504F8844E28a249203Cfa7c471D"
 # redeployed `L1MessageRoot` as its immutable `ERA_GATEWAY_CHAIN_ID`. The key is optional,
 # and the currently deployed testnet `L1MessageRoot` (`0xe7047cD9…`) reports
 # `ERA_GATEWAY_CHAIN_ID() == 0` — testnet never had a Gateway to retire. Omitting the
-# section reproduces that 0 exactly. Do *not* copy the `531050204` placeholder from
-# `permanent-values/testnet.toml`: that is a real registered chain on this bridgehub, and
-# baking it in would make the new message root treat a live chain as the legacy Gateway.
+# section reproduces that 0 exactly.
 #
 # NOTE: no `pre_v32_introspection` either. The scripts default it from the CTM's own reported
 # version, and both testnet CTMs are already on v31, so the override has nothing to stand in for.
