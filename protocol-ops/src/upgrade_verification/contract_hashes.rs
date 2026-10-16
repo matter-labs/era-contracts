@@ -5,11 +5,15 @@
 //! address the code the reviewed commit produces?".
 
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::upgrade_verification::paths::repo_relative_path;
+
+/// The committed record, at the repository root.
+pub const LOCAL_CONTRACT_HASHES_PATH: &str = "AllContractsHashes.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContractHash {
@@ -36,10 +40,12 @@ pub struct ContractHashes {
 
 impl ContractHashes {
     pub fn init_from_local() -> anyhow::Result<Self> {
-        const LOCAL_CONTRACT_HASHES_PATH: &str = "AllContractsHashes.json";
+        Self::init_from_file(&repo_relative_path(LOCAL_CONTRACT_HASHES_PATH))
+    }
 
-        let path = repo_relative_path(LOCAL_CONTRACT_HASHES_PATH);
-        let contents = fs::read_to_string(&path).with_context(|| {
+    /// Reads a hashes file in the `AllContractsHashes.json` format from `path`.
+    pub fn init_from_file(path: &Path) -> anyhow::Result<Self> {
+        let contents = fs::read_to_string(path).with_context(|| {
             format!(
                 "failed to read {}; run `yarn calculate-hashes:fix` or \
                  `npx ts-node scripts/calculate-hashes.ts` from the repository root, or pass \
@@ -50,7 +56,14 @@ impl ContractHashes {
 
         Ok(Self {
             hashes: serde_json::from_str(&contents)
-                .context("failed to parse local AllContractsHashes.json")?,
+                .with_context(|| format!("failed to parse {}", path.display()))?,
         })
     }
+}
+
+/// The hashes file a verification run reads: `override_path` when given, else the committed one.
+pub fn contract_hashes_path(override_path: Option<&Path>) -> PathBuf {
+    override_path
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| repo_relative_path(LOCAL_CONTRACT_HASHES_PATH))
 }

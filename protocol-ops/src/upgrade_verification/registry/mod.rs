@@ -21,11 +21,14 @@
 //!      deploy-time record ([`lifecycle`]), or the migration and core transition the bootstrap
 //!      sequence was built over. The question a runtime codehash cannot answer, and
 //!      the reason the chain no longer pretends to answer it. Every object a package names gets
-//!      this check, on both paths.
-//!   2. Does every immutable-free object run the code the reviewed commit produces?
-//!      ([`provenance`]) — the objects that set immutables cannot hash to any artifact, and
-//!      question 1 is the whole of their identity.
-//!   3. Does every contract an object names exist?
+//!      this check, on every path.
+//!   2. Does every object, and every MEMBER an object names, run the code the reviewed build
+//!      produces for its role? ([`provenance`], [`members`]) — the live code against the
+//!      reviewed artifact, byte for byte outside its immutable slots: each release's facets,
+//!      `DiamondInit`, genesis upgrade and verifier tree, each L2 bytecode the release's table or
+//!      a plan names, each engine and composer, each row's `implNew`.
+//!   3. Does every proxy row name the proxy of its slot, discovered on chain from the
+//!      Bridgehub or the CTM? ([`rows`])
 //!   4. Does every release the package installs pin the reviewed genesis — the genesis config's
 //!      root and the force deployments the prepare wrote? ([`genesis`])
 //!   5. Is authority bound where the review says, and to the expected governance owner — with
@@ -56,12 +59,14 @@ use alloy::providers::Provider;
 
 use crate::common::env_config::EnvConfig;
 use crate::common::ethereum::get_provider;
+use crate::upgrade_verification::contract_hashes::contract_hashes_path;
 use crate::upgrade_verification::report::VerificationResult;
 
 pub(crate) mod bootstrap;
 pub(crate) mod construction;
 pub(crate) mod genesis;
 pub(crate) mod lifecycle;
+pub(crate) mod members;
 pub(crate) mod operation;
 pub(crate) mod package;
 pub(crate) mod provenance;
@@ -87,7 +92,10 @@ use views::CommittedUpgradeView;
 /// the whole lifecycle. `executor_records` are files whose `[upgrade_executors]` records add to
 /// the package's own ([`records`]). `env` names the upgrade env whose permanent values hold the
 /// reviewed ZK token asset id an installed release's force deployments are held against
-/// ([`genesis`]); a replacement installs no release and does not need it.
+/// ([`genesis`]); a replacement installs no release and does not need it. `contract_hashes`
+/// replaces the committed `AllContractsHashes.json` the build is held against (see the
+/// `--contract-hashes` help).
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify(
     ecosystem_toml: &std::path::Path,
     l1_rpc_url: &str,
@@ -95,11 +103,20 @@ pub(crate) async fn verify(
     extra_create2_salts: &[B256],
     executor_records: &[std::path::PathBuf],
     env: Option<&str>,
+    contract_hashes: Option<&std::path::Path>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     let provider = get_provider(l1_rpc_url)?;
-    let identity = CodeIdentity::from_local_hashes()?;
-    let build = ReviewedBuild::load(&identity);
+    let hashes_path = contract_hashes_path(contract_hashes);
+    let identity = CodeIdentity::from_hashes_file(&hashes_path)?;
+    if contract_hashes.is_some() {
+        result.report_warn(&format!(
+            "code identity is held against {}, not the committed AllContractsHashes.json: this run \
+             reviews the local build, not a commit",
+            hashes_path.display()
+        ));
+    }
+    let build = ReviewedBuild::load(identity);
     let genesis_root = genesis::reviewed_genesis_root();
 
     let mut package = RegistryPackage::load(ecosystem_toml)?;
@@ -118,7 +135,6 @@ pub(crate) async fn verify(
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             replacement::verify(
                 &provider,
-                &identity,
                 &build,
                 &package,
                 expected_governance_owner,
@@ -137,7 +153,6 @@ pub(crate) async fn verify(
             };
             operation::verify(
                 &provider,
-                &identity,
                 &build,
                 &genesis,
                 &package,
@@ -157,7 +172,6 @@ pub(crate) async fn verify(
             };
             bootstrap::verify(
                 &provider,
-                &identity,
                 &build,
                 &genesis,
                 &package,

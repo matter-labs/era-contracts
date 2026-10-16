@@ -2,31 +2,36 @@
 //!
 //! Under the registry model this replaces v31's CREATE2-transaction archaeology. There, a
 //! reviewer had to reconstruct each deployment from an append-only transaction log to learn
-//! what had been deployed. Here the answer comes from the REVIEWED COMMIT's own artifacts:
-//! live `EXTCODEHASH` against `AllContractsHashes.json`. Nothing the package supplies takes
-//! part in that comparison — a fingerprint the package carried would only prove the package
-//! is self-consistent.
+//! what had been deployed. Here the answer comes from the REVIEWED COMMIT's own artifacts: the
+//! live code is compared against the deployed bytecode the reviewed build produces for the
+//! contract its role admits, and that build is held against `AllContractsHashes.json`
+//! ([`super::construction::ReviewedBuild`]). Nothing the package supplies takes part in that
+//! comparison — a fingerprint the package carried would only prove the package is
+//! self-consistent.
 //!
 //! # Constructor-set immutables
 //!
-//! `AllContractsHashes.json` records the ARTIFACT's deployed bytecode, whose immutable slots
-//! are zero. A contract that sets immutables in its constructor therefore never hashes to its
-//! own artifact once deployed, and a hash lookup for it misses by construction. Such a contract
-//! — the executors and the bootstrap sequence — gets NO identity check from this module:
-//! it is identified by its construction alone (`construction::expect_canonical_construction`
-//! from its reviewed constructor arguments), which covers its immutables and its storage at
-//! once. An earlier primitive accepted such an object on its getters answering the reviewed
-//! values while its code stayed unattributed; that admitted any counterfeit answering the same
-//! getters, and it is gone. Only objects WITHOUT immutables come here, and for them code the
-//! commit does not produce is an error — never a warning that could accompany a successful
-//! review.
+//! An artifact's deployed bytecode carries ZEROED immutable slots, so a contract that sets
+//! immutables in its constructor never hashes to its own artifact once deployed. The comparison
+//! therefore masks exactly the artifact's `immutableReferences` and requires every other byte —
+//! and the length — to match ([`super::construction::ReviewedArtifact::is_runtime_of`]). That
+//! proves the account runs the reviewed CODE; the VALUES in the masked slots are the deploying
+//! constructor's, and this module says nothing about them. For the objects a package names that
+//! is closed by their construction ([`super::construction`]); for the members those objects name
+//! it is the limit of this check (see the module docs of [`super::members`]).
+//!
+//! Code the build does not produce for the expected contract is an error — never a warning that
+//! could accompany a successful review.
 
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
-use alloy::primitives::{Address, FixedBytes};
+use alloy::primitives::{Address, FixedBytes, B256};
 use alloy::providers::Provider;
 
 use crate::upgrade_verification::{contract_hashes::ContractHashes, report::VerificationResult};
+
+use super::construction::ReviewedBuild;
 
 /// Resolves an eth_call that may revert into a reported error rather than an abort.
 ///
@@ -49,43 +54,82 @@ pub(crate) fn tolerate<T>(
     }
 }
 
-/// The reviewed commit's contracts, indexed by deployed-bytecode hash (what is this code?) and
-/// by short contract name (what creation code does the commit build for it?).
+/// A ZKsync OS bytecode info's three fields (`ZKSyncOSBytecodeInfo`): the deployed bytecode's
+/// blake2s hash, its length and its keccak256 ("observable") hash.
+pub(crate) type BytecodeInfoKey = (B256, u32, B256);
+
+/// The reviewed commit's contracts, indexed by deployed-bytecode hash (what is this code?), by
+/// short contract name (what does the commit build for it?) and by ZKsync OS bytecode info (which
+/// contract does an L2 bytecode descriptor name?).
 pub(crate) struct CodeIdentity {
+    /// The hashes file this index was read from.
+    source: PathBuf,
     by_codehash: HashMap<FixedBytes<32>, String>,
     creation_code_by_short_name: HashMap<String, FixedBytes<32>>,
+    deployed_code_by_short_name: HashMap<String, FixedBytes<32>>,
+    by_bytecode_info: HashMap<BytecodeInfoKey, String>,
 }
 
 impl CodeIdentity {
-    pub(crate) fn from_local_hashes() -> anyhow::Result<Self> {
-        let hashes = ContractHashes::init_from_local()?;
-        let mut by_codehash = HashMap::new();
-        let mut creation_code_by_short_name = HashMap::new();
+    pub(crate) fn from_hashes_file(path: &Path) -> anyhow::Result<Self> {
+        let hashes = ContractHashes::init_from_file(path)?;
+        let mut identity = Self::empty();
+        identity.source = path.to_path_buf();
         for contract in hashes.hashes {
-            if let Some(hash) = contract.evm_bytecode_hash.as_deref() {
-                if let (Ok(parsed), Some(short)) = (
-                    hash.parse::<FixedBytes<32>>(),
-                    contract.contract_name.rsplit('/').next(),
-                ) {
-                    creation_code_by_short_name
-                        .entry(short.to_string())
-                        .or_insert(parsed);
-                }
+            let short = contract
+                .contract_name
+                .rsplit('/')
+                .next()
+                .unwrap_or_default()
+                .to_string();
+            let parse = |hash: Option<&str>| hash.and_then(|h| h.parse::<FixedBytes<32>>().ok());
+            if let Some(hash) = parse(contract.evm_bytecode_hash.as_deref()) {
+                identity
+                    .creation_code_by_short_name
+                    .entry(short.clone())
+                    .or_insert(hash);
             }
-            if let Some(hash) = contract.evm_deployed_bytecode_hash.as_deref() {
-                if let Ok(parsed) = hash.parse::<FixedBytes<32>>() {
-                    // First writer wins: a duplicate hash means two names share bytecode
-                    // (identical sources), and either name is a truthful answer.
-                    by_codehash
-                        .entry(parsed)
-                        .or_insert_with(|| contract.contract_name.clone());
-                }
+            let deployed = parse(contract.evm_deployed_bytecode_hash.as_deref());
+            if let Some(hash) = deployed {
+                identity
+                    .deployed_code_by_short_name
+                    .entry(short)
+                    .or_insert(hash);
+                // First writer wins: a duplicate hash means two names share bytecode
+                // (identical sources), and either name is a truthful answer.
+                identity
+                    .by_codehash
+                    .entry(hash)
+                    .or_insert_with(|| contract.contract_name.clone());
+            }
+            if let (Some(keccak), Some(blake), Some(length)) = (
+                deployed,
+                parse(contract.evm_deployed_bytecode_blake_hash.as_deref()),
+                contract.evm_deployed_bytecode_length,
+            ) {
+                identity
+                    .by_bytecode_info
+                    .entry((blake, length, keccak))
+                    .or_insert_with(|| contract.contract_name.clone());
             }
         }
-        Ok(Self {
-            by_codehash,
-            creation_code_by_short_name,
-        })
+        Ok(identity)
+    }
+
+    /// An index of nothing, read from nowhere.
+    pub(crate) fn empty() -> Self {
+        Self {
+            source: PathBuf::new(),
+            by_codehash: HashMap::new(),
+            creation_code_by_short_name: HashMap::new(),
+            deployed_code_by_short_name: HashMap::new(),
+            by_bytecode_info: HashMap::new(),
+        }
+    }
+
+    /// The hashes file this index was read from.
+    pub(crate) fn source(&self) -> &Path {
+        &self.source
     }
 
     /// The reviewed-commit name for `codehash`, if the commit produces that code at all.
@@ -101,59 +145,111 @@ impl CodeIdentity {
     pub(crate) fn creation_code_hash_of(&self, short_name: &str) -> Option<FixedBytes<32>> {
         self.creation_code_by_short_name.get(short_name).copied()
     }
+
+    /// The DEPLOYED-bytecode hash the reviewed commit produces for `short_name` (immutable slots
+    /// zeroed), which a locally built artifact is held against before live code is compared with
+    /// it.
+    pub(crate) fn deployed_code_hash_of(&self, short_name: &str) -> Option<FixedBytes<32>> {
+        self.deployed_code_by_short_name.get(short_name).copied()
+    }
+
+    /// The reviewed-commit contract whose deployed bytecode a ZKsync OS bytecode info describes.
+    pub(crate) fn name_of_bytecode_info(&self, info: &BytecodeInfoKey) -> Option<&str> {
+        self.by_bytecode_info.get(info).map(String::as_str)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_contract(mut self, name: &str, deployed: &[u8]) -> Self {
+        let hash = alloy::primitives::keccak256(deployed);
+        self.by_codehash.insert(hash, name.to_string());
+        self.deployed_code_by_short_name.insert(
+            name.rsplit('/').next().unwrap_or_default().to_string(),
+            hash,
+        );
+        self
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_bytecode_info(mut self, name: &str, info: BytecodeInfoKey) -> Self {
+        self.by_bytecode_info.insert(info, name.to_string());
+        self
+    }
 }
 
-/// What the reviewed commit says about a live codehash. Separated from the reporting so the
+/// What the reviewed build says about live code. Separated from the reporting so the
 /// classification is testable on its own: whether unknown code counts as a finding is the whole
 /// question this verifier turns on.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum CodeVerdict<'a> {
-    /// The commit produces this code for the expected contract.
-    Reviewed(&'a str),
+    /// The code is the reviewed build of `name`, one of the expected contracts — byte for byte
+    /// outside its `immutable_slots` constructor-set slots.
+    Reviewed {
+        name: &'static str,
+        immutable_slots: usize,
+    },
     /// The commit produces this code for a DIFFERENT contract, named here.
     OtherContract(&'a str),
-    /// The commit produces this code for nothing at all: what runs there is unknown.
+    /// The commit produces this code for nothing the build can name: what runs there is unknown.
     Unknown,
+    /// An expected contract's reviewed artifact is unavailable, so the code cannot be judged.
+    Unverifiable(String),
 }
 
-/// Classifies `live` against the reviewed commit.
+/// Classifies `live` against the reviewed build of each `expected` contract.
 ///
 /// `Unknown` is deliberately its own verdict rather than a benign default: whatever else the
 /// package claims about the address, a reviewer who cannot name the deployed code has not
 /// verified it.
 pub(crate) fn classify_code<'a>(
-    identity: &'a CodeIdentity,
-    live: &FixedBytes<32>,
-    expected_short_name: &str,
+    build: &'a ReviewedBuild,
+    live: &[u8],
+    expected: &[&'static str],
 ) -> CodeVerdict<'a> {
-    match identity.name_of(live) {
-        Some(name) if name.rsplit('/').next() == Some(expected_short_name) => {
-            CodeVerdict::Reviewed(name)
+    let mut unavailable = Vec::new();
+    for name in expected {
+        match build.get(name) {
+            Ok(artifact) if artifact.is_runtime_of(live) => {
+                return CodeVerdict::Reviewed {
+                    name,
+                    immutable_slots: artifact.immutable_slots(),
+                }
+            }
+            Ok(_) => {}
+            Err(why) => unavailable.push(format!("{name}: {why}")),
         }
+    }
+    if !unavailable.is_empty() {
+        return CodeVerdict::Unverifiable(unavailable.join("; "));
+    }
+    match build
+        .identity()
+        .name_of(&alloy::primitives::keccak256(live))
+    {
         Some(other) => CodeVerdict::OtherContract(other),
         None => CodeVerdict::Unknown,
     }
 }
 
-/// Reports whether the account at `address` runs the code the reviewed commit produces for
-/// `expected_short_name` — for a contract WITHOUT constructor-set immutables, the only kind
-/// whose deployment can hash to its artifact (see the module docs for the others).
+/// Reports whether the account at `address` runs the code the reviewed build produces for one of
+/// the `expected` contracts, and returns which. Both the objects a package names (one expected
+/// contract each) and the members those objects name (every contract the member's role admits)
+/// go through here.
 ///
-/// Three outcomes a reviewer must be able to tell apart, so they are reported separately:
-/// the address has no code at all; it has code the commit does not produce (which is what a
-/// wrong compilation profile or a foreign contract looks like); or it runs a DIFFERENT
-/// contract from the commit, which is named in the error.
+/// The outcomes a reviewer must be able to tell apart are reported separately: the address has
+/// no code at all; it runs code the build produces for a different contract (named); it runs code
+/// the build does not produce (which is what a wrong compilation profile or a foreign contract
+/// looks like); or the expected artifact could not be loaded. Each is an ERROR.
 pub(crate) async fn expect_code_identity<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
+    build: &ReviewedBuild,
     result: &mut VerificationResult,
     label: &str,
     address: Address,
-    expected_short_name: &str,
-) -> anyhow::Result<bool> {
+    expected: &[&'static str],
+) -> anyhow::Result<Option<&'static str>> {
     if address.is_zero() {
         result.report_error(&format!("{label} is the zero address"));
-        return Ok(false);
+        return Ok(None);
     }
 
     let code = provider.get_code_at(address).await?;
@@ -161,33 +257,55 @@ pub(crate) async fn expect_code_identity<P: Provider>(
         result.report_error(&format!(
             "{label} at {address} has NO code: nothing is deployed there"
         ));
-        return Ok(false);
+        return Ok(None);
     }
 
-    let live = alloy::primitives::keccak256(&code);
-    match classify_code(identity, &live, expected_short_name) {
-        CodeVerdict::Reviewed(name) => {
-            result.report_ok(&format!("{label} at {address} runs {name}"));
-            Ok(true)
+    let expectation = expected.join(" or ");
+    match classify_code(build, &code, expected) {
+        CodeVerdict::Reviewed {
+            name,
+            immutable_slots: 0,
+        } => {
+            result.report_ok(&format!("{label} at {address} runs the reviewed {name}"));
+            Ok(Some(name))
+        }
+        CodeVerdict::Reviewed {
+            name,
+            immutable_slots,
+        } => {
+            result.report_ok(&format!(
+                "{label} at {address} runs the reviewed {name} (byte for byte outside its \
+                 {immutable_slots} constructor-set immutable slot(s))"
+            ));
+            Ok(Some(name))
         }
         CodeVerdict::OtherContract(other) => {
             result.report_error(&format!(
-                "{label} at {address} runs {other}, not {expected_short_name}"
+                "{label} at {address} runs {other}, not {expectation}"
             ));
-            Ok(false)
+            Ok(None)
         }
         CodeVerdict::Unknown => {
             // An ERROR, not a warning: the reviewer cannot say what is deployed here, and an
             // unresolved deployment must not ride along with an otherwise successful review.
-            // The two benign causes name themselves in the message; both are fixed BEFORE the
-            // review concludes, not annotated in it.
+            // The benign causes name themselves in the message; they are fixed BEFORE the review
+            // concludes, not annotated in it.
             result.report_error(&format!(
-                "{label} at {address} runs code ({live}) that AllContractsHashes.json does not \
-                 attribute to any contract: what is deployed there is unknown. Regenerate \
-                 AllContractsHashes.json for the reviewed commit, or confirm the object was \
-                 built with the deterministic (metadata-free) profile"
+                "{label} at {address} runs code ({}) that is not the reviewed build of \
+                 {expectation}, nor any contract {} attributes: what is deployed there is \
+                 unknown. Regenerate the hashes for the reviewed commit, or confirm the object \
+                 was built with the reviewed compiler profile",
+                alloy::primitives::keccak256(&code),
+                build.identity().source().display()
             ));
-            Ok(false)
+            Ok(None)
+        }
+        CodeVerdict::Unverifiable(why) => {
+            result.report_error(&format!(
+                "{label} at {address}: its code cannot be held against the reviewed build of \
+                 {expectation} — {why}"
+            ));
+            Ok(None)
         }
     }
 }
@@ -220,75 +338,119 @@ pub(crate) async fn expect_code_present<P: Provider>(
 mod tests {
     use super::*;
     use crate::upgrade_verification::contract_hashes::ContractHash;
+    use alloy::primitives::keccak256;
 
-    fn identity_from(pairs: &[(&str, &str)]) -> CodeIdentity {
-        let mut by_codehash = HashMap::new();
-        for (name, hash) in pairs {
-            by_codehash.insert(hash.parse::<FixedBytes<32>>().unwrap(), (*name).to_string());
-        }
-        CodeIdentity {
-            by_codehash,
-            creation_code_by_short_name: HashMap::new(),
+    /// The one immutable slot of [`runtime_with_immutable`].
+    const IMMUTABLE_SLOT: std::ops::Range<usize> = 4..36;
+
+    /// A contract whose constructor sets one immutable: a 32-byte slot at offset 4 of its runtime.
+    fn runtime_with_immutable() -> Vec<u8> {
+        let mut code = b"PUSH".to_vec();
+        code.extend_from_slice(&[0u8; 32]);
+        code.extend_from_slice(b" the reviewed facet runtime");
+        code
+    }
+
+    fn deployed_with_immutable(value: u8) -> Vec<u8> {
+        let mut code = runtime_with_immutable();
+        code[IMMUTABLE_SLOT].fill(value);
+        code
+    }
+
+    const RELEASE_RUNTIME: &[u8] = b"the reviewed CTMRelease runtime";
+    const TRANSITION_RUNTIME: &[u8] = b"the reviewed CoreTransition runtime";
+
+    fn build() -> ReviewedBuild {
+        let identity = CodeIdentity::empty()
+            .with_contract("l1-contracts/CTMRelease", RELEASE_RUNTIME)
+            .with_contract("l1-contracts/CoreTransition", TRANSITION_RUNTIME)
+            .with_contract("l1-contracts/MailboxFacet", &runtime_with_immutable());
+        ReviewedBuild::from_artifacts(
+            identity,
+            vec![
+                (
+                    "CTMRelease.sol",
+                    "CTMRelease",
+                    Vec::new(),
+                    RELEASE_RUNTIME.to_vec(),
+                    Vec::new(),
+                ),
+                (
+                    "Mailbox.sol",
+                    "MailboxFacet",
+                    Vec::new(),
+                    runtime_with_immutable(),
+                    vec![IMMUTABLE_SLOT],
+                ),
+            ],
+        )
+    }
+
+    #[test]
+    fn the_reviewed_runtime_is_recognized() {
+        assert_eq!(
+            classify_code(&build(), RELEASE_RUNTIME, &["CTMRelease"]),
+            CodeVerdict::Reviewed {
+                name: "CTMRelease",
+                immutable_slots: 0
+            }
+        );
+    }
+
+    /// The immutable slot carries whatever the deploying constructor wrote, so it is masked: the
+    /// same code with any value there is the reviewed contract.
+    #[test]
+    fn immutable_slots_are_masked() {
+        for value in [0x00, 0x11, 0xff] {
+            assert_eq!(
+                classify_code(&build(), &deployed_with_immutable(value), &["MailboxFacet"]),
+                CodeVerdict::Reviewed {
+                    name: "MailboxFacet",
+                    immutable_slots: 1
+                }
+            );
         }
     }
 
-    const HASH_A: &str = "0x1111111111111111111111111111111111111111111111111111111111111111";
-    const HASH_B: &str = "0x2222222222222222222222222222222222222222222222222222222222222222";
-
+    /// Masking is exactly the artifact's immutable ranges: one byte changed anywhere else, or one
+    /// byte more, is not the reviewed contract.
     #[test]
-    fn resolves_a_codehash_to_its_path_qualified_name() {
-        let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);
+    fn a_byte_outside_the_immutable_slots_is_not_masked() {
+        let mut tampered = deployed_with_immutable(0x11);
+        tampered[40] ^= 0x01;
         assert_eq!(
-            id.name_of(&HASH_A.parse().unwrap()),
-            Some("l1-contracts/CTMRelease")
+            classify_code(&build(), &tampered, &["MailboxFacet"]),
+            CodeVerdict::Unknown
+        );
+        let mut longer = deployed_with_immutable(0x11);
+        longer.push(0x00);
+        assert_eq!(
+            classify_code(&build(), &longer, &["MailboxFacet"]),
+            CodeVerdict::Unknown
+        );
+    }
+
+    /// The match is the first of the role's admitted contracts the code IS.
+    #[test]
+    fn a_member_matches_any_contract_its_role_admits() {
+        assert_eq!(
+            classify_code(
+                &build(),
+                &deployed_with_immutable(0x22),
+                &["CTMRelease", "MailboxFacet"]
+            ),
+            CodeVerdict::Reviewed {
+                name: "MailboxFacet",
+                immutable_slots: 1
+            }
         );
     }
 
     #[test]
-    fn unknown_code_resolves_to_nothing() {
-        let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);
-        assert!(id.name_of(&HASH_B.parse().unwrap()).is_none());
-    }
-
-    /// A duplicate codehash must not panic or lose the map: two names can legitimately share
-    /// bytecode when their sources are identical.
-    #[test]
-    fn duplicate_codehashes_keep_the_first_name() {
-        let hashes = ContractHashes {
-            hashes: vec![
-                ContractHash {
-                    contract_name: "l1-contracts/First".into(),
-                    evm_bytecode_hash: None,
-                    evm_deployed_bytecode_hash: Some(HASH_A.into()),
-                    evm_deployed_bytecode_blake_hash: None,
-                    evm_deployed_bytecode_length: None,
-                    zk_bytecode_hash: None,
-                },
-                ContractHash {
-                    contract_name: "l1-contracts/Second".into(),
-                    evm_bytecode_hash: None,
-                    evm_deployed_bytecode_hash: Some(HASH_A.into()),
-                    evm_deployed_bytecode_blake_hash: None,
-                    evm_deployed_bytecode_length: None,
-                    zk_bytecode_hash: None,
-                },
-            ],
-        };
-        let mut by_codehash = HashMap::new();
-        for contract in hashes.hashes {
-            if let Some(h) = contract.evm_deployed_bytecode_hash.as_deref() {
-                by_codehash
-                    .entry(h.parse::<FixedBytes<32>>().unwrap())
-                    .or_insert_with(|| contract.contract_name.clone());
-            }
-        }
-        let id = CodeIdentity {
-            by_codehash,
-            creation_code_by_short_name: HashMap::new(),
-        };
+    fn code_the_commit_produces_for_another_contract_names_it() {
         assert_eq!(
-            id.name_of(&HASH_A.parse().unwrap()),
-            Some("l1-contracts/First")
+            classify_code(&build(), TRANSITION_RUNTIME, &["CTMRelease"]),
+            CodeVerdict::OtherContract("l1-contracts/CoreTransition")
         );
     }
 
@@ -298,31 +460,79 @@ mod tests {
     /// reported success.
     #[test]
     fn unrecognized_code_is_a_verdict_of_its_own() {
-        let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);
         assert_eq!(
-            classify_code(&id, &HASH_B.parse().unwrap(), "CTMRelease"),
+            classify_code(&build(), b"code no reviewed artifact is", &["CTMRelease"]),
             CodeVerdict::Unknown
         );
     }
 
+    /// An expected contract whose artifact the build could not load cannot pass silently.
     #[test]
-    fn code_the_commit_produces_for_another_contract_names_it() {
-        let id = identity_from(&[("l1-contracts/CoreTransition", HASH_A)]);
-        assert_eq!(
-            classify_code(&id, &HASH_A.parse().unwrap(), "CTMRelease"),
-            CodeVerdict::OtherContract("l1-contracts/CoreTransition")
-        );
+    fn an_unloadable_expected_artifact_is_unverifiable() {
+        assert!(matches!(
+            classify_code(&build(), RELEASE_RUNTIME, &["DiamondInit"]),
+            CodeVerdict::Unverifiable(_)
+        ));
     }
 
-    /// The short name is matched against the LAST path segment, so a reviewed name and the
-    /// verifier's expectation agree without the verifier repeating the path.
     #[test]
-    fn the_expected_contract_resolves_through_its_short_name() {
-        let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);
+    fn resolves_a_codehash_to_its_path_qualified_name() {
+        let id = CodeIdentity::empty().with_contract("l1-contracts/CTMRelease", RELEASE_RUNTIME);
         assert_eq!(
-            classify_code(&id, &HASH_A.parse().unwrap(), "CTMRelease"),
-            CodeVerdict::Reviewed("l1-contracts/CTMRelease")
+            id.name_of(&keccak256(RELEASE_RUNTIME)),
+            Some("l1-contracts/CTMRelease")
         );
+        assert!(id.name_of(&keccak256(b"other")).is_none());
+    }
+
+    /// The hashes file indexes every hash a row carries: creation code, deployed bytecode and the
+    /// ZKsync OS bytecode info triple. A duplicate codehash keeps the first name — two names can
+    /// legitimately share bytecode when their sources are identical.
+    #[test]
+    fn a_hashes_file_is_indexed_by_every_hash_it_records() {
+        let hash = |byte: u8| format!("{}", B256::repeat_byte(byte));
+        let row = |name: &str| ContractHash {
+            contract_name: name.into(),
+            evm_bytecode_hash: Some(hash(0x01)),
+            evm_deployed_bytecode_hash: Some(hash(0x02)),
+            evm_deployed_bytecode_blake_hash: Some(hash(0x03)),
+            evm_deployed_bytecode_length: Some(7),
+            zk_bytecode_hash: None,
+        };
+        let dir = std::env::temp_dir().join(format!(
+            "protocol-ops-provenance-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("hashes.json");
+        std::fs::write(
+            &path,
+            serde_json::to_string(&[row("l1-contracts/First"), row("l1-contracts/Second")])
+                .unwrap(),
+        )
+        .unwrap();
+        let id = CodeIdentity::from_hashes_file(&path).unwrap();
+        assert_eq!(id.source(), path.as_path());
+        assert_eq!(
+            id.creation_code_hash_of("First"),
+            Some(B256::repeat_byte(0x01))
+        );
+        assert_eq!(
+            id.deployed_code_hash_of("Second"),
+            Some(B256::repeat_byte(0x02))
+        );
+        assert_eq!(
+            id.name_of(&B256::repeat_byte(0x02)),
+            Some("l1-contracts/First")
+        );
+        assert_eq!(
+            id.name_of_bytecode_info(&(B256::repeat_byte(0x03), 7, B256::repeat_byte(0x02))),
+            Some("l1-contracts/First")
+        );
+        assert!(id
+            .name_of_bytecode_info(&(B256::repeat_byte(0x03), 8, B256::repeat_byte(0x02)))
+            .is_none());
     }
 
     // ───────────────────────── the reporting path ─────────────────────────
@@ -340,23 +550,29 @@ mod tests {
         ProviderBuilder::new().connect_mocked_client(asserter)
     }
 
-    #[tokio::test]
-    async fn code_the_commit_does_not_produce_fails_the_run() {
-        let runtime = b"code no reviewed artifact hashes to";
-        let id = identity_from(&[("l1-contracts/CTMRelease", HASH_A)]);
-        let provider = mocked_provider(runtime);
+    async fn report(
+        code: &[u8],
+        expected: &[&'static str],
+    ) -> (Option<&'static str>, VerificationResult) {
+        let provider = mocked_provider(code);
         let mut result = VerificationResult::default();
-        let verified = expect_code_identity(
+        let verdict = expect_code_identity(
             &provider,
-            &id,
+            &build(),
             &mut result,
-            "the release",
+            "the member",
             Address::repeat_byte(0x11),
-            "CTMRelease",
+            expected,
         )
         .await
         .expect("a mocked read is not a transport failure");
-        assert!(!verified);
+        (verdict, result)
+    }
+
+    #[tokio::test]
+    async fn code_the_commit_does_not_produce_fails_the_run() {
+        let (verdict, result) = report(b"code no reviewed artifact is", &["CTMRelease"]).await;
+        assert_eq!(verdict, None);
         assert_eq!(
             result.errors, 1,
             "unknown code must be an error, never a warning"
@@ -367,21 +583,50 @@ mod tests {
 
     #[tokio::test]
     async fn code_the_commit_produces_for_the_expected_contract_passes() {
-        let runtime = b"the reviewed CTMRelease runtime";
-        let hash = format!("{}", alloy::primitives::keccak256(runtime));
-        let id = identity_from(&[("l1-contracts/CTMRelease", &hash)]);
-        let provider = mocked_provider(runtime);
-        let mut result = VerificationResult::default();
-        assert!(expect_code_identity(
-            &provider,
-            &id,
-            &mut result,
-            "the release",
-            Address::repeat_byte(0x11),
-            "CTMRelease",
-        )
-        .await
-        .unwrap());
+        let (verdict, result) = report(RELEASE_RUNTIME, &["CTMRelease"]).await;
+        assert_eq!(verdict, Some("CTMRelease"));
         assert_eq!(result.errors, 0);
+    }
+
+    #[tokio::test]
+    async fn a_member_with_its_immutables_set_passes_and_another_contract_fails() {
+        let (verdict, result) = report(&deployed_with_immutable(0x42), &["MailboxFacet"]).await;
+        assert_eq!(verdict, Some("MailboxFacet"));
+        assert_eq!(result.errors, 0);
+
+        let (verdict, result) = report(TRANSITION_RUNTIME, &["MailboxFacet"]).await;
+        assert_eq!(verdict, None);
+        assert_eq!(result.errors, 1);
+    }
+
+    #[tokio::test]
+    async fn no_code_and_the_zero_address_fail_the_run() {
+        let (verdict, result) = report(&[], &["CTMRelease"]).await;
+        assert_eq!(verdict, None);
+        assert_eq!(result.errors, 1);
+
+        let mut result = VerificationResult::default();
+        let provider = mocked_provider(RELEASE_RUNTIME);
+        assert_eq!(
+            expect_code_identity(
+                &provider,
+                &build(),
+                &mut result,
+                "the member",
+                Address::ZERO,
+                &["CTMRelease"],
+            )
+            .await
+            .unwrap(),
+            None
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    #[tokio::test]
+    async fn an_unverifiable_member_fails_the_run() {
+        let (verdict, result) = report(RELEASE_RUNTIME, &["DiamondInit"]).await;
+        assert_eq!(verdict, None);
+        assert_eq!(result.errors, 1);
     }
 }

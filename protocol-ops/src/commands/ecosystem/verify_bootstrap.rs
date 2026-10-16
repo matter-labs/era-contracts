@@ -65,6 +65,14 @@ pub struct VerifyBootstrapArgs {
     /// and does not need it.
     #[clap(long)]
     pub env: Option<String>,
+
+    /// A hashes file in the `AllContractsHashes.json` format to hold the local build and the live
+    /// code against, instead of the committed `AllContractsHashes.json`. Only for a harness that
+    /// verifies deployments of an uncommitted build (the committed file is regenerated last):
+    /// with it, the run reviews the local build rather than a commit, and the report says so. A
+    /// review of a package that will be signed uses the default.
+    #[clap(long)]
+    pub contract_hashes: Option<PathBuf>,
 }
 
 pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
@@ -78,6 +86,7 @@ pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
         &args.create2_salts,
         &args.executor_records,
         args.env.as_deref(),
+        args.contract_hashes.as_deref(),
         &mut result,
     )
     .await?;

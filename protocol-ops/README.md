@@ -163,9 +163,10 @@ since a genuine executor built for an attacker's owner answers them exactly like
 That is what establishes the audited CONSTRUCTOR produced it, which a runtime codehash cannot (and
 the lifecycle objects set immutables, so no codehash identifies them at all) — so it needs the
 reviewed commit built locally
-(`cd l1-contracts && forge build`) for the creation code BYTES, and the reviewed CREATE2 salts:
-the core prepare's `[contracts] create2_factory_salt` and the CTM prepare's
-`[create2_factory_salts]` entry, both passed as `--create2-salt` (a package records neither).
+(`cd l1-contracts && forge build`) for the creation code BYTES, and the CREATE2 salts: each prepare
+records the salt it deployed under (`create2_factory_salt`, merged under `[core]` and `[ctms.*]`),
+and `--create2-salt` adds reviewer-supplied ones (the env's `[contracts] create2_factory_salt` and
+`[create2_factory_salts]` entries).
 An executor is re-derived from its EXECUTOR RECORD, which is mandatory: the `[upgrade_executors]`
 table the run that deployed it wrote (the `ecosystem init` / `ctm init` forge outputs
 `script-out/output-deploy-l1.toml` / `output-deploy-ctm.toml`, or a bootstrap package, which carries
@@ -173,8 +174,8 @@ its own), passed with the repeatable `--executor-record`. The record's salt and 
 arguments re-derive the address; its immutable bindings are still held against the package's values,
 and its initial owner is only reported — a fresh ecosystem constructs its executors for the deployer
 and nominates governance. An executor without a record is unverified, which is an error. The live
-owner, pending owner and coordinator are checked separately. The immutable-free objects are
-additionally identified against `AllContractsHashes.json`. Every release the package installs is
+owner, pending owner and coordinator are checked separately. Each write-once object's live code is
+also compared with the reviewed build's deployed bytecode of its contract. Every release the package installs is
 held against the reviewed genesis: `genesisBatchHash` against the `genesis_root` of
 `configs/genesis/zksync-os/latest.json`, `genesisIndexRepeatedStorageChanges` against zero, and
 `fixedForceDeploymentsData` against the package's `force_deployments_data` — and decoded, with every
@@ -185,6 +186,47 @@ against the `zk_token_asset_id` of `upgrade-envs/permanent-values/<env>.toml` fo
 package is held against (required unless the package is a replacement), the legacy and test-only
 addresses against zero, and each bytecode field against the release's own L2 bytecode table.
 
+**What the objects' members run** is held against the reviewed build too. An L1 member's live code
+is compared with the reviewed artifact of each contract its role admits, byte for byte outside the
+artifact's immutable slots (`immutableReferences`) — which proves the code, not the values its
+constructor wrote into those slots:
+
+| Member                                                     | Must run                                                                                                                                                                                                                                                                     |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a release's genesis facets                                 | `AdminFacet`, `GettersFacet`, `MailboxFacet`, `ExecutorFacet`, `MigratorFacet` or `CommitterFacet`                                                                                                                                                                           |
+| a release's `diamondInit` / `genesisUpgrade`               | `DiamondInit` / `L1GenesisUpgrade`                                                                                                                                                                                                                                           |
+| a release's `verifier`                                     | `MultiProofTestnetVerifier`, `MultiProofVerifier`, `ZKsyncOSTestnetVerifier` or `ZKsyncOSVerifier`, and each sub-verifier it names through `INNER_VERIFIER` / `AIRBENDER_VERIFIER` / `ZISK_RANGE_VERIFIER` / `PLONK_VERIFIER` the reviewed contract of its place in the tree |
+| a transition's / the bootstrap migration's `upgradeEngine` | `DefaultUpgrade` / `BootstrapUpgrade`                                                                                                                                                                                                                                        |
+| an L2 plan's `delegateComposer`                            | `L2DefaultDelegateCalldataComposer`                                                                                                                                                                                                                                          |
+| each proxy row's `implNew`                                 | the contract of the row's slot (`MultisigCommitter` or `ValidatorTimelock` for the timelock)                                                                                                                                                                                 |
+
+A release may carry over the verifier already in force where it departs from — the departing
+release's, or for the bootstrap the one the CTM's chains at the departing version run — even when
+an earlier build produced it: the prepare pins the live verifier unless the version deploys one, and
+an unchanged verifier is not something the upgrade changes. Every other member must be this
+build's. `ZiskVerifier`'s snarkJS Plonk backend is built outside this repository, so no reviewed
+build describes it and it fails the run. An L2 member is a ZKsync OS bytecode info, held against
+the reviewed hashes' `(blake2s, length, keccak256)`: each row of a release's L2 table must be the
+bytecode of the contract its `L2EcosystemContract` slot names (`EmptyContract` for the removed
+GWAssetTracker), its system-proxy shell `SystemContractProxy`'s, a plan's delegate
+`L2DefaultUpgrade`'s and each extra bytecode some reviewed contract's.
+
+**Every proxy row names the proxy of its slot.** Row `i` of a core transition's ecosystem inventory
+is `L1EcosystemContract` member `i`, of an operation's or the bootstrap's CTM-domain inventory
+`CTMContract` member `i`, and that member's proxy is discovered on chain: the Bridgehub (from the
+CTM's `BRIDGE_HUB()`) and its `assetRouter()`, the router's `L1_NULLIFIER()` and
+`nativeTokenVault()`, the Bridgehub's `messageRoot()`, `l1CtmDeployer()`, `chainAssetHandler()` and
+`chainRegistrationSender()`, the nullifier's `l1InteropHandler()`; the CTM itself and its
+`validatorTimelockPostV29()`, `L1_BYTECODES_SUPPLIER()`, `PERMISSIONLESS_VALIDATOR()` and
+`serverNotifierAddress()`. A row naming another proxy, a row in a slot that is no proxy of its
+domain, and an inventory whose length is not its enum's each fail the run.
+
+`--contract-hashes <path>` replaces the committed `AllContractsHashes.json` the local build and the
+live code are held against. It exists for harnesses that verify deployments of an uncommitted build
+(the anvil upgrade runner computes one with `scripts/calculate-hashes.ts --output`); the report then
+says it reviews the local build rather than a commit, and a package that will be signed is
+reviewed without it.
+
 A transition replacement is held against the transition it replaces rather than the CTM's current
 state: the replacement's construction as for any transition, the same source release (the replaced
 transition's, not the CTM's current one) and pinned deadline, `upgradeTransition[departure]` still
@@ -192,7 +234,8 @@ the expected one and not the replacement, a departure below the CTM's version, a
 than the replaced one that is the CTM's current release at its version or else the source of the
 edge committed onward from it, and the replacement's L2 bytecodes published. The effective deadline
 and any `setProtocolVersionDeadline` riding the `forward` are reported. The destination is an
-existing release, so no genesis is judged on this path.
+existing release, possibly built by an earlier commit, so neither its genesis nor its members are
+judged on this path; the replacement's own engine, composer and L2 bytecodes are.
 
 **Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
 `EcosystemUpgradeExecutor.execute(operation)` on the reviewed coordinator and comparing byte for

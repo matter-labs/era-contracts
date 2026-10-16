@@ -29,6 +29,78 @@ pub const FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS: [(&str, usize); 9] = [
 /// The source-sync test below fails the build if the append-only enum moves it.
 pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 19;
 
+/// `enum L1EcosystemContract`, in declaration order: the slot names of a core transition's
+/// ecosystem inventory. The source-sync test below fails the build if the enum changes.
+pub const L1_ECOSYSTEM_CONTRACTS: [&str; 9] = [
+    "L1Bridgehub",
+    "L1ChainAssetHandler",
+    "L1MessageRoot",
+    "L1Nullifier",
+    "L1AssetRouter",
+    "L1NativeTokenVault",
+    "L1InteropHandler",
+    "CTMDeploymentTracker",
+    "ChainRegistrationSender",
+];
+
+/// `enum CTMContract`, in declaration order: the slot names of a CTM-domain inventory (an
+/// operation's `ctmInfrastructure`, a bootstrap's `ctmProxyUpgrades`). The source-sync test below
+/// fails the build if the enum changes.
+pub const CTM_CONTRACTS: [&str; 20] = [
+    "AdminFacet",
+    "MailboxFacet",
+    "ExecutorFacet",
+    "MigratorFacet",
+    "CommitterFacet",
+    "DiamondInit",
+    "ValidatorTimelock",
+    "ChainTypeManager",
+    "VerifierPlonk",
+    "DualVerifier",
+    "TestnetVerifier",
+    "GatewayCTMDeployerCTM",
+    "GatewayCTMDeployerVerifiers",
+    "BlobsL1DAValidatorZKsyncOS",
+    "GettersFacet",
+    "DefaultUpgrade",
+    "L1GenesisUpgrade",
+    "BytecodesSupplier",
+    "PermissionlessValidator",
+    "ServerNotifier",
+];
+
+/// `enum L2EcosystemContract`, in declaration order: the slot names of a release's L2 bytecode
+/// table. The source-sync test below fails the build if the enum changes.
+pub const L2_ECOSYSTEM_CONTRACTS: [&str; 27] = [
+    "L2Bridgehub",
+    "L2AssetRouter",
+    "L2NativeTokenVault",
+    "L2MessageRoot",
+    "UpgradeableBeaconDeployer",
+    "BaseTokenHolder",
+    "L2ChainAssetHandler",
+    "InteropCenter",
+    "InteropAttributeParser",
+    "L2InteropHandler",
+    "L2AssetTracker",
+    "L2WrappedBaseToken",
+    "L2MessageVerification",
+    "L2InteropRootStorage",
+    "BeaconProxy",
+    "L2DefaultUpgrade",
+    "BridgedStandardERC20",
+    "DiamondProxy",
+    "ProxyAdmin",
+    "TransparentUpgradeableProxy",
+    "L2InteropCommitmentTree",
+    "AtomicFlowManager",
+    "L2BaseToken",
+    "L1Messenger",
+    "SystemContext",
+    "RemovedGWAssetTracker",
+    "L2ComplexUpgrader",
+];
+
 /// Builds an L2 built-in address from a 16-bit offset into the
 /// `BUILT_IN_CONTRACTS_OFFSET` range (`0x10000..=0x1ffff`).
 const fn l2_addr(offset: u16) -> Address {
@@ -308,19 +380,25 @@ mod tests {
 
     /// The members of `enum <name>` in ContractIdentifiers.sol, in declaration order.
     fn enum_members(name: &str) -> Vec<&'static str> {
-        let body = CONTRACT_IDENTIFIERS
+        let after = CONTRACT_IDENTIFIERS
             .split_once(&format!("enum {name} {{"))
             .unwrap_or_else(|| panic!("ContractIdentifiers.sol must declare `enum {name}`"))
-            .1
-            .split_once('}')
-            .expect("the enum must be closed")
-            .0;
-        body.lines()
-            .map(|line| line.split("//").next().unwrap_or_default())
-            .flat_map(|line| line.split(','))
-            .map(str::trim)
-            .filter(|member| !member.is_empty())
-            .collect()
+            .1;
+        // Comments are dropped BEFORE looking for the closing brace: a braced doc reference in a
+        // member's comment would otherwise close the enum early.
+        let mut members = Vec::new();
+        for line in after.lines() {
+            let code = line.split("//").next().unwrap_or_default();
+            let (code, closed) = match code.split_once('}') {
+                Some((before, _)) => (before, true),
+                None => (code, false),
+            };
+            members.extend(code.split(',').map(str::trim).filter(|m| !m.is_empty()));
+            if closed {
+                return members;
+            }
+        }
+        panic!("enum {name} must be closed");
     }
 
     #[test]
@@ -331,6 +409,21 @@ mod tests {
                 .position(|m| *m == "ServerNotifier"),
             Some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
             "CTMContract.ServerNotifier moved; update CTM_CONTRACT_SERVER_NOTIFIER_SLOT"
+        );
+    }
+
+    /// The inventory slot names are the Solidity enums, member for member: a slot check that
+    /// named the wrong member would hold a row against another contract's proxy.
+    #[test]
+    fn the_inventory_slot_names_are_the_solidity_enums() {
+        assert_eq!(
+            enum_members("L1EcosystemContract"),
+            L1_ECOSYSTEM_CONTRACTS.to_vec()
+        );
+        assert_eq!(enum_members("CTMContract"), CTM_CONTRACTS.to_vec());
+        assert_eq!(
+            enum_members("L2EcosystemContract"),
+            L2_ECOSYSTEM_CONTRACTS.to_vec()
         );
     }
 

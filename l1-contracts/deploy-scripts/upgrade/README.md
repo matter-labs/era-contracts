@@ -103,7 +103,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x... \
   --env <env> \
   --executor-record <the bootstrap package, or the ecosystem/ctm init outputs, that deployed the executors> \
-  --create2-salt <[contracts] create2_factory_salt> --create2-salt <[create2_factory_salts] entry of the CTM>
+  [--create2-salt <a salt the package does not record>]
 ```
 
 Run it before every vote: governance approves the exact deployed objects, and this is where their
@@ -113,9 +113,10 @@ registry-driven package against live L1 and decides from the package itself whic
 recurring upgrade driven through its coordinator, the one-time bootstrap edge, or the replacement
 of a committed transition (prepared by `DefaultTransitionReplacement`). It checks every object's
 construction (the write-once objects from their manifests, the bootstrap sequence from the objects
-it was constructed over — which is why both prepare legs' salts are inputs: a package records
-neither — and the executors from the `[upgrade_executors]` record of the run that
-deployed them, without which an executor is unverified), the immutable-free objects' provenance,
+it was constructed over — under the salts each prepare leg records in its output
+(`create2_factory_salt`) — and the executors from the `[upgrade_executors]` record of the run that
+deployed them, without which an executor is unverified), that every object and every member it
+names runs the reviewed build's code for its role, that every proxy row names its slot's proxy,
 the bound authority and the owner the upgrade is driven by, every row's departing implementation, readiness,
 and that the calldata governance signs invokes the reviewed upgrade and nothing else. What it
 checks and deliberately does not is in

@@ -50,25 +50,43 @@ from calldata:
   The current owner, nomination and coordinator are checked separately against the reviewed
   governance and bindings. The creation-code bytes come from the local build (`l1-contracts/out`, so
   the reviewed commit must be built), held against the committed `evmBytecodeHash`. The salts are
-  per prepare leg and come from `--create2-salt` (a package records none); with no salt the check
-  cannot run, and that is an ERROR rather than a silent pass. An executor is re-derived from its
+  per prepare leg: each prepare records the one it deployed under (`create2_factory_salt`, merged
+  under `[core]` / `[ctms.*]`) and `--create2-salt` adds more; with no salt the check cannot run,
+  and that is an ERROR rather than a silent pass. An executor is re-derived from its
   `[upgrade_executors]` record — salt and ORIGINAL constructor arguments, written by the run that
   deployed it (`ecosystem init`, `ctm init` or the bootstrap prepares) and read from the package or
   `--executor-record` — so one whose owner or coordinator moved since still verifies. The record is
   mandatory: an executor without one is unverified, which is an error.
-- **Object provenance** — for the objects without constructor-set immutables, the code at each
-  address, looked up in `AllContractsHashes.json`. Code attributable to a _different_ contract is
-  an ERROR, and so is code attributable to NO contract: the reviewer cannot say what is deployed
-  there, and an unresolved deployment must not ride along with an otherwise successful review.
-  (The usual cause is an un-regenerated hash file, which makes every lookup miss at once — fixed
-  before the review concludes, not annotated in it.)
-- **Constructor-set immutables.** `AllContractsHashes.json` records the ARTIFACT's deployed
-  bytecode, whose immutable slots are zero, so a contract that sets immutables never hashes to its
-  own artifact once deployed. Such an object gets NO provenance lookup and NO identity from its
-  getters: its construction above is the whole of its identity — getters answering the reviewed
-  values would admit any counterfeit that answers them too.
-- **Named members exist.** Every contract an object names by address must be deployed code,
-  which is what the objects' own `validate()` refuses on-chain.
+- **Code identity** (`provenance.rs`) — the live code at an address against the reviewed build's
+  deployed bytecode of each contract its role admits, byte for byte outside the artifact's
+  immutable slots (`immutableReferences`), with the build's bytes held against the committed
+  `evmDeployedBytecodeHash`. Code that is a _different_ contract is an ERROR, and so is code that
+  is NO reviewed contract: the reviewer cannot say what is deployed there, and an unresolved
+  deployment must not ride along with an otherwise successful review. (The usual cause is an
+  un-regenerated hash file, which makes every lookup miss at once — fixed before the review
+  concludes, not annotated in it.) Masking proves the CODE, not the values the constructor wrote
+  into the masked slots: for the write-once objects their construction covers those, and the
+  executors are identified by construction alone — getters answering the reviewed values would
+  admit any counterfeit that answers them too.
+- **Members** (`members.rs`) — every member an object names runs the reviewed build's code for its
+  role: a release's genesis facets (one of the six facets), `DiamondInit`, `L1GenesisUpgrade`, its
+  verifier (a top-level verifier) and every sub-verifier the verifier names through its
+  `*_VERIFIER()` getters; a transition's engine `DefaultUpgrade`, the bootstrap migration's
+  `BootstrapUpgrade`, an L2 plan's `L2DefaultDelegateCalldataComposer`. The one exception is the
+  verifier already in force where the upgrade departs from (the departing release's, or the one the
+  CTM's chains run for the bootstrap), which a release carries over without redeploying and an
+  earlier build may have produced. `ZiskVerifier`'s snarkJS Plonk backend is outside the
+  repository's build and fails the run. L2 members are ZKsync OS bytecode infos held against the
+  reviewed hashes' `(blake2s, length, keccak256)`: each L2 table row the contract of its
+  `L2EcosystemContract` slot, the shell `SystemContractProxy`, a plan's delegate `L2DefaultUpgrade`,
+  each extra bytecode some reviewed contract. What this cannot cover: the values in a member's
+  immutable slots (a facet built over another chain id runs the reviewed code).
+- **Inventory slots** (`rows.rs`) — every participating proxy row names the proxy of its slot
+  (`L1EcosystemContract` / `CTMContract` member `i`), discovered on chain through the Bridgehub and
+  the getters it links (asset router, nullifier, NTV, message root, CTM deployment tracker, chain
+  asset handler, chain registration sender, interop handler) or through the CTM (itself, its
+  validator timelock, bytecodes supplier, permissionless validator, server notifier), and its
+  `implNew` runs the slot's contract. A row in a slot that is no proxy of its domain fails.
 - **Bound authority** — the coordinator, both domain executors, the CTM and both ProxyAdmins,
   and the governance owner the whole lifecycle answers to, with no ownership nomination
   outstanding on any of them. The reviewed owner is what the executors' current ownership is
@@ -121,6 +139,11 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --executor-record <the package or init output that deployed the executors> \
   --create2-salt 0x...
 ```
+
+`--contract-hashes <path>` replaces the committed `AllContractsHashes.json`; only the anvil upgrade
+runner (`yarn test:upgrade`) uses it, with the hashes of the build it deployed from, because the
+committed file is regenerated last. The runner verifies the bootstrap and each registry-driven hop
+with `--env local` and the bootstrap package as `--executor-record` before it replays governance.
 
 In every kind the executing object is recovered from the CALLDATA governance will run — the
 `[operation]` section for a recurring upgrade, the bundle's `migrate()` call for a bootstrap — and

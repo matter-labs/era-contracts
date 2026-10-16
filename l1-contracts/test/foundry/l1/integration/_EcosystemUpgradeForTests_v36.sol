@@ -45,13 +45,13 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
     }
 
     function saveOutput(string memory outputPath) internal override {
-        TrimmedUpgradeOutput.write(
-            vm,
-            outputPath,
-            getChainUpgradeDiamondCutData(),
-            committedUpgradeEngine(),
-            getAddresses().admin.eip7702Checker,
-            TrimmedUpgradeOutput.Registry({
+        TrimmedUpgradeOutput.write({
+            _vm: vm,
+            _outputPath: outputPath,
+            _upgradeCutData: getChainUpgradeDiamondCutData(),
+            _defaultUpgrade: committedUpgradeEngine(),
+            _eip7702Checker: getAddresses().admin.eip7702Checker,
+            _registry: TrimmedUpgradeOutput.Registry({
                 ctmTransition: upgradeAddresses.ctmTransition,
                 ctmUpgradeExecutor: boundCTMUpgradeExecutor(),
                 ctmRelease: getAddresses().stateTransition.currentRelease,
@@ -59,8 +59,14 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
                 bootstrapMigration: address(0),
                 operation: upgradeAddresses.ecosystemUpgradeOperation,
                 coordinator: upgradeCoordinator()
+            }),
+            _reviewed: TrimmedUpgradeOutput.Reviewed({
+                create2FactorySalt: _create2FactorySalt,
+                chainTypeManagerProxy: getAddresses().stateTransition.proxies.chainTypeManager,
+                transparentProxyAdmin: getAddresses().admin.transparentProxyAdmin,
+                forceDeploymentsData: generatedData.forceDeploymentsData
             })
-        );
+        });
     }
 }
 

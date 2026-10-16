@@ -39,16 +39,17 @@ use crate::upgrade_verification::report::VerificationResult;
 use super::construction::{
     canonical_create2_address, constructor_args, expect_canonical_construction, ReviewedBuild,
 };
-use super::genesis::{judge_release_genesis, ReviewedGenesis};
+use super::genesis::ReviewedGenesis;
 use super::lifecycle::{verify_lifecycle_construction, LifecycleBindings, LifecycleReview};
-use super::operation::cross_check;
+use super::members::{verify_engine_and_l2_plan, DepartingVerifiers, BOOTSTRAP_ENGINES};
+use super::operation::{cross_check, verify_core_transition, verify_release};
 use super::package::BootstrapPackage;
-use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
-use super::rows::verify_rows;
+use super::provenance::{expect_code_identity, tolerate};
+use super::rows::{participating, verify_inventory, Inventory, InventoryReview};
 use super::views::{
-    self, BootstrapCall, BridgehubView, CTMReleaseView, CTMUpgradeExecutorView, CoreTransitionView,
-    CoreUpgradeExecutorView, CtmView, EcosystemUpgradeExecutorView, ProxyUpgradeRow,
-    RegistryBootstrapMigrationView, ServerNotifierView,
+    self, BootstrapCall, BridgehubView, CTMUpgradeExecutorView, CoreUpgradeExecutorView, CtmView,
+    EcosystemUpgradeExecutorView, RegistryBootstrapMigrationView, ServerNotifierView,
+    ZkChainGettersView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -56,7 +57,6 @@ use super::{format_semver, render_derived_payloads};
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
     build: &ReviewedBuild,
     genesis: &ReviewedGenesis,
     package: &BootstrapPackage,
@@ -94,11 +94,11 @@ pub(crate) async fn verify<P: Provider>(
     result.print_info("\n== Object provenance ==");
     expect_code_identity(
         provider,
-        identity,
+        build,
         result,
         "the bootstrap migration",
         package.migration,
-        "RegistryBootstrapMigration",
+        &["RegistryBootstrapMigration"],
     )
     .await?;
 
@@ -184,27 +184,45 @@ pub(crate) async fn verify<P: Provider>(
             "the manifest's governance",
         )
         .await;
-    verify_release_construction(
+    // A pre-registry CTM has no release to depart from: the verifier already in force is the
+    // one its chains at the departing version run.
+    let chains = read_chain_versions(
+        provider,
+        result,
+        manifest.ctm,
+        manifest.expectedProtocolVersion,
+    )
+    .await;
+    let departing = DepartingVerifiers::new(
+        "the verifier the CTM's chains at the departing version run",
+        chains.iter().filter_map(|chain| chain.verifier).collect(),
+    );
+    verify_release(
         provider,
         build,
         &genesis,
         result,
+        "the release the edge installs",
         manifest.currentRelease,
         salts,
+        &departing,
         &mut reviewed,
     )
-    .await;
-    if let Some(core_transition_addr) = package.core_transition {
-        verify_core_transition_construction(
-            provider,
-            build,
-            result,
-            core_transition_addr,
-            salts,
-            &mut reviewed,
-        )
-        .await;
-    }
+    .await?;
+    let core_rows = match package.core_transition {
+        Some(core_transition_addr) => Some(
+            verify_core_transition(
+                provider,
+                build,
+                result,
+                core_transition_addr,
+                salts,
+                &mut reviewed,
+            )
+            .await?,
+        ),
+        None => None,
+    };
 
     // The owner is the manifest's: the edge hands both domains to executors that answer to it,
     // and it is cross-checked against the reviewed governance address below.
@@ -244,38 +262,18 @@ pub(crate) async fn verify<P: Provider>(
         result.report_ok("the migration is un-executed");
     }
 
-    expect_code_identity(
-        provider,
-        identity,
-        result,
-        "the release the edge installs",
-        manifest.currentRelease,
-        "CTMRelease",
-    )
-    .await?;
-
-    // ── 2. Every contract the manifest names is deployed ──
-    //
-    // The manifest names members by ADDRESS; what those addresses RUN is what governance
-    // reviewed before approving this object. What the object itself refuses — and what a
-    // reviewer can check here, before the edge runs — is a member nothing is deployed to.
+    // ── 2. The members the manifest names run the reviewed code ──
     result.print_info("\n== Named members ==");
-    expect_code_present(
+    verify_engine_and_l2_plan(
         provider,
+        build,
         result,
-        "manifest.upgradeEngine",
+        "the bootstrap migration",
         manifest.upgradeEngine,
+        BOOTSTRAP_ENGINES,
+        &manifest.l2Plan,
     )
     .await?;
-    if !manifest.l2Plan.delegateComposer.is_zero() {
-        expect_code_present(
-            provider,
-            result,
-            "manifest.l2Plan.delegateComposer",
-            manifest.l2Plan.delegateComposer,
-        )
-        .await?;
-    }
 
     // ── 3. Authority: the bindings that are storage, and the owner the domain lands on ──
     //
@@ -473,44 +471,32 @@ pub(crate) async fn verify<P: Provider>(
         ));
     }
 
-    // Each CTM-domain row must depart from the implementation that is LIVE, not from whatever
-    // the prepare saw: a row at an unexpected implementation reverts the bundle wholesale.
-    let ctm_rows =
-        participating_ctm_rows(&manifest.ctmProxyUpgrades, handover.under_ctm_proxy_admin);
-    if ctm_rows.len() < participating_ctm_rows(&manifest.ctmProxyUpgrades, true).len() {
-        result.print_info(
-            "  the ServerNotifier row is not source-checked: its proxy is not under the \
-             CTM-domain ProxyAdmin yet, so its implementation cannot be read through it (see the \
-             prerequisite above)",
-        );
-    }
-    verify_rows(
+    // Each CTM-domain row must name its slot's proxy and depart from the implementation that is
+    // LIVE, not from whatever the prepare saw: a row at an unexpected implementation reverts the
+    // bundle wholesale.
+    verify_inventory(
         provider,
+        build,
         result,
-        "CTM-domain row",
-        &ctm_rows,
-        manifest.ctmProxyAdmin,
+        &InventoryReview {
+            inventory: Inventory::CtmDomain,
+            rows: &manifest.ctmProxyUpgrades,
+            domain_admin: manifest.ctmProxyAdmin,
+            anchor: Some(manifest.ctm),
+            departure_unreadable: (!handover.under_ctm_proxy_admin)
+                .then_some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
+        },
     )
     .await?;
 
     // ── 6. Chains the edge leaves behind ──
     result.print_info("\n== Chains below the departing version ==");
-    let chains = read_chain_versions(provider, result, manifest.ctm).await;
     judge_lagging_chains(result, manifest.expectedProtocolVersion, &chains);
 
     // ── 7. The ecosystem leg ──
     result.print_info("\n== Ecosystem leg ==");
-    if let Some(core_transition_addr) = package.core_transition {
-        expect_code_identity(
-            provider,
-            identity,
-            result,
-            "the core transition",
-            core_transition_addr,
-            "CoreTransition",
-        )
-        .await?;
-
+    // An unreadable core transition was reported when it was read, and leaves no rows to judge.
+    if let Some(core_rows) = core_rows.as_ref().filter(|rows| participating(rows) > 0) {
         let Some(eco_admin_addr) = bindings.core_proxy_admin else {
             result.report_error(
                 "the ecosystem ProxyAdmin is unknown (the core executor's PROXY_ADMIN could not \
@@ -518,20 +504,25 @@ pub(crate) async fn verify<P: Provider>(
             );
             return Ok(());
         };
-        let registry = CoreTransitionView::new(core_transition_addr, provider);
-        let Some(rows) = tolerate(
-            registry.ecosystemRows().call().await,
+        let bridgehub = tolerate(
+            ctm.BRIDGE_HUB().call().await,
             result,
-            "the core transition's ecosystemRows()",
-        ) else {
-            return Ok(());
-        };
-        let rows: Vec<ProxyUpgradeRow> = rows
-            .into_iter()
-            .filter(|row| !row.implNew.is_zero())
-            .collect();
-        verify_rows(provider, result, "ecosystem row", &rows, eco_admin_addr).await?;
-    } else {
+            "the CTM's BRIDGE_HUB(), through which the ecosystem rows' proxies are discovered",
+        );
+        verify_inventory(
+            provider,
+            build,
+            result,
+            &InventoryReview {
+                inventory: Inventory::Ecosystem,
+                rows: core_rows,
+                domain_admin: eco_admin_addr,
+                anchor: bridgehub,
+                departure_unreadable: None,
+            },
+        )
+        .await?;
+    } else if core_rows.is_none() {
         result.report_ok("no core transition: this edge upgrades no shared singletons");
     }
 
@@ -628,23 +619,32 @@ fn judge_executor_records_against_manifest(
     }
 }
 
-/// One chain registered on the CTM, as the lagging-chain report reads it.
+/// One chain registered on the CTM, as the lagging-chain report and the departing verifier read
+/// it.
 #[derive(Debug)]
 struct ChainVersion {
     chain_id: U256,
     /// `None` when the CTM could not answer for the chain (already reported).
     protocol_version: Option<U256>,
+    /// The verifier the chain runs, read only for a chain at the departing version; `None`
+    /// otherwise or when unreadable (already reported).
+    verifier: Option<Address>,
 }
 
-/// Every chain the CTM's Bridgehub registers on `ctm`, with its protocol version.
+/// Every chain the CTM's Bridgehub registers on `ctm`, with its protocol version and, for a chain
+/// at `departing`, the verifier it runs.
 ///
 /// Reads, in order: the CTM's `BRIDGE_HUB()`, the Bridgehub's `getAllZKChainChainIDs()`, then per
-/// chain `chainTypeManager(id)` and, for the CTM's own chains, the CTM's `getProtocolVersion(id)`.
-/// The report is informational, so a failed read is a warning rather than an error.
+/// chain `chainTypeManager(id)` and, for the CTM's own chains, the CTM's `getProtocolVersion(id)`
+/// — and at the departing version the Bridgehub's `getZKChain(id)` and the chain's
+/// `getVerifier()`. The reads are informational, so a failed one is a warning rather than an
+/// error: an unread verifier only withholds the carry-over, and the release's verifier then fails
+/// on its own.
 async fn read_chain_versions<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
     ctm: Address,
+    departing: U256,
 ) -> Vec<ChainVersion> {
     let not_enumerable = |result: &mut VerificationResult, e: &dyn std::fmt::Display| {
         result.report_warn(&format!(
@@ -689,12 +689,44 @@ async fn read_chain_versions<P: Provider>(
                 None
             }
         };
+        let verifier = if protocol_version == Some(departing) {
+            read_chain_verifier(provider, result, &bridgehub, chain_id).await
+        } else {
+            None
+        };
         chains.push(ChainVersion {
             chain_id,
             protocol_version,
+            verifier,
         });
     }
     chains
+}
+
+/// The verifier chain `chain_id` runs, through its diamond.
+async fn read_chain_verifier<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    bridgehub: &BridgehubView::BridgehubViewInstance<&P>,
+    chain_id: U256,
+) -> Option<Address> {
+    let read = async {
+        let diamond = bridgehub.getZKChain(chain_id).call().await?;
+        ZkChainGettersView::new(diamond, provider)
+            .getVerifier()
+            .call()
+            .await
+    };
+    match read.await {
+        Ok(verifier) => Some(verifier),
+        Err(e) => {
+            result.report_warn(&format!(
+                "chain {chain_id}: the verifier it runs could not be read ({e}), so it offers the \
+                 release no verifier to carry over"
+            ));
+            None
+        }
+    }
 }
 
 /// Reports every chain on the CTM below the edge's departing version. A warning, not an error:
@@ -738,23 +770,6 @@ fn judge_lagging_chains(result: &mut VerificationResult, departing: U256, chains
             "  {unknown} chain(s) could not be read and may lag too"
         ));
     }
-}
-
-/// The CTM-domain rows `migrate()` applies, minus the ServerNotifier's while its proxy is not yet
-/// under the CTM-domain `ProxyAdmin` (`notifier_readable`) — reading it through that admin would
-/// ask a non-admin, and the prerequisite has already reported why.
-fn participating_ctm_rows(
-    rows: &[ProxyUpgradeRow],
-    notifier_readable: bool,
-) -> Vec<ProxyUpgradeRow> {
-    rows.iter()
-        .enumerate()
-        .filter(|(slot, row)| {
-            !row.implNew.is_zero()
-                && (notifier_readable || *slot != CTM_CONTRACT_SERVER_NOTIFIER_SLOT)
-        })
-        .map(|(_, row)| row.clone())
-        .collect()
 }
 
 /// The prerequisite's verdict, for the row check that follows it.
@@ -965,91 +980,6 @@ fn notifier_acceptance(ctm_executor: Address, notifier: Address) -> GovernanceCa
     }
 }
 
-/// The release's construction, re-derived from the manifest the release itself serves, and its
-/// genesis against the reviewed one.
-async fn verify_release_construction<P: Provider>(
-    provider: &P,
-    build: &ReviewedBuild,
-    genesis: &ReviewedGenesis,
-    result: &mut VerificationResult,
-    release: Address,
-    salts: &[B256],
-    reviewed: &mut BTreeMap<Address, String>,
-) {
-    let view = CTMReleaseView::new(release, provider);
-    let manifest = match view.getManifest().call().await {
-        Ok(m) => m,
-        Err(e) => {
-            result.report_error(&format!(
-                "the release at {release} does not answer `getManifest()` ({e}): its construction \
-                 cannot be verified"
-            ));
-            return;
-        }
-    };
-    if expect_canonical_construction(
-        build,
-        result,
-        "the release the edge installs",
-        release,
-        "CTMRelease",
-        &manifest.abi_encode(),
-        salts,
-    ) {
-        reviewed.insert(release, "the release the edge installs".to_string());
-    }
-    result.print_info(&format!(
-        "  release manifest: protocolVersion {}, diamondInit {}, verifier {}, genesisUpgrade {}, \
-         {} facet row(s), {} L2 bytecode slot(s)",
-        format_semver(manifest.protocolVersion),
-        manifest.diamondInit,
-        manifest.verifier,
-        manifest.genesisUpgrade,
-        manifest.genesisFacets.len(),
-        manifest.l2BytecodeInfos.len()
-    ));
-    for (i, row) in manifest.genesisFacets.iter().enumerate() {
-        result.print_info(&format!(
-            "    facet {i}: {} (freezable: {})",
-            row.facet, row.isFreezable
-        ));
-    }
-    judge_release_genesis(result, "the release the edge installs", &manifest, genesis);
-}
-
-/// The core transition's construction, re-derived from the manifest it serves.
-async fn verify_core_transition_construction<P: Provider>(
-    provider: &P,
-    build: &ReviewedBuild,
-    result: &mut VerificationResult,
-    core_transition: Address,
-    salts: &[B256],
-    reviewed: &mut BTreeMap<Address, String>,
-) {
-    let view = CoreTransitionView::new(core_transition, provider);
-    let manifest = match view.getManifest().call().await {
-        Ok(m) => m,
-        Err(e) => {
-            result.report_error(&format!(
-                "the core transition at {core_transition} does not answer `getManifest()` ({e}): its \
-                 construction cannot be verified"
-            ));
-            return;
-        }
-    };
-    if expect_canonical_construction(
-        build,
-        result,
-        "the core transition",
-        core_transition,
-        "CoreTransition",
-        &manifest.abi_encode(),
-        salts,
-    ) {
-        reviewed.insert(core_transition, "the core transition".to_string());
-    }
-}
-
 /// The bootstrap sequence over this edge, DERIVED rather than read from the package: the address
 /// the deterministic factory gives the reviewed creation code over the migration (recovered from
 /// the bundle's `migrate()`) and the package's core transition, under a reviewed salt. Code there
@@ -1091,7 +1021,7 @@ async fn locate_sequence<P: Provider>(
     let args = constructor_args::registry_bootstrap_sequence(package.migration, core_transition);
     let mut derived = Vec::with_capacity(salts.len());
     for salt in salts {
-        let address = canonical_create2_address(*salt, creation_code.code(), &args);
+        let address = canonical_create2_address(*salt, creation_code.creation_code(), &args);
         if !provider.get_code_at(address).await?.is_empty() {
             result.report_ok(&format!(
                 "{label} is deployed at {address}: the reviewed RegistryBootstrapSequence built \
@@ -1409,6 +1339,7 @@ fn verify_bundle(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::upgrade_verification::registry::views::ProxyUpgradeRow;
     use alloy::primitives::{Bytes, U256};
 
     /// The address derivation feeds `abi_encode()` in as the object's CONSTRUCTOR ARGUMENTS, so
@@ -2068,20 +1999,6 @@ mod tests {
         );
     }
 
-    /// The notifier row is left out of the source check only while it is unreadable through the
-    /// CTM-domain admin; every other participating row stays in.
-    #[test]
-    fn only_an_unreadable_notifier_row_is_left_out_of_the_source_check() {
-        let mut rows = vec![inert_row(); CTM_CONTRACT_SERVER_NOTIFIER_SLOT + 1];
-        rows[0] = notifier_row();
-        rows[0].proxy = Address::repeat_byte(0x5A);
-        rows[CTM_CONTRACT_SERVER_NOTIFIER_SLOT] = notifier_row();
-        assert_eq!(participating_ctm_rows(&rows, true).len(), 2);
-        let readable_only = participating_ctm_rows(&rows, false);
-        assert_eq!(readable_only.len(), 1);
-        assert_eq!(readable_only[0].proxy, Address::repeat_byte(0x5A));
-    }
-
     #[tokio::test]
     async fn a_manifest_without_the_notifier_row_is_an_error() {
         let asserter = Asserter::new();
@@ -2192,6 +2109,7 @@ mod tests {
         ChainVersion {
             chain_id: U256::from(chain_id),
             protocol_version: protocol_version.map(U256::from),
+            verifier: None,
         }
     }
 
@@ -2230,34 +2148,44 @@ mod tests {
     }
 
     /// The live read path, in the order it queries: the CTM's Bridgehub, its chain ids, then per
-    /// chain its CTM and — for this CTM's chains only — the version the CTM reports.
+    /// chain its CTM and — for this CTM's chains only — the version the CTM reports, and for a
+    /// chain at the departing version its diamond and the verifier it runs: the verifier a
+    /// bootstrap release may carry over.
     #[tokio::test]
     async fn the_chains_are_enumerated_through_the_bridgehub_and_filtered_by_ctm() {
         const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
         const OTHER_CTM: Address = Address::repeat_byte(0xC1);
+        const DIAMOND: Address = Address::repeat_byte(0xD1);
+        const LIVE_VERIFIER: Address = Address::repeat_byte(0xFE);
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from(BRIDGEHUB.abi_encode()));
         let ids = vec![U256::from(270u64), U256::from(271u64), U256::from(272u64)];
         asserter.push_success(&Bytes::from(ids.abi_encode()));
         asserter.push_success(&Bytes::from(CTM.abi_encode()));
         asserter.push_success(&Bytes::from(U256::from(V34).abi_encode()));
+        asserter.push_success(&Bytes::from(DIAMOND.abi_encode()));
+        asserter.push_success(&Bytes::from(LIVE_VERIFIER.abi_encode()));
         asserter.push_success(&Bytes::from(OTHER_CTM.abi_encode()));
         asserter.push_success(&Bytes::from(CTM.abi_encode()));
         asserter.push_success(&Bytes::from(U256::from(V33).abi_encode()));
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
-        let chains = read_chain_versions(&provider, &mut result, CTM).await;
+        let chains = read_chain_versions(&provider, &mut result, CTM, U256::from(V34)).await;
         assert!(asserter.read_q().is_empty());
         assert_eq!((result.errors, result.warnings), (0, 0));
-        let read: Vec<(U256, Option<U256>)> = chains
+        let read: Vec<(U256, Option<U256>, Option<Address>)> = chains
             .iter()
-            .map(|c| (c.chain_id, c.protocol_version))
+            .map(|c| (c.chain_id, c.protocol_version, c.verifier))
             .collect();
         assert_eq!(
             read,
             vec![
-                (U256::from(270u64), Some(U256::from(V34))),
-                (U256::from(272u64), Some(U256::from(V33))),
+                (
+                    U256::from(270u64),
+                    Some(U256::from(V34)),
+                    Some(LIVE_VERIFIER)
+                ),
+                (U256::from(272u64), Some(U256::from(V33)), None),
             ]
         );
     }

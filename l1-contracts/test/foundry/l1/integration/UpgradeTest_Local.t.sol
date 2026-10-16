@@ -335,6 +335,10 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             ctmOutput.readAddress("$.deployed_addresses.transparent_proxy_admin"),
             address(manifest.ctmProxyAdmin)
         );
+        // Each leg records the salt it deployed under, so the verifier re-derives the objects below
+        // without a reviewer-supplied salt.
+        assertEq(coreOutput.readBytes32("$.create2_factory_salt"), coreSalt, "the core leg's salt");
+        assertEq(ctmOutput.readBytes32("$.create2_factory_salt"), ctmSalt, "the CTM leg's salt");
 
         // The executors' construction record (`[upgrade_executors]`), which protocol-ops re-derives each
         // executor from after its owner or coordinator moves: the ORIGINAL constructor arguments and salt.

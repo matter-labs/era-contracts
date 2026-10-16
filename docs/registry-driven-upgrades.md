@@ -305,16 +305,24 @@ The verification answers three questions for every object a package names:
    BYTES come from the local build (`l1-contracts/out`), held against the committed
    `evmBytecodeHash`, so a doctored build directory cannot pass. The salt is per prepare leg (the
    core prepare's `[contracts] create2_factory_salt`, each CTM prepare's `[create2_factory_salts]`
-   entry); the package records neither, so both are reviewer inputs and every object is tried
-   under each. The executors outlive the run that deployed them, so that run — `ecosystem init`,
+   entry); each prepare records the one it deployed under (`create2_factory_salt`), a reviewer may
+   add more, and every object is tried under each. The executors outlive the run that deployed them, so that run — `ecosystem init`,
    `ctm init` or the bootstrap prepares — records each one's salt and ORIGINAL constructor
    arguments in its output (`[upgrade_executors]`); a later package is verified against that
    record (`--executor-record`), so an executor whose owner or coordinator has legitimately moved
    since still re-derives. The record is mandatory: an executor without one is unverified.
-2. **Does it run the reviewed code?** Live `EXTCODEHASH` against `AllContractsHashes.json` for the
-   reviewed commit, for the objects without constructor-set immutables (the objects with them
-   cannot hash to any artifact; question 1 is the whole of their identity). Code the commit does
-   not produce is UNKNOWN and therefore a finding.
+2. **Does it — and does every member it names — run the reviewed code?** The live code against the
+   reviewed build's deployed bytecode of the contract its role admits, byte for byte outside the
+   artifact's immutable slots, the build held against `AllContractsHashes.json`. For a write-once
+   object that is beside question 1; the executors, whose bindings are immutables, rest on
+   question 1 alone. For the MEMBERS — a release's facets, `DiamondInit`, genesis upgrade and
+   verifier tree, each engine and composer, each row's `implNew`, and on L2 each bytecode info a
+   release's table or a transition's plan names (against the reviewed `(blake2s, length,
+keccak256)`) — it is the identity check: nothing records their constructor arguments, so it
+   proves their code but not the values their constructors wrote into the masked slots. A release
+   may carry over the verifier already in force where it departs from, which an earlier build
+   produced. Every proxy row must also name the proxy of its slot, discovered on chain from the
+   Bridgehub or the CTM. Code the build does not produce for the role is a finding.
 3. **Do the governance calls execute those objects, and nothing else?** For a recurring upgrade
    every call is `coordinator.execute(operation)` or a declared external action. For the bootstrap
    edge the bundle carries the run the construction-verified `RegistryBootstrapSequence` derives,
@@ -330,11 +338,13 @@ The tool's full checklist, including what it deliberately does not check, is in
 
 Its limits, stated so they are not mistaken for coverage: the salt is a package input, so an
 attacker free to choose both a salt and a counterfeit deployment faces the standard ~2^80 CREATE2
-address-collision bound rather than a 160-bit preimage; and the derivation binds an object to its
-MANIFEST, never to what the manifest's members RUN. A genuine object built from a manifest naming
-an attacker's facet verifies perfectly — which is why governance reviews the member addresses. Both
-boundaries are pinned by `test/foundry/l1/upgrades/CounterfeitObject.t.sol`, which builds an actual
-counterfeit from real initcode and asserts the derivation rejects it.
+address-collision bound rather than a 160-bit preimage; the derivation binds an object to its
+MANIFEST, never to what the manifest's members RUN — a genuine object built from a manifest naming
+an attacker's facet verifies perfectly, which is why question 2 holds every member to the reviewed
+build; and question 2 proves a member's code, not the values in its immutable slots, so those stay
+governance's to review. The first two boundaries are pinned by
+`test/foundry/l1/upgrades/CounterfeitObject.t.sol`, which builds an actual counterfeit from real
+initcode and asserts the derivation rejects it.
 
 For this to hold, manifest data must live in **storage**, never in immutables: immutables are
 patched into runtime code, which would make an object's runtime bytes depend on its manifest and
@@ -342,7 +352,7 @@ break question 2.
 
 **Members are named by address.** Everything executable an object names — facets, `DiamondInit`,
 the verifier, the genesis upgrade, the upgrade engine, the composer, each `implNew` — is
-an ADDRESS, and what it runs is what governance reviewed before approving the object.
+an ADDRESS; what it runs is held to the reviewed build off chain (question 2), never on chain.
 
 **What the chain enforces**, on every path:
 

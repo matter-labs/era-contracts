@@ -1,10 +1,10 @@
 //! The lifecycle objects a package names — the coordinator and the two domain executors — and the
-//! one identity check they can have.
+//! identity check that covers their bindings.
 //!
-//! All three set their bindings as constructor immutables, so none of them can hash to its
-//! artifact and [`super::provenance`] has nothing to say about them. What identifies each is its
-//! CONSTRUCTION ([`super::construction`]): the reviewed creation code run on its constructor
-//! arguments must land at its address. Nothing is taken from the object's own answers: a genuine
+//! All three set their bindings as constructor immutables, which a runtime comparison
+//! ([`super::provenance`]) masks. What identifies each is its CONSTRUCTION
+//! ([`super::construction`]): the reviewed creation code run on its constructor arguments must
+//! land at its address, which covers the immutable values too. Nothing is taken from the object's own answers: a genuine
 //! executor built for an attacker's owner answers every getter like the reviewed one. The getters
 //! ARE read, but only to name in the report which argument a failed derivation disagrees on.
 //!

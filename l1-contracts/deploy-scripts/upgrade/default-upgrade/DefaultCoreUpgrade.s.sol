@@ -616,6 +616,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         if (recorded) {
             vm.serializeString("root", "upgrade_executors", executorsRecord);
         }
+        // The salt this run's CREATE2 deployments used, so a reviewer re-derives its objects
+        // without being told it out of band.
+        vm.serializeBytes32("root", "create2_factory_salt", _create2FactorySalt);
         string memory toml = vm.serializeString("root", "misc", misc);
 
         vm.writeToml(toml, outputPath);

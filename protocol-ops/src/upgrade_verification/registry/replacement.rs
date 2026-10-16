@@ -26,13 +26,12 @@ use super::operation::{
     verify_transition, ArrivingRelease,
 };
 use super::package::{DeadlineChange, RecoveredReplacement, ReplacementPackage};
-use super::provenance::{expect_code_present, tolerate, CodeIdentity};
+use super::provenance::{expect_code_present, tolerate};
 use super::views::{CTMTransitionView, CtmView, EcosystemUpgradeExecutorView};
 
 /// Verify a transition replacement against the live L1 it targets.
 pub(crate) async fn verify<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
     build: &ReviewedBuild,
     package: &ReplacementPackage,
     expected_governance_owner: Option<Address>,
@@ -98,7 +97,6 @@ pub(crate) async fn verify<P: Provider>(
     result.print_info("\n== Object provenance and construction ==");
     let replacement_edge = verify_transition(
         provider,
-        identity,
         build,
         ArrivingRelease::Existing,
         result,

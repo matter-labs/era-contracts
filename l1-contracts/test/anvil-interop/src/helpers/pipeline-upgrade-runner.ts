@@ -16,7 +16,9 @@
  *      (deployer Safe bundles replayed onto the harness anvil, the ChainAdmin's half of the one-time
  *      ServerNotifier handover included); the merged governance bundle is asserted to be exactly
  *      the one `RegistryBootstrapSequence.actions()` derives, closing with the edge's completion
- *      check. Then `protocol-ops ecosystem upgrade-governance` replays that one bundle.
+ *      check; `protocol-ops ecosystem verify-bootstrap` must pass on the package (see
+ *      `verifyPackageAsReviewed`). Then `protocol-ops ecosystem upgrade-governance` replays that
+ *      one bundle.
  *   5. Per-chain legacy handed-cut crossing, recorded-L2-tx verification, and the L2 relay of
  *      the proposed upgrade transaction on each chain's anvil fork.
  *   6. Final protocol-version verification on every upgraded chain.
@@ -282,6 +284,20 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     }
     await assertBootstrapBundle(l1Provider, mergedBootstrap, migrationAddr, bootstrapCoreTransition);
 
+    // ── Governance's review: the bundle is signed only once the package verifies ──
+    // The bootstrap package carries the records of the executors it deploys, and every later hop
+    // runs through those executors, so it is the record file the hops are verified with.
+    const reviewedBuildHashes = path.join(upgradeHarnessInputs.protocolOpsOutDir, "reviewed-build-hashes.json");
+    writeReviewedBuildHashes(reviewedBuildHashes);
+    verifyPackageAsReviewed({
+      command: "verify-bootstrap",
+      rpcUrl: l1Chain.rpcUrl,
+      ecosystemToml: mergedEcosystemToml,
+      governance: l1Addresses.governance,
+      reviewedBuildHashes,
+      executorRecords: [],
+    });
+
     // ── Execute the governance bundle via protocol-ops ──
     console.log("\n── Replaying the governance bundle ──");
     await runEcosystemGovernanceUpgrade({
@@ -349,6 +365,8 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
         ctmAddresses,
         upgradeChainAddresses,
         eip7702Checker: reportedEip7702Checker,
+        executorRecords: mergedEcosystemToml,
+        reviewedBuildHashes,
       });
     }
   } finally {
@@ -396,25 +414,26 @@ async function describeReleaseDifference(
 
 /**
  * Throws unless every row the operation names — its CTM-domain rows and its core transition's
- * ecosystem rows — reads back at its `implNew`. Returns the number of rows checked.
+ * ecosystem rows — reads back at its `implNew`. Returns how many rows of each domain were checked.
  */
 async function verifyOperationRowsApplied(
   provider: ethers.providers.JsonRpcProvider,
   operation: ethers.Contract
-): Promise<number> {
-  const rows: Array<{ proxy: string; implNew: string }> = [...(await operation.ctmInfrastructureRows())];
+): Promise<{ ctmRows: number; ecosystemRows: number }> {
+  const ctmRows: Array<{ proxy: string; implNew: string }> = [...(await operation.ctmInfrastructureRows())];
+  const ecosystemRows: Array<{ proxy: string; implNew: string }> = [];
   const coreTransitionAddr: string = await operation.coreTransition();
   if (coreTransitionAddr !== ethers.constants.AddressZero) {
     const coreTransition = new ethers.Contract(coreTransitionAddr, getAbi("ICoreTransition"), provider);
-    rows.push(...(await coreTransition.ecosystemRows()));
+    ecosystemRows.push(...(await coreTransition.ecosystemRows()));
   }
-  for (const row of rows) {
+  for (const row of [...ctmRows, ...ecosystemRows]) {
     const live = await readProxyImplementation(provider, row.proxy);
     if (live.toLowerCase() !== row.implNew.toLowerCase()) {
       throw new Error(`proxy ${row.proxy} runs ${live}, but the operation's row installs ${row.implNew}`);
     }
   }
-  return rows.length;
+  return { ctmRows: ctmRows.length, ecosystemRows: ecosystemRows.length };
 }
 
 /**
@@ -440,7 +459,7 @@ function readReportedEip7702Checker(mergedEcosystemTomlPath: string): string | u
  *      deploys the release, the `CTMTransition` and the `EcosystemUpgradeOperation` naming both.
  *   2. The merged `ecosystem.toml` is asserted to carry exactly one call, the derived
  *      `execute(operation)` on the coordinator, and no `external_actions` at all — the tooling
- *      claim, checked on the artifact.
+ *      claim, checked on the artifact — and `protocol-ops ecosystem verify-package` must pass on it.
  *   3. The governance replay executes it; each chain then crosses through the cut-READING
  *      `upgradeChainFromVersion` as its own admin (no cut is handed over).
  *   4. End state: `OperationExecuted(operation)` emitted once, chains and CTM at the new version,
@@ -458,6 +477,10 @@ async function runRecurringHop(
     upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
     /** The live EIP-7702 checker as the previous hop's prepare reported it. */
     eip7702Checker?: string;
+    /** The bootstrap package: the records of the executors every hop runs through. */
+    executorRecords: string;
+    /** The hashes of the build the scenario deploys from (see `writeReviewedBuildHashes`). */
+    reviewedBuildHashes: string;
   }
 ): Promise<string | undefined> {
   console.log(`\n══ Registry-driven follow-up hop: ${hop.label} ══`);
@@ -578,6 +601,17 @@ async function runRecurringHop(
     }
     console.log("  ✓ the merged bundle is exactly execute(operation), with no external actions");
 
+    verifyPackageAsReviewed({
+      command: "verify-package",
+      rpcUrl: ctx.rpcUrl,
+      ecosystemToml: mergedEcosystemToml,
+      governance: ctx.l1Addresses.governance,
+      reviewedBuildHashes: ctx.reviewedBuildHashes,
+      executorRecords: [ctx.executorRecords],
+    });
+
+    const messageRootImplBefore = await readProxyImplementation(l1Provider, ctx.l1Addresses.messageRoot);
+
     // ── Governance executes the operation ──
     console.log("\n── Replaying the coordinator call via protocol-ops ──");
     const replayFromBlock = await l1Provider.getBlockNumber();
@@ -659,19 +693,30 @@ async function runRecurringHop(
       console.log("  ✓ identical routing on both edges derived an empty facet delta");
     }
     const appliedRows = await verifyOperationRowsApplied(l1Provider, operation);
-    console.log(`  ✓ OperationExecuted emitted once; transition committed; ${appliedRows} row(s) at implNew`);
+    console.log(
+      `  ✓ OperationExecuted emitted once; transition committed; ` +
+        `${appliedRows.ctmRows} CTM-domain and ${appliedRows.ecosystemRows} ecosystem row(s) at implNew`
+    );
     if (hop.expectsFreshMessageRoot) {
+      // The ecosystem leg must really apply: a row whose implementation the proxy already ran
+      // would pass every check above while changing nothing.
+      if (appliedRows.ecosystemRows < 1) {
+        throw new Error(`hop ${hop.label} redeploys L1MessageRoot, but its operation applied no ecosystem row`);
+      }
       const expectedMessageRootImpl = merged.core.upgrade_addresses?.bridgehub?.message_root_implementation_addr;
       if (!expectedMessageRootImpl) {
         throw new Error("the core prepare did not report the fresh L1MessageRoot implementation");
       }
-      const implSlot = await l1Provider.getStorageAt(ctx.l1Addresses.messageRoot, EIP1967_IMPL_SLOT);
-      const liveMessageRootImpl = ethers.utils.getAddress("0x" + implSlot.slice(26));
+      const liveMessageRootImpl = await readProxyImplementation(l1Provider, ctx.l1Addresses.messageRoot);
+      if (liveMessageRootImpl.toLowerCase() === messageRootImplBefore.toLowerCase()) {
+        throw new Error(`MessageRoot proxy still points at ${liveMessageRootImpl}: the hop did not move it`);
+      }
       if (liveMessageRootImpl.toLowerCase() !== expectedMessageRootImpl.toLowerCase()) {
         throw new Error(
           `MessageRoot proxy points at ${liveMessageRootImpl}, expected the fresh ${expectedMessageRootImpl}`
         );
       }
+      console.log(`  ✓ L1MessageRoot moved ${messageRootImplBefore} -> ${liveMessageRootImpl}`);
     }
     for (const chain of upgradeChainAddresses) {
       const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
@@ -841,6 +886,57 @@ function runProtocolOps(args: string[], extraEnv?: Record<string, string>): void
   if (result.status !== 0) {
     throw new Error(`protocol-ops failed: ${args.join(" ")}`);
   }
+}
+
+/**
+ * Writes the hashes of the build that deploys this scenario's objects (`scripts/calculate-hashes.ts
+ * --output`), for `verify-package --contract-hashes`. The committed `AllContractsHashes.json` is
+ * regenerated last, after the sources are final, so it does not describe the working tree a run
+ * deploys from; the verifier still holds every local artifact it reads against this file.
+ */
+function writeReviewedBuildHashes(outputPath: string): void {
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  const result = spawnSync(
+    path.join(contractsRootDir, "node_modules", ".bin", "ts-node"),
+    ["scripts/calculate-hashes.ts", "--output", outputPath],
+    { cwd: contractsRootDir, stdio: "inherit" }
+  );
+  if (result.status !== 0) {
+    throw new Error("scripts/calculate-hashes.ts --output failed: build l1-contracts and da-contracts first");
+  }
+}
+
+/**
+ * `protocol-ops ecosystem verify-bootstrap` / `verify-package` (one command, two names) on a merged
+ * prepare output, run the way a reviewer runs it before governance signs: against the live L1, the
+ * reviewed governance owner and the `local` env's permanent values. Throws when the verifier reports
+ * any error.
+ */
+function verifyPackageAsReviewed(params: {
+  command: "verify-bootstrap" | "verify-package";
+  rpcUrl: string;
+  ecosystemToml: string;
+  governance: string;
+  reviewedBuildHashes: string;
+  /** Files carrying `[upgrade_executors]` records the package itself does not carry. */
+  executorRecords: string[];
+}): void {
+  console.log(`\n── ${params.command}: reviewing the package before governance replays it ──`);
+  runProtocolOps([
+    "ecosystem",
+    params.command,
+    "--ecosystem-toml",
+    params.ecosystemToml,
+    "--l1-rpc-url",
+    params.rpcUrl,
+    "--expected-governance-owner",
+    params.governance,
+    "--env",
+    "local",
+    "--contract-hashes",
+    params.reviewedBuildHashes,
+    ...params.executorRecords.flatMap((record) => ["--executor-record", record]),
+  ]);
 }
 
 function safeBundlesInDir(dir: string): Array<{ file: string; target: string }> {
@@ -1471,6 +1567,17 @@ export function prepareUpgradeHarnessInputs(
   permanentValues = replaceTomlBareValue(permanentValues, "era_chain_id", String(primaryChainId));
   permanentValues = replaceTomlStringValue(permanentValues, "bridgehub_proxy_addr", state.l1Addresses.bridgehub);
   permanentValues = replaceTomlStringValue(permanentValues, "ctm_proxy_addr", state.ctmAddresses.chainTypeManager);
+  // Every prepare deploys under a salt of its own, as production rotates `[contracts]
+  // create2_factory_salt` per release: a hop redeploying an implementation under an earlier
+  // prepare's salt lands on the address that prepare already installed, and its row is inert.
+  if (!/^create2_factory_salt\s*=/m.test(permanentValues)) {
+    throw new Error(`${scenario.permanentValuesTemplatePath} has no create2_factory_salt to rotate`);
+  }
+  permanentValues = replaceTomlStringValue(
+    permanentValues,
+    "create2_factory_salt",
+    ethers.utils.id(`anvil-interop upgrade ${scenario.label}`)
+  );
   fs.writeFileSync(permanentValuesPath, permanentValues);
 
   let upgradeInput = fs.readFileSync(path.join(l1ContractsDir, scenario.upgradeInputTemplatePath), "utf8");

@@ -167,8 +167,8 @@ contract CounterfeitObjectTest is RegistryObjectsFixture {
 
     /// The boundary this mechanism does NOT cover, pinned so it is not mistaken for coverage: the
     /// derivation binds an object to its MANIFEST, not to what the manifest's members run. A
-    /// genuine object built from a manifest naming an attacker's facet verifies perfectly — that
-    /// is governance's review of the addresses, not the construction check's job.
+    /// genuine object built from a manifest naming an attacker's facet verifies perfectly — the
+    /// verifier's member check (`protocol-ops` `registry/members.rs`) answers that, not this one.
     function test_theConstructionCheckSaysNothingAboutWhatMembersRun() public {
         TransitionManifest memory hostile = approvedManifest;
         hostile.upgradeEngine = _attackerFacet();

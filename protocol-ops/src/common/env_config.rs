@@ -638,6 +638,21 @@ mod tests {
         assert!(envs > 0, "no permanent values in {}", dir.display());
     }
 
+    /// The `local` env pins the ZK token a prepare on a local L1 without `--env` pins
+    /// (`L1Network::Localhost`), so a package prepared on anvil verifies with `--env local`.
+    #[test]
+    fn the_local_env_pins_the_localhost_zk_token() {
+        assert_eq!(
+            EnvConfig::load("local")
+                .unwrap()
+                .require_zk_token_asset_id()
+                .unwrap(),
+            crate::types::L1Network::Localhost
+                .zk_token_asset_id()
+                .unwrap()
+        );
+    }
+
     /// An env without `zk_token_asset_id` names the file and the key it lacks.
     #[test]
     fn a_missing_zk_token_asset_id_names_the_file_and_the_key() {

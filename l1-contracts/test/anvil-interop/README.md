@@ -72,6 +72,14 @@ yarn test:upgrade             # the v35 bootstrap via protocol-ops on the frozen
 yarn test:upgrade-recurring   # the recurring registry-driven hop on the current-genesis states
 ```
 
+`yarn test:upgrade` reviews each package the way governance would before replaying it:
+`protocol-ops ecosystem verify-package` against the live anvil L1, with `--env local`, the
+fixture's governance as `--expected-governance-owner` and, for the hops, the bootstrap package as
+`--executor-record`. It holds the deployments against the hashes of the build it deployed from
+(`scripts/calculate-hashes.ts --output`, passed as `--contract-hashes`), because the committed
+`AllContractsHashes.json` is regenerated last. Every prepare deploys under a salt of its own, as
+production rotates its salt per release, so the recurring hop's `L1MessageRoot` row really applies.
+
 A fresh deployment is born into the registry-driven model: `DeployL1CoreContracts` gives the
 ecosystem ProxyAdmin to the `CoreUpgradeExecutor`, `DeployCTM` gives the CTM, its own ProxyAdmin and
 the ServerNotifier to the `CTMUpgradeExecutor`, and `RegisterCTM` binds it to the coordinator

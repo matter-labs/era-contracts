@@ -283,8 +283,9 @@ sol! {
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
-    /// The chain registry the bootstrap's lagging-chain report enumerates, and the live values a
-    /// release's force deployments are held against.
+    /// The chain registry the bootstrap's lagging-chain report enumerates, the live values a
+    /// release's force deployments are held against, and the ecosystem proxies an inventory's
+    /// slots must name.
     #[sol(rpc)]
     contract BridgehubView {
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
@@ -292,6 +293,40 @@ sol! {
         function assetRouter() external view returns (address);
         function MAX_NUMBER_OF_ZK_CHAINS() external view returns (uint256);
         function chainRegistrationSender() external view returns (address);
+        function messageRoot() external view returns (address);
+        function l1CtmDeployer() external view returns (address);
+        function chainAssetHandler() external view returns (address);
+        function getZKChain(uint256 _chainId) external view returns (address);
+    }
+
+    /// A chain's diamond, for the verifier its chain runs today.
+    #[sol(rpc)]
+    contract ZkChainGettersView {
+        function getVerifier() external view returns (address);
+    }
+
+    /// The asset router's links to the nullifier and the native token vault, which an ecosystem
+    /// inventory's slots must name.
+    #[sol(rpc)]
+    contract L1AssetRouterView {
+        function L1_NULLIFIER() external view returns (address);
+        function nativeTokenVault() external view returns (address);
+    }
+
+    /// The nullifier's link to the interop handler, which an ecosystem inventory's slot must name.
+    #[sol(rpc)]
+    contract L1NullifierView {
+        function l1InteropHandler() external view returns (address);
+    }
+
+    /// The sub-verifier getters of the verifier contracts. Each verifier answers only the ones its
+    /// own contract declares; which ones those are is read off the artifact it was identified as.
+    #[sol(rpc)]
+    contract VerifierTreeView {
+        function INNER_VERIFIER() external view returns (address);
+        function AIRBENDER_VERIFIER() external view returns (address);
+        function ZISK_RANGE_VERIFIER() external view returns (address);
+        function PLONK_VERIFIER() external view returns (address);
     }
 
     /// Positional mirror of `IL2GenesisUpgrade.FixedForceDeploymentsData` — what a release's
@@ -330,6 +365,8 @@ sol! {
         function L1_BYTECODES_SUPPLIER() external view returns (address);
         function BRIDGE_HUB() external view returns (address);
         function serverNotifierAddress() external view returns (address);
+        function validatorTimelockPostV29() external view returns (address);
+        function PERMISSIONLESS_VALIDATOR() external view returns (address);
         function getProtocolVersion(uint256 _chainId) external view returns (uint256);
         function upgradeTransition(uint256 _oldProtocolVersion) external view returns (address);
         function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);

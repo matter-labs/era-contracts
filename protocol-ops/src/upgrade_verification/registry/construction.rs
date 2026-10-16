@@ -36,9 +36,11 @@
 //! A prepare run deploys under ONE salt per leg: the core prepare under the upgrade env's
 //! `[contracts] create2_factory_salt`, each CTM prepare under that CTM's
 //! `[create2_factory_salts]` entry (`DefaultCoreUpgrade.initializeConfigWithArgs`,
-//! `DefaultCTMUpgrade.initializeConfig`). The merged package records neither, so both reach
-//! this module as reviewer inputs (`--create2-salt`), every object is tried under each, and the
-//! report names the salt that reproduced it.
+//! `DefaultCTMUpgrade.initializeConfig`). Each prepare records the salt it deployed under
+//! (`create2_factory_salt`, merged as `[core]` / `[ctms.*]`), a reviewer may add more
+//! (`--create2-salt`), every object is tried under each, and the report names the salt that
+//! reproduced it. A salt is only a search parameter: what proves the construction is the creation
+//! code and the arguments.
 //!
 //! # What this cannot cover
 //!
@@ -47,14 +49,16 @@
 //!   work). That is the standard CREATE2 collision bound every counterfactual-address system
 //!   lives with, and it is not reachable by rewriting a package.
 //! * It says nothing about what the object's MEMBERS run — the facets, the verifier, each
-//!   `implNew`. Those are addresses governance approves; `expect_code_identity` answers for them
-//!   separately.
+//!   `implNew`. Those are held to the reviewed build by their runtime code
+//!   ([`super::members`], [`super::rows`]), which proves their code but not the values their own
+//!   constructors wrote into their immutable slots.
 //! * It requires the reviewed commit to be BUILT locally (`l1-contracts/out`), because the
 //!   address derivation needs the creation-code BYTES and `AllContractsHashes.json` records only
 //!   their hash. The hash is what the local build is then held against, so a doctored `out/`
 //!   cannot pass.
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::path::PathBuf;
 
 use alloy::primitives::{keccak256, Address, Bytes, B256};
@@ -64,6 +68,7 @@ use crate::upgrade_verification::constants::ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
 use crate::upgrade_verification::paths::repo_relative_path;
 use crate::upgrade_verification::report::VerificationResult;
 
+use super::members;
 use super::provenance::CodeIdentity;
 
 /// The deterministic deployment proxy (Arachnid's), at the same address on L1 and on the ZKsync
@@ -74,80 +79,136 @@ use super::provenance::CodeIdentity;
 /// be re-derived without knowing which chain they were deployed to.
 pub(crate) const DETERMINISTIC_CREATE2_FACTORY: Address = ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR;
 
-/// One object type's reviewed creation code, as built from the reviewed commit.
-pub(crate) struct ReviewedCreationCode {
+/// The objects a registry package names — write-once and lifecycle — as `(artifact file,
+/// contract)` under `l1-contracts/out`. Identified by construction and by runtime.
+const OBJECT_ARTIFACTS: &[(&str, &str)] = &[
+    (
+        "RegistryBootstrapMigration.sol",
+        "RegistryBootstrapMigration",
+    ),
+    ("RegistryBootstrapSequence.sol", "RegistryBootstrapSequence"),
+    ("CTMRelease.sol", "CTMRelease"),
+    ("CoreTransition.sol", "CoreTransition"),
+    ("CTMTransition.sol", "CTMTransition"),
+    ("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
+    ("EcosystemUpgradeExecutor.sol", "EcosystemUpgradeExecutor"),
+    ("CoreUpgradeExecutor.sol", "CoreUpgradeExecutor"),
+    ("CTMUpgradeExecutor.sol", "CTMUpgradeExecutor"),
+];
+
+/// One contract as the reviewed commit builds it.
+pub(crate) struct ReviewedArtifact {
     /// `<File>.sol` under `l1-contracts/out`.
     artifact_file: &'static str,
-    code: Bytes,
+    creation_code: Bytes,
+    /// The deployed bytecode, with every constructor-set immutable slot zeroed.
+    runtime: Bytes,
+    /// The byte ranges of `runtime` the constructor fills in (`immutableReferences`).
+    immutables: Vec<Range<usize>>,
 }
 
-impl ReviewedCreationCode {
+impl ReviewedArtifact {
     pub(crate) fn artifact_file(&self) -> &'static str {
         self.artifact_file
     }
 
-    pub(crate) fn code(&self) -> &Bytes {
-        &self.code
+    pub(crate) fn creation_code(&self) -> &Bytes {
+        &self.creation_code
+    }
+
+    /// How many immutable slots the comparison in [`Self::is_runtime_of`] leaves out.
+    pub(crate) fn immutable_slots(&self) -> usize {
+        self.immutables.len()
+    }
+
+    /// Whether `live` is this artifact's deployed bytecode with its immutable slots filled in —
+    /// byte for byte everywhere else, and of the same length.
+    pub(crate) fn is_runtime_of(&self, live: &[u8]) -> bool {
+        if live.len() != self.runtime.len() || self.runtime.is_empty() {
+            return false;
+        }
+        let mut masked = live.to_vec();
+        for range in &self.immutables {
+            masked[range.clone()].fill(0);
+        }
+        masked[..] == self.runtime[..]
     }
 }
 
-/// The reviewed commit's creation code for each object type, loaded once per run.
+/// `(artifact file, contract, creation code, runtime, immutable ranges)` of a test artifact.
+#[cfg(test)]
+pub(crate) type TestArtifact = (
+    &'static str,
+    &'static str,
+    Vec<u8>,
+    Vec<u8>,
+    Vec<Range<usize>>,
+);
+
+/// The reviewed commit's build: the hashes it is held against ([`CodeIdentity`]) and the
+/// artifacts of every contract a package can name, loaded once per run.
 ///
-/// Loading is fallible per type and the failure is reported rather than fatal: a reviewer needs
-/// every other finding in the report even when one artifact is missing.
+/// Loading is fallible per contract and the failure is reported rather than fatal: a reviewer
+/// needs every other finding in the report even when one artifact is missing.
 pub(crate) struct ReviewedBuild {
-    loaded: HashMap<&'static str, Result<ReviewedCreationCode, String>>,
+    identity: CodeIdentity,
+    loaded: HashMap<&'static str, Result<ReviewedArtifact, String>>,
 }
 
 impl ReviewedBuild {
-    /// Loads the creation code of every object type a registry package can name — the
-    /// write-once objects and the lifecycle objects alike — cross-checking each against
-    /// `AllContractsHashes.json`.
-    pub(crate) fn load(identity: &CodeIdentity) -> Self {
-        const OBJECT_TYPES: &[(&str, &str)] = &[
-            (
-                "RegistryBootstrapMigration.sol",
-                "RegistryBootstrapMigration",
-            ),
-            ("RegistryBootstrapSequence.sol", "RegistryBootstrapSequence"),
-            ("CTMRelease.sol", "CTMRelease"),
-            ("CoreTransition.sol", "CoreTransition"),
-            ("CTMTransition.sol", "CTMTransition"),
-            ("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
-            ("EcosystemUpgradeExecutor.sol", "EcosystemUpgradeExecutor"),
-            ("CoreUpgradeExecutor.sol", "CoreUpgradeExecutor"),
-            ("CTMUpgradeExecutor.sol", "CTMUpgradeExecutor"),
-        ];
+    /// Loads the artifact of every object type a registry package can name and of every member
+    /// kind its objects name ([`members::MEMBER_ARTIFACTS`]), cross-checking each artifact's
+    /// creation code and deployed bytecode against `identity`.
+    pub(crate) fn load(identity: CodeIdentity) -> Self {
         let mut loaded = HashMap::new();
-        for (file, name) in OBJECT_TYPES {
-            loaded.insert(*name, load_one(identity, file, name));
+        for (file, name) in OBJECT_ARTIFACTS.iter().chain(members::MEMBER_ARTIFACTS) {
+            loaded.insert(*name, load_one(&identity, file, name));
         }
-        Self { loaded }
+        Self { identity, loaded }
     }
 
-    /// A build holding exactly the given creation code, for tests that drive the reporting path
-    /// without a compiled repository on disk.
+    /// A build holding exactly the given creation code (and no runtime), for tests that drive the
+    /// construction path without a compiled repository on disk.
     #[cfg(test)]
     pub(crate) fn from_parts(entries: &[(&'static str, &'static str, Vec<u8>)]) -> Self {
+        Self::from_artifacts(
+            CodeIdentity::empty(),
+            entries
+                .iter()
+                .map(|(file, name, code)| (*file, *name, code.clone(), Vec::new(), Vec::new()))
+                .collect(),
+        )
+    }
+
+    /// A build of the given artifacts over `identity`, for tests of the runtime comparison.
+    #[cfg(test)]
+    pub(crate) fn from_artifacts(identity: CodeIdentity, entries: Vec<TestArtifact>) -> Self {
         let mut loaded = HashMap::new();
-        for (file, short_name, code) in entries {
+        for (file, name, creation_code, runtime, immutables) in entries {
             loaded.insert(
-                *short_name,
-                Ok(ReviewedCreationCode {
+                name,
+                Ok(ReviewedArtifact {
                     artifact_file: file,
-                    code: Bytes::from(code.clone()),
+                    creation_code: Bytes::from(creation_code),
+                    runtime: Bytes::from(runtime),
+                    immutables,
                 }),
             );
         }
-        Self { loaded }
+        Self { identity, loaded }
     }
 
-    /// The reviewed creation code for `short_name`, or the reason it is unavailable.
-    pub(crate) fn get(&self, short_name: &str) -> Result<&ReviewedCreationCode, &str> {
+    /// The hashes the build is held against.
+    pub(crate) fn identity(&self) -> &CodeIdentity {
+        &self.identity
+    }
+
+    /// The reviewed artifact of `short_name`, or the reason it is unavailable.
+    pub(crate) fn get(&self, short_name: &str) -> Result<&ReviewedArtifact, &str> {
         match self.loaded.get(short_name) {
-            Some(Ok(code)) => Ok(code),
+            Some(Ok(artifact)) => Ok(artifact),
             Some(Err(why)) => Err(why.as_str()),
-            None => Err("this verifier does not know that object type"),
+            None => Err("this verifier does not know that contract"),
         }
     }
 }
@@ -156,48 +217,122 @@ fn load_one(
     identity: &CodeIdentity,
     file: &'static str,
     short_name: &'static str,
-) -> Result<ReviewedCreationCode, String> {
+) -> Result<ReviewedArtifact, String> {
     let path = artifact_path(file, short_name);
     let raw = std::fs::read_to_string(&path).map_err(|e| {
         format!(
             "cannot read {} ({e}): build the reviewed commit first (`cd l1-contracts && forge \
              build`), because deriving an object's address needs the creation-code BYTES and \
-             AllContractsHashes.json records only their hash",
+             comparing a member's code needs the deployed BYTES, while AllContractsHashes.json \
+             records only their hashes",
             path.display()
         )
     })?;
     let json: serde_json::Value = serde_json::from_str(&raw)
         .map_err(|e| format!("{} is not valid JSON ({e})", path.display()))?;
-    let hex = json
-        .get("bytecode")
-        .and_then(|b| b.get("object"))
-        .and_then(|o| o.as_str())
-        .ok_or_else(|| format!("{} has no bytecode.object", path.display()))?;
-    let code: Bytes = hex
-        .parse()
-        .map_err(|e| format!("{} has an unparsable bytecode.object ({e})", path.display()))?;
-    if code.is_empty() {
-        return Err(format!("{} has empty creation code", path.display()));
-    }
+    let bytes_at = |key: &str| -> Result<Bytes, String> {
+        let hex = json
+            .get(key)
+            .and_then(|b| b.get("object"))
+            .and_then(|o| o.as_str())
+            .ok_or_else(|| format!("{} has no {key}.object", path.display()))?;
+        let code: Bytes = hex
+            .parse()
+            .map_err(|e| format!("{} has an unparsable {key}.object ({e})", path.display()))?;
+        if code.is_empty() {
+            return Err(format!("{} has an empty {key}.object", path.display()));
+        }
+        Ok(code)
+    };
+    let creation_code = bytes_at("bytecode")?;
+    let runtime = bytes_at("deployedBytecode")?;
+    let immutables =
+        immutable_ranges(&json, runtime.len()).map_err(|e| format!("{}: {e}", path.display()))?;
 
-    // The local build is held against the COMMITTED hash file, so the derivation below rests on
-    // the reviewed commit rather than on whatever happens to sit in `out/`.
-    let built = keccak256(&code);
-    match identity.creation_code_hash_of(short_name) {
-        Some(reviewed) if reviewed == built => Ok(ReviewedCreationCode {
-            artifact_file: file,
-            code,
-        }),
-        Some(reviewed) => Err(format!(
-            "the local build of {short_name} has creation code {built}, but the reviewed commit's \
-             AllContractsHashes.json records {reviewed}: the working tree is not the reviewed \
-             commit, or it was built with a different compiler profile"
-        )),
-        None => Err(format!(
-            "AllContractsHashes.json has no evmBytecodeHash for {short_name}, so the local build \
-             cannot be held against the reviewed commit"
-        )),
+    // The local build is held against the COMMITTED hash file, so everything derived from it
+    // rests on the reviewed commit rather than on whatever happens to sit in `out/`.
+    for (what, built, reviewed, field) in [
+        (
+            "creation code",
+            keccak256(&creation_code),
+            identity.creation_code_hash_of(short_name),
+            "evmBytecodeHash",
+        ),
+        (
+            "deployed bytecode",
+            keccak256(&runtime),
+            identity.deployed_code_hash_of(short_name),
+            "evmDeployedBytecodeHash",
+        ),
+    ] {
+        match reviewed {
+            Some(reviewed) if reviewed == built => {}
+            Some(reviewed) => {
+                return Err(format!(
+                    "the local build of {short_name} has {what} {built}, but {} records \
+                     {reviewed}: the working tree is not the reviewed commit, or it was built \
+                     with a different compiler profile",
+                    identity.source().display()
+                ))
+            }
+            None => {
+                return Err(format!(
+                    "{} has no {field} for {short_name}, so the local build cannot be held \
+                     against the reviewed commit",
+                    identity.source().display()
+                ))
+            }
+        }
     }
+    Ok(ReviewedArtifact {
+        artifact_file: file,
+        creation_code,
+        runtime,
+        immutables,
+    })
+}
+
+/// The `deployedBytecode.immutableReferences` byte ranges, all inside the deployed bytecode. An
+/// artifact without immutables has no such key.
+fn immutable_ranges(
+    json: &serde_json::Value,
+    runtime_len: usize,
+) -> Result<Vec<Range<usize>>, String> {
+    let Some(references) = json
+        .get("deployedBytecode")
+        .and_then(|d| d.get("immutableReferences"))
+    else {
+        return Ok(Vec::new());
+    };
+    let references = references
+        .as_object()
+        .ok_or("deployedBytecode.immutableReferences is not an object")?;
+    let mut ranges = Vec::new();
+    for occurrences in references.values() {
+        for occurrence in occurrences
+            .as_array()
+            .ok_or("an immutableReferences entry is not an array")?
+        {
+            let field = |key: &str| {
+                occurrence
+                    .get(key)
+                    .and_then(|v| v.as_u64())
+                    .and_then(|v| usize::try_from(v).ok())
+                    .ok_or_else(|| format!("an immutable reference has no numeric `{key}`"))
+            };
+            let (start, length) = (field("start")?, field("length")?);
+            if start + length > runtime_len {
+                return Err(format!(
+                    "an immutable reference [{start}, {}) lies outside the {runtime_len}-byte \
+                     deployed bytecode",
+                    start + length
+                ));
+            }
+            ranges.push(start..start + length);
+        }
+    }
+    ranges.sort_by_key(|range| range.start);
+    Ok(ranges)
 }
 
 fn artifact_path(file: &str, short_name: &str) -> PathBuf {
@@ -280,7 +415,12 @@ pub(crate) fn expect_canonical_construction(
         }
     };
 
-    match classify_construction(address, creation_code.code(), constructor_args, salts) {
+    match classify_construction(
+        address,
+        creation_code.creation_code(),
+        constructor_args,
+        salts,
+    ) {
         ConstructionVerdict::Canonical { salt } => {
             result.report_ok(&format!(
                 "{label} at {address} IS the reviewed {short_name} built from its reviewed \
@@ -375,6 +515,31 @@ mod tests {
 
     fn args() -> Vec<u8> {
         b"the approved manifest".to_vec()
+    }
+
+    /// `immutableReferences` become the byte ranges the runtime comparison masks, sorted; an
+    /// artifact without immutables has none, and a reference outside the bytecode is refused
+    /// rather than masking nothing.
+    #[test]
+    fn immutable_references_become_byte_ranges() {
+        let json = serde_json::json!({
+            "deployedBytecode": {
+                "immutableReferences": {
+                    "12": [{"start": 4, "length": 32}, {"start": 40, "length": 32}],
+                    "7": [{"start": 0, "length": 2}]
+                }
+            }
+        });
+        assert_eq!(
+            immutable_ranges(&json, 72).unwrap(),
+            vec![0..2, 4..36, 40..72]
+        );
+        assert!(immutable_ranges(&json, 71).is_err());
+        assert!(
+            immutable_ranges(&serde_json::json!({"deployedBytecode": {}}), 10)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

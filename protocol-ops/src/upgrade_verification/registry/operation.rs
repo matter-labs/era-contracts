@@ -38,9 +38,12 @@ use crate::upgrade_verification::report::VerificationResult;
 use super::construction::{expect_canonical_construction, ReviewedBuild};
 use super::genesis::{judge_release_genesis, ReviewedGenesis};
 use super::lifecycle::{verify_lifecycle_construction, LifecycleReview};
+use super::members::{
+    verify_engine_and_l2_plan, verify_release_members, DepartingVerifiers, TRANSITION_ENGINES,
+};
 use super::package::OperationPackage;
-use super::provenance::{expect_code_identity, expect_code_present, tolerate, CodeIdentity};
-use super::rows::verify_rows;
+use super::provenance::{expect_code_identity, expect_code_present, tolerate};
+use super::rows::{participating, verify_inventory, Inventory, InventoryReview};
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView,
     CommittedUpgradeView, CoreTransitionView, CoreUpgradeExecutorView, CtmView,
@@ -52,7 +55,6 @@ use super::{format_semver, render_derived_payloads};
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
     build: &ReviewedBuild,
     genesis: &ReviewedGenesis,
     package: &OperationPackage,
@@ -74,11 +76,11 @@ pub(crate) async fn verify<P: Provider>(
     result.print_info("\n== Object provenance ==");
     expect_code_identity(
         provider,
-        identity,
+        build,
         result,
         "the operation",
         package.operation,
-        "EcosystemUpgradeOperation",
+        &["EcosystemUpgradeOperation"],
     )
     .await?;
     let operation = EcosystemUpgradeOperationView::new(package.operation, provider);
@@ -129,7 +131,6 @@ pub(crate) async fn verify<P: Provider>(
                 .await;
             verify_transition(
                 provider,
-                identity,
                 build,
                 ArrivingRelease::Installed(&genesis),
                 result,
@@ -159,16 +160,7 @@ pub(crate) async fn verify<P: Provider>(
     );
     let core_rows = match core_transition {
         Some(address) => {
-            verify_core_transition(
-                provider,
-                identity,
-                build,
-                result,
-                address,
-                salts,
-                &mut reviewed,
-            )
-            .await?
+            verify_core_transition(provider, build, result, address, salts, &mut reviewed).await?
         }
         None => {
             result.report_ok(
@@ -181,17 +173,12 @@ pub(crate) async fn verify<P: Provider>(
     // The three changes are each optional, but the object refuses to be all three at once
     // (`OperationChangesNothing`). Naming what this one actually carries is what a reviewer
     // reads first.
-    let ctm_rows: Vec<ProxyUpgradeRow> = manifest
-        .ctmInfrastructure
-        .iter()
-        .filter(|row| !row.implNew.is_zero())
-        .cloned()
-        .collect();
+    let ctm_rows = &manifest.ctmInfrastructure;
     result.print_info(&format!(
         "  this operation carries: {} CTM-domain infrastructure row(s), {} ecosystem row(s), and \
          {}",
-        ctm_rows.len(),
-        core_rows.len(),
+        participating(ctm_rows),
+        participating(&core_rows),
         match transition {
             Some(address) => format!("the chain-version transition {address}"),
             None => "no chain-version transition".to_string(),
@@ -399,22 +386,39 @@ pub(crate) async fn verify<P: Provider>(
         }
     }
 
-    verify_rows(
+    verify_inventory(
         provider,
+        build,
         result,
-        "CTM-domain row",
-        &ctm_rows,
-        ctm_admin_addr,
+        &InventoryReview {
+            inventory: Inventory::CtmDomain,
+            rows: ctm_rows,
+            domain_admin: ctm_admin_addr,
+            anchor: Some(ctm_addr),
+            departure_unreadable: None,
+        },
     )
     .await?;
-    verify_rows(
-        provider,
-        result,
-        "ecosystem row",
-        &core_rows,
-        core_admin_addr,
-    )
-    .await?;
+    if participating(&core_rows) > 0 {
+        let bridgehub = tolerate(
+            ctm.BRIDGE_HUB().call().await,
+            result,
+            "the CTM's BRIDGE_HUB(), through which the ecosystem rows' proxies are discovered",
+        );
+        verify_inventory(
+            provider,
+            build,
+            result,
+            &InventoryReview {
+                inventory: Inventory::Ecosystem,
+                rows: &core_rows,
+                domain_admin: core_admin_addr,
+                anchor: bridgehub,
+                departure_unreadable: None,
+            },
+        )
+        .await?;
+    }
 
     // ── 4. Readiness: what `execute` requires that no object can assert ──
     result.print_info("\n== Readiness ==");
@@ -533,7 +537,6 @@ pub(super) enum ArrivingRelease<'a> {
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn verify_transition<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
     build: &ReviewedBuild,
     arriving: ArrivingRelease<'_>,
     result: &mut VerificationResult,
@@ -544,11 +547,11 @@ pub(super) async fn verify_transition<P: Provider>(
 ) -> anyhow::Result<Option<TransitionEdge>> {
     expect_code_identity(
         provider,
-        identity,
+        build,
         result,
         label,
         transition,
-        "CTMTransition",
+        &["CTMTransition"],
     )
     .await?;
     let view = CTMTransitionView::new(transition, provider);
@@ -579,25 +582,27 @@ pub(super) async fn verify_transition<P: Provider>(
             // The arriving release is a member the transition NAMES, so its own construction is
             // verified separately — the transition's address commits to the release's ADDRESS,
             // not to its state.
+            let departing =
+                DepartingVerifiers::of_release(provider, result, manifest.fromRelease).await;
             verify_release(
                 provider,
-                identity,
                 build,
                 genesis,
                 result,
                 "the release the transition installs",
                 manifest.newRelease,
                 salts,
+                &departing,
                 reviewed,
             )
             .await?;
             expect_code_identity(
                 provider,
-                identity,
+                build,
                 result,
                 "the release the transition departs from",
                 manifest.fromRelease,
-                "CTMRelease",
+                &["CTMRelease"],
             )
             .await?;
         }
@@ -615,22 +620,16 @@ pub(super) async fn verify_transition<P: Provider>(
             }
         }
     }
-    expect_code_present(
+    verify_engine_and_l2_plan(
         provider,
+        build,
         result,
-        "the transition's upgradeEngine",
+        label,
         manifest.upgradeEngine,
+        TRANSITION_ENGINES,
+        &manifest.l2Plan,
     )
     .await?;
-    if !manifest.l2Plan.delegateComposer.is_zero() {
-        expect_code_present(
-            provider,
-            result,
-            "the transition's l2Plan.delegateComposer",
-            manifest.l2Plan.delegateComposer,
-        )
-        .await?;
-    }
 
     render_facet_cuts(&view, result, transition).await;
     render_derived_payloads(provider, result, transition).await;
@@ -655,21 +654,21 @@ pub(super) async fn verify_transition<P: Provider>(
     }))
 }
 
-/// A release's provenance and construction, re-derived from the manifest it serves, and its
-/// genesis against the reviewed one.
+/// A release's provenance and construction, re-derived from the manifest it serves, the members it
+/// names, and its genesis against the reviewed one.
 #[allow(clippy::too_many_arguments)]
-async fn verify_release<P: Provider>(
+pub(super) async fn verify_release<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
     build: &ReviewedBuild,
     genesis: &ReviewedGenesis,
     result: &mut VerificationResult,
     label: &str,
     release: Address,
     salts: &[B256],
+    departing: &DepartingVerifiers,
     reviewed: &mut BTreeMap<Address, String>,
 ) -> anyhow::Result<()> {
-    expect_code_identity(provider, identity, result, label, release, "CTMRelease").await?;
+    expect_code_identity(provider, build, result, label, release, &["CTMRelease"]).await?;
     let view = CTMReleaseView::new(release, provider);
     let manifest = match view.getManifest().call().await {
         Ok(m) => m,
@@ -708,15 +707,15 @@ async fn verify_release<P: Provider>(
             row.facet, row.isFreezable
         ));
     }
+    verify_release_members(provider, build, result, label, &manifest, departing).await?;
     judge_release_genesis(result, label, &manifest, genesis);
     Ok(())
 }
 
-/// The core transition's provenance and construction, plus the rows it pins.
-#[allow(clippy::too_many_arguments)]
-async fn verify_core_transition<P: Provider>(
+/// The core transition's provenance and construction, plus the whole enum-indexed inventory it
+/// pins.
+pub(super) async fn verify_core_transition<P: Provider>(
     provider: &P,
-    identity: &CodeIdentity,
     build: &ReviewedBuild,
     result: &mut VerificationResult,
     core_transition: Address,
@@ -725,11 +724,11 @@ async fn verify_core_transition<P: Provider>(
 ) -> anyhow::Result<Vec<ProxyUpgradeRow>> {
     expect_code_identity(
         provider,
-        identity,
+        build,
         result,
         "the core transition",
         core_transition,
-        "CoreTransition",
+        &["CoreTransition"],
     )
     .await?;
     let view = CoreTransitionView::new(core_transition, provider);
@@ -754,11 +753,7 @@ async fn verify_core_transition<P: Provider>(
     ) {
         reviewed.insert(core_transition, "the core transition".to_string());
     }
-    Ok(manifest
-        .proxyUpgrades
-        .into_iter()
-        .filter(|row| !row.implNew.is_zero())
-        .collect())
+    Ok(manifest.proxyUpgrades)
 }
 
 /// Every bytecode the transition's L2 transaction depends on must ALREADY be published on the
