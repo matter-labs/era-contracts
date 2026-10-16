@@ -49,8 +49,9 @@ production prepare builds and submits these objects.
 The upgrade change adds **11 production contract types**, all deployed on L1. The larger source-file
 count also includes abstract bases, internal libraries, interfaces, preparation scripts and tests.
 The **12 new runtime libraries have only internal/private functions**: they compile into their
-callers and do not require library deployment transactions. This map separates those roles; the
-[architecture document](./docs/registry-driven-upgrades.md) defines their behavior.
+callers and do not require library deployment transactions. The
+[expanded architecture maps](./docs/registry-driven-upgrades.md#contract-map) also cover the
+existing genesis and upgrade engines, with a separate diagram for each group of helpers.
 
 #### Deployed contracts: recurring upgrades
 

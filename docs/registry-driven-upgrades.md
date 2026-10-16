@@ -19,8 +19,8 @@ This is the architecture document. Two other documents complete it and are not r
 neither: the ServerNotifier handover, coordinator succession, monitoring, recovery and the
 incident-only migration pauses.
 
-Read in this order: [objects](#objects), [authority](#authority), [upgrading](#flow-upgrading),
-[bootstrap](#bootstrap). The central security question is whether the reviewed objects and the
+Start with the [contract maps](#contract-map) for the component inventory, then read
+[objects](#objects), [authority](#authority), [upgrading](#flow-upgrading) and [bootstrap](#bootstrap). The central security question is whether the reviewed objects and the
 declared external actions account for every executable change: review source/target edges,
 target identities, the deployed code at every named address, initializers, engine and composer
 code and ownership changes together, and include governance's `forward` and coordinator-replacement
@@ -58,6 +58,110 @@ them separable: replacing an ecosystem singleton
 behind a CTM-domain proxy is an operation with no transition at all, and therefore costs no
 chain-version edge. See
 [the coordination document](../protocol-docs/ecosystem-upgrade-coordination.md).
+
+## Contract map
+
+The upgrade change introduces **11 production contract types**, all deployed on L1. They are
+three persistent executors, four write-once upgrade records, two bootstrap helpers, the bootstrap
+engine and the L1 calldata composer. The larger file count also includes **three abstract bases**,
+**twelve internal libraries**, **eighteen runtime interfaces** and **two data-only files**. Libraries
+and inherited bases add code to their callers, rather than additional protocol deployments.
+
+These small maps show records, authority, shared code and bootstrap separately. Existing contracts
+appear as context and are marked explicitly. [The runbook](../l1-contracts/deploy-scripts/upgrade/README.md)
+covers the preparation scripts and CLI commands around these contracts.
+
+### Records and their references
+
+Dashed arrows are reads or stored references. An operation may omit either transition; its CTM
+infrastructure inventory is a third, independent leg. A transition always names both releases.
+
+```mermaid
+flowchart TB
+    OP["EcosystemUpgradeOperation<br/>one governance-approved operation"]
+    CORE["CoreTransition<br/>ecosystem proxy inventory"]
+    ROWS["CTM infrastructure rows<br/>data inside the operation"]
+    TRANS["CTMTransition<br/>schedule, engine, derived cuts and L2 plan"]
+    FROM["CTMRelease<br/>source version"]
+    TO["CTMRelease<br/>target version"]
+    ENGINE["DefaultUpgrade · existing, extended<br/>or its BootstrapUpgrade subclass"]
+    COMPOSER["L2DefaultDelegateCalldataComposer<br/>L1 view contract for the L2 delegate"]
+
+    OP -.->|"optional coreTransition"| CORE
+    OP -.-> ROWS
+    OP -.->|"optional ctmTransition"| TRANS
+    TRANS -.->|"fromRelease"| FROM
+    TRANS -.->|"newRelease"| TO
+    TRANS -.->|"upgradeEngine"| ENGINE
+    TRANS -.->|"optional l2Plan.delegateComposer"| COMPOSER
+```
+
+The two release boxes are instances of the same `CTMRelease` type. A release names the facets,
+`DiamondInit`, verifier and genesis engine it installs, together with genesis data and L2 bytecodes.
+It holds no executor or authority. The engine and composer boxes show the current production
+implementations; manifests pin addresses and can name version-specific implementations. The
+[authority map](#authority) shows which executors consume these records; the
+[bootstrap map](#bootstrap-component-map) adds the one-time migration objects.
+
+### Inherited code
+
+Arrows point from a caller to the base it inherits. These bases do not introduce separate deployed
+instances. `ManifestStorage` stores the encoded manifest and supplies the common hash; each record
+retains its own typed decoder.
+
+```mermaid
+flowchart TB
+    COORD["EcosystemUpgradeExecutor"]
+    DOMAIN["CoreUpgradeExecutor<br/>CTMUpgradeExecutor"]
+    RECORDS["CTMRelease · CTMTransition<br/>CoreTransition · EcosystemUpgradeOperation<br/>RegistryBootstrapMigration"]
+    UBASE["UpgradeExecutorBase<br/>owner-only forward"]
+    DBASE["DomainUpgradeExecutorBase<br/>coordinator binding"]
+    MBASE["ManifestStorage<br/>encoded manifest + manifestHash"]
+    OWN["Ownable2Step · existing dependency"]
+
+    COORD --> UBASE
+    DOMAIN --> DBASE
+    DBASE --> UBASE
+    UBASE --> OWN
+    RECORDS --> MBASE
+```
+
+The existing engine hierarchy supplies the common diamond-storage upgrade logic. Arrows again
+point from a contract to its base; only `BootstrapUpgrade` is a new type in this diagram.
+
+```mermaid
+flowchart TB
+    BOOT["BootstrapUpgrade · new"]
+    DEFAULT["DefaultUpgrade · existing, extended"]
+    GENESIS["L1GenesisUpgrade · existing, extended"]
+    GENBASE["BaseZkSyncUpgradeGenesis · existing"]
+    BASE["BaseZkSyncUpgrade · existing, extended<br/>shared diamond-storage upgrade logic"]
+
+    BOOT --> DEFAULT
+    DEFAULT --> BASE
+    GENESIS --> GENBASE
+    GENBASE --> BASE
+```
+
+A deployed `BootstrapUpgrade` can serve the bootstrap and later transitions. The L2 calldata
+composer implements `IL2DelegateCalldataComposer`; it is called on L1, and its output is executed
+later on L2.
+
+<details>
+<summary>Interfaces and data declarations: no deployed instances</summary>
+
+| Surface                       | New interfaces                                                                                                               |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Executor authority            | `IUpgradeExecutorBase`, `IDomainUpgradeExecutor`, `IEcosystemUpgradeExecutor`, `ICoreUpgradeExecutor`, `ICTMUpgradeExecutor` |
+| Records and shared reads      | `ICTMRelease`, `ICTMTransition`, `ICoreTransition`, `IEcosystemUpgradeOperation`, `ICommittedUpgrade`, `IManifestHash`       |
+| Bootstrap and composition     | `IRegistryBootstrapMigration`, `IRegistryBootstrapSequence`, `IBootstrapUpgrade`, `IL2DelegateCalldataComposer`              |
+| Compatibility and member APIs | `ILegacyChainTypeManager`, `ISelfDescribingFacet`, `IProxyUpgradeInitializable` (declared in `IUpgradeInit.sol`)             |
+
+`RegistryTypes.sol` defines manifests and rows. `ContractIdentifiers.sol` defines the inventory enums
+and their counts; despite its directory name, it declares no library. Preparation-only interfaces
+(`ICoreUpgradePrepare`, `ICTMUpgradePrepare`) and test doubles are outside this runtime inventory.
+
+</details>
 
 ## Objects
 
@@ -122,6 +226,8 @@ diff, never a wrong byte in offchain-authored data.
 ### Supporting libraries
 
 All twelve helpers below have only internal/private functions and compile into their callers.
+The maps below group their responsibilities; an arrow means “uses this code” unless labelled as an
+external view call. They show representative callers, rather than every Solidity import.
 
 | Library                                                                                                         | Role                                                                               |
 | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -138,78 +244,120 @@ All twelve helpers below have only internal/private functions and compile into t
 | [L2CanonicalTransactionLib](../l1-contracts/contracts/state-transition/libraries/L2CanonicalTransactionLib.sol) | Shared construction of canonical L2 transactions                                   |
 | [ZKChainSpecificForceDeploymentsLib](../l1-contracts/contracts/upgrades/ZKChainSpecificForceDeploymentsLib.sol) | Builds the per-chain base-token and context payload                                |
 
+#### Constructing a committed edge
+
+```mermaid
+flowchart TB
+    EDGE["CTMTransition<br/>RegistryBootstrapMigration"]
+    DERIVE["TransitionDerivationLib<br/>facet / L2 deployment derivation"]
+    INVENTORY["L2InventoryLib<br/>member to fixed L2 address"]
+    PLAN["L2PlanLib<br/>final deployments, delegate and factory deps"]
+    VERSION["VersionEdgeLib<br/>version and schedule rules"]
+
+    EDGE --> DERIVE
+    DERIVE --> INVENTORY
+    EDGE --> PLAN
+    EDGE --> VERSION
+```
+
+A transition derives its delta from two releases. The bootstrap derives its full initial L2 set
+from the first release; both construct the final plan and enforce the same edge rules.
+
+#### Applying rows and checking authority
+
+```mermaid
+flowchart TB
+    APPLIERS["CoreUpgradeExecutor / CTMUpgradeExecutor<br/>RegistryBootstrapMigration"]
+    ROWS["ProxyUpgradeRowLib<br/>source-checked proxy swaps and post-state reads"]
+    BOOT["RegistryBootstrapMigration<br/>bootstrap and completion checks"]
+    AUTH["RegistryAuthorityLib<br/>ownership, bindings and notifier handover"]
+    OBJECTS["Upgrade records / executors<br/>construction or validation paths"]
+    CODE["ObjectAnchorLib<br/>nonempty code check"]
+
+    APPLIERS --> ROWS
+    BOOT --> AUTH
+    ROWS --> CODE
+    AUTH --> CODE
+    OBJECTS --> CODE
+```
+
+`ObjectAnchorLib` checks that code exists. The separate
+[provenance verification](#provenance-and-validation) establishes whether it is the reviewed code.
+
+#### Diamond routing and committed cuts
+
+```mermaid
+flowchart TB
+    CTM["ChainTypeManager · existing, extended"]
+    ENGINE["DefaultUpgrade · existing, extended<br/>BootstrapUpgrade · new"]
+    GENESIS["DiamondInit · existing, extended"]
+    COMPOSE["CTMUpgradeComposer<br/>engine init cut and L2 transaction"]
+    LIVE["LiveRoutingReader<br/>live diamond routing"]
+    FACETS["ReleaseFacetReader<br/>release to genesis installation cuts"]
+
+    CTM --> COMPOSE
+    ENGINE --> COMPOSE
+    ENGINE --> LIVE
+    GENESIS --> FACETS
+    ENGINE -->|"BootstrapUpgrade only: full reinstall"| FACETS
+```
+
+These engine calls run in the chain diamond's storage through delegatecall. Recurring upgrades
+check the source release's routing and apply the transition's stored cuts. The bootstrap removes
+the live legacy routing and installs the first release's complete routing.
+
+#### Composing the L2 transaction on L1
+
+```mermaid
+flowchart TB
+    COMPOSE["CTMUpgradeComposer"]
+    CANONICAL["L2CanonicalTransactionLib<br/>canonical transaction envelope"]
+    CALLDATA["L2DefaultDelegateCalldataComposer<br/>L1 contract"]
+    CONTEXT["ZKChainSpecificForceDeploymentsLib<br/>per-chain base-token and context payload"]
+    GENESIS["L1GenesisUpgrade · existing, extended"]
+    COMPLEX["L2ComplexUpgrader · existing<br/>executes the protocol transaction on L2"]
+    L2["L2DefaultUpgrade · existing<br/>L2 upgrade delegate"]
+
+    COMPOSE --> CANONICAL
+    COMPOSE -->|"external view call via IL2DelegateCalldataComposer"| CALLDATA
+    CALLDATA --> CONTEXT
+    GENESIS --> CANONICAL
+    GENESIS --> CONTEXT
+    CALLDATA -.->|"produces calldata for"| L2
+    COMPOSE -.->|"encodes forceDeployAndUpgradeUniversal"| COMPLEX
+    COMPLEX -->|"later on L2: delegatecalls after force deployments"| L2
+```
+
+The composer reads the target release and Bridgehub to encode the L2 delegate's arguments for one
+chain. It holds no chain state and executes on L1; its result is part of the L2 protocol transaction.
+
 There is no intermediate genesis-manifest type between a build and its `ReleaseManifest`:
 `DeployCTMUtils.deployCurrentRelease` (and `deployAdditionalReleaseFacets`) assembles the
 `GenesisFacet[]` directly as it deploys each facet, and the release's implementation table and its
 one shared `l2SystemProxyBytecodeInfo` shell come from `SystemContractsProcessing`.
 
-## Contract map
-
-Who holds what, who reads what. Solid = writes or drives; dashed = reads.
-
-```mermaid
-flowchart TB
-    subgraph obj["Write-once objects — manifest fixed in the constructor"]
-      REL["CTMRelease"]
-      TRA["CTMTransition<br/>version edge, engine, chain schedule,<br/>L2 plan + DERIVED cuts"]
-      CR["CoreTransition<br/>ecosystem inventory"]
-      OP["EcosystemUpgradeOperation<br/>coreTransition + CTM infrastructure<br/>+ transition"]
-      BOOT["RegistryBootstrapMigration<br/>pre-registry entry edge"]
-      SEQ["RegistryBootstrapSequence<br/>the entry edge's governance bundle, derived"]
-    end
-
-    subgraph exe["Executors — immutable bindings"]
-      EE["EcosystemUpgradeExecutor (coordinator)<br/>CORE_EXECUTOR · ctmExecutor"]
-      CO["CoreUpgradeExecutor<br/>PROXY_ADMIN<br/>coordinator"]
-      CE["CTMUpgradeExecutor<br/>CHAIN_TYPE_MANAGER · CTM_PROXY_ADMIN<br/>coordinator"]
-    end
-
-    CTM["ChainTypeManager<br/>currentRelease<br/>upgradeTransition[old]"]
-    PA["ecosystem ProxyAdmin"]
-    CPA["CTM-domain ProxyAdmin"]
-    DI["DiamondInit — genesis"]
-    ENG["DefaultUpgrade — upgradeFromTransition"]
-    BOOTENG["BootstrapUpgrade — upgradeFromBootstrap"]
-
-    EE -. "validate + manifest held to manifestHash()" .-> OP
-    EE -- "applyOperation (core leg)" --> CO
-    EE -- "applyOperation (CTM leg)" --> CE
-    CO -. "validate + rows" .-> CR
-    CO -- "upgrade / upgradeAndCall" --> PA
-    CE -. "validate + both edges" .-> TRA
-    CE -- "the operation's infrastructure rows" --> CPA
-    CE -- "setNewVersionUpgradeFromTransition ·<br/>upgradeChainFromVersion" --> CTM
-    BOOT -- "one-time: hands over CTM + CTM-domain ProxyAdmin" --> CE
-
-    TRA -. "derive cuts + L2 deployments" .-> REL
-    CTM -. "currentRelease · validate + version on install" .-> REL
-    DI -. "routing, verifier" .-> REL
-    ENG -. "cuts, schedule, target release, L2 plan" .-> TRA
-    BOOTENG -. "schedule, genesis release, L2 plan" .-> BOOT
-    SEQ -. "both domains' calls, ending in the completion check" .-> BOOT
-    SEQ -. "the ecosystem leg" .-> CR
-```
-
 ## Authority
 
 ```mermaid
-flowchart LR
-    PUH["Governance (owner of every executor)"]
-    EE["EcosystemUpgradeExecutor<br/>(coordinator)"]
+flowchart TB
+    GOV["Governance · existing<br/>owner of all three executors"]
+    EE["EcosystemUpgradeExecutor<br/>coordinator"]
     CO["CoreUpgradeExecutor"]
     CE["CTMUpgradeExecutor"]
-    PA["ecosystem ProxyAdmin"]
-    CPA["CTM-domain ProxyAdmin"]
-    CTM["ChainTypeManager"]
+    PA["ecosystem ProxyAdmin · existing"]
+    CPA["CTM-domain ProxyAdmin · existing"]
+    CTM["ChainTypeManager · existing"]
+    NOTIFIER["ServerNotifier · existing"]
 
-    PUH -->|"owns · execute · setCTMExecutor · forward"| EE
-    PUH -->|"owns · setCoordinator · applyL1Upgrade · forward"| CO
-    PUH -->|"owns · setCoordinator · forward"| CE
-    EE -.->|"onlyCoordinator applyOperation"| CO
-    EE -.->|"onlyCoordinator applyOperation"| CE
-    CO -->|owns| PA
-    CE -->|owns| CTM
-    CE -->|owns| CPA
+    GOV -->|"owns / execute / setCTMExecutor / forward"| EE
+    GOV -->|"owns / setCoordinator / applyL1Upgrade / forward"| CO
+    GOV -->|"owns / setCoordinator / forward"| CE
+    EE -.->|"onlyCoordinator: applyOperation, core first"| CO
+    EE -.->|"onlyCoordinator: applyOperation, CTM second"| CE
+    CO -->|"owns"| PA
+    CE -->|"owns"| CTM
+    CE -->|"owns"| CPA
+    CE -->|"owns"| NOTIFIER
 ```
 
 Three executors, one authority root. Governance owns all three; each domain executor holds one
@@ -459,16 +607,16 @@ sequenceDiagram
     participant D as Chain diamond
 
     G->>X: execute(operation)
-    Note over X: operation.validate(), manifest held to manifestHash();<br/>applyOperation is onlyCoordinator
+    Note over X: Validates the operation<br/>and its manifest hash
     X->>CO: applyOperation(manifest) — core leg first, rows verified
     X->>E: applyOperation(manifest)
     E->>C: infrastructure rows first (CTM-domain ProxyAdmin), verified, then the commit
-    E->>C: setNewVersionUpgradeFromTransition(transition) — version, cut and newRelease together
+    E->>C: setNewVersionUpgradeFromTransition(transition) — transition, version and newRelease together
     G->>E: upgradeChain(transition, chainId)
     E->>C: upgradeChainFromVersion(chainId, oldV)
     C->>D: upgradeChainFromVersion(oldV)
     D->>C: upgradeCutForVersion(oldV) — derived from upgradeTransition[oldV]
-    Note over D: apply derived facetCuts verbatim,<br/>then version + target release's verifier + composed L2 tx
+    Note over D: Applies derived cuts,<br/>version and verifier,<br/>and L2 transaction
 ```
 
 The one `execute(operation)` call is ALL a registry-driven upgrade emits; every other call is a
@@ -489,10 +637,10 @@ version. Chain admins additionally retain their own direct path on the chain dia
 `CTMUpgradeComposer.buildUpgradeCutData(ICTMTransition)`. Prepare and the CTM use this same
 transition-only function; the bootstrap edge composes its cut the same way from its own object,
 `buildBootstrapUpgradeCutData(IRegistryBootstrapMigration)`, served as the migration's
-`upgradeCut()`. The CTM hashes it at commit time (`setNewVersionUpgradeFromTransition`)
-and re-derives it on read (`upgradeCutForVersion`). It never travels in calldata: not in governance calls, and not to
-the chain — the chain's Admin facet takes only the departing version and reads the cut from its
-CTM. The chain diamond still treats the cut it reads as opaque bytes and stays unaware of
+`upgradeCut()`. The CTM commits the transition address (`setNewVersionUpgradeFromTransition`)
+and derives the cut on read (`upgradeCutForVersion`). For recurring edges, cut bytes never travel
+in governance calls or to the chain: the chain's Admin facet takes only the departing version and
+reads the cut from its CTM. The chain diamond still treats the cut it reads as opaque bytes and stays unaware of
 transitions.
 
 On the chain, `DefaultUpgrade.upgradeFromTransition` first requires the chain's live routing to be
@@ -618,6 +766,42 @@ The [multi-CTM extension boundary](../protocol-docs/ecosystem-upgrade-coordinati
 identifies the schema, coordinator and tooling changes needed to expand participation later.
 
 ## Bootstrap
+
+### Bootstrap component map
+
+Solid arrows execute or transfer authority; dashed arrows read or reference. The sequence only
+describes the bundle: governance executes its calls, including the core leg and handovers, in one
+transaction. This map completes the eleven deployed types with `RegistryBootstrapSequence`,
+`RegistryBootstrapMigration` and `BootstrapUpgrade`.
+
+```mermaid
+flowchart TB
+    GOV["Governance · existing"]
+    SEQ["RegistryBootstrapSequence<br/>actions(): describes the complete bundle"]
+    CORE["CoreTransition<br/>ecosystem proxy inventory"]
+    COREEXEC["CoreUpgradeExecutor<br/>applies the ecosystem leg"]
+    MIG["RegistryBootstrapMigration<br/>one-time CTM entry edge"]
+    CTM["ChainTypeManager + CTM ProxyAdmin · existing"]
+    EXEC["CTMUpgradeExecutor<br/>permanent authority after migration"]
+    CHAIN["Legacy chain diamond · existing"]
+    ENGINE["BootstrapUpgrade<br/>inherits DefaultUpgrade"]
+
+    GOV -.->|"reads actions()"| SEQ
+    SEQ -.->|"pins"| CORE
+    SEQ -.->|"pins"| MIG
+    GOV -->|"applyL1Upgrade(coreTransition)"| COREEXEC
+    COREEXEC -.->|"reads proxy rows"| CORE
+    GOV -->|"hands authorities over / calls migrate()"| MIG
+    MIG -->|"applies rows / installs release / commits cut hash"| CTM
+    MIG -->|"hands CTM + ProxyAdmin ownership to"| EXEC
+    CHAIN -.->|"checks caller-supplied bootstrap cut hash"| CTM
+    CHAIN -->|"delegatecalls"| ENGINE
+    ENGINE -.->|"reads migration's target release and L2 plan"| MIG
+```
+
+The admin supplies each legacy chain's bootstrap cut. After crossing this edge, the new Admin
+facet instead reads recurring cuts from its CTM's committed transition. The following text details
+the migration and the sequence's checks.
 
 A pre-registry CTM has no `currentRelease`, and transitions never accept a zero `fromRelease`. It
 must therefore cross into the model once, through one-time migration code — never through an
