@@ -108,7 +108,7 @@ The counters start at zero when the cap is introduced, while chains already hold
 flag that tells a zero backfill from none:
 
 - `setChainBalanceBackfill(chainId, assetIds, amounts)` sets the amounts, once per chain and asset
-  (`ChainBalanceBackfillAlreadySet`).
+  (`ChainBalanceBackfillAlreadySet`). It refuses `INTEROP_POOL_CHAIN_ID` (`InvalidChainId`): the pool has no backfill.
 
 Until a chain's backfill is set, its users can only withdraw what was deposited after the upgrade, and its balance
 can't move to the pool. The amounts are in [Backfill amounts](#backfill-amounts).

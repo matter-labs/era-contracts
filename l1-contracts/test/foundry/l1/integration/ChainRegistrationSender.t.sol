@@ -383,12 +383,12 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         );
     }
 
-    /// @dev The harness deploys every chain with the same admin, so tests that need two admins give the peer its own.
     function _peers(uint256 _peerChainId) internal pure returns (uint256[] memory peers) {
         peers = new uint256[](1);
         peers[0] = _peerChainId;
     }
 
+    /// @dev The harness deploys every chain with the same admin, so tests that need two admins give the peer its own.
     function _setOwnAdmin(uint256 _chainId, string memory _name) internal returns (address admin) {
         address chain = getZKChainAddress(_chainId);
         admin = makeAddr(_name);

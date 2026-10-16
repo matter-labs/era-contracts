@@ -8,7 +8,7 @@ interface IChainRegistrationSender {
     /// @notice The admin of `chainId` allowed interop with `peerChainId`.
     event InteropPeerAllowed(uint256 indexed chainId, uint256 indexed peerChainId);
 
-    /// @notice Governance removed `chainId` from the L2 Bridgehub of `chainRegisteredOn`.
+    /// @notice The owner or the admin of `chainRegisteredOn` removed `chainId` from its L2 Bridgehub.
     event InteropPairDeregistered(uint256 indexed chainRegisteredOn, uint256 indexed chainId);
 
     function initialize(address _owner) external;
