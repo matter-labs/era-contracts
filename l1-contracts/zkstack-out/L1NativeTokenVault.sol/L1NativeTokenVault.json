@@ -1327,6 +1327,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidChainId",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidNTVBurnData",
     "inputs": []
   },
