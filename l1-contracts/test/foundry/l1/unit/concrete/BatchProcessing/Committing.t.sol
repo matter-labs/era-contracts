@@ -6,16 +6,18 @@ import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {BatchHashMismatch, ChainConfigHashMismatch} from "contracts/common/L1ContractErrors.sol";
-import {L2DACommitmentScheme, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PubdataContent} from "contracts/common/Config.sol";
-import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {
-    InvalidPubdataHash,
-    InvalidBlobsPublished,
-    BlobNotPublished
-} from "../../../da-contracts-imports/DAContractsErrors.sol";
-import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
+    BatchHashMismatch,
+    CanOnlyProcessOneBatch,
+    ChainConfigHashMismatch,
+    InvalidProtocolVersion
+} from "contracts/common/L1ContractErrors.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {L2DACommitmentScheme, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT, PubdataContent} from "contracts/common/Config.sol";
+import {InvalidPubdataHash, MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
+import {InvalidBlobsPublished, BlobNotPublished} from "contracts/state-transition/data-availability/DAErrors.sol";
+import {BlobsL1DAValidatorZKsyncOS} from "contracts/state-transition/data-availability/BlobsL1DAValidatorZKsyncOS.sol";
 
 contract CommittingTest is ExecutorTest {
     function setUp() public {}
@@ -718,6 +720,40 @@ contract CommittingTest is ExecutorTest {
         );
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
             .encodeCommitBatchesDataZKsyncOS(wrongGenesisStoredBatchInfo, commitInfos);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_CommittingMultipleBatches() public {
+        CommitBatchInfoZKsyncOS[] memory newBatchesData = new CommitBatchInfoZKsyncOS[](2);
+        newBatchesData[0] = newCommitBatchInfoZKsyncOS;
+        newBatchesData[1] = newCommitBatchInfoZKsyncOS;
+        newBatchesData[1].batchNumber = 2;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, newBatchesData);
+
+        vm.prank(validator);
+        vm.expectRevert(CanOnlyProcessOneBatch.selector);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_ProtocolVersionIsNotActive() public {
+        // The fixture's CTM is a dummy whose version check is already mocked to `true`; flip it to
+        // model a chain whose protocol version has expired.
+        vm.mockCall(
+            utilsFacet.util_getChainTypeManager(),
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
+            abi.encode(false)
+        );
+
+        CommitBatchInfoZKsyncOS[] memory newBatchesData = new CommitBatchInfoZKsyncOS[](1);
+        newBatchesData[0] = newCommitBatchInfoZKsyncOS;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, newBatchesData);
+
+        vm.prank(validator);
+        vm.expectRevert(InvalidProtocolVersion.selector);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 }

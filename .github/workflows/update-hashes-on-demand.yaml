@@ -82,7 +82,6 @@ jobs:
 
           yarn
 
-          yarn --cwd da-contracts build:foundry
           yarn --cwd l1-contracts build:foundry
 
           yarn calculate-hashes:fix

@@ -343,13 +343,9 @@ committed anvil-interop chain states; regenerate those too if a bump changes it.
 
 ### Building Artifacts
 
-Before running tests, build all required artifacts from the repository root:
+Before running tests, build the artifacts from the repository root:
 
 ```bash
-# Build da-contracts
-yarn da build:foundry
-
-# Build l1-contracts
 yarn l1 build:foundry
 ```
 
@@ -435,8 +431,8 @@ yarn lint:ts --fix
 # Fix formatting issues
 yarn prettier:fix
 
-# Check solc warnings (needs forge; ~5s each)
-yarn l1 solc-warnings && yarn da solc-warnings
+# Check solc warnings (needs forge; ~5s)
+yarn l1 solc-warnings
 ```
 
 ### solc warnings
@@ -456,7 +452,7 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 ### Pre-Push Checklist
 
 1. **Run linting fixes**: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
-2. **Check solc warnings**: `yarn l1 solc-warnings && yarn da solc-warnings`
+2. **Check solc warnings**: `yarn l1 solc-warnings`
 3. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
 4. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
 5. **Verify no uncommitted changes**: `git status`
@@ -477,7 +473,9 @@ Whenever an agent makes changes in a PR, it **MUST** update the PR description t
 
 ### Pushing and Creating PRs
 
-Agents do **not** have push access to the main repository. Always push to a **fork** and create PRs from there. Do not attempt to push directly to `matter-labs/era-contracts`.
+If the credentials you run with have push access to `matter-labs/era-contracts`, push your branch there and open the PR from it. Otherwise, push to a **fork** and open the PR from the fork.
+
+Either way, push only to your own feature branch: never push directly to `main`, `draft/*` or release branches; changes to them go through a PR.
 
 ### Never Force Push
 

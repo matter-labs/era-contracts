@@ -56,11 +56,8 @@ contract ChainAdminOwnableTest is Test {
 
     // ============ Constructor Tests ============
 
-    function test_constructor_setsOwner() public view {
+    function test_constructor() public view {
         assertEq(chainAdminOwnable.owner(), owner);
-    }
-
-    function test_constructor_setsTokenMultiplierSetter() public view {
         assertEq(chainAdminOwnable.tokenMultiplierSetter(), tokenMultiplierSetter);
     }
 

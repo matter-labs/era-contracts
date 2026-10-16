@@ -21,7 +21,6 @@ fs_permissions = [
     { access = "read-write", path = "./script-out" },
     { access = "read", path = "../l1-contracts/script-out/" },
     { access = "read", path = "../l1-contracts/broadcast/" },
-    { access = "read", path = "../da-contracts/" },
     { access = "read", path = "./script-config" },
     { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
@@ -55,22 +54,6 @@ allow_internal_expect_revert = true
 [profile.anvil-interop]
 cbor_metadata = false
 bytecode_hash = "none"
-
-[profile.invariant_tests_l1context]
-test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
-optimizer = false
-[profile.invariant_tests_l1context.invariant]
-runs = 10
-depth = 1000
-
-[profile.invariant_tests_l1context_ci]
-test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
-optimizer = false
-[profile.invariant_tests_l1context_ci.invariant]
-runs = 10
-depth = 10000
 
 [lint]
 lint_on_build = false

@@ -28,10 +28,6 @@ runs:
       shell: bash
       run: yarn
 
-    - name: Build da-contracts artifacts (no CBOR metadata for determinism)
-      shell: bash
-      run: FOUNDRY_PROFILE=anvil-interop yarn da build:foundry
-
     - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
       shell: bash
       working-directory: l1-contracts

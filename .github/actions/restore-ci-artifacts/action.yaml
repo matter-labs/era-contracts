@@ -38,7 +38,5 @@ runs:
         fail-on-cache-miss: ${{ inputs.fail-on-miss }}
         key: ${{ inputs.key }}
         path: |
-          da-contracts/cache-forge
-          da-contracts/out
           l1-contracts/cache-forge
           l1-contracts/out

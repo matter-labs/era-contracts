@@ -18,6 +18,7 @@ contract GatewayTransactionFiltererTest is Test {
     address internal sender = makeAddr("sender");
     address internal bridgehub = makeAddr("bridgehub");
     address internal assetRouter = makeAddr("assetRouter");
+    address internal randomUser = makeAddr("randomUser");
 
     constructor() {
         owner = makeAddr("owner");

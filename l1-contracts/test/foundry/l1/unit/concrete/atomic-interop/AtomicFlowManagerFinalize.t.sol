@@ -17,6 +17,7 @@ import {
     ManagerFlowIdMismatch,
     ManagerProofCountMismatch,
     ManagerExecutingBundleNotInFlow,
+    ManagerNotInteropHandler,
     ProofSourceChainMismatch,
     ProofDeadlineExceeded
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
@@ -114,6 +115,14 @@ contract AtomicFlowManagerFinalizeTest is AtomicInteropProofBuilder {
     }
 
     // ============ reverts ============
+
+    /// @notice Only the InteropHandler may consult the gate, even with a valid finality proof.
+    function test_RevertWhen_NotInteropHandler() public {
+        AtomicFinalityProof memory finality = _validFinality();
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerNotInteropHandler.selector, address(this)));
+        manager.requireFlowFinalized(legFirst, finality);
+    }
 
     /// @notice A `flowId` that does not match the canonicalized preimage hash is rejected: proofs are
     /// for commit values derived from the CLAIMED id, so accepting a mismatch would unbind the legs.

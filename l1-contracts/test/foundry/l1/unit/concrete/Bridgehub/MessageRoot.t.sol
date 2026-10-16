@@ -13,15 +13,18 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     ChainBatchRootAlreadyExists,
     ChainBatchRootZero,
+    ChainExists,
     OnlyBridgehub,
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
-    OnlyBridgehubOrChainAssetHandler
+    OnlyBridgehubOrChainAssetHandler,
+    OnlyChain,
+    OnlyChainAssetHandler
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {StoredInteropRoot} from "contracts/common/Messaging.sol";
+import {ProofData, StoredInteropRoot} from "contracts/common/Messaging.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
@@ -45,6 +48,7 @@ contract MessageRootTest is Test {
     L2MessageRoot internal l2MessageRoot;
     uint256 internal L1_CHAIN_ID;
     address internal assetTracker;
+    address internal chainAssetHandler;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
@@ -68,7 +72,7 @@ contract MessageRootTest is Test {
             abi.encode(makeAddr("chainAssetHandler"))
         );
         L1_CHAIN_ID = 5;
-        address chainAssetHandler = makeAddr("chainAssetHandler");
+        chainAssetHandler = makeAddr("chainAssetHandler");
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
@@ -135,6 +139,12 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IGetters.l2LogsRootHash.selector, uint256(0)),
             abi.encode(_genesisRoot)
         );
+    }
+
+    function test_constructor() public view {
+        assertEq(messageRoot.BRIDGE_HUB(), bridgeHub);
+        assertEq(messageRoot.CHAIN_ASSET_HANDLER(), chainAssetHandler);
+        assertEq(messageRoot.L1_CHAIN_ID(), block.chainid);
     }
 
     function test_init() public view {
@@ -256,7 +266,6 @@ contract MessageRootTest is Test {
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
-        address chainAssetHandler = makeAddr("chainAssetHandler");
         vm.expectRevert(
             abi.encodeWithSelector(
                 OnlyBridgehubOrChainAssetHandler.selector,
@@ -567,5 +576,136 @@ contract MessageRootTest is Test {
         expectedPath[0] = SHARED_ROOT_TREE_EMPTY_HASH;
         expectedPath[1] = keccak256(abi.encodePacked(hash0, hash1));
         assertEq(pathFor2, expectedPath, "Incorrect path for beta chain");
+    }
+
+    function test_AddNewChain_ChainExists() public {
+        uint256 chainId = 271;
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(chainId, 0);
+
+        vm.prank(bridgeHub);
+        vm.expectRevert(ChainExists.selector);
+        messageRoot.addNewChain(chainId, 0);
+    }
+
+    function test_AddNewChain_FromChainAssetHandler() public {
+        uint256 chainId = 271;
+
+        vm.prank(chainAssetHandler);
+        vm.expectEmit(true, false, false, false);
+        emit IMessageRootBase.AddedChain(chainId, 0);
+        messageRoot.addNewChain(chainId, 0);
+
+        assertTrue(messageRoot.chainRegistered(chainId));
+    }
+
+    function test_GetChainRoot_ChainNotRegistered() public {
+        vm.expectRevert(MessageRootNotRegistered.selector);
+        messageRoot.getChainRoot(999);
+    }
+
+    function test_AddChainBatchRoot_RevertWhen_NotChain() public {
+        uint256 chainId = 271;
+        address wrongSender = makeAddr("wrongSender");
+        address correctChain = makeAddr("correctChain");
+
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
+            abi.encode(correctChain)
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(OnlyChain.selector, wrongSender, correctChain));
+        vm.prank(wrongSender);
+        messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+    }
+
+    function test_setMigratingChainBatchNumber_Success() public {
+        uint256 chainId = 271;
+        uint256 batchNumber = 1;
+
+        vm.prank(chainAssetHandler);
+        messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
+
+        assertEq(messageRoot.currentChainBatchNumber(chainId), batchNumber);
+    }
+
+    function test_setMigratingChainBatchNumber_RevertWhenCalledByBridgehub() public {
+        vm.prank(bridgeHub);
+        vm.expectRevert(abi.encodeWithSelector(OnlyChainAssetHandler.selector, bridgeHub, chainAssetHandler));
+        messageRoot.setMigratingChainBatchNumber(271, 1);
+    }
+
+    /// @notice A plain (legacy-format) Merkle path is a final proof node: the batch settlement root is
+    /// the log leaf hashed up the path, and no settlement-layer hop is parsed.
+    function test_GetProofData() public view {
+        bytes32 leaf = keccak256("leaf");
+        bytes32[] memory proof = new bytes32[](1);
+        proof[0] = keccak256("proof");
+
+        ProofData memory result = messageRoot.getProofData({
+            _chainId: 271,
+            _batchNumber: 1,
+            _leafProofMask: 1,
+            _leaf: leaf,
+            _proof: proof
+        });
+
+        // Mask bit 0 set: the leaf is the right child.
+        assertEq(result.batchSettlementRoot, keccak256(abi.encodePacked(proof[0], leaf)));
+        assertTrue(result.finalProofNode);
+        assertEq(result.ptr, 1);
+        assertEq(result.settlementLayerChainId, 0);
+        assertEq(result.chainIdLeaf, bytes32(0));
+    }
+
+    function test_ChainCount() public {
+        // The settlement layer itself is registered on initialization.
+        assertEq(messageRoot.chainCount(), 1);
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(271, 0);
+
+        assertEq(messageRoot.chainCount(), 2);
+    }
+
+    function test_ChainIndex() public {
+        uint256 chainId = 271;
+
+        assertTrue(messageRoot.chainRegistered(block.chainid));
+        assertEq(messageRoot.chainIndexToId(0), block.chainid);
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(chainId, 0);
+
+        assertEq(messageRoot.chainIndex(chainId), 1);
+        assertEq(messageRoot.chainIndexToId(1), chainId);
+    }
+
+    function test_AddChainBatchRoot_ConsecutiveBatchNumber() public {
+        uint256 chainId = 271;
+        address chainSender = makeAddr("chainSender");
+        bytes32 batchRoot1 = keccak256("batchRoot1");
+        bytes32 batchRoot2 = keccak256("batchRoot2");
+
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
+            abi.encode(chainSender)
+        );
+
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(chainId, 0);
+
+        vm.prank(chainSender);
+        messageRoot.addChainBatchRootV32(chainId, 1, batchRoot1);
+
+        vm.prank(chainSender);
+        messageRoot.addChainBatchRootV32(chainId, 2, batchRoot2);
+
+        assertEq(messageRoot.chainBatchRoots(chainId, 1), batchRoot1);
+        assertEq(messageRoot.chainBatchRoots(chainId, 2), batchRoot2);
+        assertEq(messageRoot.currentChainBatchNumber(chainId), 2);
     }
 }
