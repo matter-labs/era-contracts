@@ -168,6 +168,11 @@ const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
 /// send even when its execution would fit. It is also below reth's elastic
 /// block gas limit (~30M on a quiet chain), so a single tx never equals or
 /// exceeds the block limit (which reth rejects with `gas limit too high`).
+///
+/// Since Glamsterdam (EIP-8037) the cap bounds a tx's regular gas only: state
+/// gas (e.g. code deposit) comes on top, so a tx may declare more. Sepolia mined
+/// the ZKsync OS PLONK verifier deployment with 26.85M gas used. See
+/// `buffered_gas_limit`.
 const PER_TX_GAS_LIMIT_CAP: u64 = 1 << 24;
 /// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
 /// it (anvil/reth on a quiet local chain reports near-zero).
@@ -231,9 +236,18 @@ fn format_gwei(gas_price: u128) -> String {
 
 /// Gas limit for a call whose `eth_estimateGas` returned `estimate`: the
 /// estimate plus `GAS_ESTIMATE_BUFFER_BPS` headroom, clamped to
-/// `PER_TX_GAS_LIMIT_CAP`.
+/// `PER_TX_GAS_LIMIT_CAP` while the estimate itself fits under it.
+///
+/// An estimate above the cap only comes from a chain where the cap does not
+/// bound the tx's total gas (Glamsterdam's state gas, see
+/// `PER_TX_GAS_LIMIT_CAP`); clamping it would only make the tx run out of gas,
+/// so it keeps its full headroom. On a chain where the cap is total, such a tx
+/// cannot be sent at any limit.
 fn buffered_gas_limit(estimate: u64) -> u64 {
     let buffered = estimate.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
+    if estimate > PER_TX_GAS_LIMIT_CAP {
+        return buffered;
+    }
     std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP)
 }
 
@@ -1715,7 +1729,17 @@ mod tests {
         assert_eq!(super::buffered_gas_limit(1_000_000), 1_250_000);
         assert_eq!(super::buffered_gas_limit(13_421_772), 16_777_215);
         assert_eq!(super::buffered_gas_limit(14_000_000), 16_777_216);
-        assert_eq!(super::buffered_gas_limit(u64::MAX), 16_777_216);
+        assert_eq!(super::buffered_gas_limit(16_777_216), 16_777_216);
+    }
+
+    /// An estimate above 2^24 only comes from a chain whose cap leaves state gas
+    /// out (Glamsterdam): it keeps its buffer instead of being clamped into an
+    /// out-of-gas. 26_850_548 is the PLONK verifier deployment Sepolia mined.
+    #[test]
+    fn buffered_gas_limit_keeps_estimates_above_the_cap() {
+        assert_eq!(super::buffered_gas_limit(26_850_548), 33_563_185);
+        assert_eq!(super::buffered_gas_limit(16_777_217), 20_971_521);
+        assert_eq!(super::buffered_gas_limit(u64::MAX), u64::MAX / 10_000);
     }
 
     /// A spent nonce we never sent at (a stale pending nonce) is resent at the
