@@ -87,12 +87,6 @@ jobs:
         if: steps.reuse.outputs.cache-hit != 'true'
         uses: ./.github/actions/warm-solc-cache
 
-      - name: Build da contracts
-        if: steps.reuse.outputs.cache-hit != 'true'
-        working-directory: da-contracts
-        run: |
-          yarn build:foundry
-
       - name: Build l1 contracts
         if: steps.reuse.outputs.cache-hit != 'true'
         working-directory: l1-contracts
@@ -110,8 +104,6 @@ jobs:
         with:
           key: ${{ inputs.cache-key }}
           path: |
-            da-contracts/cache-forge
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
 
@@ -121,7 +113,5 @@ jobs:
         with:
           name: build-artifacts
           path: |
-            da-contracts/cache-forge
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out

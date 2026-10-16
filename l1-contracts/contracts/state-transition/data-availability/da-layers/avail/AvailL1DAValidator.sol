@@ -2,13 +2,12 @@
 
 pragma solidity 0.8.28;
 
-import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
+import {IL1DAValidator, L1DAValidatorOutput} from "../../../chain-interfaces/IL1DAValidator.sol";
+import {InvalidValidatorOutputHash} from "../../DAErrors.sol";
 import {IAvailBridge} from "./IAvailBridge.sol";
 import {AvailAttestationLib} from "./AvailAttestationLib.sol";
 
 contract AvailL1DAValidator is IL1DAValidator, AvailAttestationLib {
-    error InvalidValidatorOutputHash();
-
     constructor(IAvailBridge _availBridge) AvailAttestationLib(_availBridge) {}
 
     function checkDA(
@@ -21,8 +20,9 @@ contract AvailL1DAValidator is IL1DAValidator, AvailAttestationLib {
         output.stateDiffHash = bytes32(operatorDAInput[:32]);
 
         IAvailBridge.MerkleProofInput memory input = abi.decode(operatorDAInput[32:], (IAvailBridge.MerkleProofInput));
-        if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(output.stateDiffHash, input.leaf)))
+        if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(output.stateDiffHash, input.leaf))) {
             revert InvalidValidatorOutputHash();
+        }
         _attest(input);
 
         // The rest of the fields that relate to blobs are empty.

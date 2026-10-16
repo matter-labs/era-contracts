@@ -45,11 +45,6 @@ pub fn l1_contract_name_to_code(contract_name: &str) -> Vec<u8> {
     contract_artifact_to_code(&path, contract_name)
 }
 
-pub fn da_contract_name_to_code(contract_name: &str) -> Vec<u8> {
-    let path = format!("../../da-contracts/out/{contract_name}.sol/{contract_name}.json");
-    contract_artifact_to_code(&path, contract_name)
-}
-
 fn contract_artifact_to_code(path: &str, contract_name: &str) -> Vec<u8> {
     let file_content = std::fs::read_to_string(path)
         .expect(format!("Failed to read contract bytecode file {}", path).as_str());

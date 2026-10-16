@@ -34,8 +34,6 @@ runs:
         restore-keys: |
           artifacts-l1-ci-solc-
         path: |
-          da-contracts/cache-forge
-          da-contracts/out
           l1-contracts/cache-forge
           l1-contracts/out
 
@@ -56,7 +54,6 @@ runs:
       run: |
         node "${{ github.action_path }}/prune-stale-artifacts.js" \
           --manifest "$MANIFEST_PATH" \
-          "da-contracts:da-contracts/out" \
           "l1-contracts:l1-contracts/out"
       env:
         MANIFEST_PATH: l1-contracts/cache-forge/.warm-solc-cache-sources.json

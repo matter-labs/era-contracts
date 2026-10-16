@@ -5,9 +5,6 @@ use alloy::primitives::{Address, B256, FixedBytes};
 pub enum ContractSource {
     /// Load bytecode from a compiled contract artifact by name from l1-contracts.
     L1ContractName(&'static str),
-    /// Load bytecode from a compiled contract artifact by name from da-contracts.
-    #[allow(dead_code)]
-    DAContractName(&'static str),
     /// Use bytecode directly.
     Bytecode(&'static [u8]),
 }

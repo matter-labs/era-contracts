@@ -14,10 +14,10 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "interop/InteropErrors.sol",
     "atomic-interop/AtomicInteropErrors.sol",
     "state-transition/L1StateTransitionErrors.sol",
+    "state-transition/data-availability/DAErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],
   "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol", "ecosystem/DeployScriptErrors.sol"],
-  "../da-contracts/contracts": ["DAContractsErrors.sol"],
   "./contracts/l2-system": ["zksync-os/errors/SystemContractErrors.sol"],
 };
 
