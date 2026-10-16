@@ -41,10 +41,10 @@ impl GovernanceStage2Calls {
             result,
         );
 
-        // Per-CTM (2 calls per CTM, in artifact order):
+        // Per-CTM (2 calls per CTM):
         //   +0 stage-validator.checkProtocolUpgradePresence()
         //   +1 stage-validator.checkMigrationsUnpaused()
-        for (ctm_index, ctm) in artifact.ctms.iter().enumerate() {
+        for ctm in artifact.ctms.iter() {
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let Some(validator) = required_ctm_address(
                 ctm,
@@ -55,7 +55,21 @@ impl GovernanceStage2Calls {
                 continue;
             };
 
-            let block = 1 + ctm_index * 2;
+            // Per-CTM blocks are emitted in env-config order, which can differ
+            // from artifact.ctms order — match each CTM's 2-call block by its
+            // validator target (order-independent; per-CTM order is cosmetic).
+            let Some(block) = (0..artifact.ctms.len()).map(|k| 1 + k * 2).find(|&b| {
+                self.calls
+                    .elems
+                    .get(b)
+                    .is_some_and(|c| c.target == validator)
+            }) else {
+                result.report_error(&format!(
+                    "Stage-2 per-CTM block for {validator_label} not found"
+                ));
+                errors += 2;
+                continue;
+            };
             errors += verify_call_by_address(
                 &self.calls,
                 block,
