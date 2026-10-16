@@ -18,7 +18,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
-import {ArrayLengthMismatch, Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
     ChainNotSettlingOnL1,
@@ -36,6 +36,7 @@ import {
 contract ChainRegistrationSenderUnitTest is Test {
     uint256 internal constant CHAIN_ID = 271;
     uint256 internal constant PEER_CHAIN_ID = 272;
+    uint256 internal constant THIRD_CHAIN_ID = 273;
     uint256 internal constant UNREGISTERED_CHAIN_ID = 123456;
     uint256 internal constant GATEWAY_CHAIN_ID = 506;
     bytes32 internal constant PEER_BASE_TOKEN_ASSET_ID = keccak256("peerBaseToken");
@@ -207,8 +208,6 @@ contract ChainRegistrationSenderUnitTest is Test {
 
     /// @notice A pair registered by the retired `registerChain`, which L1 never recorded.
     function test_deregisterInteropPairs_legacyPair() public {
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
-
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
         vm.expectCall(
@@ -216,7 +215,7 @@ contract ChainRegistrationSenderUnitTest is Test {
             abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
         );
         vm.prank(owner);
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
     }
@@ -224,7 +223,6 @@ contract ChainRegistrationSenderUnitTest is Test {
     function test_deregisterInteropPairs_allowedPair() public {
         vm.prank(chainAdmin);
         sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
 
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
@@ -233,7 +231,7 @@ contract ChainRegistrationSenderUnitTest is Test {
             abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
         );
         vm.prank(owner);
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID), "cleared on L1");
         vm.prank(bridgehub);
@@ -250,7 +248,6 @@ contract ChainRegistrationSenderUnitTest is Test {
     function test_deregisterInteropPairs_byChainAdmin() public {
         vm.prank(chainAdmin);
         sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
 
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
@@ -259,9 +256,42 @@ contract ChainRegistrationSenderUnitTest is Test {
             abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
         );
         vm.prank(chainAdmin);
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+    }
+
+    /// @notice One call removes several peers of the chain, reading the chain's admin once.
+    function test_deregisterInteropPairs_severalPeers() public {
+        _mockChain(THIRD_CHAIN_ID, makeAddr("third"), keccak256("thirdBaseToken"));
+        vm.startPrank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        sender.allowInteropPeer(CHAIN_ID, THIRD_CHAIN_ID);
+        vm.stopPrank();
+        uint256[] memory peers = new uint256[](2);
+        (peers[0], peers[1]) = (PEER_CHAIN_ID, THIRD_CHAIN_ID);
+
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, THIRD_CHAIN_ID);
+        vm.expectCall(
+            chain,
+            abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
+        );
+        vm.expectCall(
+            chain,
+            abi.encodeCall(
+                IMailbox.requestL2ServiceTransaction,
+                (L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.deregisterChainForInterop, (THIRD_CHAIN_ID)))
+            )
+        );
+        vm.expectCall(chain, abi.encodeCall(IGetters.getAdmin, ()), 1);
+        vm.prank(chainAdmin);
+        sender.deregisterInteropPairs(CHAIN_ID, peers);
+
+        assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+        assertFalse(sender.interopPeerAllowed(CHAIN_ID, THIRD_CHAIN_ID));
     }
 
     function testFuzz_deregisterInteropPairs_revertWhen_notOwnerNorChainAdmin(address _caller) public {
@@ -269,74 +299,60 @@ contract ChainRegistrationSenderUnitTest is Test {
         vm.assume(_caller != owner && _caller != chainAdmin && _caller != makeAddr("proxyAdmin"));
         vm.prank(chainAdmin);
         sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
 
         vm.prank(_caller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
     }
 
     /// @notice The admin of the peer cannot remove the chain's side of the pair.
     function test_deregisterInteropPairs_revertWhen_peerAdmin() public {
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
         address peerAdmin = makeAddr("peerAdmin");
 
         vm.prank(peerAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, peerAdmin));
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
-    }
-
-    /// @notice An admin's batch that also holds another chain's pair reverts as a whole.
-    function test_deregisterInteropPairs_revertWhen_batchHasAnotherChainsPair() public {
-        vm.prank(chainAdmin);
-        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        uint256[] memory chainsRegisteredOn = new uint256[](2);
-        uint256[] memory chainsToDeregister = new uint256[](2);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (CHAIN_ID, PEER_CHAIN_ID);
-        (chainsRegisteredOn[1], chainsToDeregister[1]) = (PEER_CHAIN_ID, CHAIN_ID);
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
     }
 
-    function test_deregisterInteropPairs_revertWhen_lengthMismatch() public {
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(ArrayLengthMismatch.selector, 1, 2));
-        sender.deregisterInteropPairs(new uint256[](1), new uint256[](2));
+    /// @notice A list with one invalid peer reverts as a whole, the valid peers included.
+    function test_deregisterInteropPairs_revertWhen_oneOfThePeersIsInvalid() public {
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        uint256[] memory peers = new uint256[](2);
+        (peers[0], peers[1]) = (PEER_CHAIN_ID, CHAIN_ID);
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, CHAIN_ID, CHAIN_ID));
+        sender.deregisterInteropPairs(CHAIN_ID, peers);
+
+        assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
     }
 
     function test_deregisterInteropPairs_revertWhen_pairIsSelf() public {
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, CHAIN_ID);
-
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, CHAIN_ID, CHAIN_ID));
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(CHAIN_ID));
     }
 
     /// @notice The L2 Bridgehub of a settlement layer keeps the entries of the chains that settle on it.
     function test_deregisterInteropPairs_revertWhen_peerSettlesOnTheChain() public {
         _mockSettlementLayer(PEER_CHAIN_ID, CHAIN_ID);
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, CHAIN_ID, PEER_CHAIN_ID));
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
     }
 
     function test_deregisterInteropPairs_revertWhen_chainNotRegistered() public {
-        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(
-            UNREGISTERED_CHAIN_ID,
-            CHAIN_ID
-        );
-
         vm.prank(owner);
         vm.expectRevert(ZKChainNotRegistered.selector);
-        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        sender.deregisterInteropPairs(UNREGISTERED_CHAIN_ID, _peers(CHAIN_ID));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -445,14 +461,9 @@ contract ChainRegistrationSenderUnitTest is Test {
         return bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(_peerChainId));
     }
 
-    function _pair(
-        uint256 _chainRegisteredOn,
-        uint256 _chainToDeregister
-    ) internal pure returns (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) {
-        chainsRegisteredOn = new uint256[](1);
-        chainsToDeregister = new uint256[](1);
-        chainsRegisteredOn[0] = _chainRegisteredOn;
-        chainsToDeregister[0] = _chainToDeregister;
+    function _peers(uint256 _peerChainId) internal pure returns (uint256[] memory peers) {
+        peers = new uint256[](1);
+        peers[0] = _peerChainId;
     }
 
     // add this to be excluded from coverage report

@@ -106,7 +106,7 @@ export class InteropChainRegistrar {
     if (owner !== this.l1Wallet.address) {
       throw new Error(`ChainRegistrationSender owner is ${owner}, not the default Anvil account`);
     }
-    const l1Receipt = await (await sender.deregisterInteropPairs([chainId], [peerChainId])).wait();
+    const l1Receipt = await (await sender.deregisterInteropPairs(chainId, [peerChainId])).wait();
     await relayPriorityRequestsToChain(l1Receipt, diamondProxy, l2Provider);
 
     if (await sender.interopPeerAllowed(chainId, peerChainId)) {

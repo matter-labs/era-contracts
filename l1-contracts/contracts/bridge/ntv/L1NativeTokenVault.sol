@@ -26,6 +26,7 @@ import {
     ArrayLengthMismatch,
     AssetIdAlreadyRegistered,
     InsufficientChainBalance,
+    InvalidChainId,
     NoFundsTransferred,
     OriginChainIdNotFound,
     WithdrawFailed,
@@ -213,6 +214,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bytes32[] calldata _assetIds,
         uint256[] calldata _amounts
     ) external onlyOwner {
+        require(_chainId != INTEROP_POOL_CHAIN_ID, InvalidChainId());
         uint256 assetIdsLength = _assetIds.length;
         require(assetIdsLength == _amounts.length, ArrayLengthMismatch(assetIdsLength, _amounts.length));
         for (uint256 i = 0; i < assetIdsLength; ++i) {
@@ -416,7 +418,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         if (tracked) {
             uint256 newWithdrawn = chainTotalWithdrawn[balanceChainId][_assetId] + _amount;
             uint256 available = chainTotalDeposited[balanceChainId][_assetId];
-            uint256 backfill = balanceChainId == _chainId ? chainBalanceBackfill[_chainId][_assetId].amount : 0;
+            // No backfill is ever set for `INTEROP_POOL_CHAIN_ID`, so the pool reads zero here.
+            uint256 backfill = chainBalanceBackfill[balanceChainId][_assetId].amount;
             // Written as two comparisons so that a backfill close to `type(uint256).max` cannot overflow.
             if (newWithdrawn > available && newWithdrawn - available > backfill) {
                 revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, available + backfill);
