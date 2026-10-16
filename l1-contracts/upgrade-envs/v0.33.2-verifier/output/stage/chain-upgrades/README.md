@@ -10,7 +10,7 @@ This directory holds two bundles per chain, **in execution order**:
 
 Both are `ChainAdmin.multicall` (`0x69340beb`), signed by that ChainAdmin's owner. Every cut bundle is
 byte-identical to `[chain_upgrades.<id>].chain_admin_calldata` in `../ecosystem.toml`;
-`generate-chain-upgrades-stage.sh` and `rehearse-stage.sh` both check it.
+`generate-chain-upgrades.sh stage` and `rehearse.sh stage` both check it.
 
 | chain | ChainAdmin (the `to`)                        | signer (ChainAdmin owner)                    | DA today (unchanged by the upgrade) |
 | ----- | -------------------------------------------- | -------------------------------------------- | ----------------------------------- |
@@ -52,7 +52,7 @@ in `keep_unrecommended_da_chain_ids`.
 ## Regenerating
 
 ```bash
-L1_FORK_URL=<sepolia rpc> ../../../generate-chain-upgrades-stage.sh 2026-10-05
+L1_FORK_URL=<sepolia rpc> ../../../generate-chain-upgrades.sh stage 2026-10-05
 ```
 
 It forks Sepolia, applies the ecosystem upgrade (`apply-ecosystem-upgrade-to-fork.sh`), then runs
