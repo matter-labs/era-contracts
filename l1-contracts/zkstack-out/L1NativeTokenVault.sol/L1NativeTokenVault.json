@@ -565,44 +565,6 @@
   },
   {
     "type": "function",
-    "name": "interopPoolTotalDeposited",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "interopPoolTotalWithdrawn",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "legacyBridgedOut",
     "inputs": [
       {

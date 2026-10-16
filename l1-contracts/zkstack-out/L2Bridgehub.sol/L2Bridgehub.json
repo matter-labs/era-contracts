@@ -649,24 +649,6 @@
   },
   {
     "type": "function",
-    "name": "registerChainForInterop",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_baseTokenAssetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "registerNewZKChain",
     "inputs": [
       {

@@ -180,13 +180,6 @@
   },
   {
     "type": "function",
-    "name": "lockSecondProofSystem",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "makePermanentRollup",
     "inputs": [],
     "outputs": [],
@@ -195,6 +188,13 @@
   {
     "type": "function",
     "name": "permanentlyAllowPriorityMode",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "permanentlyRequireSecondProofSystem",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -909,7 +909,7 @@
   },
   {
     "type": "event",
-    "name": "SecondProofSystemLocked",
+    "name": "SecondProofSystemRequired",
     "inputs": [],
     "anonymous": false
   },
