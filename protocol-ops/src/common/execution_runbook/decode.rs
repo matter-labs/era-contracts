@@ -28,6 +28,14 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     // ChainTypeManager
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
+    "createNewVerifierOnlyUpgrade(uint256,uint256,uint256,address)",
+    // GovernanceUpgradeTimer
+    "startTimer()",
+    "checkDeadline()",
+    // UpgradeStageValidator
+    "checkMigrationsPaused()",
+    "checkProtocolUpgradePresence()",
+    "checkMigrationsUnpaused()",
     // ChainAssetHandler
     "pauseMigration()",
     "unpauseMigration()",

@@ -52,9 +52,10 @@ pub const BUNDLE_METADATA_FILE: &str = "bundle-metadata.json";
 const MANIFEST_FILE: &str = "prepare/manifest.json";
 /// Generation outputs a bundle must carry, besides the `prepare/*.safe.json` files the manifest names.
 const REQUIRED_BUNDLE_FILES: [&str; 2] = [MANIFEST_FILE, "ecosystem.toml"];
+/// The L1 deployments' `forge verify-contract` commands, which the deploy workflow replays on Etherscan.
+const EXTRA_VERIFICATION_LOGS: &str = "extra-verification-logs.txt";
 /// Etherscan verification command logs; `gw-verification-logs.txt` only exists on gateway-enabled envs.
-const OPTIONAL_BUNDLE_FILES: [&str; 2] =
-    ["extra-verification-logs.txt", "gw-verification-logs.txt"];
+const OPTIONAL_BUNDLE_FILES: [&str; 2] = [EXTRA_VERIFICATION_LOGS, "gw-verification-logs.txt"];
 /// The per-env real-network broadcast log, committed under `output/<env>/` and read by PUVT.
 /// A run's own log carries the same basename inside the bundle work dir.
 const TRANSACTIONS_LOG: &str = "transactions.txt";
@@ -65,11 +66,12 @@ const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
 /// replay can run next to a rehearsal of the same env.
-const ENV_ANVIL_PORTS: [(&str, u16); 4] = [
+const ENV_ANVIL_PORTS: [(&str, u16); 5] = [
     ("stage", 29_545),
     ("testnet", 29_547),
     ("mainnet", 29_549),
     ("adi", 29_551),
+    ("stage3", 29_553),
 ];
 const REPLAY_PORT_OFFSET: u16 = 1;
 const ANVIL_GAS_PRICE_WEI: u64 = 1_000_000_000;
@@ -896,6 +898,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
                 &rpc_url,
                 args.deployer_address,
                 &output_dir.join("prepare"),
+                &output_dir.join(EXTRA_VERIFICATION_LOGS),
             )
             .await?;
             anyhow::ensure!(

@@ -81,6 +81,17 @@ impl PubdataContent {
     }
 }
 
+impl TryFrom<u8> for PubdataContent {
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(PubdataContent::FullPubdata),
+            1 => Ok(PubdataContent::LogsOnly),
+            _ => Err("Invalid PubdataContent value"),
+        }
+    }
+}
+
 /// How a chain's committed pubdata is delivered to L1 — the on-chain `L2DACommitmentScheme`, and
 /// the second DA axis.
 ///
@@ -193,6 +204,15 @@ impl FromStr for L2DACommitmentScheme {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `getPubdataContent()` returns the Solidity enum's ordinal; it must map back onto the same variant.
+    #[test]
+    fn pubdata_content_round_trips_through_its_on_chain_value() {
+        for content in [PubdataContent::FullPubdata, PubdataContent::LogsOnly] {
+            assert_eq!(PubdataContent::try_from(content.to_u8()), Ok(content));
+        }
+        assert!(PubdataContent::try_from(2).is_err());
+    }
 
     /// What a chain is (`DAValidatorType`) fixes how much pubdata it commits; how that pubdata is
     /// delivered is the other axis, and every kind defaults to blobs on ZKsync OS.
