@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IManifestHash} from "contracts/upgrades/registry/objects/IManifestHash.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -555,11 +556,7 @@ contract OperationExecutionTest is CTMUpgradeExecutorFixture {
     function test_revertWhen_theOperationHashDoesNotCommitToItsManifest() public {
         EcosystemUpgradeOperation operation = _operationFor(_deployFullTransition());
         bytes32 committed = keccak256("not this manifest");
-        vm.mockCall(
-            address(operation),
-            abi.encodeCall(EcosystemUpgradeOperation.manifestHash, ()),
-            abi.encode(committed)
-        );
+        vm.mockCall(address(operation), abi.encodeCall(IManifestHash.manifestHash, ()), abi.encode(committed));
 
         vm.expectRevert(
             abi.encodeWithSelector(

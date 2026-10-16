@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
+import {ManifestStorage} from "../objects/ManifestStorage.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
@@ -50,14 +51,10 @@ import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol"
 /// @dev Authority is never parked: `migrate()` acquires nothing it does not hand onward in the same
 ///      transaction. Governance transfers ownership in, the migration executes, and ownership
 ///      leaves to the executors before the call returns.
-contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
+contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStorage {
     /// @notice Set once `migrate` has run. The edge is one-shot: replaying it would re-check a
     ///         starting state that no longer exists anyway, but failing loudly is clearer.
     bool public executed;
-
-    /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
-    ///      not transcribed into structured storage.
-    bytes internal encodedManifest;
 
     /// @dev The FINAL L2 plan, constructed at construction and stored as its ABI encoding (see
     ///      {CTMTransition} for why).
@@ -67,7 +64,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
     uint256 internal derivedNewProtocolVersion;
 
     /// @notice Stores the audited manifest at construction; it is immutable afterwards.
-    constructor(BootstrapManifest memory _manifest) {
+    constructor(BootstrapManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
         if (
             _manifest.ctm == address(0) ||
             address(_manifest.ctmProxyAdmin) == address(0) ||
@@ -116,13 +113,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration {
             _hasL2Side: plan.deployments.length != 0
         });
         encodedL2Plan = abi.encode(plan);
-        encodedManifest = abi.encode(_manifest);
-    }
-
-    /// @notice Commitment to the whole manifest — the 32 bytes governance approves. Computed
-    ///         from the stored encoding; no contract reads it.
-    function manifestHash() external view returns (bytes32) {
-        return keccak256(encodedManifest);
     }
 
     /// @inheritdoc IRegistryBootstrapMigration

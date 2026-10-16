@@ -80,13 +80,14 @@ const FUNDING_TX_GAS_LIMIT: u64 = 500_000;
 /// Tracked paths whose modification changes the bytecode or calldata a generation run
 /// produces. `contracts_worktree_dirty` is scoped to these, so the generated files the run
 /// itself rewrites (`output/<env>/`, `zkstack-out/`) do not count.
-const CONTRACT_SOURCE_PATHSPECS: [&str; 10] = [
+const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
     "*/foundry.toml",
     "AllContractsHashes.json",
     "SystemConfig.json",
     "configs/genesis",
     "l1-contracts/contracts",
     "l1-contracts/deploy-scripts",
+    "l1-contracts/dev",
     "l1-contracts/upgrade-envs/permanent-values",
     "l2-contracts/contracts",
     "protocol-ops/src",
@@ -1187,7 +1188,8 @@ mod tests {
             format!("l1-contracts/upgrade-envs/{DEFAULT_UPGRADE}/output/mainnet/ecosystem.toml");
         let (input, output) = (input.as_str(), output.as_str());
         let source = "l1-contracts/contracts/Example.sol";
-        for path in [input, output, source] {
+        let simulation = "l1-contracts/dev/simulation/UpgradeSimulation.s.sol";
+        for path in [input, output, source, simulation] {
             write(&repo.path().join(path), "original\n");
         }
         for args in [vec!["init"], vec!["add", "."]] {
@@ -1223,7 +1225,7 @@ mod tests {
             status().is_empty(),
             "generated TOML must not mark sources dirty"
         );
-        for path in [input, source] {
+        for path in [input, source, simulation] {
             write(&repo.path().join(path), "changed\n");
             assert!(
                 status().contains(path),

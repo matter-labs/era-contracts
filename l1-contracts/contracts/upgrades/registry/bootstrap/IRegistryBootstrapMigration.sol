@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IManifestHash} from "../objects/IManifestHash.sol";
 import {ICommittedUpgrade} from "../objects/ICommittedUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
@@ -10,7 +11,7 @@ import {BootstrapManifest} from "../RegistryTypes.sol";
 /// @notice The read surface of `RegistryBootstrapMigration`: what the bootstrap engine reads at
 ///         execution ({IBootstrapUpgrade.upgradeFromBootstrap}) and what tooling reads to relay
 ///         the edge's L2 leg.
-interface IRegistryBootstrapMigration is ICommittedUpgrade {
+interface IRegistryBootstrapMigration is ICommittedUpgrade, IManifestHash {
     /// @notice Emitted once the ecosystem has crossed into the registry-driven model.
     event EcosystemBootstrapped(address indexed ctm, address indexed currentRelease, uint256 newProtocolVersion);
 

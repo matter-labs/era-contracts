@@ -14,7 +14,7 @@ import {ZKSYNC_OS_TEST_CREATE_CHAIN_ID} from "./Constants.sol";
 
 /// @notice Adds chain-upgrade and chain-creation probes to a prepared package for simulator replay.
 /// @dev Runs separately after production prepare, on the same fork, without broadcasting calls.
-// solhint-disable gas-custom-errors
+// solhint-disable gas-custom-errors, reason-string
 contract UpgradeSimulation is Script {
     using stdToml for string;
 

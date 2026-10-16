@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IManifestHash} from "./IManifestHash.sol";
 import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
@@ -14,11 +15,7 @@ import {TransitionManifest, ReleaseDiff} from "../RegistryTypes.sol";
 ///      the `(fromRelease, newRelease)` pair at initialization and stored. What governance reviews
 ///      is two releases and this transition's schedule/engine/L2 plan; the delta is a
 ///      pure function of the release pair, so transition and release state cannot diverge.
-interface ICTMTransition is ICommittedUpgrade {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every manifest value:
-    ///         the single value governance reviews against the audited manifest.
-    function manifestHash() external view returns (bytes32);
-
+interface ICTMTransition is ICommittedUpgrade, IManifestHash {
     /// @notice The whole manifest, exactly as it was pinned. Readers needing several fields
     ///         should take this once instead of calling the per-field getters (each getter
     ///         decodes the full manifest).

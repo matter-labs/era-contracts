@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {IManifestHash} from "contracts/upgrades/registry/objects/IManifestHash.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -134,7 +135,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         vm.etch(Utils.TEST_GENESIS_REGISTRY, type(CTMRelease).runtimeCode);
         vm.mockCall(
             Utils.TEST_GENESIS_REGISTRY,
-            abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
+            abi.encodeWithSelector(IManifestHash.manifestHash.selector),
             abi.encode(bytes32("mock-genesis-manifest"))
         );
     }

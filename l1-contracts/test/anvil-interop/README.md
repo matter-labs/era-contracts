@@ -80,6 +80,11 @@ fixture's governance as `--expected-governance-owner` and, for the hops, the boo
 `AllContractsHashes.json` is regenerated last. Every prepare deploys under a salt of its own, as
 production rotates its salt per release, so the recurring hop's `L1MessageRoot` row really applies.
 
+The pipeline caps each replayed L1 prepare/governance transaction at EIP-7825's 16,777,216 gas
+limit and logs its phase, bundle, index, target, hash and gas usage. Per-chain L1 upgrade calls
+are checked and logged too. These calls impersonate the bundle signer: the measurements exclude
+the outer Safe/governance envelope and do not validate Glamsterdam's future gas schedule.
+
 A fresh deployment is born into the registry-driven model: `DeployL1CoreContracts` gives the
 ecosystem ProxyAdmin to the `CoreUpgradeExecutor`, `DeployCTM` gives the CTM, its own ProxyAdmin and
 the ServerNotifier to the `CTMUpgradeExecutor`, and `RegisterCTM` binds it to the coordinator

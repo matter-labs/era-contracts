@@ -8,7 +8,12 @@ import * as blakejs from "blakejs";
 const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
-const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test", "l1-contracts/contracts/dev-contracts"];
+const SKIPPED_FOLDERS = [
+  "l1-contracts/deploy-scripts",
+  "l1-contracts/dev",
+  "l1-contracts/test",
+  "l1-contracts/contracts/dev-contracts",
+];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.

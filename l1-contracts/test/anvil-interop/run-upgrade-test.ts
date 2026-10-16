@@ -17,8 +17,8 @@ runPipelineUpgradeScenario({
   label: "bootstrap",
   // The FROZEN previous-release fixture (see chain-states/README.md).
   stateVersion: readStateVersion("upgradeSourceStateVersion"),
-  permanentValuesTemplatePath: "test/anvil-interop/config/bootstrap-permanent-values.toml",
-  upgradeInputTemplatePath: "test/anvil-interop/config/bootstrap-upgrade.toml",
+  permanentValuesTemplatePath: "test/anvil-interop/config/v35-permanent-values.toml",
+  upgradeInputTemplatePath: "test/anvil-interop/config/v35-upgrade.toml",
   isZKsyncOS: true,
   expectedProtocolVersion: packProtocolVersion(genesis),
   // The proposed upgrade's L2 leg delegates to `L2DefaultUpgrade` (the upgrade-time re-init, force

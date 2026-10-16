@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IManifestHash} from "contracts/upgrades/registry/objects/IManifestHash.sol";
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "./Utils.sol";
 
@@ -254,7 +255,7 @@ contract UtilsCallMockerTest is Test {
         vm.mockCall(genesisRegistry, abi.encodeWithSelector(ICTMRelease.validate.selector), bytes(""));
         vm.mockCall(
             genesisRegistry,
-            abi.encodeWithSelector(ICTMRelease.manifestHash.selector),
+            abi.encodeWithSelector(IManifestHash.manifestHash.selector),
             abi.encode(bytes32("mock-genesis-manifest"))
         );
         vm.mockCall(

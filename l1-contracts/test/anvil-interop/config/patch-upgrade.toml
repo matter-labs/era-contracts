@@ -2,7 +2,7 @@
 # that copies the departing one except that member. A patch may change the release but may not
 # carry an L2 upgrade, and it deliberately does not require an earlier L2 upgrade to be finalized
 # first — the hop runs with one still pending. Substituted by the harness like
-# bootstrap-upgrade.toml; only `contracts.new_protocol_version` is consumed.
+# v35-upgrade.toml; only `contracts.new_protocol_version` is consumed.
 
 old_protocol_version = 0x2300000000
 bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"

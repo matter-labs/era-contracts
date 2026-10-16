@@ -6,8 +6,6 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
-
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IZKChainBase} from "contracts/state-transition/chain-interfaces/IZKChainBase.sol";
@@ -186,7 +184,10 @@ library AddressIntrospector {
         // The release registry only exists on the CTM from v35 on — every earlier
         // implementation has no `currentRelease` getter at all — so it is read only off a
         // registry-era CTM and reported as zero otherwise.
-        address currentRelease = ctm.protocolVersion() >= SemVer.packSemVer(0, 35, 0)
+        address currentRelease = ProtocolVersionFeatures.has(
+            ctm.protocolVersion(),
+            ProtocolVersionFeatures.CTM_RELEASE_REGISTRY
+        )
             ? ctm.currentRelease()
             : address(0);
         Facets memory facets;

@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {ManifestStorage} from "./ManifestStorage.sol";
 import {IEcosystemUpgradeOperation} from "./IEcosystemUpgradeOperation.sol";
 import {ICoreTransition} from "./ICoreTransition.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
@@ -20,13 +21,9 @@ import {OperationChangesNothing} from "../../../common/L1ContractErrors.sol";
 /// @dev The constructor checks only the shape a manifest must have to be one operation; whether the
 ///      named objects are usable is {validate}'s job, and whether they are the reviewed ones is
 ///      governance's (see "Provenance and validation" in {docs/registry-driven-upgrades.md}).
-contract EcosystemUpgradeOperation is IEcosystemUpgradeOperation {
-    /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
-    ///      not transcribed into structured storage.
-    bytes internal encodedManifest;
-
+contract EcosystemUpgradeOperation is IEcosystemUpgradeOperation, ManifestStorage {
     /// @notice Pins the manifest. No state-mutating function exists on this contract.
-    constructor(OperationManifest memory _manifest) {
+    constructor(OperationManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.ctmInfrastructure, CTM_CONTRACT_COUNT);
         ProxyUpgradeRowLib.validateRows(rows);
         // An all-inert inventory is not a change: the container's presence must never make an
@@ -34,12 +31,6 @@ contract EcosystemUpgradeOperation is IEcosystemUpgradeOperation {
         if (_manifest.coreTransition == address(0) && rows.length == 0 && _manifest.ctmTransition == address(0)) {
             revert OperationChangesNothing();
         }
-        encodedManifest = abi.encode(_manifest);
-    }
-
-    /// @inheritdoc IEcosystemUpgradeOperation
-    function manifestHash() external view returns (bytes32) {
-        return keccak256(encodedManifest);
     }
 
     /// @inheritdoc IEcosystemUpgradeOperation

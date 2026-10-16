@@ -338,7 +338,7 @@ impl<'a> UpgradeInner<'a> {
         let simulation = runner
             .script_path_from_root(
                 self.contracts_path,
-                Path::new("deploy-scripts/simulation/UpgradeSimulation.s.sol"),
+                Path::new("dev/simulation/UpgradeSimulation.s.sol"),
             )
             .with_env("UPGRADE_SIMULATION_CTM", format!("{ctm_proxy:#x}"))
             .with_env(

@@ -9,6 +9,9 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 /// a feature checks `has(<their protocol version>, <feature>)` instead of comparing minor versions itself; a new such
 /// feature gets a row here.
 library ProtocolVersionFeatures {
+    /// @dev The CTM exposes its current release (`currentRelease()`).
+    uint32 internal constant CTM_RELEASE_REGISTRY = 35;
+
     /// @dev The CTM exposes the L1 interop fee manager (`L1_INTEROP_FEE_MANAGER()`).
     uint32 internal constant CTM_INTEROP_FEE_MANAGER = 35;
 

@@ -10,6 +10,7 @@ on:
       - ".github/actions/setup-anvil-interop/**"
       - "l1-contracts/contracts/**"
       - "l1-contracts/deploy-scripts/**"
+      - "l1-contracts/dev/**"
       - "l1-contracts/lib/**"
       - "l1-contracts/scripts/**"
       - "l1-contracts/test/**"

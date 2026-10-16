@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {ManifestStorage} from "./ManifestStorage.sol";
 import {ICommittedUpgrade} from "./ICommittedUpgrade.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ICTMTransition} from "./ICTMTransition.sol";
@@ -28,11 +29,7 @@ import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 ///      release's bytecode table and the authored input ({L2PlanLib.build}); the authored input is
 ///      REVIEWED data (L1 cannot verify L2 execution effects), so the on-chain convergence guarantee
 ///      covers L1 state only.
-contract CTMTransition is ICTMTransition {
-    /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
-    ///      not transcribed into structured storage.
-    bytes internal encodedManifest;
-
+contract CTMTransition is ICTMTransition, ManifestStorage {
     // Derived at initialization from (fromRelease, newRelease) — never authored, and stored as
     // ready-to-execute cuts the chain applies verbatim (no re-diffing at execution).
     Diamond.FacetCut[] internal derivedFacetCuts;
@@ -47,7 +44,7 @@ contract CTMTransition is ICTMTransition {
 
     /// @notice Pins the manifest and DERIVES the delta. No state-mutating function exists on this
     ///         contract: everything is written once, at construction.
-    constructor(TransitionManifest memory _manifest) {
+    constructor(TransitionManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
         // `fromRelease` is MANDATORY: every transition departs from a real, pinned release.
         // Bootstrapping a pre-registry CTM is one-time migration code, never an accommodation
         // here; see the Bootstrap section of {docs/registry-driven-upgrades.md}.
@@ -107,7 +104,6 @@ contract CTMTransition is ICTMTransition {
             _requireL2StateKept(ICTMRelease(_manifest.fromRelease), ICTMRelease(_manifest.newRelease));
         }
 
-        encodedManifest = abi.encode(_manifest);
         encodedL2Plan = abi.encode(derivedPlan);
 
         // Derive the L1 delta from the release pair and freeze it as final diamond cuts.
@@ -161,13 +157,6 @@ contract CTMTransition is ICTMTransition {
             keccak256(from.l2SystemProxyBytecodeInfo()) != keccak256(to.l2SystemProxyBytecodeInfo());
         diff.fixedForceDeploymentsData =
             keccak256(from.fixedForceDeploymentsData()) != keccak256(to.fixedForceDeploymentsData());
-    }
-
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares
-    ///         against the audited manifest. Computed from the stored encoding, not stored
-    ///         separately: no contract reads it, and a second copy could only ever agree.
-    function manifestHash() external view returns (bytes32) {
-        return keccak256(encodedManifest);
     }
 
     /// @notice The whole manifest, exactly as it was pinned.

@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {ManifestStorage} from "./ManifestStorage.sol";
 import {ICoreTransition} from "./ICoreTransition.sol";
 import {L1_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
@@ -18,15 +19,7 @@ import {CoreTransitionManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 /// @dev Rows are source-checked edges (`expectedOldImpl -> implNew`). What each `implNew`
 ///      RUNS is what governance reviewed before approving this object; the object's own job
 ///      is to refuse a target that is not a deployed contract at all.
-contract CoreTransition is ICoreTransition {
-    /*//////////////////////////////////////////////////////////////
-                              STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev THE manifest, stored as its own ABI encoding — see {CTMRelease} for why the struct is
-    ///      not transcribed into structured storage.
-    bytes internal encodedManifest;
-
+contract CoreTransition is ICoreTransition, ManifestStorage {
     /*//////////////////////////////////////////////////////////////
                              CONSTRUCTION
     //////////////////////////////////////////////////////////////*/
@@ -41,7 +34,7 @@ contract CoreTransition is ICoreTransition {
     ///        changes. A reviewer still has to check those statements against the release: the
     ///        length check cannot tell an intended "leave alone" from a row preparation never
     ///        built (see {ProxyUpgradeRowLib.toRows}).
-    constructor(CoreTransitionManifest memory _manifest) {
+    constructor(CoreTransitionManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.proxyUpgrades, L1_ECOSYSTEM_CONTRACT_COUNT);
         // Sentinel against pinning an empty manifest: a transition that upgrades nothing is not a
         // transition, it is a mistake.
@@ -49,14 +42,6 @@ contract CoreTransition is ICoreTransition {
             revert RegistryUnknownKey();
         }
         ProxyUpgradeRowLib.validateRows(rows);
-        encodedManifest = abi.encode(_manifest);
-    }
-
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares
-    ///         against the audited manifest. Computed from the stored encoding, not stored
-    ///         separately: no contract reads it, and a second copy could only ever agree.
-    function manifestHash() external view returns (bytes32) {
-        return keccak256(encodedManifest);
     }
 
     /// @notice The whole manifest, exactly as it was pinned.

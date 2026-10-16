@@ -1,7 +1,7 @@
 # Upgrade input for the recurring (registry-driven) hop that follows the bootstrap scenario on the
 # same chains: the v35 ecosystem the bootstrap produced -> the next version, driven by the base
 # prepare pipeline (a fresh release + one `CTMTransition`, three executor calls). Substituted by
-# the harness like bootstrap-upgrade.toml; only `contracts.new_protocol_version` is consumed.
+# the harness like v35-upgrade.toml; only `contracts.new_protocol_version` is consumed.
 
 old_protocol_version = 0x2300000000
 bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"

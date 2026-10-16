@@ -2,6 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {IManifestHash} from "./IManifestHash.sol";
 import {ProxyUpgradeRow} from "../RegistryTypes.sol";
 
 /// @title Core (ecosystem-wide) transition.
@@ -12,11 +13,7 @@ import {ProxyUpgradeRow} from "../RegistryTypes.sol";
 ///         edge (see {ProxyUpgradeRow}).
 /// @dev The object is initialized once from an audited manifest and `manifestHash` commits to
 ///      every value in it. Version-schedule identity is owned by {ICTMTransition}, not here.
-interface ICoreTransition {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every manifest
-    ///         value: the single value governance reviews against the audited manifest.
-    function manifestHash() external view returns (bytes32);
-
+interface ICoreTransition is IManifestHash {
     /// @notice Every ecosystem contract participating in this upgrade, as complete typed rows —
     ///         one call, no per-key rescans. Consumers iterate these directly.
     function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);

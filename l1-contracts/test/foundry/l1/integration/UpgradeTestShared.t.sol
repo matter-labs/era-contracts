@@ -7,7 +7,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
-import {UpgradeSimulation} from "deploy-scripts/simulation/UpgradeSimulation.s.sol";
+import {UpgradeSimulation} from "dev/simulation/UpgradeSimulation.s.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";

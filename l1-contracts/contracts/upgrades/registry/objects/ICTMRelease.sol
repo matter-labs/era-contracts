@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IManifestHash} from "./IManifestHash.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of one CTM release: the genesis / post-upgrade state a chain at
@@ -10,11 +11,7 @@ import {GenesisFacet} from "../RegistryTypes.sol";
 /// @dev One release per version: a transition reads its version edge off its two releases, and the
 ///      CTM moves its version and its release together.
 /// @dev A release also carries NO VM flag: every release is a ZKsync OS release.
-interface ICTMRelease {
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment to every manifest value:
-    ///         the single value governance reviews against the audited manifest.
-    function manifestHash() external view returns (bytes32);
-
+interface ICTMRelease is IManifestHash {
     /// @notice The protocol version this release IS — see `ReleaseManifest.protocolVersion`.
     function protocolVersion() external view returns (uint256);
 

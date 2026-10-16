@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {IManifestHash} from "./IManifestHash.sol";
 import {OperationManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 
 /// @title IEcosystemUpgradeOperation
@@ -11,10 +12,7 @@ import {OperationManifest, ProxyUpgradeRow} from "../RegistryTypes.sol";
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev The coordinator is its only reader: it reads `getManifest()` once, held to
 ///      `manifestHash()`; the per-field getters are for tooling and never steer an execution.
-interface IEcosystemUpgradeOperation {
-    /// @notice `keccak256(abi.encode(manifest))` — the commitment governance reviews.
-    function manifestHash() external view returns (bytes32);
-
+interface IEcosystemUpgradeOperation is IManifestHash {
     /// @notice The whole manifest, exactly as it was pinned.
     function getManifest() external view returns (OperationManifest memory);
 

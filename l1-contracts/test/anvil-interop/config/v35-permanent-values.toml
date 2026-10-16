@@ -1,4 +1,4 @@
-# Permanent values for the bootstrap upgrade scenario. `era_chain_id`, `bridgehub_proxy_addr` and
+# Permanent values for the v35 upgrade scenario. `era_chain_id`, `bridgehub_proxy_addr` and
 # `ctm_proxy_addr` are substituted by the harness from the loaded chain states.
 era_chain_id = 10
 

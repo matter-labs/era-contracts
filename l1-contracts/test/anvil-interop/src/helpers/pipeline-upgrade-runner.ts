@@ -37,6 +37,7 @@ import { DeploymentRunner } from "../deployment-runner";
 import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
+  ETHEREUM_L1_TX_GAS_LIMIT,
   EIP1967_ADMIN_SLOT,
   EIP1967_IMPL_SLOT,
   ETH_TOKEN_ADDRESS,
@@ -86,6 +87,7 @@ import {
 } from "./bootstrap-upgrade-stage";
 import type { MergedGovernanceOutput } from "./governance-bundle";
 import { assertRegistryHopBundle } from "./governance-bundle";
+import { recordL1TransactionGas } from "./l1-transaction-gas";
 import { proxyUpgradeSlotIndex } from "./registry-manifest";
 import { createProvider, impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
@@ -779,6 +781,12 @@ async function sendAndCheck(
     const trace = await traceFailedTx(provider, receipt.transactionHash);
     throw new Error(`${label} reverted:\n${trace}`);
   }
+  recordL1TransactionGas(receipt, tx.gasLimit, {
+    phase: "chain-upgrade",
+    bundle: label,
+    index: 1,
+    target: tx.to!,
+  });
   return receipt;
 }
 
@@ -978,7 +986,7 @@ function safeBundlesInDir(dir: string): Array<{ file: string; target: string }> 
     .map((file) => ({ file: path.join(dir, file), target: ANVIL_DEFAULT_ACCOUNT_ADDR }));
 }
 
-async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void> {
+async function executeSafeBundles(outDir: string, rpcUrl: string, phase: "prepare" | "governance"): Promise<void> {
   if (!fs.existsSync(outDir)) {
     throw new Error(`Protocol-ops output directory does not exist: ${outDir}`);
   }
@@ -1006,7 +1014,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
           to: transactions[i].to,
           value: ethers.BigNumber.from(transactions[i].value),
           data: transactions[i].data,
-          gasLimit: 30_000_000,
+          gasLimit: ETHEREUM_L1_TX_GAS_LIMIT,
         });
         const receipt = await tx.wait();
         if (receipt.status !== 1) {
@@ -1015,6 +1023,12 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
             `Safe bundle ${path.basename(bundle.file)} tx ${i + 1}/${transactions.length} reverted:\n${trace}`
           );
         }
+        recordL1TransactionGas(receipt, tx.gasLimit, {
+          phase,
+          bundle: path.basename(bundle.file),
+          index: i + 1,
+          target: transactions[i].to,
+        });
       }
     } finally {
       await provider.send("anvil_stopImpersonatingAccount", [bundle.target]);
@@ -1061,7 +1075,7 @@ export async function runEcosystemUpgradeScripts(params: {
   );
 
   if (params.executeBundles) {
-    await executeSafeBundles(prepareOutDir, params.rpcUrl);
+    await executeSafeBundles(prepareOutDir, params.rpcUrl, "prepare");
   }
 }
 
@@ -1093,7 +1107,7 @@ export async function runEcosystemGovernanceUpgrade(params: {
   runProtocolOps(args);
 
   if (params.executeBundles) {
-    await executeSafeBundles(params.outDir, params.rpcUrl);
+    await executeSafeBundles(params.outDir, params.rpcUrl, "governance");
   }
 }
 

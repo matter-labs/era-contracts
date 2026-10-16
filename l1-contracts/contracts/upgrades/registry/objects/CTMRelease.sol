@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {ManifestStorage} from "./ManifestStorage.sol";
 import {ICTMRelease} from "./ICTMRelease.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/ISelfDescribingFacet.sol";
@@ -23,18 +24,11 @@ import {L2EcosystemContract, L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/Con
 ///      reviewed before approving this object; the contract's own job is to refuse a member
 ///      that is not a deployed contract at all, which `validate()` does on every path that
 ///      installs or applies the release.
-contract CTMRelease is ICTMRelease {
-    /// @dev THE manifest, stored as its own ABI encoding. Structured storage would need the
-    ///      constructor to transcribe the struct field by field — the legacy codegen pipeline
-    ///      cannot copy a struct ARRAY from memory to storage — which is exactly the second,
-    ///      drift-prone copy of the shape this object is supposed to BE. One blob, one
-    ///      assignment, and `manifestHash` is its hash by construction.
-    bytes internal encodedManifest;
-
+contract CTMRelease is ICTMRelease, ManifestStorage {
     /// @notice Pins the full manifest. There is NO state-mutating function on this contract: the
     ///         manifest is written once, at construction, so write-once is structural rather than a
     ///         runtime guard and `manifestHash` can never describe a stale object.
-    constructor(ReleaseManifest memory _manifest) {
+    constructor(ReleaseManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
         if (
             _manifest.diamondInit == address(0) ||
             _manifest.genesisUpgrade == address(0) ||
@@ -66,16 +60,6 @@ contract CTMRelease is ICTMRelease {
             revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
         _requireForceDeploymentsMatchTable(_manifest);
-        // NO routing validation here: the selectors live in the facets' own self-description,
-        // which needs the facets' code, so `validate()` checks the routing.
-        encodedManifest = abi.encode(_manifest);
-    }
-
-    /// @notice `keccak256(abi.encode(manifest))` — the 32-byte commitment governance compares
-    ///         against the audited manifest. Computed from the stored encoding, not stored
-    ///         separately: no contract reads it, and a second copy could only ever agree.
-    function manifestHash() external view returns (bytes32) {
-        return keccak256(encodedManifest);
     }
 
     /// @notice The whole manifest, exactly as it was pinned.
