@@ -1,9 +1,9 @@
-# v0.33.2 — stage
+# v0.33.2 — stage3
 
-The atomic-interop stage ecosystem deployed from `release/v0.33.0-atomic-interop` on 2026-08-27. It is
-**not** the older stage ecosystem that `../../../v0.33.0-atomic-interop/stage.toml` and
-`permanent-values/stage.toml` describe (bridgehub `0x236D1c3F…`, owned by the stage ProtocolUpgradeHandler).
-Everything below was read from Sepolia.
+The atomic-interop stage ecosystem deployed from `release/v0.33.0-atomic-interop` on 2026-08-27, "stage3" in
+`AGENTS.md`; its permanent values are `../../permanent-values/stage3.toml`. It is **not** the older stage
+ecosystem that `../../v0.33.0-atomic-interop/stage.toml` and `permanent-values/stage.toml` describe (bridgehub
+`0x236D1c3F…`, owned by the stage ProtocolUpgradeHandler). Everything below was read from Sepolia.
 
 | what                        | address                                      | notes                                                                  |
 | --------------------------- | -------------------------------------------- | ---------------------------------------------------------------------- |
@@ -25,14 +25,20 @@ carries the production verifier `0x2aEa8C51…` from the original deployment.
 **Executed.** The governance stages ran on 2026-10-06 (the CTM's `NewProtocolVersion` at block 11855311, tx
 `0xb2f19079…`); the CTM is on v0.33.2 with the new verifier. Chains 27271 and 27273 have taken their cut;
 2727, 2728, 2729 and 27272 are still on v0.33.0 (as of 2026-10-16). `prepare` therefore no longer runs
-against live stage: it requires the CTM on v0.33.0. To reproduce this artifact, fork Sepolia at a block before
-11855311 (2026-10-16: regenerating at block 11855300 gives `ecosystem.toml` and the ecosystem scenario byte
-for byte).
+against live stage3: it requires the CTM on v0.33.0. To reproduce the artifact, fork Sepolia before the first
+deployment (block 11854783): `FORK_BLOCK=11854782 ./generate.sh stage3 2026-10-05`, or the
+generate-ecosystem-upgrade-calldata workflow with `upgrade=v0.33.2-verifier`, `environment=stage3`,
+`fork_block=11854782` and `deployer_address=0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`. Both reproduce
+`../output/stage3/ecosystem.toml`, `execution.json` and the ecosystem scenario byte for byte.
+
+`test_create_chain_zkos` names the script's sender as the test chain's admin (`DefaultCTMUpgrade`), so it
+follows the deployer the pipeline runs as; the artifact first generated on 2026-10-05 named forge's default
+sender there. The governance calls, the only calls executed, are unchanged.
 
 ## Deployed on Sepolia
 
 The four contracts were deployed on 2026-10-06 with `deploy.sh stage` and are source-verified on Etherscan.
-Hashes are in `transactions.txt`.
+Hashes are in `../output/stage3/transactions.txt`.
 
 | contract                  | address                                      | deploy tx     |
 | ------------------------- | -------------------------------------------- | ------------- |
@@ -48,9 +54,10 @@ already verified.
 ## Executing it
 
 1. Deploy: done.
-2. Governance: done. As the Governance owner, `stageN_schedule_calldata` then `stageN_execute_calldata` to the
-   Governance for N = 0, 1, 2 (`[governance_operations]`; `yarn execute-governance-instant` in the
-   transaction-simulator sends the same transactions).
+2. Governance: done. As the Governance owner, the six txs of [`../output/stage3/EXECUTE.md`](../output/stage3/EXECUTE.md):
+   `stageN_schedule_calldata` then `stageN_execute_calldata` to the Governance for N = 0, 1, 2
+   (`[governance_operations]`; `yarn execute-governance-instant` in the transaction-simulator sends the same
+   transactions).
 3. Per chain, once the v0.33.2 prover is live and the chain has no unexecuted batches, the ChainAdmin's owner
    executes `chain-upgrades/<id>/01_*` (`setUpgradeTimestamp`), then `02_*` (the cut).
 
@@ -66,5 +73,5 @@ already verified.
 
 The simulator's era-contracts copy-paste check hardcodes stage's owner as the old ProtocolUpgradeHandler
 `0x8f086275…`, so registering these files in `era-contracts-provenance.json` also needs this ecosystem's
-Governance there. The committed ecosystem scenario still carries the `ack_test_upgrade_chain_zkos` marker it
-was generated with; the transaction-simulator's copy replaces it with the `alreadyExecuted` placeholder.
+Governance there. The transaction-simulator's copies (merged in its #374) are named `…-stage-…`, after the env's
+earlier name, and name the earlier test chain admin.

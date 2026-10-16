@@ -32,7 +32,7 @@ Two inputs in `../../testnet.toml` differ from stage:
 
 ## Deployed on Sepolia
 
-The four contracts were deployed on 2026-10-16 with `deploy.sh testnet` (hashes in `transactions.txt`) and
+The four contracts were deployed on 2026-10-16 with `deploy.sh testnet` (hashes in `../output/testnet/transactions.txt`) and
 are source-verified on Etherscan. They are inert until the emergency proposal names them.
 
 | contract                  | address                                      | deploy tx     |
@@ -49,7 +49,7 @@ directly; the other three were matched by Etherscan to identical bytecode it had
 ## Executing it
 
 1. Deploy: done.
-2. Governance: follow [`EXECUTE.md`](./EXECUTE.md). The board owner `0xD64e1365…` sends the 12 `approveHash`
+2. Governance: follow [`../output/testnet/EXECUTE.md`](../output/testnet/EXECUTE.md). The board owner `0xD64e1365…` sends the 12 `approveHash`
    txs and then `executeEmergencyUpgrade` (tx 13), which runs stages 0-2 atomically.
 3. Per chain, once the v0.33.2 prover is live and the chain has no unexecuted batches, the ChainAdmin's owner
    follows `chain-upgrades/<id>/EXECUTE.md`: `01_*` (`setUpgradeTimestamp`), then `02_*` (the cut). See
@@ -60,7 +60,7 @@ directly; the other three were matched by Etherscan to identical bytecode it had
 | check                                                                                  | result                                                                                                                                                                                                                                                                                                                                                                                    |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | deployed VK vs `zksync-os/latest.json` (asserted by the script)                        | `0xec24ed29…`, also on the live `0x9308Cc55…`                                                                                                                                                                                                                                                                                                                                             |
-| `generate.sh testnet`, run twice                                                       | `ecosystem.toml` and `emergency-upgrade-board.json` byte-identical                                                                                                                                                                                                                                                                                                                        |
+| `generate.sh testnet` (`FORK_BLOCK=11926704`), the pipeline's `rehearse-upgrade`       | `ecosystem.toml`, `execution.json` (the emergency proposal) and the ecosystem scenario reproduced byte for byte; `rehearse.sh` passes as its `verify_fork`                                                                                                                                                                                                                                |
 | `EXECUTE.md` replay (`protocol_ops dev execution-runbook --check-fork-url`)            | all 13 emergency txs succeed on a Sepolia fork                                                                                                                                                                                                                                                                                                                                            |
 | `rehearse.sh testnet` on a Sepolia fork (block 11926765), against the live deployments | `REHEARSAL PASSED` (46 checks): the 13 emergency txs succeed and carry exactly stages 0-2 of `[governance_calls]`; CTM on v0.33.2 with the new verifier and stored cut, creation params unchanged, migrations unpaused; chain 1913 (idle) upgrades through its committed bundles, the six chains with batches in flight refuse with `NotAllBatchesExecuted`; chain 556 created on v0.33.2 |
 | per-chain bundles                                                                      | every cut byte-identical to `[chain_upgrades.<id>].chain_admin_calldata`; every timestamp bundle exactly `multicall([ServerNotifier.setUpgradeTimestamp(id, 1)])`                                                                                                                                                                                                                         |
