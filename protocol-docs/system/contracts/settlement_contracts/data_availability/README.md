@@ -24,6 +24,5 @@ rollup to a weaker mode is restricted by the chain administration rules.
 - [Validium](./validium.md)
 - [Custom DA](./custom_da.md)
 
-The standalone `da-contracts/` package contains reusable L1 validators, including calldata/blob and
-Avail-backed implementations. Chain-integrated validators live under
+The L1 validators, including the calldata/blob and Avail-backed implementations, live under
 `l1-contracts/contracts/state-transition/data-availability/`.

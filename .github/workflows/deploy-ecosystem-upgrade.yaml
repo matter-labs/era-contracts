@@ -221,9 +221,7 @@ jobs:
       # not verifying — the broadcast itself needs no contract build.
       - name: Build contracts (for Etherscan verify)
         if: ${{ inputs.run_verify }}
-        run: |
-          yarn da build:foundry
-          yarn l1 build:foundry
+        run: yarn l1 build:foundry
 
       # The deploy bundle produced by step 1: the deployer calls, ecosystem.toml,
       # the Etherscan verify log and `bundle-metadata.json`.
@@ -529,18 +527,12 @@ jobs:
           readonly verification_retry_delay=10
           while IFS= read -r cmd; do
             echo "--- $cmd"
-            # These contracts are built by da-contracts, not l1-contracts.
-            # Keep the recorded address and constructor arguments unchanged.
             read -r _forge _verify _address contract _rest <<< "$cmd"
-            verification_root="$PWD"
-            case "$contract" in
-              EIP7702Checker|RollupL1DAValidator) verification_root="../da-contracts" ;;
-            esac
             success=false
             for ((attempt=1; attempt<=verification_attempts; attempt++)); do
               # --retries covers verification polling, but not an initial ABI
               # request timeout. Retry the complete idempotent submission too.
-              if (cd "$verification_root" && eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"); then
+              if eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
                 success=true
                 break
               fi

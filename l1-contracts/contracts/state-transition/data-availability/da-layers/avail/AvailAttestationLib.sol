@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IVectorx} from "./IVectorx.sol";
 import {IAvailBridge} from "./IAvailBridge.sol";
+import {InvalidAttestationProof} from "../../DAErrors.sol";
 
 abstract contract AvailAttestationLib {
     struct AttestationData {
@@ -21,15 +22,15 @@ abstract contract AvailAttestationLib {
     /// It is necessary for recovery of the state from the onchain data.
     mapping(bytes32 => AttestationData) public attestations;
 
-    error InvalidAttestationProof();
-
     constructor(IAvailBridge _bridge) {
         bridge = _bridge;
         vectorx = bridge.vectorx();
     }
 
     function _attest(IAvailBridge.MerkleProofInput memory input) internal virtual {
-        if (!bridge.verifyBlobLeaf(input)) revert InvalidAttestationProof();
+        if (!bridge.verifyBlobLeaf(input)) {
+            revert InvalidAttestationProof();
+        }
         attestations[input.leaf] = AttestationData(
             msg.sender,
             vectorx.rangeStartBlocks(input.rangeHash) + uint32(input.dataRootIndex) + 1,

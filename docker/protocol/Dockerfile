@@ -130,7 +130,6 @@ WORKDIR /contracts
 # so the subsequent `COPY . /contracts` only overlays source on top.
 COPY package.json yarn.lock /contracts/
 COPY l1-contracts/package.json /contracts/l1-contracts/
-COPY da-contracts/package.json /contracts/da-contracts/
 RUN yarn install --frozen-lockfile
 
 # === Copy all source code ===
@@ -157,7 +156,6 @@ COPY zk-governance /zk-governance
 # manually to regenerate + commit the hash file back to the PR. Failing the
 # docker build on stale hashes would force every contract-touching branch
 # through a "trigger regen → wait → re-trigger docker" loop.
-RUN yarn --cwd da-contracts build:foundry
 RUN yarn --cwd l1-contracts build:foundry
 
 # Pre-compile zk-governance contracts. This both seeds /root/.svm/ with solc
@@ -213,7 +211,6 @@ COPY --from=cargo-builder /contracts/tools/upgrade-readiness-checker/upgrade-rea
 WORKDIR /contracts
 COPY --from=forge-builder /contracts/configs /contracts/configs
 COPY --from=forge-builder /contracts/l1-contracts /contracts/l1-contracts
-COPY --from=forge-builder /contracts/da-contracts /contracts/da-contracts
 COPY --from=forge-builder /contracts/lib /contracts/lib
 COPY --from=forge-builder /contracts/node_modules /contracts/node_modules
 COPY --from=forge-builder /contracts/package.json /contracts/package.json

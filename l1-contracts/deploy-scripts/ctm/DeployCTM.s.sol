@@ -295,7 +295,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
         updateRollupDAManager();
 
-        // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
         ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator");
         ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract("BlobsL1DAValidatorZKsyncOS");
 
