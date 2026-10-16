@@ -197,10 +197,13 @@ jobs:
         with:
           submodules: true
 
+      # v1.8.5, not v1.5.1: a fork must replay Sepolia under the rules Sepolia runs (Glamsterdam since
+      # 2026-10-06; v1.5.1 forks it as Prague and under-prices code deposit). 1.8.5 picks the fork's
+      # hardfork from its chain id and timestamp.
       - name: Install Foundry (cast + forge for verify)
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: v1.5.1
+          version: v1.8.5
 
       - name: Install foundry-zksync (for the verify build)
         if: ${{ inputs.run_verify }}
