@@ -16,7 +16,7 @@ import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
-import {ArrayLengthMismatch, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
     ChainNotSettlingOnL1,
@@ -96,28 +96,22 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IChainRegistrationSender
-    // The call to a pair's ZK chain precedes the next pair's write; the function is `nonReentrant`.
+    // The call to the ZK chain precedes the next pair's write; the function is `nonReentrant`.
     // slither-disable-next-line reentrancy-no-eth
     function deregisterInteropPairs(
-        uint256[] calldata _chainsRegisteredOn,
+        uint256 _chainRegisteredOn,
         uint256[] calldata _chainsToDeregister
     ) external nonReentrant {
-        uint256 pairsLength = _chainsRegisteredOn.length;
-        require(
-            pairsLength == _chainsToDeregister.length,
-            ArrayLengthMismatch(pairsLength, _chainsToDeregister.length)
-        );
-        bool callerIsOwner = msg.sender == owner();
-        for (uint256 i = 0; i < pairsLength; ++i) {
-            uint256 chainRegisteredOn = _chainsRegisteredOn[i];
+        address zkChain = BRIDGE_HUB.getZKChain(_chainRegisteredOn);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(msg.sender == owner() || msg.sender == IGetters(zkChain).getAdmin(), Unauthorized(msg.sender));
+        uint256 chainsLength = _chainsToDeregister.length;
+        for (uint256 i = 0; i < chainsLength; ++i) {
             uint256 chainToDeregister = _chainsToDeregister[i];
-            _checkPeerPair(chainRegisteredOn, chainToDeregister);
-            address zkChain = BRIDGE_HUB.getZKChain(chainRegisteredOn);
-            require(zkChain != address(0), ZKChainNotRegistered());
-            require(callerIsOwner || msg.sender == IGetters(zkChain).getAdmin(), Unauthorized(msg.sender));
+            _checkPeerPair(_chainRegisteredOn, chainToDeregister);
 
-            delete interopPeerAllowed[chainRegisteredOn][chainToDeregister];
-            emit InteropPairDeregistered(chainRegisteredOn, chainToDeregister);
+            delete interopPeerAllowed[_chainRegisteredOn][chainToDeregister];
+            emit InteropPairDeregistered(_chainRegisteredOn, chainToDeregister);
             // slither-disable-next-line unused-return
             IMailbox(zkChain).requestL2ServiceTransaction(
                 L2_BRIDGEHUB_ADDR,

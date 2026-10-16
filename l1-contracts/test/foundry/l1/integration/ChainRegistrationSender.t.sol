@@ -10,8 +10,8 @@ import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {ArrayLengthMismatch, Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
@@ -185,18 +185,17 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
 
     /// @notice Deregistering the legacy pairs, which L1 never recorded, of two chains registered on each other.
     function test_deregisterInteropPairs_clearsEveryPair() public {
-        uint256[] memory chainsRegisteredOn = new uint256[](2);
-        uint256[] memory chainsToDeregister = new uint256[](2);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
-        (chainsRegisteredOn[1], chainsToDeregister[1]) = (peerChainId, chainId);
+        address owner = addresses.chainRegistrationSender.owner();
 
+        vm.recordLogs();
+        vm.startPrank(owner);
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
         emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(peerChainId));
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
         emit IChainRegistrationSender.InteropPairDeregistered(peerChainId, chainId);
-        vm.recordLogs();
-        vm.prank(addresses.chainRegistrationSender.owner());
-        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(peerChainId, _peers(chainId));
+        vm.stopPrank();
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
@@ -208,15 +207,12 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         _allowInteropPeer();
-        uint256[] memory chainsRegisteredOn = new uint256[](1);
-        uint256[] memory chainsToDeregister = new uint256[](1);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
 
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
         emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
         vm.recordLogs();
         vm.prank(addresses.chainRegistrationSender.owner());
-        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(peerChainId));
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
@@ -231,15 +227,12 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         _allowInteropPeer();
-        uint256[] memory chainsRegisteredOn = new uint256[](1);
-        uint256[] memory chainsToDeregister = new uint256[](1);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
 
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
         emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
         vm.recordLogs();
         vm.prank(chainAdmin);
-        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(peerChainId));
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
@@ -249,18 +242,50 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
     }
 
+    /// @notice The chain's admin removes two allowed peers in one call: one service transaction per peer, all on
+    /// the chain, none on the peers.
+    function test_deregisterInteropPairs_severalPeers() public {
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        uint256 thirdChainId = zkChainIds[2];
+        _enableInterop(chainId);
+        _enableInterop(peerChainId);
+        _enableInterop(thirdChainId);
+        _allowInteropPeer();
+        vm.prank(chainAdmin);
+        addresses.chainRegistrationSender.allowInteropPeer(chainId, thirdChainId);
+        uint256[] memory peers = new uint256[](2);
+        (peers[0], peers[1]) = (peerChainId, thirdChainId);
+        uint256 peerPriorityTxs = IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs();
+        uint256 thirdPriorityTxs = IGetters(getZKChainAddress(thirdChainId)).getTotalPriorityTxs();
+
+        vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
+        emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
+        vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
+        emit IChainRegistrationSender.InteropPairDeregistered(chainId, thirdChainId);
+        vm.recordLogs();
+        vm.prank(chainAdmin);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, peers);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        bytes[] memory calldatas = _priorityTxCalldatas(logs, chainId);
+        assertEq(calldatas.length, 2, "one service transaction per peer");
+        assertEq(calldatas[0], _deregistrationCalldata(peerChainId));
+        assertEq(calldatas[1], _deregistrationCalldata(thirdChainId));
+        assertEq(IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs(), peerPriorityTxs);
+        assertEq(IGetters(getZKChainAddress(thirdChainId)).getTotalPriorityTxs(), thirdPriorityTxs);
+        assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
+        assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(chainId, thirdChainId));
+    }
+
     function test_deregisterInteropPairs_revertWhen_notOwnerNorChainAdmin() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         _allowInteropPeer();
-        uint256[] memory chainsRegisteredOn = new uint256[](1);
-        uint256[] memory chainsToDeregister = new uint256[](1);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
         address stranger = makeAddr("stranger");
 
         vm.prank(stranger);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, stranger));
-        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(peerChainId));
 
         assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
     }
@@ -271,61 +296,45 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         _enableInterop(peerChainId);
         _allowInteropPeer();
         address peerAdmin = _setOwnAdmin(peerChainId, "peerAdmin");
-        uint256[] memory chainsRegisteredOn = new uint256[](1);
-        uint256[] memory chainsToDeregister = new uint256[](1);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
+        uint256 priorityTxs = IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs();
 
         vm.prank(peerAdmin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, peerAdmin));
-        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
-
-        assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
-    }
-
-    /// @notice An admin's batch that also holds another chain's pair reverts as a whole, its own pair included.
-    function test_deregisterInteropPairs_revertWhen_batchHasAnotherChainsPair() public {
-        _enableInterop(chainId);
-        _enableInterop(peerChainId);
-        _allowInteropPeer();
-        _setOwnAdmin(peerChainId, "peerAdmin");
-        uint256[] memory chainsRegisteredOn = new uint256[](2);
-        uint256[] memory chainsToDeregister = new uint256[](2);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (chainId, peerChainId);
-        (chainsRegisteredOn[1], chainsToDeregister[1]) = (peerChainId, chainId);
-        uint256 priorityTxs = IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs();
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
-        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(peerChainId));
 
         assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
         assertEq(IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs(), priorityTxs);
     }
 
-    function test_deregisterInteropPairs_revertWhen_lengthMismatch() public {
-        address owner = addresses.chainRegistrationSender.owner();
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(ArrayLengthMismatch.selector, 1, 2));
-        addresses.chainRegistrationSender.deregisterInteropPairs(new uint256[](1), new uint256[](2));
+    /// @notice A list with one invalid peer reverts as a whole, the valid peers included.
+    function test_deregisterInteropPairs_revertWhen_oneOfThePeersIsInvalid() public {
+        _enableInterop(chainId);
+        _enableInterop(peerChainId);
+        _allowInteropPeer();
+        uint256[] memory peers = new uint256[](2);
+        (peers[0], peers[1]) = (peerChainId, chainId);
+        uint256 priorityTxs = IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs();
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, chainId, chainId));
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, peers);
+
+        assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
+        assertEq(IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs(), priorityTxs);
     }
 
     function test_deregisterInteropPairs_revertWhen_pairIsSelf() public {
-        uint256[] memory pairs = new uint256[](1);
-        pairs[0] = chainId;
         address owner = addresses.chainRegistrationSender.owner();
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(InvalidInteropPeer.selector, chainId, chainId));
-        addresses.chainRegistrationSender.deregisterInteropPairs(pairs, pairs);
+        addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(chainId));
     }
 
     function test_deregisterInteropPairs_revertWhen_chainNotRegistered() public {
-        uint256[] memory chainsRegisteredOn = new uint256[](1);
-        uint256[] memory chainsToDeregister = new uint256[](1);
-        (chainsRegisteredOn[0], chainsToDeregister[0]) = (UNREGISTERED_CHAIN_ID, chainId);
         address owner = addresses.chainRegistrationSender.owner();
         vm.prank(owner);
         vm.expectRevert(ZKChainNotRegistered.selector);
-        addresses.chainRegistrationSender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+        addresses.chainRegistrationSender.deregisterInteropPairs(UNREGISTERED_CHAIN_ID, _peers(chainId));
     }
 
     function test_serviceTransaction_revertWhenCalledByDiamond() public {
@@ -375,6 +384,11 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
     }
 
     /// @dev The harness deploys every chain with the same admin, so tests that need two admins give the peer its own.
+    function _peers(uint256 _peerChainId) internal pure returns (uint256[] memory peers) {
+        peers = new uint256[](1);
+        peers[0] = _peerChainId;
+    }
+
     function _setOwnAdmin(uint256 _chainId, string memory _name) internal returns (address admin) {
         address chain = getZKChainAddress(_chainId);
         admin = makeAddr(_name);

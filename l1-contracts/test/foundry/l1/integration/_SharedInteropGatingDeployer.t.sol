@@ -66,6 +66,22 @@ abstract contract InteropGatingDeployer is L1ContractDeployer, ZKChainDeployer, 
         (, data) = _priorityTx(_logs, _chainId);
     }
 
+    /// @notice Returns the L2 calldata of every priority transaction `_chainId`'s diamond queued in `_logs`, in order.
+    function _priorityTxCalldatas(
+        Vm.Log[] memory _logs,
+        uint256 _chainId
+    ) internal view returns (bytes[] memory calldatas) {
+        Vm.Log[] memory requests = _logs.findAllFrom(NEW_PRIORITY_REQUEST_SIGNATURE, getZKChainAddress(_chainId));
+        calldatas = new bytes[](requests.length);
+        for (uint256 i = 0; i < requests.length; ++i) {
+            (, , , L2CanonicalTransaction memory transaction, ) = abi.decode(
+                requests[i].data,
+                (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[])
+            );
+            calldatas[i] = transaction.data;
+        }
+    }
+
     /// @notice Returns the id and the L2 calldata of the single priority transaction `_chainId`'s diamond
     /// queued in `_logs`.
     function _priorityTx(

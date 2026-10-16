@@ -77,7 +77,7 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// See {protocol-docs/interop-gating.md#interop-pool}.
     function chainBalanceInInteropPool(uint256 _chainId, bytes32 _assetId) external view returns (bool);
 
-    /// @notice Sets the backfill of `_chainId` for each asset, once per chain and asset.
+    /// @notice Sets the backfill of `_chainId` for each asset, once per chain and asset. Not for `INTEROP_POOL_CHAIN_ID`.
     /// See {protocol-docs/interop-gating.md#backfill}.
     /// @param _chainId The chain to set the backfill for.
     /// @param _assetIds The assets to set the backfill for.

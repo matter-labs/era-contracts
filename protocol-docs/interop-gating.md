@@ -147,8 +147,8 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
   can call it, and the caller pays the L1->L2 transaction in the base token.
 - **`registerChain`**, the retired consent-free registration, is removed. Its paid counterpart, deposit encoding
   version `0x01`, reverts with `UnsupportedEncodingVersion`.
-- **`deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister)`** is callable by the owner, and by the admin of
-  every chain in `chainsRegisteredOn` (`Unauthorized` otherwise). For each pair, it clears
+- **`deregisterInteropPairs(chainRegisteredOn, chainsToDeregister)`** removes peers from one chain's L2 Bridgehub.
+  It is callable by the owner and by that chain's admin (`Unauthorized` otherwise). For each peer, it clears
   `interopPeerAllowed` and sends a service transaction to `L2Bridgehub.deregisterChainForInterop`, which clears
   `baseTokenAssetId` and `isPeerAllowed`. The chain's L2 must already be upgraded, or that transaction fails. It
   refuses a peer that settles on the chain (`InvalidInteropPeer`), whose entry the chain needs as a settlement layer.

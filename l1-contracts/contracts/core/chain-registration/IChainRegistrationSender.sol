@@ -24,14 +24,11 @@ interface IChainRegistrationSender {
     /// @param _peerChainId The chain to allow.
     function allowInteropPeer(uint256 _chainId, uint256 _peerChainId) external;
 
-    /// @notice Removes interop pairs from the L2 Bridgehubs: the pairs registered by the retired consent-free
-    /// registration, and allowed pairs, which it also clears on L1. Callable by the owner, and by the admin of every
-    /// chain in `_chainsRegisteredOn`. Removing an allowed pair may strand its flows.
+    /// @notice Removes interop pairs from the L2 Bridgehub of `_chainRegisteredOn`: the pairs registered by the
+    /// retired consent-free registration, and allowed pairs, which it also clears on L1. Callable by the owner and by
+    /// the admin of `_chainRegisteredOn`. Removing an allowed pair may strand its flows.
     /// See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
-    /// @param _chainsRegisteredOn The chains whose L2 Bridgehub holds the registration.
-    /// @param _chainsToDeregister The registered chains, one per entry of `_chainsRegisteredOn`.
-    function deregisterInteropPairs(
-        uint256[] calldata _chainsRegisteredOn,
-        uint256[] calldata _chainsToDeregister
-    ) external;
+    /// @param _chainRegisteredOn The chain whose L2 Bridgehub holds the registrations.
+    /// @param _chainsToDeregister The registered chains to remove.
+    function deregisterInteropPairs(uint256 _chainRegisteredOn, uint256[] calldata _chainsToDeregister) external;
 }

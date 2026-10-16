@@ -128,7 +128,7 @@ async function deregisterInteropPair(
     _context.l1Provider
   );
   const receipt = await asOwnerOf(_context, sender, (signer) =>
-    sender.connect(signer).deregisterInteropPairs([_chain.chainId], [_peer.chainId])
+    sender.connect(signer).deregisterInteropPairs(_chain.chainId, [_peer.chainId])
   );
   await relayPriorityRequestsToChain(receipt, _chain.diamondProxy, _chain.provider);
 

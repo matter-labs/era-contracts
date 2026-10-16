@@ -8,7 +8,7 @@ import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {INTEROP_POOL_CHAIN_ID} from "contracts/common/Config.sol";
-import {ArrayLengthMismatch} from "contracts/common/L1ContractErrors.sol";
+import {ArrayLengthMismatch, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
 import {InteropNotEnabled} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {
     ChainBalanceAlreadyInInteropPool,
@@ -96,6 +96,13 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(ArrayLengthMismatch.selector, 1, 2));
         nativeTokenVault.setChainBalanceBackfill(chainId, _assetIdArray(tokenAssetId), new uint256[](2));
+    }
+
+    function test_setChainBalanceBackfill_revertWhen_interopPool() public {
+        vm.prank(owner);
+        vm.expectRevert(InvalidChainId.selector);
+        nativeTokenVault.setChainBalanceBackfill(INTEROP_POOL_CHAIN_ID, _assetIdArray(tokenAssetId), _amountArray(100));
+        _assertBackfill(INTEROP_POOL_CHAIN_ID, tokenAssetId, 0, false);
     }
 
     function test_setChainBalanceBackfill_revertWhen_alreadySet() public {
