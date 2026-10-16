@@ -15,9 +15,6 @@
 #   - no --tag              → local mode: uses this era-contracts checkout
 #   - --tag <tag>           → docker mode: runs inside ghcr.io/matter-labs/protocol-ops:<tag>
 #   - --tag sha256:<digest> → docker mode: runs inside ghcr.io/matter-labs/protocol-ops@sha256:<digest>
-#     In docker mode the image reference and its registry digest are passed into the
-#     container (PROTOCOL_OPS_IMAGE / PROTOCOL_OPS_IMAGE_DIGEST); `ecosystem
-#     rehearse-upgrade` records them in the deploy bundle.
 #
 # Examples:
 #   ./protocol-ops.sh chain init --l1-rpc-url http://localhost:8545 …
@@ -140,9 +137,9 @@ else
   IMAGE="${IMAGE_REPO}:${TAG}"
 fi
 
-# The registry digest of the image, so a run records exactly which image it was
-# even when started by a (mutable) tag. Pull output goes to stderr: callers
-# capture this wrapper's stdout (e.g. `cast wallet address`).
+# The registry digest of the image, which `ecosystem rehearse-upgrade` records in
+# the deploy bundle even when started by a (mutable) tag. Pull output goes to
+# stderr: callers capture this wrapper's stdout (e.g. `cast wallet address`).
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   docker pull --quiet --platform=linux/amd64 "$IMAGE" >&2
 fi

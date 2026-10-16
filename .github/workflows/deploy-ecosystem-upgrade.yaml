@@ -232,7 +232,8 @@ jobs:
             echo "DEPLOY_BUNDLE_DIR=$bundle"
             echo "BUNDLE_IMAGE=${digest#*@}"
             echo "BUNDLE_COMMIT=$commit"
-            echo "EXTRA_MOUNTS=$bundle:/contracts/deploy-bundle:ro"
+            # Mounted at the same path, so the commands below take host paths.
+            echo "EXTRA_MOUNTS=$RUNNER_TEMP:$RUNNER_TEMP"
           } >> "$GITHUB_ENV"
 
       - name: Checkout the bundle's commit
@@ -242,7 +243,7 @@ jobs:
           persist-credentials: false
 
       - name: Validate deploy bundle integrity
-        run: bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem verify-bundle /contracts/deploy-bundle
+        run: bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
 
       # The bundle names the upgrade it was generated for; that upgrade's upgrade.toml in this
       # checkout says how its broadcast is checked (protocol-ops/src/common/upgrade_descriptor.rs).
@@ -297,7 +298,7 @@ jobs:
           RESUME_FROM_OTHER_BUNDLE: ${{ inputs.resume_from_other_bundle }}
         run: |
           set -euo pipefail
-          OUTDIR="$GITHUB_WORKSPACE/deploy-result"
+          OUTDIR="$RUNNER_TEMP/deploy-result"
           mkdir -p "$OUTDIR"
           bundle_metadata_sha256="$(sha256sum "$DEPLOY_BUNDLE_DIR/bundle-metadata.json" | awk '{print $1}')"
 
@@ -435,14 +436,15 @@ jobs:
             sepolia) pk="$PK_SEPOLIA" ;;
             *) echo "::error::No deployer key wired for L1 network '$L1_NETWORK'"; exit 1 ;;
           esac
-          EXTRA_MOUNTS="$EXTRA_MOUNTS $DEPLOY_OUTDIR:/contracts/deploy-result" \
-            bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem upgrade-broadcast \
-            --manifest /contracts/deploy-bundle/prepare/manifest.json \
+          MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
+          echo "Manifest: $MANIFEST"
+          bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem upgrade-broadcast \
+            --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
             --key "${DEPLOYER_ADDR}=${pk}" \
             --skip-unkeyed \
             --max-gas-price-gwei "$MAX_GAS_PRICE_GWEI" \
-            --out /contracts/deploy-result/deploy-executed.json
+            --out "$DEPLOY_OUTDIR/deploy-executed.json"
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
 
@@ -452,41 +454,20 @@ jobs:
         if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
         run: |
           set -euo pipefail
-          EXTRA_MOUNTS="$EXTRA_MOUNTS $DEPLOY_OUTDIR:/contracts/deploy-result" \
-            bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle \
-            --bundle /contracts/deploy-bundle \
+          bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle \
+            --bundle "$DEPLOY_BUNDLE_DIR" \
             --rpc "$L1_RPC_URL" \
             --verify-only \
-            --transactions-log /contracts/deploy-result/transactions.txt
+            --transactions-log "$TXLOG"
 
       - name: Upload transactions.txt + executed log
         if: ${{ always() && !inputs.verify_only }}
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
-          path: ${{ github.workspace }}/deploy-result
+          path: ${{ runner.temp }}/deploy-result
           if-no-files-found: warn
           retention-days: 90
-
-      # The verify step runs `forge` from l1-contracts/ or da-contracts/; this
-      # one runs in the bundle's image, against the artifacts the bundle was
-      # generated with.
-      - name: Run forge from the bundle's image
-        if: ${{ inputs.run_verify }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/bin"
-          cat > "$RUNNER_TEMP/bin/forge" <<'EOF'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          case "$(basename "$PWD")" in
-            l1-contracts|da-contracts) root="/contracts/$(basename "$PWD")" ;;
-            *) echo "forge: run from l1-contracts/ or da-contracts/, not $PWD" >&2; exit 1 ;;
-          esac
-          exec bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" forge "$@" --root "$root"
-          EOF
-          chmod +x "$RUNNER_TEMP/bin/forge"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
 
       # Etherscan verification. Replays the `forge verify-contract` commands step
       # 1 logged — which already carry the exact `--constructor-args <hex>` taken
@@ -498,7 +479,6 @@ jobs:
         continue-on-error: ${{ !inputs.verify_only }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        working-directory: l1-contracts
         run: |
           set -uo pipefail
           if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
@@ -518,28 +498,30 @@ jobs:
           # already emits the exact `--constructor-args <hex>` for every contract
           # that has them (derived from the CREATE2 init code it deployed — see
           # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
-          # guess. We only append the chain + `--watch`; the key comes from
-          # $ETHERSCAN_API_KEY in the env. `--retries/--delay` ride out Etherscan
-          # indexing freshly-deployed code. Report partial failures explicitly;
+          # guess. We only run it in the bundle's image with that image's `--root`
+          # and append the chain + `--watch`; the key comes from $ETHERSCAN_API_KEY
+          # in the env. `--retries/--delay` ride out Etherscan indexing
+          # freshly-deployed code. Report partial failures explicitly;
           # normal deployments tolerate them, verification-only runs do not.
           verified=0
           failed=0
           readonly verification_attempts=3
           readonly verification_retry_delay=10
+          po() { bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" "$@"; }
           while IFS= read -r cmd; do
             echo "--- $cmd"
             # These contracts are built by da-contracts, not l1-contracts.
             # Keep the recorded address and constructor arguments unchanged.
             read -r _forge _verify _address contract _rest <<< "$cmd"
-            verification_root="$PWD"
+            verification_root=/contracts/l1-contracts
             case "$contract" in
-              EIP7702Checker|RollupL1DAValidator) verification_root="../da-contracts" ;;
+              EIP7702Checker|RollupL1DAValidator) verification_root=/contracts/da-contracts ;;
             esac
             success=false
             for ((attempt=1; attempt<=verification_attempts; attempt++)); do
               # --retries covers verification polling, but not an initial ABI
               # request timeout. Retry the complete idempotent submission too.
-              if (cd "$verification_root" && eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"); then
+              if eval "po $cmd --root $verification_root --chain $CHAIN --watch --retries 8 --delay 20"; then
                 success=true
                 break
               fi
