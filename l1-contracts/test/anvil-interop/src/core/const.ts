@@ -2,7 +2,7 @@
 // probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
 // `./runtime-config` instead of importing a constant from here.
 
-import { utils } from "ethers";
+import { BigNumber, utils } from "ethers";
 
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
@@ -64,6 +64,10 @@ export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8e
 
 // EIP-1967 implementation slot: bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
 export const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+
+// Chain ID under which `L1NativeTokenVault` records the interop pool's totals:
+// uint256(keccak256("interop.pool")) - 1, as `INTEROP_POOL_CHAIN_ID` in Config.sol.
+export const INTEROP_POOL_CHAIN_ID = BigNumber.from(utils.id("interop.pool")).sub(1);
 
 // Default gas limits for test transactions.
 // Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}

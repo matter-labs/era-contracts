@@ -344,7 +344,7 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
         selectors[i++] = UtilsFacet.util_getPubdataContent.selector;
         selectors[i++] = UtilsFacet.util_setDeprecatedPrecommitmentForTheLatestBatch.selector;
-        selectors[i++] = UtilsFacet.util_getSecondProofSystemLocked.selector;
+        selectors[i++] = UtilsFacet.util_getSecondProofSystemRequired.selector;
         selectors[i++] = UtilsFacet.util_getDisabledProofSystems.selector;
 
         return selectors;

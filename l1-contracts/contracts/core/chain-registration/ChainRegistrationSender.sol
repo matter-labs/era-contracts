@@ -101,18 +101,20 @@ contract ChainRegistrationSender is
     function deregisterInteropPairs(
         uint256[] calldata _chainsRegisteredOn,
         uint256[] calldata _chainsToDeregister
-    ) external onlyOwner nonReentrant {
+    ) external nonReentrant {
         uint256 pairsLength = _chainsRegisteredOn.length;
         require(
             pairsLength == _chainsToDeregister.length,
             ArrayLengthMismatch(pairsLength, _chainsToDeregister.length)
         );
+        bool callerIsOwner = msg.sender == owner();
         for (uint256 i = 0; i < pairsLength; ++i) {
             uint256 chainRegisteredOn = _chainsRegisteredOn[i];
             uint256 chainToDeregister = _chainsToDeregister[i];
             _checkPeerPair(chainRegisteredOn, chainToDeregister);
             address zkChain = BRIDGE_HUB.getZKChain(chainRegisteredOn);
             require(zkChain != address(0), ZKChainNotRegistered());
+            require(callerIsOwner || msg.sender == IGetters(zkChain).getAdmin(), Unauthorized(msg.sender));
 
             delete interopPeerAllowed[chainRegisteredOn][chainToDeregister];
             emit InteropPairDeregistered(chainRegisteredOn, chainToDeregister);

@@ -27,7 +27,7 @@ import {
     L1DAValidatorAddressIsZero,
     NotL1,
     PriorityModeAlreadyAllowed,
-    SecondProofSystemAlreadyLocked,
+    SecondProofSystemAlreadyRequired,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted
 } from "../../L1StateTransitionErrors.sol";
@@ -117,8 +117,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function _executeDiamondCut(Diamond.DiamondCutData memory _diamondCut) internal {
         Diamond.diamondCut(_diamondCut);
         // Repeats the check of `BaseZkSyncUpgrade._setVerifier`, for an upgrade that sets the verifier without it.
-        // See {protocol-docs/interop-gating.md#second-proof-system-lock}.
-        if (s.secondProofSystemLocked) {
+        // See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+        if (s.secondProofSystemRequired) {
             uint256 proofMode = IZKsyncOSVerifier(address(s.verifier)).getProofMode(0);
             if (proofMode != ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE) {
                 revert NotMultiProofMode(proofMode);
@@ -414,7 +414,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setProofSystemStatus(ProofSystem _proofSystem, bool _enabled) external {
-        address authorized = !_enabled && s.secondProofSystemLocked ? IOwnable(s.bridgehub).owner() : s.admin;
+        address authorized = !_enabled && s.secondProofSystemRequired ? IOwnable(s.bridgehub).owner() : s.admin;
         if (msg.sender != authorized) {
             revert Unauthorized(msg.sender);
         }
@@ -451,17 +451,17 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function lockSecondProofSystem() external onlyAdmin onlySettlementLayer {
-        if (s.secondProofSystemLocked) {
-            revert SecondProofSystemAlreadyLocked();
+    function permanentlyRequireSecondProofSystem() external onlyAdmin onlySettlementLayer {
+        if (s.secondProofSystemRequired) {
+            revert SecondProofSystemAlreadyRequired();
         }
         uint256 proofMode = _getProofMode();
         if (proofMode != ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE) {
             revert NotMultiProofMode(proofMode);
         }
 
-        s.secondProofSystemLocked = true;
-        emit SecondProofSystemLocked();
+        s.secondProofSystemRequired = true;
+        emit SecondProofSystemRequired();
     }
 
     /// @inheritdoc IAdmin

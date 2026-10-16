@@ -33,14 +33,16 @@ export class InteropChainRegistrar {
     await this.requireChainAdmin(zkChain);
     const zeroBackfills = assetIds.map(() => 0);
     await (await ntv.setChainBalanceBackfill(chainId, assetIds, zeroBackfills)).wait();
-    await (await zkChain.lockSecondProofSystem()).wait();
+    await (await zkChain.permanentlyRequireSecondProofSystem()).wait();
     await (await messageRoot.enableInterop(chainId, true)).wait();
     for (const assetId of assetIds) {
       await (await ntv.moveChainBalanceToInteropPool(chainId, assetId)).wait();
     }
 
-    if (!(await zkChain.isSecondProofSystemLocked()) || !(await messageRoot.isInteropEnabled(chainId))) {
-      throw new Error(`Enabling interop for chain ${chainId} did not lock the proof system and enable interop`);
+    if (!(await zkChain.isSecondProofSystemRequired()) || !(await messageRoot.isInteropEnabled(chainId))) {
+      throw new Error(
+        `Enabling interop for chain ${chainId} did not require the second proof system and enable interop`
+      );
     }
     for (const assetId of assetIds) {
       if (!(await ntv.chainBalanceInInteropPool(chainId, assetId))) {
@@ -48,7 +50,7 @@ export class InteropChainRegistrar {
       }
     }
     console.log(
-      `   ✅ Chain ${chainId}: second proof system locked, interop enabled, balances moved to the interop pool`
+      `   ✅ Chain ${chainId}: second proof system required, interop enabled, balances moved to the interop pool`
     );
   }
 

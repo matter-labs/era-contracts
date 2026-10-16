@@ -47,16 +47,16 @@ abstract contract InteropGatingDeployer is L1ContractDeployer, ZKChainDeployer, 
         return IGetters(getZKChainAddress(_chainId)).getAdmin();
     }
 
-    function _lockSecondProofSystem(uint256 _chainId) internal {
+    function _permanentlyRequireSecondProofSystem(uint256 _chainId) internal {
         address chain = getZKChainAddress(_chainId);
         vm.prank(IGetters(chain).getAdmin());
-        IAdmin(chain).lockSecondProofSystem();
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
     }
 
-    /// @notice Runs the full enabling procedure: the chain admin locks the second proof system, then the
+    /// @notice Runs the full enabling procedure: the chain admin permanently requires the second proof system, then the
     /// Bridgehub owner enables interop.
     function _enableInterop(uint256 _chainId) internal {
-        _lockSecondProofSystem(_chainId);
+        _permanentlyRequireSecondProofSystem(_chainId);
         vm.prank(addresses.bridgehubOwnerAddress);
         messageRoot.enableInterop(_chainId, true);
     }

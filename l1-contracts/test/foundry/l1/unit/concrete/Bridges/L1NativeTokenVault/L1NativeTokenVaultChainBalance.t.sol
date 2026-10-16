@@ -7,6 +7,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
+import {INTEROP_POOL_CHAIN_ID} from "contracts/common/Config.sol";
 import {ArrayLengthMismatch} from "contracts/common/L1ContractErrors.sol";
 import {InteropNotEnabled} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {
@@ -130,7 +131,7 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
 
         assertEq(nativeTokenVault.chainTotalDeposited(chainId, tokenAssetId), 100);
         assertEq(nativeTokenVault.chainTotalDeposited(OTHER_CHAIN_ID, tokenAssetId), 0, "other chains untouched");
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(tokenAssetId), 0, "pool untouched");
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, tokenAssetId), 0, "pool untouched");
     }
 
     function test_depositAndWithdrawal_trackAssetNativeToAThirdChain() public {
@@ -161,7 +162,7 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         _withdraw(chainId, tokenAssetId, address(testToken), 60);
 
         assertEq(nativeTokenVault.chainTotalWithdrawn(chainId, tokenAssetId), 60);
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 0, "pool untouched");
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 0, "pool untouched");
         assertEq(testToken.balanceOf(owner), 60, "withdrawal paid out");
     }
 
@@ -309,8 +310,8 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         _depositNativeTestToken(chainId, 100);
         _withdraw(chainId, tokenAssetId, address(testToken), 60);
 
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(tokenAssetId), 100, "deposit pooled");
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 60, "withdrawal pooled");
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, tokenAssetId), 100, "deposit pooled");
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 60, "withdrawal pooled");
         assertEq(nativeTokenVault.chainTotalDeposited(chainId, tokenAssetId), 0, "chain deposit untouched");
         assertEq(nativeTokenVault.chainTotalWithdrawn(chainId, tokenAssetId), 0, "chain withdrawal untouched");
         assertEq(testToken.balanceOf(owner), 60, "withdrawal paid out");
@@ -325,7 +326,7 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
 
         _withdraw(chainId, tokenAssetId, address(testToken), 100);
 
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 100);
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 100);
         assertEq(testToken.balanceOf(owner), 100, "withdrawal paid out");
         _expectWithdrawalExceeds({
             _chainId: chainId,
@@ -351,7 +352,7 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
             _limit: 0
         });
 
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 0, "nothing recorded");
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 0, "nothing recorded");
         assertEq(testToken.balanceOf(owner), 0, "nothing paid out");
     }
 
@@ -372,7 +373,7 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         nativeTokenVault.moveChainBalanceToInteropPool(chainId, tokenAssetId);
         _withdraw(chainId, tokenAssetId, address(testToken), 60);
 
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 60);
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 60);
         assertEq(testToken.balanceOf(owner), 60, "withdrawal paid out");
     }
 
@@ -384,7 +385,7 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         vm.prank(address(assetRouter));
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, tokenAssetId, owner, data);
 
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 40, "claim recorded");
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 40, "claim recorded");
         assertEq(testToken.balanceOf(owner), 40, "claim paid out");
         _expectWithdrawalExceeds({
             _chainId: chainId,
@@ -405,8 +406,8 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
 
         _withdraw(chainId, assetId, address(token), 50);
 
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(assetId), 0, "deposit untracked");
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(assetId), 0, "withdrawal untracked");
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId), 0, "deposit untracked");
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, assetId), 0, "withdrawal untracked");
         assertEq(nativeTokenVault.chainTotalDeposited(chainId, assetId), 0, "chain deposit untouched");
         assertEq(nativeTokenVault.chainTotalWithdrawn(chainId, assetId), 0, "chain withdrawal untouched");
         assertEq(token.balanceOf(owner), 50, "withdrawal paid out");
@@ -416,14 +417,18 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         _mockInteropEnabled(chainId, true);
         (bytes32 assetId, ChainBalanceBridgedToken token) = _registerBridgedToken(OTHER_CHAIN_ID);
         _depositBridgedToken(assetId, token, chainId, 20);
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(assetId), 20, "tracked while the origin has no interop");
+        assertEq(
+            nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId),
+            20,
+            "tracked while the origin has no interop"
+        );
 
         _mockInteropEnabled(OTHER_CHAIN_ID, true);
         _depositBridgedToken(assetId, token, chainId, 5);
         _withdraw(chainId, assetId, address(token), 50);
 
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(assetId), 20, "deposit untracked");
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(assetId), 0, "withdrawal untracked");
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId), 20, "deposit untracked");
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, assetId), 0, "withdrawal untracked");
         assertEq(token.balanceOf(owner), 50, "withdrawal paid out");
     }
 
@@ -441,7 +446,7 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
             _totalWithdrawn: 21,
             _limit: 20
         });
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(assetId), 0, "pool untouched");
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId), 0, "pool untouched");
     }
 
     function test_interopChain_assetNativeToAChainWithoutInterop_capped() public {
@@ -465,8 +470,8 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
 
         _withdraw(chainId, assetId, address(token), 80);
 
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(assetId), 0, "deposit untracked");
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(assetId), 0, "withdrawal untracked");
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId), 0, "deposit untracked");
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, assetId), 0, "withdrawal untracked");
         assertEq(token.balanceOf(owner), 80, "withdrawal paid out");
     }
 
@@ -489,8 +494,12 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
 
         assertTrue(nativeTokenVault.chainBalanceInInteropPool(chainId, tokenAssetId), "moved");
         assertFalse(nativeTokenVault.chainBalanceInInteropPool(chainId, ETH_TOKEN_ASSET_ID), "other assets stay");
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(tokenAssetId), 160, "deposited and backfill added");
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 30, "withdrawn added");
+        assertEq(
+            nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, tokenAssetId),
+            160,
+            "deposited and backfill added"
+        );
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 30, "withdrawn added");
         assertEq(nativeTokenVault.chainTotalDeposited(chainId, tokenAssetId), 100, "chain deposit kept");
         assertEq(nativeTokenVault.chainTotalWithdrawn(chainId, tokenAssetId), 30, "chain withdrawal kept");
 
@@ -514,8 +523,8 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         emit IL1NativeTokenVault.ChainBalanceMovedToInteropPool(chainId, tokenAssetId, 100, 0);
         nativeTokenVault.moveChainBalanceToInteropPool(chainId, tokenAssetId);
 
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(tokenAssetId), 100);
-        assertEq(nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId), 0);
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, tokenAssetId), 100);
+        assertEq(nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId), 0);
     }
 
     function test_moveChainBalanceToInteropPool_revertWhen_interopNotEnabled() public {
@@ -542,12 +551,12 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
         vm.expectRevert(abi.encodeWithSelector(ChainBalanceAlreadyInInteropPool.selector, chainId, tokenAssetId));
         nativeTokenVault.moveChainBalanceToInteropPool(chainId, tokenAssetId);
 
-        assertEq(nativeTokenVault.interopPoolTotalDeposited(tokenAssetId), 100, "moved once");
+        assertEq(nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, tokenAssetId), 100, "moved once");
     }
 
     /// @dev Random sequences of deposits into chains with and without interop, and of withdrawals and
     /// failed-deposit claims from chains with interop: whatever succeeds keeps
-    /// `interopPoolTotalWithdrawn <= interopPoolTotalDeposited`, deposits into a chain without interop never
+    /// the pool's total withdrawn at most its total deposited, deposits into a chain without interop never
     /// reach the pool, and whatever would break the bound reverts.
     function testFuzz_poolWithdrawnNeverExceedsPoolDeposited(
         uint128[8] calldata _amounts,
@@ -568,8 +577,9 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
             } else if (action == 1) {
                 _depositNativeTestToken(THIRD_CHAIN_ID, amount);
             } else {
-                uint256 newWithdrawn = nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId) + amount;
-                uint256 deposited = nativeTokenVault.interopPoolTotalDeposited(tokenAssetId);
+                uint256 newWithdrawn = nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId) +
+                    amount;
+                uint256 deposited = nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, tokenAssetId);
                 bytes memory expectedRevert = newWithdrawn > deposited
                     ? abi.encodeWithSelector(
                         ChainBalanceExceeded.selector,
@@ -583,8 +593,8 @@ contract L1NativeTokenVaultChainBalanceTest is L1NativeTokenVaultTestBase {
             }
 
             assertLe(
-                nativeTokenVault.interopPoolTotalWithdrawn(tokenAssetId),
-                nativeTokenVault.interopPoolTotalDeposited(tokenAssetId),
+                nativeTokenVault.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, tokenAssetId),
+                nativeTokenVault.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, tokenAssetId),
                 "pool withdrawn <= pool deposited"
             );
             assertEq(

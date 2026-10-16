@@ -6,6 +6,7 @@ import {
   ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
   ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   DEFAULT_TX_GAS_LIMIT,
+  INTEROP_POOL_CHAIN_ID,
   L2_BRIDGEHUB_ADDR,
   LEGACY_CHAIN_REGISTRATION_ENCODING_VERSION,
   PRE_UPGRADE_DEPOSIT_MAX_ETH,
@@ -179,18 +180,18 @@ async function enableInterop(
       throw new Error(`Chain ${_chain.chainId} backfill of asset ${assetId} is ${amount} (set: ${set})`);
     }
   }
-  // The default upgrade keeps the chain's single-proof verifier, so the chain can't lock a second proof system.
-  // Governance enables it without the lock, as it may for a chain it trusts for reasons checked offchain
+  // The default upgrade keeps the chain's single-proof verifier, so the chain can't require a second proof system.
+  // Governance enables it without the requirement, as it may for a chain it trusts for reasons checked offchain
   // ({protocol-docs/interop-gating.md#enabling-interop}). `enableInterop` belongs to the Bridgehub owner.
   await asOwnerOf(_context, l1Bridgehub, (signer) => messageRoot.connect(signer).enableInterop(_chain.chainId, false));
   for (const [i, assetId] of assetIds.entries()) {
     const deposited = await ntv.chainTotalDeposited(_chain.chainId, assetId);
     const withdrawn = await ntv.chainTotalWithdrawn(_chain.chainId, assetId);
-    const poolDepositedBefore = await ntv.interopPoolTotalDeposited(assetId);
-    const poolWithdrawnBefore = await ntv.interopPoolTotalWithdrawn(assetId);
+    const poolDepositedBefore = await ntv.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId);
+    const poolWithdrawnBefore = await ntv.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, assetId);
     await (await ntv.connect(_context.chainAdminOwner).moveChainBalanceToInteropPool(_chain.chainId, assetId)).wait();
-    const poolDepositedDelta = (await ntv.interopPoolTotalDeposited(assetId)).sub(poolDepositedBefore);
-    const poolWithdrawnDelta = (await ntv.interopPoolTotalWithdrawn(assetId)).sub(poolWithdrawnBefore);
+    const poolDepositedDelta = (await ntv.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId)).sub(poolDepositedBefore);
+    const poolWithdrawnDelta = (await ntv.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, assetId)).sub(poolWithdrawnBefore);
     if (
       !(await ntv.chainBalanceInInteropPool(_chain.chainId, assetId)) ||
       !poolDepositedDelta.eq(deposited.add(backfills[i])) ||

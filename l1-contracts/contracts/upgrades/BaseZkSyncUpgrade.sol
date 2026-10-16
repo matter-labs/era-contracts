@@ -106,9 +106,9 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         if (_newVerifier == IVerifier(address(0))) {
             revert ZeroAddress();
         }
-        // A locked chain must keep a verifier that supports the second proof system.
-        // See {protocol-docs/interop-gating.md#second-proof-system-lock}.
-        if (s.secondProofSystemLocked) {
+        // A chain that requires its second proof system must keep a verifier that supports it.
+        // See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+        if (s.secondProofSystemRequired) {
             uint256 proofMode = IZKsyncOSVerifier(address(_newVerifier)).getProofMode(0);
             if (proofMode != ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE) {
                 revert NotMultiProofMode(proofMode);

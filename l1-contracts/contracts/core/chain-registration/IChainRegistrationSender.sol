@@ -18,16 +18,16 @@ interface IChainRegistrationSender {
     function interopPeerAllowed(uint256 _chainId, uint256 _peerChainId) external view returns (bool);
 
     /// @notice Allows interop between `_chainId` and `_peerChainId` on `_chainId`'s side, on L1 and on
-    /// `_chainId`'s L2 Bridgehub. The admin cannot revoke an allowed pair; only `deregisterInteropPairs` can.
+    /// `_chainId`'s L2 Bridgehub. `deregisterInteropPairs` revokes it.
     /// Callable by the admin of `_chainId`. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
     /// @param _chainId The chain whose admin consents.
     /// @param _peerChainId The chain to allow.
     function allowInteropPeer(uint256 _chainId, uint256 _peerChainId) external;
 
     /// @notice Removes interop pairs from the L2 Bridgehubs: the pairs registered by the retired consent-free
-    /// registration, and allowed pairs, which it also clears on L1. Callable by the owner.
-    /// @dev Governance keeps the ability to disable interop for a pair its admin explicitly allowed, but using it is
-    /// not recommended: it may strand the pair's flows. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+    /// registration, and allowed pairs, which it also clears on L1. Callable by the owner, and by the admin of every
+    /// chain in `_chainsRegisteredOn`. Removing an allowed pair may strand its flows.
+    /// See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
     /// @param _chainsRegisteredOn The chains whose L2 Bridgehub holds the registration.
     /// @param _chainsToDeregister The registered chains, one per entry of `_chainsRegisteredOn`.
     function deregisterInteropPairs(

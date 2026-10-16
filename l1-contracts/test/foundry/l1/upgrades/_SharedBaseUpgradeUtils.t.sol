@@ -42,16 +42,16 @@ contract BaseUpgradeUtils is ZKChainBase {
         s.feeParams.priorityTxMaxPubdata = _priorityTxMaxPubdata;
     }
 
-    function setSecondProofSystemLocked(bool _locked) public {
-        s.secondProofSystemLocked = _locked;
+    function setSecondProofSystemRequired(bool _required) public {
+        s.secondProofSystemRequired = _required;
     }
 
     function setDisabledProofSystems(uint8 _disabledProofSystems) public {
         s.disabledProofSystems = _disabledProofSystems;
     }
 
-    function getSecondProofSystemLocked() public view returns (bool) {
-        return s.secondProofSystemLocked;
+    function getSecondProofSystemRequired() public view returns (bool) {
+        return s.secondProofSystemRequired;
     }
 
     function getDisabledProofSystems() public view returns (uint8) {

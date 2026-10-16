@@ -45,12 +45,12 @@ contract DefaultUpgradeTest is BaseUpgrade {
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
     }
 
-    /// @notice The second-proof-system lock also applies to the verifier-only upgrade.
-    /// See {protocol-docs/interop-gating.md#second-proof-system-lock}.
-    function test_revertWhen_LockedChainRunsVerifierOnlyUpgradeToSingleProofVerifier() public {
+    /// @notice The second proof system requirement also applies to the verifier-only upgrade.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+    function test_revertWhen_RequiringChainRunsVerifierOnlyUpgradeToSingleProofVerifier() public {
         address singleProofVerifier = address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))));
         baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, singleProofVerifier);
-        baseZkSyncUpgrade.setSecondProofSystemLocked(true);
+        baseZkSyncUpgrade.setSecondProofSystemRequired(true);
 
         vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
         baseZkSyncUpgrade.upgradeVerifierOnly(protocolVersion);
@@ -59,21 +59,21 @@ contract DefaultUpgradeTest is BaseUpgrade {
         assertEq(baseZkSyncUpgrade.getVerifier(), address(0));
     }
 
-    function test_LockedChainRunsVerifierOnlyUpgradeToMultiProofVerifier() public {
-        _assertLockedChainRunsVerifierOnlyUpgrade(0);
+    function test_RequiringChainRunsVerifierOnlyUpgradeToMultiProofVerifier() public {
+        _assertRequiringChainRunsVerifierOnlyUpgrade(0);
     }
 
-    /// @notice After an emergency ZiSK-off, the verifier-only upgrade keeps both the lock and ZiSK off.
-    function test_LockedChainRunsVerifierOnlyUpgradeAfterEmergencyZiskOff() public {
-        _assertLockedChainRunsVerifierOnlyUpgrade(uint8(1 << uint8(ProofSystem.Zisk)));
+    /// @notice After an emergency ZiSK-off, the verifier-only upgrade keeps both the requirement and ZiSK off.
+    function test_RequiringChainRunsVerifierOnlyUpgradeAfterEmergencyZiskOff() public {
+        _assertRequiringChainRunsVerifierOnlyUpgrade(uint8(1 << uint8(ProofSystem.Zisk)));
     }
 
-    function _assertLockedChainRunsVerifierOnlyUpgrade(uint8 _disabledProofSystems) internal {
+    function _assertRequiringChainRunsVerifierOnlyUpgrade(uint8 _disabledProofSystems) internal {
         address multiProofVerifier = address(
             new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
         );
         baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, multiProofVerifier);
-        baseZkSyncUpgrade.setSecondProofSystemLocked(true);
+        baseZkSyncUpgrade.setSecondProofSystemRequired(true);
         baseZkSyncUpgrade.setDisabledProofSystems(_disabledProofSystems);
 
         bytes32 result = baseZkSyncUpgrade.upgradeVerifierOnly(protocolVersion);
@@ -81,7 +81,7 @@ contract DefaultUpgradeTest is BaseUpgrade {
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
         assertEq(baseZkSyncUpgrade.getVerifier(), multiProofVerifier);
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
-        assertTrue(baseZkSyncUpgrade.getSecondProofSystemLocked(), "the upgrade must keep the lock");
+        assertTrue(baseZkSyncUpgrade.getSecondProofSystemRequired(), "the upgrade must keep the requirement");
         assertEq(baseZkSyncUpgrade.getDisabledProofSystems(), _disabledProofSystems, "the upgrade keeps the flags");
         assertEq(
             baseZkSyncUpgrade.getProofMode(),

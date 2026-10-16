@@ -15,7 +15,7 @@ import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors
 import {
     ChainNotSettlingOnL1,
     InteropAlreadyEnabled,
-    SecondProofSystemNotLocked,
+    SecondProofSystemNotRequired,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
@@ -56,7 +56,7 @@ contract L1MessageRootEnableInteropTest is Test {
         vm.mockCall(bridgehub, abi.encodeCall(IOwnable.owner, ()), abi.encode(governance));
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.getZKChain, (CHAIN_ID)), abi.encode(zkChain));
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.settlementLayer, (CHAIN_ID)), abi.encode(block.chainid));
-        vm.mockCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemLocked, ()), abi.encode(true));
+        vm.mockCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemRequired, ()), abi.encode(true));
         vm.mockCall(
             zkChain,
             abi.encodeCall(IGetters.getProofMode, ()),
@@ -112,11 +112,11 @@ contract L1MessageRootEnableInteropTest is Test {
         messageRoot.enableInterop(CHAIN_ID, true);
     }
 
-    function test_enableInterop_revertWhen_secondProofSystemNotLocked() public {
-        vm.mockCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemLocked, ()), abi.encode(false));
+    function test_enableInterop_revertWhen_secondProofSystemNotRequired() public {
+        vm.mockCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemRequired, ()), abi.encode(false));
 
         vm.prank(governance);
-        vm.expectRevert(abi.encodeWithSelector(SecondProofSystemNotLocked.selector, CHAIN_ID));
+        vm.expectRevert(abi.encodeWithSelector(SecondProofSystemNotRequired.selector, CHAIN_ID));
         messageRoot.enableInterop(CHAIN_ID, true);
     }
 
@@ -130,12 +130,12 @@ contract L1MessageRootEnableInteropTest is Test {
         assertFalse(messageRoot.isInteropEnabled(CHAIN_ID));
     }
 
-    /// @notice Without the flag, neither the lock nor the proof mode is read.
+    /// @notice Without the flag, neither the requirement nor the proof mode is read.
     function test_enableInterop_withoutSecondProofSystem() public {
-        vm.mockCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemLocked, ()), abi.encode(false));
+        vm.mockCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemRequired, ()), abi.encode(false));
         vm.mockCall(zkChain, abi.encodeCall(IGetters.getProofMode, ()), abi.encode(ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
 
-        vm.expectCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemLocked, ()), 0);
+        vm.expectCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemRequired, ()), 0);
         vm.expectCall(zkChain, abi.encodeCall(IGetters.getProofMode, ()), 0);
         vm.expectEmit(true, false, false, true, address(messageRoot));
         emit IL1MessageRoot.InteropEnabled(CHAIN_ID);

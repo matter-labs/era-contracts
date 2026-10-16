@@ -10,7 +10,7 @@ import {
     InteropAlreadyEnabled,
     InvalidSettlementLayerForBatch,
     LocallyNoChainsAtGenesis,
-    SecondProofSystemNotLocked,
+    SecondProofSystemNotRequired,
     ZKChainNotRegistered
 } from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
@@ -75,7 +75,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         require(settlementLayer == block.chainid, ChainNotSettlingOnL1(_chainId, settlementLayer));
         require(!interopEnabled[_chainId], InteropAlreadyEnabled(_chainId));
         if (_requireSecondProofSystem) {
-            require(IGetters(zkChain).isSecondProofSystemLocked(), SecondProofSystemNotLocked(_chainId));
+            require(IGetters(zkChain).isSecondProofSystemRequired(), SecondProofSystemNotRequired(_chainId));
             uint256 proofMode = IGetters(zkChain).getProofMode();
             require(proofMode == ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE, NotMultiProofMode(proofMode));
         }
