@@ -2,7 +2,7 @@ name: "Execute Deployer Safe Bundles"
 
 # Apply Safe Transaction Builder bundles whose `target` is the ecosystem
 # deployer EOA (i.e. bundles emitted by the chain-init workflow). The
-# deployer's private key is pulled from a per-environment secret and used to
+# deployer's private key is pulled from the preset L1's secret and used to
 # sign every tx in the bundle via `protocol-ops dev execute-safe`. Ecosystem
 # upgrade bundles go through `deploy-ecosystem-upgrade.yaml` instead.
 #
@@ -14,10 +14,10 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment = upgrade-envs/permanent-values/<env>.toml preset; selects the DEPLOYER_PRIVATE_KEY_* secret (stage → STAGE, testnet → SEPOLIA, mainnet → MAINNET)"
+        description: "Target environment = upgrade-envs/permanent-values/<env>.toml preset; its l1_chain_id selects the DEPLOYER_PRIVATE_KEY_{SEPOLIA,MAINNET} secret"
         required: true
         type: choice
-        options: [stage, testnet, mainnet]
+        options: [stage, testnet, mainnet, adi]
       protocol_ops_tag:
         description: "protocol-ops Docker image tag"
         required: true
@@ -63,16 +63,23 @@ jobs:
       - name: Select deployer private key + resolve its address
         id: deployer
         env:
-          KEY_STAGE: ${{ secrets.DEPLOYER_PRIVATE_KEY_STAGE }}
+          PRESET: l1-contracts/upgrade-envs/permanent-values/${{ inputs.environment }}.toml
+          L1_RPC_URL: ${{ inputs.l1_rpc_url }}
           KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
           KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
-          case "${{ inputs.environment }}" in
-            stage)   secret=STAGE   key="$KEY_STAGE" ;;
-            testnet) secret=SEPOLIA key="$KEY_SEPOLIA" ;;
-            mainnet) secret=MAINNET key="$KEY_MAINNET" ;;
-            *)       echo "unknown environment" >&2; exit 1 ;;
+          # Deployer secrets are per L1, as in deploy-ecosystem-upgrade.yaml.
+          l1=$(python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["l1_chain_id"])' "$PRESET")
+          case "$l1" in
+            1)        secret=MAINNET key="$KEY_MAINNET" ;;
+            11155111) secret=SEPOLIA key="$KEY_SEPOLIA" ;;
+            *)        echo "no deployer secret for L1 chain $l1" >&2; exit 1 ;;
           esac
+          rpc_chain=$(bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" cast chain-id --rpc-url "$L1_RPC_URL")
+          if [[ "$rpc_chain" != "$l1" ]]; then
+            echo "error: l1_rpc_url is chain $rpc_chain, but the $PRESET preset is on L1 $l1" >&2
+            exit 1
+          fi
           if [[ -z "$key" ]]; then
             echo "error: DEPLOYER_PRIVATE_KEY_$secret secret is empty" >&2
             exit 1

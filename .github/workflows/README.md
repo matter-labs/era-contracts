@@ -25,6 +25,19 @@ image was built from, so its configs are the image's: a change to `upgrade-envs/
 `verify-bundle-handoff` and `deploy-ecosystem-upgrade` run. The chain workflows run on the dispatched
 branch, whose `upgrade-envs/` is mounted into the image.
 
+### For partners
+
+Share the digest from the run summary. A partner needs docker and an L1 RPC, not a checkout: run the
+image directly, so the configs are the image's (`protocol-ops.sh` would mount the caller's
+`upgrade-envs/` over them):
+
+```bash
+docker run --rm --platform linux/amd64 -v "$PWD/out:/out" \
+  ghcr.io/matter-labs/protocol-ops@sha256:<digest> \
+  protocol_ops chain set-upgrade-timestamp --env adi --chain-id <id> --l1-rpc-url <rpc> \
+  --upgrade-timestamp <ts> --out /out
+```
+
 ## Mapping
 
 | Workflow                                        | Entry point                                |
@@ -37,9 +50,9 @@ branch, whose `upgrade-envs/` is mounted into the image.
 
 ## Execute workflows
 
-| Workflow                        | Purpose                                                                                                                                                                                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (e.g. the chain-init workflow's). Signs with the `DEPLOYER_PRIVATE_KEY_{STAGE,SEPOLIA,MAINNET}` secret of `stage`, `testnet` or `mainnet`; `adi` has no deployer secret, so it isn't offered. |
+| Workflow                        | Purpose                                                                                                                                                                                                                                         |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (e.g. the chain-init workflow's). Signs with the deployer secret of the preset's L1, `DEPLOYER_PRIVATE_KEY_SEPOLIA` or `_MAINNET`, and refuses bundles that target another EOA. |
 
 ## Ecosystem-upgrade workflows
 
