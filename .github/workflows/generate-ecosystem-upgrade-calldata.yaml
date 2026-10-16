@@ -292,7 +292,7 @@ on:
         default: ""
         type: string
       deployer_address:
-        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
+        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret (stage, testnet and mainnet only; a partner's env such as adi needs its own deployer here)."
         required: false
         default: ""
         type: string
@@ -404,6 +404,11 @@ jobs:
           if [ -n "${INPUT_DEPLOYER:-}" ]; then
             deployer="$INPUT_DEPLOYER"
           elif [ -n "${pk:-}" ]; then
+            # Our deployer only for our ecosystems: a partner's (adi) broadcasts with its own.
+            case "$ENVIRONMENT" in
+              stage|testnet|mainnet) ;;
+              *) echo "::error::'$ENVIRONMENT' is not our ecosystem: pass its own deployer as deployer_address (docs/protocol-ops-for-partners.md)"; exit 1 ;;
+            esac
             echo "::add-mask::$pk"
             deployer="$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast wallet address --private-key "$pk")"
           else

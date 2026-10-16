@@ -56,7 +56,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
+        description: "Environment = the same config-pair basename you generated with. Broadcasts only ours (stage, testnet, mainnet): a partner's (adi) is broadcast by its own deployer; verify_only takes any. Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
         required: true
         type: string
       generate_run_id:
@@ -376,6 +376,12 @@ jobs:
           PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
           set -euo pipefail
+          # Our deployer keys broadcast our ecosystems only (the bundle's env was matched
+          # to this input above); a partner (adi) broadcasts with its own key.
+          case "$ENVIRONMENT" in
+            stage|testnet|mainnet) ;;
+            *) echo "::error::'$ENVIRONMENT' is not our ecosystem: its own deployer broadcasts it (docs/protocol-ops-for-partners.md)"; exit 1 ;;
+          esac
           META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
           L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
           case "$L1_CHAIN_ID" in

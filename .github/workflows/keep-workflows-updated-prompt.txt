@@ -35,6 +35,7 @@ Mapping (workflow -> protocol-ops command):
 Conventions:
 - All workflows share: environment, protocol_ops_tag, l1_rpc_url
 - environment choices are the permanent-values presets (stage, testnet,
-  mainnet, adi)
+  mainnet, adi); workflows that sign or broadcast with our deployer keys take
+  only ours (stage, testnet, mainnet)
 - Artifact names:
   - per-chain workflows: safe-bundles-{operation}-{chain_id}-{environment}

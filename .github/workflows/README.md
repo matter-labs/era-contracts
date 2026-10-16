@@ -27,16 +27,12 @@ branch, whose `upgrade-envs/` is mounted into the image.
 
 ### For partners
 
-Share the digest from the run summary. A partner needs docker and an L1 RPC, not a checkout: run the
-image directly, so the configs are the image's (`protocol-ops.sh` would mount the caller's
-`upgrade-envs/` over them):
-
-```bash
-docker run --rm --platform linux/amd64 -v "$PWD/out:/out" \
-  ghcr.io/matter-labs/protocol-ops@sha256:<digest> \
-  protocol_ops chain set-upgrade-timestamp --env adi --chain-id <id> --l1-rpc-url <rpc> \
-  --upgrade-timestamp <ts> --out /out
-```
+Share the digest from the run summary. A partner (ADI) runs chain operations with `docker run` and no
+checkout, and signs and broadcasts with its own keys:
+[docs/protocol-ops-for-partners.md](../../docs/protocol-ops-for-partners.md). Our deployer keys serve
+only `stage`, `testnet` and `mainnet`: `execute-deployer-safe-bundles` offers no other, the
+`deploy-ecosystem-upgrade` broadcast refuses any other, and generate takes a blank `deployer_address`
+(our deployer) for no other.
 
 ## Mapping
 
@@ -50,9 +46,9 @@ docker run --rm --platform linux/amd64 -v "$PWD/out:/out" \
 
 ## Execute workflows
 
-| Workflow                        | Purpose                                                                                                                                                                                                                                         |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (e.g. the chain-init workflow's). Signs with the deployer secret of the preset's L1, `DEPLOYER_PRIVATE_KEY_SEPOLIA` or `_MAINNET`, and refuses bundles that target another EOA. |
+| Workflow                        | Purpose                                                                                                                                                                                                                                                                                              |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (e.g. the chain-init workflow's). Our ecosystems only (`stage`, `testnet`, `mainnet`): signs with the deployer secret of the preset's L1, `DEPLOYER_PRIVATE_KEY_SEPOLIA` or `_MAINNET`, and refuses bundles that target another EOA. |
 
 ## Ecosystem-upgrade workflows
 
@@ -71,7 +67,8 @@ transfers between machines.
 - **All workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`
 - **`environment`** is a preset: `l1-contracts/upgrade-envs/permanent-values/<env>.toml` (`stage`,
   `testnet`, `mainnet`, `adi`), passed as `--env <env>`; it gives the bridgehub and the L1 chain id.
-  Chain workflows take the chain as `chain_id` (`--chain-id`).
+  Chain workflows take the chain as `chain_id` (`--chain-id`). What uses our deployer keys takes only
+  ours (see [For partners](#for-partners)).
 - **Integration-test-only** env vars (e.g. `L1_DIAMOND_CUT_DATA`) are NOT workflow inputs
 - **v30-only** overrides are marked `[v30 only]` in descriptions and `TODO(v30-removal)` in code
 - **Artifact names**: per-chain workflows upload `safe-bundles-{operation}-{chain_id}-{environment}`

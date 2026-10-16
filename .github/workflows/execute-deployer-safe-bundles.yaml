@@ -14,10 +14,10 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment = upgrade-envs/permanent-values/<env>.toml preset; its l1_chain_id selects the DEPLOYER_PRIVATE_KEY_{SEPOLIA,MAINNET} secret"
+        description: "Target environment = upgrade-envs/permanent-values/<env>.toml preset; its l1_chain_id selects the DEPLOYER_PRIVATE_KEY_{SEPOLIA,MAINNET} secret. Our ecosystems only: partners (adi) sign with their own keys, see docs/protocol-ops-for-partners.md"
         required: true
         type: choice
-        options: [stage, testnet, mainnet, adi]
+        options: [stage, testnet, mainnet]
       protocol_ops_tag:
         description: "protocol-ops Docker image tag"
         required: true
