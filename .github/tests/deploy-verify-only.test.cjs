@@ -78,7 +78,7 @@ test("a verification failure fails the step without skipping remaining contracts
   assert.equal(result.calls.filter((call) => call.includes("good")).length, 1);
 });
 
-test("DA contracts use their own root in the image without changing recorded constructor arguments", () => {
+test("DA contracts verify from l1-contracts without changing recorded constructor arguments", () => {
   const result = runVerification(
     "forge verify-contract first EIP7702Checker\n" +
       "forge verify-contract second RollupL1DAValidator --constructor-args 0x1234\n" +
@@ -86,9 +86,9 @@ test("DA contracts use their own root in the image without changing recorded con
   );
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.calls, [
-    "--tag sha256:image forge verify-contract first EIP7702Checker --root /contracts/da-contracts --chain mainnet --watch --retries 8 --delay 20",
-    "--tag sha256:image forge verify-contract second RollupL1DAValidator --constructor-args 0x1234 --root /contracts/da-contracts --chain mainnet --watch --retries 8 --delay 20",
-    "--tag sha256:image forge verify-contract third CommitterFacet --constructor-args 0x5678 --root /contracts/l1-contracts --chain mainnet --watch --retries 8 --delay 20",
+    "--tag sha256:image forge verify-contract first EIP7702Checker --chain mainnet --watch --retries 8 --delay 20",
+    "--tag sha256:image forge verify-contract second RollupL1DAValidator --constructor-args 0x1234 --chain mainnet --watch --retries 8 --delay 20",
+    "--tag sha256:image forge verify-contract third CommitterFacet --constructor-args 0x5678 --chain mainnet --watch --retries 8 --delay 20",
   ]);
 });
 

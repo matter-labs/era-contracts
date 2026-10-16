@@ -19,7 +19,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-contract MessageRootTest is Test {
+contract L2MessageVerificationTest is Test {
     uint256 internal constant TEST_L1_TIMESTAMP = 1_700_000_000;
     bytes32 internal constant NON_ZERO_TIMESTAMP_INTEROP_ROOT =
         0x55765aa3f08b5bec688734c70b62b130aeb4be787d6206ed626d7675742db67d;

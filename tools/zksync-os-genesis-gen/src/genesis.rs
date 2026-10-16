@@ -4,9 +4,7 @@ use crate::consts::{
     SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
-use crate::utils::{
-    address_to_b256, da_contract_name_to_code, generate_random_address, l1_contract_name_to_code,
-};
+use crate::utils::{address_to_b256, generate_random_address, l1_contract_name_to_code};
 use alloy::consensus::{EMPTY_OMMER_ROOT_HASH, Header};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, B64, B256, Bloom, U256};
@@ -26,12 +24,6 @@ impl InitialGenesisInput {
     pub fn from_forge_artifacts(l1_contracts_out: &std::path::Path) -> anyhow::Result<Self> {
         Self::build_from_source_loader(|source| match source {
             ContractSource::L1ContractName(name) => load_artifact(l1_contracts_out, name),
-            ContractSource::DAContractName(name) => {
-                anyhow::bail!(
-                    "DA contract '{name}' not supported in from_forge_artifacts; \
-                     pass the DA contracts out dir separately if needed"
-                )
-            }
             ContractSource::Bytecode(bytes) => Ok(bytes.to_vec()),
         })
     }
@@ -44,7 +36,6 @@ impl InitialGenesisInput {
         Self::build_from_source_loader(|source| {
             Ok(match source {
                 ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
-                ContractSource::DAContractName(name) => da_contract_name_to_code(name),
                 ContractSource::Bytecode(bytes) => bytes.to_vec(),
             })
         })

@@ -498,11 +498,11 @@ jobs:
           # already emits the exact `--constructor-args <hex>` for every contract
           # that has them (derived from the CREATE2 init code it deployed — see
           # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
-          # guess. We only run it in the bundle's image with that image's `--root`
-          # and append the chain + `--watch`; the key comes from $ETHERSCAN_API_KEY
-          # in the env. `--retries/--delay` ride out Etherscan indexing
-          # freshly-deployed code. Report partial failures explicitly;
-          # normal deployments tolerate them, verification-only runs do not.
+          # guess. We only run it in the bundle's image and append the chain +
+          # `--watch`; the key comes from $ETHERSCAN_API_KEY in the env.
+          # `--retries/--delay` ride out Etherscan indexing freshly-deployed code.
+          # Report partial failures explicitly; normal deployments tolerate them,
+          # verification-only runs do not.
           verified=0
           failed=0
           readonly verification_attempts=3
@@ -510,18 +510,12 @@ jobs:
           po() { bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" "$@"; }
           while IFS= read -r cmd; do
             echo "--- $cmd"
-            # These contracts are built by da-contracts, not l1-contracts.
-            # Keep the recorded address and constructor arguments unchanged.
             read -r _forge _verify _address contract _rest <<< "$cmd"
-            verification_root=/contracts/l1-contracts
-            case "$contract" in
-              EIP7702Checker|RollupL1DAValidator) verification_root=/contracts/da-contracts ;;
-            esac
             success=false
             for ((attempt=1; attempt<=verification_attempts; attempt++)); do
               # --retries covers verification polling, but not an initial ABI
               # request timeout. Retry the complete idempotent submission too.
-              if eval "po $cmd --root $verification_root --chain $CHAIN --watch --retries 8 --delay 20"; then
+              if eval "po $cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
                 success=true
                 break
               fi

@@ -93,11 +93,6 @@ jobs:
       - name: Warm solc build cache
         uses: ./.github/actions/warm-solc-cache
 
-      - name: Build da contracts
-        working-directory: da-contracts
-        run: |
-          yarn build:foundry
-
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
@@ -114,8 +109,6 @@ jobs:
         with:
           key: artifacts-l1-ci-${{ github.sha }}
           path: |
-            da-contracts/cache-forge
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
 
@@ -125,8 +118,6 @@ jobs:
           overwrite: true
           name: build-artifacts-${{ matrix.kind }}
           path: |
-            da-contracts/cache-forge
-            da-contracts/out
             l1-contracts/cache-forge
             l1-contracts/out
 
@@ -163,10 +154,6 @@ jobs:
       # repository does not ship; it skips here and runs in zksync-os-integration-tests.
       - name: Run tests
         working-directory: ./l1-contracts
-        run: yarn test:foundry
-
-      - name: Run DA tests
-        working-directory: ./da-contracts
         run: yarn test:foundry
 
       # TODO: restore once we can get back to latest foundry
@@ -236,10 +223,21 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # The artifact holds only l1-contracts paths, so its root is l1-contracts/.
       - name: Restore this revision's build artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ matrix.kind }}
+          path: l1-contracts
+
+      # A base revision from before da-contracts moved into l1-contracts (EVM-1760) still reads
+      # da-contracts/out, which the build job no longer produces. Drop this step once no
+      # coverage base can predate the move.
+      - &build-legacy-da-contracts
+        name: Build da-contracts (base revisions before EVM-1760)
+        if: hashFiles('da-contracts/foundry.toml') != ''
+        working-directory: da-contracts
+        run: yarn build:foundry
 
       # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
       # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.
@@ -325,8 +323,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: build-artifacts-${{ matrix.kind }}
+          path: l1-contracts
 
       - *coverage-foundry-setup
+
+      - *build-legacy-da-contracts
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -566,8 +567,6 @@ jobs:
   #         fail-on-cache-miss: true
   #         key: artifacts-l1-ci-${{ github.sha }}
   #         path: |
-  #           da-contracts/cache-forge
-  #           da-contracts/out
   #           l1-contracts/cache-forge
   #           l1-contracts/out
 

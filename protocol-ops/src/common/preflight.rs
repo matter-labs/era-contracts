@@ -3,28 +3,16 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-use crate::common::{
-    logger,
-    paths::{contracts_root, resolve_l1_contracts_path},
-};
+use crate::common::{logger, paths::resolve_l1_contracts_path};
 
 /// Ensure all Forge artifact directories needed by `bootstrap` and `apply`
 /// exist, building them automatically when they are missing.
 ///
-/// Runs `forge build` in `l1-contracts/` and `da-contracts/` if their `out/`
-/// directories are absent or incomplete.
+/// Runs `forge build` in `l1-contracts/` if its `out/` directory is absent.
 pub fn check_required_artifacts() -> Result<()> {
     let l1 = resolve_l1_contracts_path()?;
     if !l1.join("out").exists() {
         forge_build(&l1)?;
-    }
-
-    // DeployCTM.s.sol reads EIP7702Checker and RollupL1DAValidator bytecodes
-    // from da-contracts/out/. Without this, forge prints a cryptic
-    // "not allowed to be accessed for read operations" error.
-    let da = contracts_root().join("da-contracts");
-    if !da.join("out").join("EIP7702Checker.sol").exists() {
-        forge_build(&da)?;
     }
 
     Ok(())

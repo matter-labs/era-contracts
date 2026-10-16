@@ -10,7 +10,7 @@
 - `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v31→v33 upgrade test.
 - `.github/workflows/update-generated-artifacts.yaml` — the one-dispatch regen (hashes + selectors + zkstack-out, then chain states) that clears every pre-merge check.
 - `recompute_hashes.sh` — one-shot rebuild + recompute + write hashes.
-- `package.json`, `l1-contracts/package.json`, `da-contracts/package.json` — top-level scripts referenced below.
+- `package.json`, `l1-contracts/package.json` — top-level scripts referenced below.
 
 ## CI tiers: per-commit vs pre-merge
 
@@ -82,17 +82,16 @@ foundryup --install "$FOUNDRY_VERSION"
 From the repo root:
 
 ```bash
-yarn da build:foundry   # da-contracts → da-contracts/out
 yarn l1 build:foundry   # l1-contracts → l1-contracts/out, zkstack-out
 ```
 
-Order matters: l1 needs da artifacts, anvil-interop needs both, and `l1 build:foundry` regenerates `zkstack-out` (see step 4). If `yarn l1 build:foundry` fails, **stop and fix the Solidity** — every later step will fail too.
+anvil-interop needs these artifacts, and `l1 build:foundry` regenerates `zkstack-out` (see step 4). If `yarn l1 build:foundry` fails, **stop and fix the Solidity** — every later step will fail too.
 
 ### 1a. Foundry tests
 
 ```bash
 cd l1-contracts
-yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*'
+yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*'
 ```
 
 Common foundry test failures and their root causes:
@@ -184,18 +183,17 @@ done
 
 CI also runs `codespell` and `crate-ci/typos` as separate jobs (see `.github/workflows/lint.yaml`). They are easy to forget locally because neither is wired into `yarn lint:check`. Both must pass independently.
 
-**Important: filter out submodule paths locally.** CI's `actions/checkout@v6` runs without `submodules: true`, so it never sees the contents of `lib/`, `l1-contracts/lib/`, `da-contracts/lib/`, etc. Locally those directories are populated and produce hundreds of false-positive errors that CI doesn't see. Use `typos`'s native `--exclude` (do **not** pipe `git ls-files | xargs typos` — file paths with spaces in submodule audits will silently break the pipeline before scanning starts):
+**Important: filter out submodule paths locally.** CI's `actions/checkout@v6` runs without `submodules: true`, so it never sees the contents of `lib/`, `l1-contracts/lib/`, etc. Locally those directories are populated and produce hundreds of false-positive errors that CI doesn't see. Use `typos`'s native `--exclude` (do **not** pipe `git ls-files | xargs typos` — file paths with spaces in submodule audits will silently break the pipeline before scanning starts):
 
 ```bash
 # typos — exclude submodule paths to match CI's view
 typos . \
   --exclude 'lib/**' \
-  --exclude 'l1-contracts/lib/**' \
-  --exclude 'da-contracts/lib/**'
+  --exclude 'l1-contracts/lib/**'
 
 # codespell — `skip` already supports comma-separated paths
 codespell . \
-  --skip='_typos.toml,*.json,*.lock,*.html,*.map,target,node_modules,venv,dist,report,yarn-error.log,lib,l1-contracts/lib,da-contracts/lib'
+  --skip='_typos.toml,*.json,*.lock,*.html,*.map,target,node_modules,venv,dist,report,yarn-error.log,lib,l1-contracts/lib'
 
 # Quick "did *I* introduce a typo" check: only run on what your branch changed
 git diff --name-only -z main -- ':!lib' ':!*/lib/*' | xargs -0 typos
@@ -286,7 +284,6 @@ Before pushing, run from repo root:
 
 ```bash
 # 1. Build everything (catches Solidity break first)
-yarn da build:foundry
 yarn l1 build:foundry
 
 # 2. Tests

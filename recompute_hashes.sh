@@ -55,11 +55,9 @@ git submodule update --init --recursive
 
 yarn
 
-# Clean and rebuild the ordinary-EVM artifact roots.
-forge clean --root da-contracts
+# Clean and rebuild the ordinary-EVM artifacts.
 forge clean --root l1-contracts
 
-yarn --cwd da-contracts build:foundry
 yarn --cwd l1-contracts build:foundry
 
 yarn calculate-hashes:fix

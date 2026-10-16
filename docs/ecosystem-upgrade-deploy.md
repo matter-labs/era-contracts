@@ -193,15 +193,12 @@ EXTRA_MOUNTS="$PWD/deploy-result:/contracts/deploy-result" \
 # Verify on Etherscan — replay the logged forge verify-contract commands VERBATIM,
 # in the image (its artifacts are the deployed ones). Step 1 already wrote the exact
 # `--constructor-args <hex>` for every contract (from the CREATE2 init code it
-# deployed), so nothing is guessed. The DA contracts are da-contracts' own.
+# deployed), so nothing is guessed.
 export ETHERSCAN_API_KEY   # protocol-ops.sh passes it into the image
 grep 'forge verify-contract' "$OUT/extra-verification-logs.txt" |
   sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u |
   while IFS= read -r cmd; do
-    read -r _ _ _ contract _ <<< "$cmd"
-    root=/contracts/l1-contracts
-    case "$contract" in EIP7702Checker|RollupL1DAValidator) root=/contracts/da-contracts ;; esac
-    eval "./protocol-ops.sh --tag $TAG $cmd --root $root --chain mainnet --watch --retries 8 --delay 20" || true
+    eval "./protocol-ops.sh --tag $TAG $cmd --chain mainnet --watch --retries 8 --delay 20" || true
   done
 ```
 

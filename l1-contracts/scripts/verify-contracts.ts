@@ -55,11 +55,9 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
   const repoRoot = path.resolve(__dirname, "../..");
 
   try {
-    solPath = execFileSync(
-      "find",
-      [`${repoRoot}/l1-contracts`, `${repoRoot}/da-contracts`, "-type", "f", "-iname", `${name}.sol`],
-      { encoding: "utf8" }
-    )
+    solPath = execFileSync("find", [`${repoRoot}/l1-contracts`, "-type", "f", "-iname", `${name}.sol`], {
+      encoding: "utf8",
+    })
       .split("\n")[0]
       .trim();
   } catch {
@@ -72,11 +70,9 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
       console.log(`🛠 Using fallbacks for ${name}: ${fallbacks.join(", ")}`);
       for (const alt of fallbacks) {
         try {
-          solPath = execFileSync(
-            "find",
-            [`${repoRoot}/l1-contracts`, `${repoRoot}/da-contracts`, "-type", "f", "-iname", `${alt}.sol`],
-            { encoding: "utf8" }
-          )
+          solPath = execFileSync("find", [`${repoRoot}/l1-contracts`, "-type", "f", "-iname", `${alt}.sol`], {
+            encoding: "utf8",
+          })
             .split("\n")[0]
             .trim();
         } catch {
@@ -97,30 +93,23 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
   let dir = path.dirname(solPath);
 
   // Walk up the directory tree until we either:
-  //  - reach the root of the repository (l1-contracts or da-contracts),
+  //  - reach the root of the repository (l1-contracts),
   //  - or find a folder that contains foundry.toml (project root).
-  while (
-    dir !== "." &&
-    dir !== `${repoRoot}/l1-contracts` &&
-    dir !== `${repoRoot}/da-contracts` &&
-    !existsSync(path.join(dir, "foundry.toml"))
-  ) {
+  while (dir !== "." && dir !== `${repoRoot}/l1-contracts` && !existsSync(path.join(dir, "foundry.toml"))) {
     // Move one level up
     dir = path.dirname(dir);
   }
 
   // If we climbed all the way up and still didn’t find foundry.toml,
-  // assume the project root is just the contracts folder (l1-contracts or da-contracts).
+  // assume the project root is just the contracts folder (l1-contracts).
   if (!existsSync(path.join(dir, "foundry.toml"))) {
     if (solPath.includes("/l1-contracts/")) {
       dir = path.join(repoRoot, "l1-contracts");
-    } else if (solPath.includes("/da-contracts/")) {
-      dir = path.join(repoRoot, "da-contracts");
     } else {
       throw new Error(
         "❌ Could not determine project root for " +
           solPath +
-          ". Expected it to be inside l1-contracts or da-contracts, but no foundry.toml found."
+          ". Expected it to be inside l1-contracts, but no foundry.toml found."
       );
     }
   }
