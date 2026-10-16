@@ -7,7 +7,7 @@ on:
         description: "Target environment = basename of upgrade-envs/permanent-values/<env>.toml (read by protocol_ops --env)"
         required: true
         type: choice
-        options: [stage, testnet, mainnet, adi]
+        options: [stage, stage3, testnet, mainnet, adi]
       protocol_ops_tag:
         description: "protocol-ops Docker image tag"
         required: true
