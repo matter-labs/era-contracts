@@ -10,9 +10,11 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # any transactions, dispatch with verify_only=true and run_verify=true using
 # the SAME generate_run_id that supplied the deployed bundle.
 #
-# It runs the SAME `protocol_ops` commands you'd run locally (see
-# `docs/ecosystem-upgrade-deploy.md`), so a local deploy and a CI deploy are
-# byte-for-byte the same tool — CI is just a convenience wrapper.
+# Every command runs in the protocol-ops image the bundle was generated with
+# (`bundle-metadata.json` `protocol_ops_image.digest`, pulled by digest), from a
+# checkout of the commit that image was built from. Nothing is compiled here,
+# and these are the same `./protocol-ops.sh --tag sha256:<digest>` commands you'd
+# run locally (see `docs/ecosystem-upgrade-deploy.md`).
 #
 # What gets broadcast: ONLY the deployer's (Camp-A) bundles — the ones whose
 # `manifest.bundles[].target` is the deployer EOA. The legacy-Governance /
@@ -46,12 +48,15 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 #   ETHERSCAN_API_KEY                         — for the Etherscan verify step
 # The L1 RPC URL comes from the secret (never a plaintext input) so its API key
 # is never shown in the run-summary UI.
+#
+# The step names and `if:` guards below are pinned by
+# `.github/tests/deploy-verify-only.test.cjs` (run by lint.yaml).
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
+        description: "Environment = the same config-pair basename you generated with. Broadcasts only ours (stage, testnet, mainnet): a partner's (adi) is broadcast by its own deployer; verify_only takes any. Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
         required: true
         type: string
       generate_run_id:
@@ -159,7 +164,6 @@ jobs:
               return;
             }
 
-            core.exportVariable("GENERATE_HEAD_SHA", run.head_sha);
             core.exportVariable("GENERATE_RUN_URL", run.html_url);
             core.info(`Handoff proof passed: ${handoffJobs[0].html_url}`);
 
@@ -187,49 +191,14 @@ jobs:
               core.exportVariable("RESUME_RUN_URL", resumeRun.html_url);
             }
 
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Install Foundry (cast + forge for verify)
-        uses: ./.github/actions/install-foundry
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.91.1
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Test verification-only workflow guards
-        run: node --test .github/tests/deploy-verify-only.test.cjs
-
-      - name: Build protocol_ops
-        working-directory: protocol-ops
-        run: cargo build --release
-
-      # forge verify-contract compiles the source to compare against the
-      # on-chain bytecode, so it needs the EVM (out/) artifacts. Skipped when
-      # not verifying — the broadcast itself needs no contract build.
-      - name: Build contracts (for Etherscan verify)
-        if: ${{ inputs.run_verify }}
-        run: yarn l1 build:foundry
-
       # The deploy bundle produced by step 1: the deployer calls, ecosystem.toml,
-      # the Etherscan verify log and `bundle-metadata.json`.
+      # the Etherscan verify log and `bundle-metadata.json`. Outside the
+      # workspace: the checkout below would clean it.
       - name: Download the deploy bundle from the calldata (step 1) run
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: ${{ github.workspace }}/deploy-inputs
+          path: ${{ runner.temp }}/deploy-inputs
           run-id: ${{ inputs.generate_run_id }}
           github-token: ${{ github.token }}
 
@@ -238,21 +207,43 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
-          path: ${{ github.workspace }}/previous-deploy-result
+          path: ${{ runner.temp }}/previous-deploy-result
           run-id: ${{ inputs.resume_deploy_run_id }}
           github-token: ${{ github.token }}
 
-      - name: Validate deploy bundle integrity
+      # The bundle names the image it was generated with, pulled by digest, and the
+      # commit that image was built from; the checkout below takes protocol-ops.sh
+      # and the upgrade's configs from that commit.
+      - name: Pull the bundle's protocol-ops image
         run: |
           set -euo pipefail
-          META="$(find "$GITHUB_WORKSPACE/deploy-inputs" -name bundle-metadata.json -print -quit)"
-          if [ -z "$META" ]; then
-            echo "::error::bundle-metadata.json not found in the downloaded deploy inputs"
-            exit 1
+          bundle="$RUNNER_TEMP/deploy-inputs"
+          digest="$(jq -r '.protocol_ops_image.digest // empty' "$bundle/bundle-metadata.json")"
+          commit="$(jq -r '.contracts_commit' "$bundle/bundle-metadata.json")"
+          if [ -z "$digest" ]; then
+            echo "::error::the bundle names no protocol-ops image: generate it with a released one"; exit 1
           fi
-          DEPLOY_BUNDLE_DIR="$(dirname "$META")"
-          ./protocol-ops/target/release/protocol_ops ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
-          echo "DEPLOY_BUNDLE_DIR=$DEPLOY_BUNDLE_DIR" >> "$GITHUB_ENV"
+          docker pull --quiet --platform=linux/amd64 "$digest"
+          revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$digest")"
+          if [ -z "$revision" ] || [ "$revision" != "$commit" ]; then
+            echo "::error::$digest was built from '$revision', the bundle from '$commit'"; exit 1
+          fi
+          {
+            echo "DEPLOY_BUNDLE_DIR=$bundle"
+            echo "BUNDLE_IMAGE=${digest#*@}"
+            echo "BUNDLE_COMMIT=$commit"
+            # Mounted at the same path, so the commands below take host paths.
+            echo "EXTRA_MOUNTS=$RUNNER_TEMP:$RUNNER_TEMP"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout the bundle's commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BUNDLE_COMMIT }}
+          persist-credentials: false
+
+      - name: Validate deploy bundle integrity
+        run: bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem verify-bundle "$DEPLOY_BUNDLE_DIR"
 
       # The bundle names the upgrade it was generated for; that upgrade's upgrade.toml in this
       # checkout says how its broadcast is checked (protocol-ops/src/common/upgrade_descriptor.rs).
@@ -275,8 +266,6 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # Tie the downloaded bytes back to the exact successful generation run.
-      # Broadcasting is commit-agnostic, but Etherscan verification recompiles
-      # from this checkout, so a different checkout is still warned separately.
       - name: Check bundle provenance against the proven run
         env:
           ENVIRONMENT: ${{ inputs.environment }}
@@ -284,24 +273,17 @@ jobs:
           set -euo pipefail
           META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
           cat "$META"
-          bundle_commit="$(jq -r '.contracts_commit // empty' "$META")"
           bundle_run="$(jq -r '.generated_by.workflow_run // empty' "$META")"
           bundle_env="$(jq -r '.env // empty' "$META")"
           bundle_dirty="$(jq -r 'if has("contracts_worktree_dirty") then (.contracts_worktree_dirty | tostring) else empty end' "$META")"
           if [ "$bundle_run" != "$GENERATE_RUN_URL" ]; then
             echo "::error::bundle provenance run '$bundle_run' does not match proven run '$GENERATE_RUN_URL'"; exit 1
           fi
-          if [ "$bundle_commit" != "$GENERATE_HEAD_SHA" ]; then
-            echo "::error::bundle commit '$bundle_commit' does not match generation head '$GENERATE_HEAD_SHA'"; exit 1
-          fi
           if [ "$bundle_env" != "$ENVIRONMENT" ]; then
             echo "::error::bundle env '$bundle_env' does not match requested env '$ENVIRONMENT'"; exit 1
           fi
           if [ "$bundle_dirty" != "false" ]; then
             echo "::error::bundle was generated from a dirty or unknown worktree"; exit 1
-          fi
-          if [ "$bundle_commit" != "$GITHUB_SHA" ]; then
-            echo "::warning::bundle was generated from $bundle_commit but this run checked out $GITHUB_SHA — re-dispatch on that commit for a source-matching Etherscan verify."
           fi
 
       # A failed broadcast can already have mined some CREATE2 transactions.
@@ -316,12 +298,12 @@ jobs:
           RESUME_FROM_OTHER_BUNDLE: ${{ inputs.resume_from_other_bundle }}
         run: |
           set -euo pipefail
-          OUTDIR="$GITHUB_WORKSPACE/deploy-result"
+          OUTDIR="$RUNNER_TEMP/deploy-result"
           mkdir -p "$OUTDIR"
           bundle_metadata_sha256="$(sha256sum "$DEPLOY_BUNDLE_DIR/bundle-metadata.json" | awk '{print $1}')"
 
           if [ -n "$RESUME_DEPLOY_RUN_ID" ]; then
-            previous_meta="$(find "$GITHUB_WORKSPACE/previous-deploy-result" -name resume-metadata.json -print -quit)"
+            previous_meta="$(find "$RUNNER_TEMP/previous-deploy-result" -name resume-metadata.json -print -quit)"
             if [ -z "$previous_meta" ]; then
               echo "::error::resume artifact has no resume-metadata.json"; exit 1
             fi
@@ -394,6 +376,12 @@ jobs:
           PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
           set -euo pipefail
+          # Our deployer keys broadcast our ecosystems only (the bundle's env was matched
+          # to this input above); a partner (adi) broadcasts with its own key.
+          case "$ENVIRONMENT" in
+            stage|testnet|mainnet) ;;
+            *) echo "::error::'$ENVIRONMENT' is not our ecosystem: its own deployer broadcasts it (docs/protocol-ops-for-partners.md)"; exit 1 ;;
+          esac
           META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
           L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$META")"
           case "$L1_CHAIN_ID" in
@@ -410,13 +398,13 @@ jobs:
           fi
           echo "::add-mask::$rpc"
           echo "::add-mask::$pk"
-          actual_chain_id="$(cast chain-id --rpc-url "$rpc")"
+          actual_chain_id="$(bash protocol-ops.sh --tag "$BUNDLE_IMAGE" cast chain-id --rpc-url "$rpc")"
           if [ "$actual_chain_id" != "$L1_CHAIN_ID" ]; then
             echo "::error::RPC selected for $net reports chain id $actual_chain_id, bundle requires $L1_CHAIN_ID"
             exit 1
           fi
           echo "RPC chain id verified: $actual_chain_id"
-          deployer="$(cast wallet address --private-key "$pk")"
+          deployer="$(bash protocol-ops.sh --tag "$BUNDLE_IMAGE" cast wallet address --private-key "$pk")"
           echo "Deployer (real signer): $deployer"
           # The bundle names the EOA whose bundles are the deployer's. If the key in
           # CI is a different account, `--skip-unkeyed` would silently broadcast
@@ -456,7 +444,7 @@ jobs:
           esac
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
           echo "Manifest: $MANIFEST"
-          ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
+          bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
             --key "${DEPLOYER_ADDR}=${pk}" \
@@ -472,7 +460,7 @@ jobs:
         if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
         run: |
           set -euo pipefail
-          ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
+          bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle \
             --bundle "$DEPLOY_BUNDLE_DIR" \
             --rpc "$L1_RPC_URL" \
             --verify-only \
@@ -483,7 +471,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
-          path: ${{ github.workspace }}/deploy-result
+          path: ${{ runner.temp }}/deploy-result
           if-no-files-found: warn
           retention-days: 90
 
@@ -497,7 +485,6 @@ jobs:
         continue-on-error: ${{ !inputs.verify_only }}
         env:
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-        working-directory: l1-contracts
         run: |
           set -uo pipefail
           if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
@@ -517,14 +504,16 @@ jobs:
           # already emits the exact `--constructor-args <hex>` for every contract
           # that has them (derived from the CREATE2 init code it deployed — see
           # Create2FactoryUtils.notifyAboutDeployment), so there is nothing to
-          # guess. We only append the chain + `--watch`; the key comes from
-          # $ETHERSCAN_API_KEY in the env. `--retries/--delay` ride out Etherscan
-          # indexing freshly-deployed code. Report partial failures explicitly;
-          # normal deployments tolerate them, verification-only runs do not.
+          # guess. We only run it in the bundle's image and append the chain +
+          # `--watch`; the key comes from $ETHERSCAN_API_KEY in the env.
+          # `--retries/--delay` ride out Etherscan indexing freshly-deployed code.
+          # Report partial failures explicitly; normal deployments tolerate them,
+          # verification-only runs do not.
           verified=0
           failed=0
           readonly verification_attempts=3
           readonly verification_retry_delay=10
+          po() { bash "$GITHUB_WORKSPACE/protocol-ops.sh" --tag "$BUNDLE_IMAGE" "$@"; }
           while IFS= read -r cmd; do
             echo "--- $cmd"
             read -r _forge _verify _address contract _rest <<< "$cmd"
@@ -532,7 +521,7 @@ jobs:
             for ((attempt=1; attempt<=verification_attempts; attempt++)); do
               # --retries covers verification polling, but not an initial ABI
               # request timeout. Retry the complete idempotent submission too.
-              if eval "$cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
+              if eval "po $cmd --chain $CHAIN --watch --retries 8 --delay 20"; then
                 success=true
                 break
               fi

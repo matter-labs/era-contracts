@@ -30,7 +30,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: zksync-association/zk-governance
-          ref: kl/v31-puh-guardians-redeploy
+          ref: 9b06a16159cd58add109f25598e79731450d1772 # build-docker.yaml's ZK_GOVERNANCE_COMMIT
           submodules: recursive
           path: zk-governance
 

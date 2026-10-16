@@ -60,7 +60,7 @@ const OPTIONAL_BUNDLE_FILES: [&str; 2] =
 const TRANSACTIONS_LOG: &str = "transactions.txt";
 
 /// The reviewed zk-governance commit PUVT verifies governance bytecodes against by default
-/// (same default as the generate workflow input).
+/// (the one build-docker.yaml checks out into the image).
 const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
@@ -92,6 +92,13 @@ const CONTRACT_SOURCE_PATHSPECS: [&str; 10] = [
     "protocol-ops/src",
     "system-contracts/contracts",
 ];
+
+/// Set in the protocol-ops image (`docker/protocol/Dockerfile`): the commit its sources were
+/// built from.
+const IMAGE_CONTRACTS_COMMIT_ENV: &str = "PROTOCOL_OPS_CONTRACTS_COMMIT";
+/// Set by `protocol-ops.sh --tag`: the image reference it ran and that image's registry digest.
+const IMAGE_REFERENCE_ENV: &str = "PROTOCOL_OPS_IMAGE";
+const IMAGE_DIGEST_ENV: &str = "PROTOCOL_OPS_IMAGE_DIGEST";
 
 /// [`CONTRACT_SOURCE_PATHSPECS`] plus the upgrade's own input TOMLs.
 fn contract_source_pathspecs(upgrade: &str) -> Vec<String> {
@@ -132,6 +139,8 @@ pub struct DeployBundleMetadata {
     pub upgrade: String,
     pub env: String,
     pub contracts_commit: String,
+    /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in the
+    /// protocol-ops image, which records its own commit and does not check the mounted `upgrade-envs/`.
     pub contracts_worktree_dirty: bool,
     pub all_contracts_hashes_sha256: String,
     pub l1: L1Provenance,
@@ -139,8 +148,19 @@ pub struct DeployBundleMetadata {
     pub zk_governance_commit: Option<String>,
     pub toolchain: Toolchain,
     pub generated_by: Option<GeneratedBy>,
+    /// The protocol-ops image the bundle was generated in; absent when generated from a checkout.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol_ops_image: Option<ImageProvenance>,
     /// Bundle-relative POSIX path → SHA-256, for every file except this one.
     pub files: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImageProvenance {
+    /// The reference the run was started with: `<repo>:<tag>` or `<repo>@sha256:<digest>`.
+    pub reference: String,
+    /// `<repo>@sha256:<digest>`; absent for an image that never came from a registry.
+    pub digest: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,6 +260,39 @@ fn github_run_provenance() -> Option<GeneratedBy> {
     })
 }
 
+fn env_value(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|value| !value.is_empty())
+}
+
+fn image_provenance() -> Option<ImageProvenance> {
+    Some(ImageProvenance {
+        reference: env_value(IMAGE_REFERENCE_ENV)?,
+        digest: env_value(IMAGE_DIGEST_ENV),
+    })
+}
+
+/// The commit the protocol-ops image was built from, else the checkout's HEAD.
+fn contracts_commit(repository_root: &Path) -> String {
+    env_value(IMAGE_CONTRACTS_COMMIT_ENV)
+        .or_else(|| try_capture("git", &["rev-parse", "HEAD"], repository_root))
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// The sources that decide the bundle's bytes and differ from [`contracts_commit`], one per
+/// line (empty when none do), or `None` when that cannot be told.
+fn source_changes(repository_root: &Path, upgrade: &str) -> Option<String> {
+    // The image has no git (the generate workflow mounts a checkout of the image's commit).
+    if env_value(IMAGE_CONTRACTS_COMMIT_ENV).is_some() {
+        return Some(String::new());
+    }
+    let pathspecs = contract_source_pathspecs(upgrade);
+    let git_status_args: Vec<&str> = ["status", "--porcelain", "--"]
+        .into_iter()
+        .chain(pathspecs.iter().map(String::as_str))
+        .collect();
+    try_capture("git", &git_status_args, repository_root)
+}
+
 /// Every regular file below `directory`, as directory-relative POSIX paths.
 fn list_files(directory: &Path, prefix: &str, out: &mut Vec<String>) -> anyhow::Result<()> {
     for entry in fs::read_dir(directory).with_context(|| format!("list {}", directory.display()))? {
@@ -307,26 +360,20 @@ pub fn pack_deploy_bundle(
         .map(|relative| Ok((relative.clone(), sha256_file(&bundle_dir.join(relative))?)))
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
 
-    let pathspecs = contract_source_pathspecs(upgrade);
-    let git_status_args: Vec<&str> = ["status", "--porcelain", "--"]
-        .into_iter()
-        .chain(pathspecs.iter().map(String::as_str))
-        .collect();
-    let source_status = try_capture("git", &git_status_args, repository_root);
+    let source_status = source_changes(repository_root, upgrade);
     match source_status.as_deref() {
         Some("") => {}
         Some(dirty) => logger::warn(format!(
             "contract sources differ from the commit; the bundle is marked dirty:
 {dirty}"
         )),
-        None => logger::warn("git status failed; the bundle is marked dirty"),
+        None => logger::warn("source status unknown; the bundle is marked dirty"),
     }
     let metadata = DeployBundleMetadata {
         schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
         upgrade: upgrade.to_string(),
         env: env_cfg.env.clone(),
-        contracts_commit: try_capture("git", &["rev-parse", "HEAD"], repository_root)
-            .unwrap_or_else(|| "unknown".to_string()),
+        contracts_commit: contracts_commit(repository_root),
         contracts_worktree_dirty: source_status
             .as_deref()
             .is_none_or(|status| !status.is_empty()),
@@ -346,6 +393,7 @@ pub fn pack_deploy_bundle(
             foundry_zksync: provenance.foundry_zksync_version.clone(),
         },
         generated_by: github_run_provenance(),
+        protocol_ops_image: image_provenance(),
         files,
     };
     let json = serde_json::to_string_pretty(&metadata)? + "\n";
@@ -1088,7 +1136,8 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
     anyhow::ensure!(
         local_hashes == metadata.all_contracts_hashes_sha256,
         "AllContractsHashes.json differs from the bundle's (bundle {}, commit {}; local {}). \
-         PUVT will not recognise the deployed bytecode: check out {} first.",
+         PUVT will not recognise the deployed bytecode: replay from a checkout of {}, or in the \
+         bundle's protocol_ops_image when it names one.",
         metadata.all_contracts_hashes_sha256,
         metadata.contracts_commit,
         local_hashes,
@@ -1289,6 +1338,7 @@ mod tests {
             },
             deployer_address: Some(TARGET.parse().unwrap()),
             zk_governance_commit: None,
+            protocol_ops_image: None,
             toolchain: Toolchain {
                 forge: "test".into(),
                 rustc: "test".into(),
@@ -1365,6 +1415,27 @@ mod tests {
         let dir = valid_bundle();
         let metadata = verify_bundle_integrity(dir.path()).unwrap();
         assert_eq!(metadata.files.len(), 3);
+    }
+
+    #[test]
+    fn image_provenance_is_optional_in_the_metadata() {
+        let bundle = tempfile::tempdir().unwrap();
+        let mut metadata = write_metadata(bundle.path(), &[]);
+        let json = serde_json::to_value(&metadata).unwrap();
+        assert!(json.get("protocol_ops_image").is_none());
+        let parsed: DeployBundleMetadata = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.protocol_ops_image, None);
+
+        metadata.protocol_ops_image = Some(ImageProvenance {
+            reference: "ghcr.io/matter-labs/protocol-ops:tag".into(),
+            digest: Some(format!(
+                "ghcr.io/matter-labs/protocol-ops@sha256:{}",
+                "a".repeat(64)
+            )),
+        });
+        let parsed: DeployBundleMetadata =
+            serde_json::from_value(serde_json::to_value(&metadata).unwrap()).unwrap();
+        assert_eq!(parsed.protocol_ops_image, metadata.protocol_ops_image);
     }
 
     #[test]

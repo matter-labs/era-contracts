@@ -28,8 +28,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # it). `git pull --ff-only` afterwards.
 #
 # ── 1. Generate the ecosystem calldata (THIS workflow) ──────────────────────
+# `protocol_ops_tag` is an image released per .github/workflows/README.md#release-flow.
 #
 #   gh workflow run generate-ecosystem-upgrade-calldata.yaml --ref <branch> \
+#     -f protocol_ops_tag=<tag> \
 #     -f environment=<env> \
 #     -f deployer_address=0x…                 # MUST be the EOA that will broadcast
 #     [-f fork_block=<n>]                     # see TROUBLESHOOTING
@@ -74,10 +76,12 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # from the env name. The key's address must be the deployer the bundle was
 # prepared for, or the job stops.
 #
-# Or locally from the downloaded bundle — same `protocol_ops` code path:
+# Or locally from the downloaded bundle, in the image it records
+# (`protocol_ops_image.digest` in `bundle-metadata.json`) — same code path:
 #
-#   protocol_ops ecosystem replay-bundle \
-#     --bundle <unpacked-bundle> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
+#   EXTRA_MOUNTS="$PWD/<unpacked-bundle>:/contracts/bundle" \
+#     ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
+#     --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 #
 # Broadcast ONLY the deployer's bundles; the governance-signed ones are the
 # ceremony (step 4). Both paths are idempotent — re-run after a partial deploy.
@@ -85,13 +89,12 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # produced it, so a re-run yields different addresses and different calldata.
 #
 # ── 3. Verify what landed (PUVT), yourself ─────────────────────────────────
-# From the bundle, no compiler needed (check out the commit its
-# `bundle-metadata.json` names — PUVT matches deployed code against that commit's
-# `AllContractsHashes.json`):
+# From the bundle, in its image (PUVT matches deployed code against its
+# `AllContractsHashes.json`), from a checkout of the commit it names:
 #
-#   cd protocol-ops && cargo build --release && cd ..
-#   protocol_ops ecosystem replay-bundle \
-#     --bundle <unpacked-bundle> --rpc <l1-rpc> --verify-only     # already deployed
+#   EXTRA_MOUNTS="$PWD/<unpacked-bundle>:/contracts/bundle" \
+#     ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
+#     --bundle /contracts/bundle --rpc <l1-rpc> --verify-only    # already deployed
 #   #  … or --fork-url <l1-rpc> to rehearse the whole thing on a throw-away fork
 #
 # ── 4. Execute the governance ceremony ────────────────────────────────────
@@ -140,6 +143,9 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                               the regen is not reproducible.
 # `No deploy bundle was published`            → the prepare died before the pack
 #                                               step; fix the generate job first.
+# `image has no revision label`               → the tag was not built by
+#                                               build-docker.yaml from this
+#                                               change on; release a new image.
 # deploy job: "bundle was prepared for X but    → the key in CI is not the EOA the
 # this key is Y"                                  bundle was generated for. Those two
 #                                                 must match: the deployer is in the
@@ -154,15 +160,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 
 # Regenerates the `upgrade` input's ecosystem calldata for one environment and
 # verifies it (PUVT for prepare-all, the declared checks for a forge-script
-# upgrade), on a Linux runner so the compiled bytecode — and
-# therefore the CREATE2 addresses baked into `ecosystem.toml` — is
-# bit-identical with CI (the whole reason this can't be trusted from a dev's
-# macOS checkout).
-#
-# It builds the CONTRACTS AND protocol_ops FROM THE CHECKED-OUT BRANCH (not a
-# pre-built Docker image), so the regenerated calldata reflects the current
-# source — including any contract changes merged in since the last image was
-# published.
+# upgrade), inside the released protocol-ops image (`protocol_ops_tag`): its
+# compiled contracts, protocol_ops and zk-governance checkout produce the
+# calldata, so the bytecode — and therefore the CREATE2 addresses baked into
+# `ecosystem.toml` — is the image's, whoever runs it. Nothing is compiled here.
 #
 # Flow (the canonical `protocol_ops ecosystem rehearse-upgrade` command):
 #   anvil fork of the L1 RPC
@@ -186,7 +187,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # verbatim.
 # So this workflow publishes a self-contained DEPLOY BUNDLE
 # (`ecosystem-upgrade-deploy-inputs-<env>`): the deployer calls, `ecosystem.toml`,
-# the Etherscan verify commands, and a `bundle-metadata.json` pinning the
+# the Etherscan verify commands, and a `bundle-metadata.json` pinning the image,
 # contracts commit / `AllContractsHashes.json` hash / fork height / toolchain
 # versions that the bytecode identity depends on. The `verify-bundle-handoff` job
 # below then proves the bundle is sufficient by deploying + PUVT-ing it from
@@ -207,7 +208,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #   2. BEFORE the block that bumped the CTM protocol versions — that is the
 #      upgrade execution itself, and past it constraint 1's gate flips.
 #   3. Rotate the salts in `upgrade-envs/<upgrade>/<env>.toml` first (the
-#      config comments say to do this every regen anyway). The previous regen's
+#      config comments say to do this every regen anyway), and release an image
+#      with them (.github/workflows/README.md#release-flow). The previous regen's
 #      CREATE2 addresses are already occupied at any post-deployment block, so a
 #      re-prepare with the old salts can only run at a block before that
 #      deployment — which violates constraint 1.
@@ -271,6 +273,10 @@ on:
         required: false
         default: "v0.35.0-upgrade-system"
         type: string
+      protocol_ops_tag:
+        description: "protocol-ops image released by build-docker.yaml: a tag, or sha256:<digest>. The calldata comes from its contracts, protocol_ops and zk-governance; the run checks out the commit it was built from."
+        required: true
+        type: string
       environment:
         description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/<upgrade>/<env>.toml. Today: stage, testnet, mainnet. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
         required: true
@@ -280,18 +286,13 @@ on:
         required: false
         default: ""
         type: string
-      zk_governance_commit:
-        description: "Full zk-governance commit SHA for checkout and PUVT bytecode metadata (PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard)."
-        required: false
-        default: "9b06a16159cd58add109f25598e79731450d1772"
-        type: string
       fork_block:
         description: "L1 block to fork at (BLANK = chain tip). Pin to a block BEFORE the upgrade was deployed if the ecosystem is already live: re-running the prepare against post-deploy tip reverts because ownership has already been handed off from the deployer. CREATE2 addresses are deterministic, so the generated calldata is identical to a tip run."
         required: false
         default: ""
         type: string
       deployer_address:
-        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
+        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret (stage, testnet and mainnet only; a partner's env such as adi needs its own deployer here)."
         required: false
         default: ""
         type: string
@@ -305,47 +306,34 @@ jobs:
     timeout-minutes: 60
     env:
       UPGRADE: ${{ inputs.upgrade }}
+      # Every protocol_ops / cast call below runs in this image (protocol-ops.sh
+      # docker mode). Pulled once here, so a tag moved mid-run changes nothing.
+      PROTOCOL_OPS_TAG: ${{ inputs.protocol_ops_tag }}
 
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      # Only build-docker.yaml sets the revision label: the commit checked out below.
+      - name: Pull the protocol-ops image
+        id: image
+        run: |
+          set -euo pipefail
+          case "$PROTOCOL_OPS_TAG" in
+            sha256:*) image="ghcr.io/matter-labs/protocol-ops@$PROTOCOL_OPS_TAG" ;;
+            *) image="ghcr.io/matter-labs/protocol-ops:$PROTOCOL_OPS_TAG" ;;
+          esac
+          docker pull --quiet --platform=linux/amd64 "$image"
+          revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")"
+          if [ -z "$revision" ]; then
+            echo "::error::$image has no revision label: release it with build-docker.yaml"; exit 1
+          fi
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
-      - name: Checkout zk-governance at the reviewed commit
+      # protocol-ops.sh mounts this checkout's upgrade-envs/ into the image:
+      # the configs the image was built with.
+      - name: Checkout the image's revision
         uses: actions/checkout@v4
         with:
-          repository: zksync-association/zk-governance
-          ref: ${{ inputs.zk_governance_commit }}
-          path: zk-governance
-          submodules: recursive
+          ref: ${{ steps.image.outputs.revision }}
           persist-credentials: false
-
-      - name: Install Foundry
-        uses: ./.github/actions/install-foundry
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: yarn
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.91.1
-
-      - name: Install dependencies
-        run: yarn
-
-      # Build the way `update-hashes-on-demand.yaml` produces the committed
-      # `AllContractsHashes.json`, with the same pinned Foundry.
-      - name: Build l1-contracts artifacts
-        run: yarn l1 build:foundry
-
-      - name: Build protocol_ops
-        working-directory: protocol-ops
-        run: cargo build --release
 
       # Pick the per-network L1 RPC (secret), mask it, and resolve the deployer
       # EOA address. stage + testnet fork Sepolia; mainnet forks mainnet.
@@ -416,8 +404,13 @@ jobs:
           if [ -n "${INPUT_DEPLOYER:-}" ]; then
             deployer="$INPUT_DEPLOYER"
           elif [ -n "${pk:-}" ]; then
+            # Our deployer only for our ecosystems: a partner's (adi) broadcasts with its own.
+            case "$ENVIRONMENT" in
+              stage|testnet|mainnet) ;;
+              *) echo "::error::'$ENVIRONMENT' is not our ecosystem: pass its own deployer as deployer_address (docs/protocol-ops-for-partners.md)"; exit 1 ;;
+            esac
             echo "::add-mask::$pk"
-            deployer="$(cast wallet address --private-key "$pk")"
+            deployer="$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast wallet address --private-key "$pk")"
           else
             echo "::error::No deployer: pass the deployer_address input or set DEPLOYER_PRIVATE_KEY_SEPOLIA / DEPLOYER_PRIVATE_KEY_MAINNET"
             exit 1
@@ -438,11 +431,6 @@ jobs:
       - name: Regenerate + verify calldata
         env:
           ENVIRONMENT: ${{ inputs.environment }}
-          # zk-governance commit whose AllContractsHashes PUVT uses to verify the
-          # redeployed PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard bytecodes.
-          ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
-          # Read by protocol_ops to find the zk-governance checkout above.
-          ZK_GOVERNANCE_DIR: ${{ github.workspace }}/zk-governance
           # Optional fork-block pin (blank = tip).
           FORK_BLOCK: ${{ inputs.fork_block }}
         run: |
@@ -452,10 +440,9 @@ jobs:
           # against localhost, so only anvil sees the real RPC; the deployer is
           # impersonated (no signing key needed).
           args=(--upgrade "$UPGRADE" --env "$ENVIRONMENT" --fork-url "$L1_FORK_URL" --deployer-address "$DEPLOYER_ADDR")
-          args+=(--zk-governance-commit "$ZK_GOVERNANCE_COMMIT")
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
           [ -z "$FORK_BLOCK" ] || args+=(--fork-block "$FORK_BLOCK")
-          ./protocol-ops/target/release/protocol_ops ecosystem rehearse-upgrade "${args[@]}"
+          bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" ecosystem rehearse-upgrade "${args[@]}"
 
       # Produce the same calldata artifact set PR #2268 committed for mainnet:
       # the git-portable `sim-inputs/` handoff set AND the ready-to-paste
@@ -468,14 +455,16 @@ jobs:
         run: |
           set -euo pipefail
           OUT="l1-contracts/upgrade-envs/$UPGRADE/output/$ENVIRONMENT"
-          BIN=./protocol-ops/target/release/protocol_ops
+          # Relative paths resolve the same inside the image (its workdir is
+          # the contracts root, with upgrade-envs mounted from this checkout).
+          po() { bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" "$@"; }
           # $DEPLOYER_ADDR (resolved earlier) is the Camp-A signer. Its bundles
           # are dropped from the sim-inputs: they're broadcast to the real chain,
           # so the simulator's fork inherits their effects from chain tip and
           # replaying them would revert.
           # 1) Normalized manifest + Camp-B `*.safe.json` sim-input bundles, and
           #    `$OUT/EXECUTE.md`, the runbook of those bundles.
-          "$BIN" ecosystem governance-toml-to-simulator \
+          po ecosystem governance-toml-to-simulator \
             --env "$ENVIRONMENT" \
             --include-manifest "$OUT/prepare/manifest.json" \
             --camp-a-signers "$DEPLOYER_ADDR" \
@@ -483,7 +472,7 @@ jobs:
           # 2) The full transaction-simulator.json (Camp-B manifest bundles + the
           #    PUH stage 0/1/2 governance ceremony + post-upgrade smoke tests).
           #    --include-manifest defaults to sim-inputs/manifest.json (step 1).
-          "$BIN" ecosystem governance-toml-to-simulator \
+          po ecosystem governance-toml-to-simulator \
             --env "$ENVIRONMENT" \
             --out "$OUT/transaction-simulator.json"
 
@@ -529,18 +518,12 @@ jobs:
           # elsewhere if it must outlive the retention window.
           retention-days: 90
 
-      - name: Cleanup anvil
-        if: always()
-        working-directory: l1-contracts/test/anvil-interop
-        run: bash cleanup.sh
-
   # ─────────────────────────────────────────────────────────────────────────────
   # Proof that the published deploy bundle is SUFFICIENT on its own.
   #
-  # This job deliberately does NOT build the contracts (no
-  # `yarn l1 build:foundry`): it has only the artifact, this checkout and
-  # `protocol_ops` — exactly what an operator downloading the bundle has. It
-  # forks L1 at the height recorded in `bundle-metadata.json`, replays every
+  # This job has only the artifact and the image the bundle names (by digest,
+  # from `bundle-metadata.json`) — exactly what an operator downloading the
+  # bundle has. It forks L1 at the height recorded in the bundle, replays every
   # bundle under impersonation, and runs PUVT against the result.
   #
   # If this job is green, "deploy the contracts and run the PUVT yourself"
@@ -558,52 +541,49 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
       # Tolerated so the next step can explain WHY there is no bundle: the pack
       # runs right after the prepare, so a prepare that never finished leaves
       # nothing to hand off (and the upload step, being `always()` +
       # `if-no-files-found: warn`, still "succeeds" having uploaded nothing).
+      # Outside the workspace: the checkout below would clean it.
       - name: Download the deploy bundle
         id: download-bundle
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: ${{ github.workspace }}/deploy-bundle
+          path: ${{ runner.temp }}/deploy-bundle
 
       - name: Require a bundle to hand off
+        id: bundle
         run: |
           set -euo pipefail
-          if [ ! -f "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json" ]; then
+          meta="$RUNNER_TEMP/deploy-bundle/bundle-metadata.json"
+          if [ ! -f "$meta" ]; then
             echo '::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first.'
             exit 1
           fi
+          image="$(jq -er '.protocol_ops_image.digest // error("the bundle names no protocol-ops image") | sub(".*@"; "")' "$meta")"
+          commit="$(jq -er .contracts_commit "$meta")"
+          {
+            echo "image=$image"
+            echo "commit=$commit"
+          } >> "$GITHUB_OUTPUT"
 
-      # Foundry supplies anvil + cast and `protocol_ops` supplies the replay. There is
-      # no contract build: PUVT reads committed configuration, never `out/`.
-      - name: Install Foundry (anvil + cast)
-        uses: ./.github/actions/install-foundry
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+      # protocol-ops.sh and the configs it mounts into the image.
+      - name: Checkout the bundle's commit
+        uses: actions/checkout@v4
         with:
-          toolchain: 1.91.1
-
-      - name: Build protocol_ops
-        working-directory: protocol-ops
-        run: cargo build --release
+          ref: ${{ steps.bundle.outputs.commit }}
+          persist-credentials: false
 
       - name: Show the bundle's provenance
         run: |
           set -euo pipefail
           echo "=== bundle-metadata.json"
-          cat "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json"
+          cat "$RUNNER_TEMP/deploy-bundle/bundle-metadata.json"
           echo "=== files"
-          find "$GITHUB_WORKSPACE/deploy-bundle" -type f | sed "s|$GITHUB_WORKSPACE/||" | sort
+          find "$RUNNER_TEMP/deploy-bundle" -type f | sed "s|$RUNNER_TEMP/||" | sort
 
       - name: Select + mask the L1 RPC to fork (and the GW RPC for PUVT)
         env:
@@ -616,7 +596,7 @@ jobs:
           set -euo pipefail
           # Which L1 the bundle belongs to is recorded IN the bundle — one more
           # thing a consumer doesn't have to be told out of band.
-          L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$GITHUB_WORKSPACE/deploy-bundle/bundle-metadata.json")"
+          L1_CHAIN_ID="$(jq -r '.l1.chain_id // empty' "$RUNNER_TEMP/deploy-bundle/bundle-metadata.json")"
           case "$L1_CHAIN_ID" in
             1)        rpc="$RPC_MAINNET" ;;
             11155111) rpc="$RPC_SEPOLIA" ;;
@@ -638,10 +618,13 @@ jobs:
 
       # The same command an operator runs locally against a downloaded bundle.
       - name: Replay the bundle on a fresh fork + PUVT
+        env:
+          BUNDLE_IMAGE: ${{ steps.bundle.outputs.image }}
+          # Mounted at the same path in the image.
+          EXTRA_MOUNTS: ${{ runner.temp }}:${{ runner.temp }}
         run: |
           set -euo pipefail
-          # The command stops the fork anvil it started, so this job needs no
-          # separate cleanup step.
-          args=(--bundle "$GITHUB_WORKSPACE/deploy-bundle" --fork-url "$L1_FORK_URL")
+          # The fork anvil runs inside the container, so nothing outlives it.
+          args=(--bundle "$RUNNER_TEMP/deploy-bundle" --fork-url "$L1_FORK_URL")
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
-          ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle "${args[@]}"
+          bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle "${args[@]}"
