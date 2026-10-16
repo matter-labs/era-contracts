@@ -92,12 +92,6 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     }
 
     /// @inheritdoc IL2Bridgehub
-    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
-        require(_baseTokenAssetId != bytes32(0), EmptyAssetId());
-        baseTokenAssetId[_chainId] = _baseTokenAssetId;
-    }
-
-    /// @inheritdoc IL2Bridgehub
     function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
         require(_baseTokenAssetId != bytes32(0), EmptyAssetId());
         baseTokenAssetId[_chainId] = _baseTokenAssetId;

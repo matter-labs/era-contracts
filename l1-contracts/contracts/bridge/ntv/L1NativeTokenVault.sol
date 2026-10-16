@@ -17,7 +17,7 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
-import {ETH_TOKEN_ADDRESS, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, INTEROP_POOL_CHAIN_ID, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
@@ -98,12 +98,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @inheritdoc IL1NativeTokenVault
     mapping(uint256 chainId => mapping(bytes32 assetId => bool moved)) public chainBalanceInInteropPool;
-
-    /// @inheritdoc IL1NativeTokenVault
-    mapping(bytes32 assetId => uint256 amount) public interopPoolTotalDeposited;
-
-    /// @inheritdoc IL1NativeTokenVault
-    mapping(bytes32 assetId => uint256 amount) public interopPoolTotalWithdrawn;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -239,8 +233,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 deposited = chainTotalDeposited[_chainId][_assetId] + backfill.amount;
         uint256 withdrawn = chainTotalWithdrawn[_chainId][_assetId];
         chainBalanceInInteropPool[_chainId][_assetId] = true;
-        interopPoolTotalDeposited[_assetId] += deposited;
-        interopPoolTotalWithdrawn[_assetId] += withdrawn;
+        chainTotalDeposited[INTEROP_POOL_CHAIN_ID][_assetId] += deposited;
+        chainTotalWithdrawn[INTEROP_POOL_CHAIN_ID][_assetId] += withdrawn;
         emit ChainBalanceMovedToInteropPool(_chainId, _assetId, deposited, withdrawn);
     }
 
@@ -400,12 +394,9 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         if (assetOriginChainId == block.chainid) {
             bridgedOut[_assetId] += _amount;
         }
-        (bool tracked, mapping(bytes32 => uint256) storage deposited, , ) = _trackedBalance(
-            _chainId,
-            assetOriginChainId
-        );
+        (bool tracked, uint256 balanceChainId) = _trackedBalance(_chainId, assetOriginChainId);
         if (tracked) {
-            deposited[_assetId] += _amount;
+            chainTotalDeposited[balanceChainId][_assetId] += _amount;
         }
     }
 
@@ -421,55 +412,35 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             }
             bridgedOut[_assetId] -= _amount;
         }
-        (
-            bool tracked,
-            mapping(bytes32 => uint256) storage deposited,
-            mapping(bytes32 => uint256) storage withdrawn,
-            bool hasInterop
-        ) = _trackedBalance(_chainId, assetOriginChainId);
+        (bool tracked, uint256 balanceChainId) = _trackedBalance(_chainId, assetOriginChainId);
         if (tracked) {
-            uint256 newWithdrawn = withdrawn[_assetId] + _amount;
-            uint256 available = deposited[_assetId];
-            uint256 backfill = hasInterop ? 0 : chainBalanceBackfill[_chainId][_assetId].amount;
+            uint256 newWithdrawn = chainTotalWithdrawn[balanceChainId][_assetId] + _amount;
+            uint256 available = chainTotalDeposited[balanceChainId][_assetId];
+            uint256 backfill = balanceChainId == _chainId ? chainBalanceBackfill[_chainId][_assetId].amount : 0;
             // Written as two comparisons so that a backfill close to `type(uint256).max` cannot overflow.
             if (newWithdrawn > available && newWithdrawn - available > backfill) {
                 revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, available + backfill);
             }
-            withdrawn[_assetId] = newWithdrawn;
+            chainTotalWithdrawn[balanceChainId][_assetId] = newWithdrawn;
         }
     }
 
-    /// @notice Returns the totals that bound what leaves `_chainId`: the interop pool's if the chain has interop,
-    /// and the chain's own otherwise. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
+    /// @notice Returns the chain ID whose totals bound what leaves `_chainId`: `INTEROP_POOL_CHAIN_ID` if the chain
+    /// has interop, and `_chainId` otherwise. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
     /// @param _chainId The chain.
     /// @param _assetOriginChainId The origin chain of the asset.
     /// @return tracked Whether the asset is tracked at all: it is not if it is native to the chain, or if both the
     /// chain and the asset's origin have interop.
-    /// @return deposited The deposited totals, by asset.
-    /// @return withdrawn The withdrawn totals, by asset.
-    /// @return hasInterop Whether the chain has interop, so the totals are the pool's.
+    /// @return balanceChainId The key of the totals in `chainTotalDeposited` and `chainTotalWithdrawn`.
     function _trackedBalance(
         uint256 _chainId,
         uint256 _assetOriginChainId
-    )
-        internal
-        view
-        returns (
-            bool tracked,
-            mapping(bytes32 => uint256) storage deposited,
-            mapping(bytes32 => uint256) storage withdrawn,
-            bool hasInterop
-        )
-    {
+    ) internal view returns (bool tracked, uint256 balanceChainId) {
         IL1MessageRoot messageRoot = _messageRoot();
-        hasInterop = messageRoot.isInteropEnabled(_chainId);
-        if (hasInterop) {
-            tracked = !messageRoot.isInteropEnabled(_assetOriginChainId);
-            (deposited, withdrawn) = (interopPoolTotalDeposited, interopPoolTotalWithdrawn);
-        } else {
-            tracked = _assetOriginChainId != _chainId;
-            (deposited, withdrawn) = (chainTotalDeposited[_chainId], chainTotalWithdrawn[_chainId]);
+        if (messageRoot.isInteropEnabled(_chainId)) {
+            return (!messageRoot.isInteropEnabled(_assetOriginChainId), INTEROP_POOL_CHAIN_ID);
         }
+        return (_assetOriginChainId != _chainId, _chainId);
     }
 
     /// @notice Returns the L1 message root, which records the chains with interop.

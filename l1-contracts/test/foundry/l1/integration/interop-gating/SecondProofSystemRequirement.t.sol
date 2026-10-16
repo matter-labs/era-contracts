@@ -15,7 +15,7 @@ import {
 } from "contracts/common/Config.sol";
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {SecondProofSystemAlreadyLocked} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {SecondProofSystemAlreadyRequired} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {InteropGatingDeployer} from "../_SharedInteropGatingDeployer.t.sol";
 
@@ -28,9 +28,9 @@ contract VerifierOverwrite is ZKChainBase {
     }
 }
 
-/// @notice The permanent second-proof-system lock and the ZiSK switch auth it changes. See
-/// {protocol-docs/interop-gating.md#second-proof-system-lock}.
-contract SecondProofSystemLockTest is InteropGatingDeployer {
+/// @notice The permanent second proof system requirement and the ZiSK switch auth it changes. See
+/// {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+contract SecondProofSystemRequirementTest is InteropGatingDeployer {
     uint8 internal constant ZISK_DISABLED = uint8(1 << uint8(ProofSystem.Zisk));
 
     address internal chain;
@@ -50,84 +50,84 @@ contract SecondProofSystemLockTest is InteropGatingDeployer {
         assertNotEq(chainAdmin, governance);
     }
 
-    function test_lockSecondProofSystem() public {
-        assertFalse(IGetters(chain).isSecondProofSystemLocked());
+    function test_permanentlyRequireSecondProofSystem() public {
+        assertFalse(IGetters(chain).isSecondProofSystemRequired());
 
         vm.expectEmit(true, true, true, true, chain);
-        emit IAdmin.SecondProofSystemLocked();
+        emit IAdmin.SecondProofSystemRequired();
         vm.prank(chainAdmin);
-        IAdmin(chain).lockSecondProofSystem();
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
 
-        assertTrue(IGetters(chain).isSecondProofSystemLocked());
+        assertTrue(IGetters(chain).isSecondProofSystemRequired());
         assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE);
     }
 
-    function test_lockSecondProofSystem_revertWhen_alreadyLocked() public {
-        _lock();
+    function test_permanentlyRequireSecondProofSystem_revertWhen_alreadyRequired() public {
+        _requireSecondProofSystem();
 
         vm.prank(chainAdmin);
-        vm.expectRevert(SecondProofSystemAlreadyLocked.selector);
-        IAdmin(chain).lockSecondProofSystem();
+        vm.expectRevert(SecondProofSystemAlreadyRequired.selector);
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
 
-        assertTrue(IGetters(chain).isSecondProofSystemLocked());
+        assertTrue(IGetters(chain).isSecondProofSystemRequired());
     }
 
-    function test_lockSecondProofSystem_revertWhen_ziskDisabled() public {
+    function test_permanentlyRequireSecondProofSystem_revertWhen_ziskDisabled() public {
         _setZiskStatus(chainAdmin, false);
 
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
-        IAdmin(chain).lockSecondProofSystem();
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
 
-        assertFalse(IGetters(chain).isSecondProofSystemLocked());
+        assertFalse(IGetters(chain).isSecondProofSystemRequired());
     }
 
-    function test_lockSecondProofSystem_revertWhen_notAdmin() public {
+    function test_permanentlyRequireSecondProofSystem_revertWhen_notAdmin() public {
         vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
-        IAdmin(chain).lockSecondProofSystem();
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
 
-        assertFalse(IGetters(chain).isSecondProofSystemLocked());
+        assertFalse(IGetters(chain).isSecondProofSystemRequired());
     }
 
-    /// @notice Before the lock, only the chain admin switches ZiSK, in both directions.
-    function test_beforeLock_adminSwitchesZisk() public {
+    /// @notice Before the requirement, only the chain admin switches ZiSK, in both directions.
+    function test_beforeRequirement_adminSwitchesZisk() public {
         _setZiskStatus(chainAdmin, false);
         _setZiskStatus(chainAdmin, true);
     }
 
-    function test_beforeLock_revertWhen_governanceDisablesZisk() public {
+    function test_beforeRequirement_revertWhen_governanceDisablesZisk() public {
         _expectUnauthorizedZiskSwitch(governance, false);
     }
 
-    function test_afterLock_revertWhen_adminDisablesZisk() public {
-        _lock();
+    function test_afterRequirement_revertWhen_adminDisablesZisk() public {
+        _requireSecondProofSystem();
         _expectUnauthorizedZiskSwitch(chainAdmin, false);
     }
 
-    /// @notice The emergency switch: governance disables ZiSK on a locked chain, which stays locked; the chain
-    /// admin can turn it back on.
-    function test_afterLock_governanceDisablesAndAdminReenablesZisk() public {
-        _lock();
+    /// @notice The emergency switch: governance disables ZiSK on a chain under the requirement, which stays under
+    /// it; the chain admin can turn it back on.
+    function test_afterRequirement_governanceDisablesAndAdminReenablesZisk() public {
+        _requireSecondProofSystem();
 
         _setZiskStatus(governance, false);
         assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_PLONK_VERIFICATION_TYPE);
-        assertTrue(IGetters(chain).isSecondProofSystemLocked());
+        assertTrue(IGetters(chain).isSecondProofSystemRequired());
 
         _setZiskStatus(chainAdmin, true);
         assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE);
     }
 
-    function test_afterLock_revertWhen_governanceEnablesZisk() public {
-        _lock();
+    function test_afterRequirement_revertWhen_governanceEnablesZisk() public {
+        _requireSecondProofSystem();
         _setZiskStatus(governance, false);
         _expectUnauthorizedZiskSwitch(governance, true);
     }
 
-    /// @notice The Admin facet refuses any diamond cut that leaves a locked chain on a verifier without the
-    /// multi-proof mode, here one the chain type manager's owner executes.
-    function test_afterLock_revertWhen_upgradeSetsSingleProofVerifier() public {
-        _lock();
+    /// @notice The Admin facet refuses any diamond cut that leaves a chain under the requirement on a verifier
+    /// without the multi-proof mode, here one the chain type manager's owner executes.
+    function test_afterRequirement_revertWhen_upgradeSetsSingleProofVerifier() public {
+        _requireSecondProofSystem();
         address verifierBefore = IGetters(chain).getVerifier();
         Diamond.DiamondCutData memory cut = _verifierOverwrite(
             address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))))
@@ -140,26 +140,26 @@ contract SecondProofSystemLockTest is InteropGatingDeployer {
         assertEq(IGetters(chain).getVerifier(), verifierBefore);
     }
 
-    function test_afterLock_upgradeSetsMultiProofVerifier() public {
-        _lock();
-        _assertLockedChainUpgradesToMultiProofVerifier();
+    function test_afterRequirement_upgradeSetsMultiProofVerifier() public {
+        _requireSecondProofSystem();
+        _assertRequiringChainUpgradesToMultiProofVerifier();
 
         assertFalse(IGetters(chain).disabledProofSystems().zisk, "the upgrade must keep ZiSK on");
         assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE);
     }
 
-    /// @notice The check reads what the verifier supports, not the chain's flags: a locked chain whose ZiSK
-    /// governance switched off still upgrades to a multi-proof verifier, and ZiSK stays off.
-    function test_afterLock_upgradeAfterEmergencyZiskOffSetsMultiProofVerifier() public {
-        _lock();
+    /// @notice The check reads what the verifier supports, not the chain's flags: a chain under the requirement
+    /// whose ZiSK governance switched off still upgrades to a multi-proof verifier, and ZiSK stays off.
+    function test_afterRequirement_upgradeAfterEmergencyZiskOffSetsMultiProofVerifier() public {
+        _requireSecondProofSystem();
         _setZiskStatus(governance, false);
-        _assertLockedChainUpgradesToMultiProofVerifier();
+        _assertRequiringChainUpgradesToMultiProofVerifier();
 
         assertTrue(IGetters(chain).disabledProofSystems().zisk, "the upgrade must keep ZiSK off");
         assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_PLONK_VERIFICATION_TYPE);
     }
 
-    function test_beforeLock_upgradeSetsSingleProofVerifier() public {
+    function test_beforeRequirement_upgradeSetsSingleProofVerifier() public {
         address newVerifier = address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))));
         Diamond.DiamondCutData memory cut = _verifierOverwrite(newVerifier);
 
@@ -169,7 +169,7 @@ contract SecondProofSystemLockTest is InteropGatingDeployer {
         assertEq(IGetters(chain).getVerifier(), newVerifier);
     }
 
-    function _assertLockedChainUpgradesToMultiProofVerifier() internal {
+    function _assertRequiringChainUpgradesToMultiProofVerifier() internal {
         address newVerifier = address(
             new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
         );
@@ -179,7 +179,7 @@ contract SecondProofSystemLockTest is InteropGatingDeployer {
         addresses.chainTypeManager.executeUpgrade(zkChainIds[0], cut);
 
         assertEq(IGetters(chain).getVerifier(), newVerifier);
-        assertTrue(IGetters(chain).isSecondProofSystemLocked(), "the upgrade must keep the lock");
+        assertTrue(IGetters(chain).isSecondProofSystemRequired(), "the upgrade must keep the requirement");
     }
 
     function _verifierOverwrite(address _verifier) internal returns (Diamond.DiamondCutData memory) {
@@ -195,9 +195,9 @@ contract SecondProofSystemLockTest is InteropGatingDeployer {
         return IOwnable(address(addresses.chainTypeManager)).owner();
     }
 
-    function _lock() internal {
+    function _requireSecondProofSystem() internal {
         vm.prank(chainAdmin);
-        IAdmin(chain).lockSecondProofSystem();
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
     }
 
     function _setZiskStatus(address _caller, bool _enabled) internal {

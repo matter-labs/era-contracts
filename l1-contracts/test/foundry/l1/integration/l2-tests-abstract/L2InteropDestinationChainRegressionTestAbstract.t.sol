@@ -6,6 +6,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {DestinationChainNotAllowed, DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
@@ -60,9 +61,15 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
     function test_sendToRegisteredButNotAllowedChainReverts() public {
         bytes32 legacyBaseTokenAssetId = bytes32(uint256(0xABCDEF));
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.registerChainForInterop(UNREGISTERED_CHAIN_ID, legacyBaseTokenAssetId);
+        l2Bridgehub.allowInteropPeer(UNREGISTERED_CHAIN_ID, legacyBaseTokenAssetId);
+        // Mock: only storage written before the upgrade holds a chain that is registered but not allowed, since
+        // the retired registration is gone. The anvil upgrade test sends over such a pair end to end.
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IL2Bridgehub.isPeerAllowed, (UNREGISTERED_CHAIN_ID)),
+            abi.encode(false)
+        );
         assertEq(l2Bridgehub.baseTokenAssetId(UNREGISTERED_CHAIN_ID), legacyBaseTokenAssetId);
-        assertFalse(l2Bridgehub.isPeerAllowed(UNREGISTERED_CHAIN_ID));
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = InteropCallStarter({

@@ -80,8 +80,8 @@ error OnlyGateway();
 error OnlyL1();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
-// 0x59b9bf0e
-error SecondProofSystemNotLocked(uint256 chainId);
+// 0x6ad2fba2
+error SecondProofSystemNotRequired(uint256 chainId);
 // 0xefb272e2
 error SettlementLayerMustNotBeL1();
 // 0x36917565

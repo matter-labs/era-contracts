@@ -3,7 +3,7 @@
 Interop between L1-settled chains is opt-in at two levels:
 
 - Chains are **disabled** by default. Governance (the Bridgehub owner) enables a chain manually and one-way,
-  normally only after the chain has locked its second proof system.
+  normally only after the chain has permanently required its second proof system.
 - A chain's admin chooses its interop peers on L1. Both chains of a pair must be enabled.
 
 |                   | Disabled chain (default)                                                                       | Enabled chain                                                                                              |
@@ -23,16 +23,16 @@ lose funds deposited into that chain:
 - the [asset handler restriction](#asset-handler-restriction) keeps it away from L1 handlers that don't apply the cap;
 - the [receive filter](#receive-filter) stops enabled chains from accepting its interop.
 
-The [second proof system lock](#second-proof-system-lock) makes every batch of an enabled chain carry both an
-Airbender and a ZiSK proof from then on, unless governance turns ZiSK off in an emergency. Governance may waive
-the lock for a chain it trusts for reasons checked offchain ([Enabling interop](#enabling-interop)).
+The [second proof system requirement](#second-proof-system-requirement) makes every batch of an enabled chain carry
+both an Airbender and a ZiSK proof from then on, unless governance turns ZiSK off in an emergency. Governance may waive
+the requirement for a chain it trusts for reasons checked offchain ([Enabling interop](#enabling-interop)).
 
-## Second proof system lock
+## Second proof system requirement
 
-`AdminFacet.lockSecondProofSystem()` is called by the chain admin on the chain's settlement layer. It requires
-`getProofMode()` to be `ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE` (a multi-proof verifier with ZiSK enabled, see
-{protocol-docs/multi-proof-verification.md}) and reverts with `NotMultiProofMode` otherwise. The lock is one-way
-(`SecondProofSystemAlreadyLocked`) and is read with `isSecondProofSystemLocked()`. Once it is set:
+`AdminFacet.permanentlyRequireSecondProofSystem()` is called by the chain admin on the chain's settlement layer. It
+requires `getProofMode()` to be `ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE` (a multi-proof verifier with ZiSK enabled,
+see {protocol-docs/multi-proof-verification.md}) and reverts with `NotMultiProofMode` otherwise. The requirement is
+one-way (`SecondProofSystemAlreadyRequired`) and is read with `isSecondProofSystemRequired()`. Once it is set:
 
 - **ZiSK-off is governance's.** `setProofSystemStatus(ProofSystem.Zisk, false)` is reserved for the Bridgehub owner,
   for emergencies such as a ZiSK bug. Turning ZiSK back on stays with the chain admin.
@@ -41,8 +41,8 @@ the lock for a chain it trusts for reasons checked offchain ([Enabling interop](
   reports multi-proof mode with no proof system disabled. The `AdminFacet` checks the chain's verifier the same way
   after every diamond cut, so an upgrade that sets the verifier another way can't drop it either.
 
-The lock doesn't change which proofs the chain accepts. It only takes the way back to a single proof system out of
-the chain admin's hands.
+The requirement doesn't change which proofs the chain accepts. It only takes the way back to a single proof system
+out of the chain admin's hands.
 
 ## Enabling interop
 
@@ -50,8 +50,8 @@ the chain admin's hands.
 requires the chain to be registered and to settle on L1. It is one-way: there is no way to disable interop again
 (`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads the result.
 
-With `requireSecondProofSystem`, the chain must also have locked its second proof system
-(`SecondProofSystemNotLocked`) and be in multi-proof mode right now, so not during an emergency ZiSK-off
+With `requireSecondProofSystem`, the chain must also permanently require its second proof system
+(`SecondProofSystemNotRequired`) and be in multi-proof mode right now, so not during an emergency ZiSK-off
 (`NotMultiProofMode`). Governance enables without it only a chain it trusts for reasons checked offchain.
 
 These checks are necessary, not sufficient: governance enables a chain only after the checks in
@@ -78,15 +78,18 @@ flows count in the [interop pool](#interop-pool) instead, and these counters sto
 
 ## Interop pool
 
-Enabled chains share one balance per asset, because interop moves tokens between them without passing L1:
+Enabled chains share one balance per asset, because interop moves tokens between them without passing L1. The vault
+keeps it in the same counters as a chain's, under `INTEROP_POOL_CHAIN_ID = uint256(keccak256("interop.pool")) - 1`,
+which no chain can have: the Bridgehub caps chain IDs at `type(uint48).max` (`ChainIdTooBig`).
 
-- `interopPoolTotalDeposited[assetId]`: everything bridged to enabled chains since they were enabled, plus the moved
-  balances.
-- `interopPoolTotalWithdrawn[assetId]`: everything released or minted on L1 for enabled chains since they were
-  enabled, plus the withdrawals of the moved balances.
+- `chainTotalDeposited[INTEROP_POOL_CHAIN_ID][assetId]`: everything bridged to enabled chains since they were
+  enabled, plus the moved balances.
+- `chainTotalWithdrawn[INTEROP_POOL_CHAIN_ID][assetId]`: everything released or minted on L1 for enabled chains since
+  they were enabled, plus the withdrawals of the moved balances.
 
-A withdrawal or failed-deposit claim from an enabled chain that would make `interopPoolTotalWithdrawn` exceed
-`interopPoolTotalDeposited` reverts with `ChainBalanceExceeded`, which then carries the pool's totals.
+A withdrawal or failed-deposit claim from an enabled chain that would make the pool's withdrawn total exceed its
+deposited total reverts with `ChainBalanceExceeded`, which then carries the pool's totals. The pool has no backfill of
+its own: the moved balances bring theirs.
 
 - Assets native to an enabled chain, the withdrawing chain included, are not tracked: interop brings them to the
   other enabled chains without passing L1, so the pool can't bound them. An asset whose origin chain is enabled
@@ -133,8 +136,8 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
   - Both chains must be registered, settle on L1 and be enabled (`InteropNotEnabled`). The peer can be neither the
     chain itself nor L1 (`InvalidInteropPeer`), and must have a batch in L1's message root
     ({protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}).
-  - The admin can't revoke an allowed peer (`InteropPeerAlreadyAllowed`): that would need handling of the pair's
-    unfinalized messages first. Governance can, with `deregisterInteropPairs`.
+  - An allowed peer stays allowed (`InteropPeerAlreadyAllowed` on a second call) until `deregisterInteropPairs`
+    removes it.
 - **Consent is per side.** Each admin writes only its own chain's side, and a chain sends interop to and accepts
   it from only the peers on its own side ([receive filter](#receive-filter)). Two-way interop needs both admins,
   and a one-sided whitelist can strand flows ([K1](#k1-stuck-flows)). SDKs should check both sides on L1 before
@@ -144,17 +147,20 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
   can call it, and the caller pays the L1->L2 transaction in the base token.
 - **`registerChain`**, the retired consent-free registration, is removed. Its paid counterpart, deposit encoding
   version `0x01`, reverts with `UnsupportedEncodingVersion`.
-- **`deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister)`** is owner-only. For each pair, it clears
+- **`deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister)`** is callable by the owner, and by the admin of
+  every chain in `chainsRegisteredOn` (`Unauthorized` otherwise). For each pair, it clears
   `interopPeerAllowed` and sends a service transaction to `L2Bridgehub.deregisterChainForInterop`, which clears
   `baseTokenAssetId` and `isPeerAllowed`. The chain's L2 must already be upgraded, or that transaction fails. It
   refuses a peer that settles on the chain (`InvalidInteropPeer`), whose entry the chain needs as a settlement layer.
   - Its main use is the cleanup of the pairs `registerChain` registered ([Legacy registrations](#legacy-registrations)).
     Nothing depends on that cleanup: `registerChain` set only `baseTokenAssetId`, never `isPeerAllowed`, so neither
     `InteropCenter` nor the [receive filter](#receive-filter) accept a legacy pair.
-  - It also removes allowed pairs. Governance keeps this ability on purpose, but using it is not recommended: the
-    pair's unfinalized flows can be stranded ([K1](#k1-stuck-flows)). The admin can allow the pair again.
-- **`L2Bridgehub.registerChainForInterop`**, the target of the retired registration, now requires a non-zero
-  `baseTokenAssetId` (`EmptyAssetId`), as does `allowInteropPeer`.
+  - It also removes allowed pairs, which can strand the pair's unfinalized flows ([K1](#k1-stuck-flows)). Whoever
+    removes a pair is responsible for them: an admin removing its chain's pair, for its users. The admin can allow
+    the pair again.
+- **`L2Bridgehub.registerChainForInterop`**, the target of the retired registration, is removed too. A legacy
+  registration still in the priority queue when the chain's L2 is upgraded fails there and registers nothing.
+  `L2Bridgehub.allowInteropPeer` requires a non-zero `baseTokenAssetId` (`EmptyAssetId`).
 
 ## Receive filter
 
@@ -185,7 +191,7 @@ no longer sends to them ([whitelist](#interop-peer-whitelist)), so they are clea
 with `deregisterInteropPairs` in the first governance transaction after the chain's upgrade. Governance enables a chain
 only once every legacy pair involving it is cleared; this order is enforced offchain. To find them:
 
-1. list the L1 priority transactions that call the `registerChainForInterop` selector;
+1. list the L1 priority transactions that call the retired `registerChainForInterop(uint256,bytes32)` selector;
 2. cross-check each pair against `baseTokenAssetId` on the target chain's `L2Bridgehub`.
 
 ### Backfill amounts
@@ -209,7 +215,7 @@ unbacked.
 Before `enableInterop(X)`:
 
 - confirm on L2 that every [legacy pair](#legacy-registrations) involving X is cleared;
-- wait for X's second proof system lock, unless governance waives it;
+- wait for X's second proof system requirement, unless governance waives it;
 - check X's whole history:
   - the proof modes since the upgrade (no single-proven batches is recommended);
   - the interop X finalized or refunded while it was disabled;
@@ -220,7 +226,7 @@ Before `enableInterop(X)`:
 1. Chain upgrade.
 2. Governance deregisters the chain's legacy pairs.
 3. Backfill.
-4. The admin turns ZiSK on and calls `lockSecondProofSystem`.
+4. The admin turns ZiSK on and calls `permanentlyRequireSecondProofSystem`.
 5. Governance calls `enableInterop`.
 6. Anyone calls `moveChainBalanceToInteropPool` for each asset the chain holds.
 7. The admin calls `allowInteropPeer` for each peer.
@@ -233,7 +239,7 @@ A flow gets stuck when a chain's [receive filter](#receive-filter) refuses one o
 present, that chain can't finalize the flow; with a leg missing, a committed leg on that chain can't be refunded.
 Causes:
 
-- a one-sided whitelist, or a pair governance removed;
+- a one-sided whitelist, or a removed pair;
 - a leg from a chain that the destination doesn't whitelist;
 - legacy flows that involve a chain that stays disabled.
 

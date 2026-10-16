@@ -10,7 +10,7 @@ import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors
 import {
     ChainNotSettlingOnL1,
     InteropAlreadyEnabled,
-    SecondProofSystemNotLocked,
+    SecondProofSystemNotRequired,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
@@ -34,7 +34,7 @@ contract EnableInteropTest is InteropGatingDeployer {
     }
 
     function test_enableInterop() public {
-        _lockSecondProofSystem(chainId);
+        _permanentlyRequireSecondProofSystem(chainId);
 
         vm.expectEmit(true, true, true, true, address(messageRoot));
         emit IL1MessageRoot.InteropEnabled(chainId);
@@ -46,7 +46,7 @@ contract EnableInteropTest is InteropGatingDeployer {
     }
 
     /// @notice Governance may enable a chain it trusts for reasons checked offchain: without the flag, a chain
-    /// that neither locked its second proof system nor runs in multi-proof mode is enabled.
+    /// that neither required its second proof system nor runs in multi-proof mode is enabled.
     function test_enableInterop_withoutSecondProofSystem() public {
         vm.prank(_chainAdmin(chainId));
         IAdmin(chain).setProofSystemStatus(ProofSystem.Zisk, false);
@@ -57,7 +57,7 @@ contract EnableInteropTest is InteropGatingDeployer {
         messageRoot.enableInterop(chainId, false);
 
         assertTrue(messageRoot.isInteropEnabled(chainId));
-        assertFalse(IGetters(chain).isSecondProofSystemLocked(), "the chain stays unlocked");
+        assertFalse(IGetters(chain).isSecondProofSystemRequired(), "the chain stays without the requirement");
         assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_PLONK_VERIFICATION_TYPE, "the chain stays single-proof");
     }
 
@@ -75,7 +75,7 @@ contract EnableInteropTest is InteropGatingDeployer {
     }
 
     function test_enableInterop_revertWhen_notGovernance() public {
-        _lockSecondProofSystem(chainId);
+        _permanentlyRequireSecondProofSystem(chainId);
         address chainAdmin = makeAddr("chainAdmin");
         vm.prank(_chainAdmin(chainId));
         IAdmin(chain).setPendingAdmin(chainAdmin);
@@ -96,7 +96,7 @@ contract EnableInteropTest is InteropGatingDeployer {
     /// @dev The Bridgehub's settlement layer is mocked: moving the chain off L1 needs a Gateway, which this
     /// suite stays clear of.
     function test_enableInterop_revertWhen_notSettlingOnL1() public {
-        _lockSecondProofSystem(chainId);
+        _permanentlyRequireSecondProofSystem(chainId);
         vm.mockCall(
             address(addresses.bridgehub),
             abi.encodeCall(IBridgehubBase.settlementLayer, (chainId)),
@@ -110,17 +110,17 @@ contract EnableInteropTest is InteropGatingDeployer {
         );
     }
 
-    function test_enableInterop_revertWhen_secondProofSystemNotLocked() public {
+    function test_enableInterop_revertWhen_secondProofSystemNotRequired() public {
         _expectEnableInteropRevert(
             governance,
             chainId,
-            abi.encodeWithSelector(SecondProofSystemNotLocked.selector, chainId)
+            abi.encodeWithSelector(SecondProofSystemNotRequired.selector, chainId)
         );
     }
 
-    /// @notice A locked chain that runs on a single prover after an emergency ZiSK-off can't be enabled.
+    /// @notice A chain under the requirement that runs on a single prover after an emergency ZiSK-off can't be enabled.
     function test_enableInterop_revertWhen_notMultiProofMode() public {
-        _lockSecondProofSystem(chainId);
+        _permanentlyRequireSecondProofSystem(chainId);
         vm.prank(governance);
         IAdmin(chain).setProofSystemStatus(ProofSystem.Zisk, false);
 
@@ -131,17 +131,17 @@ contract EnableInteropTest is InteropGatingDeployer {
         );
     }
 
-    /// @dev A diamond whose facets predate the lock has no `isSecondProofSystemLocked`, so the proxy reverts
+    /// @dev A diamond whose facets predate the requirement has no `isSecondProofSystemRequired`, so the proxy reverts
     /// with "F". The getter is mocked to revert that way, isolating the old facet set.
     function test_enableInterop_revertWhen_oldDiamond() public {
-        vm.mockCallRevert(chain, abi.encodeCall(IGetters.isSecondProofSystemLocked, ()), bytes("F"));
+        vm.mockCallRevert(chain, abi.encodeCall(IGetters.isSecondProofSystemRequired, ()), bytes("F"));
 
         _expectEnableInteropRevert(governance, chainId, bytes("F"));
     }
 
     /// @dev Without the flag the getter missing on an old diamond is never read, so such a chain can be enabled.
     function test_enableInterop_withoutSecondProofSystem_oldDiamond() public {
-        vm.mockCallRevert(chain, abi.encodeCall(IGetters.isSecondProofSystemLocked, ()), bytes("F"));
+        vm.mockCallRevert(chain, abi.encodeCall(IGetters.isSecondProofSystemRequired, ()), bytes("F"));
 
         vm.prank(governance);
         messageRoot.enableInterop(chainId, false);

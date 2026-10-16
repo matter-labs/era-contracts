@@ -16,8 +16,8 @@ interface IL1MessageRoot {
     /// @notice Enables interop for a chain. One-way: there is no way to disable it. Callable by the
     /// Bridgehub owner. See {protocol-docs/interop-gating.md#enabling-interop}.
     /// @param _chainId The chain to enable interop for.
-    /// @param _requireSecondProofSystem Whether the chain must have locked its second proof system and be in
-    /// multi-proof mode.
+    /// @param _requireSecondProofSystem Whether the chain must permanently require its second proof system and be
+    /// in multi-proof mode.
     function enableInterop(uint256 _chainId, bool _requireSecondProofSystem) external;
 
     /// @notice Returns whether governance enabled interop for the chain; false for unknown chains.

@@ -82,7 +82,8 @@ deployment tracker, chain asset handler and `ChainRegistrationSender` are transf
 `hub init` completes the hand-off as the owner: `AdminFunctions.chainAdminAcceptAdmin` accepts the
 Bridgehub admin role and `AdminFunctions.governanceAcceptOwnerAggregated` accepts every pending
 ownership above on behalf of `Governance`, so none of them stays with the deployer EOA. In particular,
-only `Governance` can call `ChainRegistrationSender.deregisterInteropPairs`.
+only `Governance` can call `ChainRegistrationSender.deregisterInteropPairs` for any pair (a chain's admin can for
+its own chain's pairs).
 
 Two inputs are immutable once deployed and therefore must be right the first time: the L1 WETH
 address (baked into the asset router and vault implementations; resolved from the L1 chain id when
@@ -203,7 +204,7 @@ block.
 Creating a chain does not make it reachable for interop, and no deployment command makes it so: which
 chains of a production ecosystem may talk to each other is a decision, not a side effect of creating
 one. A chain joins interop through the steps in
-[Order per chain](./interop-gating.md#order-per-chain): its admin locks the second proof system,
+[Order per chain](./interop-gating.md#order-per-chain): its admin permanently requires the second proof system,
 governance enables interop for it on `L1MessageRoot`, and its admin allows each peer on
 `ChainRegistrationSender`. The checks the sender applies are described in
 [Interop registration](./chain-lifecycle.md#interop-registration-chainregistrationsender).

@@ -246,12 +246,62 @@ contract ChainRegistrationSenderUnitTest is Test {
         assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID), "allowed again");
     }
 
-    function test_deregisterInteropPairs_revertWhen_notOwner() public {
+    /// @notice The chain's admin can remove its chain's pairs; it answers for their unfinalized flows.
+    function test_deregisterInteropPairs_byChainAdmin() public {
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
         (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
 
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
+        vm.expectCall(
+            chain,
+            abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
+        );
         vm.prank(chainAdmin);
-        vm.expectRevert("Ownable: caller is not the owner");
         sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+
+        assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+    }
+
+    function testFuzz_deregisterInteropPairs_revertWhen_notOwnerNorChainAdmin(address _caller) public {
+        // The proxy admin can only reach the proxy itself.
+        vm.assume(_caller != owner && _caller != chainAdmin && _caller != makeAddr("proxyAdmin"));
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
+
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+
+        assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+    }
+
+    /// @notice The admin of the peer cannot remove the chain's side of the pair.
+    function test_deregisterInteropPairs_revertWhen_peerAdmin() public {
+        (uint256[] memory chainsRegisteredOn, uint256[] memory chainsToDeregister) = _pair(CHAIN_ID, PEER_CHAIN_ID);
+        address peerAdmin = makeAddr("peerAdmin");
+
+        vm.prank(peerAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, peerAdmin));
+        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+    }
+
+    /// @notice An admin's batch that also holds another chain's pair reverts as a whole.
+    function test_deregisterInteropPairs_revertWhen_batchHasAnotherChainsPair() public {
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        uint256[] memory chainsRegisteredOn = new uint256[](2);
+        uint256[] memory chainsToDeregister = new uint256[](2);
+        (chainsRegisteredOn[0], chainsToDeregister[0]) = (CHAIN_ID, PEER_CHAIN_ID);
+        (chainsRegisteredOn[1], chainsToDeregister[1]) = (PEER_CHAIN_ID, CHAIN_ID);
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        sender.deregisterInteropPairs(chainsRegisteredOn, chainsToDeregister);
+
+        assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
     }
 
     function test_deregisterInteropPairs_revertWhen_lengthMismatch() public {

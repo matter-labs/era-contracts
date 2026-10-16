@@ -60,11 +60,13 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     function populateBridgedOut(bytes32[] calldata _assetIds) external returns (uint256[] memory populatedAmounts);
 
     /// @notice Total amount of `_assetId` deposited into `_chainId` through this vault while the chain had
-    /// no interop. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
+    /// no interop. For `INTEROP_POOL_CHAIN_ID`, the total deposited into the chains with interop, moved chain
+    /// balances included. See {protocol-docs/interop-gating.md#per-chain-balance-cap}.
     function chainTotalDeposited(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Total amount of `_assetId` withdrawn from `_chainId`, failed-deposit claims included, while
-    /// the chain had no interop.
+    /// the chain had no interop. For `INTEROP_POOL_CHAIN_ID`, the total withdrawn from the chains with interop,
+    /// moved chain balances included.
     function chainTotalWithdrawn(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Governance-provided amount of `_assetId` the chain held before its deposits and withdrawals
@@ -74,12 +76,6 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// @notice Whether the balance of `_chainId` in `_assetId` was moved to the interop pool.
     /// See {protocol-docs/interop-gating.md#interop-pool}.
     function chainBalanceInInteropPool(uint256 _chainId, bytes32 _assetId) external view returns (bool);
-
-    /// @notice Total amount of `_assetId` deposited into the chains with interop, moved chain balances included.
-    function interopPoolTotalDeposited(bytes32 _assetId) external view returns (uint256);
-
-    /// @notice Total amount of `_assetId` withdrawn from the chains with interop, moved chain balances included.
-    function interopPoolTotalWithdrawn(bytes32 _assetId) external view returns (uint256);
 
     /// @notice Sets the backfill of `_chainId` for each asset, once per chain and asset.
     /// See {protocol-docs/interop-gating.md#backfill}.

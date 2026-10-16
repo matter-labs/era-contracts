@@ -128,11 +128,11 @@ describe("01 - Deployment Verification", function () {
     for (const chainConfig of l2ChainConfigs) {
       const interop = chainConfig.interop === true;
 
-      it(`chain ${chainConfig.chainId} (${chainConfig.role}) has ${interop ? "" : "not "}locked its second proof system and enabled interop`, async () => {
+      it(`chain ${chainConfig.chainId} (${chainConfig.role}) has ${interop ? "" : "not "}required its second proof system and enabled interop`, async () => {
         const chainAddr = state.chainAddresses!.find((c) => c.chainId === chainConfig.chainId)!;
         const diamond = new Contract(chainAddr.diamondProxy, getAbi("IZKChain"), l1Provider);
         const messageRoot = new Contract(state.l1Addresses!.messageRoot, getAbi("L1MessageRoot"), l1Provider);
-        expect(await diamond.isSecondProofSystemLocked()).to.equal(interop);
+        expect(await diamond.isSecondProofSystemRequired()).to.equal(interop);
         expect(await messageRoot.isInteropEnabled(chainConfig.chainId)).to.equal(interop);
       });
 

@@ -17,12 +17,13 @@ import {ProofSystem, ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/C
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     NotSettlementLayer,
-    SecondProofSystemAlreadyLocked
+    SecondProofSystemAlreadyRequired
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-/// @notice The second-proof-system lock on the Admin facet alone. The end-to-end flow with a real
-/// Bridgehub is in `SecondProofSystemLock.t.sol`. See {protocol-docs/interop-gating.md#second-proof-system-lock}.
-contract LockSecondProofSystemTest is AdminTest {
+/// @notice The second proof system requirement on the Admin facet alone. The end-to-end flow with a real
+/// Bridgehub is in `SecondProofSystemRequirement.t.sol`.
+/// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+contract PermanentlyRequireSecondProofSystemTest is AdminTest {
     uint8 internal constant ZISK_DISABLED = uint8(1 << uint8(ProofSystem.Zisk));
 
     address internal admin;
@@ -31,7 +32,7 @@ contract LockSecondProofSystemTest is AdminTest {
     function setUp() public override {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         bytes4[] memory adminSelectors = new bytes4[](2);
-        adminSelectors[0] = IAdmin.lockSecondProofSystem.selector;
+        adminSelectors[0] = IAdmin.permanentlyRequireSecondProofSystem.selector;
         adminSelectors[1] = IAdmin.setProofSystemStatus.selector;
         facetCuts[0] = Diamond.FacetCut({
             facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
@@ -63,52 +64,52 @@ contract LockSecondProofSystemTest is AdminTest {
         vm.mockCall(address(dummyBridgehub), abi.encodeCall(IOwnable.owner, ()), abi.encode(governance));
     }
 
-    function test_lockSecondProofSystem() public {
+    function test_permanentlyRequireSecondProofSystem() public {
         vm.expectEmit(true, true, true, true, address(adminFacet));
-        emit IAdmin.SecondProofSystemLocked();
+        emit IAdmin.SecondProofSystemRequired();
         vm.prank(admin);
-        adminFacet.lockSecondProofSystem();
+        adminFacet.permanentlyRequireSecondProofSystem();
 
-        assertTrue(utilsFacet.util_getSecondProofSystemLocked());
+        assertTrue(utilsFacet.util_getSecondProofSystemRequired());
     }
 
-    function test_lockSecondProofSystem_revertWhen_alreadyLocked() public {
+    function test_permanentlyRequireSecondProofSystem_revertWhen_alreadyRequired() public {
         vm.prank(admin);
-        adminFacet.lockSecondProofSystem();
+        adminFacet.permanentlyRequireSecondProofSystem();
 
         vm.prank(admin);
-        vm.expectRevert(SecondProofSystemAlreadyLocked.selector);
-        adminFacet.lockSecondProofSystem();
+        vm.expectRevert(SecondProofSystemAlreadyRequired.selector);
+        adminFacet.permanentlyRequireSecondProofSystem();
     }
 
-    function test_lockSecondProofSystem_revertWhen_notMultiProofMode() public {
+    function test_permanentlyRequireSecondProofSystem_revertWhen_notMultiProofMode() public {
         vm.prank(admin);
         adminFacet.setProofSystemStatus(ProofSystem.Zisk, false);
 
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
-        adminFacet.lockSecondProofSystem();
+        adminFacet.permanentlyRequireSecondProofSystem();
 
-        assertFalse(utilsFacet.util_getSecondProofSystemLocked());
+        assertFalse(utilsFacet.util_getSecondProofSystemRequired());
     }
 
-    function test_lockSecondProofSystem_revertWhen_notAdmin() public {
+    function test_permanentlyRequireSecondProofSystem_revertWhen_notAdmin() public {
         vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
-        adminFacet.lockSecondProofSystem();
+        adminFacet.permanentlyRequireSecondProofSystem();
     }
 
-    function test_lockSecondProofSystem_revertWhen_settlingOnGateway() public {
+    function test_permanentlyRequireSecondProofSystem_revertWhen_settlingOnGateway() public {
         utilsFacet.util_setSettlementLayer(makeAddr("gatewayChain"));
 
         vm.prank(admin);
         vm.expectRevert(NotSettlementLayer.selector);
-        adminFacet.lockSecondProofSystem();
+        adminFacet.permanentlyRequireSecondProofSystem();
     }
 
-    function test_setProofSystemStatus_afterLock_onlyGovernanceDisables() public {
+    function test_setProofSystemStatus_afterRequirement_onlyGovernanceDisables() public {
         vm.prank(admin);
-        adminFacet.lockSecondProofSystem();
+        adminFacet.permanentlyRequireSecondProofSystem();
 
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, admin));

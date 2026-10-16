@@ -493,6 +493,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
             revert ZeroChainId();
         }
 
+        // Also keeps `INTEROP_POOL_CHAIN_ID` from ever being registered.
         if (_chainId > type(uint48).max) {
             revert ChainIdTooBig();
         }

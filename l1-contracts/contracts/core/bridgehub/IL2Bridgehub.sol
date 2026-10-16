@@ -17,11 +17,6 @@ interface IL2Bridgehub is IBridgehubBase {
     //     address _chainRegistrationSender
     // ) external;
 
-    /// @notice Registers the base token of a chain for interop, without allowing interop with it.
-    /// @param _chainId The chain id of the chain.
-    /// @param _baseTokenAssetId The base token asset id of the chain, non-zero.
-    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
-
     /// @notice Allows interop with a peer chain once its whitelisting on L1 arrives, see
     /// {protocol-docs/interop-gating.md#interop-peer-whitelist}.
     /// @param _chainId The chain id of the peer chain.

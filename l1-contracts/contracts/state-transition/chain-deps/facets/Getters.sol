@@ -110,8 +110,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function isSecondProofSystemLocked() external view returns (bool) {
-        return s.secondProofSystemLocked;
+    function isSecondProofSystemRequired() external view returns (bool) {
+        return s.secondProofSystemRequired;
     }
 
     /// @inheritdoc IGetters
