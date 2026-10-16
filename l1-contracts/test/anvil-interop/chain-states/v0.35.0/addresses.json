@@ -3,15 +3,15 @@
     "bridgehub": "0x3BFDCfcc2Ac1d41071F3D8c52991f00C9Ac4D1B0",
     "l1SharedBridge": "0xff5e5d29D75e703847eC330356C109C75326BF61",
     "l1NullifierProxy": "0x19313914d9220C4E263628b6a334d2F6282C04B2",
-    "l1NativeTokenVault": "0x7Cece875113C7e6417B479190ED437FE1187ef79",
+    "l1NativeTokenVault": "0x3396325a1AF0161524295311100F1eD600bC0484",
     "governance": "0xa60F07cAaFA0aE451296c0ca5C261578A390105e",
     "transparentProxyAdmin": "0x0FA38b5c8cb180809E0C95E2EE923eC093123285",
     "messageRoot": "0xA40e63F1252d1436ef3eF4D3a85e59d72EFBe8f7",
     "ctmDeploymentTracker": "0xFa50420995E01E773C57a732A058bade1FCD978f",
-    "chainRegistrationSender": "0xf9b0393Be4c5e2cAAf4639a8F02110E68076d74f"
+    "chainRegistrationSender": "0x3192801Fb5304cFEfa7e2C629a9d815F00d45fC1"
   },
   "ctmAddresses": {
-    "chainTypeManager": "0xC32980DcB3B7A75363C95Bc0E121EbEF2268d8F3",
+    "chainTypeManager": "0x07b827d5C9e8BFC75dC481e6FBBF2FF27a148f93",
     "chainAdmin": "0x16b5d0b1A5c64195453315C58671A6f847CE1aC2",
     "verifier": "0x2b51a4111cB79Cab5E58b61069F663Ae022165E0",
     "rollupL1DAValidator": "0xb3b366482f8EE84c1D3De15A2C906099cf847dE5",
@@ -20,23 +20,23 @@
   "chainAddresses": [
     {
       "chainId": 10,
-      "diamondProxy": "0x3e2f0508254e98780b40bcA72d4b11D4FD804A4E"
+      "diamondProxy": "0xAF85F6Ba7db25E66e500C138A11080Ab310723d0"
     },
     {
       "chainId": 11,
-      "diamondProxy": "0x202aba11d521092ec26E2833b185ccC7f4c27304"
+      "diamondProxy": "0xa7700cF5b7C95064981817C507d402f1a4007988"
     },
     {
       "chainId": 12,
-      "diamondProxy": "0xa53dBBf98477c3408F738C4A5BEaF76F5DB1012B"
+      "diamondProxy": "0x2486fDe344a3Ec366f943b329446c7A358B8F1B0"
     },
     {
       "chainId": 13,
-      "diamondProxy": "0xc702c765d97D622CefD76DdF4E72e5Ae3f9fE561"
+      "diamondProxy": "0x4176d8b33E5186325Db7f582DDfF7e58939841c6"
     },
     {
       "chainId": 14,
-      "diamondProxy": "0x0bf2d15f86c09b86f9a2F2F247af89e6bA778289"
+      "diamondProxy": "0x2D4E0F1C13385D13DC8C6CC1f9b908D5deC77895"
     }
   ],
   "testTokens": {
