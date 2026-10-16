@@ -15,27 +15,31 @@ interface IL1GenesisUpgrade {
     /// @param _zkChain the address of the zk chain
     /// @param _l2Transaction the l2 genesis upgrade transaction
     /// @param _protocolVersion the current protocol version
-    /// @param _factoryDeps the factory dependencies needed for the upgrade
     event GenesisUpgrade(
         address indexed _zkChain,
         L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion,
-        bytes[] _factoryDeps
+        uint256 indexed _protocolVersion
     );
 
     /// @notice The main function that will be called by the Admin facet at genesis.
-    /// @param _l1GenesisUpgrade the address of the l1 genesis upgrade
-    /// @param _chainId the chain id
-    /// @param _protocolVersion the current protocol version
-    /// @param _l1CtmDeployerAddress the address of the l1 ctm deployer
-    /// @param _forceDeployments the force deployments
-    /// @param _factoryDeps the factory dependencies
-    function genesisUpgrade(
-        address _l1GenesisUpgrade,
+    /// @dev Takes no arguments: it is delegatecalled into the freshly initialized chain diamond,
+    /// so the chain identity and protocol version come from that diamond's own storage, the force
+    /// deployments from the release its CTM pins, and the CTM deployer from the Bridgehub.
+    function genesisUpgrade() external returns (bytes32);
+
+    /// @notice The L2 genesis transaction `genesisUpgrade` commits for a chain created at
+    ///         `_release` — the FINAL transaction, exactly as the chain stores its hash.
+    /// @dev THE composition view, the genesis counterpart of `IDefaultUpgrade.l2UpgradeTx`: free
+    /// of diamond-storage reads, so it is called directly on this contract rather than through a
+    /// chain, and it runs the same construction the execution path runs.
+    /// @param _release The `CTMRelease` the chain is created at.
+    /// @param _bridgehub The Bridgehub of the ecosystem the chain belongs to.
+    /// @param _chainId The chain to compose for.
+    /// @param _protocolVersion The packed version the chain starts at.
+    function genesisUpgradeTx(
+        address _release,
+        address _bridgehub,
         uint256 _chainId,
-        uint256 _protocolVersion,
-        address _l1CtmDeployerAddress,
-        bytes calldata _forceDeployments,
-        bytes[] calldata _factoryDeps
-    ) external returns (bytes32);
+        uint256 _protocolVersion
+    ) external view returns (L2CanonicalTransaction memory);
 }

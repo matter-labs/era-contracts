@@ -1,12 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+/// @notice What a version's prepare SETS OUT to change. Declared by the version script
+///         (`DefaultCTMUpgrade.upgradeKind`), never inferred from the version numbers the run
+///         happens to see. See "Infrastructure-only operations" in
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
+enum UpgradeKind {
+    // A chain-version edge: the prepare deploys the upgrade engine and the `CTMTransition` chains
+    // cross, and the protocol version moves.
+    ChainRelease,
+    // Ecosystem and CTM-domain singletons behind their proxies, and nothing else: no transition,
+    // no upgrade engine, and nothing chain-facing moves.
+    InfrastructureOnly,
+    // The replacement of a transition already committed for a departed version
+    // (`ChainTypeManager.replaceUpgradeTransition`): a transition onto an existing release, and no
+    // version or release of the CTM moves. See `DefaultTransitionReplacement`.
+    TransitionReplacement
+}
+
 /// @notice Parameters for the ecosystem upgrade entry point.
 ///         Passed as a struct to avoid stack-depth issues as the parameter list grows.
 struct EcosystemUpgradeParams {
     address bridgehubProxyAddress;
     address ctmProxy;
-    address bytecodesSupplier;
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
@@ -27,11 +43,17 @@ struct CoreUpgradeParams {
     string outputPath;
 }
 
-/// @notice Parameters for the standalone CTM upgrade entry point.
-///         Used by `CTMUpgrade_v31.noGovernancePrepare` when running once per target CTM.
+/// @notice Parameters for the standalone CTM upgrade entry point
+///         (`DefaultCTMUpgrade.noGovernancePrepare`) when running once per target CTM in a
+///         multi-CTM ecosystem.
 struct CTMUpgradeParams {
     address ctmProxy;
-    address bytecodesSupplier;
+    /// @notice The CTM's rollup `DAManager`, an AdminFacet constructor argument. No CTM- or
+    ///         Bridgehub-level getter exposes it — only a live chain's diamond does, and a
+    ///         chainless ecosystem has none — so it stays an explicit input rather than something
+    ///         the prepare discovers. Contrast the `BytecodesSupplier`, which the prepare reads
+    ///         off the CTM's own `L1_BYTECODES_SUPPLIER()` immutable and therefore takes no
+    ///         parameter for.
     address rollupDAManager;
     bytes32 create2FactorySalt;
     string upgradeInputPath;
@@ -48,4 +70,16 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
+    /// @notice The `EcosystemUpgradeExecutor` — the lifecycle coordinator — the core prepare of the
+    ///         BOOTSTRAP edge deployed (its output TOML, `[registry].ecosystem_upgrade_executor_addr`):
+    ///         the bootstrap's CTM executor is constructed answering to it. Every later prepare
+    ///         derives the coordinator from the CTM (owner = bound `CTMUpgradeExecutor`, then its
+    ///         `coordinator()`) and ignores this field.
+    address ecosystemUpgradeExecutor;
+    /// @notice The core prepare's `CoreTransition` (its output TOML,
+    ///         `[registry].core_transition_addr`), zero when the upgrade has no ecosystem leg. It is
+    ///         the ecosystem leg of the `EcosystemUpgradeOperation` this prepare deploys, and the
+    ///         bootstrap edge's second object — the one its derived call sequence covers the
+    ///         ecosystem domain from.
+    address coreTransition;
 }

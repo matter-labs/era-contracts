@@ -7,11 +7,14 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
+import {UpgradeSimulation} from "dev/simulation/UpgradeSimulation.s.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
+import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
-import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -22,7 +25,7 @@ import {LogFinder} from "./utils/LogFinder.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-contract UpgradeIntegrationTestBase is Test {
+abstract contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
     using LogFinder for Vm.Log[];
 
@@ -39,12 +42,9 @@ contract UpgradeIntegrationTestBase is Test {
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
     string public ECOSYSTEM_INPUT = "file_1.toml";
-    /// @dev Version-free on purpose: the harness always runs the current default upgrade, so the input
-    ///      must not be tied to a release directory under `upgrade-envs/`.
-    string public ECOSYSTEM_UPGRADE_INPUT = "/test/foundry/l1/integration/fixtures/default-upgrade-input.toml";
+    string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
-    /// @dev The CTM deploy output (not an upgrade input): `_readEcosystemParams` reads deployed addresses from it.
-    string public CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
+    string public CTM_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
     string public CHAIN_INPUT;
@@ -62,7 +62,7 @@ contract UpgradeIntegrationTestBase is Test {
     bool internal _ctmAdminCallsPrepared;
 
     function setupUpgrade() public virtual {
-        console.log("setupUpgrade: Creating DefaultCoreUpgrade and DefaultCTMUpgrade");
+        console.log("setupUpgrade: Creating the version-specific core + CTM upgrade scripts");
         coreUpgrade = createCoreUpgrade();
         ctmUpgrade = createCTMUpgrade();
 
@@ -84,7 +84,6 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Initializing CTM upgrade");
         ctmUpgrade.initializeWithArgs({
             ctmProxy: params.ctmProxy,
-            bytecodesSupplier: params.bytecodesSupplier,
             rollupDAManager: params.rollupDAManager,
             create2FactorySalt: params.create2FactorySalt,
             newConfigPath: params.upgradeInputPath,
@@ -98,8 +97,8 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         coreUpgrade.deployNewEcosystemContractsL1();
 
-        console.log("setupUpgrade: Creating DefaultChainUpgrade");
-        chainUpgrade = new DefaultChainUpgrade();
+        console.log("setupUpgrade: Creating chain upgrade");
+        chainUpgrade = createChainUpgrade();
 
         // Hook for child classes to mutate Core/CTM state after init but before prepare
         // (e.g. local test needs to bump CTM's protocol version from the upgrade input).
@@ -107,26 +106,71 @@ contract UpgradeIntegrationTestBase is Test {
 
         console.log("setupUpgrade: Preparing core + CTM upgrades");
         coreUpgrade.prepareEcosystemUpgrade();
+        // What protocol-ops passes through `CTMUpgradeParams` from the core output TOML.
+        ctmUpgrade.setEcosystemUpgradeExecutor(coreUpgrade.getEcosystemUpgradeExecutor());
+        ctmUpgrade.setCoreTransition(address(coreUpgrade.coreTransition()));
         ctmUpgrade.prepareCTMUpgrade();
 
         console.log("setupUpgrade: Preparing CTM admin calls");
         _cacheCTMAdminCalls(ctmUpgrade.prepareDefaultCTMAdminCalls());
         _ctmAdminCallsPrepared = true;
+        _assertSimulationProbes();
 
         console.log("setupUpgrade: Preparing chain for the upgrade");
         chainUpgrade.prepareChainWithBridgehub(chainId, params.bridgehubProxyAddress);
         console.log("setupUpgrade: Complete");
     }
 
-    /// @notice Override in child classes to use mocked versions.
-    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade) {
-        return new DefaultCoreUpgrade();
+    /// @dev Exercise the same independent package augmentation used by protocol-ops on real
+    ///      prepared contracts; the probes must not alter chain state or deployment output.
+    function _assertSimulationProbes() internal {
+        string memory outputPath = string.concat(vm.projectRoot(), CTM_OUTPUT);
+        string memory beforeOutput = vm.readFile(outputPath);
+        assertFalse(beforeOutput.keyExists(".test_upgrade_calls"), "production prepare emitted test calls");
+        vm.setEnv("UPGRADE_SIMULATION_CTM", vm.toString(ctmUpgrade.getCTMAddress()));
+        vm.setEnv("UPGRADE_SIMULATION_OUTPUT", outputPath);
+        UpgradeSimulation simulation = new UpgradeSimulation();
+        simulation.run();
+        string memory output = vm.readFile(outputPath);
+        assertEq(
+            output.readBytes(".chain_upgrade_diamond_cut"),
+            beforeOutput.readBytes(".chain_upgrade_diamond_cut"),
+            "simulation changed the reviewed cut"
+        );
+        Call[] memory upgrades = abi.decode(output.readBytes(".test_upgrade_calls.test_upgrade_chain"), (Call[]));
+        Call[] memory creations = abi.decode(output.readBytes(".test_upgrade_calls.test_create_chain"), (Call[]));
+        assertEq(upgrades.length, 1, "missing chain-upgrade probe");
+        assertEq(creations.length, 1, "missing chain-creation probe");
+        assertEq(IZKChain(upgrades[0].target).getChainTypeManager(), ctmUpgrade.getCTMAddress());
+        assertEq(
+            output.readAddress(".test_upgrade_calls.test_upgrade_chain_caller"),
+            IZKChain(upgrades[0].target).getAdmin()
+        );
+        assertEq(
+            upgrades[0].data,
+            UpgradeChainCall.encode(
+                upgrades[0].target,
+                ctmUpgrade.getOldProtocolVersion(),
+                abi.decode(ctmUpgrade.getChainUpgradeDiamondCutData(), (Diamond.DiamondCutData))
+            ),
+            "simulation changed chain-upgrade calldata"
+        );
+        assertEq(creations[0].target, coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub);
+        assertEq(output.readAddress(".test_upgrade_calls.test_create_chain_caller"), ctmUpgrade.getBridgehubAdmin());
+        assertEq(IChainTypeManager(ctmUpgrade.getCTMAddress()).protocolVersion(), ctmUpgrade.getOldProtocolVersion());
+        vm.expectRevert("simulation calls already exist; rerun prepare first");
+        simulation.run();
+        assertEq(vm.readFile(outputPath), output, "duplicate invocation corrupted the package");
     }
 
-    /// @notice Override in child classes to use mocked versions.
-    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade) {
-        return new DefaultCTMUpgrade();
-    }
+    /// @notice The version-specific (possibly mocked) core upgrade script under test.
+    function createCoreUpgrade() internal virtual returns (DefaultCoreUpgrade);
+
+    /// @notice The version-specific (possibly mocked) CTM upgrade script under test.
+    function createCTMUpgrade() internal virtual returns (DefaultCTMUpgrade);
+
+    /// @notice The version-specific chain upgrade script under test.
+    function createChainUpgrade() internal virtual returns (DefaultChainUpgrade);
 
     /// @notice Hook for test-specific setup before chain upgrade.
     function beforeChainUpgrade() internal virtual {}
@@ -140,36 +184,28 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("internalTest: Starting");
         vm.recordLogs();
 
-        console.log("internalTest: Preparing core + CTM governance calls and merging by stage");
-        (
-            Call[] memory upgradeStage0Calls,
-            Call[] memory upgradeStage1Calls,
-            Call[] memory upgradeStage2Calls
-        ) = _mergeCoreAndCTMGovernanceCalls();
+        console.log("internalTest: Preparing core + CTM governance calls and merging them into one bundle");
+        Call[] memory upgradeCalls = _mergeCoreAndCTMGovernanceCalls();
 
-        // Cached for migration-pause outcome checks across stages 0..2.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
+        address ctm = ctmUpgrade.getCTMAddress();
+        bool pausedBefore = IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm);
 
         console.log("Executing CTM admin calls through the current operational owner");
         executeCTMAdminCalls();
 
-        console.log("Starting upgrade stage 0 (core + CTM merged)!");
-        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage0Calls);
-        // Stage 0 must pause migrations so setNewVersionUpgrade in stage 1 can run.
-        assertTrue(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "Stage 0 should pause migrations");
-
-        console.log("Starting upgrade stage 1 (core + CTM merged)!");
-        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage1Calls);
-
-        console.log("Starting upgrade stage 2 (core + CTM merged)!");
-        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage2Calls);
-        // Stage 2 must unpause migrations on L1 (DefaultCoreUpgrade.prepareUnpauseGatewayMigrationsCall).
-        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "Stage 2 should unpause migrations");
+        console.log("Executing the governance bundle (core + CTM merged)!");
+        governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeCalls);
+        assertEq(
+            IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm),
+            pausedBefore,
+            "the upgrade neither takes nor lifts a migration pause"
+        );
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 
-        // Capture stage 0..2 events for assertion below.
+        // Capture the bundle's events for assertion below.
         Vm.Log[] memory ecosystemLogs = vm.getRecordedLogs();
 
         Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(
@@ -190,8 +226,14 @@ contract UpgradeIntegrationTestBase is Test {
 
         console.log("Creating new chain");
         address admin = ctmUpgrade.getBridgehubAdmin();
+        UpgradeSimulation simulation = new UpgradeSimulation();
+        Call memory createNewChainCall = simulation.createChainCall(
+            ctmUpgrade.getCTMAddress(),
+            chainId,
+            NEW_CHAIN_ID,
+            admin
+        );
         vm.startPrank(admin);
-        Call memory createNewChainCall = ctmUpgrade.prepareCreateNewChainCall(NEW_CHAIN_ID)[0];
         (bool success, ) = payable(createNewChainCall.target).call{value: createNewChainCall.value}(
             createNewChainCall.data
         );
@@ -199,7 +241,7 @@ contract UpgradeIntegrationTestBase is Test {
         vm.stopPrank();
         Vm.Log[] memory chainOpsLogs = vm.getRecordedLogs();
 
-        // Stage 0..2 ecosystem events
+        // The bundle's ecosystem events
         Vm.Log memory npv = ecosystemLogs.requireOneFrom(
             "NewProtocolVersion(uint256,uint256)",
             ctmUpgrade.getCTMAddress()
@@ -207,28 +249,36 @@ contract UpgradeIntegrationTestBase is Test {
         assertEq(uint256(npv.topics[1]), ctmUpgrade.getOldProtocolVersion(), "CTM old version mismatch");
         assertEq(uint256(npv.topics[2]), ctmUpgrade.getNewProtocolVersion(), "CTM new version mismatch");
 
-        // NewUpgradeCutHash: both fields are indexed -> protocolVersion in topics[1], cutHash in topics[2].
-        // Cut data is stored under the OLD (FROM) version key in setUpgradeDiamondCutInner,
-        // so the event's topics[1] is the old version, not the new one.
-        Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
-            "NewUpgradeCutHash(uint256,bytes32)",
-            ctmUpgrade.getCTMAddress()
+        // The commit shape differs per edge: a transition-committed edge writes only the
+        // transition pointer (the deprecated `upgradeCutHash` stays zero); a legacy cut-taking
+        // edge writes the hash and emits `NewUpgradeCutHash` keyed by the OLD (FROM) version.
+        address committedTransition = IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeTransition(
+            ctmUpgrade.getOldProtocolVersion()
         );
-        assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
-        _expectedUpgradeCutHash = nuch.topics[2];
+        if (committedTransition != address(0)) {
+            Vm.Log memory nut = ecosystemLogs.requireOneFrom(
+                "NewUpgradeTransition(uint256,address)",
+                ctmUpgrade.getCTMAddress()
+            );
+            assertEq(uint256(nut.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Transition version mismatch");
+            assertEq(address(uint160(uint256(nut.topics[2]))), committedTransition, "Committed transition mismatch");
+            _expectedUpgradeCutHash = bytes32(0);
+        } else {
+            Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
+                "NewUpgradeCutHash(uint256,bytes32)",
+                ctmUpgrade.getCTMAddress()
+            );
+            assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
+            _expectedUpgradeCutHash = nuch.topics[2];
+        }
         assertEq(
             IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeCutHash(ctmUpgrade.getOldProtocolVersion()),
             _expectedUpgradeCutHash,
             "Cut hash storage mismatch"
         );
 
-        // NewProtocolVersionVerifier: both fields are indexed.
-        Vm.Log memory npvv = ecosystemLogs.requireOneFrom(
-            "NewProtocolVersionVerifier(uint256,address)",
-            ctmUpgrade.getCTMAddress()
-        );
-        assertEq(uint256(npvv.topics[1]), ctmUpgrade.getNewProtocolVersion(), "Verifier protocol version mismatch");
-        _expectedNewVerifier = address(uint160(uint256(npvv.topics[2])));
+        // The verifier is no longer keyed by version on the CTM; it is pinned by the release,
+        // which `NewCurrentRelease` announces and the state-level asserts check.
 
         // Chain-op events
         chainOpsLogs.requireAtLeast("DiamondCut((address,uint8,bool,bytes4[])[],address,bytes)", 1);
@@ -256,33 +306,13 @@ contract UpgradeIntegrationTestBase is Test {
         // so it was tested in e2e local environment.
     }
 
-    /// @dev Merges per-stage governance calls from core and CTM. Inlines the orchestration that
-    ///      `DefaultEcosystemUpgrade.prepareDefaultGovernanceCalls` used to do; no merged TOML is
-    ///      written because production callers now pass the per-script TOMLs to
-    ///      `protocol-ops upgrade-governance` separately.
-    function _mergeCoreAndCTMGovernanceCalls()
-        internal
-        returns (Call[] memory stage0, Call[] memory stage1, Call[] memory stage2)
-    {
-        (Call[] memory coreStage0, Call[] memory coreStage1, Call[] memory coreStage2) = coreUpgrade
-            .prepareDefaultGovernanceCalls();
-        (Call[] memory ctmStage0, Call[] memory ctmStage1, Call[] memory ctmStage2) = ctmUpgrade
-            .prepareDefaultGovernanceCalls();
-
-        Call[][] memory s0 = new Call[][](2);
-        s0[0] = coreStage0;
-        s0[1] = ctmStage0;
-        stage0 = UpgradeUtils.mergeCallsArray(s0);
-
-        Call[][] memory s1 = new Call[][](2);
-        s1[0] = coreStage1;
-        s1[1] = ctmStage1;
-        stage1 = UpgradeUtils.mergeCallsArray(s1);
-
-        Call[][] memory s2 = new Call[][](2);
-        s2[0] = coreStage2;
-        s2[1] = ctmStage2;
-        stage2 = UpgradeUtils.mergeCallsArray(s2);
+    /// @dev Merges the core and CTM prepares' governance calls into one bundle, core first — what
+    ///      the protocol-ops merge does with the per-script TOMLs.
+    function _mergeCoreAndCTMGovernanceCalls() internal returns (Call[] memory calls) {
+        Call[][] memory parts = new Call[][](2);
+        parts[0] = coreUpgrade.prepareDefaultGovernanceCalls();
+        parts[1] = ctmUpgrade.prepareDefaultGovernanceCalls();
+        calls = UpgradeUtils.mergeCallsArray(parts);
     }
 
     function executeCTMAdminCalls() internal virtual {
@@ -333,9 +363,6 @@ contract UpgradeIntegrationTestBase is Test {
         address ctmProxy = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );
-        address bytecodesSupplier = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-        );
         address rollupDAManager = outputDeployCTMToml.readAddress(
             "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
         );
@@ -345,7 +372,6 @@ contract UpgradeIntegrationTestBase is Test {
             EcosystemUpgradeParams({
                 bridgehubProxyAddress: bridgehubProxy,
                 ctmProxy: ctmProxy,
-                bytecodesSupplier: bytecodesSupplier,
                 rollupDAManager: rollupDAManager,
                 create2FactorySalt: UPGRADE_CREATE2_FACTORY_SALT,
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,

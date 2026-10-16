@@ -39,7 +39,6 @@ export const L2_BASE_TOKEN_HOLDER_ADDR = "0x000000000000000000000000000000000001
 export const L2_REMOVED_GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010";
 export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
 export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
-
 // ZK-VM system hook addresses: SYSTEM_HOOKS_OFFSET (0x7000) + offset
 export const L1_MESSENGER_HOOK_ADDR = "0x0000000000000000000000000000000000007001";
 export const MINT_BASE_TOKEN_HOOK_ADDR = "0x0000000000000000000000000000000000007100";
@@ -59,18 +58,17 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
-// EIP-1967 admin slot: bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)
-export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-
-// EIP-1967 implementation slot: bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
-export const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
-
 // Default gas limits for test transactions.
 // Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
 // via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed) insert
 // grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+// Current Ethereum L1 transaction cap, independent of the block gas limit (EIP-7825).
+export const ETHEREUM_L1_TX_GAS_LIMIT = 2 ** 24;
+// The CTM deployment builds the release's complete L2 bytecode inventory in script memory.
+// Foundry's default execution-memory cap is too small for that deterministic artifact pass.
+export const CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
 export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
 
@@ -109,15 +107,19 @@ export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111
 // L2 bootloader address (used for failed deposit logs)
 export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
 
+// EIP-1967 proxy slots: keccak256("eip1967.proxy.admin") - 1 and keccak256("eip1967.proxy.implementation") - 1.
+export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+export const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+
 // NTV (L2NativeTokenVault) storage slot numbers.
 // Obtained via: forge inspect L2NativeTokenVault storageLayout
 export const NTV_WETH_TOKEN_SLOT = 251;
 export const NTV_L1_CHAIN_ID_SLOT = 253;
 
 // Event signatures
-// GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed, bytes[])
+// GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed)
 export const GENESIS_UPGRADE_EVENT_SIG =
-  "GenesisUpgrade(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),uint256,bytes[])";
+  "GenesisUpgrade(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),uint256)";
 export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";

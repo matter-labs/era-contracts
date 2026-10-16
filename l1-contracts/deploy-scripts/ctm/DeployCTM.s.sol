@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {Utils} from "../utils/Utils.sol";
+import {CTM_PROXY_ADMIN_SALT_DOMAIN, Utils} from "../utils/Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
@@ -14,9 +14,16 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../utils/UpgradeExecutorsRecord.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -30,31 +37,23 @@ import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Commi
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
-import {CoreContract} from "../ecosystem/CoreContract.sol";
+import {L2EcosystemContract} from "../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
-import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
-import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
-    /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
-    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`node blake2s256.js`).
-    /// Without caching, each call to `Utils.getZKOSProxyUpgradeBytecodeInfo` spawns 2 FFI processes
-    /// (one for the impl, one for SystemContractProxy). With ~10 contracts in `_buildForceDeploymentsData`,
-    /// that's ~20 sequential FFI calls. The cache batches all bytecodes into a single FFI call in
-    /// `_precomputeBlakeHashes()`, reducing deployment time significantly.
-    mapping(bytes32 => bytes32) private _blakeCache;
+    /// @dev The reusable upgrade engine this deployment publishes. Not part of the CTM's address
+    ///      set: the CTM holds no pointer to an engine, every transition pins the one it commits.
+    address internal deployedUpgradeEngine;
 
-    function run() public virtual {
-        // Had to leave the function due to scripts that inherit this one, as well as for tests
-        return ();
-    }
+    /// @dev The CTM executor this deployment created (see {deployCTMUpgradeExecutor}).
+    CTMExecutorDeployment internal ctmUpgradeExecutorDeployment;
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
@@ -95,6 +94,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return config;
     }
 
+    /// @notice The CTM executor this deployment created, with its construction.
+    function getCTMUpgradeExecutor() public view returns (CTMExecutorDeployment memory) {
+        return ctmUpgradeExecutorDeployment;
+    }
+
     /// @notice Returns the address to use as the deployer/owner for contracts.
     function getDeployerAddress() public view returns (address) {
         return tx.origin;
@@ -119,19 +123,24 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("Initializing core contracts from BH");
         // Populate discovered addresses via inspector
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
+        // Read where every upgrade prepare reads it, so the genesis release and the releases after it
+        // pin the same L2 Bridgehub cap.
+        config.contracts.maxNumberOfChains = L1Bridgehub(bridgehub).MAX_NUMBER_OF_ZK_CHAINS();
 
         if (reuseGovAndAdmin) {
             ctmAddresses.admin.governance = coreAddresses.shared.governance;
             ctmAddresses.chainAdmin = coreAddresses.shared.bridgehubAdmin;
-            ctmAddresses.admin.transparentProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
         } else {
             (ctmAddresses.admin.governance) = deploySimpleContract("Governance");
             (ctmAddresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
-            ctmAddresses.admin.transparentProxyAdmin = deployWithCreate2AndOwner(
-                "ProxyAdmin",
-                ctmAddresses.admin.governance
-            );
         }
+        // The CTM domain always has its OWN ProxyAdmin, held by the CTM executor (the ecosystem's is
+        // the core executor's). Owned by the deployer until {deployCTMUpgradeExecutor} hands it over.
+        ctmAddresses.admin.transparentProxyAdmin = deployWithCreate2AndOwner(
+            "ProxyAdmin",
+            getDeployerAddress(),
+            CTM_PROXY_ADMIN_SALT_DOMAIN
+        );
 
         deployEIP7702Checker();
         deployDAValidators();
@@ -144,11 +153,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         deployVerifiers();
 
-        // The CTM keeps this implementation and reuses it for every upgrade that needs no bespoke
-        // logic — a verifier or VK swap, say — so it has to be the reusable one. A one-shot migration
-        // like `V34UpgradeZKsyncOS` would be replayed by those later upgrades.
-        (ctmAddresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgradeZKsyncOS");
-        (ctmAddresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
+        // Deployed so a fresh ecosystem ships with the reusable engine already on-chain. Nothing
+        // points at it: each transition pins the engine it commits, and a later prepare building
+        // the same code through the CREATE2 factory lands on this very address. It must therefore
+        // be the reusable implementation — a one-shot migration like `V32UpgradeZKsyncOS` would be
+        // replayed by every upgrade that reused it.
+        deployedUpgradeEngine = deploySimpleContract("DefaultUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
@@ -186,9 +196,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         setChainTypeManagerInServerNotifier();
 
-        setDefaultUpgradeInChainTypeManager();
-
         updateOwners();
+        deployCTMUpgradeExecutor();
 
         saveOutput(outputPath);
     }
@@ -277,15 +286,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("ChainTypeManager set in ServerNotifier");
     }
 
-    function setDefaultUpgradeInChainTypeManager() internal {
-        IChainTypeManager ctm = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
-        vm.broadcast(getDeployerAddress());
-        ctm.setDefaultUpgrade(ctmAddresses.stateTransition.defaultUpgrade);
-        console.log("DefaultUpgrade set in ChainTypeManager");
-    }
-
-    function deployEIP7702Checker() internal {
-        ctmAddresses.admin.eip7702Checker = deploySimpleContract("EIP7702Checker");
+    /// @notice The EIP-7702 checker: a permanent, argument-less CTM-domain singleton that the
+    ///         `MailboxFacet` takes as an immutable. Reused when one is already known and runs the
+    ///         current code — otherwise the fresh checker would change the Mailbox's immutable and
+    ///         force a Mailbox redeploy (and a facet cut on every chain) for an upgrade that
+    ///         changes neither. A fresh deployment has none and deploys one.
+    function deployEIP7702Checker() internal virtual {
+        ctmAddresses.admin.eip7702Checker = _deployReleaseMember("EIP7702Checker", ctmAddresses.admin.eip7702Checker);
     }
 
     function deployDAValidators() internal {
@@ -334,6 +341,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
     }
 
+    /// @dev The CTM, its ProxyAdmin and the ServerNotifier are not handed out here: they go to the
+    ///      CTM executor ({deployCTMUpgradeExecutor}).
     function updateOwners() internal {
         vm.startBroadcast(getDeployerAddress());
 
@@ -341,14 +350,79 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         validatorTimelock.transferOwnership(config.ownerAddress);
 
         IChainTypeManager ctm = IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager);
-        IOwnable(address(ctm)).transferOwnership(ctmAddresses.admin.governance);
         ctm.setPendingAdmin(ctmAddresses.chainAdmin);
 
-        IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
         IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");
+    }
+
+    /// @notice Deploys the CTM executor bound to the ecosystem's coordinator and hands it the whole CTM
+    ///         domain — the CTM (whose nomination its permissionless `acceptCTMOwnership` completes),
+    ///         the CTM-domain ProxyAdmin and the ServerNotifier (accepted through `forward`) — then
+    ///         nominates the coordinator's governance on it: the CTM half of what the v35 bootstrap
+    ///         ends with. `RegisterCTM` binds it to the coordinator. Constructed for the deployer,
+    ///         which performs the handover; governance accepts afterwards.
+    /// @dev Rides the CREATE2 factory like every deployment of this script.
+    function deployCTMUpgradeExecutor() internal {
+        address deployer = getDeployerAddress();
+        address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        address ctmProxyAdmin = ctmAddresses.admin.transparentProxyAdmin;
+        address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
+        address coordinator = _ecosystemCoordinator();
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(
+            payable(
+                deployViaCreate2AndNotify(
+                    type(CTMUpgradeExecutor).creationCode,
+                    abi.encode(deployer, ctm, ctmProxyAdmin, coordinator),
+                    "CTMUpgradeExecutor"
+                )
+            )
+        );
+        ctmUpgradeExecutorDeployment = CTMExecutorDeployment({
+            ctmExecutor: address(executor),
+            create2Salt: _create2FactorySalt,
+            initialOwner: deployer,
+            chainTypeManager: ctm,
+            ctmProxyAdmin: ctmProxyAdmin,
+            coordinator: coordinator
+        });
+
+        Call[] memory acceptNotifier = new Call[](1);
+        acceptNotifier[0] = Call({target: notifier, value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
+        vm.startBroadcast(deployer);
+        IOwnable(ctm).transferOwnership(address(executor));
+        executor.acceptCTMOwnership();
+        ProxyAdmin(ctmProxyAdmin).transferOwnership(address(executor));
+        IOwnable(notifier).transferOwnership(address(executor));
+        executor.forward(acceptNotifier);
+        executor.transferOwnership(_coordinatorGovernance(coordinator));
+        vm.stopBroadcast();
+        console.log("CTM upgrade executor deployed and handed the CTM domain");
+    }
+
+    /// @dev The ecosystem's coordinator, read off the ecosystem ProxyAdmin's owner — the core executor
+    ///      `DeployL1CoreContracts` handed it to.
+    function _ecosystemCoordinator() internal view returns (address coordinator) {
+        address coreExecutor = ProxyAdmin(coreAddresses.shared.transparentProxyAdmin).owner();
+        require(
+            coreExecutor.code.length != 0,
+            "the ecosystem ProxyAdmin is not held by a CoreUpgradeExecutor: the ecosystem predates the registry model"
+        );
+        coordinator = CoreUpgradeExecutor(payable(coreExecutor)).coordinator();
+        require(coordinator != address(0), "the core executor is bound to no coordinator");
+    }
+
+    /// @dev The governance the coordinator answers to: its owner, or — while a fresh ecosystem
+    ///      deployment's nomination is still to be accepted — the nominee. All three executors end
+    ///      owned by this one governance.
+    /// @param _coordinator The ecosystem's coordinator.
+    function _coordinatorGovernance(address _coordinator) internal view returns (address governance) {
+        governance = Ownable2Step(_coordinator).pendingOwner();
+        if (governance == address(0)) {
+            governance = Ownable2Step(_coordinator).owner();
+        }
     }
 
     function saveOutput(string memory outputPath) internal virtual {
@@ -391,7 +465,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             );
         }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
-        vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "current_release_addr", ctmAddresses.stateTransition.currentRelease);
+        vm.serializeAddress("state_transition", "default_upgrade_addr", deployedUpgradeEngine);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",
@@ -487,133 +562,72 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts", contracts);
-        string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeString("root", "contracts_config", contractsConfig);
+        string memory toml = vm.serializeString(
+            "root",
+            "upgrade_executors",
+            UpgradeExecutorsRecord.serializeCTM(ctmUpgradeExecutorDeployment)
+        );
         vm.writeToml(toml, outputPath);
     }
 
+    /// @dev Pins the ECOSYSTEM governance (the one the CTM executor is nominated to), not
+    ///      `ctmAddresses.admin.governance`: without `reuseGovAndAdmin` the latter is the CTM's own.
     function prepareForceDeploymentsData() internal returns (bytes memory) {
-        require(ctmAddresses.admin.governance != address(0), "Governance address is not set");
+        address governance = _coordinatorGovernance(_ecosystemCoordinator());
+        require(governance != address(0), "the coordinator has no governance");
 
-        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(ctmAddresses.admin.governance);
+        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(governance);
 
         return abi.encode(data);
     }
 
-    /// @dev Scratch file for `_precomputeBlakeHashes`. Set by `runInner`
-    ///      from the caller's output path; falls back to the conventional
-    ///      fixed name for entrypoints that don't take paths.
-    string private _blakeBatchTmpFile;
-
-    /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
-    function _precomputeBlakeHashes() private {
-        CoreContract[10] memory contracts = [
-            CoreContract.L2Bridgehub,
-            CoreContract.L2AssetRouter,
-            CoreContract.L2NativeTokenVault,
-            CoreContract.L2MessageRoot,
-            CoreContract.UpgradeableBeaconDeployer,
-            CoreContract.L2ChainAssetHandler,
-            CoreContract.InteropCenter,
-            CoreContract.L2InteropHandler,
-            CoreContract.L2AssetTracker,
-            CoreContract.BaseTokenHolder
-        ];
-
-        string memory tmpFile = bytes(_blakeBatchTmpFile).length != 0
-            ? _blakeBatchTmpFile
-            : string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
-        vm.writeFile(tmpFile, "");
-
-        bytes[10] memory bytecodes;
-        for (uint256 i = 0; i < contracts.length; i++) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(contracts[i]);
-            bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(fileName, contractName);
-            vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
-        }
-        // Also add SystemContractProxy (used for proxy-upgrade bytecode info)
-        bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
-            "SystemContractProxy.sol",
-            "SystemContractProxy"
-        );
-        vm.writeLine(tmpFile, vm.toString(proxyBytecode));
-
-        // Single FFI call to batch-hash all bytecodes
-        string[] memory input = new string[](4);
-        input[0] = "node";
-        input[1] = "./scripts/blake2s256.js";
-        input[2] = "--batch";
-        input[3] = tmpFile;
-        bytes memory result = vm.ffi(input);
-
-        // The batch is the `contracts` list plus the SystemContractProxy appended above.
-        uint256 totalBytecodes = contracts.length + 1;
-        require(result.length == totalBytecodes * 32, "Unexpected batch blake2s result length");
-        for (uint256 i = 0; i < contracts.length; i++) {
-            bytes32 hash;
-            assembly {
-                hash := mload(add(result, add(32, mul(i, 32))))
-            }
-            _blakeCache[keccak256(bytecodes[i])] = hash;
-        }
-        {
-            uint256 proxyIndex = contracts.length;
-            bytes32 proxyHash;
-            assembly {
-                proxyHash := mload(add(result, add(32, mul(proxyIndex, 32))))
-            }
-            _blakeCache[keccak256(proxyBytecode)] = proxyHash;
-        }
-
-        vm.removeFile(tmpFile);
-    }
-
-    /// @dev Look up a pre-computed blake2s hash and build ZKSyncOSBytecodeInfo.
-    function _cachedZKOSBytecodeInfo(bytes memory _bytecode) private view returns (bytes memory) {
-        bytes32 key = keccak256(_bytecode);
-        bytes32 blakeHash = _blakeCache[key];
-        require(blakeHash != bytes32(0), "Blake hash not cached");
-        return ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(blakeHash, uint32(_bytecode.length), key);
-    }
-
-    /// @dev Returns proxy-upgrade bytecode info, using the blake cache when available.
-    function _getProxyUpgradeBytecodeInfo(
-        string memory _fileName,
-        string memory _contractName
-    ) private view returns (bytes memory) {
-        bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(_fileName, _contractName);
-        bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
-            "SystemContractProxy.sol",
-            "SystemContractProxy"
-        );
-        return abi.encode(_cachedZKOSBytecodeInfo(implBytecode), _cachedZKOSBytecodeInfo(proxyBytecode));
-    }
-
-    /// @dev Get bytecode info, using cached blake hashes.
-    function _getBytecodeInfo(CoreContract _c) internal virtual returns (bytes memory) {
+    /// @dev The `(implementation, proxy)` system-proxy descriptor of `_c` for the genesis
+    ///      force-deployments blob, from the cached bytecode infos. Only for the beacon deployer,
+    ///      which has no release-table row; every other descriptor comes from {_tableDescriptor}.
+    function _getBytecodeInfo(L2EcosystemContract _c) internal virtual returns (bytes memory) {
         (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(_c);
-        return _getProxyUpgradeBytecodeInfo(fileName, contractName);
+        return
+            abi.encode(
+                _cachedBytecodeInfo(fileName, contractName),
+                _cachedBytecodeInfo("SystemContractProxy.sol", "SystemContractProxy")
+            );
+    }
+
+    /// @dev The blob field `CTMRelease` requires for `_member`: its table row behind the shell, or
+    ///      empty when the row is.
+    function _tableDescriptor(
+        bytes[] memory _table,
+        bytes memory _shell,
+        L2EcosystemContract _member
+    ) internal pure returns (bytes memory) {
+        bytes memory row = _table[uint256(_member)];
+        return row.length == 0 ? bytes("") : abi.encode(row, _shell);
     }
 
     function _buildForceDeploymentsData(
         address _governance
     ) internal virtual returns (FixedForceDeploymentsData memory data) {
-        _precomputeBlakeHashes();
+        _cacheReleaseBytecodeInfos();
+        // The same table the release pins, so its two copies of each implementation agree.
+        bytes[] memory table = getL2BytecodeInfoTable();
+        bytes memory shell = getL2SystemProxyBytecodeInfo();
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetRouter),
-            l2NtvBytecodeInfo: _getBytecodeInfo(CoreContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: _getBytecodeInfo(CoreContract.L2MessageRoot),
-            beaconDeployerInfo: _getBytecodeInfo(CoreContract.UpgradeableBeaconDeployer),
-            baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
-            chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
-            interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2InteropHandler),
-            assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
+            bridgehubBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2AssetRouter),
+            l2NtvBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2MessageRoot),
+            beaconDeployerInfo: _getBytecodeInfo(L2EcosystemContract.UpgradeableBeaconDeployer),
+            baseTokenHolderBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.BaseTokenHolder),
+            chainAssetHandlerBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2ChainAssetHandler),
+            interopCenterBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.InteropCenter),
+            interopHandlerBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2InteropHandler),
+            assetTrackerBytecodeInfo: _tableDescriptor(table, shell, L2EcosystemContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -625,10 +639,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         });
     }
 
+    /// @dev Under the CTM-domain ProxyAdmin like every other per-CTM proxy, so its implementation
+    ///      swaps ride the same operation rows (see {docs/upgrade-operations.md}).
     function deployServerNotifier() internal returns (address implementation, address proxy) {
-        // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", ctmAddresses.chainAdmin);
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
+        (implementation, proxy) = deployTuppWithContract("ServerNotifier");
     }
 
     function saveDiamondSelectors() public {

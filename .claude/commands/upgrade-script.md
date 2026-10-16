@@ -14,6 +14,11 @@ Every release is prepared by its own `CoreUpgrade_v{N}` + `CTMUpgrade_v{N}`
 (`current_upgrade_env_dir!` in `protocol-ops/src/common/forge/scripts/mod.rs`). The upgrade tests run exactly
 these defaults, so they always cover the release being built.
 
+There is no per-version chain script: every chain crosses through
+`AdminFunctions.upgradeChainFromCTM`, which picks the modern cut-reading call or the legacy
+handed-cut call from the chain's own protocol version. `DefaultChainUpgrade` remains only as
+the Foundry integration harness for the legacy edge.
+
 ## Steps
 
 1. On the new release's branch, merge the outgoing release's branch in first (the script refuses otherwise).
@@ -25,16 +30,28 @@ these defaults, so they always cover the release being built.
 2. Ask the user what the release changes. Only if it needs release-specific preparation (extra contracts, a
    custom per-chain initializer, one-off governance calls), override only what the release needs in the
    generated `CoreUpgrade_v{N}` / `CTMUpgrade_v{N}`; protocol-ops and the upgrade tests already run them.
+   Use the most recent steady-state version as the template — `v36`, not `v35`:
+   - `l1-contracts/deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol`
+   - `l1-contracts/deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol`
 
-3. Run `cd protocol-ops && cargo test`, the anvil upgrade test (`yarn ts-node run-upgrade-test.ts` in
-   `l1-contracts/test/anvil-interop`) and the foundry upgrade tests
+   `v35` is the one-shot registry bootstrap edge and carries a large amount of machinery
+   (`RegistryBootstrapMigration`, the authored L2 plan, the declared bootstrap actions) that a
+   normal version must NOT copy.
+
+3. Declare the release scope. `changedReleaseMembers()` lists the release members this version
+   replaces; anything not listed is reused from the live release, and a member that changes without
+   being declared makes the prepare fail. Override it whenever the version changes chain code.
+
+4. Run `cd protocol-ops && cargo test`, the anvil upgrade tests (`yarn test:upgrade` and
+   `yarn test:upgrade-recurring` in `l1-contracts/test/anvil-interop`) and the foundry upgrade tests
    (`forge test --ffi --match-path 'test/foundry/l1/integration/UpgradeTest*'` in `l1-contracts`).
 
 ## Key rules
 
 - NEVER use try-catch or staticcall in upgrade scripts
 - Prefer the default upgrade; the release's scripts override the `Default*` ones only where it needs to
-- Three-stage governance: stage0 (pause), stage1 (upgrade), stage2 (unpause)
+- One governance call: `EcosystemUpgradeExecutor.execute(operation)`, derived by the merge; anything else
+  governance must do is a declared external action
 - Never pin the upgrade tests to a release by hand: they follow protocol-ops' defaults (moved by
   `yarn new-release`) and the genesis version
 - Test with `forge script` in simulation mode before broadcasting

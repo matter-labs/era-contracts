@@ -15,12 +15,15 @@ use serde_json::Value;
 use crate::common::ethereum::get_provider;
 use crate::common::{logger, PrivateKey};
 
-/// One replayed Safe tx as it lands on L1, persisted to `--out` so the
-/// PUVT (`ecosystem verify-upgrade`) can later reconstruct CREATE2 / TUPP
-/// deployments from the prepare bundles. The fields mirror the legacy
-/// `UpgradeOutput.transactions` shape but with the raw input data alongside
-/// each hash, so verifier-side parsing doesn't need an extra
-/// `eth_getTransactionByHash` round trip.
+/// One replayed Safe tx as it lands on L1, persisted to `--out` as the
+/// deployment record of a prepare run. The fields mirror the legacy
+/// `UpgradeOutput.transactions` shape but carry the raw input data alongside
+/// each hash, so a reader does not need an extra `eth_getTransactionByHash`
+/// round trip.
+///
+/// The registry verifier does NOT consume this: an object's provenance is
+/// re-derived from the reviewed creation code and its own manifest, not
+/// reconstructed from a deployment history. It remains an operational record.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutedTx {
     pub tx_hash: String,
@@ -516,10 +519,9 @@ pub struct DevExecuteSafeArgs {
 
     /// Optional path to append the replayed transactions to as JSON. Use the
     /// same path across multiple bundles or retries. Each confirmed receipt is
-    /// journaled immediately, so a later failure cannot erase the provenance
-    /// of transactions that already mined. Consumed later by
-    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
-    /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
+    /// journaled immediately, so a later failure cannot erase the record of
+    /// transactions that already mined, and a resumed run skips them. An
+    /// operational record of what a replay broadcast; no verifier reads it.
     #[clap(long)]
     pub out: Option<PathBuf>,
 
@@ -1077,13 +1079,13 @@ async fn already_deployed_create2<P: Provider>(
 
 /// The skip leaves no journal entry: the tx that deployed the contract is not
 /// known here (a cancelled run, or a receipt that never reached the journal).
-/// PUVT attributes CREATE2 deployments through `transactions.txt`, so say which
-/// address needs its deployment hash appended if PUVT reports it missing.
+/// Say which address it was, so the operator can complete the record in
+/// `transactions.txt` by hand.
 fn log_create2_skip(idx: usize, to: Address, deployed: Address) {
     logger::warn(format!(
         "Skipping Safe tx #{idx} (to {to:#x}) — already deployed at {deployed:#x}. Its deployment \
-         tx is not in this run's journal: if PUVT reports {deployed:#x} missing from the CREATE2 \
-         deployments, append that tx's hash to transactions.txt."
+         tx is not in this run's journal: to keep the record complete, append that tx's hash to \
+         transactions.txt."
     ));
 }
 
@@ -1116,8 +1118,8 @@ fn load_executed_bundle(out_path: Option<&Path>) -> anyhow::Result<ExecutedBundl
     }
 }
 
-/// Journal one confirmed receipt immediately. `transactions.txt` is written
-/// first because it is the PUVT's source of deployment provenance; the JSON is
+/// Journal one confirmed receipt immediately. `transactions.txt` (the plain
+/// list of broadcast hashes) is written first; the JSON is
 /// then atomically replaced for the human/machine execution record. If a later
 /// transaction in the same Safe bundle fails, this receipt survives the retry.
 fn record_executed_tx(

@@ -7,7 +7,13 @@
 
 import type { JsonFragment } from "@ethersproject/abi";
 import * as path from "path";
-import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./artifacts";
+import {
+  loadAbiFromOut,
+  loadBytecodeFromOut,
+  loadCreationBytecodeFromOut,
+  loadDeterministicBytecodeFromOut,
+  loadDeterministicCreationBytecodeFromOut,
+} from "./artifacts";
 
 // ── Artifact path registry ──────────────────────────────────────
 //
@@ -18,10 +24,40 @@ import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from
 const ARTIFACTS = {
   AdminFacet: "Admin.sol/AdminFacet.json",
   BaseTokenHolder: "BaseTokenHolder.sol/BaseTokenHolder.json",
+  // ── Registry-driven upgrade machinery (see registry-upgrade-test-runner.ts) ──
+  BytecodesSupplier: "BytecodesSupplier.sol/BytecodesSupplier.json",
+  CTMUpgradeExecutor: "CTMUpgradeExecutor.sol/CTMUpgradeExecutor.json",
+  CoreUpgradeExecutor: "CoreUpgradeExecutor.sol/CoreUpgradeExecutor.json",
+  EcosystemUpgradeExecutor: "EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
+  EcosystemUpgradeOperation: "EcosystemUpgradeOperation.sol/EcosystemUpgradeOperation.json",
+  ISelfDescribingFacet: "ISelfDescribingFacet.sol/ISelfDescribingFacet.json",
+  ICTMRelease: "ICTMRelease.sol/ICTMRelease.json",
+  ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
+  ICoreTransition: "ICoreTransition.sol/ICoreTransition.json",
+  DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
+  BootstrapUpgrade: "BootstrapUpgrade.sol/BootstrapUpgrade.json",
+  DiamondInit: "DiamondInit.sol/DiamondInit.json",
+  ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
+  ZKsyncOSVerifierPlonk: "ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
+  ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
+  L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
+  // Write-once release/CTM-transition/core-transition objects (contracts/upgrades/registry). Each
+  // takes its manifest as a CONSTRUCTOR argument, so a plain deployment is the whole creation
+  // step. The committed manifest they are built from regenerates via
+  // `yarn regen:registry-manifest` (emit mode of the registry upgrade runner).
+  CTMRelease: "CTMRelease.sol/CTMRelease.json",
+  CTMTransition: "CTMTransition.sol/CTMTransition.json",
+  CoreTransition: "CoreTransition.sol/CoreTransition.json",
+  ServerNotifier: "ServerNotifier.sol/ServerNotifier.json",
+  // Bootstrap edge (see bootstrap-upgrade-stage.ts): the one-time entry into the registry-driven
+  // model, plus the legacy cut-taking entrypoint a fixture may need installed.
+  RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
+  LegacyTestAdminFacet: "LegacyTestAdminFacet.sol/LegacyTestAdminFacet.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",
   DummyInteropRecipient: "DummyInteropRecipient.sol/DummyInteropRecipient.json",
+  ExecutorFacet: "Executor.sol/ExecutorFacet.json",
   EmptyContract: "EmptyContract.sol/EmptyContract.json",
   GettersFacet: "Getters.sol/GettersFacet.json",
   IChainTypeManager: "IChainTypeManager.sol/IChainTypeManager.json",
@@ -57,14 +93,14 @@ const ARTIFACTS = {
   L2NativeTokenVaultDev: "L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json",
   L2WrappedBaseToken: "L2WrappedBaseToken.sol/L2WrappedBaseToken.json",
   MailboxFacet: "Mailbox.sol/MailboxFacet.json",
+  CommitterFacet: "Committer.sol/CommitterFacet.json",
   MigratorFacet: "Migrator.sol/MigratorFacet.json",
   MockContractDeployer: "MockContractDeployer.sol/MockContractDeployer.json",
+  FixedDelegateCalldataComposer: "FixedDelegateCalldataComposer.sol/FixedDelegateCalldataComposer.json",
   MockL1MessengerHook: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
-  ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
-  DefaultUpgradeZKsyncOS: "DefaultUpgradeZKsyncOS.sol/DefaultUpgradeZKsyncOS.json",
   SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
@@ -95,6 +131,20 @@ export function getCreationBytecode(name: ContractName): string {
   return loadCreationBytecodeFromOut(ARTIFACTS[name]);
 }
 
+/**
+ * Deployed (runtime) bytecode from the deterministic (CBOR-metadata-free) build — see
+ * `[profile.registry-deterministic]` in l1-contracts/foundry.toml. Used for every contract an
+ * bytecode-DERIVED value the committed registry manifest pins, and for the addresses it names.
+ */
+export function getDeterministicBytecode(name: ContractName): string {
+  return loadDeterministicBytecodeFromOut(ARTIFACTS[name]);
+}
+
+/** Creation (init) bytecode from the deterministic (CBOR-metadata-free) build. */
+export function getDeterministicCreationBytecode(name: ContractName): string {
+  return loadDeterministicCreationBytecodeFromOut(ARTIFACTS[name]);
+}
+
 /** Solidity contract name behind `name`, which can differ from the harness name. */
 export function getSolidityContractName(name: ContractName): string {
   return path.basename(ARTIFACTS[name], ".json");
@@ -104,7 +154,3 @@ export function getSolidityContractName(name: ContractName): string {
 export function getSoliditySourceFileName(name: ContractName): string {
   return path.dirname(ARTIFACTS[name]);
 }
-
-// ── Legacy ABIs ─────────────────────────────────────────────────
-// ABIs for older contract versions that no longer exist as artifacts.
-// Kept here (not inline) so every consumer imports from a single source of truth.

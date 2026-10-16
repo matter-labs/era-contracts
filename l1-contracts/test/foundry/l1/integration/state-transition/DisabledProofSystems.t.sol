@@ -12,7 +12,6 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ICommitter, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -251,16 +250,26 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
 
     function _deployChain(uint256 _chainId, address _verifier) internal returns (address result) {
         address bridgehub = makeAddr("bridgehub");
-        InitializeData memory init = Utils.makeInitializeData(bridgehub);
-        init.chainId = _chainId;
-        init.admin = owner;
-        init.validatorTimelock = validator;
-        init.storedBatchZero = keccak256(abi.encode(genesis));
-        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), init.baseTokenAssetId);
+        address chainTypeManager = Utils.TEST_CHAIN_TYPE_MANAGER;
+        bytes32 baseTokenAssetId = bytes32(uint256(0x923645439232223445));
+        // Everything but (chainId, admin) is read from the CTM that creates the chain and the
+        // release it pins — all mocked here. This fixture's validator timelock and genesis batch
+        // hash differ from the mocker defaults, so they are overridden explicitly.
+        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), baseTokenAssetId);
         mockChainTypeManagerVerifier(_verifier);
         vm.mockCall(
-            init.chainTypeManager,
-            abi.encodeCall(IChainTypeManager.protocolVersionIsActive, (init.protocolVersion)),
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.validatorTimelockPostV29.selector),
+            abi.encode(validator)
+        );
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.storedBatchZero.selector),
+            abi.encode(keccak256(abi.encode(genesis)))
+        );
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(true)
         );
 
@@ -283,16 +292,15 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         selectors[4] = IGetters.getChainId.selector;
         selectors[5] = IGetters.getProofMode.selector;
         cuts[3] = _cut(address(new GettersFacet()), selectors);
-        result = address(
-            new DiamondProxy(
-                block.chainid,
-                Diamond.DiamondCutData({
-                    facetCuts: cuts,
-                    initAddress: address(new DiamondInit()),
-                    initCalldata: abi.encodeCall(DiamondInit.initialize, (init))
-                })
-            )
-        );
+        // Build the cut before the prank: `new DiamondInit()` is its own creation, and the prank
+        // must land on the DiamondProxy construction, where DiamondInit reads the CTM as sender.
+        Diamond.DiamondCutData memory cutData = Diamond.DiamondCutData({
+            facetCuts: cuts,
+            initAddress: address(new DiamondInit()),
+            initCalldata: abi.encodeCall(DiamondInit.initialize, (_chainId, owner))
+        });
+        vm.prank(chainTypeManager);
+        result = address(new DiamondProxy(block.chainid, cutData));
         address daValidator = address(new ValidiumL1DAValidator());
         vm.prank(owner);
         IAdmin(result).setDAValidatorPair(daValidator, L2DACommitmentScheme.EMPTY_NO_DA);

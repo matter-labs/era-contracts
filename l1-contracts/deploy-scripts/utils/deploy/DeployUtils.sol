@@ -50,6 +50,26 @@ abstract contract DeployUtils is Create2FactoryUtils {
         );
     }
 
+    /// @notice {deployWithCreate2AndOwner} under a domain-separated salt (see
+    ///         {create2WithDeterministicOwner}).
+    /// @param contractName The contract to deploy.
+    /// @param owner Its owner.
+    /// @param _saltDomain The domain separating it from same-code, same-owner deployments of the run.
+    /// @return contractAddress The deployed contract address.
+    function deployWithCreate2AndOwner(
+        string memory contractName,
+        address owner,
+        bytes32 _saltDomain
+    ) public returns (address contractAddress) {
+        bytes memory constructorParams = getCreationCalldata(contractName);
+        contractAddress = create2WithDeterministicOwner(
+            abi.encodePacked(getCreationCode(contractName), constructorParams),
+            owner,
+            _saltDomain
+        );
+        notifyAboutDeployment(contractAddress, contractName, constructorParams, contractName);
+    }
+
     function deployWithCreate2AndOwner(
         string memory contractName,
         address owner

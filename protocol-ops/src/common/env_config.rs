@@ -30,8 +30,8 @@ use serde::Deserialize;
 use crate::common::forge::scripts::CURRENT_UPGRADE_ENV_DIR;
 use crate::common::paths::resolve_l1_contracts_path;
 
-/// The release's upgrade: the directory under `upgrade-envs/` that `upgrade-prepare-all`,
-/// PUVT and the generate / replay pipeline (`ecosystem rehearse-upgrade`, `replay-bundle`)
+/// The release's upgrade: the directory under `upgrade-envs/` that `upgrade-prepare-all`
+/// and the generate / replay pipeline (`ecosystem rehearse-upgrade`, `replay-bundle`)
 /// target when none is named. The last segment of [`CURRENT_UPGRADE_ENV_DIR`].
 pub const DEFAULT_UPGRADE: &str = last_path_segment(CURRENT_UPGRADE_ENV_DIR);
 
@@ -56,9 +56,9 @@ const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
 pub struct PermanentValues {
-    /// L1 chain id (e.g. 11155111 for Sepolia, 1 for mainnet). PUVT reads
-    /// this at startup and cross-checks `eth_chainId` against it as a basic
-    /// "right network" sanity check.
+    /// L1 chain id (e.g. 11155111 for Sepolia, 1 for mainnet). The generate / replay
+    /// pipeline records it in a bundle and cross-checks the endpoint's `eth_chainId`
+    /// against it as a basic "right network" sanity check.
     #[serde(default)]
     pub l1_chain_id: Option<u64>,
     #[serde(default)]
@@ -147,8 +147,10 @@ pub struct CtmContracts {
 #[derive(Debug, Deserialize, Clone)]
 pub struct CtmEntry {
     pub proxy: Address,
-    #[serde(default)]
-    pub bytecodes_supplier: Option<Address>,
+    /// Optional override; the prepare flow otherwise resolves it from a chain registered on the
+    /// CTM. The bytecodes supplier has no counterpart here: the prepare script reads it off the
+    /// CTM's own `L1_BYTECODES_SUPPLIER()` immutable, so a permanent-values entry for it would
+    /// name a value nothing consumes.
     #[serde(default)]
     pub rollup_da_manager: Option<Address>,
 }
@@ -165,7 +167,7 @@ pub struct PermanentContracts {
     // `EnvConfig::create2_factory_salt_for_upgrade`.
 }
 
-/// Fields read from the release upgrade input TOML (best-effort regex parse —
+/// Fields read from the upgrade input TOML (best-effort regex parse —
 /// the file has unquoted hex literals that the TOML crate rejects).
 ///
 /// CREATE2 salts are *not* stored here; `EnvConfig::create2_factory_salt_for_upgrade`
@@ -176,6 +178,17 @@ pub struct PermanentContracts {
 pub struct UpgradeInputs {
     pub owner_address: Option<Address>,
     pub era_chain_id: Option<u64>,
+    /// Whether THIS release replaces the ecosystem's governance set (a new
+    /// `ProtocolUpgradeHandler` implementation plus Guardians / SecurityCouncil /
+    /// EmergencyUpgradeBoard, wired in by one governance call — see
+    /// [`crate::commands::ecosystem::zk_governance`]).
+    ///
+    /// Absent (the default) means no. `governance_kind = "puh"` is NOT this statement:
+    /// it says the ecosystem HAS a PUH, which is a permanent property, true of every
+    /// release prepared for that env. The redeploy is a one-off act of a particular
+    /// release, so it is declared in that release's own env input — the directory
+    /// moves with the release, so a later one omits the key and redeploys nothing.
+    pub redeploy_zk_governance: bool,
 }
 
 /// Fully-resolved per-env config.
@@ -193,7 +206,7 @@ pub struct EnvConfig {
 
 impl EnvConfig {
     /// Load `<l1-contracts>/upgrade-envs/permanent-values/<env>.toml` and the
-    /// release upgrade input TOML for the same env. Both files must exist.
+    /// upgrade input TOML for the same env. Both files must exist.
     pub fn load(env: &str) -> anyhow::Result<Self> {
         Self::load_from_upgrade_env_dir(env, upgrade_env_dir())
     }
@@ -283,7 +296,7 @@ impl EnvConfig {
     /// salt every regen prevents the broadcaster from colliding with previously
     /// executed op ids that still sit in the on-chain `Done` map. When absent,
     /// returns `None` and the forge scripts default to `bytes32(0)`.
-    pub fn v31_legacy_gov_salt(&self) -> anyhow::Result<Option<B256>> {
+    pub fn legacy_gov_salt_for_upgrade(&self) -> anyhow::Result<Option<B256>> {
         Ok(read_core_legacy_gov_salt(&self.release_input_contents()?))
     }
 
@@ -308,6 +321,12 @@ impl EnvConfig {
     /// The env's `era_chain_id` from the release input; errors like [`Self::owner_address`].
     pub fn era_chain_id(&self) -> anyhow::Result<Option<u64>> {
         Ok(self.release_input()?.era_chain_id)
+    }
+
+    /// Whether this release replaces the ecosystem's governance set — see
+    /// [`UpgradeInputs::redeploy_zk_governance`]; errors like [`Self::owner_address`].
+    pub fn redeploys_zk_governance(&self) -> anyhow::Result<bool> {
+        Ok(self.release_input()?.redeploy_zk_governance)
     }
 
     fn missing_release_input(&self) -> anyhow::Error {
@@ -363,6 +382,18 @@ impl EnvConfig {
     pub fn zk_token_asset_id(&self) -> Option<B256> {
         self.permanent.zk_token_asset_id
     }
+
+    /// The env's `zk_token_asset_id`, which a named env must declare: there is no canonical
+    /// network-wide value to fall back to.
+    pub fn require_zk_token_asset_id(&self) -> anyhow::Result<B256> {
+        self.zk_token_asset_id().ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} is missing top-level `zk_token_asset_id`; a named env must declare it, since \
+                 there is no canonical network-wide value",
+                self.permanent_values_path.display()
+            )
+        })
+    }
 }
 
 /// Default output dir for an env, e.g. `<upgrade-env dir>/output/<env>/`, without loading the env.
@@ -392,6 +423,8 @@ fn parse_upgrade_input(content: &str) -> UpgradeInputs {
             out.owner_address = Some(addr);
         } else if let Some(id) = match_unquoted_uint(line, "era_chain_id") {
             out.era_chain_id = Some(id);
+        } else if let Some(flag) = match_unquoted_bool(line, "redeploy_zk_governance") {
+            out.redeploy_zk_governance = flag;
         }
     }
     out
@@ -486,6 +519,15 @@ fn match_quoted_address(line: &str, key: &str) -> Option<Address> {
     rest[..end].parse().ok()
 }
 
+fn match_unquoted_bool(line: &str, key: &str) -> Option<bool> {
+    let prefix = format!("{key} = ");
+    if !line.starts_with(&prefix) {
+        return None;
+    }
+    // Strip optional trailing comment.
+    line[prefix.len()..].split('#').next()?.trim().parse().ok()
+}
+
 fn match_unquoted_uint(line: &str, key: &str) -> Option<u64> {
     let prefix = format!("{key} = ");
     if !line.starts_with(&prefix) {
@@ -510,6 +552,31 @@ fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The governance redeploy is a RELEASE's declaration, not a property of the env: absent means
+    /// no, whatever `governance_kind` says. Without this, every recurring preparation on a
+    /// PUH-governed env redeployed the whole governance set.
+    #[test]
+    fn zk_governance_redeploy_defaults_to_off() {
+        assert!(!parse_upgrade_input("era_chain_id = 270\n").redeploy_zk_governance);
+        assert!(!parse_upgrade_input("redeploy_zk_governance = false\n").redeploy_zk_governance);
+        assert!(parse_upgrade_input("redeploy_zk_governance = true\n").redeploy_zk_governance);
+        assert!(
+            parse_upgrade_input("redeploy_zk_governance = true # the bootstrap release\n")
+                .redeploy_zk_governance
+        );
+    }
+
+    /// The v35 release is the one that replaces the governance set, on both PUH-governed envs.
+    /// A later release's directory simply omits the key.
+    #[test]
+    fn v35_env_inputs_declare_the_governance_redeploy() {
+        for env in ["stage", "mainnet"] {
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
+            assert_eq!(cfg.governance_kind(), GovernanceKind::Puh, "{env}");
+            assert!(cfg.redeploys_zk_governance().unwrap(), "{env}");
+        }
+    }
 
     /// Smoke-tests that `permanent-values/stage.toml` deserializes into `PermanentValues`
     /// end-to-end. Catches any future TOML drift before it shows up as a runtime parse error
@@ -596,6 +663,69 @@ mod tests {
         assert!(saw_mainnet, "no mainnet permanent values");
     }
 
+    /// Every env declares a non-zero `zk_token_asset_id`: the prepare pins it in every release's
+    /// force deployments, and `verify-bootstrap --env` holds those against it.
+    #[test]
+    fn every_env_declares_a_zk_token_asset_id() {
+        let dir = resolve_l1_contracts_path()
+            .unwrap()
+            .join(PERMANENT_VALUES_DIR);
+        let mut envs = 0;
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+            let env = path.file_stem().unwrap().to_str().unwrap();
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
+            let zk_token_asset_id = cfg
+                .require_zk_token_asset_id()
+                .unwrap_or_else(|e| panic!("{e}"));
+            assert_ne!(zk_token_asset_id, B256::ZERO, "{env}");
+            envs += 1;
+        }
+        assert!(envs > 0, "no permanent values in {}", dir.display());
+    }
+
+    /// The `local` env pins the ZK token a prepare on a local L1 without `--env` pins
+    /// (`L1Network::Localhost`), so a package prepared on anvil verifies with `--env local`.
+    #[test]
+    fn the_local_env_pins_the_localhost_zk_token() {
+        assert_eq!(
+            EnvConfig::load("local")
+                .unwrap()
+                .require_zk_token_asset_id()
+                .unwrap(),
+            crate::types::L1Network::Localhost
+                .zk_token_asset_id()
+                .unwrap()
+        );
+    }
+
+    /// An env without `zk_token_asset_id` names the file and the key it lacks.
+    #[test]
+    fn a_missing_zk_token_asset_id_names_the_file_and_the_key() {
+        let permanent_values_path = PathBuf::from("upgrade-envs/permanent-values/scratch.toml");
+        let cfg = EnvConfig {
+            env: "scratch".to_string(),
+            permanent_values_path: permanent_values_path.clone(),
+            upgrade_input_path: PathBuf::from("scratch.toml"),
+            permanent: toml::from_str(
+                "[core_contracts]\n\
+                 bridgehub_proxy_addr = \"0x0000000000000000000000000000000000000001\"\n",
+            )
+            .unwrap(),
+            upgrade_input: None,
+            upgrade_env_dir: PathBuf::new(),
+        };
+        let message = cfg.require_zk_token_asset_id().unwrap_err().to_string();
+        assert!(
+            message.contains(&permanent_values_path.display().to_string()),
+            "{message}"
+        );
+        assert!(message.contains("`zk_token_asset_id`"), "{message}");
+    }
+
     #[test]
     fn missing_release_input_fails_closed() {
         let missing_release = tempfile::tempdir().unwrap();
@@ -621,9 +751,8 @@ mod tests {
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the
     /// `[create2_factory_salts]` table and `[contracts] create2_factory_salt`
-    /// — gov-replay relies on distinct per-CTM salts to keep
-    /// `GovernanceUpgradeTimer` deploys at different CREATE2 addresses
-    /// across Era and ZKsyncOS CTMs.
+    /// — the prepare relies on distinct per-CTM salts to keep each CTM's
+    /// deployments at different CREATE2 addresses across Era and ZKsyncOS CTMs.
     #[test]
     fn stage_env_config_reads_create2_salts() {
         let cfg = load_current("stage");

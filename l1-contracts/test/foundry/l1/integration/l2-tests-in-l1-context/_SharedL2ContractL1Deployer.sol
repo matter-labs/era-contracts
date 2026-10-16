@@ -10,9 +10,6 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {StateTransitionDeployedAddresses} from "deploy-scripts/utils/Types.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
@@ -61,7 +58,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
-        ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock");
@@ -70,7 +66,9 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             ctmAddresses.stateTransition.proxies.serverNotifier
         ) = deployServerNotifier();
         ctmAddresses.admin.eip7702Checker = address(0);
-        initializeGeneratedData();
+        // No ecosystem (and so no coordinator) exists here for `initializeGeneratedData` to read the
+        // governance from: the blob names the harness's governance directly.
+        generatedData.forceDeploymentsData = abi.encode(_buildForceDeploymentsData(ctmAddresses.admin.governance));
         deployStateTransitionDiamondFacets();
         string memory ctmContractName = "ChainTypeManager";
         (
@@ -81,31 +79,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
 
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployCTMIntegrationScript, SharedL2ContractDeployer) {}
-
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
-    {
-        // This standard-EVM harness reads selectors from ordinary Forge artifacts.
-        // It must not depend on the old Foundry-ZKsync test side effect that wrote
-        // script-out/diamond-selectors.toml.
-        return DeployIntegrationUtils.getChainCreationFacetCuts(stateTransition);
-    }
-
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
-    {
-        return DeployIntegrationUtils.getUpgradeAddedFacetCuts(stateTransition);
-    }
 
     function getInitializeCalldata(
         string memory contractName

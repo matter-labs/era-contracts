@@ -84,20 +84,6 @@ export async function forceBatchExecutedEqualsCommitted(
 }
 
 /**
- * Harness-only shim: fast-forward the L1 anvil clock past the
- * `GovernanceUpgradeTimer.INITIAL_DELAY` window so stage 1's `checkDeadline()`
- * call passes. The deploy-time delay is at most a few minutes on stage/testnet,
- * so 1 day of warp covers every configured `INITIAL_DELAY` with margin.
- */
-export async function advanceL1TimePastUpgradeDeadline(
-  provider: providers.JsonRpcProvider,
-  seconds = 24 * 60 * 60
-): Promise<void> {
-  await provider.send("evm_increaseTime", [seconds]);
-  await provider.send("evm_mine", []);
-}
-
-/**
  * Harness-only shim: simulate the bootloader updating SystemContext settlement layer.
  *
  * Real chains do this at batch start. On Anvil we impersonate the bootloader to

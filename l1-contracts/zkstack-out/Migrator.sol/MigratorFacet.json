@@ -212,6 +212,19 @@
   },
   {
     "type": "function",
+    "name": "selectors",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "result",
+        "type": "bytes4[]",
+        "internalType": "bytes4[]"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "unpauseDeposits",
     "inputs": [],
     "outputs": [],

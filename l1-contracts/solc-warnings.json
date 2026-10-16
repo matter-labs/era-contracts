@@ -1,5 +1,5 @@
 {
-  "roots": ["contracts", "deploy-scripts", "scripts", "test"],
+  "roots": ["contracts", "deploy-scripts", "dev", "scripts", "test"],
   "exceptions": [
     {
       "file": "contracts/common/libraries/TransientPrimitives/TransientPrimitives.sol",
