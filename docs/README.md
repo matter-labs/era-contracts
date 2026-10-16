@@ -6,3 +6,5 @@ Start with [the system architecture](../protocol-docs/system/README.md); the ope
 [upgrading an ecosystem](../protocol-docs/ecosystem-upgrade.md) sit next to it.
 
 Historical ZKsync Era contract documentation is maintained in the [zksync-era repository](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts).
+
+Testing tools: [mutation testing](mutation-testing.md) for l1-contracts.

@@ -61,9 +61,12 @@ export function evaluate(
   return { violations, stale: policy.exceptions.filter((e) => !used.has(e)) };
 }
 
-// Blanks comments out, keeping offsets, so a commented-out `tstore` is not reported.
+// Blanks comments out, keeping offsets, so a commented-out `tstore` is not reported. String literals are
+// matched first and kept, so `"../..//common/X.sol"` does not start a comment.
 export function stripComments(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (comment) => comment.replace(/[^\n]/g, " "));
+  return src.replace(/("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*')|\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (match, literal) =>
+    literal ? match : match.replace(/[^\n]/g, " ")
+  );
 }
 
 export function tstoreSites(file: string, src: string): SolcWarning[] {
@@ -283,4 +286,6 @@ function main(): void {
   }
 }
 
-main();
+if (require.main === module) {
+  main();
+}
