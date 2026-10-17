@@ -3,7 +3,7 @@
 //! `protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition`).
 //!
 //! The replacement is an ordinary write-once `CTMTransition`, so its identity is checked exactly
-//! as an operation's transition is ([`super::operation::verify_transition`]). What it is HELD
+//! as an upgrade's transition leg is ([`super::upgrade::verify_transition`]). What it is HELD
 //! AGAINST differs: not the CTM's current release, but the transition it replaces and the onward
 //! path — the CTM's own compare-and-replace checks, judged over live reads before governance
 //! signs ([`judge_replacement_state`]). It lands on an existing release, so it deploys none and
@@ -21,15 +21,14 @@ use crate::upgrade_verification::report::VerificationResult;
 use super::construction::ReviewedBuild;
 use super::format_semver;
 use super::genesis::GenesisImage;
-use super::lifecycle::{verify_lifecycle_construction, LifecycleReview};
-use super::operation::{
-    cross_check, expect_domains_answer_to, verify_bytecodes_published, verify_governance_owner,
-    verify_transition, ArrivingRelease,
+use super::lifecycle::{
+    verify_executor_owners, verify_lifecycle_construction, CtmExecutorReview, LifecycleReview,
 };
 use super::package::{DeadlineChange, RecoveredReplacement, ReplacementPackage};
 use super::provenance::{expect_code_present, tolerate};
 use super::shell::verify_shell_kept;
-use super::views::{CTMTransitionView, CtmView, EcosystemUpgradeExecutorView};
+use super::upgrade::{cross_check, verify_bytecodes_published, verify_transition, ArrivingRelease};
+use super::views::{CTMTransitionView, CtmView};
 
 /// Verify a transition replacement against the live L1 it targets.
 #[allow(clippy::too_many_arguments)]
@@ -89,12 +88,6 @@ pub(crate) async fn verify<P: Provider>(
         ),
     ] {
         cross_check(result, field, reported, Some(actual), what);
-    }
-    if let Some(core_transition) = package.reported_core_transition {
-        result.print_info(&format!(
-            "  the package's [core] names core transition {core_transition}: a replacement \
-             carries no ecosystem leg, so no call in it drives that object"
-        ));
     }
 
     // ── 1. The replacement, and the transition it replaces ──
@@ -167,70 +160,33 @@ pub(crate) async fn verify<P: Provider>(
         )),
         None => {}
     }
-    match package.reported_coordinator {
-        Some(coordinator) => {
-            let bindings = verify_lifecycle_construction(
-                provider,
-                build,
-                result,
-                &LifecycleReview {
-                    owner: expected_governance_owner,
-                    coordinator,
-                    core_executor: package.lifecycle.core_executor,
-                    core_proxy_admin: package.lifecycle.core_proxy_admin,
-                    ctm_executor: forward.executor,
-                    ctm: package.reported_ctm,
-                    ctm_proxy_admin: package.reported_ctm_proxy_admin,
-                    records: package.executor_records.clone(),
-                },
-                &mut reviewed,
-            )
-            .await?;
-            match tolerate(
-                EcosystemUpgradeExecutorView::new(coordinator, provider)
-                    .ctmExecutor()
-                    .call()
-                    .await,
-                result,
-                "the coordinator's bound CTM executor",
-            ) {
-                Some(bound) if bound == forward.executor => result.report_ok(&format!(
-                    "the coordinator is bound to the CTM executor the forward targets ({bound})"
-                )),
-                Some(bound) => result.report_error(&format!(
-                    "the coordinator is bound to CTM executor {bound}, not {} which the forward \
-                     targets: the replacement would run through an executor outside the reviewed \
-                     lifecycle",
-                    forward.executor
-                )),
-                None => {}
-            }
-            if let Some(core_executor) = bindings.core_executor {
-                expect_domains_answer_to(
-                    provider,
-                    result,
-                    coordinator,
-                    core_executor,
-                    forward.executor,
-                )
-                .await;
-                verify_governance_owner(
-                    provider,
-                    result,
-                    expected_governance_owner,
-                    coordinator,
-                    core_executor,
-                    forward.executor,
-                )
-                .await;
-            }
-        }
-        None => result.report_error(
-            "the package does not name the coordinator (`coordinator_addr`): the lifecycle the \
-             CTM executor belongs to — and so the executor's construction and owner — cannot be \
-             held against the review",
-        ),
-    }
+    // The forward runs through the CTM executor alone; no core executor is involved.
+    verify_lifecycle_construction(
+        provider,
+        build,
+        result,
+        &LifecycleReview {
+            owner: expected_governance_owner,
+            core_executor: None,
+            ctm_executor: Some(CtmExecutorReview {
+                address: forward.executor,
+                ctm: package.reported_ctm,
+                ctm_proxy_admin: package.reported_ctm_proxy_admin,
+            }),
+            records: package.executor_records.clone(),
+        },
+        &mut reviewed,
+    )
+    .await?;
+    verify_executor_owners(
+        provider,
+        result,
+        expected_governance_owner,
+        "the reviewed governance",
+        &[("the CTM executor", forward.executor)],
+    )
+    .await;
+
     // ── 3. The commitment being replaced, and where the replacement lands ──
     result.print_info("\n== Departing state ==");
     if let (Some(expected), Some(replacement)) = (expected, replacement) {
@@ -711,7 +667,7 @@ fn format_deadline(deadline: U256) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::upgrade_verification::registry::operation::judge_bytecode_publication;
+    use crate::upgrade_verification::registry::upgrade::judge_bytecode_publication;
 
     /// Exercise the replacement verifier's own shell call. The mocked RPC transport isolates
     /// the wiring: all unrelated findings are held fixed while real proxy logic changes.
@@ -738,13 +694,10 @@ mod tests {
                 reported_ctm: Some(forward.ctm),
                 forward,
                 ctm_key: "zksync_os".to_string(),
-                reported_coordinator: None,
                 reported_ctm_proxy_admin: None,
-                reported_core_transition: None,
                 calls: vec![the_forward()],
                 external_actions: declared_forward(),
                 create2_salts: Vec::new(),
-                lifecycle: Default::default(),
                 reported_old_version: None,
                 reported_new_version: None,
                 executor_records: Default::default(),

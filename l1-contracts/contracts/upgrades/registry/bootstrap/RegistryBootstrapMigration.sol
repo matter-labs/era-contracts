@@ -72,7 +72,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
             _manifest.ctmExecutor == address(0) ||
             _manifest.coreExecutor == address(0) ||
             _manifest.governance == address(0) ||
-            _manifest.coordinator == address(0) ||
             _manifest.upgradeEngine == address(0)
         ) {
             revert ZeroAddress();
@@ -83,7 +82,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
         if (rows.length == 0) {
             revert RegistryUnknownKey();
         }
-        // Same row discipline as {CoreTransition} and {EcosystemUpgradeOperation} (shared lib).
+        // Same row discipline as {ProxyUpgradeTransition} (shared lib).
         ProxyUpgradeRowLib.validateRows(rows);
         // The notifier's slot is mandatory: its proxy is what `validate()` holds the one-time
         // notifier handover against.
@@ -180,7 +179,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
         }
 
-        RegistryAuthorityLib.requireExecutorsBound(_authority(m));
+        RegistryAuthorityLib.requireExecutorAuthorities(_authority(m));
 
         // The departing version fixes which ecosystem this edge is valid for.
         uint256 liveVersion = IChainTypeManager(m.ctm).protocolVersion();
@@ -262,7 +261,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
                 serverNotifier: _m.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)].proxy,
                 ctmExecutor: _m.ctmExecutor,
                 coreExecutor: _m.coreExecutor,
-                coordinator: _m.coordinator,
                 governance: _m.governance
             });
     }

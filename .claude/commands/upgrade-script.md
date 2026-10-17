@@ -50,8 +50,9 @@ the Foundry integration harness for the legacy edge.
 
 - NEVER use try-catch or staticcall in upgrade scripts
 - Prefer the default upgrade; the release's scripts override the `Default*` ones only where it needs to
-- One governance call: `EcosystemUpgradeExecutor.execute(operation)`, derived by the merge; anything else
-  governance must do is a declared external action
+- No hand-authored governance calls: the merge derives the executor legs (`applyL1Upgrade`,
+  `applyInfrastructureUpgrade`, `applyCTMUpgrade`, in that order) from the objects the prepares deploy;
+  anything else governance must do is a declared external action
 - Never pin the upgrade tests to a release by hand: they follow protocol-ops' defaults (moved by
   `yarn new-release`) and the genesis version
 - Test with `forge script` in simulation mode before broadcasting

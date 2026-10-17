@@ -96,8 +96,8 @@ pub struct DeployL1CoreContractsOutput {
     pub l1_chain_id: u32,
     pub owner_address: Address,
     pub deployed_addresses: DeployL1CoreContractsDeployedAddressesOutput,
-    /// The core executor and the coordinator this run deployed (absent from outputs written
-    /// before fresh ecosystems were born into the registry model).
+    /// The core executor this run deployed (absent from outputs written before fresh ecosystems
+    /// were born into the registry model).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upgrade_executors: Option<UpgradeExecutorsRecord>,
 }

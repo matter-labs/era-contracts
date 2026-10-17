@@ -318,8 +318,7 @@ abstract contract RegistryObjectsFixture is Test {
                 upgradeTimestamp: _upgradeTimestamp,
                 ctmExecutor: _deployedStub("ctmExecutor"),
                 coreExecutor: _deployedStub("coreExecutor"),
-                governance: makeAddr("governor"),
-                coordinator: makeAddr("coordinator")
+                governance: makeAddr("governor")
             });
     }
 

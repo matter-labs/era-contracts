@@ -57,8 +57,8 @@ contract EmergencyUpgradeCalldata is Script {
 
     /// @notice The governance bundle of a prepared package, in execution order: its
     ///         `[governance_calls] calls`, an `abi.encode(Call[])` — for a recurring upgrade the
-    ///         coordinator's `execute(operation)` among the declared actions, for the bootstrap the
-    ///         one bundle `RegistryBootstrapSequence` derives.
+    ///         ordered domain-executor calls among the declared actions, for the bootstrap the one
+    ///         bundle `RegistryBootstrapSequence` derives.
     /// @param _ecosystemToml The merged package.
     function loadGovernanceCalls(
         string memory _ecosystemToml

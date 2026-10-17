@@ -1,14 +1,19 @@
 /**
- * Small utilities shared by the upgrade test runners. Extracted from the (deleted)
- * v31-upgrade-test-runner when the legacy v31 -> v32 harness was removed — the registry-driven
- * runner is their remaining consumer.
+ * Small utilities shared by the upgrade test runners: version and chain selection, proxy slot
+ * reads, failed-transaction traces, and the chain-side view of the direct upgrade legs (executor
+ * discovery, leg encoding, and the assertions that one governance execution applied them).
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
 import { EIP1967_ADMIN_SLOT, EIP1967_IMPL_SLOT, SEMVER_MAJOR_OFFSET, SEMVER_MINOR_OFFSET } from "../core/const";
+import { getAbi } from "../core/contracts";
 import type { ChainRole } from "../core/types";
+import type { ExpectedCall, UpgradeLeg, UpgradeLegKind, UpgradeLegSelectors } from "./governance-bundle";
+import { UPGRADE_LEG_KINDS } from "./governance-bundle";
+import type { ProxyUpgradeDomainName } from "./registry-manifest";
+import { proxyUpgradeDomain } from "./registry-manifest";
 
 // The genesis config the default upgrade scripts read their target version from.
 const ZKSYNC_OS_GENESIS_PATH = path.resolve(__dirname, "../../../../../configs/genesis/zksync-os/latest.json");
@@ -124,4 +129,230 @@ export async function sendAndCheck(
     throw new Error(`${label} reverted:\n${trace}`);
   }
   return receipt;
+}
+
+// ── Direct upgrade legs ──────────────────────────────────────────────
+
+/** The two domain executors of an ecosystem. */
+export type DomainExecutors = { coreExecutor: string; ctmExecutor: string };
+
+async function requireCode(provider: ethers.providers.Provider, account: string, what: string): Promise<void> {
+  if ((await provider.getCode(account)) === "0x") {
+    throw new Error(`${what} ${account} has no code`);
+  }
+}
+
+/**
+ * The domain executors, each found through the custody it holds — neither names the other: the CTM
+ * executor is the CTM's owner and must be bound to that CTM (`CHAIN_TYPE_MANAGER()`); the core
+ * executor is the ecosystem ProxyAdmin's owner and must be bound to that admin (`PROXY_ADMIN()`).
+ * Throws when either binding fails.
+ * @param ecosystemProxyAdmin The ecosystem ProxyAdmin (e.g. the MessageRoot proxy's admin).
+ */
+export async function discoverDomainExecutors(
+  provider: ethers.providers.Provider,
+  ctmAddr: string,
+  ecosystemProxyAdmin: string
+): Promise<DomainExecutors> {
+  const ctmExecutor = ethers.utils.getAddress(
+    await new ethers.Contract(ctmAddr, getAbi("Ownable2Step"), provider).owner()
+  );
+  await requireCode(provider, ctmExecutor, `the owner of CTM ${ctmAddr},`);
+  const boundCtm: string = await new ethers.Contract(
+    ctmExecutor,
+    getAbi("CTMUpgradeExecutor"),
+    provider
+  ).CHAIN_TYPE_MANAGER();
+  if (boundCtm.toLowerCase() !== ctmAddr.toLowerCase()) {
+    throw new Error(`CTM executor ${ctmExecutor} owns CTM ${ctmAddr} but is bound to ${boundCtm}`);
+  }
+
+  const coreExecutor = ethers.utils.getAddress(
+    await new ethers.Contract(ecosystemProxyAdmin, getAbi("ProxyAdmin"), provider).owner()
+  );
+  await requireCode(provider, coreExecutor, `the owner of the ecosystem ProxyAdmin ${ecosystemProxyAdmin},`);
+  const boundAdmin: string = await new ethers.Contract(
+    coreExecutor,
+    getAbi("CoreUpgradeExecutor"),
+    provider
+  ).PROXY_ADMIN();
+  if (boundAdmin.toLowerCase() !== ecosystemProxyAdmin.toLowerCase()) {
+    throw new Error(
+      `core executor ${coreExecutor} owns the ecosystem ProxyAdmin ${ecosystemProxyAdmin} but is bound to ${boundAdmin}`
+    );
+  }
+  return { coreExecutor, ctmExecutor };
+}
+
+/** Each leg's executor contract, entrypoint and domain event. */
+const LEG_ENTRYPOINTS: Record<
+  UpgradeLegKind,
+  { executor: "CoreUpgradeExecutor" | "CTMUpgradeExecutor"; method: string; event: string }
+> = {
+  core: { executor: "CoreUpgradeExecutor", method: "applyL1Upgrade", event: "L1UpgradeApplied" },
+  ctmInfrastructure: {
+    executor: "CTMUpgradeExecutor",
+    method: "applyInfrastructureUpgrade",
+    event: "CTMInfrastructureUpgradeApplied",
+  },
+  ctmTransition: { executor: "CTMUpgradeExecutor", method: "applyCTMUpgrade", event: "CTMUpgradeApplied" },
+};
+
+/** The domain of the `ProxyUpgradeTransition` a row-object leg applies; the transition leg has none. */
+const LEG_PROXY_UPGRADE_DOMAIN: Partial<Record<UpgradeLegKind, ProxyUpgradeDomainName>> = {
+  core: "Core",
+  ctmInfrastructure: "CTM",
+};
+
+function legInterface(kind: UpgradeLegKind): ethers.utils.Interface {
+  return new ethers.utils.Interface(getAbi(LEG_ENTRYPOINTS[kind].executor));
+}
+
+/** The leg entrypoint selectors, from the executor ABIs. */
+export function upgradeLegSelectors(): UpgradeLegSelectors {
+  return Object.fromEntries(
+    UPGRADE_LEG_KINDS.map((kind) => [kind, legInterface(kind).getSighash(LEG_ENTRYPOINTS[kind].method)])
+  ) as UpgradeLegSelectors;
+}
+
+/** `leg` as the governance call that applies it. */
+export function upgradeLegCall(leg: UpgradeLeg): ExpectedCall {
+  const { executor, method } = LEG_ENTRYPOINTS[leg.kind];
+  return {
+    label: `${executor}.${method}(${leg.object})`,
+    target: leg.executor,
+    data: legInterface(leg.kind).encodeFunctionData(method, [leg.object]),
+  };
+}
+
+/** A row-object leg's rows, with the implementation each proxy ran before the legs were applied. */
+export type ProxyUpgradeLegSnapshot = {
+  leg: UpgradeLeg;
+  rows: Array<{ proxy: string; implNew: string; implBefore: string }>;
+};
+
+/**
+ * Reads each row-object leg's `ProxyUpgradeTransition` before execution: it must be of the leg's
+ * domain and validate, and every row's live implementation is recorded so the execution's swaps can
+ * be told from its idempotent skips. The transition leg carries no rows and is skipped.
+ */
+export async function snapshotProxyUpgradeLegs(
+  provider: ethers.providers.Provider,
+  legs: UpgradeLeg[]
+): Promise<ProxyUpgradeLegSnapshot[]> {
+  const snapshots: ProxyUpgradeLegSnapshot[] = [];
+  for (const leg of legs) {
+    const domain = LEG_PROXY_UPGRADE_DOMAIN[leg.kind];
+    if (!domain) {
+      continue;
+    }
+    const object = new ethers.Contract(leg.object, getAbi("IProxyUpgradeTransition"), provider);
+    const liveDomain: number = await object.domain();
+    if (liveDomain !== proxyUpgradeDomain(domain)) {
+      throw new Error(`the ${leg.kind} leg's object ${leg.object} is of domain ${liveDomain}, expected ${domain}`);
+    }
+    await object.callStatic.validate();
+    const rows: Array<{ proxy: string; implNew: string }> = await object.rows();
+    snapshots.push({
+      leg,
+      rows: await Promise.all(
+        rows.map(async (row) => ({
+          proxy: row.proxy,
+          implNew: row.implNew,
+          implBefore: await readProxyImplementation(provider, row.proxy),
+        }))
+      ),
+    });
+  }
+  return snapshots;
+}
+
+/**
+ * The one transaction that applied `legs` since `fromBlock`: each executor emitted its leg's domain
+ * event naming the leg's object exactly once, all in the same transaction. Throws otherwise —
+ * legs applied by separate transactions would not roll back together.
+ */
+export async function findLegExecution(
+  provider: ethers.providers.Provider,
+  legs: UpgradeLeg[],
+  fromBlock: number
+): Promise<ethers.providers.TransactionReceipt> {
+  const txHashes = new Set<string>();
+  for (const leg of legs) {
+    const executor = new ethers.Contract(leg.executor, legInterface(leg.kind), provider);
+    const event = LEG_ENTRYPOINTS[leg.kind].event;
+    const found = await executor.queryFilter(executor.filters[event](leg.object), fromBlock);
+    if (found.length !== 1) {
+      throw new Error(
+        `${event}(${leg.object}) was emitted ${found.length} time(s) since block ${fromBlock}, expected once`
+      );
+    }
+    txHashes.add(found[0].transactionHash);
+  }
+  if (txHashes.size !== 1) {
+    throw new Error(
+      `the legs were applied by ${txHashes.size} transactions (${[...txHashes].join(", ")}), expected one`
+    );
+  }
+  return provider.getTransactionReceipt([...txHashes][0]);
+}
+
+/**
+ * Throws unless `receipt` is one execution of `legs`: each executor's domain event names its leg's
+ * object exactly once, in leg order; every row of each row-object leg now runs its `implNew`; and
+ * `ProxyImplementationUpgraded` was emitted (by that leg's executor) exactly for the rows whose
+ * proxy ran something else before. Returns the number of rows and of actual swaps checked.
+ */
+export async function assertLegsApplied(
+  provider: ethers.providers.Provider,
+  receipt: ethers.providers.TransactionReceipt,
+  legs: UpgradeLeg[],
+  snapshots: ProxyUpgradeLegSnapshot[]
+): Promise<{ rows: number; swaps: number }> {
+  const parsedFrom = (executor: string, iface: ethers.utils.Interface) => {
+    const topics = new Set(Object.values(iface.events).map((fragment) => iface.getEventTopic(fragment)));
+    return receipt.logs
+      .filter((log) => log.address.toLowerCase() === executor.toLowerCase() && topics.has(log.topics[0]))
+      .map((log) => ({ log, event: iface.parseLog(log) }));
+  };
+
+  let previousLogIndex = -1;
+  for (const leg of legs) {
+    const event = LEG_ENTRYPOINTS[leg.kind].event;
+    const applied = parsedFrom(leg.executor, legInterface(leg.kind)).filter(({ event: e }) => e.name === event);
+    if (applied.length !== 1 || applied[0].event.args[0].toLowerCase() !== leg.object.toLowerCase()) {
+      throw new Error(
+        `tx ${receipt.transactionHash}: expected exactly one ${event}(${leg.object}) from ${leg.executor}`
+      );
+    }
+    if (applied[0].log.logIndex <= previousLogIndex) {
+      throw new Error(`tx ${receipt.transactionHash}: the ${leg.kind} leg ran out of the canonical order`);
+    }
+    previousLogIndex = applied[0].log.logIndex;
+  }
+
+  let rows = 0;
+  let swaps = 0;
+  for (const { leg, rows: legRows } of snapshots) {
+    const emitted = parsedFrom(leg.executor, legInterface(leg.kind))
+      .filter(({ event }) => event.name === "ProxyImplementationUpgraded")
+      .map(({ event }) => ({ proxy: event.args.proxy as string, newImpl: event.args.newImpl as string }));
+    const expectedSwaps = legRows.filter((row) => row.implBefore.toLowerCase() !== row.implNew.toLowerCase());
+    const describe = (list: Array<{ proxy: string; newImpl?: string; implNew?: string }>) =>
+      JSON.stringify(list.map((r) => `${r.proxy}->${r.newImpl ?? r.implNew}`.toLowerCase()).sort());
+    if (describe(emitted) !== describe(expectedSwaps)) {
+      throw new Error(
+        `the ${leg.kind} leg swapped ${describe(emitted)}, but its object's rows that moved are ${describe(expectedSwaps)}`
+      );
+    }
+    for (const row of legRows) {
+      const live = await readProxyImplementation(provider, row.proxy);
+      if (live.toLowerCase() !== row.implNew.toLowerCase()) {
+        throw new Error(`proxy ${row.proxy} runs ${live}, but the ${leg.kind} leg's row installs ${row.implNew}`);
+      }
+    }
+    rows += legRows.length;
+    swaps += expectedSwaps.length;
+  }
+  return { rows, swaps };
 }

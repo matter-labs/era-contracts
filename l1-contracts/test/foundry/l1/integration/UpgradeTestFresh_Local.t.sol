@@ -16,11 +16,9 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
 import {TransitionNotCommitted} from "contracts/common/L1ContractErrors.sol";
 
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -59,9 +57,9 @@ contract FreshVerifierReleaseHop is DefaultCTMUpgrade {
         return upgradeAddresses.ctmTransition;
     }
 
-    /// @notice The operation the coordinator's `execute` call names.
-    function preparedOperation() external view returns (address) {
-        return upgradeAddresses.ecosystemUpgradeOperation;
+    /// @notice The CTM-domain infrastructure transition this prepare deployed (zero when none).
+    function preparedInfrastructure() external view returns (address) {
+        return upgradeAddresses.ctmInfrastructureTransition;
     }
 }
 
@@ -85,7 +83,7 @@ contract FreshTransitionReplacement is DefaultTransitionReplacement {
 contract CoreUpgradeNoLegForFresh is DefaultCoreUpgrade {}
 
 /// @notice A FRESH ecosystem — `DeployL1CoreContracts` + `DeployCTM` + `RegisterCTM` + governance's accepts,
-///         no bootstrap — is born in the registry model: it runs a registry-driven v35 -> v36 operation
+///         no bootstrap — is born in the registry model: it runs a registry-driven v35 -> v36 upgrade
 ///         directly through the executors the deployment created, and a committed transition of it can be
 ///         repaired through the replacement prepare (`DefaultTransitionReplacement`). See "Replacing a
 ///         committed transition" in {protocol-docs/ecosystem-upgrade-coordination.md}.
@@ -110,13 +108,13 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         _deployEra();
         acceptPendingAdmin();
         ctm = address(addresses.chainTypeManager);
-        governance = IOwnable(upgradeExecutors.coordinator).owner();
+        governance = IOwnable(upgradeExecutors.ctmExecutor).owner();
         eraChainAdmin = IZKChain(getZKChainAddress(eraZKChainId)).getAdmin();
     }
 
     /// @notice No bootstrap ran, and none is needed: the hop's prepare finds the executors the deployment
-    ///         created, the coordinator drives them, the CTM commits the edge and a chain crosses it through
-    ///         the CTM executor.
+    ///         created, governance applies the transition through the CTM executor, the CTM commits the
+    ///         edge and a chain crosses it through the CTM executor.
     function test_freshEcosystem_runsARegistryDrivenHopWithoutABootstrap() public {
         uint256 genesisVersion = IChainTypeManager(ctm).protocolVersion();
         address genesisRelease = IChainTypeManager(ctm).currentRelease();
@@ -128,14 +126,18 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         );
 
         FreshVerifierReleaseHop hop = _prepareHop();
-        assertEq(hop.upgradeCoordinator(), upgradeExecutors.coordinator, "the prepare finds the born coordinator");
-        assertEq(hop.boundCTMUpgradeExecutor(), upgradeExecutors.ctmExecutor, "and the born CTM executor");
+        assertEq(
+            hop.boundCTMUpgradeExecutor(),
+            upgradeExecutors.ctmExecutor,
+            "the prepare finds the born CTM executor"
+        );
+        assertEq(hop.preparedInfrastructure(), address(0), "a verifier release swaps no CTM-domain implementation");
         assertEq(hop.bootstrapMigrationAddress(), address(0), "a recurring prepare deploys no migration");
 
         ICTMTransition transition = ICTMTransition(hop.preparedTransition());
         assertEq(transition.fromRelease(), genesisRelease, "the edge departs from the genesis release");
         assertEq(transition.oldProtocolVersion(), genesisVersion);
-        _runOperation(IEcosystemUpgradeOperation(hop.preparedOperation()));
+        _applyTransition(transition);
 
         uint256 newVersion = transition.newProtocolVersion();
         assertTrue(newVersion > genesisVersion, "a version edge");
@@ -195,7 +197,11 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         assertEq(output.readAddress("$.registry.replaced_transition_addr"), address(replaced));
         assertEq(output.readAddress("$.registry.replacement_transition_addr"), address(repaired));
         assertEq(output.readAddress("$.registry.ctm_transition_addr"), address(repaired));
-        assertEq(output.readAddress("$.registry.operation_addr"), address(0), "no operation");
+        assertEq(
+            output.readAddress("$.registry.ctm_infrastructure_transition_addr"),
+            address(0),
+            "no infrastructure transition"
+        );
         assertEq(output.readUint("$.contracts_config.old_protocol_version"), departing);
 
         // ── Governance executes it ──
@@ -304,7 +310,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
     /// @dev A hop committed and completed on L1; every chain stays at the departing version.
     function _prepareHopAndRun() internal returns (FreshVerifierReleaseHop hop) {
         hop = _prepareHop();
-        _runOperation(IEcosystemUpgradeOperation(hop.preparedOperation()));
+        _applyTransition(ICTMTransition(hop.preparedTransition()));
     }
 
     function _initReplacement(
@@ -331,13 +337,17 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         _prepare.setEIP7702Checker(ctmAddresses.admin.eip7702Checker);
     }
 
-    /// @dev The one governance call of a registry-driven upgrade.
-    function _runOperation(IEcosystemUpgradeOperation _operation) internal {
-        EcosystemUpgradeExecutor coordinator = EcosystemUpgradeExecutor(payable(upgradeExecutors.coordinator));
-        vm.expectEmit(true, true, true, true, address(coordinator));
-        emit IEcosystemUpgradeExecutor.OperationExecuted(address(_operation));
+    /// @dev The one governance call of a transition-only registry-driven upgrade.
+    function _applyTransition(ICTMTransition _transition) internal {
+        CTMUpgradeExecutor ctmExecutor = CTMUpgradeExecutor(payable(upgradeExecutors.ctmExecutor));
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit ICTMUpgradeExecutor.CTMUpgradeApplied(
+            address(_transition),
+            _transition.oldProtocolVersion(),
+            _transition.newProtocolVersion()
+        );
         vm.prank(governance);
-        coordinator.execute(_operation);
+        ctmExecutor.applyCTMUpgrade(_transition);
     }
 
     function _executeAsGovernance(Call memory _call) internal {

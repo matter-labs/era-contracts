@@ -4,9 +4,9 @@
 [zk-governance](https://github.com/zksync-association/zk-governance) and is its own audit scope;
 nothing in era-contracts blocks on it.
 
-The registry model's authority chain bottoms out at the governance layer: the coordinator's and
-the domain executors' `owner` is the `ProtocolUpgradeHandler` (PUH), whose own process guards
-their `forward` escape hatch. See
+The registry model's authority chain bottoms out at the governance layer: the domain executors'
+`owner` is the `ProtocolUpgradeHandler` (PUH), whose own process guards their `forward` escape
+hatch. See
 [Registry-driven protocol upgrades](./registry-driven-upgrades.md) for the layer above.
 
 ## The problem
@@ -46,9 +46,9 @@ A **write-once `GovernanceMigration` object** — the same data discipline appli
 
 ## Coupling to era-contracts
 
-The executors' `owner` (`EcosystemUpgradeExecutor`, `CoreUpgradeExecutor`, every
-`CTMUpgradeExecutor`) and the `L1ChainAssetHandler`'s owner are themselves edges such a migration
-must move, so the source-checked-edge row shape should be shared through a small extracted
-library rather than reimplemented on each side. The migration must land between upgrade
-operations: a domain executor refuses no owner change, but a coordinator mid-lifecycle would be
-driven by a governance that no longer exists.
+The executors' `owner` (`CoreUpgradeExecutor`, every `CTMUpgradeExecutor`) and the
+`L1ChainAssetHandler`'s owner are themselves edges such a migration must move, so the
+source-checked-edge row shape should be shared through a small extracted library rather than
+reimplemented on each side. The migration must land between upgrades: an executor refuses no owner
+change, but an upgrade proposal still pending in the old PUH would then call executors it no longer
+owns and revert.

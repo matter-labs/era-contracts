@@ -10,9 +10,9 @@ transaction. The objects, and why the cut is derived rather than supplied, are d
 
 ## Publishing a version
 
-Governance publishes a version by executing an upgrade operation
-(`EcosystemUpgradeExecutor.execute(operation)`); the CTM leg of that one call reaches the CTM through
-its owner, the bound `CTMUpgradeExecutor`, as `setNewVersionUpgradeFromTransition(transition)`
+Governance publishes a version with `CTMUpgradeExecutor.applyCTMUpgrade(transition)`, the transition
+leg of its upgrade proposal; the executor, the CTM's owner, commits it as
+`setNewVersionUpgradeFromTransition(transition)`
 ([Ecosystem upgrade coordination](../../../ecosystem-upgrade-coordination.md#execution)). The
 transition carries everything the CTM commits for the edge:
 

@@ -10,16 +10,22 @@ import {Call} from "contracts/governance/Common.sol";
 import {IUpgradeExecutorBase} from "contracts/governance/IUpgradeExecutorBase.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
-import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract,
+    L1_ECOSYSTEM_CONTRACT_COUNT,
+    L1EcosystemContract,
+    L2_ECOSYSTEM_CONTRACT_COUNT
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
-import {OperationFixtures} from "./OperationFixtures.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -32,32 +38,29 @@ import {
     L2BytecodeNotPublished,
     TransitionNotCommitted,
     TransitionReleaseMismatch,
-    Unauthorized,
     UpgradeNotPermissionlessYet
 } from "contracts/common/L1ContractErrors.sol";
 import {
     GenesisFacet,
-    OperationManifest,
+    ProxyUpgradeDomain,
+    ProxyUpgradeRow,
+    ProxyUpgradeTransitionManifest,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @notice The shared fixture of the registry executor suites (`CTMUpgradeExecutorTest`,
-///         `OperationExecutionTest`, `EcosystemUpgradeCoordinationTest`): a real ZKsyncOS CTM with
-///         one chain, the coordinator and the two domain executors (each owning its own
-///         `ProxyAdmin`) wired the way the v35 bootstrap leaves them, and real write-once
-///         release/transition objects. See {protocol-docs/ecosystem-upgrade-coordination.md}.
+///         `UpgradeBundleExecutionTest`, `CTMExecutorDomainsTest`): a real ZKsyncOS CTM with one
+///         chain, the two domain executors (each owning its own `ProxyAdmin`) owned by `governor`
+///         the way the v35 bootstrap leaves them, and real write-once release/transition objects.
+///         See {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Every fixture transition departs from the fixture's current release toward `release`.
-///      Each rides a one-leg operation (`_operationFor`) that names NO ecosystem leg
-///      (`coreTransition` zero) and NO infrastructure rows. Suites that need a CTM-domain row or an
-///      ecosystem leg build the operation through {OperationFixtures._deployOperation}.
-abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFixtures {
+abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
     ProxyAdmin internal ctmProxyAdmin;
     CoreUpgradeExecutor internal coreExecutor;
     ProxyAdmin internal ecosystemProxyAdmin;
-    EcosystemUpgradeExecutor internal coordinator;
     CTMRelease internal fromRelease;
     CTMRelease internal release;
     CTMTransition internal transition;
@@ -80,26 +83,14 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         chainAddress = createNewChain(getDiamondCutData(diamondInit));
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        // The ecosystem domain: its executor owns the ecosystem ProxyAdmin, and the coordinator is
-        // constructed over it. The core executor is then pointed at the coordinator (the v35
-        // bootstrap's binding).
+        // The ecosystem domain: its executor owns the ecosystem ProxyAdmin.
         ecosystemProxyAdmin = new ProxyAdmin();
         coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);
         ecosystemProxyAdmin.transferOwnership(address(coreExecutor));
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
-        vm.prank(governor);
-        coreExecutor.setCoordinator(address(coordinator));
 
-        // The CTM domain: its executor is constructed answering to the coordinator.
+        // The CTM domain: its executor owns the CTM and the CTM-domain ProxyAdmin.
         ctmProxyAdmin = new ProxyAdmin();
-        ctmExecutor = new CTMUpgradeExecutor(
-            governor,
-            IChainTypeManager(address(chainContractAddress)),
-            ctmProxyAdmin,
-            address(coordinator)
-        );
-        vm.prank(governor);
-        coordinator.setCTMExecutor(ctmExecutor);
+        ctmExecutor = new CTMUpgradeExecutor(governor, IChainTypeManager(address(chainContractAddress)), ctmProxyAdmin);
         ctmProxyAdmin.transferOwnership(address(ctmExecutor));
 
         // Handover through the fixed entrypoint — no escape hatch involved.
@@ -120,7 +111,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         assertEq(chainContractAddress.currentRelease(), address(fromRelease));
 
         // The delegate's bytecode is a factory dependency of every fixture transition, and
-        // `execute` requires it published on the CTM's supplier before the edge commits.
+        // `applyCTMUpgrade` requires it published on the CTM's supplier before the edge commits.
         assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
         L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(L2_DELEGATE_CODE));
 
@@ -194,7 +185,8 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
 
     /// @dev The default fixture manifest: the L2 side is the minimal plan (the delegate's bytecode
     ///      info — the object constructs its Unsafe deployment and pins its bytecode as the one
-    ///      factory dependency). Infrastructure rows are the OPERATION's, not the transition's.
+    ///      factory dependency). Infrastructure rows ride a `ProxyUpgradeTransition`, never the
+    ///      transition.
     function _transitionManifest(
         uint256 _upgradeTimestamp,
         address _fromRelease,
@@ -217,34 +209,69 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, OperationFi
         return CTMUpgradeComposer.buildUpgradeCutData(_transition);
     }
 
-    // ─────────────────────────── drivers (as governance) ───────────────────────────
-
-    /// @dev The one-leg operation over `_transition` on the fixture's executor.
-    function _operationFor(CTMTransition _transition) internal returns (EcosystemUpgradeOperation) {
-        return _cachedOperationFor(ICTMTransition(address(_transition)));
+    /// @dev A row departing from `_expectedOldImpl` toward `_implNew` on `_proxy`, without a
+    ///      reinitializer.
+    function _row(
+        address _proxy,
+        address _expectedOldImpl,
+        address _implNew
+    ) internal pure returns (ProxyUpgradeRow memory) {
+        return
+            ProxyUpgradeRow({
+                proxy: _proxy,
+                expectedOldImpl: _expectedOldImpl,
+                implNew: _implNew,
+                callInitializeUpgrade: false
+            });
     }
 
-    /// @dev Governance executes the operation over `_transition`.
+    /// @dev A Core-domain transition carrying `_inventoryRow` in the `L1Bridgehub` slot (the slot is a label —
+    ///      the row's own proxy address is its identity).
+    function _deployCoreTransition(ProxyUpgradeRow memory _inventoryRow) internal returns (ProxyUpgradeTransition) {
+        ProxyUpgradeRow[] memory inventory = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        inventory[uint256(L1EcosystemContract.L1Bridgehub)] = _inventoryRow;
+        return
+            new ProxyUpgradeTransition(
+                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: inventory})
+            );
+    }
+
+    /// @dev A CTM-domain transition carrying `_inventoryRow` in the `ValidatorTimelock` slot.
+    function _deployCTMInfrastructureTransition(
+        ProxyUpgradeRow memory _inventoryRow
+    ) internal returns (ProxyUpgradeTransition) {
+        ProxyUpgradeRow[] memory inventory = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        inventory[uint256(CTMContract.ValidatorTimelock)] = _inventoryRow;
+        return
+            new ProxyUpgradeTransition(
+                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory})
+            );
+    }
+
+    // ─────────────────────────── drivers (as governance) ───────────────────────────
+
+    /// @dev Governance commits `_transition` through the CTM executor.
     function _execute(CTMTransition _transition) internal {
-        EcosystemUpgradeOperation operation = _operationFor(_transition);
         vm.prank(governor);
-        coordinator.execute(operation);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(_transition)));
     }
 }
 
 /// @notice Exercises the CTM-BOUND executor against real write-once release and transition
-///         objects: the commit `execute` makes and what it writes, CTM owner calls through
+///         objects: the commit `applyCTMUpgrade` makes and what it writes, CTM owner calls through
 ///         `forward`, the post-state check and the per-chain entrypoint. Release data describes
 ///         new-chain genesis; transition data describes the one movement from the fixture's current
 ///         version to that release — its facet delta is DERIVED from the release pair (a
 ///         facet-neutral hop here; facet-changing hops are exercised end-to-end by
-///         RegistryDrivenUpgrade.t.sol). The coordinator's own rules are OperationExecution.t.sol
-///         and EcosystemUpgradeCoordination.t.sol.
+///         RegistryDrivenUpgrade.t.sol). Multi-leg governance bundles are UpgradeBundleExecution.t.sol.
 contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     /// @dev A limit within the 2^24 admission cap that differs from the one a fresh chain starts with.
     uint256 internal constant NEW_PRIORITY_TX_MAX_GAS_LIMIT = PRIORITY_TX_MAX_GAS_LIMIT / 2;
 
-    function test_execute_setsVersionCutAndCurrentRelease() public {
+    function test_applyCTMUpgrade_setsVersionCutAndCurrentRelease() public {
+        uint256 oldVersion = chainContractAddress.protocolVersion();
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit ICTMUpgradeExecutor.CTMUpgradeApplied(address(transition), oldVersion, newVersion);
         _execute(transition);
 
         assertEq(chainContractAddress.protocolVersion(), newVersion);
@@ -264,27 +291,21 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.l1GenesisUpgrade(), address(genesisUpgradeContract));
     }
 
-    function test_revertWhen_executeCalledByNonGovernance() public {
-        EcosystemUpgradeOperation operation = _operationFor(transition);
+    function test_revertWhen_applyCTMUpgradeCalledByNonGovernance() public {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("stranger"));
-        coordinator.execute(operation);
-        assertEq(chainContractAddress.upgradeTransition(0), address(0), "nothing may be committed");
-    }
-
-    /// @dev The domain's apply callback answers to the coordinator only — not even the owner
-    ///      drives it directly (the owner's route to the same authority is the logged escape hatch).
-    function test_revertWhen_applyOperationCalledByOwnerOrStranger() public {
-        OperationManifest memory manifest = _operationFor(transition).getManifest();
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governor));
-        vm.prank(governor);
-        ctmExecutor.applyOperation(manifest);
-        address stranger = makeAddr("stranger");
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, stranger));
-        vm.prank(stranger);
-        ctmExecutor.applyOperation(manifest);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
         assertEq(chainContractAddress.upgradeTransition(0), address(0), "nothing may be committed");
         assertEq(chainContractAddress.protocolVersion(), 0, "the CTM must not move");
+    }
+
+    function test_revertWhen_applyInfrastructureUpgradeCalledByNonGovernance() public {
+        IProxyUpgradeTransition infrastructure = IProxyUpgradeTransition(
+            address(_deployCTMInfrastructureTransition(_row(makeAddr("proxy"), makeAddr("old"), makeAddr("new"))))
+        );
+        vm.expectRevert("Ownable: caller is not the owner");
+        vm.prank(makeAddr("stranger"));
+        ctmExecutor.applyInfrastructureUpgrade(infrastructure);
     }
 
     function test_forwardExecutesForOwner() public {
@@ -356,17 +377,16 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.protocolVersionDeadline(0), 8000);
     }
 
-    function test_revertWhen_executeReplaysAnAppliedOperation() public {
+    function test_revertWhen_applyCTMUpgradeReplaysAnAppliedTransition() public {
         _execute(transition);
 
-        // Replaying an applied operation trips the release edge: the CTM already moved on to the
+        // Replaying an applied transition trips the release edge: the CTM already moved on to the
         // transition's target release, so `fromRelease` no longer matches.
-        EcosystemUpgradeOperation replay = _operationFor(transition);
         vm.expectRevert(
             abi.encodeWithSelector(TransitionReleaseMismatch.selector, transition.fromRelease(), address(release))
         );
         vm.prank(governor);
-        coordinator.execute(replay);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(transition)));
         assertEq(chainContractAddress.protocolVersion(), newVersion, "the applied edge stands");
     }
 
@@ -393,7 +413,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     ///      whose factory dependency is not yet on the CTM's supplier deploys fine but cannot be
     ///      executed — the whole call reverts and the CTM is untouched — and executes once the
     ///      bytecode is published, with nothing else changed.
-    function test_execute_requiresFactoryDepsPublishedOnTheCtmSupplier() public {
+    function test_applyCTMUpgrade_requiresFactoryDepsPublishedOnTheCtmSupplier() public {
         bytes memory unpublishedDelegate = hex"de1f";
         CTMTransition unpublished = _deployTransitionWithDelegate(
             777,
@@ -402,10 +422,9 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         );
         assertEq(bytecodesSupplier.evmPublishingBlock(keccak256(unpublishedDelegate)), 0, "fixture: not yet published");
 
-        EcosystemUpgradeOperation operation = _operationFor(unpublished);
         vm.expectRevert(abi.encodeWithSelector(L2BytecodeNotPublished.selector, keccak256(unpublishedDelegate)));
         vm.prank(governor);
-        coordinator.execute(operation);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(unpublished)));
         assertEq(chainContractAddress.protocolVersion(), 0, "a refused execution must not move the CTM");
         assertEq(chainContractAddress.upgradeTransition(0), address(0), "a refused execution must commit nothing");
         assertEq(
@@ -422,7 +441,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     }
 
     /// @dev The chain needs the transition itself, not just its cut hash, to rebuild the cut.
-    function test_execute_recordsTheCommittedTransition() public {
+    function test_applyCTMUpgrade_recordsTheCommittedTransition() public {
         uint256 oldVersion = chainContractAddress.protocolVersion();
         _execute(transition);
 
@@ -434,8 +453,8 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
     }
 
     // ──────────────── routine operational and recovery calls through `forward` ────────────────
-    // The executor has no typed passthroughs: every CTM owner operation outside an operation's
-    // execution goes through the owner-gated, event-logged `forward`. Each runs end-to-end —
+    // The executor has no typed passthroughs: every CTM owner operation outside its fixed
+    // entrypoints goes through the owner-gated, event-logged `forward`. Each runs end-to-end —
     // executor -> bound CTM -> the fixture's real chain diamond — asserting the chain-side (or
     // CTM-side) state and event.
 

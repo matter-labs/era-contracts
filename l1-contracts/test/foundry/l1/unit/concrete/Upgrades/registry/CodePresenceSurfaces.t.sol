@@ -7,24 +7,12 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
-import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
-import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {
-    CTMContract,
-    L1EcosystemContract,
-    L1_ECOSYSTEM_CONTRACT_COUNT
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
 import {RegistryTargetHasNoCode} from "contracts/common/L1ContractErrors.sol";
-import {
-    CoreTransitionManifest,
-    ProxyUpgradeRow,
-    ReleaseManifest,
-    TransitionManifest
-} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {ProxyUpgradeRow, ReleaseManifest, TransitionManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
 
 /// @dev The check surface every write-once registry object exposes, so one helper can drive a
-///      release, a transition, a core transition and an operation alike.
+///      release, a transition and a proxy upgrade transition of either domain alike.
 interface IValidatable {
     function validate() external view;
 }
@@ -45,11 +33,11 @@ contract ValidateTargetNew {
 /// @notice `validate()` is the enforcement surface every write-once registry object exposes: it
 ///         refuses a manifest naming a member that is not deployed code (see "Validation" in
 ///         {docs/registry-driven-upgrades.md}). These tests enumerate every contract a release, a
-///         transition, a core transition and an operation name — the MANIFEST is the spec, not the
-///         objects' code — and check that emptying any ONE of them is refused with that member's
-///         own diagnostic, so no named member can be left unchecked.
-/// @dev The transition under test names its optional delegate composer and the operation carries a
-///      participating CTM-domain row, so the full list is exercised.
+///         transition and a proxy upgrade transition of each domain name — the MANIFEST is the spec,
+///         not the objects' code — and check that emptying any ONE of them is refused with that
+///         member's own diagnostic, so no named member can be left unchecked.
+/// @dev The transition under test names its optional delegate composer, so the full list is
+///      exercised.
 contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
     /// @dev `diamondInit`, `genesisUpgrade`, `verifier` — the release members that are not facets.
     uint256 internal constant RELEASE_FIXED_MEMBERS = 3;
@@ -58,28 +46,21 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
 
     address internal implOld;
     address internal implNew;
-    CoreTransition internal coreTransition;
-    /// @dev The fixture's default transition, under an operation carrying one CTM-domain row.
+    ProxyUpgradeTransition internal coreTransition;
+    ProxyUpgradeTransition internal infrastructure;
     CTMTransition internal fullTransition;
-    EcosystemUpgradeOperation internal operation;
 
     function setUp() public override {
         super.setUp();
         implOld = address(new ValidateTargetOld());
         implNew = address(new ValidateTargetNew());
 
-        ProxyUpgradeRow[] memory ecosystemInventory = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         TransparentUpgradeableProxy ecosystemProxy = new TransparentUpgradeableProxy(
             implOld,
             address(ecosystemProxyAdmin),
             hex""
         );
-        // An implementation of its own: shared with the CTM row, an emptied core implementation
-        // would be refused by the CTM row's check before the core leg is ever validated.
-        ProxyUpgradeRow memory coreRow = _row(address(ecosystemProxy));
-        coreRow.implNew = address(new ValidateTargetNew());
-        ecosystemInventory[uint256(L1EcosystemContract.L1Bridgehub)] = coreRow;
-        coreTransition = new CoreTransition(CoreTransitionManifest({proxyUpgrades: ecosystemInventory}));
+        coreTransition = _deployCoreTransition(_row(address(ecosystemProxy)));
 
         fullTransition = _deployTransition(777);
         TransparentUpgradeableProxy ctmDomainProxy = new TransparentUpgradeableProxy(
@@ -87,9 +68,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
             address(ctmProxyAdmin),
             hex""
         );
-        ProxyUpgradeRow[] memory ctmInventory = _emptyInventory();
-        ctmInventory[uint256(CTMContract.ValidatorTimelock)] = _row(address(ctmDomainProxy));
-        operation = _operationWithInfrastructure(ICTMTransition(address(fullTransition)), ctmInventory);
+        infrastructure = _deployCTMInfrastructureTransition(_row(address(ctmDomainProxy)));
     }
 
     // ─────────────────────────────── happy path ───────────────────────────────
@@ -98,7 +77,7 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         IValidatable(address(release)).validate();
         IValidatable(address(fullTransition)).validate();
         IValidatable(address(coreTransition)).validate();
-        IValidatable(address(operation)).validate();
+        IValidatable(address(infrastructure)).validate();
     }
 
     /// @dev The optional-zero member stays legal: a transition with no composer still validates,
@@ -112,13 +91,6 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         manifest.l2Plan.delegateComposer = address(0);
         CTMTransition uncomposed = new CTMTransition(manifest);
         uncomposed.validate();
-    }
-
-    /// @dev Same for the operation: an all-inert infrastructure inventory leaves only the core
-    ///      transition to check, and that operation still validates.
-    function test_operationWithoutInfrastructureValidates() public {
-        EcosystemUpgradeOperation bare = _deployOperation(address(coreTransition), _emptyInventory(), address(0));
-        bare.validate();
     }
 
     // ─────────────────────────────── every named member ───────────────────────────────
@@ -144,43 +116,16 @@ contract CodePresenceSurfacesTest is CTMUpgradeExecutorFixture {
         }
     }
 
-    function test_everyCoreTransitionRowIsRequiredToHaveCode() public {
-        ProxyUpgradeRow[] memory rows = coreTransition.ecosystemRows();
-        assertEq(rows.length, 1, "one participating row");
-        for (uint256 i = 0; i < rows.length; ++i) {
-            _assertCodelessMemberIsRefused(IValidatable(address(coreTransition)), rows[i].implNew);
-        }
-    }
-
-    /// @dev An operation validates in one call: its own members (every participating
-    ///      infrastructure row's implementation), the core transition and its rows, and the CTM
-    ///      transition with both of its releases.
-    function test_everyOperationMemberIsRequiredToHaveCode() public {
-        EcosystemUpgradeOperation complete = _deployOperation(
-            address(coreTransition),
-            operation.getManifest().ctmInfrastructure,
-            address(fullTransition)
-        );
-        ProxyUpgradeRow[] memory rows = complete.ctmInfrastructureRows();
-        assertEq(rows.length, 1, "one participating infrastructure row");
-        ProxyUpgradeRow[] memory coreRows = coreTransition.ecosystemRows();
-        address[] memory transitionMembers = _transitionMembers(fullTransition.getManifest());
-
-        address[] memory members = new address[](2 + rows.length + coreRows.length + transitionMembers.length);
-        uint256 next = 0;
-        for (uint256 i = 0; i < rows.length; ++i) {
-            members[next++] = rows[i].implNew;
-        }
-        members[next++] = address(coreTransition);
-        for (uint256 i = 0; i < coreRows.length; ++i) {
-            members[next++] = coreRows[i].implNew;
-        }
-        members[next++] = address(fullTransition);
-        for (uint256 i = 0; i < transitionMembers.length; ++i) {
-            members[next++] = transitionMembers[i];
-        }
-        for (uint256 i = 0; i < members.length; ++i) {
-            _assertCodelessMemberIsRefused(IValidatable(address(complete)), members[i]);
+    /// @dev A proxy upgrade transition of either domain names exactly its participating rows'
+    ///      implementations.
+    function test_everyProxyUpgradeTransitionRowIsRequiredToHaveCode() public {
+        ProxyUpgradeTransition[2] memory objects = [coreTransition, infrastructure];
+        for (uint256 o = 0; o < objects.length; ++o) {
+            ProxyUpgradeRow[] memory rows = objects[o].rows();
+            assertEq(rows.length, 1, "one participating row");
+            for (uint256 i = 0; i < rows.length; ++i) {
+                _assertCodelessMemberIsRefused(IValidatable(address(objects[o])), rows[i].implNew);
+            }
         }
     }
 

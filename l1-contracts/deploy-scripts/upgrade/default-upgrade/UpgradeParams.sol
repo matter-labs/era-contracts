@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 /// @notice What a version's prepare SETS OUT to change. Declared by the version script
 ///         (`DefaultCTMUpgrade.upgradeKind`), never inferred from the version numbers the run
-///         happens to see. See "Infrastructure-only operations" in
+///         happens to see. See "Infrastructure-only upgrades" in
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 enum UpgradeKind {
     // A chain-version edge: the prepare deploys the upgrade engine and the `CTMTransition` chains
@@ -70,16 +70,17 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
-    /// @notice The `EcosystemUpgradeExecutor` — the lifecycle coordinator — the core prepare of the
-    ///         BOOTSTRAP edge deployed (its output TOML, `[registry].ecosystem_upgrade_executor_addr`):
-    ///         the bootstrap's CTM executor is constructed answering to it. Every later prepare
-    ///         derives the coordinator from the CTM (owner = bound `CTMUpgradeExecutor`, then its
-    ///         `coordinator()`) and ignores this field.
+    /// @notice The ecosystem domain's executor — the `CoreUpgradeExecutor` — the core prepare of the
+    ///         BOOTSTRAP edge deployed (its output TOML, `[registry].core_upgrade_executor_addr`): the
+    ///         bootstrap manifest names it as the executor the ecosystem `ProxyAdmin` lands under.
+    ///         Every later prepare ignores it.
+    /// @dev Named for the domain rather than the contract so the prepare entry point's ABI, which
+    ///      `zkstack-out` exports, keeps its shape.
     address ecosystemUpgradeExecutor;
-    /// @notice The core prepare's `CoreTransition` (its output TOML,
-    ///         `[registry].core_transition_addr`), zero when the upgrade has no ecosystem leg. It is
-    ///         the ecosystem leg of the `EcosystemUpgradeOperation` this prepare deploys, and the
+    /// @notice The core prepare's Core-domain `ProxyUpgradeTransition` (its output TOML,
+    ///         `[registry].core_transition_addr`), zero when the upgrade has no ecosystem leg: the
     ///         bootstrap edge's second object — the one its derived call sequence covers the
-    ///         ecosystem domain from.
+    ///         ecosystem domain from — and, on every other edge, what tells this prepare whether
+    ///         the upgrade changes anything beside its own objects.
     address coreTransition;
 }

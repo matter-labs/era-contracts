@@ -644,6 +644,10 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0x4dd18bf5", "`setPendingAdmin(address)`"),
         ("0x99a88ec4", "`upgrade(address,address)`"),
         ("0x9623609d", "`upgradeAndCall(address,address,bytes)`"),
+        ("0x6093a259", "`applyL1Upgrade(address)`"),
+        ("0x68e98978", "`applyInfrastructureUpgrade(address)`"),
+        ("0x7b1b716a", "`applyCTMUpgrade(address)`"),
+        ("0x71b0e408", "`forward(...)`"),
     ];
     for (selector, display) in expected {
         assert_eq!(
@@ -732,6 +736,24 @@ fn chain_upgrades_name_the_departing_version_in_every_form() {
         decode::annotation(&pre_v31).as_deref(),
         Some("from v0.30.0")
     );
+}
+
+/// An upgrade's executor legs name the object they apply.
+#[test]
+fn executor_legs_name_their_object() {
+    let object = Address::repeat_byte(0x0b);
+    for selector in [
+        [0x60, 0x93, 0xa2, 0x59],
+        [0x68, 0xe9, 0x89, 0x78],
+        [0x7b, 0x1b, 0x71, 0x6a],
+    ] {
+        let mut data = selector.to_vec();
+        data.extend_from_slice(&object.into_word()[..]);
+        assert_eq!(
+            decode::annotation(&data),
+            Some(format!("object `{}`", object.to_checksum(None)))
+        );
+    }
 }
 
 #[test]

@@ -19,6 +19,9 @@ pub(crate) struct VerificationResult {
     pub(crate) result: String,
     pub(crate) warnings: u64,
     pub(crate) errors: u64,
+    /// Every error reported, so a test can assert WHICH check failed rather than only how many.
+    #[cfg(test)]
+    pub(crate) error_messages: Vec<String>,
 }
 
 impl VerificationResult {
@@ -37,7 +40,17 @@ impl VerificationResult {
 
     pub(crate) fn report_error(&mut self, error: &str) {
         self.errors += 1;
+        #[cfg(test)]
+        self.error_messages.push(error.to_string());
         println!("{} {}", style("[ERROR]:").red(), error);
+    }
+
+    /// Whether some reported error contains `needle`.
+    #[cfg(test)]
+    pub(crate) fn has_error(&self, needle: &str) -> bool {
+        self.error_messages
+            .iter()
+            .any(|error| error.contains(needle))
     }
 
     pub(crate) fn ensure_success(&self) -> anyhow::Result<()> {

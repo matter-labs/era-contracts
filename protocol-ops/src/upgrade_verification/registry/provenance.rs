@@ -358,12 +358,12 @@ mod tests {
     }
 
     const RELEASE_RUNTIME: &[u8] = b"the reviewed CTMRelease runtime";
-    const TRANSITION_RUNTIME: &[u8] = b"the reviewed CoreTransition runtime";
+    const TRANSITION_RUNTIME: &[u8] = b"the reviewed ProxyUpgradeTransition runtime";
 
     fn build() -> ReviewedBuild {
         let identity = CodeIdentity::empty()
             .with_contract("l1-contracts/CTMRelease", RELEASE_RUNTIME)
-            .with_contract("l1-contracts/CoreTransition", TRANSITION_RUNTIME)
+            .with_contract("l1-contracts/ProxyUpgradeTransition", TRANSITION_RUNTIME)
             .with_contract("l1-contracts/MailboxFacet", &runtime_with_immutable());
         ReviewedBuild::from_artifacts(
             identity,
@@ -450,7 +450,7 @@ mod tests {
     fn code_the_commit_produces_for_another_contract_names_it() {
         assert_eq!(
             classify_code(&build(), TRANSITION_RUNTIME, &["CTMRelease"]),
-            CodeVerdict::OtherContract("l1-contracts/CoreTransition")
+            CodeVerdict::OtherContract("l1-contracts/ProxyUpgradeTransition")
         );
     }
 

@@ -58,8 +58,7 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
                 ctmRelease: getAddresses().stateTransition.currentRelease,
                 // Not a bootstrap: no migration to name.
                 bootstrapMigration: address(0),
-                operation: upgradeAddresses.ecosystemUpgradeOperation,
-                coordinator: upgradeCoordinator()
+                ctmInfrastructureTransition: upgradeAddresses.ctmInfrastructureTransition
             }),
             _reviewed: TrimmedUpgradeOutput.Reviewed({
                 create2FactorySalt: _create2FactorySalt,

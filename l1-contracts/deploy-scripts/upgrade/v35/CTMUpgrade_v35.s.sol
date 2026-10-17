@@ -11,8 +11,8 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {BootstrapAction} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
@@ -40,7 +40,7 @@ import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/Upgrade
 ///         version commit, the authority handover) is pinned in a write-once
 ///         `RegistryBootstrapMigration` deployed at prepare time, and executed by its single
 ///         `migrate()` call inside the one governance bundle `RegistryBootstrapSequence` derives;
-///         every later upgrade is an operation under the bound executors. Before any of it, the
+///         every later upgrade is applied through the bound domain executors. Before any of it, the
 ///         ChainAdmin hands the ServerNotifier to the CTM domain ({serverNotifierHandoverCalls});
 ///         the edge refuses to run until it has.
 // solhint-disable-next-line contract-name-capwords
@@ -247,21 +247,13 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             create2Salt: salt,
             initialOwner: getOwnerAddress(),
             chainTypeManager: ctmProxy,
-            ctmProxyAdmin: address(ctmProxyAdmin),
-            // The coordinator the core prepare of this upgrade deployed — the only address that
-            // will drive this executor's lifecycle callbacks.
-            coordinator: address(ecosystemUpgradeExecutor())
+            ctmProxyAdmin: address(ctmProxyAdmin)
         });
         ctmUpgradeExecutor = CTMUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(
                     type(CTMUpgradeExecutor).creationCode,
-                    abi.encode(
-                        ctmExecutorDeployment.initialOwner,
-                        IChainTypeManager(ctmProxy),
-                        ctmProxyAdmin,
-                        ctmExecutorDeployment.coordinator
-                    ),
+                    abi.encode(ctmExecutorDeployment.initialOwner, IChainTypeManager(ctmProxy), ctmProxyAdmin),
                     "CTMUpgradeExecutor"
                 )
             )
@@ -281,7 +273,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         bootstrapSequence = RegistryBootstrapSequence(
             deployViaCreate2AndNotify(
                 type(RegistryBootstrapSequence).creationCode,
-                abi.encode(bootstrapMigration, ICoreTransition(coreTransition)),
+                abi.encode(bootstrapMigration, IProxyUpgradeTransition(coreTransition)),
                 "RegistryBootstrapSequence"
             )
         );
@@ -352,11 +344,10 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             l2Plan: authoredL2Plan(),
             upgradeTimestamp: 0,
             ctmExecutor: address(ctmUpgradeExecutor),
-            coreExecutor: address(ecosystemUpgradeExecutor().CORE_EXECUTOR()),
-            // The executors' ownership and bindings are storage, so the edge names them here and
-            // refuses to hand either domain over if any moved after the prepares deployed them.
-            governance: getOwnerAddress(),
-            coordinator: address(ecosystemUpgradeExecutor())
+            coreExecutor: address(coreUpgradeExecutor()),
+            // The executors' ownership is storage, so the edge names the expected owner here and
+            // refuses to hand either domain over if it moved after the prepares deployed them.
+            governance: getOwnerAddress()
         });
     }
 
@@ -382,20 +373,18 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         }
     }
 
-    /// @notice The `EcosystemUpgradeExecutor` (lifecycle coordinator) the core prepare of this
-    ///         upgrade deployed — an input of this prepare (`CTMUpgradeParams.ecosystemUpgradeExecutor`,
-    ///         read by protocol-ops from the core output TOML): no executor answers to it on-chain
-    ///         until this edge binds them. Checked to exist so a stale or missing input fails here
-    ///         instead of at the bootstrap's binding check.
-    function ecosystemUpgradeExecutor() public view returns (EcosystemUpgradeExecutor) {
-        address coordinator = upgradeAddresses.ecosystemUpgradeExecutor;
-        require(coordinator != address(0), "coordinator not set (core prepare output)");
-        require(coordinator.code.length != 0, "coordinator has no code");
-        return EcosystemUpgradeExecutor(payable(coordinator));
-    }
-
-    /// @inheritdoc DefaultCTMUpgrade
-    function upgradeCoordinator() public view virtual override returns (address) {
-        return address(ecosystemUpgradeExecutor());
+    /// @notice The `CoreUpgradeExecutor` the core prepare of this upgrade deployed — an input of this
+    ///         prepare (`CTMUpgradeParams.ecosystemUpgradeExecutor`, read by protocol-ops from the core
+    ///         output TOML). Checked to exist and to be bound to the ecosystem `ProxyAdmin` so a stale
+    ///         or missing input fails here instead of at the bootstrap's authority check.
+    function coreUpgradeExecutor() public view returns (CoreUpgradeExecutor) {
+        address executor = upgradeAddresses.coreUpgradeExecutor;
+        require(executor != address(0), "core executor not set (core prepare output)");
+        require(executor.code.length != 0, "core executor has no code");
+        require(
+            address(CoreUpgradeExecutor(payable(executor)).PROXY_ADMIN()) == coreAddresses.shared.transparentProxyAdmin,
+            "core executor is not bound to the ecosystem ProxyAdmin"
+        );
+        return CoreUpgradeExecutor(payable(executor));
     }
 }

@@ -2,29 +2,30 @@
 
 A protocol upgrade is a set of **write-once contracts** deployed ahead of time. Governance approves
 the object addresses and the contents they commit to; the contracts validate them and the executors
-apply them. What governance signs is one fixed-signature call on one coordinator plus whatever the
-prepare declared as an external action.
+apply them. What governance signs is one proposal: a fixed-signature call per object on the executor
+of its domain, in a canonical order, plus whatever the prepare declared as an external action.
 
 **Scope:** L1 + L2 era-contracts, upgrade tooling, governance proposal shape.
 
 This is the architecture document. Two other documents complete it and are not restated here:
 
 - [`protocol-docs/ecosystem-upgrade-coordination.md`](../protocol-docs/ecosystem-upgrade-coordination.md)
-  is the **coordinator spec**: what `EcosystemUpgradeExecutor.execute` does, the operation
-  commitment and the authorization of the domain executors.
+  is the **coordination spec**: what each domain executor's entrypoint does, the order governance
+  calls them in within one proposal, and where ordering and atomicity are enforced.
 - [`l1-contracts/deploy-scripts/upgrade/README.md`](../l1-contracts/deploy-scripts/upgrade/README.md)
   is the **runbook**: how a prepare is run, composed, verified, replayed and how chains cross.
 
 [`upgrade-operations.md`](upgrade-operations.md) keeps the operational policies that belong to
-neither: the ServerNotifier handover, coordinator succession, monitoring, recovery and the
+neither: the ServerNotifier handover, executor succession, monitoring, recovery and the
 incident-only migration pauses.
 
 Start with the [contract maps](#contract-map) for the component inventory, then read
 [objects](#objects), [authority](#authority), [upgrading](#flow-upgrading) and [bootstrap](#bootstrap). The central security question is whether the reviewed objects and the
 declared external actions account for every executable change: review source/target edges,
 target identities, the deployed code at every named address, initializers, engine and composer
-code and ownership changes together, and include governance's `forward` and coordinator-replacement
-powers. Execution verifies the applied L1 state, not completion on every L2 chain.
+code and ownership changes together, check that the proposal carries every leg the upgrade needs in
+canonical order, and include governance's `forward` and executor-replacement powers. Execution
+verifies the applied L1 state, not completion on every L2 chain.
 
 ## Model
 
@@ -53,18 +54,17 @@ releases whose routing is byte-identical. Governance
 reviews two releases plus the transition's own fields; the cuts are computed, not written.
 
 A transition describes one CTM's chain-version edge and nothing else. Infrastructure changes belong
-to the third object — the **operation**, named only by the coordinator — which is also what makes
-them separable: replacing an ecosystem singleton
-behind a CTM-domain proxy is an operation with no transition at all, and therefore costs no
-chain-version edge. See
+to a third object, the **proxy upgrade transition** (one per domain), which is also what makes them
+separable: replacing a singleton behind a CTM-domain proxy is an upgrade with no transition at all,
+and therefore costs no chain-version edge. See
 [the coordination document](../protocol-docs/ecosystem-upgrade-coordination.md).
 
 ## Contract map
 
-The upgrade change introduces **11 production contract types**, all deployed on L1. They are
-three persistent executors, four write-once upgrade records, two bootstrap helpers, the bootstrap
-engine and the L1 calldata composer. The larger file count also includes **three abstract bases**,
-**twelve internal libraries**, **eighteen runtime interfaces** and **two data-only files**. Libraries
+The upgrade change introduces **9 production contract types**, all deployed on L1. They are
+two persistent executors, three write-once upgrade records, two bootstrap helpers, the bootstrap
+engine and the L1 calldata composer. The larger file count also includes **two abstract bases**,
+**twelve internal libraries**, **fifteen runtime interfaces** and **two data-only files**. Libraries
 and inherited bases add code to their callers, rather than additional protocol deployments.
 
 These small maps show records, authority, shared code and bootstrap separately. Existing contracts
@@ -73,31 +73,33 @@ covers the preparation scripts and CLI commands around these contracts.
 
 ### Records and their references
 
-Dashed arrows are reads or stored references. An operation may omit either transition; its CTM
-infrastructure inventory is a third, independent leg. A transition always names both releases.
+Dashed arrows are reads or stored references. An upgrade carries any nonempty subset of the three
+top objects and nothing links them: the governance proposal applies them in order. A transition
+always names both releases.
 
 ```mermaid
 flowchart TB
-    OP["EcosystemUpgradeOperation<br/>one governance-approved operation"]
-    CORE["CoreTransition<br/>ecosystem proxy inventory"]
-    ROWS["CTM infrastructure rows<br/>data inside the operation"]
+    CORE["ProxyUpgradeTransition · Core domain<br/>ecosystem proxy inventory"]
+    INFRA["ProxyUpgradeTransition · CTM domain<br/>CTM-domain proxy inventory"]
     TRANS["CTMTransition<br/>schedule, engine, derived cuts and L2 plan"]
+    PROXIES["Ecosystem and CTM-domain proxies · existing"]
     FROM["CTMRelease<br/>source version"]
     TO["CTMRelease<br/>target version"]
     ENGINE["DefaultUpgrade · existing, extended<br/>or its BootstrapUpgrade subclass"]
     COMPOSER["L2DefaultDelegateCalldataComposer<br/>L1 view contract for the L2 delegate"]
 
-    OP -.->|"optional coreTransition"| CORE
-    OP -.-> ROWS
-    OP -.->|"optional ctmTransition"| TRANS
+    CORE -.->|"rows: proxy, expectedOldImpl, implNew"| PROXIES
+    INFRA -.->|"rows"| PROXIES
     TRANS -.->|"fromRelease"| FROM
     TRANS -.->|"newRelease"| TO
     TRANS -.->|"upgradeEngine"| ENGINE
     TRANS -.->|"optional l2Plan.delegateComposer"| COMPOSER
 ```
 
-The two release boxes are instances of the same `CTMRelease` type. A release names the facets,
-`DiamondInit`, verifier and genesis engine it installs, together with genesis data and L2 bytecodes.
+The two release boxes are instances of the same `CTMRelease` type, and the two inventory boxes of
+the same `ProxyUpgradeTransition` type, told apart by the domain in their manifests. A release names
+the facets, `DiamondInit`, verifier and genesis engine it installs, together with genesis data and L2
+bytecodes.
 It holds no executor or authority. The engine and composer boxes show the current production
 implementations; manifests pin addresses and can name version-specific implementations. The
 [authority map](#authority) shows which executors consume these records; the
@@ -111,17 +113,13 @@ retains its own typed decoder.
 
 ```mermaid
 flowchart TB
-    COORD["EcosystemUpgradeExecutor"]
     DOMAIN["CoreUpgradeExecutor<br/>CTMUpgradeExecutor"]
-    RECORDS["CTMRelease · CTMTransition<br/>CoreTransition · EcosystemUpgradeOperation<br/>RegistryBootstrapMigration"]
+    RECORDS["CTMRelease · CTMTransition<br/>ProxyUpgradeTransition<br/>RegistryBootstrapMigration"]
     UBASE["UpgradeExecutorBase<br/>owner-only forward"]
-    DBASE["DomainUpgradeExecutorBase<br/>coordinator binding"]
     MBASE["ManifestStorage<br/>encoded manifest + manifestHash"]
     OWN["Ownable2Step · existing dependency"]
 
-    COORD --> UBASE
-    DOMAIN --> DBASE
-    DBASE --> UBASE
+    DOMAIN --> UBASE
     UBASE --> OWN
     RECORDS --> MBASE
 ```
@@ -150,12 +148,12 @@ later on L2.
 <details>
 <summary>Interfaces and data declarations: no deployed instances</summary>
 
-| Surface                       | New interfaces                                                                                                               |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Executor authority            | `IUpgradeExecutorBase`, `IDomainUpgradeExecutor`, `IEcosystemUpgradeExecutor`, `ICoreUpgradeExecutor`, `ICTMUpgradeExecutor` |
-| Records and shared reads      | `ICTMRelease`, `ICTMTransition`, `ICoreTransition`, `IEcosystemUpgradeOperation`, `ICommittedUpgrade`, `IManifestHash`       |
-| Bootstrap and composition     | `IRegistryBootstrapMigration`, `IRegistryBootstrapSequence`, `IBootstrapUpgrade`, `IL2DelegateCalldataComposer`              |
-| Compatibility and member APIs | `ILegacyChainTypeManager`, `ISelfDescribingFacet`, `IProxyUpgradeInitializable` (declared in `IUpgradeInit.sol`)             |
+| Surface                       | New interfaces                                                                                                   |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Executor authority            | `IUpgradeExecutorBase`, `ICoreUpgradeExecutor`, `ICTMUpgradeExecutor`                                            |
+| Records and shared reads      | `ICTMRelease`, `ICTMTransition`, `IProxyUpgradeTransition`, `ICommittedUpgrade`, `IManifestHash`                 |
+| Bootstrap and composition     | `IRegistryBootstrapMigration`, `IRegistryBootstrapSequence`, `IBootstrapUpgrade`, `IL2DelegateCalldataComposer`  |
+| Compatibility and member APIs | `ILegacyChainTypeManager`, `ISelfDescribingFacet`, `IProxyUpgradeInitializable` (declared in `IUpgradeInit.sol`) |
 
 `RegistryTypes.sol` defines manifests and rows. `ContractIdentifiers.sol` defines the inventory enums
 and their counts; despite its directory name, it declares no library. Preparation-only interfaces
@@ -169,13 +167,12 @@ All are storage-backed, built once from a manifest they take in the constructor,
 `manifestHash = keccak256(abi.encode(manifest))`. The struct definitions and their field docs are
 in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                                                   |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell   |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                               |
-| `CoreTransition`             | the `L1EcosystemContract`-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows for the SHARED singletons (bridges, Bridgehub, MessageRoot, …)                                                                                                                  |
-| `EcosystemUpgradeOperation`  | `{coreTransition, ctmInfrastructure, ctmTransition}` — three optional changes. `ctmInfrastructure` is the `CTMContract`-indexed CTM-domain inventory, incl. the CTM itself. Executors are bound on the coordinator; an operation carrying no change at all is rejected. |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                          |
+| Contract                     | Holds                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                                              |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                                          |
+| `ProxyUpgradeTransition`     | its `domain` and that domain's enum-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows: `Core` for the SHARED singletons (bridges, Bridgehub, MessageRoot, …), `CTM` for the CTM-domain proxies, incl. the CTM itself. One instance per changed domain per upgrade; an inventory with no participating row is rejected. |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                                     |
 
 ### Enum-indexed proxy inventories
 
@@ -184,11 +181,14 @@ array indexed by the canonical contract enum** — the SAME enum that identifies
 deployment, one enum per domain (`ContractIdentifiers.sol`) — whose length must be exactly the
 enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT`):
 
-- `CoreTransitionManifest.proxyUpgrades` is indexed by `L1EcosystemContract`.
-- `OperationManifest.ctmInfrastructure` and `BootstrapManifest.ctmProxyUpgrades` are indexed by
-  `CTMContract`. Only the members behind a proxy under the CTM-domain `ProxyAdmin` can
-  participate: ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator,
-  the ServerNotifier and the L1InteropFeeManager.
+- `ProxyUpgradeTransitionManifest.proxyUpgrades` is indexed by `L1EcosystemContract` in the `Core`
+  domain and by `CTMContract` in the `CTM` domain. The domain is part of the manifest, and the
+  required length follows from it, never from the caller.
+- `BootstrapManifest.ctmProxyUpgrades` is indexed by `CTMContract`.
+
+In the CTM domain only the members behind a proxy under the CTM-domain `ProxyAdmin` can
+participate: ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator, the
+ServerNotifier and the L1InteropFeeManager.
 
 Slot `uint256(member)` IS that contract's row; a slot whose `implNew` is zero is the **"not
 upgraded" statement**. The length check means every contract of the domain HAS a slot and none can
@@ -209,8 +209,9 @@ them against the release.
 **A row has no admin of its own.** Every row is applied through the applying executor's bound
 `ProxyAdmin`, which administers every proxy of its domain — the ServerNotifier included, after its
 [one-time handover](upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy).
-A row under an admin the executor does not own reverts: a misbound executor is a configuration
-error, not something to skip past. `applyRows` re-reads every row after the swaps and reverts
+A row under an admin the executor does not own reverts, and so does an object of the other domain
+(`ProxyUpgradeDomainMismatch`): a misbound executor is a configuration error, not something to skip
+past. `applyRows` re-reads every row after the swaps and reverts
 unless each proxy runs its `implNew`, so execution verifies what it applied in the same transaction.
 
 ### Reinitializers: a fixed call, no data
@@ -340,8 +341,7 @@ one shared `l2SystemProxyBytecodeInfo` shell come from `SystemContractsProcessin
 
 ```mermaid
 flowchart TB
-    GOV["Governance · existing<br/>owner of all three executors"]
-    EE["EcosystemUpgradeExecutor<br/>coordinator"]
+    GOV["Governance · existing<br/>owner of both executors"]
     CO["CoreUpgradeExecutor"]
     CE["CTMUpgradeExecutor"]
     PA["ecosystem ProxyAdmin · existing"]
@@ -349,45 +349,36 @@ flowchart TB
     CTM["ChainTypeManager · existing"]
     NOTIFIER["ServerNotifier · existing"]
 
-    GOV -->|"owns / execute / setCTMExecutor / forward"| EE
-    GOV -->|"owns / setCoordinator / applyL1Upgrade / forward"| CO
-    GOV -->|"owns / setCoordinator / forward"| CE
-    EE -.->|"onlyCoordinator: applyOperation, core first"| CO
-    EE -.->|"onlyCoordinator: applyOperation, CTM second"| CE
+    GOV -->|"owns · forward<br/>1. applyL1Upgrade"| CO
+    GOV -->|"owns · forward<br/>2. applyInfrastructureUpgrade<br/>3. applyCTMUpgrade"| CE
     CO -->|"owns"| PA
     CE -->|"owns"| CTM
     CE -->|"owns"| CPA
     CE -->|"owns"| NOTIFIER
 ```
 
-Three executors, one authority root. Governance owns all three; each domain executor holds one
-piece of protocol authority and answers to exactly one coordinator, which it names explicitly
-(`coordinator`, set by the owner). A shared owner is not authorization: `applyOperation` rejects
-callers other than the configured coordinator.
+Two executors, one authority root. Governance owns both; each holds one domain's protocol
+authority and answers only to its owner. Neither calls nor names the other: what ties one upgrade's
+legs together is the governance proposal that calls them, in the numbered order above
+([coordination spec](../protocol-docs/ecosystem-upgrade-coordination.md#execution)).
 
-A fresh ecosystem is born in this shape. `DeployL1CoreContracts` deploys the core executor and the
-coordinator, binds them and hands the core executor the ecosystem `ProxyAdmin`; `DeployCTM` deploys
-the CTM executor answering to that coordinator and hands it the CTM, the CTM-domain `ProxyAdmin`
-(every CTM gets its own, even when it reuses the ecosystem's governance and ChainAdmin) and the
-ServerNotifier; `RegisterCTM` binds it on the coordinator (`setCTMExecutor`). The scripts construct
-the executors for the deployer, which makes these bindings and handovers, and nominate governance,
-which accepts in `protocol-ops hub init` / `ctm init`. The end state is exactly what a completed
-[bootstrap](#bootstrap) leaves: `RegistryAuthorityLib.requireRegistryAuthority`, the authority half
-of `RegistryBootstrapMigration.validateApplied()`, accepts both.
+A fresh ecosystem is born in this shape. `DeployL1CoreContracts` deploys the core executor and
+hands it the ecosystem `ProxyAdmin`; `DeployCTM` deploys the CTM executor bound to the CTM and the
+CTM-domain `ProxyAdmin` (every CTM gets its own, even when it reuses the ecosystem's governance and
+ChainAdmin), hands it the CTM, that `ProxyAdmin` and the ServerNotifier, and nominates the ecosystem
+governance it reads off the core executor; `RegisterCTM` registers the CTM and binds nothing. The
+scripts construct the executors for the deployer, which makes these handovers, and nominate
+governance, which accepts in `protocol-ops hub init` / `ctm init`. The end state is exactly what a
+completed [bootstrap](#bootstrap) leaves: `RegistryAuthorityLib.requireRegistryAuthority`, the
+authority half of `RegistryBootstrapMigration.validateApplied()`, accepts both.
 
-| Executor                   | Bound to (immutable)                      | Entrypoints                                                                                                                            |
-| -------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `EcosystemUpgradeExecutor` | `CORE_EXECUTOR`                           | `execute(operation)`, `setCTMExecutor`, `forward` (owner)                                                                              |
-| `CoreUpgradeExecutor`      | the ecosystem `ProxyAdmin`                | `applyOperation` (coordinator); `applyL1Upgrade` (owner — bootstrap and recovery); `setCoordinator`, `forward` (owner)                 |
-| `CTMUpgradeExecutor`       | one `ChainTypeManager` + its `ProxyAdmin` | `applyOperation` (coordinator); `validateTransitionApplied`; `upgradeChain`; `acceptCTMOwnership`; `setCoordinator`, `forward` (owner) |
+| Executor              | Bound to (immutable)                      | Entrypoints                                                                                                                           |
+| --------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `CoreUpgradeExecutor` | the ecosystem `ProxyAdmin`                | `applyL1Upgrade`, `forward` (owner)                                                                                                   |
+| `CTMUpgradeExecutor`  | one `ChainTypeManager` + its `ProxyAdmin` | `applyInfrastructureUpgrade`, `applyCTMUpgrade`, `forward` (owner); `upgradeChain`; `validateTransitionApplied`; `acceptCTMOwnership` |
 
-The coordinator half of both domain executors — the binding and `applyOperation` — is one shared
-surface (`IDomainUpgradeExecutor`; the binding is implemented once in `DomainUpgradeExecutorBase`).
-
-The coordinator owns no proxy administration and applies nothing itself: it validates the operation,
-holds its manifest to `manifestHash()` and hands each domain's `applyOperation` that manifest, core
-leg first. What `execute` checks and in which order is the
-[coordinator spec](../protocol-docs/ecosystem-upgrade-coordination.md).
+What each entrypoint checks is the
+[coordination spec](../protocol-docs/ecosystem-upgrade-coordination.md#execution).
 
 `UpgradeExecutorBase` gives every executor ONE role. `owner` (`Ownable2Step`) drives the fixed
 entrypoints, whose inputs are write-once objects, and the same owner can `forward` raw calls — the
@@ -402,11 +393,11 @@ Security Council's veto, the board's quorum).
 Who can do what once the CTM domain is owned by `CTMUpgradeExecutor`. "Chain side" is the
 `onlyAdmin` / `onlyAdminOrChainTypeManager` path on the chain's own Admin facet;
 `onlyChainTypeManager` methods have no such path; governance reaches them, like every CTM owner
-method outside an operation, through the executor's owner-gated, logged `forward`.
+method the executor has no entrypoint for, through the executor's owner-gated, logged `forward`.
 
 | CTM owner method                                                                                                                    | Through the executors                                                             | Chain side                              |
 | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------- |
-| `setNewVersionUpgradeFromTransition` (installs the target release too)                                                              | the coordinator's `execute` → `applyOperation` (the operation's transition)       | —                                       |
+| `setNewVersionUpgradeFromTransition` (installs the target release too)                                                              | `applyCTMUpgrade` (the transition governance approved)                            | —                                       |
 | `upgradeChainFromVersion`                                                                                                           | `upgradeChain`                                                                    | —                                       |
 | `L1ChainAssetHandler.pauseCTMMigration` / `unpauseCTMMigration` (as CTM owner; incident control)                                    | `forward`                                                                         | —                                       |
 | `replaceUpgradeTransition` (repair a departed version's transition)                                                                 | `forward`                                                                         | —                                       |
@@ -418,11 +409,10 @@ method outside an operation, through the executor's owner-gated, logged `forward
 | `executeUpgrade` (arbitrary cut), legacy `setNewVersionUpgrade` / `setUpgradeDiamondCut`                                            | `forward` only — deliberately: the bypass the object-driven path exists to remove | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                                                          | `forward` only                                                                    | —                                       |
 
-The executors hold three more authorities, reached the same way outside an operation:
+The executors hold three more authorities, reached the same way outside their upgrade entrypoints:
 `CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
 (`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
-ecosystem `ProxyAdmin` (the core executor's owner may also apply a whole `CoreTransition` directly
-with `applyL1Upgrade`). The `L1ChainAssetHandler` stays with its own owner.
+ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
 
 ## Provenance and validation
 
@@ -448,25 +438,24 @@ The verification answers three questions for every object a package names:
    object is deployed through the deterministic CREATE2 factory (`0x4e59…4956C`), so
    `address == keccak256(0xff ++ factory ++ salt ++ keccak256(creationCode ++ abi.encode(args)))[12:]`.
    For a write-once object the arguments are the manifest it serves: the verifier reads it off the
-   object, re-encodes it, and recomputes that address from the reviewed creation code. For the
-   executors — the coordinator and both domain executors — and the bootstrap sequence, the
-   arguments are the ones each was constructed with (an executor's as its record states them,
-   below): the governance owner, the core executor, the ecosystem `ProxyAdmin`, the CTM, its
-   `ProxyAdmin` and coordinator.
+   object, re-encodes it, and recomputes that address from the reviewed creation code. For both
+   domain executors and the bootstrap sequence, the arguments are the ones each was constructed
+   with (an executor's as its record states them, below): the initial owner, the ecosystem
+   `ProxyAdmin`, the CTM and its `ProxyAdmin`; the sequence's migration and core transition.
    Never the object's own getters: a genuine executor built for an attacker's owner answers every
-   getter like the reviewed one. What legitimately moves after construction —
-   the current owner, a pending nomination, the coordinator — is checked live against the reviewed
-   governance and bindings. A match proves the canonical constructor ran on those arguments, which
-   covers the object's WHOLE state — immutables, storage and derived fields. The creation-code
-   BYTES come from the local build (`l1-contracts/out`), held against the committed
-   `evmBytecodeHash`, so a doctored build directory cannot pass. The salt is per prepare leg (the
+   getter like the reviewed one. What legitimately moves after construction — the current owner
+   and a pending nomination — is checked live against the reviewed governance. A match proves the
+   canonical constructor ran on those arguments, which covers the object's WHOLE state —
+   immutables, storage and derived fields. The creation-code BYTES come from the local build
+   (`l1-contracts/out`), held against the committed `evmBytecodeHash`, so a doctored build
+   directory cannot pass. The salt is per prepare leg (the
    core prepare's `[contracts] create2_factory_salt`, each CTM prepare's `[create2_factory_salts]`
    entry); each prepare records the one it deployed under (`create2_factory_salt`), a reviewer may
    add more, and every object is tried under each. The executors outlive the run that deployed them, so that run — `ecosystem init`,
    `ctm init` or the bootstrap prepares — records each one's salt and ORIGINAL constructor
    arguments in its output (`[upgrade_executors]`); a later package is verified against that
-   record (`--executor-record`), so an executor whose owner or coordinator has legitimately moved
-   since still re-derives. The record is mandatory: an executor without one is unverified.
+   record (`--executor-record`), so an executor whose owner has legitimately moved since still
+   re-derives. The record is mandatory: an executor without one is unverified.
 2. **Does it — and does every member it names — run the reviewed code?** The live code against the
    reviewed build's deployed bytecode of the contract its role admits, byte for byte outside the
    artifact's immutable slots, the build held against `AllContractsHashes.json`. For a write-once
@@ -479,8 +468,11 @@ keccak256)`) — it is the identity check: nothing records their constructor arg
    may carry over the verifier already in force where it departs from, which an earlier build
    produced. Every proxy row must also name the proxy of its slot, discovered on chain from the
    Bridgehub or the CTM. Code the build does not produce for the role is a finding.
-3. **Do the governance calls execute those objects, and nothing else?** For a recurring upgrade
-   every call is `coordinator.execute(operation)` or a declared external action. For the bootstrap
+3. **Do the governance calls execute those objects, and nothing else?** For an upgrade the bundle
+   carries the executor legs its objects need, each re-encoded from the reviewed executor and
+   object, exactly once and as one contiguous run in canonical order (core, CTM infrastructure, CTM
+   transition); every other call is a declared external action, and none may reach the executors,
+   the objects, the CTM or either `ProxyAdmin`. For the bootstrap
    edge the bundle carries the run the construction-verified `RegistryBootstrapSequence` derives,
    contiguous and in order, and every other call must be a declared external action to a target
    OUTSIDE the edge's authorities: a call to the CTM, a `ProxyAdmin`, an executor or an object
@@ -515,25 +507,26 @@ an ADDRESS; what it runs is held to the reviewed build off chain (question 2), n
 - `ObjectAnchorLib.requireCode` on every object and every member an object names. Not bookkeeping:
   a call to a codeless address SUCCEEDS silently, and a codeless delegatecall target turns a
   chain's upgrade into a no-op that reports success.
-- `validate()` on each object, where it is committed or applied (`execute` on the coordinator, which
-  validates the whole operation including both transitions it names, `applyL1Upgrade`,
-  `applyOperation`, `migrate()`, transition construction for both release edges). Two paths deliberately skip it and say so in code: the per-chain
+- `validate()` on each object, where it is committed or applied (`applyL1Upgrade`,
+  `applyInfrastructureUpgrade`, `applyCTMUpgrade`, `migrate()`, transition construction for both
+  release edges). Two paths deliberately skip it and say so in code: the per-chain
   `upgradeChain` and the engine's `upgradeFromTransition` execute only the transition the CTM
   already committed, whose members cannot have lost their code since.
 - The source-checked edges: every proxy row departs from `expectedOldImpl`, a transition departs
   from the CTM's live `currentRelease` and its live `protocolVersion`, and the bootstrap refuses
   unless the live ecosystem is exactly the starting state its manifest names.
-- Authority and bindings: the executors' bound CTM, ProxyAdmin, coordinator and owner, checked by
-  value against the manifest before the domain is handed over.
-- Execution: the manifest held to the operation's `manifestHash()`, each domain answering only to
-  its coordinator.
+- Authority and bindings: the executors' bound CTM, ProxyAdmin and owner, checked by value against
+  the manifest before the domain is handed over.
+- Domains: each executor applies only objects of its own domain (`ProxyUpgradeDomainMismatch`),
+  through the `ProxyAdmin` it is bound to, and only for its owner.
 
 **Post-state verification.** A second layer proves the upgrade LANDED, in the transaction that
 applies it:
 
 - `ProxyUpgradeRowLib.applyRows` re-reads every row after the swaps and reverts unless each proxy
-  runs its `implNew` — for the core leg, the CTM leg and the bootstrap's `migrate()` alike.
-- `CTMUpgradeExecutor.applyOperation` ends by requiring that the CTM commits exactly this
+  runs its `implNew` — for both domains' proxy upgrade transitions and the bootstrap's `migrate()`
+  alike.
+- `CTMUpgradeExecutor.applyCTMUpgrade` ends by requiring that the CTM commits exactly this
   transition for its departure and has reached its target; `validateTransitionApplied(transition)`
   serves the same check afterwards, and fails once the transition has been replaced.
 - `RegistryBootstrapMigration.validateApplied()` — the bootstrap's completion check, the last call
@@ -559,7 +552,7 @@ The CTM stores one release pointer and derives genesis data from it:
   `setProtocolVersionDeadline` (owner, through the executor's `forward`) keeps moving it afterwards,
   and a stored value takes precedence. `replaceUpgradeTransition` repairs a departed version's
   transition without moving the CTM (see "Replacing a committed transition" in the
-  [coordinator spec](../protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition)).
+  [coordination spec](../protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition)).
 - `upgradeCutHash` — DEPRECATED. Written only by the legacy cut-taking commit path (which the
   bootstrap edge uses); transition commits leave it zero.
 
@@ -600,18 +593,19 @@ forwards only `(admin, protocolVersion)`; the destination CTM rebuilds the genes
 ```mermaid
 sequenceDiagram
     participant G as Governance
-    participant X as EcosystemUpgradeExecutor
     participant CO as CoreUpgradeExecutor
     participant E as CTMUpgradeExecutor
     participant C as ChainTypeManager
     participant D as Chain diamond
 
-    G->>X: execute(operation)
-    Note over X: Validates the operation<br/>and its manifest hash
-    X->>CO: applyOperation(manifest) — core leg first, rows verified
-    X->>E: applyOperation(manifest)
-    E->>C: infrastructure rows first (CTM-domain ProxyAdmin), verified, then the commit
+    Note over G,E: One proposal: the legs in canonical order, all or nothing
+    G->>CO: applyL1Upgrade(coreTransition)
+    Note over CO: Ecosystem rows through the<br/>ecosystem ProxyAdmin, verified
+    G->>E: applyInfrastructureUpgrade(infrastructureTransition)
+    Note over E: CTM-domain rows through the<br/>CTM-domain ProxyAdmin, verified
+    G->>E: applyCTMUpgrade(transition)
     E->>C: setNewVersionUpgradeFromTransition(transition) — transition, version and newRelease together
+    Note over G,D: Later, once per chain
     G->>E: upgradeChain(transition, chainId)
     E->>C: upgradeChainFromVersion(chainId, oldV)
     C->>D: upgradeChainFromVersion(oldV)
@@ -619,11 +613,12 @@ sequenceDiagram
     Note over D: Applies derived cuts,<br/>version and verifier,<br/>and L2 transaction
 ```
 
-The one `execute(operation)` call is ALL a registry-driven upgrade emits; every other call is a
-declared external action listed in the prepare output (see the runbook). An operation applies its
-optional core change and then its CTM leg — infrastructure rows, then the transition it may carry —
-atomically. One CTM may still manage many chains. The semantics of `execute` are the
-[coordinator spec](../protocol-docs/ecosystem-upgrade-coordination.md).
+The executor legs are ALL a registry-driven upgrade emits; every other call is a declared external
+action listed in the prepare output (see the runbook). One proposal applies the legs it carries in
+order — the ecosystem rows, then the CTM-domain rows, then the transition — and reverts all of them
+if one fails. One CTM may still manage many chains. What each leg checks, and where ordering and
+atomicity are enforced, are the
+[coordination spec](../protocol-docs/ecosystem-upgrade-coordination.md).
 
 **`upgradeChain(transition, chainId)`** is the per-chain crossing. The executor's owner may
 upgrade any chain at any time; a chain's **own admin** may upgrade **that** chain at any time
@@ -695,7 +690,7 @@ infos and a calldata composer. `L2PlanLib.build` constructs the delegate and ext
 deduplicates every installed bytecode’s observable hash into the factory dependencies. Those
 addresses, deployment types and dependency hashes are not separately authored or cross-checked.
 The CTM’s `BytecodesSupplier` must hold those dependencies published where the edge COMMITS
-(`applyOperation` and `migrate()`). What is not proven is what the delegate does on L2: its
+(`applyCTMUpgrade` and `migrate()`). What is not proven is what the delegate does on L2: its
 bytecode hash names an auditable artifact, not a behavior.
 
 ## Rules enforced at construction
@@ -739,7 +734,7 @@ patch version up, and derives nothing.
 
 A verifier rotation is therefore: deploy the verifier, publish release B copying release A except
 that member, publish the `0.35.0 -> 0.35.1` transition naming `A -> B` with no L2 side, execute it
-as an ordinary operation. Mechanical permission is not a safety argument: a facet patch still needs the
+as an ordinary upgrade. Mechanical permission is not a safety argument: a facet patch still needs the
 usual compatibility review of storage layout, proof handling and L2 interaction.
 
 **Schedule.** `oldProtocolVersionDeadline >= upgradeTimestamp`, so the old protocol is never disabled
@@ -759,11 +754,12 @@ and the engines take no bytecode-hash inputs.
 **Row sets.** Every participating row is a real, unique edge: all fields nonzero, one row per
 proxy. A bootstrap manifest must carry at least one row.
 
-**Operation.** At least one real change: a nonzero core transition, a nonempty CTM infrastructure row
-set, or a nonzero transition — an all-inert inventory is not a change, so a container that upgrades
-nothing is refused. The coordinator binds one CTM executor.
-The [multi-CTM extension boundary](../protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension)
-identifies the schema, coordinator and tooling changes needed to expand participation later.
+**Proxy upgrade transitions.** At least one participating row: an all-inert inventory is not a
+change, so an object that upgrades nothing is refused, and an upgrade that leaves a domain alone
+omits that domain's object. Preparation refuses an upgrade with no object at all. A package
+upgrades one CTM through that CTM's own executor; the
+[multi-CTM extension boundary](../protocol-docs/ecosystem-upgrade-coordination.md#future-multi-ctm-extension)
+identifies what a package spanning several CTMs needs.
 
 ## Bootstrap
 
@@ -771,14 +767,14 @@ identifies the schema, coordinator and tooling changes needed to expand particip
 
 Solid arrows execute or transfer authority; dashed arrows read or reference. The sequence only
 describes the bundle: governance executes its calls, including the core leg and handovers, in one
-transaction. This map completes the eleven deployed types with `RegistryBootstrapSequence`,
+transaction. This map completes the nine deployed types with `RegistryBootstrapSequence`,
 `RegistryBootstrapMigration` and `BootstrapUpgrade`.
 
 ```mermaid
 flowchart TB
     GOV["Governance · existing"]
     SEQ["RegistryBootstrapSequence<br/>actions(): describes the complete bundle"]
-    CORE["CoreTransition<br/>ecosystem proxy inventory"]
+    CORE["ProxyUpgradeTransition · Core domain<br/>ecosystem proxy inventory"]
     COREEXEC["CoreUpgradeExecutor<br/>applies the ecosystem leg"]
     MIG["RegistryBootstrapMigration<br/>one-time CTM entry edge"]
     CTM["ChainTypeManager + CTM ProxyAdmin · existing"]
@@ -806,14 +802,15 @@ the migration and the sequence's checks.
 A pre-registry CTM has no `currentRelease`, and transitions never accept a zero `fromRelease`. It
 must therefore cross into the model once, through one-time migration code — never through an
 accommodation inside the transition model. Fresh ecosystems pin their release at genesis and are
-deployed with their executors already bound (see [Authority](#authority)); they need no bootstrap.
+deployed with their executors already holding their domains (see [Authority](#authority)); they
+need no bootstrap.
 
 `RegistryBootstrapMigration` expresses that crossing as a single write-once object. Its manifest names
 the CTM and its departing version, the CTM-domain `ProxyAdmin`, the source-checked implementation
 swaps (the CTM's, the ServerNotifier's and the `ValidatorTimelock`'s), the genesis `currentRelease`, the version edge and deadline, the
 bootstrap engine and authored L2 plan, the `CTMUpgradeExecutor` that receives the domain,
-the `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under, the `coordinator` both answer to
-and the `governance` every one of them must already be owned by. Its notifier row is mandatory:
+the `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under and the `governance` both must
+already be owned by. Its notifier row is mandatory:
 the one-time ServerNotifier handover is a precondition of the edge (see the
 [operations document](upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
 
@@ -827,13 +824,13 @@ never parked.
 the CTM sits at the departing version, that the ServerNotifier handover completed, that every proxy
 row is at its `expectedOldImpl` (or already at `implNew`), that every contract the manifest names is
 deployed code and every factory dependency is published, and that both domains' executors are
-**bound to what they are about to receive**: the CTM executor's `CHAIN_TYPE_MANAGER`,
-`CTM_PROXY_ADMIN` and `coordinator()`, the core executor's `coordinator()`, the coordinator's
-`CORE_EXECUTOR` and `ctmExecutor()`, the ecosystem `ProxyAdmin` already handed to the core executor
-earlier in the same bundle, and every executor's and the coordinator's `owner()` equal
-to `governance` with no pending owner. Ownership and bindings are storage rather than settled by
-the reviewed deployment, so they are checked by value: the edge is one-shot, and an executor whose
-ownership moved after deployment would receive its domain on behalf of whoever owns it now.
+**bound to what they are about to receive**: the CTM executor's `CHAIN_TYPE_MANAGER` and
+`CTM_PROXY_ADMIN`, the ecosystem `ProxyAdmin` already handed to the core executor earlier in the
+same bundle, and both executors' `owner()` equal to `governance` with no pending owner. The manifest
+names the executors only by address, so their bindings are checked by value, and so is ownership,
+which is storage rather than settled by the reviewed deployment: the edge is one-shot, and an
+executor whose ownership moved after deployment would receive its domain on behalf of whoever owns
+it now.
 
 Two properties that look like omissions but are not:
 
@@ -857,22 +854,23 @@ CTM domain and the notifier landed under the executor, every executor governed a
 manifest names, no nomination outstanding. It does not re-read the rows: `migrate()` verified them
 when it applied them.
 
-The bootstrap edge runs before the coordinator is bound, so its calls are declared external actions
-in ONE governance bundle rather than a coordinator call. The bundle accepts the notifier for the CTM
-executor (while the ChainAdmin's nomination is unaccepted), binds the core executor to the
-coordinator and the coordinator to the CTM executor, hands the ecosystem `ProxyAdmin` to the core
-executor and applies the `CoreTransition` through it (`applyL1Upgrade`), hands the CTM and its
-`ProxyAdmin` to the migration, runs `migrate()` — which refuses unless all of it holds — and ends
-with `validateApplied()`, so a failing completion check reverts the whole edge.
+The bootstrap edge runs before the executors hold their domains, so its calls are declared external
+actions in ONE governance bundle rather than executor legs. The bundle accepts the notifier for the
+CTM executor (while the ChainAdmin's nomination is unaccepted), hands the ecosystem `ProxyAdmin` to
+the core executor and applies the Core-domain `ProxyUpgradeTransition` through it
+(`applyL1Upgrade`), hands the CTM and its `ProxyAdmin` to the migration, runs `migrate()` — which
+refuses unless all of it holds — and ends with `validateApplied()`, so a failing completion check
+reverts the whole edge.
 
 ### The sequence is an object too
 
 Those calls are not authored by the prepare scripts. `RegistryBootstrapSequence` is deployed over
-the two objects the edge already has — the migration and the `CoreTransition` — and DERIVES the whole
-sequence: the manifest names the CTM, its `ProxyAdmin`, both domain executors and the coordinator,
-and the core executor names the ecosystem `ProxyAdmin`. The only input the edge does not already
-name is the registry, so the sequence pins it: the bundle applies exactly the address this object
-was constructed over, and a reviewer reads it off the derived calls.
+the two objects the edge already has — the migration and the Core-domain `ProxyUpgradeTransition` —
+and DERIVES the whole sequence: the manifest names the CTM, its `ProxyAdmin` and both domain
+executors, and the core executor names the ecosystem `ProxyAdmin`. The only input the edge does not
+already name is the core transition, so the sequence pins it (refusing one of another domain): the
+bundle applies exactly the address this object was constructed over, and a reviewer reads it off the
+derived calls.
 
 The prepare reads the calls off that object — label and authority included — and declares each one,
 so governance reviews a sequence derived from the objects rather than one a script and the objects
@@ -882,8 +880,8 @@ mean giving the contract that holds the ecosystem's authority a generic delegate
 
 Because the object derives both domains and only exists once the migration does, the CTM prepare
 deploys it and declares the whole edge; the core prepare of this edge declares nothing, and the
-merge — which orders the core prepare's calls ahead of the CTM's — therefore carries the object's
-sequence unchanged and contiguous.
+merge — which orders the core prepare's calls ahead of the CTM's and derives no executor leg for a
+bootstrap — therefore carries the object's sequence unchanged and contiguous.
 
 `UpgradeTest_Local.t.sol` and the anvil pipeline drive the whole edge through the real prepares,
 and `RegistryBootstrapSequence.t.sol` pins the derived bundle.
@@ -913,8 +911,8 @@ Gateway deployer takes a pre-deployed release address instead (`GatewayCTMDeploy
 ## Related
 
 - [Ecosystem upgrade coordination](../protocol-docs/ecosystem-upgrade-coordination.md) — the
-  coordinator spec.
-- [Upgrade operations](upgrade-operations.md) — the ServerNotifier handover, coordinator
+  coordination spec.
+- [Upgrade operations](upgrade-operations.md) — the ServerNotifier handover, executor
   succession, monitoring, recovery and the incident-only migration pauses.
 - [Upgrade scripts runbook](../l1-contracts/deploy-scripts/upgrade/README.md) — prepare, compose,
   verify, replay, chain crossing.

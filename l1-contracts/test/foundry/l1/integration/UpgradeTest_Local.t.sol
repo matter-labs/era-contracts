@@ -36,7 +36,6 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ChainRouting} from "test-utils/ChainRouting.sol";
@@ -343,9 +342,13 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
 
         // The package summary the verifier cross-checks against the manifest.
         assertEq(coreExecutor, manifest.coreExecutor, "the manifest names the core prepare's executor");
-        assertEq(coreOutput.readAddress("$.registry.ecosystem_upgrade_executor_addr"), manifest.coordinator);
-        assertEq(ctmOutput.readAddress("$.registry.coordinator_addr"), manifest.coordinator);
         assertEq(ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr"), manifest.ctmExecutor);
+        assertEq(
+            ctmOutput.readAddress("$.registry.ctm_infrastructure_transition_addr"),
+            address(0),
+            "a bootstrap's CTM rows ride its migration"
+        );
+        assertEq(ctmOutput.readAddress("$.registry.ctm_transition_addr"), address(0), "a bootstrap has no transition");
         assertEq(ctmOutput.readAddress("$.registry.bootstrap_migration_addr"), address(bootstrap.bootstrapMigration()));
         assertEq(ctmOutput.readAddress("$.state_transition.chain_type_manager_proxy"), manifest.ctm);
         assertEq(
@@ -358,15 +361,12 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertEq(ctmOutput.readBytes32("$.create2_factory_salt"), ctmSalt, "the CTM leg's salt");
 
         // The executors' construction record (`[upgrade_executors]`), which protocol-ops re-derives each
-        // executor from after its owner or coordinator moves: the ORIGINAL constructor arguments and salt.
+        // executor from after its owner moves: the ORIGINAL constructor arguments and salt.
         assertEq(coreOutput.readAddress("$.upgrade_executors.core_executor.address"), coreExecutor);
         assertEq(coreOutput.readBytes32("$.upgrade_executors.core_executor.create2_salt"), coreSalt);
         assertEq(coreOutput.readAddress("$.upgrade_executors.core_executor.initial_owner"), manifest.governance);
         assertEq(coreOutput.readAddress("$.upgrade_executors.core_executor.proxy_admin"), ecosystemProxyAdmin);
-        assertEq(coreOutput.readAddress("$.upgrade_executors.coordinator.address"), manifest.coordinator);
-        assertEq(coreOutput.readBytes32("$.upgrade_executors.coordinator.create2_salt"), coreSalt);
-        assertEq(coreOutput.readAddress("$.upgrade_executors.coordinator.initial_owner"), manifest.governance);
-        assertEq(coreOutput.readAddress("$.upgrade_executors.coordinator.core_executor"), coreExecutor);
+        assertFalse(vm.keyExistsToml(coreOutput, "$.upgrade_executors.coordinator"), "no coordinator is recorded");
         assertEq(ctmOutput.readAddress("$.upgrade_executors.ctm_executor.address"), manifest.ctmExecutor);
         assertEq(ctmOutput.readBytes32("$.upgrade_executors.ctm_executor.create2_salt"), ctmSalt);
         assertEq(ctmOutput.readAddress("$.upgrade_executors.ctm_executor.initial_owner"), manifest.governance);
@@ -375,7 +375,6 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             ctmOutput.readAddress("$.upgrade_executors.ctm_executor.ctm_proxy_admin"),
             address(manifest.ctmProxyAdmin)
         );
-        assertEq(ctmOutput.readAddress("$.upgrade_executors.ctm_executor.coordinator"), manifest.coordinator);
 
         // The core leg, under the core prepare's salt.
         assertEq(
@@ -390,16 +389,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertEq(
             DeployScriptUtils.canonicalCreate2Address(
                 coreSalt,
-                vm.getCode("EcosystemUpgradeExecutor.sol:EcosystemUpgradeExecutor"),
-                abi.encode(manifest.governance, coreExecutor)
-            ),
-            manifest.coordinator,
-            "the coordinator re-derives from the reviewed owner and the core executor"
-        );
-        assertEq(
-            DeployScriptUtils.canonicalCreate2Address(
-                coreSalt,
-                vm.getCode("CoreTransition.sol:CoreTransition"),
+                vm.getCode("ProxyUpgradeTransition.sol:ProxyUpgradeTransition"),
                 abi.encode(coreUpgrade.coreTransition().getManifest())
             ),
             address(coreUpgrade.coreTransition()),
@@ -411,7 +401,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             DeployScriptUtils.canonicalCreate2Address(
                 ctmSalt,
                 vm.getCode("CTMUpgradeExecutor.sol:CTMUpgradeExecutor"),
-                abi.encode(manifest.governance, manifest.ctm, manifest.ctmProxyAdmin, manifest.coordinator)
+                abi.encode(manifest.governance, manifest.ctm, manifest.ctmProxyAdmin)
             ),
             manifest.ctmExecutor,
             "the CTM executor re-derives from the manifest's owner and bindings"
@@ -591,9 +581,9 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     /// @dev The whole bootstrap edge — both domains — is DERIVED from `RegistryBootstrapSequence`
     ///      and declared by the CTM prepare; the core prepare of this edge declares nothing, so the
     ///      merged bundle is exactly the object's. The harness already executed it green in
-    ///      `internalTest`; this asserts the emitted shape (the notifier accept first, the bindings
-    ///      ahead of every handover, the completion check last), that the completion check holds,
-    ///      and the notifier handover.
+    ///      `internalTest`; this asserts the emitted shape (the notifier accept first, the ecosystem
+    ///      handover and core leg, the completion check last), that the completion check holds, and
+    ///      the notifier handover.
     function _assertBootstrapJoinsTheRegistryModel(
         CTMUpgradeForLocalTest _bootstrap,
         address _ctm,
@@ -601,40 +591,38 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         address _executor
     ) private {
         address chainAssetHandler = IBridgehubBase(_bridgehub).chainAssetHandler();
-        EcosystemUpgradeExecutor coordinator = _bootstrap.ecosystemUpgradeExecutor();
         RegistryBootstrapMigration migration = _bootstrap.bootstrapMigration();
+        address coreExecutor = address(coreUpgrade.getCoreUpgradeExecutor());
         Call[] memory bundle = _bootstrap.prepareGovernanceCalls();
-        assertEq(bundle.length, 9, "v35 bundle: the notifier accept, two bindings, the core leg, the CTM handover");
+        assertEq(bundle.length, 7, "v35 bundle: the notifier accept, the core leg, the CTM handover, the edge");
         assertEq(bundle[0].target, _executor, "the notifier accept opens the bundle");
-        assertEq(bundle[1].target, address(coreUpgrade.getCoreUpgradeExecutor()), "then the core binding");
-        assertEq(bundle[2].target, address(coordinator), "then the coordinator binding");
-        assertEq(bundle[7].target, address(migration), "then the edge itself");
-        assertEq(bundle[7].data, abi.encodeCall(RegistryBootstrapMigration.migrate, ()), "migrate()");
-        assertEq(bundle[8].target, address(migration), "and the completion check closes it");
-        assertEq(bundle[8].data, abi.encodeCall(RegistryBootstrapMigration.validateApplied, ()), "validateApplied()");
+        assertEq(
+            bundle[1].target,
+            address(CoreUpgradeExecutor(payable(coreExecutor)).PROXY_ADMIN()),
+            "then the ecosystem ProxyAdmin handover"
+        );
+        assertEq(bundle[2].target, coreExecutor, "then the core leg");
+        assertEq(
+            bundle[2].data,
+            abi.encodeCall(CoreUpgradeExecutor.applyL1Upgrade, (coreUpgrade.coreTransition())),
+            "applyL1Upgrade(coreTransition)"
+        );
+        assertEq(bundle[5].target, address(migration), "then the edge itself");
+        assertEq(bundle[5].data, abi.encodeCall(RegistryBootstrapMigration.migrate, ()), "migrate()");
+        assertEq(bundle[6].target, address(migration), "and the completion check closes it");
+        assertEq(bundle[6].data, abi.encodeCall(RegistryBootstrapMigration.validateApplied, ()), "validateApplied()");
         assertEq(
             _bootstrap.externalActionEntries().length,
-            11,
-            "the CTM prepare declares the 9 derived governance calls and the 2 handover admin calls"
+            9,
+            "the CTM prepare declares the 7 derived governance calls and the 2 handover admin calls"
         );
         assertEq(coreUpgrade.externalActionEntries().length, 0, "the core prepare of a derived edge authors nothing");
-        assertEq(address(coordinator.ctmExecutor()), _executor, "coordinator CTM binding");
         migration.validateApplied();
         assertEq(_bootstrap.bootstrapSequence().MIGRATION(), address(migration), "the sequence names this edge");
         assertEq(
-            CTMUpgradeExecutor(payable(_executor)).coordinator(),
-            address(coordinator),
-            "the CTM executor answers to the coordinator"
-        );
-        assertEq(
-            coreUpgrade.getCoreUpgradeExecutor().coordinator(),
-            address(coordinator),
-            "the bundle must bind the core executor to the coordinator"
-        );
-        assertEq(
-            address(coordinator.CORE_EXECUTOR()),
-            address(coreUpgrade.getCoreUpgradeExecutor()),
-            "the coordinator drives the executor the ecosystem ProxyAdmin landed under"
+            IOwnable(address(CoreUpgradeExecutor(payable(coreExecutor)).PROXY_ADMIN())).owner(),
+            coreExecutor,
+            "the ecosystem ProxyAdmin landed under the core executor"
         );
         assertEq(IOwnable(_ctm).owner(), _executor, "the executor owns the CTM");
         assertFalse(

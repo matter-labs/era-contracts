@@ -13,13 +13,13 @@ transaction client. Every batch must name the code it removes and the checks tha
 
 The off-chain client accepts the operator's explicit proposed changes, compiles and deploys code,
 publishes bytecode, creates the existing registry objects, reads their description, simulates the
-operation and submits transactions. Selecting a desired change remains an operator decision.
+governance proposal and submits transactions. Selecting a desired change remains an operator decision.
 Resolving its consequences, constructing executable upgrade payloads, ordering protocol actions,
 and enforcing the resulting state belong in audited on-chain code.
 
 Do not replace Solidity scripts with equivalent Rust or TypeScript orchestration. Do not move an
 unrestricted `Call[]` interpreter on-chain and call the migration complete. Reuse releases,
-transitions, core registries, operations, executors and existing deployment primitives wherever
+transitions, proxy upgrade transitions, executors and existing deployment primitives wherever
 possible; introduce another permanent contract type only if a concrete responsibility cannot fit
 them. Every file in `contracts/script-interfaces/` is exported to `l1-contracts/zkstack-out/`, which
 protocol-ops binds its script ABIs from, so absence of a Solidity caller is NOT evidence that one
@@ -30,10 +30,10 @@ to keep one.
 
 Finished, and described where it now lives:
 
-- **Execution is on-chain.** An upgrade is one `EcosystemUpgradeExecutor.execute(operation)` over a
-  write-once `EcosystemUpgradeOperation`; the domain executors (`CoreUpgradeExecutor`,
-  `CTMUpgradeExecutor`) only answer the coordinator's `applyOperation`. The call is derived from the
-  operation; the Rust merger copies bundles and composes nothing. Spec:
+- **Execution is on-chain.** An upgrade is one governance proposal calling the domain executors'
+  fixed entrypoints (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) on
+  write-once objects, in canonical order. Each call is a function of an (executor, object) pair the
+  prepares report; the Rust merger derives those calls and composes nothing else. Spec:
   `protocol-docs/ecosystem-upgrade-coordination.md`.
 - **`UpgradeStageValidator` and `GovernanceUpgradeTimer` are deleted.** The bootstrap's
   `migrate()` and `validateApplied()` check its preconditions and completion themselves.
@@ -73,7 +73,7 @@ Finished, and described where it now lives:
   only an infrastructure-only edge, whose release manifest is identical, reuses the live release
   object. `DefaultCoreUpgrade` deploys or reuses every L1 ecosystem implementation against the live
   one the same way, so a version script lists only what it changes; `CoreUpgrade_v35` keeps only
-  the bootstrap's own deployments (the core executor and the coordinator).
+  the bootstrap's own deployment (the core executor).
 - Replacing a live member is a change of SCOPE and must be INTENDED: the prepare refuses to replace
   any member the version does not name in `changedReleaseMembers()`, and any ecosystem
   implementation the version does not declare. The v34 -> v35 bootstrap declares the whole set,
@@ -154,8 +154,9 @@ unauthorized targets and replay.
 
 ## Batch 4: establish deployment wiring and authority on-chain
 
-Fresh ecosystem/CTM setup should finish in a state ready for an ordinary registry operation: the
-domain executors deployed and owning their `ProxyAdmin`s / CTM, bound to a coordinator. Map the
+Fresh ecosystem/CTM setup should finish in a state ready for an ordinary registry upgrade: the
+domain executors deployed, owning their `ProxyAdmin`s / CTM and governed by the ecosystem's
+governance. Map the
 calls `DeployL1CoreContracts` and `DeployCTM` perform today: dependency wiring, CTM/notifier
 association, ownership transfers, pending-admin acceptance, executor ownership.
 
@@ -171,7 +172,7 @@ Delete or shrink: protocol wiring in `setBridgehubParams`, vault/router/nullifie
 finalization. Keep artifact deployment and transaction submission.
 
 Gate: deploy a fresh ecosystem and CTM, verify all dependency and authority relationships, then
-execute an individual-contract operation without legacy bootstrap preparation. Test partial setup,
+execute an individual-contract upgrade without legacy bootstrap preparation. Test partial setup,
 unauthorized/repeated finalization, incorrect bindings, failed handover and the absence of an
 exposed initialization window.
 
@@ -183,7 +184,7 @@ unchanged members and derived payloads from the authoritative objects. A new ver
 custom code only for new protocol behavior, not another version-specific prepare hierarchy.
 
 The recurring output should identify source/target objects, implementation/codehash changes,
-required authorities, the governance call and unresolved external actions. Reporting may format
+required authorities, the governance calls and unresolved external actions. Reporting may format
 on-chain facts; it must not decide execution order or recreate the payload.
 
 Keep the pre-registry entry edge in a small named legacy adapter. Do not delete its cut-taking
@@ -194,8 +195,8 @@ subclasses, `UpgradeHelperLib` and bundle-merging helpers with no consumers. Kee
 serialization, signer handling and simulation.
 
 Gate: production preparation must demonstrate bootstrap, recurring no-Gateway, individual-member,
-L1-only and mixed L1/L2 flows. Assert that every submitted call is the coordinator's `execute` call
-or an explicitly required external action.
+L1-only and mixed L1/L2 flows. Assert that every submitted call is an executor leg of the one
+canonical run or an explicitly required external action.
 
 ## Delivery order and review discipline
 

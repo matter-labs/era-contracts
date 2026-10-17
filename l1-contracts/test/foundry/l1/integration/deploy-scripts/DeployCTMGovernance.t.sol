@@ -37,7 +37,7 @@ contract DeployCTMGovernanceTest is Test {
     DeployL1CoreContractsIntegrationScript internal l1Script;
     DeployCTMWithOwnGovernanceScript internal ctmScript;
     CoreDeployedAddresses internal ecosystem;
-    address internal coordinator;
+    address internal coreExecutor;
 
     function setUp() public {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
@@ -51,41 +51,42 @@ contract DeployCTMGovernanceTest is Test {
         l1Script = new DeployL1CoreContractsIntegrationScript();
         l1Script.runForTest();
         ecosystem = l1Script.getAddresses();
-        coordinator = l1Script.getUpgradeExecutors().coordinator;
+        coreExecutor = l1Script.getUpgradeExecutor().coreExecutor;
         ctmScript = new DeployCTMWithOwnGovernanceScript();
     }
 
-    /// @notice A fresh init deploys the CTM while governance's nomination on the coordinator is still outstanding.
+    /// @notice A fresh init deploys the CTM while governance's nomination on the core executor is still outstanding:
+    ///         the deployer still owns the executor, and must not be taken for the governance.
     function test_ownGovernance_forceDeploymentsPinTheNominatedEcosystemGovernance() public {
-        assertEq(Ownable2Step(coordinator).pendingOwner(), ecosystem.shared.governance, "nomination outstanding");
+        assertEq(Ownable2Step(coreExecutor).pendingOwner(), ecosystem.shared.governance, "nomination outstanding");
+        assertEq(Ownable2Step(coreExecutor).owner(), l1Script.getDeployerAddress(), "the deployer still owns it");
 
         ctmScript.runForAnvilTest(ecosystem.bridgehub.proxies.bridgehub);
 
         _assertPinsTheEcosystemGovernance();
     }
 
-    /// @notice A CTM deployed after governance accepted the coordinator pins the same governance.
+    /// @notice A CTM deployed after governance accepted the core executor pins the same governance.
     function test_ownGovernance_forceDeploymentsPinTheAcceptedEcosystemGovernance() public {
         vm.prank(ecosystem.shared.governance);
-        Ownable2Step(coordinator).acceptOwnership();
+        Ownable2Step(coreExecutor).acceptOwnership();
 
         ctmScript.runForAnvilTest(ecosystem.bridgehub.proxies.bridgehub);
 
         _assertPinsTheEcosystemGovernance();
     }
 
-    /// @notice Without a coordinator there is no ecosystem governance to pin, and the deployment refuses before
-    ///         building the force deployments.
-    function test_ecosystemWithoutCoordinator_isRefused() public {
+    /// @notice Without a core executor holding the ecosystem ProxyAdmin there is no ecosystem governance to pin,
+    ///         and the deployment refuses before building the force deployments.
+    function test_ecosystemWithoutCoreExecutor_isRefused() public {
         Call[] memory release = new Call[](1);
         release[0] = Call({
             target: ecosystem.shared.transparentProxyAdmin,
             value: 0,
             data: abi.encodeCall(Ownable.transferOwnership, (makeAddr("preRegistryOwner")))
         });
-        CoreUpgradeExecutor coreExecutor = CoreUpgradeExecutor(payable(l1Script.getUpgradeExecutors().coreExecutor));
         vm.prank(l1Script.getDeployerAddress());
-        coreExecutor.forward(release);
+        CoreUpgradeExecutor(payable(coreExecutor)).forward(release);
 
         vm.expectRevert(
             "the ecosystem ProxyAdmin is not held by a CoreUpgradeExecutor: the ecosystem predates the registry model"

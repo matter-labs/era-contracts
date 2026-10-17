@@ -6,9 +6,12 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ObjectAnchorLib} from "./ObjectAnchorLib.sol";
+import {CTM_CONTRACT_COUNT, L1_ECOSYSTEM_CONTRACT_COUNT} from "./ContractIdentifiers.sol";
 import {IProxyUpgradeInitializable} from "../IUpgradeInit.sol";
-import {ProxyUpgradeRow} from "../RegistryTypes.sol";
+import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
+import {ProxyUpgradeDomain, ProxyUpgradeRow} from "../RegistryTypes.sol";
 import {
+    ProxyUpgradeDomainMismatch,
     ProxyUpgradeRowMismatch,
     RegistryDuplicateProxyRow,
     RegistryInventoryLengthMismatch,
@@ -18,9 +21,9 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice THE `ProxyUpgradeRow` semantics, shared by everything that carries rows (the core
-///         transition, the operation's CTM-domain inventory, the bootstrap migration) and
-///         everything that applies them: rows are SOURCE-CHECKED edges — a proxy already at
+/// @notice THE `ProxyUpgradeRow` semantics, shared by everything that carries rows (the proxy
+///         upgrade transitions of both domains and the bootstrap migration) and everything that
+///         applies them: rows are SOURCE-CHECKED edges — a proxy already at
 ///         `implNew` is skipped (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy
 ///         at anything else reverts, so replaying a stale object can never downgrade a proxy that
 ///         a later upgrade has already moved on.
@@ -36,10 +39,15 @@ library ProxyUpgradeRowLib {
     ///         off-chain manifest).
     event ProxyImplementationUpgraded(address indexed proxy, address newImpl);
 
+    /// @notice The inventory length of `_domain`: the member count of its contract enum.
+    /// @param _domain The domain whose inventory is measured.
+    function inventoryLength(ProxyUpgradeDomain _domain) internal pure returns (uint256) {
+        return _domain == ProxyUpgradeDomain.Core ? L1_ECOSYSTEM_CONTRACT_COUNT : CTM_CONTRACT_COUNT;
+    }
+
     /// @notice Flattens an enum-indexed inventory into rows. Its length must be exactly the domain
-    ///         enum's member count (`L1_ECOSYSTEM_CONTRACT_COUNT` / `CTM_CONTRACT_COUNT` — the
-    ///         caller passes its domain's), so every member of the domain HAS a slot and none can
-    ///         be smuggled in.
+    ///         enum's member count ({inventoryLength}), so every member of the domain HAS a slot and
+    ///         none can be smuggled in.
     /// @dev What that does NOT establish is that the slot says what the upgrade meant it to say: an
     ///      inert slot reads the same whether the upgrade leaves the contract alone or whether
     ///      preparation never built its row. Only preparation can tell those apart, and it does —
@@ -84,6 +92,26 @@ library ProxyUpgradeRowLib {
         for (uint256 i = 0; i < length; ++i) {
             ObjectAnchorLib.requireCode(_rows[i].implNew);
         }
+    }
+
+    /// @notice Applies a proxy upgrade transition of `_domain` through `_admin`: the object must be
+    ///         deployed code of that domain and pass its own `validate()`, then {applyRows} runs its
+    ///         rows.
+    /// @param _admin The applying executor's bound `ProxyAdmin`.
+    /// @param _transition The write-once transition governance approved.
+    /// @param _domain The domain the applying executor administers.
+    function applyTransition(
+        ProxyAdmin _admin,
+        IProxyUpgradeTransition _transition,
+        ProxyUpgradeDomain _domain
+    ) internal {
+        ObjectAnchorLib.requireCode(address(_transition));
+        ProxyUpgradeDomain transitionDomain = _transition.domain();
+        if (transitionDomain != _domain) {
+            revert ProxyUpgradeDomainMismatch(uint8(_domain), uint8(transitionDomain));
+        }
+        _transition.validate();
+        applyRows(_admin, _transition.rows());
     }
 
     /// @notice Applies every row with the source-checked semantics above through `_admin`, the

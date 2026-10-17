@@ -1,5 +1,5 @@
 //! Read-only views of the registry objects and the live contracts a package touches — an
-//! ordinary recurring operation, or the one-time bootstrap edge.
+//! ordinary upgrade's executor legs, the one-time bootstrap edge, or a transition replacement.
 //!
 //! Declared inline rather than bound from `zkstack-out/` because the verifier needs a
 //! handful of getters per object, not the objects' full ABIs, and because a package is
@@ -47,7 +47,6 @@ sol! {
         address ctmExecutor;
         address coreExecutor;
         address governance;
-        address coordinator;
     }
 
     #[sol(rpc)]
@@ -86,16 +85,19 @@ sol! {
         function actions() external view returns (BootstrapAction[] memory);
     }
 
-    /// `forward` is declared so the verifier can ENCODE the owner-gated call through which
-    /// governance acts on the CTM domain (the bootstrap's ServerNotifier acceptance).
+    /// The CTM domain's executor. `forward` is declared so the verifier can ENCODE the owner-gated
+    /// call through which governance acts on the CTM domain (the bootstrap's ServerNotifier
+    /// acceptance, a replacement's `replaceUpgradeTransition`); the two `apply*` entrypoints so it
+    /// can independently re-encode an upgrade's CTM legs and compare them byte for byte.
     #[sol(rpc)]
     contract CTMUpgradeExecutorView {
         function CHAIN_TYPE_MANAGER() external view returns (address);
         function CTM_PROXY_ADMIN() external view returns (address);
-        function coordinator() external view returns (address);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
         function forward(BootstrapCall[] calldata _calls) external payable;
+        function applyInfrastructureUpgrade(address _infrastructureTransition) external;
+        function applyCTMUpgrade(address _transition) external;
     }
 
     /// The CTM's ServerNotifier, whose administration and ownership the bootstrap requires
@@ -107,40 +109,6 @@ sol! {
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
         function acceptOwnership() external;
-    }
-
-    /// The coordinator every later operation is executed through.
-    ///
-    /// `execute` is declared so the verifier can ENCODE the one call a recurring upgrade's
-    /// governance transaction must contain and compare it byte for byte — the whole of "does the
-    /// signed transaction invoke the reviewed upgrade at the intended address?" for an ordinary
-    /// operation.
-    #[sol(rpc)]
-    contract EcosystemUpgradeExecutorView {
-        function CORE_EXECUTOR() external view returns (address);
-        function ctmExecutor() external view returns (address);
-        function setCTMExecutor(address _ctmExecutor) external;
-        function owner() external view returns (address);
-        function pendingOwner() external view returns (address);
-        function execute(address _operation) external;
-    }
-
-    /// Positional mirror of `RegistryTypes.OperationManifest` — the whole constructor argument of
-    /// an `EcosystemUpgradeOperation`, and therefore what its address commits to.
-    #[derive(Debug)]
-    struct OperationManifest {
-        address coreTransition;
-        ProxyUpgradeRow[] ctmInfrastructure;
-        address ctmTransition;
-    }
-
-    /// The operation object a recurring upgrade's executor call names.
-    #[sol(rpc)]
-    contract EcosystemUpgradeOperationView {
-        function manifestHash() external view returns (bytes32);
-        function getManifest() external view returns (OperationManifest memory);
-        function ctmInfrastructureRows() external view returns (ProxyUpgradeRow[] memory);
-        function validate() external view;
     }
 
     /// Positional mirror of `RegistryTypes.TransitionManifest` — the whole constructor argument of
@@ -164,7 +132,7 @@ sol! {
         bytes4[] selectors;
     }
 
-    /// The chain-version edge an operation may carry.
+    /// The chain-version edge an upgrade's transition leg applies.
     ///
     /// `facetCuts()` is DERIVED at construction from the release pair — the state a counterfeit
     /// exists to replace, and what every chain applies verbatim through delegatecall — so it is
@@ -182,28 +150,43 @@ sol! {
         function validate() external view;
     }
 
-    /// The ecosystem-domain executor the shared `ProxyAdmin` lands under.
+    /// The ecosystem-domain executor the shared `ProxyAdmin` lands under. `applyL1Upgrade` is
+    /// declared so the verifier can independently re-encode an upgrade's core leg.
     #[sol(rpc)]
     contract CoreUpgradeExecutorView {
         function PROXY_ADMIN() external view returns (address);
-        function coordinator() external view returns (address);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
+        function applyL1Upgrade(address _coreTransition) external;
     }
 
-    /// Positional mirror of `RegistryTypes.CoreTransitionManifest` — the whole constructor
-    /// argument of a `CoreTransition`, which is what its address commits to.
+    /// Positional mirror of `RegistryTypes.ProxyUpgradeTransitionManifest` — the whole
+    /// constructor argument of a `ProxyUpgradeTransition`, which is what its address commits to.
+    /// `domain` is the `ProxyUpgradeDomain` enum as its underlying `uint8`
+    /// ([`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CORE`] /
+    /// [`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CTM`]).
     #[derive(Debug)]
-    struct CoreTransitionManifest {
+    struct ProxyUpgradeTransitionManifest {
+        uint8 domain;
         ProxyUpgradeRow[] proxyUpgrades;
     }
 
+    /// One domain's write-once proxy inventory: the core leg's (`Core`) or the CTM
+    /// infrastructure leg's (`CTM`).
     #[sol(rpc)]
-    contract CoreTransitionView {
+    contract ProxyUpgradeTransitionView {
         function manifestHash() external view returns (bytes32);
-        function getManifest() external view returns (CoreTransitionManifest memory);
-        function ecosystemRows() external view returns (ProxyUpgradeRow[] memory);
+        function getManifest() external view returns (ProxyUpgradeTransitionManifest memory);
+        function domain() external view returns (uint8);
+        function rows() external view returns (ProxyUpgradeRow[] memory);
         function validate() external view;
+    }
+
+    /// The live owner and outstanding nomination of an `Ownable2Step` lifecycle object.
+    #[sol(rpc)]
+    contract Ownable2StepView {
+        function owner() external view returns (address);
+        function pendingOwner() external view returns (address);
     }
 
     /// Positional mirror of `RegistryTypes.GenesisFacet`.
@@ -277,7 +260,7 @@ sol! {
 
     /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read
     /// `L2PlanLib.requirePublished` performs when the CTM leg applies, so a zero here is the
-    /// readiness failure that would revert `execute`. The event carries the published code.
+    /// readiness failure that would revert `applyCTMUpgrade`. The event carries the published code.
     #[sol(rpc)]
     contract BytecodesSupplierView {
         event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);

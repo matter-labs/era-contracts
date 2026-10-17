@@ -2,13 +2,13 @@
 //!
 //! This is the only version-specific verifier in the tree, and it is version-specific because the
 //! thing it verifies happens exactly once: a CTM that predates the registry model is handed to a
-//! `CTMUpgradeExecutor`, and from then on every upgrade of that CTM is an ordinary operation
-//! ([`super::operation`]). There is no second bootstrap to generalise over.
+//! `CTMUpgradeExecutor`, and from then on every upgrade of that CTM is an ordinary one
+//! ([`super::upgrade`]). There is no second bootstrap to generalise over.
 //!
-//! Two things follow from an edge having no executor to invoke yet:
+//! Two things follow from an edge whose executors do not hold their domains yet:
 //!
-//! * governance executes a LIST of ordinary calls rather than `execute(operation)`, so the list has
-//!   to be compared against the one `RegistryBootstrapSequence` derives — see
+//! * governance executes a LIST of handovers around the edge rather than only executor legs, so
+//!   the list has to be compared against the one `RegistryBootstrapSequence` derives — see
 //!   [`verify_derived_sequence`], which says why that comparison is transitional scaffolding and
 //!   must not be generalised. The list is ONE bundle ending in the edge's completion check
 //!   (`RegistryBootstrapMigration.validateApplied()`), so an edge that does not complete reverts
@@ -40,16 +40,18 @@ use super::construction::{
     canonical_create2_address, constructor_args, expect_canonical_construction, ReviewedBuild,
 };
 use super::genesis::ReviewedGenesis;
-use super::lifecycle::{verify_lifecycle_construction, LifecycleBindings, LifecycleReview};
+use super::lifecycle::{
+    verify_executor_owners, verify_lifecycle_construction, CoreExecutorReview, CtmExecutorReview,
+    LifecycleBindings, LifecycleReview,
+};
 use super::members::{verify_engine_and_l2_plan, DepartingVerifiers, BOOTSTRAP_ENGINES};
-use super::operation::{cross_check, verify_core_transition, verify_release};
 use super::package::BootstrapPackage;
 use super::provenance::{expect_code_identity, tolerate};
 use super::rows::{participating, verify_inventory, Inventory, InventoryReview};
+use super::upgrade::{cross_check, verify_proxy_upgrade_transition, verify_release};
 use super::views::{
-    self, BootstrapCall, BridgehubView, CTMUpgradeExecutorView, CoreUpgradeExecutorView, CtmView,
-    EcosystemUpgradeExecutorView, RegistryBootstrapMigrationView, ServerNotifierView,
-    ZkChainGettersView,
+    self, BootstrapCall, BridgehubView, CTMUpgradeExecutorView, CtmView,
+    RegistryBootstrapMigrationView, ServerNotifierView, ZkChainGettersView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -124,12 +126,6 @@ pub(crate) async fn verify<P: Provider>(
             Some(package.release),
             manifest.currentRelease,
             "the release the edge installs",
-        ),
-        (
-            "coordinator_addr",
-            package.reported_coordinator,
-            manifest.coordinator,
-            "the coordinator",
         ),
         (
             "ctm_upgrade_executor_addr",
@@ -209,18 +205,22 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
+    // The sequence applies the core transition through the core executor, which applies only a
+    // Core-domain object: that domain is fixed here, never read from the object.
     let core_rows = match package.core_transition {
-        Some(core_transition_addr) => Some(
-            verify_core_transition(
+        Some(core_transition_addr) => {
+            verify_proxy_upgrade_transition(
                 provider,
                 build,
                 result,
+                "the core transition",
                 core_transition_addr,
+                Inventory::Ecosystem,
                 salts,
                 &mut reviewed,
             )
-            .await?,
-        ),
+            .await?
+        }
         None => None,
     };
 
@@ -233,12 +233,15 @@ pub(crate) async fn verify<P: Provider>(
         result,
         &LifecycleReview {
             owner: Some(manifest.governance),
-            coordinator: manifest.coordinator,
-            core_executor: Some(manifest.coreExecutor),
-            core_proxy_admin: package.lifecycle.core_proxy_admin,
-            ctm_executor: manifest.ctmExecutor,
-            ctm: Some(manifest.ctm),
-            ctm_proxy_admin: Some(manifest.ctmProxyAdmin),
+            core_executor: Some(CoreExecutorReview {
+                address: manifest.coreExecutor,
+                proxy_admin: package.lifecycle.core_proxy_admin,
+            }),
+            ctm_executor: Some(CtmExecutorReview {
+                address: manifest.ctmExecutor,
+                ctm: Some(manifest.ctm),
+                ctm_proxy_admin: Some(manifest.ctmProxyAdmin),
+            }),
             records: package.executor_records.clone(),
         },
         &mut reviewed,
@@ -275,115 +278,22 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await?;
 
-    // ── 3. Authority: the bindings that are storage, and the owner the domain lands on ──
+    // ── 3. Authority: the owner both domains land on ──
     //
-    // Construction settled what each object was BUILT with; what moves afterwards — owners,
-    // nominations, coordinators — is read live and held against the same reviewed values.
+    // Checked here rather than left to `migrate()`'s own check, so a wrong owner is caught BEFORE
+    // governance signs: after `migrate()` both domains are that owner's permanently.
     result.print_info("\n== Bound authority ==");
-    let executor = CTMUpgradeExecutorView::new(manifest.ctmExecutor, provider);
-    let Some(bound_coordinator) = tolerate(
-        executor.coordinator().call().await,
+    verify_executor_owners(
+        provider,
         result,
-        "the executor's coordinator",
-    ) else {
-        return Ok(());
-    };
-    if bound_coordinator == manifest.coordinator {
-        result.report_ok(&format!(
-            "the executor answers to the coordinator the manifest names ({bound_coordinator})"
-        ));
-    } else {
-        result.report_error(&format!(
-            "the executor answers to coordinator {bound_coordinator} but the manifest names {}: \
-             `migrate()` would refuse, and every later upgrade would be driven from the wrong place",
-            manifest.coordinator
-        ));
-    }
-
-    // Every executor the edge binds answers to the manifest's governance with no nomination
-    // outstanding (`migrate()` refuses anything else), and the two bindings the bundle sets are
-    // still unset or already the manifest's.
-    let coordinator = EcosystemUpgradeExecutorView::new(manifest.coordinator, provider);
-    let coordinator_owner = tolerate(
-        coordinator.owner().call().await,
-        result,
-        "the coordinator's owner",
-    );
-    let coordinator_pending_owner = tolerate(
-        coordinator.pendingOwner().call().await,
-        result,
-        "the coordinator's pending owner",
-    );
-    expect_owner_and_no_nomination(
-        result,
-        "the coordinator",
-        coordinator_owner,
-        coordinator_pending_owner,
-        manifest.governance,
-    );
-    let coordinator_ctm_executor = tolerate(
-        coordinator.ctmExecutor().call().await,
-        result,
-        "the coordinator's ctmExecutor()",
-    );
-    expect_bound_or_unset(
-        result,
-        "the coordinator's CTM executor",
-        coordinator_ctm_executor,
-        manifest.ctmExecutor,
-        "`setCTMExecutor`",
-    );
-    let core_executor = CoreUpgradeExecutorView::new(manifest.coreExecutor, provider);
-    let core_executor_owner = tolerate(
-        core_executor.owner().call().await,
-        result,
-        "the core executor's owner",
-    );
-    let core_executor_pending_owner = tolerate(
-        core_executor.pendingOwner().call().await,
-        result,
-        "the core executor's pending owner",
-    );
-    expect_owner_and_no_nomination(
-        result,
-        "the core executor",
-        core_executor_owner,
-        core_executor_pending_owner,
-        manifest.governance,
-    );
-    let core_executor_coordinator = tolerate(
-        core_executor.coordinator().call().await,
-        result,
-        "the core executor's coordinator",
-    );
-    expect_bound_or_unset(
-        result,
-        "the core executor's coordinator",
-        core_executor_coordinator,
-        manifest.coordinator,
-        "`setCoordinator`",
-    );
-
-    // The manifest states the owner every executor must already have, and the migration refuses
-    // to run otherwise. Verifying it here catches a wrong owner BEFORE governance signs — after
-    // `migrate()` both domains are that owner's permanently.
-    let executor_owner = tolerate(
-        executor.owner().call().await,
-        result,
-        "the executor's owner",
-    );
-    let executor_pending_owner = tolerate(
-        executor.pendingOwner().call().await,
-        result,
-        "the executor's pending owner",
-    );
-    expect_owner_and_no_nomination(
-        result,
-        "the CTM executor",
-        executor_owner,
-        executor_pending_owner,
-        manifest.governance,
-    );
+        Some(manifest.governance),
+        "the governance the manifest expects",
+        &[
+            ("the core executor", manifest.coreExecutor),
+            ("the CTM executor", manifest.ctmExecutor),
+        ],
+    )
+    .await;
 
     match expected_governance_owner {
         Some(expected) if expected == manifest.governance => {
@@ -560,9 +470,8 @@ pub(crate) async fn verify<P: Provider>(
 }
 
 /// The bootstrap prepare deploys the executors it hands the domains to, so their records describe
-/// the manifest's own objects: each must name the manifest's address, and the CTM executor must
-/// have been constructed with the manifest's coordinator. (The immutables are held against the
-/// manifest by the lifecycle construction check.)
+/// the manifest's own objects: each must name the manifest's address. (The immutables are held
+/// against the manifest by the lifecycle construction check.)
 fn judge_executor_records_against_manifest(
     result: &mut VerificationResult,
     records: &UpgradeExecutorsRecord,
@@ -595,26 +504,12 @@ fn judge_executor_records_against_manifest(
             "coreExecutor",
         );
     }
-    if let Some(record) = &records.coordinator {
-        check(
-            "coordinator",
-            record.address,
-            manifest.coordinator,
-            "coordinator",
-        );
-    }
     if let Some(record) = &records.ctm_executor {
         check(
             "CTM executor",
             record.address,
             manifest.ctmExecutor,
             "ctmExecutor",
-        );
-        check(
-            "CTM executor's constructor coordinator",
-            record.coordinator,
-            manifest.coordinator,
-            "coordinator",
         );
     }
 }
@@ -1043,65 +938,6 @@ async fn locate_sequence<P: Provider>(
     Ok(None)
 }
 
-/// A storage binding the bundle sets through `setter`: unset, or already the manifest's.
-fn expect_bound_or_unset(
-    result: &mut VerificationResult,
-    label: &str,
-    bound: Option<Address>,
-    expected: Address,
-    setter: &str,
-) {
-    match bound {
-        Some(bound) if bound == expected => {
-            result.report_ok(&format!("{label} is already the manifest's {expected}"))
-        }
-        Some(bound) if bound.is_zero() => result.report_ok(&format!(
-            "{label} is unset: the bundle sets it to {expected} ({setter}, in the derived \
-             sequence)"
-        )),
-        Some(bound) => result.report_error(&format!(
-            "{label} is {bound}, not the manifest's {expected}: the objects this edge binds are \
-             fresh, so the binding means one of them is already in use elsewhere — the bundle \
-             would re-point it ({setter}) or revert"
-        )),
-        None => {}
-    }
-}
-
-/// An `Ownable2Step` authority the edge hands over or drives: its owner must be the reviewed
-/// one, and no nomination may be outstanding — a nominee accepts after the edge and inherits
-/// whatever the edge handed the authority.
-fn expect_owner_and_no_nomination(
-    result: &mut VerificationResult,
-    label: &str,
-    owner: Option<Address>,
-    pending_owner: Option<Address>,
-    expected_owner: Address,
-) {
-    match owner {
-        Some(owner) if owner == expected_owner => result.report_ok(&format!(
-            "{label} is owned by the governance the manifest expects ({owner})"
-        )),
-        Some(owner) => result.report_error(&format!(
-            "{label} is owned by {owner}, not by the governance the manifest expects \
-             ({expected_owner}): one lifecycle would answer to two owners, and for the CTM \
-             executor `migrate()` would refuse — an unnoticed mismatch is a permanent handover to \
-             the wrong owner"
-        )),
-        None => {}
-    }
-    match pending_owner {
-        Some(pending) if pending.is_zero() => {
-            result.report_ok(&format!("{label} has no pending owner"))
-        }
-        Some(pending) => result.report_error(&format!(
-            "{label} has a pending owner {pending}: a nomination is outstanding that could take \
-             it after the edge runs"
-        )),
-        None => {}
-    }
-}
-
 /// Every address the edge's calls may legitimately reach, each with the role a reviewer reads
 /// it under: the objects this run established, the live contracts the manifest names, and the
 /// ecosystem `ProxyAdmin` derived from them.
@@ -1132,10 +968,6 @@ fn edge_authorities(
         "the CTM executor the manifest names",
     );
     note(
-        Some(manifest.coordinator),
-        "the coordinator the manifest names",
-    );
-    note(
         Some(manifest.currentRelease),
         "the release the manifest names",
     );
@@ -1161,11 +993,11 @@ fn edge_authorities(
 /// therefore does not establish that the calls governance will sign are the calls it derives —
 /// only comparing them does.
 ///
-/// Every LATER upgrade is a recurring operation, where governance signs
-/// `coordinator.execute(operation)` and the executors derive everything else on chain. That path
-/// needs no list comparison and must not grow one: see
-/// [`operation::verify_execute_call`](super::operation). Do not build new machinery on top of
-/// this function — when the bootstrap edge is behind us, it goes.
+/// Every LATER upgrade is an ordinary one, where governance signs at most three executor legs and
+/// the executors derive everything else on chain from the objects they apply. That path compares
+/// only the run of legs it re-encodes itself, never a list an object derives: see
+/// [`upgrade::verify_upgrade_calls`](super::upgrade::verify_upgrade_calls). Do not build new
+/// machinery on top of this function — when the bootstrap edge is behind us, it goes.
 ///
 /// `sequence` is the address [`locate_sequence`] derived from the reviewed migration and core
 /// transition; with none, no list is consulted.
@@ -1218,8 +1050,8 @@ async fn verify_derived_sequence<P: Provider>(
 /// enforces: it must be a declared governance external action, or it is an ERROR. One rule is
 /// stricter here. The derived run is the COMPLETE list of what the edge needs from its
 /// authorities (the CTM, both ProxyAdmins, the executors, the objects), so a call to any of them
-/// outside the run is an ERROR whether declared or not: a `transferOwnership` nomination, a
-/// `setCoordinator`, a `forward` added beside the legitimate calls is exactly how a bundle would
+/// outside the run is an ERROR whether declared or not: a `transferOwnership` nomination, a second
+/// `applyL1Upgrade`, a `forward` added beside the legitimate calls is exactly how a bundle would
 /// carry authority governance never reviewed, and `validateApplied()` on chain refuses a pending
 /// nomination for the same reason.
 fn verify_bundle(
@@ -1303,8 +1135,8 @@ fn verify_bundle(
             result.report_error(&format!(
                 "the bundle calls {what} ({}) with selector 0x{selector} outside the derived \
                  sequence: the edge's authorities take exactly the derived calls, so an extra \
-                 one — a `transferOwnership` nomination, a `setCoordinator`, a `forward` — is \
-                 authority the review never saw, whether or not the package declares it",
+                 one — a `transferOwnership` nomination, a second `applyL1Upgrade`, a `forward` \
+                 — is authority the review never saw, whether or not the package declares it",
                 call.target
             ));
             continue;
@@ -1367,7 +1199,6 @@ mod tests {
             ctmExecutor: Address::repeat_byte(0x55),
             coreExecutor: Address::repeat_byte(0x67),
             governance: Address::repeat_byte(0x66),
-            coordinator: Address::repeat_byte(0x77),
         };
         let encoded = manifest.abi_encode();
         assert_eq!(
@@ -1394,7 +1225,6 @@ mod tests {
     const CORE_EXECUTOR: Address = Address::repeat_byte(0x04);
     const MIGRATION: Address = Address::repeat_byte(0x05);
     const PUH: Address = Address::repeat_byte(0x07);
-    const COORDINATOR: Address = Address::repeat_byte(0x0C);
     const ATTACKER: Address = Address::repeat_byte(0xBA);
 
     /// `transferOwnership(address)`.
@@ -1431,24 +1261,14 @@ mod tests {
     fn derived_bundle() -> Vec<views::BootstrapAction> {
         vec![
             action(
-                "bind the core executor to the coordinator",
-                CORE_EXECUTOR,
-                vec![0x55, 0x66, 0x77, 0x88],
-            ),
-            action(
-                "bind the coordinator to the CTM executor",
-                COORDINATOR,
-                vec![0x99, 0xaa, 0xbb, 0xcc],
-            ),
-            action(
-                "hand the ecosystem ProxyAdmin to the core executor",
+                "hand the ecosystem ProxyAdmin to the bound core executor",
                 ECO_ADMIN,
                 transfer_ownership(CORE_EXECUTOR),
             ),
             action(
-                "apply the pinned ecosystem inventory",
+                "apply the pinned ecosystem inventory (applyL1Upgrade)",
                 CORE_EXECUTOR,
-                vec![0x11, 0x22, 0x33, 0x44],
+                super::super::package::LegKind::Core.encode(CORE_TRANSITION),
             ),
             action(
                 "nominate the migration as CTM owner",
@@ -1496,7 +1316,6 @@ mod tests {
             (CTM_ADMIN, "the CTM-domain ProxyAdmin"),
             (ECO_ADMIN, "the ecosystem ProxyAdmin"),
             (CORE_EXECUTOR, "the core executor"),
-            (COORDINATOR, "the coordinator"),
             (MIGRATION, "the bootstrap migration"),
         ]
         .into_iter()
@@ -1575,7 +1394,10 @@ mod tests {
             (CTM, transfer_ownership(ATTACKER)),
             (CTM_ADMIN, vec![0xde, 0xad, 0xbe, 0xef]),
             (MIGRATION, vec![0x01, 0x02, 0x03, 0x04]),
-            (COORDINATOR, vec![0xaa, 0xbb, 0xcc, 0xdd]),
+            (
+                CORE_EXECUTOR,
+                super::super::package::LegKind::Core.encode(CORE_TRANSITION),
+            ),
         ] {
             let mut submitted = submitted_from(&derived);
             submitted.insert(0, call(target, data));
@@ -1647,7 +1469,7 @@ mod tests {
     fn a_reordered_run_fails() {
         let derived = derived_bundle();
         let mut submitted = submitted_from(&derived);
-        submitted.swap(5, 6);
+        submitted.swap(3, 4);
         let result = run(&submitted, &declared_from(&derived));
         assert!(result.errors >= 1);
         assert!(result.ensure_success().is_err());
@@ -1716,7 +1538,6 @@ mod tests {
             release: Address::repeat_byte(0x09),
             migration: MIGRATION,
             reported_migration: None,
-            reported_coordinator: None,
             reported_ctm_executor: None,
             reported_ctm: None,
             reported_ctm_proxy_admin: None,
@@ -1886,7 +1707,6 @@ mod tests {
             ctmExecutor: CTM_EXECUTOR,
             coreExecutor: Address::repeat_byte(0x67),
             governance: Address::repeat_byte(0x66),
-            coordinator: Address::repeat_byte(0x77),
         }
     }
 
@@ -2037,7 +1857,7 @@ mod tests {
     /// The records a v35 bootstrap prepare writes for the manifest's own executors.
     fn records_for(manifest: &views::BootstrapManifest) -> UpgradeExecutorsRecord {
         use crate::common::forge::scripts::upgrade_executors::{
-            CoordinatorRecord, CoreExecutorRecord, CtmExecutorRecord,
+            CoreExecutorRecord, CtmExecutorRecord,
         };
         UpgradeExecutorsRecord {
             core_executor: Some(CoreExecutorRecord {
@@ -2046,19 +1866,12 @@ mod tests {
                 initial_owner: manifest.governance,
                 proxy_admin: ECO_ADMIN,
             }),
-            coordinator: Some(CoordinatorRecord {
-                address: manifest.coordinator,
-                create2_salt: SALT,
-                initial_owner: manifest.governance,
-                core_executor: manifest.coreExecutor,
-            }),
             ctm_executor: Some(CtmExecutorRecord {
                 address: manifest.ctmExecutor,
                 create2_salt: SALT,
                 initial_owner: manifest.governance,
                 chain_type_manager: manifest.ctm,
                 ctm_proxy_admin: manifest.ctmProxyAdmin,
-                coordinator: manifest.coordinator,
             }),
         }
     }
@@ -2080,21 +1893,19 @@ mod tests {
         assert_eq!(judge_records(&UpgradeExecutorsRecord::default()).errors, 0);
     }
 
-    /// A record of another deployment — another executor, or a CTM executor built against another
-    /// coordinator than the edge binds — is refused before anything is re-derived from it.
+    /// A record of another deployment — another executor than the edge hands a domain to — is
+    /// refused before anything is re-derived from it.
     #[test]
     fn records_of_another_deployment_fail() {
         let manifest = manifest_with(notifier_row());
         let mut records = records_for(&manifest);
         records.core_executor.as_mut().unwrap().address = ATTACKER;
-        assert_eq!(judge_records(&records).errors, 1);
+        let result = judge_records(&records);
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("describes another deployment"));
 
         let mut records = records_for(&manifest);
-        records.ctm_executor.as_mut().unwrap().coordinator = ATTACKER;
-        assert_eq!(judge_records(&records).errors, 1);
-
-        let mut records = records_for(&manifest);
-        records.coordinator.as_mut().unwrap().address = ATTACKER;
+        records.core_executor.as_mut().unwrap().address = ATTACKER;
         records.ctm_executor.as_mut().unwrap().address = ATTACKER;
         assert_eq!(judge_records(&records).errors, 2);
     }

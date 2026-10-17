@@ -2,30 +2,36 @@
 //! (`ecosystem upgrade-prepare-all`'s output) plus the live L1 it targets.
 //!
 //! The format carries NO protocol version: which version an upgrade moves chains to lives in the
-//! `CTMTransition` the operation pins, and is read from that object on chain. That is why one
-//! loader serves every release.
+//! `CTMTransition` its transition leg applies, and is read from that object on chain. That is why
+//! one loader serves every release.
 //!
-//! Three kinds, told apart by what the prepare deployed rather than by a flag. Each is ONE
-//! governance bundle, `[governance_calls] calls`:
+//! Three kinds, told apart by the CALLDATA governance will execute rather than by a flag. Each is
+//! ONE governance bundle, `[governance_calls] calls`:
 //!
-//! * a RECURRING operation, the ordinary case. The prepare deployed an
-//!   `EcosystemUpgradeOperation` and the merge derived exactly one governance call from it —
-//!   `EcosystemUpgradeExecutor.execute(operation)`. Everything executable is a function of the
-//!   operation, so the package's reviewable content is that one address.
-//! * a BOOTSTRAP edge, the one-time migration onto the registry model. It has no operation and
-//!   no executor call; governance executes the list a `RegistryBootstrapSequence` derives,
-//!   ending in the edge's completion check.
-//! * a transition REPLACEMENT: no operation, no `migrate()`, and one
-//!   `CTMUpgradeExecutor.forward` carrying `ChainTypeManager.replaceUpgradeTransition` (see
-//!   `protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition`).
+//! * an UPGRADE, the ordinary case: one contiguous run of 1..3 executor legs in canonical order —
+//!   `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)`,
+//!   `CTMUpgradeExecutor.applyInfrastructureUpgrade(infrastructureTransition)`,
+//!   `CTMUpgradeExecutor.applyCTMUpgrade(transition)` — each present only when its object is.
+//!   Everything executable is a function of those objects, so the package's reviewable content is
+//!   their addresses and the executors they are sent to.
+//! * a BOOTSTRAP edge, the one-time migration onto the registry model: the bundle calls
+//!   `migrate()`. Governance executes the list a `RegistryBootstrapSequence` derives (the core
+//!   transition rides it), ending in the edge's completion check.
+//! * a transition REPLACEMENT: one `CTMUpgradeExecutor.forward` carrying
+//!   `ChainTypeManager.replaceUpgradeTransition` (see
+//!   `protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition`), and no
+//!   executor leg.
 //!
-//! In every kind an object is recovered from the CALLDATA governance will execute, never from
-//! the prepare's summary of it, and the summary field is then a cross-check: a disagreement
-//! means the reviewer read one upgrade and governance would sign another.
+//! A bundle mixing kinds — legs beside a `migrate()` (beyond the sequence's own core leg) or beside
+//! a replacing `forward` — is refused, as is one that is none of them. In every kind an object is
+//! recovered from the calldata, never from the prepare's summary of it, and the summary field is
+//! then a cross-check: a disagreement means the reviewer read one upgrade and governance would sign
+//! another.
 
 use std::path::Path;
 
 use alloy::primitives::{Address, Bytes, B256, U256};
+use alloy::sol_types::SolCall;
 use anyhow::Context;
 
 use crate::common::external_actions::ExternalAction;
@@ -33,6 +39,7 @@ use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCallsTable};
 
 use super::records::records_in;
+use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView};
 
 /// `RegistryBootstrapMigration.migrate()`.
 pub(crate) const MIGRATE_SELECTOR: [u8; 4] = [0x8f, 0xd3, 0xab, 0x80];
@@ -44,8 +51,8 @@ pub(crate) const TRANSFER_OWNERSHIP_SELECTOR: [u8; 4] = [0xf2, 0xfd, 0xe3, 0x8b]
 /// A merged prepare output, classified by the kind of upgrade it drives.
 #[derive(Debug)]
 pub(crate) enum RegistryPackage {
-    /// The ordinary case: one operation, driven through its coordinator.
-    Operation(OperationPackage),
+    /// The ordinary case: 1..3 executor legs, sent to the domain executors directly.
+    Upgrade(UpgradePackage),
     /// The one-time migration onto the registry model.
     Bootstrap(BootstrapPackage),
     /// A compare-and-replace of a committed transition.
@@ -53,80 +60,285 @@ pub(crate) enum RegistryPackage {
 }
 
 impl RegistryPackage {
-    /// Reads `ecosystem_toml` and decides which kind of upgrade it drives.
-    ///
-    /// `[operation]` is written by the merge itself and only for a package whose CTM prepare
-    /// deployed an operation, so its presence is the classification. Otherwise a `migrate()` call
-    /// in the bundle makes a bootstrap edge, and a `forward` carrying `replaceUpgradeTransition` a
-    /// replacement. A package that is none of these is REFUSED rather than verified as the
-    /// nearest match: an unrecognised package is an input this tool cannot review.
+    /// Reads `ecosystem_toml` and decides which kind of upgrade it drives, from its calldata: a
+    /// `migrate()` call makes a bootstrap edge, a `forward` carrying `replaceUpgradeTransition` a
+    /// replacement, and executor legs an upgrade. A package mixing them, or that is none of them,
+    /// is REFUSED rather than verified as the nearest match: it is an input this tool cannot
+    /// review.
     pub(crate) fn load(ecosystem_toml: &Path) -> anyhow::Result<Self> {
         let root = read_toml(ecosystem_toml)?;
-        if root.get("operation").is_some() {
-            return Ok(Self::Operation(OperationPackage::load(
+        let calls = bundle_in(&root)?;
+        let legs = recover_legs(&calls)?;
+        let migrates = migrate_targets(&calls);
+        let replacement = recover_replacement(&calls)?;
+
+        if !migrates.is_empty() {
+            if let Some(forward) = &replacement {
+                anyhow::bail!(
+                    "mixed kinds: the bundle runs a bootstrap edge (`migrate()`) and replaces a \
+                     transition (`forward` at call {}) in one package; each is reviewed on its own",
+                    forward.index
+                );
+            }
+            // The bootstrap sequence applies the core transition itself; a CTM leg has no place
+            // in it — the edge installs its release through the migration.
+            if let Some(leg) = legs.iter().find(|leg| leg.kind.is_ctm()) {
+                anyhow::bail!(
+                    "mixed kinds: the bundle runs a bootstrap edge (`migrate()`) and also calls \
+                     {} (call {}): a bootstrap carries no CTM executor leg",
+                    leg.kind.entrypoint(),
+                    leg.index
+                );
+            }
+            return Ok(Self::Bootstrap(BootstrapPackage::load(
                 ecosystem_toml,
                 &root,
+                calls,
             )?));
         }
-        let calls = bundle_in(&root)?;
-        if migrate_targets(&calls).is_empty() {
-            if let Some(forward) = recover_replacement(&calls)? {
-                return Ok(Self::Replacement(Box::new(ReplacementPackage::load(
-                    ecosystem_toml,
-                    &root,
-                    forward,
-                    calls,
-                )?)));
+        if let Some(forward) = replacement {
+            if let Some(leg) = legs.first() {
+                anyhow::bail!(
+                    "mixed kinds: the bundle replaces a transition (`forward` at call {}) and also \
+                     calls {} (call {}): a replacement package carries no executor leg",
+                    forward.index,
+                    leg.kind.entrypoint(),
+                    leg.index
+                );
             }
+            return Ok(Self::Replacement(Box::new(ReplacementPackage::load(
+                ecosystem_toml,
+                &root,
+                forward,
+                calls,
+            )?)));
         }
-        Ok(Self::Bootstrap(BootstrapPackage::load(
+        if legs.is_empty() {
+            anyhow::bail!(
+                "{} is neither kind of package this tool reviews: its governance bundle calls no \
+                 executor entrypoint (applyL1Upgrade, applyInfrastructureUpgrade, \
+                 applyCTMUpgrade), no `migrate()` and no `forward` that replaces a transition, so \
+                 this tool cannot say what it does",
+                ecosystem_toml.display()
+            );
+        }
+        Ok(Self::Upgrade(UpgradePackage::load(
             ecosystem_toml,
             &root,
+            calls,
+            legs,
         )?))
     }
 }
 
-fn read_toml(ecosystem_toml: &Path) -> anyhow::Result<toml::Value> {
-    let raw = std::fs::read_to_string(ecosystem_toml)
-        .with_context(|| format!("reading {}", ecosystem_toml.display()))?;
-    toml::from_str(&raw).with_context(|| format!("parsing {} as TOML", ecosystem_toml.display()))
+/// One of the three executor entrypoints an upgrade's governance bundle calls, in canonical order
+/// (the derive order IS the canonical order: core, then CTM infrastructure, then the transition).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum LegKind {
+    /// `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)`: a Core-domain
+    /// `ProxyUpgradeTransition`.
+    Core,
+    /// `CTMUpgradeExecutor.applyInfrastructureUpgrade(infrastructureTransition)`: a CTM-domain
+    /// `ProxyUpgradeTransition`.
+    Infrastructure,
+    /// `CTMUpgradeExecutor.applyCTMUpgrade(transition)`: a `CTMTransition`.
+    Transition,
 }
 
-/// A recurring registry-driven upgrade: one write-once operation and the coordinator that
-/// executes it.
+impl LegKind {
+    /// The order the legs must run in: ecosystem singletons first, then the CTM domain's
+    /// infrastructure, then the transition commit that may need the new CTM implementation.
+    pub(crate) const CANONICAL_ORDER: [LegKind; 3] =
+        [Self::Core, Self::Infrastructure, Self::Transition];
+
+    fn selector(self) -> [u8; 4] {
+        match self {
+            Self::Core => CoreUpgradeExecutorView::applyL1UpgradeCall::SELECTOR,
+            Self::Infrastructure => {
+                CTMUpgradeExecutorView::applyInfrastructureUpgradeCall::SELECTOR
+            }
+            Self::Transition => CTMUpgradeExecutorView::applyCTMUpgradeCall::SELECTOR,
+        }
+    }
+
+    /// The leg whose entrypoint `data` calls, by selector.
+    fn of(data: &[u8]) -> Option<Self> {
+        let selector = data.get(..4)?;
+        Self::CANONICAL_ORDER
+            .into_iter()
+            .find(|kind| kind.selector()[..] == *selector)
+    }
+
+    /// `Executor.entrypoint`, as the report names it.
+    pub(crate) fn entrypoint(self) -> &'static str {
+        match self {
+            Self::Core => "CoreUpgradeExecutor.applyL1Upgrade",
+            Self::Infrastructure => "CTMUpgradeExecutor.applyInfrastructureUpgrade",
+            Self::Transition => "CTMUpgradeExecutor.applyCTMUpgrade",
+        }
+    }
+
+    /// The prepare summary field naming this leg's object (`[core.registry]` for the core leg,
+    /// `[ctms.*.registry]` for the CTM legs).
+    pub(crate) fn summary_field(self) -> &'static str {
+        match self {
+            Self::Core => "core_transition_addr",
+            Self::Infrastructure => "ctm_infrastructure_transition_addr",
+            Self::Transition => "ctm_transition_addr",
+        }
+    }
+
+    /// The prepare summary field naming the executor this leg is sent to.
+    pub(crate) fn executor_field(self) -> &'static str {
+        if self.is_ctm() {
+            "ctm_upgrade_executor_addr"
+        } else {
+            "core_upgrade_executor_addr"
+        }
+    }
+
+    /// Whether the leg is sent to the CTM domain's executor.
+    pub(crate) fn is_ctm(self) -> bool {
+        self != Self::Core
+    }
+
+    /// The call governance signs for this leg over `object`, encoded from the executors' ABI.
+    pub(crate) fn encode(self, object: Address) -> Vec<u8> {
+        match self {
+            Self::Core => CoreUpgradeExecutorView::applyL1UpgradeCall {
+                _coreTransition: object,
+            }
+            .abi_encode(),
+            Self::Infrastructure => CTMUpgradeExecutorView::applyInfrastructureUpgradeCall {
+                _infrastructureTransition: object,
+            }
+            .abi_encode(),
+            Self::Transition => CTMUpgradeExecutorView::applyCTMUpgradeCall {
+                _transition: object,
+            }
+            .abi_encode(),
+        }
+    }
+
+    /// The object `data` applies, when `data` is EXACTLY this entrypoint's calldata — a canonical
+    /// encoding with nothing appended, since anything else is not a call the merge derives.
+    fn decode(self, data: &[u8]) -> Option<Address> {
+        let object = match self {
+            Self::Core => {
+                CoreUpgradeExecutorView::applyL1UpgradeCall::abi_decode_validate(data)
+                    .ok()?
+                    ._coreTransition
+            }
+            Self::Infrastructure => {
+                CTMUpgradeExecutorView::applyInfrastructureUpgradeCall::abi_decode_validate(data)
+                    .ok()?
+                    ._infrastructureTransition
+            }
+            Self::Transition => {
+                CTMUpgradeExecutorView::applyCTMUpgradeCall::abi_decode_validate(data)
+                    .ok()?
+                    ._transition
+            }
+        };
+        (self.encode(object) == data).then_some(object)
+    }
+}
+
+/// One executor leg as the calldata states it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RecoveredLeg {
+    pub(crate) kind: LegKind,
+    /// The call's index in the bundle.
+    pub(crate) index: usize,
+    /// The call's target: the domain executor it is sent to.
+    pub(crate) executor: Address,
+    /// The object it applies.
+    pub(crate) object: Address,
+}
+
+/// Every executor leg in the bundle, in bundle order.
 ///
-/// The package carries no derived calls of its own to check — the executor call IS
-/// `coordinator.execute(operation)` and nothing else. Everything a reviewer needs beyond those two
-/// addresses is read from the operation on chain.
+/// A call counts as a leg when it carries one of the three entrypoints' selectors; it must then BE
+/// that entrypoint's calldata exactly, carry no value (the entrypoints are not payable) and name a
+/// nonzero object — anything else is refused rather than verified as the nearest leg. A leg kind
+/// appearing twice is refused too: the second application of an object is not a bundle the merge
+/// produces.
+pub(crate) fn recover_legs(calls: &[GovernanceCall]) -> anyhow::Result<Vec<RecoveredLeg>> {
+    let mut legs: Vec<RecoveredLeg> = Vec::new();
+    for (index, call) in calls.iter().enumerate() {
+        let Some(kind) = LegKind::of(&call.data) else {
+            continue;
+        };
+        let entrypoint = kind.entrypoint();
+        let object = kind.decode(&call.data).with_context(|| {
+            format!(
+                "call {index} carries {entrypoint}'s selector but is not exactly its calldata \
+                 (one address argument, canonically encoded, nothing appended)"
+            )
+        })?;
+        anyhow::ensure!(
+            call.value.is_zero(),
+            "call {index} ({entrypoint}) carries value {}: the executor entrypoints are not \
+             payable, and an upgrade leg moves none",
+            call.value
+        );
+        anyhow::ensure!(
+            !object.is_zero(),
+            "call {index} ({entrypoint}) applies the zero address"
+        );
+        if let Some(previous) = legs.iter().find(|leg| leg.kind == kind) {
+            anyhow::bail!(
+                "duplicate leg: the bundle calls {entrypoint} twice (calls {} and {index}); an \
+                 upgrade carries each leg at most once",
+                previous.index
+            );
+        }
+        legs.push(RecoveredLeg {
+            kind,
+            index,
+            executor: call.target,
+            object,
+        });
+    }
+    Ok(legs)
+}
+
+/// An upgrade: 1..3 executor legs recovered from the calldata, each reconciled with the prepare
+/// summary that names its object and executor.
+///
+/// The package carries no derived payload of its own to check: everything executable is a
+/// function of the leg objects, read on chain. Its CTM inputs are required only when a CTM leg
+/// exists — a core-only upgrade needs no CTM prepare to manufacture one.
 #[derive(Debug)]
-pub(crate) struct OperationPackage {
-    /// `[operation] operation_addr` — the object the executor call names.
-    pub(crate) operation: Address,
-    /// `[operation] coordinator_addr` — the `EcosystemUpgradeExecutor` it is sent to.
-    pub(crate) coordinator: Address,
-    /// The CTM key under `[ctms]` this package upgrades (e.g. `zksync_os`).
-    pub(crate) ctm_key: String,
-    /// `[ctms.*.registry] ctm_transition_addr`, when the prepare named one: a cross-check on the
-    /// transition the operation's own manifest pins.
-    pub(crate) reported_ctm_transition: Option<Address>,
-    /// `[core.registry] core_transition_addr`, likewise a cross-check on the manifest's.
+pub(crate) struct UpgradePackage {
+    /// The legs, in bundle order (their order and contiguity are judged by the verifier).
+    pub(crate) legs: Vec<RecoveredLeg>,
+    /// The CTM key under `[ctms]` (e.g. `zksync_os`): required when a CTM leg exists, otherwise
+    /// present when the package carries a CTM section at all.
+    pub(crate) ctm_key: Option<String>,
+    /// `[core.registry] core_transition_addr`, reconciled with the core leg at load.
     pub(crate) reported_core_transition: Option<Address>,
-    /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the executor the
-    /// coordinator is actually bound to.
+    /// `[ctms.*.registry] ctm_infrastructure_transition_addr`, reconciled with the
+    /// infrastructure leg at load.
+    pub(crate) reported_infrastructure_transition: Option<Address>,
+    /// `[ctms.*.registry] ctm_transition_addr`, reconciled with the transition leg at load.
+    pub(crate) reported_ctm_transition: Option<Address>,
+    /// `[ctms.*.registry] ctm_upgrade_executor_addr`, reconciled with the CTM legs' target.
     pub(crate) reported_ctm_executor: Option<Address>,
-    /// `[ctms.*.state_transition] chain_type_manager_proxy` — the CTM this package upgrades.
-    ///
-    /// An operation names no CTM (the binding is the CTM executor's immutable), so this is the
-    /// only value in the package the executor's `CHAIN_TYPE_MANAGER` can be held against. Without
-    /// it, that binding is derived and unverified, which the verifier reports as an error rather
-    /// than comparing the read value with itself.
+    /// `[ctms.*.state_transition] chain_type_manager_proxy` — the CTM this package upgrades, the
+    /// independently reviewed value the CTM executor's `CHAIN_TYPE_MANAGER` is held against
+    /// (an executor names its CTM only as an immutable, so without it that binding is unverified,
+    /// which the verifier reports as an error rather than comparing the read value with itself).
     pub(crate) reported_ctm: Option<Address>,
     /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — likewise for the executor's
     /// `CTM_PROXY_ADMIN`.
     pub(crate) reported_ctm_proxy_admin: Option<Address>,
+    /// `[core.upgrade_addresses.bridgehub] bridgehub_proxy_addr` — where the ecosystem inventory's
+    /// slots are discovered when the package names no CTM to read the Bridgehub from.
+    pub(crate) reported_bridgehub: Option<Address>,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
-    /// The prepare's declared external actions — calls the operation does NOT describe.
+    /// The prepare's declared external actions — the calls no leg describes.
     pub(crate) external_actions: Vec<ExternalAction>,
     /// Every CREATE2 salt the package records; see [`BootstrapPackage::create2_salts`].
     pub(crate) create2_salts: Vec<B256>,
@@ -140,72 +352,174 @@ pub(crate) struct OperationPackage {
     pub(crate) executor_records: UpgradeExecutorsRecord,
 }
 
-impl OperationPackage {
-    fn load(ecosystem_toml: &Path, root: &toml::Value) -> anyhow::Result<Self> {
-        let operation = address_at(root, &["operation", "operation_addr"])
-            .filter(|a| !a.is_zero())
-            .with_context(|| {
-                format!(
-                    "[operation] operation_addr missing, zero or unparsable in {}",
-                    ecosystem_toml.display()
-                )
-            })?;
-        let coordinator = address_at(root, &["operation", "coordinator_addr"])
-            .filter(|a| !a.is_zero())
-            .with_context(|| {
-                format!(
-                    "[operation] coordinator_addr missing, zero or unparsable in {}: the \
-                     operation names no place to be driven from",
-                    ecosystem_toml.display()
-                )
-            })?;
-        let ctm_key = sole_ctm_key(root)?;
-
-        Ok(Self {
-            operation,
-            coordinator,
-            reported_ctm_transition: registry_address(root, &ctm_key, "ctm_transition_addr"),
+impl UpgradePackage {
+    fn load(
+        ecosystem_toml: &Path,
+        root: &toml::Value,
+        calls: Vec<GovernanceCall>,
+        legs: Vec<RecoveredLeg>,
+    ) -> anyhow::Result<Self> {
+        let ctm_key = if legs.iter().any(|leg| leg.kind.is_ctm()) {
+            Some(sole_ctm_key(root)?)
+        } else {
+            optional_ctm_key(root)?
+        };
+        let ctm_registry = |key: &str| {
+            ctm_key
+                .as_deref()
+                .and_then(|ctm| registry_address(root, ctm, key))
+        };
+        let ctm_section = |section: &str, key: &str| {
+            ctm_key
+                .as_deref()
+                .and_then(|ctm| ctm_address(root, ctm, section, key))
+        };
+        let lifecycle = lifecycle_inputs_in(root);
+        let package = Self {
             reported_core_transition: address_at(
                 root,
                 &["core", "registry", "core_transition_addr"],
             )
             .filter(|a| !a.is_zero()),
-            reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
-            reported_ctm: ctm_address(
+            reported_infrastructure_transition: ctm_registry("ctm_infrastructure_transition_addr"),
+            reported_ctm_transition: ctm_registry("ctm_transition_addr"),
+            reported_ctm_executor: ctm_registry("ctm_upgrade_executor_addr"),
+            reported_ctm: ctm_section("state_transition", "chain_type_manager_proxy"),
+            reported_ctm_proxy_admin: ctm_section("deployed_addresses", "transparent_proxy_admin"),
+            reported_bridgehub: address_at(
                 root,
-                &ctm_key,
-                "state_transition",
-                "chain_type_manager_proxy",
-            ),
-            reported_ctm_proxy_admin: ctm_address(
-                root,
-                &ctm_key,
-                "deployed_addresses",
-                "transparent_proxy_admin",
-            ),
-            calls: bundle_in(root)?,
+                &[
+                    "core",
+                    "upgrade_addresses",
+                    "bridgehub",
+                    "bridgehub_proxy_addr",
+                ],
+            )
+            .filter(|a| !a.is_zero()),
             external_actions: external_actions_in(root)?,
-            create2_salts: create2_salts_in(root, &ctm_key),
-            lifecycle: lifecycle_inputs_in(root),
-            force_deployments_data: force_deployments_data_in(root, &ctm_key),
+            create2_salts: create2_salts_in(root, ctm_key.as_deref()),
+            force_deployments_data: ctm_key
+                .as_deref()
+                .and_then(|ctm| force_deployments_data_in(root, ctm)),
             executor_records: records_in(root, &ecosystem_toml.display().to_string())?,
+            lifecycle,
             ctm_key,
-        })
+            calls,
+            legs,
+        };
+        package.reconcile()?;
+        Ok(package)
+    }
+
+    /// The leg of `kind`, if the bundle carries one.
+    pub(crate) fn leg(&self, kind: LegKind) -> Option<&RecoveredLeg> {
+        self.legs.iter().find(|leg| leg.kind == kind)
+    }
+
+    /// The object the prepare summary reports for `kind`'s leg.
+    pub(crate) fn reported_object(&self, kind: LegKind) -> Option<Address> {
+        match kind {
+            LegKind::Core => self.reported_core_transition,
+            LegKind::Infrastructure => self.reported_infrastructure_transition,
+            LegKind::Transition => self.reported_ctm_transition,
+        }
+    }
+
+    /// The executor the prepare summary reports for `kind`'s leg.
+    pub(crate) fn reported_executor(&self, kind: LegKind) -> Option<Address> {
+        if kind.is_ctm() {
+            self.reported_ctm_executor
+        } else {
+            self.lifecycle.core_executor
+        }
+    }
+
+    /// Every leg against its summary, both ways: a reported object must have its leg (a missing
+    /// leg leaves a reviewed object unapplied), a leg must have its reported object, and both must
+    /// name the same object and executor. Then no call may reach an executor other than through
+    /// its legs.
+    fn reconcile(&self) -> anyhow::Result<()> {
+        for kind in LegKind::CANONICAL_ORDER {
+            let field = kind.summary_field();
+            let entrypoint = kind.entrypoint();
+            match (self.leg(kind), self.reported_object(kind)) {
+                (Some(leg), Some(reported)) if reported == leg.object => {}
+                (Some(leg), Some(reported)) => anyhow::bail!(
+                    "substituted object: the package reports {field} {reported}, but the \
+                     bundle's {entrypoint} (call {}) applies {}: the summary a reviewer reads \
+                     names a different object from the one governance would apply",
+                    leg.index,
+                    leg.object
+                ),
+                (Some(leg), None) => anyhow::bail!(
+                    "the bundle's {entrypoint} (call {}) applies {}, but the package reports no \
+                     {field}: a leg no prepare summary accounts for",
+                    leg.index,
+                    leg.object
+                ),
+                (None, Some(reported)) => anyhow::bail!(
+                    "missing leg: the package reports {field} {reported}, but the bundle never \
+                     calls {entrypoint}, so the reviewed object would not be applied"
+                ),
+                (None, None) => {}
+            }
+        }
+        for leg in &self.legs {
+            let field = leg.kind.executor_field();
+            match self.reported_executor(leg.kind) {
+                Some(reported) if reported == leg.executor => {}
+                Some(reported) => anyhow::bail!(
+                    "substituted executor: the bundle sends {} (call {}) to {}, but the package \
+                     reports {field} {reported}",
+                    leg.kind.entrypoint(),
+                    leg.index,
+                    leg.executor
+                ),
+                None => anyhow::bail!(
+                    "the bundle sends {} (call {}) to {}, but the package reports no {field}: the \
+                     executor is held against nothing the prepare reported",
+                    leg.kind.entrypoint(),
+                    leg.index,
+                    leg.executor
+                ),
+            }
+        }
+        let executors: Vec<Address> = self
+            .legs
+            .iter()
+            .map(|leg| leg.executor)
+            .chain(self.lifecycle.core_executor)
+            .chain(self.reported_ctm_executor)
+            .collect();
+        for (index, call) in self.calls.iter().enumerate() {
+            if !executors.contains(&call.target) || self.legs.iter().any(|leg| leg.index == index) {
+                continue;
+            }
+            anyhow::bail!(
+                "unknown selector on an executor: call {index} reaches the executor {} with \
+                 selector 0x{}, which is none of the entrypoints an upgrade drives \
+                 (applyL1Upgrade, applyInfrastructureUpgrade, applyCTMUpgrade). An executor \
+                 takes exactly the upgrade's legs, so any other call to one — a `forward`, a \
+                 nomination — is authority the review never saw",
+                call.target,
+                alloy::hex::encode(call.data.get(..4).unwrap_or_default())
+            );
+        }
+        Ok(())
     }
 }
 
-/// The package's record of the values the lifecycle objects — the coordinator and the two domain
-/// executors — were constructed over. Those objects set their bindings as constructor immutables,
-/// so their construction is the only identity check they get, and the executors' recorded
-/// bindings are held against THESE values (plus the bootstrap manifest) rather than against the
-/// objects' own answers.
+/// The package's record of the values the lifecycle objects — the two domain executors — were
+/// constructed over. Those objects set their bindings as constructor immutables, so their
+/// construction is the only identity check they get, and the executors' recorded bindings are
+/// held against THESE values (plus the bootstrap manifest) rather than against the objects' own
+/// answers.
 ///
 /// Each is optional at load so the report can name exactly which one an older package lacks;
 /// the construction check ERRORS on a missing one rather than skipping the object.
 #[derive(Debug, Default)]
 pub(crate) struct LifecycleInputs {
-    /// `[core.registry] core_upgrade_executor_addr` — the core executor the coordinator was
-    /// built over.
+    /// `[core.registry] core_upgrade_executor_addr` — the ecosystem domain's executor.
     pub(crate) core_executor: Option<Address>,
     /// `[core.upgrade_addresses.shared] transparent_proxy_admin` — the ecosystem `ProxyAdmin`
     /// the core executor was built over.
@@ -239,8 +553,6 @@ pub(crate) struct BootstrapPackage {
     /// `[registry] bootstrap_migration_addr`, when the prepare named it: a cross-check on the
     /// address recovered from calldata.
     pub(crate) reported_migration: Option<Address>,
-    /// `[ctms.*.registry] coordinator_addr`, a cross-check on the manifest's coordinator.
-    pub(crate) reported_coordinator: Option<Address>,
     /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the manifest's executor.
     pub(crate) reported_ctm_executor: Option<Address>,
     /// `[ctms.*.state_transition] chain_type_manager_proxy`, a cross-check on the manifest's CTM.
@@ -270,6 +582,12 @@ pub(crate) struct BootstrapPackage {
     pub(crate) executor_records: UpgradeExecutorsRecord,
 }
 
+fn read_toml(ecosystem_toml: &Path) -> anyhow::Result<toml::Value> {
+    let raw = std::fs::read_to_string(ecosystem_toml)
+        .with_context(|| format!("reading {}", ecosystem_toml.display()))?;
+    toml::from_str(&raw).with_context(|| format!("parsing {} as TOML", ecosystem_toml.display()))
+}
+
 fn table<'a>(root: &'a toml::Value, path: &[&str]) -> Option<&'a toml::Value> {
     let mut cur = root;
     for key in path {
@@ -297,12 +615,14 @@ fn u256_at(root: &toml::Value, path: &[&str]) -> Option<U256> {
 /// Salt-bearing keys are looked up rather than required: the verifier must keep working against
 /// packages produced before the prepare wrote them, where the reviewer supplies the salts
 /// instead (and the construction check ERRORS when neither source has any).
-fn create2_salts_in(root: &toml::Value, ctm_key: &str) -> Vec<B256> {
-    let candidates = [
+fn create2_salts_in(root: &toml::Value, ctm_key: Option<&str>) -> Vec<B256> {
+    let mut candidates = vec![
         vec!["misc", "create2_factory_salt"],
         vec!["core", "create2_factory_salt"],
-        vec!["ctms", ctm_key, "create2_factory_salt"],
     ];
+    if let Some(ctm_key) = ctm_key {
+        candidates.push(vec!["ctms", ctm_key, "create2_factory_salt"]);
+    }
     let mut salts: Vec<B256> = Vec::new();
     for path in &candidates {
         let Some(parsed) = table(root, path)
@@ -365,15 +685,25 @@ fn registry_address(root: &toml::Value, ctm_key: &str, key: &str) -> Option<Addr
 
 /// The single `[ctms.*]` section a package may carry.
 ///
-/// Both kinds of package are single-CTM by construction — the prepare boundary admits one
-/// ZKsync OS CTM, and one operation names one transition — so more than one section means the
-/// verifier would be reading one upgrade's objects while reporting on another's.
+/// Every kind of package is single-CTM by construction — the prepare boundary admits one ZKsync
+/// OS CTM, and the package verifier permits one reviewed CTM executor — so more than one section
+/// means the verifier would be reading one upgrade's objects while reporting on another's.
 fn sole_ctm_key(root: &toml::Value) -> anyhow::Result<String> {
-    let ctms = table(root, &["ctms"])
-        .and_then(|v| v.as_table())
-        .context("[ctms] missing from the package — is this a merged prepare output?")?;
+    optional_ctm_key(root)?.context(
+        "[ctms] missing from the package or empty, though it drives the CTM domain — is this a \
+         merged prepare output?",
+    )
+}
+
+/// The `[ctms.*]` section, when the package carries one: absent or empty is `None`, more than one
+/// is refused (see [`sole_ctm_key`]).
+fn optional_ctm_key(root: &toml::Value) -> anyhow::Result<Option<String>> {
+    let Some(ctms) = table(root, &["ctms"]).and_then(|v| v.as_table()) else {
+        return Ok(None);
+    };
     match ctms.len() {
-        1 => Ok(ctms.keys().next().expect("len checked").clone()),
+        0 => Ok(None),
+        1 => Ok(ctms.keys().next().cloned()),
         n => anyhow::bail!(
             "expected exactly one [ctms.*] section, found {n}: {:?}",
             ctms.keys().collect::<Vec<_>>()
@@ -381,24 +711,53 @@ fn sole_ctm_key(root: &toml::Value) -> anyhow::Result<String> {
     }
 }
 
-impl BootstrapPackage {
-    fn load(ecosystem_toml: &Path, root: &toml::Value) -> anyhow::Result<Self> {
-        let calls = bundle_in(root)?;
+/// A nonzero object the summary reports for a leg a bootstrap or a replacement does not carry:
+/// the merge derives no leg for either kind, so such an object would be deployed and reviewed but
+/// never applied — refused rather than reported beside a passing review.
+fn refuse_unapplied_objects(
+    kind: &str,
+    reported: &[(&str, Option<Address>)],
+) -> anyhow::Result<()> {
+    for (field, object) in reported {
+        if let Some(object) = object {
+            anyhow::bail!(
+                "missing leg: the package reports {field} {object}, but a {kind} package carries \
+                 no executor leg to apply it"
+            );
+        }
+    }
+    Ok(())
+}
 
-        // The classification failure comes FIRST: a package that is neither kind must say so,
-        // rather than report the first bootstrap-shaped field it happens to be missing.
-        let migration = sole_migrate_target(&calls).with_context(|| {
-            format!(
-                "{} carries no [operation] section, so it was read as a bootstrap package",
-                ecosystem_toml.display()
-            )
-        })?;
+impl BootstrapPackage {
+    fn load(
+        ecosystem_toml: &Path,
+        root: &toml::Value,
+        calls: Vec<GovernanceCall>,
+    ) -> anyhow::Result<Self> {
+        let migration = sole_migrate_target(&calls)?;
 
         let ctm_key = sole_ctm_key(root)?;
+        // The edge installs its release through the migration and its core transition through
+        // the derived sequence; a CTM-domain object beside them would never be applied.
+        refuse_unapplied_objects(
+            "bootstrap",
+            &[
+                (
+                    "ctm_infrastructure_transition_addr",
+                    registry_address(root, &ctm_key, "ctm_infrastructure_transition_addr"),
+                ),
+                (
+                    "ctm_transition_addr",
+                    registry_address(root, &ctm_key, "ctm_transition_addr"),
+                ),
+            ],
+        )?;
         let release = registry_address(root, &ctm_key, "ctm_release_addr")
             .context("[ctms.*.registry] ctm_release_addr missing, zero or unparsable")?;
         // The core leg is optional: a CTM-only edge deploys no ecosystem implementations, so
-        // the prepare pins no `CoreTransition` (an all-inert inventory is refused at construction).
+        // the prepare pins no Core-domain `ProxyUpgradeTransition` (an all-inert inventory is
+        // refused at construction).
         let core_transition = address_at(root, &["core", "registry", "core_transition_addr"])
             .filter(|a| !a.is_zero());
 
@@ -407,7 +766,6 @@ impl BootstrapPackage {
             release,
             migration,
             reported_migration: registry_address(root, &ctm_key, "bootstrap_migration_addr"),
-            reported_coordinator: registry_address(root, &ctm_key, "coordinator_addr"),
             reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
             reported_ctm: ctm_address(
                 root,
@@ -423,7 +781,7 @@ impl BootstrapPackage {
             ),
             calls,
             external_actions: external_actions_in(root)?,
-            create2_salts: create2_salts_in(root, &ctm_key),
+            create2_salts: create2_salts_in(root, Some(&ctm_key)),
             lifecycle: lifecycle_inputs_in(root),
             force_deployments_data: force_deployments_data_in(root, &ctm_key),
             executor_records: records_in(root, &ecosystem_toml.display().to_string())?,
@@ -447,10 +805,7 @@ fn sole_migrate_target(calls: &[GovernanceCall]) -> anyhow::Result<Address> {
     match migrate_targets(calls).as_slice() {
         [one] => Ok(*one),
         [] => anyhow::bail!(
-            "the governance bundle contains no `migrate()` call, the package declares no \
-             [operation] and no `forward` replaces a transition: it is neither a bootstrap edge, \
-             a recurring registry-driven upgrade nor a transition replacement, so this tool \
-             cannot say what it does"
+            "the governance bundle contains no `migrate()` call, so it drives no bootstrap edge"
         ),
         many => anyhow::bail!(
             "the governance bundle calls `migrate()` on {} objects ({many:?}); a bootstrap \
@@ -463,7 +818,7 @@ fn sole_migrate_target(calls: &[GovernanceCall]) -> anyhow::Result<Address> {
 /// A replacement of a committed transition: one `CTMUpgradeExecutor.forward` carrying
 /// `ChainTypeManager.replaceUpgradeTransition(expected, replacement)`, optionally followed by
 /// `setProtocolVersionDeadline`. Its prepare deploys the replacement alone — no release (it lands
-/// on an existing one), no operation, no executor.
+/// on an existing one), no executor, and no object an executor leg would apply.
 #[derive(Debug)]
 pub(crate) struct ReplacementPackage {
     /// The forward call, recovered from the calldata — the executable source of truth.
@@ -480,24 +835,18 @@ pub(crate) struct ReplacementPackage {
     pub(crate) reported_release: Option<Address>,
     /// `[ctms.*.registry] ctm_upgrade_executor_addr`, a cross-check on the forward's target.
     pub(crate) reported_ctm_executor: Option<Address>,
-    /// `[ctms.*.registry] coordinator_addr` — the coordinator the CTM executor answers to.
-    pub(crate) reported_coordinator: Option<Address>,
     /// `[ctms.*.state_transition] chain_type_manager_proxy`, a cross-check on the inner target and
     /// the value the CTM executor's `CHAIN_TYPE_MANAGER` is held against.
     pub(crate) reported_ctm: Option<Address>,
     /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — the CTM executor's
     /// `CTM_PROXY_ADMIN` is held against it.
     pub(crate) reported_ctm_proxy_admin: Option<Address>,
-    /// `[core.registry] core_transition_addr` — a core leg a replacement does not carry.
-    pub(crate) reported_core_transition: Option<Address>,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
     /// The prepare's declared external actions (the forward is one of them).
     pub(crate) external_actions: Vec<ExternalAction>,
     /// Every CREATE2 salt the package records; see [`BootstrapPackage::create2_salts`].
     pub(crate) create2_salts: Vec<B256>,
-    /// The package's record of the lifecycle objects' binding values.
-    pub(crate) lifecycle: LifecycleInputs,
     /// `[ctms.*.contracts_config] old_protocol_version` — the replaced transition's departing
     /// version, a cross-check.
     pub(crate) reported_old_version: Option<U256>,
@@ -516,6 +865,22 @@ impl ReplacementPackage {
         calls: Vec<GovernanceCall>,
     ) -> anyhow::Result<Self> {
         let ctm_key = sole_ctm_key(root)?;
+        // A replacement repairs one committed edge through `forward`; an ecosystem or
+        // infrastructure object beside it would be deployed and never applied.
+        refuse_unapplied_objects(
+            "replacement",
+            &[
+                (
+                    "core_transition_addr",
+                    address_at(root, &["core", "registry", "core_transition_addr"])
+                        .filter(|a| !a.is_zero()),
+                ),
+                (
+                    "ctm_infrastructure_transition_addr",
+                    registry_address(root, &ctm_key, "ctm_infrastructure_transition_addr"),
+                ),
+            ],
+        )?;
         Ok(Self {
             forward,
             reported_replaced: registry_address(root, &ctm_key, "replaced_transition_addr"),
@@ -523,7 +888,6 @@ impl ReplacementPackage {
             reported_ctm_transition: registry_address(root, &ctm_key, "ctm_transition_addr"),
             reported_release: registry_address(root, &ctm_key, "ctm_release_addr"),
             reported_ctm_executor: registry_address(root, &ctm_key, "ctm_upgrade_executor_addr"),
-            reported_coordinator: registry_address(root, &ctm_key, "coordinator_addr"),
             reported_ctm: ctm_address(
                 root,
                 &ctm_key,
@@ -536,15 +900,9 @@ impl ReplacementPackage {
                 "deployed_addresses",
                 "transparent_proxy_admin",
             ),
-            reported_core_transition: address_at(
-                root,
-                &["core", "registry", "core_transition_addr"],
-            )
-            .filter(|a| !a.is_zero()),
             calls,
             external_actions: external_actions_in(root)?,
-            create2_salts: create2_salts_in(root, &ctm_key),
-            lifecycle: lifecycle_inputs_in(root),
+            create2_salts: create2_salts_in(root, Some(&ctm_key)),
             reported_old_version: u256_at(
                 root,
                 &["ctms", &ctm_key, "contracts_config", "old_protocol_version"],
@@ -689,6 +1047,51 @@ mod tests {
         assert_eq!(&computed[..4], &TRANSFER_OWNERSHIP_SELECTOR);
     }
 
+    /// The three entrypoints a leg is recognized by must be the executors' real ones, so a
+    /// signature change is caught here rather than by a package whose legs silently stop being
+    /// recognized. Transcribed (from the compiled artifacts' `methodIdentifiers`) as well as
+    /// derived, so the `sol!` mirror cannot drift with them.
+    #[test]
+    fn the_leg_selectors_are_the_executors() {
+        for (kind, signature, transcribed) in [
+            (
+                LegKind::Core,
+                "applyL1Upgrade(address)",
+                [0x60, 0x93, 0xa2, 0x59],
+            ),
+            (
+                LegKind::Infrastructure,
+                "applyInfrastructureUpgrade(address)",
+                [0x68, 0xe9, 0x89, 0x78],
+            ),
+            (
+                LegKind::Transition,
+                "applyCTMUpgrade(address)",
+                [0x7b, 0x1b, 0x71, 0x6a],
+            ),
+        ] {
+            assert_eq!(kind.selector(), transcribed, "{signature}");
+            assert_eq!(
+                &alloy::primitives::keccak256(signature.as_bytes())[..4],
+                &transcribed,
+                "{signature}"
+            );
+            let encoded = kind.encode(Address::repeat_byte(0x0b));
+            assert_eq!(encoded.len(), 4 + 32);
+            assert_eq!(kind.decode(&encoded), Some(Address::repeat_byte(0x0b)));
+        }
+    }
+
+    #[test]
+    fn the_canonical_order_is_core_infrastructure_transition() {
+        assert_eq!(
+            LegKind::CANONICAL_ORDER,
+            [LegKind::Core, LegKind::Infrastructure, LegKind::Transition]
+        );
+        assert!(LegKind::Core < LegKind::Infrastructure);
+        assert!(LegKind::Infrastructure < LegKind::Transition);
+    }
+
     #[test]
     fn recovers_the_migration_from_the_bundle() {
         let migration = Address::repeat_byte(0xAB);
@@ -722,246 +1125,454 @@ mod tests {
         assert!(err.contains("exactly one edge"), "{err}");
     }
 
-    const OPERATION: &str = "0x00000000000000000000000000000000000000aa";
-    const COORDINATOR: &str = "0x00000000000000000000000000000000000000bb";
+    // ───────────────────────── upgrade packages ─────────────────────────
+    //
+    // A merged prepare output in the exact shape `write_merged_ecosystem_toml` emits — the core
+    // and CTM prepares' summaries and the legs the merge derived from them, as real ABI-encoded
+    // `Call[]` hex — so the loader is driven through the same entry point production uses.
 
-    /// A merged prepare output for a recurring upgrade, trimmed to the fields the loader reads.
-    fn recurring_toml(operation_section: &str) -> String {
-        format!(
-            "{operation_section}\n\
-             [ctms.zksync_os.registry]\n\
-             ctm_transition_addr = \"0x00000000000000000000000000000000000000cc\"\n\
-             ctm_upgrade_executor_addr = \"0x00000000000000000000000000000000000000dd\"\n\
-             [core.registry]\n\
-             core_transition_addr = \"0x00000000000000000000000000000000000000ee\"\n\
-             [governance_calls]\n\
-             calls = \"0x\"\n"
-        )
+    const CORE_EXECUTOR: Address = Address::repeat_byte(0xE0);
+    const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
+    const CORE_TRANSITION: Address = Address::repeat_byte(0xEE);
+    const INFRASTRUCTURE: Address = Address::repeat_byte(0x1F);
+    const TRANSITION: Address = Address::repeat_byte(0xCC);
+    const RELEASE: Address = Address::repeat_byte(0xC1);
+    const CTM_PROXY: Address = Address::repeat_byte(0xF1);
+    const CTM_ADMIN: Address = Address::repeat_byte(0xF2);
+    const ECO_ADMIN: Address = Address::repeat_byte(0xE2);
+    const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+    const STRANGER: Address = Address::repeat_byte(0x99);
+
+    fn leg(kind: LegKind, executor: Address, object: Address) -> GovernanceCall {
+        call(executor, kind.encode(object))
+    }
+
+    fn core_leg() -> GovernanceCall {
+        leg(LegKind::Core, CORE_EXECUTOR, CORE_TRANSITION)
+    }
+
+    fn infrastructure_leg() -> GovernanceCall {
+        leg(LegKind::Infrastructure, CTM_EXECUTOR, INFRASTRUCTURE)
+    }
+
+    fn transition_leg() -> GovernanceCall {
+        leg(LegKind::Transition, CTM_EXECUTOR, TRANSITION)
+    }
+
+    /// The prepares' summaries of what they deployed: zero for an object a prepare did not deploy.
+    #[derive(Clone)]
+    struct Summary {
+        core_transition: Address,
+        infrastructure: Address,
+        transition: Address,
+        bootstrap_migration: Address,
+        ctm_section: bool,
+    }
+
+    impl Summary {
+        fn all() -> Self {
+            Self {
+                core_transition: CORE_TRANSITION,
+                infrastructure: INFRASTRUCTURE,
+                transition: TRANSITION,
+                bootstrap_migration: Address::ZERO,
+                ctm_section: true,
+            }
+        }
+
+        fn of(core: bool, infrastructure: bool, transition: bool) -> Self {
+            let pick = |on: bool, object: Address| if on { object } else { Address::ZERO };
+            Self {
+                core_transition: pick(core, CORE_TRANSITION),
+                infrastructure: pick(infrastructure, INFRASTRUCTURE),
+                transition: pick(transition, TRANSITION),
+                ..Self::all()
+            }
+        }
+
+        fn toml(&self, calls: &[GovernanceCall]) -> String {
+            let mut body = format!(
+                "[core]\n\
+                 create2_factory_salt = \"{}\"\n\
+                 [core.registry]\n\
+                 core_transition_addr = \"{}\"\n\
+                 core_upgrade_executor_addr = \"{CORE_EXECUTOR}\"\n\
+                 [core.upgrade_addresses.shared]\n\
+                 transparent_proxy_admin = \"{ECO_ADMIN}\"\n\
+                 [core.upgrade_addresses.bridgehub]\n\
+                 bridgehub_proxy_addr = \"{BRIDGEHUB}\"\n",
+                B256::repeat_byte(0x5A),
+                self.core_transition,
+            );
+            if self.ctm_section {
+                body.push_str(&format!(
+                    "[ctms.zksync_os]\n\
+                     create2_factory_salt = \"{}\"\n\
+                     [ctms.zksync_os.registry]\n\
+                     ctm_transition_addr = \"{}\"\n\
+                     ctm_infrastructure_transition_addr = \"{}\"\n\
+                     ctm_release_addr = \"{RELEASE}\"\n\
+                     bootstrap_migration_addr = \"{}\"\n\
+                     ctm_upgrade_executor_addr = \"{CTM_EXECUTOR}\"\n\
+                     [ctms.zksync_os.state_transition]\n\
+                     chain_type_manager_proxy = \"{CTM_PROXY}\"\n\
+                     [ctms.zksync_os.deployed_addresses]\n\
+                     transparent_proxy_admin = \"{CTM_ADMIN}\"\n\
+                     [ctms.zksync_os.contracts_config]\n\
+                     force_deployments_data = \"0xf0f1f2\"\n",
+                    B256::repeat_byte(0x6B),
+                    self.transition,
+                    self.infrastructure,
+                    self.bootstrap_migration,
+                ));
+            }
+            body.push_str(&format!(
+                "[governance_calls]\ncalls = \"0x{}\"\n",
+                alloy::hex::encode(crate::common::governance_calls::encode_calls(calls))
+            ));
+            body
+        }
     }
 
     fn load_str(body: &str) -> anyhow::Result<RegistryPackage> {
-        let dir = std::env::temp_dir().join(format!(
-            "protocol-ops-package-{}-{:?}",
-            std::process::id(),
-            std::thread::current().id()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        let path = dir.join("ecosystem.toml");
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ecosystem.toml");
         std::fs::write(&path, body).unwrap();
         RegistryPackage::load(&path)
     }
 
-    /// The classification: `[operation]` is written only for a package whose prepare deployed
-    /// one, so its presence — not a flag, and not a guess from the calldata — decides which
-    /// verifier runs.
+    fn load_upgrade(summary: &Summary, calls: &[GovernanceCall]) -> UpgradePackage {
+        match load_str(&summary.toml(calls)).expect("the package must load") {
+            RegistryPackage::Upgrade(package) => package,
+            other => panic!("expected an upgrade package, got {other:?}"),
+        }
+    }
+
+    fn refusal(summary: &Summary, calls: &[GovernanceCall]) -> String {
+        format!(
+            "{:#}",
+            load_str(&summary.toml(calls)).expect_err("the package must be refused")
+        )
+    }
+
+    /// The classification is the calldata: executor legs make an upgrade, and every leg is
+    /// recovered from the call governance signs — with its executor and object — and reconciled
+    /// with the summary that names it.
     #[test]
-    fn an_operation_section_classifies_the_package_as_recurring() {
-        let body = recurring_toml(&format!(
-            "[operation]\noperation_addr = \"{OPERATION}\"\ncoordinator_addr = \"{COORDINATOR}\"\n"
-        ));
-        let RegistryPackage::Operation(package) = load_str(&body).unwrap() else {
-            panic!("a package naming an operation must be read as a recurring upgrade");
-        };
-        assert_eq!(package.operation, OPERATION.parse::<Address>().unwrap());
-        assert_eq!(package.coordinator, COORDINATOR.parse::<Address>().unwrap());
-        assert_eq!(package.ctm_key, "zksync_os");
-        assert_eq!(
-            package.reported_ctm_transition,
-            Some(
-                "0x00000000000000000000000000000000000000cc"
-                    .parse()
-                    .unwrap()
-            )
+    fn an_upgrade_package_loads_its_legs_from_the_calldata() {
+        let package = load_upgrade(
+            &Summary::all(),
+            &[core_leg(), infrastructure_leg(), transition_leg()],
         );
         assert_eq!(
-            package.reported_ctm_executor,
-            Some(
-                "0x00000000000000000000000000000000000000dd"
-                    .parse()
-                    .unwrap()
-            )
+            package.legs,
+            vec![
+                RecoveredLeg {
+                    kind: LegKind::Core,
+                    index: 0,
+                    executor: CORE_EXECUTOR,
+                    object: CORE_TRANSITION,
+                },
+                RecoveredLeg {
+                    kind: LegKind::Infrastructure,
+                    index: 1,
+                    executor: CTM_EXECUTOR,
+                    object: INFRASTRUCTURE,
+                },
+                RecoveredLeg {
+                    kind: LegKind::Transition,
+                    index: 2,
+                    executor: CTM_EXECUTOR,
+                    object: TRANSITION,
+                },
+            ]
+        );
+        assert_eq!(package.ctm_key.as_deref(), Some("zksync_os"));
+        assert_eq!(package.reported_ctm, Some(CTM_PROXY));
+        assert_eq!(package.reported_ctm_proxy_admin, Some(CTM_ADMIN));
+        assert_eq!(package.reported_bridgehub, Some(BRIDGEHUB));
+        assert_eq!(package.lifecycle.core_executor, Some(CORE_EXECUTOR));
+        assert_eq!(package.lifecycle.core_proxy_admin, Some(ECO_ADMIN));
+        assert_eq!(
+            package.force_deployments_data,
+            Some(Bytes::from_static(&[0xf0, 0xf1, 0xf2]))
         );
         assert_eq!(
-            package.reported_core_transition,
-            Some(
-                "0x00000000000000000000000000000000000000ee"
-                    .parse()
-                    .unwrap()
-            )
+            package.create2_salts,
+            vec![B256::repeat_byte(0x5A), B256::repeat_byte(0x6B)]
         );
     }
 
-    /// An operation with nothing to drive it is refused at load rather than verified with the
-    /// coordinator left unknown: the executor call has no target without it.
+    /// Each leg alone is an upgrade of its own — the subsequence of the canonical run.
     #[test]
-    fn an_operation_without_a_coordinator_is_refused() {
-        let body = recurring_toml(&format!("[operation]\noperation_addr = \"{OPERATION}\"\n"));
-        let err = load_str(&body).unwrap_err().to_string();
-        assert!(err.contains("coordinator_addr"), "{err}");
+    fn each_leg_alone_loads_as_an_upgrade() {
+        for (summary, call, kind) in [
+            (Summary::of(true, false, false), core_leg(), LegKind::Core),
+            (
+                Summary::of(false, true, false),
+                infrastructure_leg(),
+                LegKind::Infrastructure,
+            ),
+            (
+                Summary::of(false, false, true),
+                transition_leg(),
+                LegKind::Transition,
+            ),
+        ] {
+            let package = load_upgrade(&summary, &[call]);
+            assert_eq!(package.legs.len(), 1);
+            assert_eq!(package.legs[0].kind, kind);
+        }
+    }
+
+    /// A core-only upgrade needs no CTM prepare: with no `[ctms]` section at all it still loads,
+    /// and reads its CTM inputs as absent.
+    #[test]
+    fn a_core_only_package_needs_no_ctm_section() {
+        let summary = Summary {
+            ctm_section: false,
+            ..Summary::of(true, false, false)
+        };
+        let package = load_upgrade(&summary, &[core_leg()]);
+        assert_eq!(package.ctm_key, None);
+        assert_eq!(package.reported_ctm, None);
+        assert_eq!(package.force_deployments_data, None);
+        assert_eq!(package.create2_salts, vec![B256::repeat_byte(0x5A)]);
+    }
+
+    /// A CTM leg without the CTM section cannot be held against the reviewed CTM at all.
+    #[test]
+    fn a_ctm_leg_requires_the_ctm_section() {
+        let summary = Summary {
+            ctm_section: false,
+            ..Summary::of(false, false, true)
+        };
+        let err = refusal(&summary, &[transition_leg()]);
+        assert!(err.contains("[ctms] missing from the package"), "{err}");
     }
 
     /// A package that is neither kind must not be verified as the nearest match.
     #[test]
     fn a_package_that_is_neither_kind_is_refused() {
-        let body = recurring_toml("");
-        let err = format!("{:#}", load_str(&body).unwrap_err());
-        assert!(err.contains("no `migrate()` call"), "{err}");
+        let err = refusal(&Summary::of(false, false, false), &[]);
+        assert!(err.contains("neither kind of package"), "{err}");
+        let err = refusal(
+            &Summary::of(false, false, false),
+            &[call(STRANGER, vec![0xde, 0xad, 0xbe, 0xef])],
+        );
+        assert!(err.contains("neither kind of package"), "{err}");
     }
 
     /// A pre-collapse package — per-stage keys instead of the one `calls` — is refused rather
     /// than read with its calls dropped.
     #[test]
     fn a_package_with_per_stage_keys_is_refused() {
-        let body = recurring_toml("").replace(
-            "calls = \"0x\"",
-            "stage0_calls = \"0x\"\nstage1_calls = \"0x\"",
-        );
+        let body = Summary::all()
+            .toml(&[])
+            .replace("calls = \"0x", "stage1_calls = \"0x\"\nstage0_calls = \"0x");
         let err = format!("{:#}", load_str(&body).unwrap_err());
         assert!(err.contains("exactly one key"), "{err}");
+    }
+
+    /// Q5: the summary names an object the bundle never applies — a reviewed object that would be
+    /// left unapplied.
+    #[test]
+    fn a_missing_leg_is_refused() {
+        let err = refusal(&Summary::all(), &[core_leg(), transition_leg()]);
+        assert!(err.contains("missing leg"), "{err}");
+        assert!(err.contains("ctm_infrastructure_transition_addr"), "{err}");
+    }
+
+    /// The other direction: a leg no summary accounts for.
+    #[test]
+    fn a_leg_without_its_summary_is_refused() {
+        let err = refusal(
+            &Summary::of(true, false, false),
+            &[core_leg(), transition_leg()],
+        );
+        assert!(err.contains("reports no ctm_transition_addr"), "{err}");
+    }
+
+    /// Q5: the bundle applies another object than the one the summary names.
+    #[test]
+    fn a_substituted_object_is_refused() {
+        let err = refusal(
+            &Summary::of(false, false, true),
+            &[leg(LegKind::Transition, CTM_EXECUTOR, STRANGER)],
+        );
+        assert!(err.contains("substituted object"), "{err}");
+    }
+
+    /// The right object sent to another executor than the summary names — including a core leg
+    /// sent to the CTM domain's executor.
+    #[test]
+    fn a_substituted_executor_is_refused() {
+        for bad in [
+            leg(LegKind::Core, STRANGER, CORE_TRANSITION),
+            leg(LegKind::Core, CTM_EXECUTOR, CORE_TRANSITION),
+        ] {
+            let err = refusal(&Summary::of(true, false, false), &[bad]);
+            assert!(err.contains("substituted executor"), "{err}");
+        }
+        let err = refusal(
+            &Summary::of(false, true, true),
+            &[
+                infrastructure_leg(),
+                leg(LegKind::Transition, STRANGER, TRANSITION),
+            ],
+        );
+        assert!(err.contains("substituted executor"), "{err}");
+    }
+
+    /// Q5: a leg twice — the second application is not a bundle the merge produces.
+    #[test]
+    fn a_duplicated_leg_is_refused() {
+        let err = refusal(
+            &Summary::of(false, false, true),
+            &[transition_leg(), transition_leg()],
+        );
+        assert!(err.contains("duplicate leg"), "{err}");
+    }
+
+    /// The executor entrypoints are not payable, so a leg carrying value is not the derived call.
+    #[test]
+    fn a_leg_carrying_value_is_refused() {
+        let mut paying = core_leg();
+        paying.value = U256::from(1);
+        let err = refusal(&Summary::of(true, false, false), &[paying]);
+        assert!(err.contains("carries value"), "{err}");
+    }
+
+    /// A call with a leg's selector but not exactly its calldata is refused rather than read as
+    /// the nearest leg.
+    #[test]
+    fn malformed_leg_calldata_is_refused() {
+        let mut trailing = core_leg();
+        trailing.data.extend_from_slice(&[0u8; 32]);
+        let err = refusal(&Summary::of(true, false, false), &[trailing]);
+        assert!(err.contains("not exactly its calldata"), "{err}");
+
+        let mut dirty = core_leg();
+        dirty.data[4] = 0xff; // an address word with its high bytes set
+        let err = refusal(&Summary::of(true, false, false), &[dirty]);
+        assert!(err.contains("not exactly its calldata"), "{err}");
+    }
+
+    /// Q5: any call to an executor other than its legs — a `forward`, a nomination — is
+    /// authority the review never saw, and is refused whether or not the package declares it.
+    #[test]
+    fn an_unknown_selector_on_an_executor_is_refused() {
+        let nomination = call(
+            CTM_EXECUTOR,
+            [
+                TRANSFER_OWNERSHIP_SELECTOR.to_vec(),
+                STRANGER.into_word().to_vec(),
+            ]
+            .concat(),
+        );
+        let err = refusal(
+            &Summary::of(false, false, true),
+            &[transition_leg(), nomination],
+        );
+        assert!(err.contains("unknown selector on an executor"), "{err}");
+
+        // The core executor is the ecosystem domain's, even when this upgrade has no core leg.
+        let forward = call(
+            CORE_EXECUTOR,
+            CTMUpgradeExecutorView::forwardCall { _calls: Vec::new() }.abi_encode(),
+        );
+        let err = refusal(
+            &Summary::of(false, false, true),
+            &[forward, transition_leg()],
+        );
+        assert!(err.contains("unknown selector on an executor"), "{err}");
+    }
+
+    /// Q5 mixed kinds: CTM legs beside a bootstrap's `migrate()`.
+    #[test]
+    fn upgrade_legs_beside_a_migrate_are_refused() {
+        let migration = Address::repeat_byte(0x55);
+        let summary = Summary {
+            bootstrap_migration: migration,
+            ..Summary::of(true, false, false)
+        };
+        let err = refusal(
+            &summary,
+            &[
+                core_leg(),
+                transition_leg(),
+                call(migration, MIGRATE_SELECTOR.to_vec()),
+            ],
+        );
+        assert!(err.contains("mixed kinds"), "{err}");
+    }
+
+    /// The bootstrap's own sequence applies the core transition — that one leg is the edge's, not
+    /// an upgrade beside it, so the package loads as a bootstrap.
+    #[test]
+    fn the_bootstrap_sequences_core_leg_is_not_a_mixed_kind() {
+        let migration = Address::repeat_byte(0x55);
+        let summary = Summary {
+            bootstrap_migration: migration,
+            ..Summary::of(true, false, false)
+        };
+        let package =
+            load_str(&summary.toml(&[core_leg(), call(migration, MIGRATE_SELECTOR.to_vec())]))
+                .unwrap();
+        let RegistryPackage::Bootstrap(package) = package else {
+            panic!("a migrate() bundle is a bootstrap");
+        };
+        assert_eq!(package.migration, migration);
+        assert_eq!(package.core_transition, Some(CORE_TRANSITION));
+    }
+
+    /// A bootstrap's summary naming a CTM-domain object: nothing in the edge applies it.
+    #[test]
+    fn a_bootstrap_reporting_a_ctm_object_is_refused() {
+        let migration = Address::repeat_byte(0x55);
+        let summary = Summary {
+            bootstrap_migration: migration,
+            ..Summary::of(true, false, true)
+        };
+        let err = refusal(&summary, &[call(migration, MIGRATE_SELECTOR.to_vec())]);
+        assert!(err.contains("missing leg"), "{err}");
+        assert!(err.contains("bootstrap"), "{err}");
     }
 
     // ───────────────────────── a release the tool has never heard of ─────────────────────────
     //
     // `CTMUpgrade_v36 is DefaultCTMUpgrade {}` — an empty subclass. A v36 upgrade is an ORDINARY
-    // registry operation, so it must verify through the general path with no v36 module, no v36
-    // branch and no v36 constant anywhere in this tree. These pin that: the loader never learns
-    // a release name, so the same code serves v36 and everything after it.
+    // registry upgrade, so it must load through the general path with no v36 module, no v36
+    // branch and no v36 constant anywhere in this tree. The loader never learns a release name.
 
-    /// The merged prepare output of a v36-shaped release, in the exact shape
-    /// `write_merged_ecosystem_toml` emits for a CTM prepare that deployed an operation: the
-    /// derived `[operation]` section, the CTM's summary fields, and a ZERO
-    /// `bootstrap_migration_addr` — the field a bootstrap fills and every later release does not.
-    fn ordinary_release_toml() -> String {
-        format!(
-            "[operation]\n\
-             operation_addr = \"{OPERATION}\"\n\
-             coordinator_addr = \"{COORDINATOR}\"\n\
-             [ctms.zksync_os.registry]\n\
-             ctm_transition_addr = \"0x00000000000000000000000000000000000000cc\"\n\
-             ctm_release_addr = \"0x00000000000000000000000000000000000000c1\"\n\
-             bootstrap_migration_addr = \"0x0000000000000000000000000000000000000000\"\n\
-             ctm_upgrade_executor_addr = \"0x00000000000000000000000000000000000000dd\"\n\
-             coordinator_addr = \"{COORDINATOR}\"\n\
-             operation_addr = \"{OPERATION}\"\n\
-             [ctms.zksync_os.state_transition]\n\
-             chain_type_manager_proxy = \"0x00000000000000000000000000000000000000f1\"\n\
-             [ctms.zksync_os.deployed_addresses]\n\
-             transparent_proxy_admin = \"0x00000000000000000000000000000000000000f2\"\n\
-             [ctms.zksync_os.contracts_config]\n\
-             force_deployments_data = \"0xf0f1f2\"\n\
-             [core.registry]\n\
-             core_transition_addr = \"0x00000000000000000000000000000000000000ee\"\n\
-             core_upgrade_executor_addr = \"0x00000000000000000000000000000000000000e1\"\n\
-             ecosystem_upgrade_executor_addr = \"{COORDINATOR}\"\n\
-             [core.upgrade_addresses.shared]\n\
-             transparent_proxy_admin = \"0x00000000000000000000000000000000000000e2\"\n\
-             [governance_calls]\n\
-             calls = \"0x\"\n"
-        )
+    /// A release with no module of its own loads as an ordinary upgrade, and every summary field
+    /// the verifier holds the CTM executor's immutables against is picked up.
+    #[test]
+    fn a_release_with_no_module_of_its_own_loads_as_an_ordinary_upgrade() {
+        let package = load_upgrade(&Summary::of(false, false, true), &[transition_leg()]);
+        assert_eq!(package.reported_ctm_transition, Some(TRANSITION));
+        assert_eq!(package.reported_ctm_executor, Some(CTM_EXECUTOR));
+        assert_eq!(package.reported_ctm, Some(CTM_PROXY));
+        assert_eq!(package.reported_ctm_proxy_admin, Some(CTM_ADMIN));
     }
 
-    /// A release with no module of its own loads as an ordinary operation, and every summary
-    /// field the verifier cross-checks is picked up — including the two that hold the CTM
-    /// executor's immutables to something the review fixes.
+    /// The zero `bootstrap_migration_addr` a post-bootstrap release carries must not divert it
+    /// into the bootstrap path.
     #[test]
-    fn a_release_with_no_module_of_its_own_loads_as_an_ordinary_operation() {
-        let RegistryPackage::Operation(package) = load_str(&ordinary_release_toml()).unwrap()
-        else {
-            panic!("an ordinary release must not need a verifier module of its own");
-        };
-        assert_eq!(package.operation, OPERATION.parse::<Address>().unwrap());
-        assert_eq!(package.coordinator, COORDINATOR.parse::<Address>().unwrap());
-        assert_eq!(
-            package.reported_ctm,
-            Some(
-                "0x00000000000000000000000000000000000000f1"
-                    .parse()
-                    .unwrap()
-            )
-        );
-        assert_eq!(
-            package.reported_ctm_proxy_admin,
-            Some(
-                "0x00000000000000000000000000000000000000f2"
-                    .parse()
-                    .unwrap()
-            )
-        );
-    }
-
-    /// The lifecycle objects' binding values are read from where the core prepare writes them —
-    /// its registry and shared-admin sections — because the executors' recorded bindings are held
-    /// against them.
-    #[test]
-    fn the_lifecycle_inputs_are_read_from_both_prepare_outputs() {
-        let RegistryPackage::Operation(package) = load_str(&ordinary_release_toml()).unwrap()
-        else {
-            panic!("an ordinary release");
-        };
-        let lifecycle = &package.lifecycle;
-        assert_eq!(
-            lifecycle.core_executor,
-            Some(
-                "0x00000000000000000000000000000000000000e1"
-                    .parse()
-                    .unwrap()
-            )
-        );
-        assert_eq!(
-            lifecycle.core_proxy_admin,
-            Some(
-                "0x00000000000000000000000000000000000000e2"
-                    .parse()
-                    .unwrap()
-            )
-        );
-    }
-
-    /// The force-deployments blob the release genesis is held against comes from the CTM
-    /// prepare's output; a package without it loads with it absent, and the release check then
-    /// reports it.
-    #[test]
-    fn the_force_deployments_data_is_read_from_the_ctm_prepare_output() {
-        let RegistryPackage::Operation(package) = load_str(&ordinary_release_toml()).unwrap()
-        else {
-            panic!("an ordinary release");
-        };
-        assert_eq!(
-            package.force_deployments_data,
-            Some(Bytes::from_static(&[0xf0, 0xf1, 0xf2]))
-        );
-
-        let body = recurring_toml(&format!(
-            "[operation]\noperation_addr = \"{OPERATION}\"\ncoordinator_addr = \"{COORDINATOR}\"\n"
+    fn a_zero_bootstrap_field_does_not_divert_an_ordinary_release() {
+        let body = Summary::of(false, false, true).toml(&[transition_leg()]);
+        assert!(body.contains("bootstrap_migration_addr"));
+        assert!(matches!(
+            load_str(&body).unwrap(),
+            RegistryPackage::Upgrade(_)
         ));
-        let RegistryPackage::Operation(package) = load_str(&body).unwrap() else {
-            panic!("an ordinary release");
-        };
-        assert!(package.force_deployments_data.is_none());
-    }
-
-    /// A package produced before the prepare recorded the lifecycle values loads with them
-    /// absent — the verifier then reports each construction it cannot run, rather than the
-    /// loader refusing a package it can otherwise review.
-    #[test]
-    fn a_package_without_lifecycle_inputs_loads_with_them_absent() {
-        let body = recurring_toml(&format!(
-            "[operation]\noperation_addr = \"{OPERATION}\"\ncoordinator_addr = \"{COORDINATOR}\"\n"
-        ));
-        let RegistryPackage::Operation(package) = load_str(&body).unwrap() else {
-            panic!("an ordinary release");
-        };
-        assert!(package.lifecycle.core_executor.is_none());
-        assert!(package.lifecycle.core_proxy_admin.is_none());
     }
 
     // ───────────────────────── transition replacements ─────────────────────────
 
-    use super::super::views::{BootstrapCall, CTMUpgradeExecutorView, CtmView};
-    use alloy::sol_types::SolCall;
+    use super::super::views::{BootstrapCall, CtmView};
 
     const CTM: Address = Address::repeat_byte(0xC7);
-    const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
     const EXPECTED: Address = Address::repeat_byte(0x7A);
     const REPLACEMENT: Address = Address::repeat_byte(0x7B);
     const DEPARTURE: u64 = 0x23_0000_0000;
@@ -1104,12 +1715,10 @@ mod tests {
         assert!(err.contains("more than one `forward`"), "{err}");
     }
 
-    /// The merged package a replacement prepare produces: no [operation], no `migrate()`, the
+    /// The merged package a replacement prepare produces: no `migrate()`, no executor leg, the
     /// forward in the bundle — classified as its own kind, with every summary field picked up.
-    #[test]
-    fn a_replacement_package_loads_as_its_own_kind() {
-        let replacement = forward(vec![replace_call(), deadline_call(DEPARTURE, 7)]);
-        let body = format!(
+    fn replacement_body(replacement: &GovernanceCall, extra_registry: &str) -> String {
+        format!(
             "[[external_actions]]\n\
              phase = \"governance\"\n\
              label = \"replace the committed transition departing {DEPARTURE}\"\n\
@@ -1123,9 +1732,9 @@ mod tests {
              replaced_transition_addr = \"{EXPECTED}\"\n\
              replacement_transition_addr = \"{REPLACEMENT}\"\n\
              ctm_transition_addr = \"{REPLACEMENT}\"\n\
+             ctm_infrastructure_transition_addr = \"0x0000000000000000000000000000000000000000\"\n\
              ctm_upgrade_executor_addr = \"{CTM_EXECUTOR}\"\n\
-             coordinator_addr = \"{COORDINATOR}\"\n\
-             operation_addr = \"0x0000000000000000000000000000000000000000\"\n\
+             {extra_registry}\
              [ctms.zksync_os.state_transition]\n\
              chain_type_manager_proxy = \"{CTM}\"\n\
              [ctms.zksync_os.contracts_config]\n\
@@ -1133,11 +1742,18 @@ mod tests {
              new_protocol_version = {}\n",
             alloy::hex::encode(&replacement.data),
             alloy::hex::encode(crate::common::governance_calls::encode_calls(
-                std::slice::from_ref(&replacement)
+                std::slice::from_ref(replacement)
             )),
             DEPARTURE + 0x1_0000_0000,
-        );
-        let RegistryPackage::Replacement(package) = load_str(&body).unwrap() else {
+        )
+    }
+
+    #[test]
+    fn a_replacement_package_loads_as_its_own_kind() {
+        let replacement = forward(vec![replace_call(), deadline_call(DEPARTURE, 7)]);
+        let RegistryPackage::Replacement(package) =
+            load_str(&replacement_body(&replacement, "")).unwrap()
+        else {
             panic!("a forwarded replaceUpgradeTransition must load as a replacement");
         };
         assert_eq!(package.forward.expected, EXPECTED);
@@ -1148,25 +1764,72 @@ mod tests {
         assert_eq!(package.reported_replacement, Some(REPLACEMENT));
         assert_eq!(package.reported_ctm_executor, Some(CTM_EXECUTOR));
         assert_eq!(package.reported_ctm, Some(CTM));
-        assert_eq!(
-            package.reported_coordinator,
-            Some(COORDINATOR.parse::<Address>().unwrap())
-        );
         assert_eq!(package.reported_old_version, Some(U256::from(DEPARTURE)));
         assert_eq!(package.external_actions.len(), 1);
         assert!(package.external_actions[0].is_call(&replacement));
         assert!(package.executor_records.is_empty());
     }
 
-    /// The zero `bootstrap_migration_addr` a post-bootstrap release carries must not divert it
-    /// into the bootstrap path — where it would be refused for having no `migrate()` call.
+    /// Q5 mixed kinds: an executor leg beside the replacing `forward`. The replacement's
+    /// `ctm_transition_addr` is the replacement, not a transition leg.
     #[test]
-    fn a_zero_bootstrap_field_does_not_divert_an_ordinary_release() {
-        let body = ordinary_release_toml();
-        assert!(body.contains("bootstrap_migration_addr"));
-        assert!(matches!(
-            load_str(&body).unwrap(),
-            RegistryPackage::Operation(_)
-        ));
+    fn upgrade_legs_beside_a_replacement_are_refused() {
+        let replacement = forward(vec![replace_call()]);
+        let body = replacement_body(&replacement, "").replace(
+            &format!(
+                "calls = \"0x{}\"",
+                alloy::hex::encode(crate::common::governance_calls::encode_calls(
+                    std::slice::from_ref(&replacement)
+                ))
+            ),
+            &format!(
+                "calls = \"0x{}\"",
+                alloy::hex::encode(crate::common::governance_calls::encode_calls(&[
+                    replacement.clone(),
+                    leg(LegKind::Transition, CTM_EXECUTOR, REPLACEMENT),
+                ]))
+            ),
+        );
+        let err = format!("{:#}", load_str(&body).unwrap_err());
+        assert!(err.contains("mixed kinds"), "{err}");
+        assert!(err.contains("carries no executor leg"), "{err}");
+    }
+
+    /// A bootstrap and a replacement in one bundle are two reviews, not one.
+    #[test]
+    fn a_migrate_beside_a_replacement_is_refused() {
+        let replacement = forward(vec![replace_call()]);
+        let migrate = call(Address::repeat_byte(0x55), MIGRATE_SELECTOR.to_vec());
+        let body = replacement_body(&replacement, "").replace(
+            &format!(
+                "calls = \"0x{}\"",
+                alloy::hex::encode(crate::common::governance_calls::encode_calls(
+                    std::slice::from_ref(&replacement)
+                ))
+            ),
+            &format!(
+                "calls = \"0x{}\"",
+                alloy::hex::encode(crate::common::governance_calls::encode_calls(&[
+                    replacement.clone(),
+                    migrate,
+                ]))
+            ),
+        );
+        let err = format!("{:#}", load_str(&body).unwrap_err());
+        assert!(err.contains("mixed kinds"), "{err}");
+    }
+
+    /// A replacement whose package also reports a core transition: the merge derives no leg for a
+    /// replacement, so the object would never be applied.
+    #[test]
+    fn a_core_transition_on_a_replacement_is_refused() {
+        let replacement = forward(vec![replace_call()]);
+        let body = format!(
+            "{}[core.registry]\ncore_transition_addr = \"{CORE_TRANSITION}\"\n",
+            replacement_body(&replacement, "")
+        );
+        let err = format!("{:#}", load_str(&body).unwrap_err());
+        assert!(err.contains("missing leg"), "{err}");
+        assert!(err.contains("core_transition_addr"), "{err}");
     }
 }

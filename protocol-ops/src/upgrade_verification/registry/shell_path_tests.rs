@@ -1,5 +1,5 @@
 //! Shared RPC fixture for the two shell-check call-site regressions. The transport is mocked to
-//! isolate wiring in the real operation/replacement verifiers, not to simulate a valid ecosystem:
+//! isolate wiring in the real upgrade/replacement verifiers, not to simulate a valid ecosystem:
 //! unrelated construction/genesis reads deliberately remain unverifiable in BOTH controls. Only
 //! the arriving shell's logic differs, so it must contribute exactly one additional error.
 
@@ -9,18 +9,14 @@ use alloy::transports::mock::Asserter;
 
 use super::construction::ReviewedBuild;
 use super::genesis::{reviewed_genesis_image, ExpectedForceDeployments, ReviewedGenesis};
-use super::views::{
-    AuthoredL2Plan, OperationManifest, ReleaseGenesisData, ReleaseManifest, TransitionManifest,
-};
+use super::views::{AuthoredL2Plan, ReleaseGenesisData, ReleaseManifest, TransitionManifest};
 use crate::upgrade_verification::constants::L2_BRIDGEHUB_ADDR;
 
 pub(super) const TRANSITION: Address = Address::repeat_byte(0xA1);
 pub(super) const FROM_RELEASE: Address = Address::repeat_byte(0xF0);
 pub(super) const NEW_RELEASE: Address = Address::repeat_byte(0xF1);
 const CTM: Address = Address::repeat_byte(0xC7);
-const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
-const CORE_EXECUTOR: Address = Address::repeat_byte(0xE0);
-const CORE_ADMIN: Address = Address::repeat_byte(0xA0);
+pub(super) const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
 const CTM_ADMIN: Address = Address::repeat_byte(0xA7);
 const SUPPLIER: Address = Address::repeat_byte(0x5B);
 pub(super) const GOVERNANCE: Address = Address::repeat_byte(0x60);
@@ -145,38 +141,17 @@ impl ShellPathFixture {
         self.address(SUPPLIER); // Both bytecodes are available in the reviewed image.
     }
 
-    pub(super) fn recurring_reads(&self, coordinator: Address) {
-        self.code(true);
-        self.asserter.push_success(&Bytes::from(
-            OperationManifest {
-                coreTransition: Address::ZERO,
-                ctmInfrastructure: Vec::new(),
-                ctmTransition: TRANSITION,
-            }
-            .abi_encode(),
-        ));
+    /// The reads of a transition-only upgrade, in the order `upgrade::verify` makes them.
+    pub(super) fn upgrade_reads(&self) {
         self.unrelated_read(); // eth_chainId for genesis expectations (package names no CTM).
         self.transition_reads(false);
-        self.address(CTM_EXECUTOR);
-        self.code(true); // Coordinator's lifecycle binding.
-        self.address(CORE_EXECUTOR);
-        self.code(true);
-        self.address(CORE_ADMIN);
-        self.code(false); // CTM executor construction is outside this regression.
+        self.code(true); // The CTM executor, whose bound CTM the departing state is read through.
         self.address(CTM);
         self.address(CTM_ADMIN);
-        for _ in 0..2 {
-            self.address(coordinator);
-        }
-        for _ in 0..3 {
-            self.address(GOVERNANCE);
-        }
-        for _ in 0..3 {
-            self.address(Address::ZERO);
-        }
+        self.address(GOVERNANCE); // The CTM executor's owner.
+        self.address(Address::ZERO); // Its pending owner.
         self.address(CTM_EXECUTOR); // CTM owner.
         self.address(CTM_EXECUTOR); // CTM-domain ProxyAdmin owner.
-        self.address(CORE_EXECUTOR); // Ecosystem ProxyAdmin owner.
         self.address(Address::ZERO); // CTM pending owner.
         self.asserter
             .push_success(&Bytes::from(U256::from(OLD_VERSION).abi_encode()));
@@ -189,6 +164,9 @@ impl ShellPathFixture {
         self.code(false); // Replaced transition's unrelated state checks are isolated out.
         self.address(CTM_EXECUTOR);
         self.address(Address::ZERO); // CTM pending owner.
+        self.code(false); // CTM executor construction is outside this regression.
+        self.address(GOVERNANCE); // The CTM executor's owner.
+        self.address(Address::ZERO); // Its pending owner.
         self.readiness_and_shell_reads();
     }
 }

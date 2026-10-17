@@ -4,8 +4,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
-import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
+import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
 import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
 
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
@@ -49,7 +48,6 @@ import {
     RegistryMemberHasNoFixedAddress,
     RegistryTargetHasNoCode,
     ReleaseForceDeploymentMismatch,
-    OperationChangesNothing,
     RegistryUnknownKey,
     TransitionDeadlineBeforeUpgrade,
     TransitionDeadlineZero,
@@ -63,9 +61,9 @@ import {
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {
     AuthoredL2Plan,
-    CoreTransitionManifest,
-    OperationManifest,
+    ProxyUpgradeDomain,
     ProxyUpgradeRow,
+    ProxyUpgradeTransitionManifest,
     GenesisFacet,
     L2UpgradePlan,
     ReleaseGenesisData,
@@ -86,7 +84,7 @@ import {
 ///         explicit routing + inline mandatory pins; transitions derive their facet delta
 ///         from the `(fromRelease, newRelease)` pair at initialization.
 contract StorageRegistriesTest is Test {
-    CoreTransition internal coreTransition;
+    ProxyUpgradeTransition internal coreTransition;
     CTMRelease internal fromRelease;
     CTMRelease internal newRelease;
     /// @dev `newRelease` one patch version up and otherwise identical: the target of a version-only patch.
@@ -149,7 +147,7 @@ contract StorageRegistriesTest is Test {
         // A real DiamondInit, the one every fixture release pins.
         diamondInit = address(new DiamondInit());
 
-        coreTransition = new CoreTransition(_coreManifest());
+        coreTransition = new ProxyUpgradeTransition(_coreManifest());
         // Releases deploy through the canonical factory: transition initialization enforces
         // factory provenance on BOTH edges.
         fromRelease = new CTMRelease(_fromReleaseManifest());
@@ -165,9 +163,10 @@ contract StorageRegistriesTest is Test {
         vm.etch(addr, bytes.concat(hex"00", bytes(_name)));
     }
 
-    function _coreManifest() internal view returns (CoreTransitionManifest memory manifest) {
+    function _coreManifest() internal view returns (ProxyUpgradeTransitionManifest memory manifest) {
         // One participating slot in the enum-indexed inventory — every other slot's zero
         // `implNew` is the explicit "not upgraded" statement and produces no row.
+        manifest.domain = ProxyUpgradeDomain.Core;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(0xB001),
@@ -659,7 +658,7 @@ contract StorageRegistriesTest is Test {
 
     /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
     ///      execution (`BaseZkSyncUpgrade._setNewProtocolVersion`). Otherwise the transition pins,
-    ///      the operation bumps the CTM, and every per-chain upgrade then reverts.
+    ///      the commit bumps the CTM, and every per-chain upgrade then reverts.
     function test_revertWhen_transitionUsesNonzeroMajorVersion() public {
         TransitionManifest memory manifest = _transitionManifest();
         // major = 1 — rejected per-chain, so it must be rejected at pin time too.
@@ -686,7 +685,7 @@ contract StorageRegistriesTest is Test {
     }
 
     /// @dev Regression: a plan whose CONSTRUCTED factory dependencies exceed what
-    ///      `BaseZkSyncUpgrade` accepts must be rejected at pin time. Otherwise the operation bumps
+    ///      `BaseZkSyncUpgrade` accepts must be rejected at pin time. Otherwise the commit bumps
     ///      the CTM version and every per-chain upgrade then reverts, stranding chains on an
     ///      unexecutable transition. The delegate plus `MAX_NEW_FACTORY_DEPS` distinct extras is
     ///      one dependency past the cap; one extra fewer constructs.
@@ -766,58 +765,87 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
     }
 
-    // ─────────────────────────── operation shape ───────────────────────────
+    // ─────────────────────────── proxy upgrade transition domains ───────────────────────────
 
-    /// @dev An operation that changes nothing is a mistake, not an upgrade — and the mere presence
-    ///      of an all-inert inventory must not make it look like one that changes something.
-    function test_revertWhen_operationChangesNothing() public {
-        OperationManifest memory manifest = _operationManifest();
-        manifest.ctmTransition = address(0);
+    /// @dev Each domain's object serves its domain and the participating rows of ITS inventory.
+    function test_eachDomainServesItsOwnInventory() public {
+        assertEq(uint8(coreTransition.domain()), uint8(ProxyUpgradeDomain.Core));
+        assertEq(coreTransition.rows().length, 1, "one participating core row");
 
-        vm.expectRevert(OperationChangesNothing.selector);
-        new EcosystemUpgradeOperation(manifest);
+        ProxyUpgradeTransitionManifest memory manifest = _ctmManifestWithTwoRows();
+        ProxyUpgradeTransition infrastructure = new ProxyUpgradeTransition(manifest);
+        assertEq(uint8(infrastructure.domain()), uint8(ProxyUpgradeDomain.CTM));
+        assertEq(infrastructure.rows().length, 2, "both participating slots become rows");
+        assertEq(infrastructure.manifestHash(), keccak256(abi.encode(manifest)), "the domain is committed too");
+        assertEq(keccak256(abi.encode(infrastructure.getManifest())), keccak256(abi.encode(manifest)));
+        infrastructure.validate();
     }
 
-    /// @dev Each change on its own is a complete operation.
-    function test_operationWithOnlyACoreChange() public {
-        OperationManifest memory manifest = _operationManifest();
-        manifest.ctmTransition = address(0);
-        manifest.coreTransition = address(coreTransition);
+    /// @dev The inventory length is the DOMAIN's: a Core manifest carrying the CTM inventory's length
+    ///      (or the reverse) is refused, so an object cannot be built over the other domain's index
+    ///      space by choosing its own length.
+    function test_revertWhen_theInventoryHasTheOtherDomainsLength() public {
+        ProxyUpgradeTransitionManifest memory ctmShaped = _ctmManifestWithTwoRows();
+        ctmShaped.domain = ProxyUpgradeDomain.Core;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryInventoryLengthMismatch.selector,
+                L1_ECOSYSTEM_CONTRACT_COUNT,
+                CTM_CONTRACT_COUNT
+            )
+        );
+        new ProxyUpgradeTransition(ctmShaped);
 
-        EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
-        assertEq(operation.coreTransition(), address(coreTransition));
-        assertEq(operation.ctmTransition(), address(0));
-        assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
-        assertEq(operation.manifestHash(), keccak256(abi.encode(manifest)));
+        ProxyUpgradeTransitionManifest memory coreShaped = _coreManifest();
+        coreShaped.domain = ProxyUpgradeDomain.CTM;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryInventoryLengthMismatch.selector,
+                CTM_CONTRACT_COUNT,
+                L1_ECOSYSTEM_CONTRACT_COUNT
+            )
+        );
+        new ProxyUpgradeTransition(coreShaped);
     }
 
-    function test_operationWithOnlyInfrastructure() public {
-        OperationManifest memory manifest = _operationManifest();
-        manifest.ctmTransition = address(0);
-        manifest.ctmInfrastructure = _ctmInventoryWithTwoRows();
-
-        EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(manifest);
-        assertEq(operation.coreTransition(), address(0));
-        assertEq(operation.ctmTransition(), address(0), "no chain-version edge is bought for an infrastructure change");
-        assertEq(operation.ctmInfrastructureRows().length, 2, "both participating slots become rows");
-        operation.validate();
-    }
-
-    function test_operationWithOnlyATransition() public {
-        EcosystemUpgradeOperation operation = new EcosystemUpgradeOperation(_operationManifest());
-        assertEq(operation.coreTransition(), address(0));
-        assertEq(operation.ctmTransition(), address(transition));
-        assertEq(operation.ctmInfrastructureRows().length, 0, "no infrastructure row");
-    }
-
-    function test_revertWhen_operationInventoryLengthMismatch() public {
-        OperationManifest memory manifest = _operationManifest();
-        manifest.ctmInfrastructure = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT - 1);
+    function test_revertWhen_ctmInventoryLengthMismatch() public {
+        ProxyUpgradeTransitionManifest memory manifest = _ctmManifestWithTwoRows();
+        ProxyUpgradeRow[] memory tooShort = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT - 1);
+        tooShort[uint256(CTMContract.ChainTypeManager)] = manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)];
+        manifest.proxyUpgrades = tooShort;
 
         vm.expectRevert(
             abi.encodeWithSelector(RegistryInventoryLengthMismatch.selector, CTM_CONTRACT_COUNT, CTM_CONTRACT_COUNT - 1)
         );
-        new EcosystemUpgradeOperation(manifest);
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    /// @dev An all-inert CTM inventory changes nothing: an upgrade that leaves the CTM domain alone
+    ///      omits that leg instead of deploying an empty object.
+    function test_revertWhen_aCtmInventoryChangesNothing() public {
+        ProxyUpgradeTransitionManifest memory manifest = ProxyUpgradeTransitionManifest({
+            domain: ProxyUpgradeDomain.CTM,
+            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT)
+        });
+        vm.expectRevert(RegistryUnknownKey.selector);
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    /// @dev A domain outside the enum is not representable: the constructor's ABI decoding refuses
+    ///      it before any check of ours runs, so no inventory length can be read off it.
+    function test_revertWhen_theDomainIsUnknown() public {
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        bytes memory args = abi.encode(manifest);
+        // The manifest is one dynamic tuple: [offset][domain][rows offset]... — word 1 is the domain.
+        assembly {
+            mstore(add(args, 0x40), 2)
+        }
+        bytes memory initCode = bytes.concat(type(ProxyUpgradeTransition).creationCode, args);
+        address deployed;
+        assembly {
+            deployed := create(0, add(initCode, 0x20), mload(initCode))
+        }
+        assertEq(deployed, address(0), "an unknown domain must not construct");
     }
 
     // ─────────────────────────── L2 plan shape ───────────────────────────
@@ -1499,13 +1527,13 @@ contract StorageRegistriesTest is Test {
         coreTransition.validate();
     }
 
-    // ─────────────────────────── core transition inventory ───────────────────────────
+    // ─────────────────────────── Core-domain inventory ───────────────────────────
 
     function test_revertWhen_inventoryLengthDoesNotMatchTheEnum() public {
         // The dynamic inventory must be exactly one slot per enum member, so every contract of
         // the domain HAS a slot and none can be smuggled in. Whether the slot says what the
         // upgrade meant is preparation's job, not this length check's.
-        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
         ProxyUpgradeRow[] memory tooShort = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT - 1);
         tooShort[uint256(L1EcosystemContract.L1Bridgehub)] = manifest.proxyUpgrades[
             uint256(L1EcosystemContract.L1Bridgehub)
@@ -1519,41 +1547,41 @@ contract StorageRegistriesTest is Test {
                 L1_ECOSYSTEM_CONTRACT_COUNT - 1
             )
         );
-        new CoreTransition(manifest);
+        new ProxyUpgradeTransition(manifest);
     }
 
     function test_revertWhen_upgradingRowMissingSource() public {
         // A participating slot must be a full edge: known source implementation.
-        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
-        new CoreTransition(manifest);
+        new ProxyUpgradeTransition(manifest);
     }
 
     function test_inertSlotIsExplicitNotUpgradedAndProducesNoRow() public {
         // A slot with zero `implNew` is the inventory's explicit "not upgraded" statement:
         // it never becomes a row, even when it documents the proxy address it refers to.
-        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)].proxy = address(0xB002);
 
-        CoreTransition registry = new CoreTransition(manifest);
-        assertEq(registry.ecosystemRows().length, 1, "the inert slot must be dropped at the flatten boundary");
-        assertEq(registry.ecosystemRows()[0].proxy, address(0xB001), "the participating slot must survive");
+        ProxyUpgradeTransition registry = new ProxyUpgradeTransition(manifest);
+        assertEq(registry.rows().length, 1, "the inert slot must be dropped at the flatten boundary");
+        assertEq(registry.rows()[0].proxy, address(0xB001), "the participating slot must survive");
     }
 
     function test_revertWhen_everyInventorySlotIsInert() public {
         // A registry whose whole inventory is "not upgraded" upgrades nothing — refused.
-        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].implNew = address(0);
 
         vm.expectRevert(RegistryUnknownKey.selector);
-        new CoreTransition(manifest);
+        new ProxyUpgradeTransition(manifest);
     }
 
     function test_revertWhen_coreTransitionHasDuplicateProxyRow() public {
         // A proxy is routed once: two slots naming the same proxy are rejected.
-        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
         // same proxy again, in another contract's slot
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)] = manifest.proxyUpgrades[
             uint256(L1EcosystemContract.L1Bridgehub)
@@ -1565,18 +1593,18 @@ contract StorageRegistriesTest is Test {
                 manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].proxy
             )
         );
-        new CoreTransition(manifest);
+        new ProxyUpgradeTransition(manifest);
     }
 
     function test_revertWhen_coreTransitionHasSelfEdgeRow() public {
         // A row whose source is its target swaps nothing and would skip its initializer: an
         // authoring mistake, rejected at construction.
-        CoreTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
         ProxyUpgradeRow memory row = manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)];
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = row.implNew;
 
         vm.expectRevert(abi.encodeWithSelector(RegistrySelfEdgeProxyRow.selector, row.proxy));
-        new CoreTransition(manifest);
+        new ProxyUpgradeTransition(manifest);
     }
 
     // ─────────────────────────── CTM-domain inventory ───────────────────────────
@@ -1598,33 +1626,27 @@ contract StorageRegistriesTest is Test {
 
     /// @dev The participating inventory slots ride the manifest into the flattened rows unchanged,
     ///      the notifier's included, and are part of the committed manifest hash.
-    function test_operationRowsCarryTheirInventorySlots() public {
-        OperationManifest memory manifest = _operationManifest();
-        manifest.ctmInfrastructure = _ctmInventoryWithTwoRows();
+    function test_ctmRowsCarryTheirInventorySlots() public {
+        ProxyUpgradeTransitionManifest memory manifest = _ctmManifestWithTwoRows();
 
-        EcosystemUpgradeOperation withRows = new EcosystemUpgradeOperation(manifest);
-        ProxyUpgradeRow[] memory rows = withRows.ctmInfrastructureRows();
+        ProxyUpgradeTransition withRows = new ProxyUpgradeTransition(manifest);
+        ProxyUpgradeRow[] memory rows = withRows.rows();
         assertEq(rows.length, 2, "both participating slots become rows, in inventory order");
         assertEq(rows[0].proxy, address(0xC001));
-        assertEq(rows[0].implNew, manifest.ctmInfrastructure[uint256(CTMContract.ChainTypeManager)].implNew);
+        assertEq(rows[0].implNew, manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)].implNew);
         assertEq(rows[1].proxy, address(0xC002));
-        assertEq(rows[1].implNew, manifest.ctmInfrastructure[uint256(CTMContract.ServerNotifier)].implNew);
+        assertEq(rows[1].implNew, manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)].implNew);
         assertEq(withRows.manifestHash(), keccak256(abi.encode(manifest)), "the rows are part of the commitment");
     }
 
-    // ─────────────────────────── operation fixtures ───────────────────────────
-
-    /// @dev The default operation: the fixture transition, no ecosystem leg, no infrastructure.
-    function _operationManifest() internal view returns (OperationManifest memory) {
-        return
-            OperationManifest({
-                coreTransition: address(0),
-                ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
-                ctmTransition: address(transition)
-            });
-    }
+    // ─────────────────────────── CTM-domain fixtures ───────────────────────────
 
     /// @dev Two participating CTM-domain slots: the CTM itself and the ServerNotifier.
+    function _ctmManifestWithTwoRows() internal returns (ProxyUpgradeTransitionManifest memory manifest) {
+        manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.proxyUpgrades = _ctmInventoryWithTwoRows();
+    }
+
     function _ctmInventoryWithTwoRows() internal returns (ProxyUpgradeRow[] memory inventory) {
         inventory = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         inventory[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({

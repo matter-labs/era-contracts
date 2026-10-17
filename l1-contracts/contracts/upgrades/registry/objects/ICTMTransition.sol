@@ -9,8 +9,8 @@ import {L2CanonicalTransaction} from "../../../common/Messaging.sol";
 import {TransitionManifest, ReleaseDiff} from "../RegistryTypes.sol";
 
 /// @notice Immutable description of how one CTM release becomes another: what chains upgrade
-///         from and to, and by when. Infrastructure changes and the execution delay belong to the
-///         OPERATION that carries this transition, not here.
+///         from and to, and by when. Infrastructure changes belong to the proxy upgrade transitions
+///         governance applies beside it, and the execution delay to the governance proposal, not here.
 /// @dev The facet cuts and table-derived L2 deployments are NOT authored: they are DERIVED from
 ///      the `(fromRelease, newRelease)` pair at initialization and stored. What governance reviews
 ///      is two releases and this transition's schedule/engine/L2 plan; the delta is a

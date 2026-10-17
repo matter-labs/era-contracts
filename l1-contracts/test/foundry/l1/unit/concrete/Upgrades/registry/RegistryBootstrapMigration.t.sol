@@ -22,7 +22,6 @@ import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDesc
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -127,7 +126,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     RegistryBootstrapMigration internal migration;
     CTMUpgradeExecutor internal ctmExecutor;
     CoreUpgradeExecutor internal coreExecutor;
-    EcosystemUpgradeExecutor internal coordinator;
     /// @dev The CTM domain's own admin (the manifest's `ctmProxyAdmin`) and the ecosystem's (the
     ///      core executor's), as in production.
     ProxyAdmin internal ctmProxyAdmin;
@@ -188,24 +186,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         vm.etch(upgradeEngine, hex"600043");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
 
-        // The coordinator is deployed first: the CTM executor is constructed answering to it, and
-        // the edge checks that binding.
+        // Both domain executors, governance-owned; the edge checks each one's authority shape.
         ecosystemProxyAdmin = new ProxyAdmin();
         coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
-        ctmExecutor = new CTMUpgradeExecutor(
-            governor,
-            IChainTypeManager(address(chainContractAddress)),
-            ctmProxyAdmin,
-            address(coordinator)
-        );
+        ctmExecutor = new CTMUpgradeExecutor(governor, IChainTypeManager(address(chainContractAddress)), ctmProxyAdmin);
 
-        // The bundle's bindings and ecosystem handover, which precede `migrate()` in the same
-        // transaction; the suites that drop one of them undo it explicitly.
-        vm.startPrank(governor);
-        coreExecutor.setCoordinator(address(coordinator));
-        coordinator.setCTMExecutor(ctmExecutor);
-        vm.stopPrank();
+        // The bundle's ecosystem handover, which precedes `migrate()` in the same transaction; the
+        // suites that drop it undo it explicitly.
         ecosystemProxyAdmin.transferOwnership(address(coreExecutor));
         _handOverNotifier(notifierProxy);
 
@@ -313,8 +300,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 upgradeTimestamp: 0,
                 ctmExecutor: address(ctmExecutor),
                 coreExecutor: address(coreExecutor),
-                governance: governor,
-                coordinator: address(coordinator)
+                governance: governor
             });
     }
 
@@ -820,38 +806,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.validateApplied();
     }
 
-    function test_validateAppliedRequiresCoordinatorToNameTheBootstrappedExecutor() public {
-        _handOverAuthority();
-        migration.migrate();
-        CTMUpgradeExecutor replacement = new CTMUpgradeExecutor(
-            governor,
-            IChainTypeManager(address(chainContractAddress)),
-            ctmProxyAdmin,
-            address(coordinator)
-        );
-        vm.prank(governor);
-        coordinator.setCTMExecutor(replacement);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BootstrapExecutorNotBound.selector,
-                address(coordinator),
-                address(ctmExecutor),
-                address(replacement)
-            )
-        );
-        migration.validateApplied();
-        assertTrue(migration.executed(), "failed completion does not undo the migration");
-        assertEq(chainContractAddress.owner(), address(ctmExecutor));
-        assertEq(ctmProxyAdmin.owner(), address(ctmExecutor));
-        assertEq(address(coordinator.ctmExecutor()), address(replacement));
-
-        vm.prank(governor);
-        coordinator.setCTMExecutor(ctmExecutor);
-        migration.validateApplied();
-        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor));
-    }
-
     /// @dev A `transferOwnership` appended to the bundle beside the derived calls is invisible to
     ///      the owner checks (`owner()` does not move until the nominee accepts) and lets the
     ///      nominee take the domain the moment the gate has passed. The gate refuses a pending
@@ -863,12 +817,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.validateApplied();
         address attacker = makeAddr("attacker");
 
-        // The three executors are governance-owned: the nomination is governance's own call.
-        Ownable2Step[3] memory governed = [
-            Ownable2Step(address(ctmExecutor)),
-            Ownable2Step(address(coordinator)),
-            Ownable2Step(address(coreExecutor))
-        ];
+        // Both executors are governance-owned: the nomination is governance's own call.
+        Ownable2Step[2] memory governed = [Ownable2Step(address(ctmExecutor)), Ownable2Step(address(coreExecutor))];
         for (uint256 i = 0; i < governed.length; ++i) {
             vm.prank(governor);
             governed[i].transferOwnership(attacker);
@@ -946,8 +896,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         CTMUpgradeExecutor foreignExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(foreignCtm),
-            ctmProxyAdmin,
-            address(coordinator)
+            ctmProxyAdmin
         );
         BootstrapManifest memory manifest = _manifest();
         manifest.ctmExecutor = address(foreignExecutor);
@@ -974,8 +923,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         CTMUpgradeExecutor foreignExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
-            foreignProxyAdmin,
-            address(coordinator)
+            foreignProxyAdmin
         );
         BootstrapManifest memory manifest = _manifest();
         manifest.ctmExecutor = address(foreignExecutor);
@@ -1025,36 +973,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         vm.expectRevert(abi.encodeWithSelector(BootstrapNominationPending.selector, address(ctmExecutor), nominee));
         migration.migrate();
-    }
-
-    /// @dev The coordinator the CTM executor answers to is storage too (governance may replace it
-    ///      between operations), and it is the only address that will drive the executor's
-    ///      lifecycle callbacks.
-    function test_revertWhen_ctmExecutorAnswersToAnotherCoordinator() public {
-        EcosystemUpgradeExecutor foreignCoordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
-        CTMUpgradeExecutor redirected = new CTMUpgradeExecutor(
-            governor,
-            IChainTypeManager(address(chainContractAddress)),
-            ctmProxyAdmin,
-            address(foreignCoordinator)
-        );
-        BootstrapManifest memory manifest = _manifest();
-        manifest.ctmExecutor = address(redirected);
-
-        RegistryBootstrapMigration mismatched = new RegistryBootstrapMigration(manifest);
-        vm.prank(governor);
-        chainContractAddress.transferOwnership(address(mismatched));
-        ctmProxyAdmin.transferOwnership(address(mismatched));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BootstrapExecutorNotBound.selector,
-                address(redirected),
-                address(coordinator),
-                address(foreignCoordinator)
-            )
-        );
-        mismatched.migrate();
     }
 
     /// @dev A refused edge leaves NOTHING behind. `migrate()` accepts CTM ownership before it
@@ -1149,7 +1067,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
-    ///      and the executed edge would differ. Same rule {CoreTransition} enforces.
+    ///      and the executed edge would differ. Same rule {ProxyUpgradeTransition} enforces.
     function test_migrate_runsFixedInitializeUpgradeExactlyOnce() public {
         // A second participating slot whose new implementation must reinitialize: the row
         // carries only a BOOLEAN, and the apply invokes the fixed argument-less selector
@@ -1371,92 +1289,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.migrate();
     }
 
-    function test_revertWhen_coreExecutorAnswersToAnotherCoordinator() public {
-        address other = makeAddr("otherCoordinator");
-        vm.prank(governor);
-        coreExecutor.setCoordinator(other);
-        _handOverAuthority();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BootstrapExecutorNotBound.selector,
-                address(coreExecutor),
-                address(coordinator),
-                other
-            )
-        );
-        migration.migrate();
-    }
-
-    /// @dev A core executor answering to the coordinator is not enough: the coordinator must name
-    ///      it as its `CORE_EXECUTOR`, or its `execute` would drive another one.
-    function test_revertWhen_theCoordinatorNamesAnotherCoreExecutor() public {
-        ProxyAdmin otherAdmin = new ProxyAdmin();
-        CoreUpgradeExecutor otherCore = new CoreUpgradeExecutor(governor, otherAdmin);
-        otherAdmin.transferOwnership(address(otherCore));
-        vm.prank(governor);
-        otherCore.setCoordinator(address(coordinator));
-        BootstrapManifest memory manifest = _manifest();
-        manifest.coreExecutor = address(otherCore);
-        RegistryBootstrapMigration mismatched = _deployAndAuthorize(manifest);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BootstrapExecutorNotBound.selector,
-                address(coordinator),
-                address(otherCore),
-                address(coreExecutor)
-            )
-        );
-        mismatched.migrate();
-    }
-
-    function test_revertWhen_theCoordinatorIsNotBoundToTheCtmExecutor() public {
-        CTMUpgradeExecutor replacement = new CTMUpgradeExecutor(
-            governor,
-            IChainTypeManager(address(chainContractAddress)),
-            ctmProxyAdmin,
-            address(coordinator)
-        );
-        vm.prank(governor);
-        coordinator.setCTMExecutor(replacement);
-        _handOverAuthority();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BootstrapExecutorNotBound.selector,
-                address(coordinator),
-                address(ctmExecutor),
-                address(replacement)
-            )
-        );
-        migration.migrate();
-    }
-
-    function test_revertWhen_coordinatorIsOwnedBySomeoneElse() public {
-        address stranger = makeAddr("stranger");
-        vm.prank(governor);
-        coordinator.transferOwnership(stranger);
-        vm.prank(stranger);
-        coordinator.acceptOwnership();
-        _handOverAuthority();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(BootstrapExecutorOwnerMismatch.selector, address(coordinator), governor, stranger)
-        );
-        migration.migrate();
-    }
-
-    function test_revertWhen_coordinatorHasAPendingOwnershipTransfer() public {
-        address nominee = makeAddr("nominee");
-        vm.prank(governor);
-        coordinator.transferOwnership(nominee);
-        _handOverAuthority();
-
-        vm.expectRevert(abi.encodeWithSelector(BootstrapNominationPending.selector, address(coordinator), nominee));
-        migration.migrate();
-    }
-
     /// @dev Completion checks owner IDENTITY, not only the absence of a nomination: an executor
     ///      whose ownership already moved fails the gate.
     function test_revertWhen_validateAppliedAfterAnExecutorChangedOwner() public {
@@ -1465,11 +1297,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         migration.validateApplied();
         address stranger = makeAddr("stranger");
 
-        Ownable2Step[3] memory governed = [
-            Ownable2Step(address(ctmExecutor)),
-            Ownable2Step(address(coreExecutor)),
-            Ownable2Step(address(coordinator))
-        ];
+        Ownable2Step[2] memory governed = [Ownable2Step(address(ctmExecutor)), Ownable2Step(address(coreExecutor))];
         for (uint256 i = 0; i < governed.length; ++i) {
             vm.prank(governor);
             governed[i].transferOwnership(stranger);
@@ -1493,25 +1321,11 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         }
     }
 
-    /// @dev ... and the core side's authority and binding.
+    /// @dev ... and the core side's authority.
     function test_revertWhen_validateAppliedAfterTheCoreSideMoved() public {
         _handOverAuthority();
         migration.migrate();
         migration.validateApplied();
-
-        vm.prank(governor);
-        coreExecutor.setCoordinator(address(0));
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BootstrapExecutorNotBound.selector,
-                address(coreExecutor),
-                address(coordinator),
-                address(0)
-            )
-        );
-        migration.validateApplied();
-        vm.prank(governor);
-        coreExecutor.setCoordinator(address(coordinator));
 
         address stranger = makeAddr("stranger");
         _forwardFromCoreExecutor(address(ecosystemProxyAdmin), abi.encodeCall(Ownable.transferOwnership, (stranger)));

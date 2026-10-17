@@ -2,7 +2,7 @@
  * Registry manifest -> initialize() arguments.
  *
  * The storage-backed, write-once upgrade objects (`CTMRelease` / `CTMTransition` /
- * `CoreTransition`, contracts/upgrades/registry) are fixed, audited-once implementations
+ * `ProxyUpgradeTransition`, contracts/upgrades/registry) are fixed, audited-once implementations
  * initialized exactly once with a full manifest struct. This module translates the committed
  * manifest JSON (scripts/registry-manifests/*.json — the reviewable per-upgrade artifact) into
  * the `initialize()` argument objects ethers encodes against the contract ABIs:
@@ -14,9 +14,11 @@
  *     Carries NO facet swaps, NO hash changes and NO version edge: the delta and the edge are
  *     DERIVED on-chain from the `(fromRelease, newRelease)` pair at initialization. What is
  *     authored: upgrade engine, schedule, and the typed `L2UpgradePlan`.
- *   - `CoreTransition.CoreTransitionManifest` — the ecosystem inventory: a fixed-length row array
- *     indexed by `L1EcosystemContract`, source-checked rows in the participating slots, zero
- *     `implNew` in the explicitly-not-upgraded ones.
+ *   - `ProxyUpgradeTransition.ProxyUpgradeTransitionManifest` — one domain's proxy inventory: the
+ *     domain (`Core`: the ecosystem's, keyed by `L1EcosystemContract` under `core.contracts`;
+ *     `CTM`: one CTM domain's, keyed by `CTMContract` under `ctms[].infrastructure.contracts`) and
+ *     a fixed-length row array indexed by that domain's enum, source-checked rows in the
+ *     participating slots, zero `implNew` in the explicitly-not-upgraded ones.
  *
  * Enum identifiers and inventory slot names in the manifest are NAMES; enum values are parsed
  * from the canonical Solidity sources at runtime (never hardcoded), so upstream reordering or
@@ -57,6 +59,14 @@ function parseSolidityEnum(relSourcePath: string, enumName: string): Record<stri
 }
 
 const CONTRACT_IDENTIFIERS_SOL = "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+const REGISTRY_TYPES_SOL = "contracts/upgrades/registry/RegistryTypes.sol";
+
+/** A `ProxyUpgradeDomain` member and the contract enum its inventory is indexed by. */
+const PROXY_UPGRADE_DOMAIN_INVENTORY = {
+  Core: "L1EcosystemContract",
+  CTM: "CTMContract",
+} as const;
+export type ProxyUpgradeDomainName = keyof typeof PROXY_UPGRADE_DOMAIN_INVENTORY;
 
 function enumValue(map: Record<string, number>, name: string, enumName: string): number {
   const value = map[name];
@@ -82,6 +92,11 @@ function zeroProxyUpgradeRow(): ProxyUpgradeRowArg {
     implNew: ethers.constants.AddressZero,
     callInitializeUpgrade: false,
   };
+}
+
+/** The `ProxyUpgradeDomain` value of `name`, as `ProxyUpgradeTransition.domain()` returns it. */
+export function proxyUpgradeDomain(name: ProxyUpgradeDomainName): number {
+  return enumValue(parseSolidityEnum(REGISTRY_TYPES_SOL, "ProxyUpgradeDomain"), name, "ProxyUpgradeDomain");
 }
 
 /** The inventory slot of `member` in the canonical contract enum `enumName` (e.g. `CTMContract`). */
@@ -137,13 +152,13 @@ export function l2BytecodeInfoRows(slots: string[]): Record<string, string> {
 // Loose manifest typing: the JSON schema is owned by the emit side of the upgrade runner.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** `CoreTransition.CoreTransitionManifest` initialize argument from the manifest JSON. */
-export function coreInitArgs(manifest: any): any {
-  // The JSON keys under `core.contracts` ARE `L1EcosystemContract` member names — one naming
-  // scheme for deployment and upgrades alike, with unknown keys refused at encode time.
-  const entries: Array<[string, any]> = Object.entries(manifest.core.contracts);
+/**
+ * `ProxyUpgradeTransitionManifest` of `domain` from manifest rows keyed by the domain's contract
+ * enum member names; unknown keys are refused at encode time.
+ */
+function proxyUpgradeTransitionArgs(domain: ProxyUpgradeDomainName, contracts: Record<string, any>): any {
   const rows = Object.fromEntries(
-    entries.map(([name, e]) => [
+    Object.entries(contracts).map(([name, e]) => [
       name,
       {
         proxy: e.proxy,
@@ -153,8 +168,33 @@ export function coreInitArgs(manifest: any): any {
       },
     ])
   );
+  return {
+    domain: proxyUpgradeDomain(domain),
+    proxyUpgrades: proxyUpgradeSlots(PROXY_UPGRADE_DOMAIN_INVENTORY[domain], rows),
+  };
+}
 
-  return { proxyUpgrades: proxyUpgradeSlots("L1EcosystemContract", rows) };
+/**
+ * The Core-domain `ProxyUpgradeTransition` constructor argument from the manifest JSON. The keys
+ * under `core.contracts` ARE `L1EcosystemContract` member names — one naming scheme for deployment
+ * and upgrades alike.
+ */
+export function coreInitArgs(manifest: any): any {
+  return proxyUpgradeTransitionArgs("Core", manifest.core.contracts);
+}
+
+/**
+ * The CTM-domain `ProxyUpgradeTransition` constructor argument from one `manifest.ctms[]` entry
+ * (`infrastructure.contracts`, keyed by `CTMContract` member names), or `undefined` when the entry
+ * changes no CTM-domain proxy: the object refuses an empty participating set, and a bundle leaves
+ * the leg out instead.
+ */
+export function ctmInfrastructureInitArgs(ctm: any): any | undefined {
+  const contracts: Record<string, any> = ctm.infrastructure?.contracts ?? {};
+  if (Object.keys(contracts).length === 0) {
+    return undefined;
+  }
+  return proxyUpgradeTransitionArgs("CTM", contracts);
 }
 
 /**
@@ -230,19 +270,5 @@ export function transitionInitArgs(manifest: any, ctm: any, newRelease: string, 
       // composer deployed alongside the objects (see the runner).
       delegateComposer,
     },
-  };
-}
-
-/**
- * `EcosystemUpgradeOperation.OperationManifest` constructor argument. The CTM-domain inventory
- * (indexed by `CTMContract`) is the OPERATION's, not the transition's; the local hop upgrades
- * chain state only, so the manifest carries no infrastructure slots and every one encodes as the
- * explicit zero ("not upgraded") row.
- */
-export function operationInitArgs(ctm: any, coreTransition: string, ctmTransition: string): any {
-  return {
-    coreTransition,
-    ctmInfrastructure: proxyUpgradeSlots("CTMContract", ctm.transition?.proxyUpgrades ?? {}),
-    ctmTransition,
   };
 }

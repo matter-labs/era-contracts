@@ -9,7 +9,6 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {ObjectAnchorLib} from "./ObjectAnchorLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "../executors/CoreUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "../executors/EcosystemUpgradeExecutor.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 import {
@@ -23,9 +22,9 @@ import {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The authority shape of a registry-era ecosystem — what a completed bootstrap leaves behind
-///         and what a fresh deployment is born with: the coordinator and both domain executors owned
-///         by one governance and bound to each other, and every authority of both domains held by its
-///         executor. See "Authority" in {docs/registry-driven-upgrades.md}.
+///         and what a fresh deployment is born with: both domain executors owned by one governance,
+///         and every authority of both domains held by its executor. See "Authority" in
+///         {docs/registry-driven-upgrades.md}.
 library RegistryAuthorityLib {
     /// @notice Every address the authority shape names.
     /// @param ctm The ChainTypeManager proxy.
@@ -33,8 +32,7 @@ library RegistryAuthorityLib {
     /// @param serverNotifier The CTM's ServerNotifier proxy.
     /// @param ctmExecutor The `CTMUpgradeExecutor` bound to `ctm`.
     /// @param coreExecutor The `CoreUpgradeExecutor` bound to the ecosystem `ProxyAdmin`.
-    /// @param coordinator The `EcosystemUpgradeExecutor` both domain executors answer to.
-    /// @param governance The owner of all three executors.
+    /// @param governance The owner of both executors.
     // solhint-disable-next-line gas-struct-packing
     struct Authority {
         address ctm;
@@ -42,13 +40,12 @@ library RegistryAuthorityLib {
         address serverNotifier;
         address ctmExecutor;
         address coreExecutor;
-        address coordinator;
         address governance;
     }
 
     /// @notice Reverts unless the whole shape holds: the CTM and its `ProxyAdmin` are the CTM
     ///         executor's with no nomination outstanding on the CTM, the executors are governed and
-    ///         bound ({requireExecutorsBound}), and the ServerNotifier is the CTM domain's
+    ///         bound ({requireExecutorAuthorities}), and the ServerNotifier is the CTM domain's
     ///         ({requireNotifierHandedOver}).
     /// @param _a The authority shape to check.
     function requireRegistryAuthority(Authority memory _a) internal view {
@@ -61,36 +58,27 @@ library RegistryAuthorityLib {
         if (proxyAdminOwner != _a.ctmExecutor) {
             revert BootstrapAuthorityNotHeld(address(_a.ctmProxyAdmin), proxyAdminOwner);
         }
-        requireExecutorsBound(_a);
+        requireExecutorAuthorities(_a);
         requireNotifierHandedOver(_a);
     }
 
     /// @notice Reverts unless every executor is checked BY VALUE against what it is handed: each is
     ///         owned by `governance` with no nomination outstanding (an executor whose ownership
     ///         moved would act for its new owner; a nominee could claim it), the CTM executor is
-    ///         bound to the CTM and its `ProxyAdmin`, both domain executors answer to the coordinator
-    ///         and the coordinator names both, and the ecosystem `ProxyAdmin` is the core executor's.
+    ///         bound to the CTM and its `ProxyAdmin`, and the ecosystem `ProxyAdmin` is the core
+    ///         executor's.
     /// @param _a The authority shape to check.
-    function requireExecutorsBound(Authority memory _a) internal view {
+    function requireExecutorAuthorities(Authority memory _a) internal view {
         ObjectAnchorLib.requireCode(_a.ctmExecutor);
         ObjectAnchorLib.requireCode(_a.coreExecutor);
-        ObjectAnchorLib.requireCode(_a.coordinator);
         _requireGovernedBy(_a.ctmExecutor, _a.governance);
         _requireGovernedBy(_a.coreExecutor, _a.governance);
-        _requireGovernedBy(_a.coordinator, _a.governance);
 
         CTMUpgradeExecutor ctmExecutor = CTMUpgradeExecutor(payable(_a.ctmExecutor));
-        _requireBound(_a.ctmExecutor, _a.coordinator, ctmExecutor.coordinator());
         _requireBound(_a.ctmExecutor, _a.ctm, address(ctmExecutor.CHAIN_TYPE_MANAGER()));
         _requireBound(_a.ctmExecutor, address(_a.ctmProxyAdmin), address(ctmExecutor.CTM_PROXY_ADMIN()));
 
         CoreUpgradeExecutor coreExecutor = CoreUpgradeExecutor(payable(_a.coreExecutor));
-        _requireBound(_a.coreExecutor, _a.coordinator, coreExecutor.coordinator());
-
-        EcosystemUpgradeExecutor coordinator = EcosystemUpgradeExecutor(payable(_a.coordinator));
-        _requireBound(_a.coordinator, _a.coreExecutor, address(coordinator.CORE_EXECUTOR()));
-        _requireBound(_a.coordinator, _a.ctmExecutor, address(coordinator.ctmExecutor()));
-
         address ecosystemProxyAdmin = address(coreExecutor.PROXY_ADMIN());
         address ecosystemProxyAdminOwner = coreExecutor.PROXY_ADMIN().owner();
         if (ecosystemProxyAdminOwner != _a.coreExecutor) {
@@ -142,7 +130,7 @@ library RegistryAuthorityLib {
         requireNoNomination(_executor);
     }
 
-    /// @param _executor The executor (or coordinator) whose binding is read.
+    /// @param _executor The executor whose binding is read.
     /// @param _expected What it must be bound to.
     /// @param _actual What it is bound to.
     function _requireBound(address _executor, address _expected, address _actual) private pure {

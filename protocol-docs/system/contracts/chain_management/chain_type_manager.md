@@ -24,7 +24,7 @@ or choose an unapproved verifier; it can only exercise the per-chain powers expo
 ## Protocol versions
 
 `setNewVersionUpgradeFromTransition(transition)`, called by the CTM's owner (the bound
-`CTMUpgradeExecutor`, inside `EcosystemUpgradeExecutor.execute`), advances from the transition's old
+`CTMUpgradeExecutor`, in its `applyCTMUpgrade`), advances from the transition's old
 version and release, records the transition under the old version and installs the target release;
 chains read their cut from it (`upgradeCutForVersion`) and the verifier from the target release. A
 verifier-only upgrade is a patch transition between releases that differ only in the verifier. The

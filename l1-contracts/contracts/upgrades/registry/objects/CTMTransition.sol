@@ -61,12 +61,12 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
         derivedNewProtocolVersion = newVersion;
 
         // The engine's code existence is checked by `validate()` on the execution paths, not
-        // here — see {CoreTransition}. Both release EDGES are validated, though: the
+        // here — see {ProxyUpgradeTransition}. Both release EDGES are validated, though: the
         // delta below is derived from their manifests, so a malformed edge would silently
         // produce a malformed cut.
         // WHICH releases these are is governance's decision, established by review: the
         // executor's release-edge check ties `fromRelease` to the CTM's live `currentRelease`,
-        // and `newRelease` is what the same operation then installs.
+        // and `newRelease` is what the same commit then installs.
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 

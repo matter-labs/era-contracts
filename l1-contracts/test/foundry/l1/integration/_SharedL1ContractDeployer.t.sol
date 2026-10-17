@@ -43,10 +43,9 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     }
 
     /// @notice The upgrade executors a fresh ecosystem is born with (see `DeployL1CoreContracts` and
-    ///         `DeployCTM`): governance owns all three once the harness accepted.
+    ///         `DeployCTM`): governance owns both once the harness accepted.
     struct UpgradeExecutorAddresses {
         address coreExecutor;
-        address coordinator;
         address ctmExecutor;
     }
 
@@ -115,8 +114,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
             ecosystemAddresses.bridgehub.proxies.chainRegistrationSender
         );
         upgradeExecutors = UpgradeExecutorAddresses({
-            coreExecutor: l1CoreContractsScript.getUpgradeExecutors().coreExecutor,
-            coordinator: l1CoreContractsScript.getUpgradeExecutors().coordinator,
+            coreExecutor: l1CoreContractsScript.getUpgradeExecutor().coreExecutor,
             ctmExecutor: ctmScript.getCTMUpgradeExecutor().ctmExecutor
         });
         _acceptOwnershipCore();
@@ -145,13 +143,9 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.stopPrank();
     }
 
-    /// @dev Governance accepts the three executors the deploy scripts nominated it on.
+    /// @dev Governance accepts the two executors the deploy scripts nominated it on.
     function _acceptUpgradeExecutors() private {
-        address[3] memory executors = [
-            upgradeExecutors.coreExecutor,
-            upgradeExecutors.coordinator,
-            upgradeExecutors.ctmExecutor
-        ];
+        address[2] memory executors = [upgradeExecutors.coreExecutor, upgradeExecutors.ctmExecutor];
         for (uint256 i = 0; i < executors.length; ++i) {
             vm.prank(IOwnable(executors[i]).pendingOwner());
             IOwnable(executors[i]).acceptOwnership();

@@ -1,10 +1,10 @@
 //! The executor records a review re-derives the executors' construction from.
 //!
-//! An executor's address commits to its ORIGINAL constructor arguments — the owner it was built
-//! for and, for the CTM executor, the coordinator it was built with — and both may move afterwards
-//! (`transferOwnership`, `setCoordinator`). Re-deriving from the current values therefore cannot
-//! tell a genuine executor whose owner moved from a counterfeit; re-deriving from what the
-//! deploying run RECORDED can ([`super::lifecycle`]).
+//! An executor's address commits to its ORIGINAL constructor arguments — among them the owner it
+//! was built for, which moves afterwards (a fresh ecosystem builds its executors for the deployer
+//! and nominates governance). Re-deriving from the current owner therefore cannot tell a genuine
+//! executor whose owner moved from a counterfeit; re-deriving from what the deploying run RECORDED
+//! can ([`super::lifecycle`]).
 //!
 //! A record sits wherever a run that deployed executors wrote its `[upgrade_executors]` table:
 //! at the root of a forge init output (`DeployL1CoreContracts`, `DeployCTM`), and under `[core]` /
@@ -83,12 +83,6 @@ pub(crate) fn merge_records(
         source,
     )?;
     merge_one(
-        &mut into.coordinator,
-        next.coordinator,
-        "coordinator",
-        source,
-    )?;
-    merge_one(
         &mut into.ctm_executor,
         next.ctm_executor,
         "ctm_executor",
@@ -121,9 +115,7 @@ mod tests {
     use super::*;
     use alloy::primitives::{Address, B256};
 
-    use crate::common::forge::scripts::upgrade_executors::{
-        CoordinatorRecord, CoreExecutorRecord, CtmExecutorRecord,
-    };
+    use crate::common::forge::scripts::upgrade_executors::{CoreExecutorRecord, CtmExecutorRecord};
 
     fn core_record_toml(address: u8) -> String {
         format!(
@@ -131,20 +123,11 @@ mod tests {
              address = \"{}\"\n\
              create2_salt = \"{}\"\n\
              initial_owner = \"{}\"\n\
-             proxy_admin = \"{}\"\n\
-             [coordinator]\n\
-             address = \"{}\"\n\
-             create2_salt = \"{}\"\n\
-             initial_owner = \"{}\"\n\
-             core_executor = \"{}\"\n",
+             proxy_admin = \"{}\"\n",
             Address::repeat_byte(address),
             B256::repeat_byte(0x5A),
             Address::repeat_byte(0x01),
             Address::repeat_byte(0x04),
-            Address::repeat_byte(0xC0),
-            B256::repeat_byte(0x5A),
-            Address::repeat_byte(0x01),
-            Address::repeat_byte(address),
         )
     }
 
@@ -155,21 +138,18 @@ mod tests {
              create2_salt = \"{}\"\n\
              initial_owner = \"{}\"\n\
              chain_type_manager = \"{}\"\n\
-             ctm_proxy_admin = \"{}\"\n\
-             coordinator = \"{}\"\n",
+             ctm_proxy_admin = \"{}\"\n",
             Address::repeat_byte(0xE0),
             B256::repeat_byte(0x6B),
             Address::repeat_byte(0x01),
             Address::repeat_byte(0x02),
             Address::repeat_byte(0x03),
-            Address::repeat_byte(0xC0),
         )
     }
 
     /// Prefixes every table header of `body` with `prefix.` — the same record, nested.
     fn nested(prefix: &str, body: &str) -> String {
         body.replace("[core_executor]", &format!("[{prefix}.core_executor]"))
-            .replace("[coordinator]", &format!("[{prefix}.coordinator]"))
             .replace("[ctm_executor]", &format!("[{prefix}.ctm_executor]"))
     }
 
@@ -186,7 +166,6 @@ mod tests {
             root.core_executor.as_ref().map(|r| r.address),
             Some(Address::repeat_byte(0xA0))
         );
-        assert!(root.coordinator.is_some());
         assert!(root.ctm_executor.is_none());
 
         let package = parse(&format!(
@@ -205,15 +184,6 @@ mod tests {
             })
         );
         assert_eq!(
-            package.coordinator,
-            Some(CoordinatorRecord {
-                address: Address::repeat_byte(0xC0),
-                create2_salt: B256::repeat_byte(0x5A),
-                initial_owner: Address::repeat_byte(0x01),
-                core_executor: Address::repeat_byte(0xA0),
-            })
-        );
-        assert_eq!(
             package.ctm_executor,
             Some(CtmExecutorRecord {
                 address: Address::repeat_byte(0xE0),
@@ -221,7 +191,6 @@ mod tests {
                 initial_owner: Address::repeat_byte(0x01),
                 chain_type_manager: Address::repeat_byte(0x02),
                 ctm_proxy_admin: Address::repeat_byte(0x03),
-                coordinator: Address::repeat_byte(0xC0),
             })
         );
     }
@@ -287,6 +256,39 @@ mod tests {
             nested("upgrade_executors", &ctm_record_toml())
         );
         assert!(parse(&body).is_err());
+    }
+
+    /// The executors no longer answer to a coordinator, so a record of one — a whole
+    /// `[coordinator]` table, or a CTM executor's constructor `coordinator` — describes a
+    /// deployment this build does not produce, and is refused rather than read with it dropped.
+    #[test]
+    fn a_coordinator_record_is_refused() {
+        let with_table = format!(
+            "{}[upgrade_executors.coordinator]\n\
+             address = \"{}\"\n\
+             create2_salt = \"{}\"\n\
+             initial_owner = \"{}\"\n\
+             core_executor = \"{}\"\n",
+            nested("upgrade_executors", &core_record_toml(0xA0)),
+            Address::repeat_byte(0xC0),
+            B256::repeat_byte(0x5A),
+            Address::repeat_byte(0x01),
+            Address::repeat_byte(0xA0),
+        );
+        let err = format!("{:#}", parse(&with_table).unwrap_err());
+        assert!(
+            err.contains("does not decode as an executor record"),
+            "{err}"
+        );
+        assert!(err.contains("coordinator"), "{err}");
+
+        let with_field = format!(
+            "{}coordinator = \"{}\"\n",
+            nested("upgrade_executors", &ctm_record_toml()),
+            Address::repeat_byte(0xC0)
+        );
+        let err = format!("{:#}", parse(&with_field).unwrap_err());
+        assert!(err.contains("coordinator"), "{err}");
     }
 
     #[test]

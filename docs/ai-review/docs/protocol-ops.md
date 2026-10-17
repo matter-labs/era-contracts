@@ -15,24 +15,24 @@
 - `protocol-ops/src/common/forge/scripts/mod.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes, and the `ScriptCall` table binding each typed call to its script.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
 - `l1-contracts/deploy-scripts/upgrade/v35/{CoreUpgrade_v35,CTMUpgrade_v35}.s.sol` — the bootstrap edge's prepares; `v36/` the first registry-driven release's.
-- The `EcosystemUpgradeOperation` is deployed by the CTM prepare, and the coordinator's one call, `execute(operation)`, is derived from its address by the merge — there is no compose step. The merged package carries ONE governance bundle, `[governance_calls] calls`: the merge's extras (PUH/Guardians wiring, CTM `acceptOwnership()` normalization), the core prepare's declared calls, the derived `execute(operation)` (recurring only), then the CTM prepare's declared calls. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
+- The core prepare deploys the Core-domain `ProxyUpgradeTransition`, the CTM prepare the CTM-domain one and/or the `CTMTransition`, and the merge derives the executor legs (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) from the objects and executors they report — there is no compose step. The merged package carries ONE governance bundle, `[governance_calls] calls`: the merge's extras (PUH/Guardians wiring, CTM `acceptOwnership()` normalization), the core prepare's declared calls, the derived legs in canonical order (none for a bootstrap or a replacement), then the CTM prepare's declared calls. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
 
 ## Verifying a package before it is signed
 
 One verifier, `ecosystem verify-bootstrap` (alias `verify-package`,
-`upgrade_verification/registry/`). It decides from the package itself which kind it drives — a
-RECURRING upgrade, the one-time BOOTSTRAP edge onto the registry model, or the REPLACEMENT of a
-committed transition (one `CTMUpgradeExecutor.forward([replaceUpgradeTransition(...)])`, see
-"Replacing a committed transition" in `protocol-docs/ecosystem-upgrade-coordination.md`) — and
-refuses a package that is none of them rather than verifying it as the nearest match. It needs only
-the merged prepare TOML and an L1 RPC: the registry model moved the reviewable content off the
+`upgrade_verification/registry/`). It decides from the package itself which kind it drives — an
+UPGRADE (one to three executor legs), the one-time BOOTSTRAP edge onto the registry model, or the
+REPLACEMENT of a committed transition (one `CTMUpgradeExecutor.forward([replaceUpgradeTransition(...)])`,
+see "Replacing a committed transition" in `protocol-docs/ecosystem-upgrade-coordination.md`) — and
+refuses a package that is none of them or mixes them rather than verifying it as the nearest
+match. It needs only the merged prepare TOML and an L1 RPC: the registry model moved the reviewable content off the
 calldata and onto write-once objects, so objects are identified against the reviewed commit's own
 artifacts rather than reconstructed from a CREATE2 deployment history.
 
 > Pre-registry calldata packages are verified by the `ecosystem verify-upgrade` of the release
 > branches that shipped them, not here. A registry-driven upgrade is reviewed the same way for
 > every release, so a release does NOT get a verifier module of its own: `v36` needs no code here —
-> its prepare is `CTMUpgrade_v36 is DefaultCTMUpgrade {}`, an ordinary operation, and the recurring
+> its prepare is `CTMUpgrade_v36 is DefaultCTMUpgrade {}`, an ordinary upgrade, and the upgrade
 > path verifies it as one. If a future release ever seems to need version-specific handling, it
 > belongs as an INPUT to the general path, not as a new module.
 
@@ -44,19 +44,18 @@ from calldata:
 - **Construction.** The check that carries object trust (why: "Provenance and validation" in
   `docs/registry-driven-upgrades.md`). Each object's address is re-derived from the reviewed
   creation code and the arguments it was constructed with, and compared with the address the package
-  uses. For a write-once object the arguments are the manifest it serves; for the coordinator and
-  both domain executors they are the original constructor arguments their records state, and for the
-  bootstrap sequence the reviewed migration and core transition — never the object's own getters.
-  The current owner, nomination and coordinator are checked separately against the reviewed
-  governance and bindings. The creation-code bytes come from the local build (`l1-contracts/out`, so
-  the reviewed commit must be built), held against the committed `evmBytecodeHash`. The salts are
+  uses. For a write-once object the arguments are the manifest it serves; for both domain executors
+  they are the original constructor arguments their records state, and for the bootstrap sequence
+  the reviewed migration and core transition — never the object's own getters. The current owner
+  and nomination are checked separately against the reviewed governance. The creation-code bytes
+  come from the local build (`l1-contracts/out`, so the reviewed commit must be built), held against the committed `evmBytecodeHash`. The salts are
   per prepare leg: each prepare records the one it deployed under (`create2_factory_salt`, merged
   under `[core]` / `[ctms.*]`) and `--create2-salt` adds more; with no salt the check cannot run,
   and that is an ERROR rather than a silent pass. An executor is re-derived from its
   `[upgrade_executors]` record — salt and ORIGINAL constructor arguments, written by the run that
   deployed it (`ecosystem init`, `ctm init` or the bootstrap prepares) and read from the package or
-  `--executor-record` — so one whose owner or coordinator moved since still verifies. The record is
-  mandatory: an executor without one is unverified, which is an error.
+  `--executor-record` — so one whose owner moved since still verifies. The record is mandatory: an
+  executor without one is unverified, which is an error.
 - **Code identity** (`provenance.rs`) — the live code at an address against the reviewed build's
   deployed bytecode of each contract its role admits, byte for byte outside the artifact's
   immutable slots (`immutableReferences`), with the build's bytes held against the committed
@@ -87,17 +86,19 @@ from calldata:
   asset handler, chain registration sender, interop handler) or through the CTM (itself, its
   validator timelock, bytecodes supplier, permissionless validator, server notifier), and its
   `implNew` runs the slot's contract. A row in a slot that is no proxy of its domain fails.
-- **Bound authority** — the coordinator, both domain executors, the CTM and both ProxyAdmins,
-  and the governance owner the whole lifecycle answers to, with no ownership nomination
-  outstanding on any of them. The reviewed owner is what the executors' current ownership is
-  checked against, so for a recurring package `--expected-governance-owner` is not optional:
-  without it that ownership is unverifiable, which is an error.
+- **Bound authority** — the domain executors the legs run through (the CTM executor's immutable
+  CTM and `ProxyAdmin` held against the package's independently reviewed CTM and `ProxyAdmin`, the
+  core executor's against the ecosystem `ProxyAdmin`), the CTM and both ProxyAdmins, and the
+  governance owner the whole lifecycle answers to, with no ownership nomination outstanding on any
+  of them. The reviewed owner is what the executors' current ownership is checked against, so for
+  an upgrade package `--expected-governance-owner` is not optional: without it that ownership is
+  unverifiable, which is an error.
 - **Departing state** — the version and release edge against live, and every proxy row's
   `expectedOldImpl` against the implementation actually live behind that proxy, read through the
   domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. For a bootstrap, every
   chain on the CTM below the departing version is listed as a warning, not an error (the legacy
   `protocolVersionVerifier` getter keeps them upgradeable).
-- **Genesis** — on the recurring and bootstrap paths, a release's genesis batch hash against the
+- **Genesis** — on the upgrade and bootstrap paths, a release's genesis batch hash against the
   reviewed commit's genesis config (`configs/genesis/zksync-os/latest.json`), its index against
   zero, and every field of its force-deployments data against an independent expectation: the L1
   chain id, the live Bridgehub's asset router, chain cap and (aliased) chain-registration sender,
@@ -105,7 +106,7 @@ from calldata:
   `--env` permanent values; without `--env` the run stops), zero for the legacy fields, and the
   release's own table for the bytecode fields; the package's `force_deployments_data` remains a
   cross-check. A replacement lands on an existing release and is exempt.
-- **System-proxy shell** — on the recurring and replacement paths, the arriving release's shell
+- **System-proxy shell** — on the upgrade and replacement paths, the arriving release's shell
   against the departing release's, compared with the compiler metadata stripped (why: "What the
   derivation guarantees" in `docs/registry-driven-upgrades.md`). The code comes from the reviewed
   genesis image or the CTM supplier's `EVMBytecodePublished` log; a shell in neither is an ERROR. A
@@ -114,23 +115,26 @@ from calldata:
 - **Readiness**, reported apart from anything about value: the transition's L2 factory
   dependencies published on the CTM's supplier.
 
-**Does the signed transaction invoke the reviewed upgrade, at the reviewed address?** For a
-recurring upgrade that is the whole of it: the bundle must call
-`EcosystemUpgradeExecutor.execute(operation)` on the reviewed coordinator exactly once, re-encoded
-here and compared byte for byte. Any other call must be a declared governance external action; one
-that is neither fails the run. The operation's INTERNAL calls are deliberately not re-derived — the
-executors derive them on chain from the same pinned object, and a second derivation in the tool
-would be a second implementation to keep in sync.
+**Does the signed transaction invoke the reviewed upgrade, at the reviewed addresses, in the
+reviewed order?** For an upgrade that is the whole of it (`verify_upgrade_calls`): each leg is
+re-encoded here from the reviewed executor and object, and the run — core, then CTM
+infrastructure, then CTM transition, each only when present — must appear exactly once,
+contiguous and in that order. With no coordinator on chain, the order the bundle states is the
+order the domains apply in; the one governance execution keeps them atomic. Every other call must
+be a declared governance external action, matched one for one and in declared order, and none may
+reach the upgrade's authorities (the executors, the objects, the CTM, either ProxyAdmin) whether
+declared or not. The legs' INTERNAL calls are deliberately not re-derived — the executors derive
+them on chain from the same pinned objects, and a second derivation in the tool would be a second
+implementation to keep in sync.
 
-A bootstrap edge is the exception, and only because it has no executor to invoke: governance
+A bootstrap edge is the exception, because its executors do not yet hold their domains: governance
 executes a LIST of ordinary calls that `RegistryBootstrapSequence.actions()` derives, so the
 submitted bundle must END with exactly that list, and only declared calls outside the edge's
 authorities (the merge's extras) may precede it. The list's last call is `validateApplied()` on the
 migration, so a bootstrap that does not complete reverts the whole bundle; there is no separate
-completion check after the replay. That comparison is transitional scaffolding for the bootstrap
-alone — it is not generalised to recurring upgrades, and nothing new should be built on it. A
-replacement's bundle carries one `forward` to the CTM's executor and nothing else that reaches the
-CTM or its executor.
+completion check after the replay. That list comparison is transitional scaffolding for the
+bootstrap alone, and nothing new should be built on it. A replacement's bundle carries one
+`forward` to the CTM's executor and nothing else that reaches the CTM or its executor.
 
 It deliberately does NOT re-derive facet cuts, L2 transactions or proposals — those come from the
 audited on-chain derivation. It also does not call the objects' own `validate()`: that runs
@@ -151,11 +155,15 @@ runner (`yarn test:upgrade`) uses it, with the hashes of the build it deployed f
 committed file is regenerated last. The runner verifies the bootstrap and each registry-driven hop
 with `--env local` and the bootstrap package as `--executor-record` before it replays governance.
 
-In every kind the executing object is recovered from the CALLDATA governance will run — the
-`[operation]` section for a recurring upgrade, the bundle's `migrate()` call for a bootstrap — and
-the prepare's summary fields (`ctm_transition_addr`, `core_transition_addr`,
-`ctm_upgrade_executor_addr`, `bootstrap_migration_addr`) are cross-checks against it. A disagreement
-is an ERROR: the reviewer read one upgrade and governance would sign another.
+In every kind the executing objects are recovered from the CALLDATA governance will run — each
+leg's (executor, object) pair for an upgrade, the bundle's `migrate()` call for a bootstrap, the
+replacing `forward` for a replacement — and the prepare's summary fields (`core_transition_addr`,
+`core_upgrade_executor_addr`, `ctm_infrastructure_transition_addr`, `ctm_transition_addr`,
+`ctm_upgrade_executor_addr`, `bootstrap_migration_addr`) are cross-checks against them. A
+disagreement is an ERROR: the reviewer read one upgrade and governance would sign another. For an
+upgrade the legs and the summaries must match one for one, so a reported object without its leg, a
+leg without its reported object, a substituted object or executor and a duplicated leg are refused
+when the package loads.
 
 ## What protocol-ops is
 
@@ -188,7 +196,7 @@ Both `upgrade-governance --env` and `governance-toml-to-simulator --env` discove
 
 For non-trivial flows (the ecosystem upgrade in particular) we keep a small library-style struct hierarchy distinct from the CLI shells:
 
-- **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. The CTM prepare also deploys the `EcosystemUpgradeOperation` (none on a bootstrap edge, which has no transition). Returns the per-step output TOML paths.
+- **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. Each prepare deploys its own domain's objects; on the bootstrap edge the CTM prepare takes the core executor from the core prepare's output. Returns the per-step output TOML paths.
 - **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before and the ServerNotifier handover calls (bootstrap only) after. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
 - **Free `replay_governance_calls` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `[governance_calls] calls`, dispatches one `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
 
@@ -259,4 +267,4 @@ When reviewing a protocol-ops PR:
 4. **Does the new flow produce one Safe bundle per signer per phase?** If a single phase emits multiple bundles for the same signer, that's a sign the orchestration logic should be on one shared `ForgeRunner`.
 5. **Does the prepare phase rely on data only present in-memory across forge invocations?** If yes, either pass it via TOML written by the previous forge call or use CREATE2 determinism — don't fold separate phases back into one forge process to dodge the question.
 6. **Are addresses in the orchestration code resolved via `l1_contracts.rs` or via `script_params` consts?** Hardcoded addresses anywhere in protocol-ops are almost always wrong.
-7. **Does the new code reintroduce a monolithic prepare, or author governance calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v35/`, `v36/`) via `upgrade-prepare-all`; the merger copies bundles and authors nothing — the only calldata it produces is `execute(operation)`, a pure function of the operation address — and anything that is not the coordinator's `execute` call must be a declared external action.
+7. **Does the new code reintroduce a monolithic prepare, or author governance calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v35/`, `v36/`) via `upgrade-prepare-all`; the merger copies bundles and authors nothing — the only calldata it produces is the executor legs, each a pure function of an (executor, object) pair the prepares report — and anything that is not an executor leg must be a declared external action.

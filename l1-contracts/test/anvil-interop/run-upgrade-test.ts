@@ -35,8 +35,9 @@ runPipelineUpgradeScenario({
   // (the gateway itself, which settles on L1) are the supported shapes.
   targetRoles: ["directSettled", "gateway"],
   // Then two registry-driven hops on the bootstrapped ecosystem, each departing from the state the
-  // previous one left, both driven by the base prepare pipeline and both emitting exactly one
-  // governance call, `execute(operation)`.
+  // previous one left, both driven by the base prepare pipeline and both emitting a governance bundle
+  // of exactly the ordered domain-executor legs the hop needs (`applyL1Upgrade` when the ecosystem
+  // changes, then `applyCTMUpgrade`).
   followUps: [
     // A same-minor PATCH first: one fresh verifier, published as a release that copies the
     // bootstrap's except that member. It runs while the bootstrap's L2 upgrade transaction is
@@ -52,7 +53,7 @@ runPipelineUpgradeScenario({
       expectsEmptyFacetDelta: true,
     },
     // Then an ordinary MINOR upgrade on top of the patch (the v36 edge): one fresh ecosystem
-    // implementation pinned in a CoreTransition and a transition naming it. Its only change is on
+    // implementation pinned in a Core-domain ProxyUpgradeTransition, and a transition. Its only change is on
     // the ecosystem side, so every CTM release member is untouched: the prepare must reuse each of
     // them rather than redeploy the facet set, publishing a copy of the live release one minor up.
     {

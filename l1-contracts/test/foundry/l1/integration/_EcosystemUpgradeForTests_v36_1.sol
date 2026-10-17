@@ -12,8 +12,8 @@ import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 /// @dev Every other release member is byte-identical, so the prepare reuses it: the only thing this
 ///      hop deploys on the CTM side is the verifier pair.
 
-/// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no `CoreTransition`
-///      exists for the transition to name.
+/// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no core transition
+///      exists for the bundle to apply.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgradeForTests_v36_1 is CoreUpgrade_v36 {
     function deployNewEcosystemContractsL1() public virtual override {}

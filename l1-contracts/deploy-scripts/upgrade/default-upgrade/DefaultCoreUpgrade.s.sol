@@ -14,9 +14,13 @@ import {Call} from "contracts/governance/Common.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
-import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {CoreTransitionManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    ProxyUpgradeDomain,
+    ProxyUpgradeRow,
+    ProxyUpgradeTransitionManifest
+} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {
     L1EcosystemContract,
     L1_ECOSYSTEM_CONTRACT_COUNT
@@ -32,9 +36,9 @@ import {Utils} from "../../utils/Utils.sol";
 
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
 ///         prepare: deploys every ecosystem implementation whose code differs from the live one
-///         (and reuses the rest) and pins the swaps in a write-once `CoreTransition`. It emits NO
-///         governance calls of its own — the operation the CTM prepare deploys names the core
-///         transition, and the coordinator's `execute` applies it through the `CoreUpgradeExecutor`.
+///         (and reuses the rest) and pins the swaps in a write-once Core-domain
+///         `ProxyUpgradeTransition`. It emits NO executor call of its own — the merge derives
+///         `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)` from the addresses it reports.
 ///         Anything a version script still needs governance to do is declared as an external
 ///         action and listed in the output.
 /// @dev Version scripts inherit and declare what they change ({changedEcosystemImplementations});
@@ -43,9 +47,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
 
-    /// @notice The write-once inventory of this upgrade's ecosystem implementation swaps; zero
-    ///         when the run deployed no ecosystem implementation.
-    CoreTransition public coreTransition;
+    /// @notice The write-once Core-domain transition of this upgrade's ecosystem implementation
+    ///         swaps; zero when the run deployed no ecosystem implementation.
+    IProxyUpgradeTransition public coreTransition;
 
     /// @dev The governance/admin calls this prepare emits that the upgrade objects do not
     ///      describe (see {ExternalActionsLib}).
@@ -121,18 +125,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             }
         }
         if (participating == 0) {
-            console.log("No ecosystem implementation deployed: this upgrade has no CoreTransition");
+            console.log("No ecosystem implementation deployed: this upgrade has no core transition");
             return;
         }
         // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
         // creation code this object's address is re-derived from.
-        coreTransition = CoreTransition(
+        coreTransition = IProxyUpgradeTransition(
             deployViaCreate2AndNotify(
-                BytecodeUtils.readBytecodeL1("CoreTransition.sol", "CoreTransition"),
-                abi.encode(CoreTransitionManifest({proxyUpgrades: rows})),
-                "CoreTransition"
+                BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
+                abi.encode(ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: rows})),
+                "ProxyUpgradeTransition"
             )
         );
+        coreTransition.validate();
     }
 
     /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a
@@ -216,7 +221,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                     vm.toString(i),
                     " (",
                     vm.toString(deployed[i]),
-                    "): this run deployed it but the CoreTransition does not install it. Add its row to "
+                    "): this run deployed it but the core transition does not install it. Add its row to "
                     "`_coreProxyUpgradeRows()`."
                 )
             );
@@ -409,16 +414,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return config.ownerAddress;
     }
 
-    /// @notice The ecosystem's lifecycle coordinator (`EcosystemUpgradeExecutor`), read from the
-    ///         core executor once the bootstrap edge has bound them: the operation naming this
-    ///         upgrade's transitions is executed through it. The bootstrap prepare overrides this
-    ///         with the coordinator it deploys.
-    function getEcosystemUpgradeExecutor() public view virtual returns (address) {
-        address coordinator = getCoreUpgradeExecutor().coordinator();
-        require(coordinator != address(0), "core executor is not bound to a coordinator: run the bootstrap edge first");
-        return coordinator;
-    }
-
     /// @notice The ecosystem's `CoreUpgradeExecutor`: the owner of the shared ecosystem `ProxyAdmin`
     ///         once the bootstrap edge has handed it over. The bootstrap prepare overrides this
     ///         with the executor it deploys.
@@ -605,11 +600,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         vm.serializeString("root", "upgrade_addresses", deployedAddresses);
         // The objects the CTM prepare and reviewers take from this run.
         vm.serializeAddress("registry", "core_transition_addr", address(coreTransition));
-        vm.serializeAddress("registry", "core_upgrade_executor_addr", address(getCoreUpgradeExecutor()));
         string memory registry = vm.serializeAddress(
             "registry",
-            "ecosystem_upgrade_executor_addr",
-            getEcosystemUpgradeExecutor()
+            "core_upgrade_executor_addr",
+            address(getCoreUpgradeExecutor())
         );
         vm.serializeString("root", "registry", registry);
         (bool recorded, string memory executorsRecord) = upgradeExecutorsRecord();
@@ -627,8 +621,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     ////////////////////////////// Preparing calls /////////////////////////////////
 
     /// @notice Writes this prepare's `[governance_calls] calls`: only what a version script declared
-    ///         as governance external actions. The ecosystem leg — the core transition applied
-    ///         through the `CoreUpgradeExecutor` — rides the coordinator's `execute` call.
+    ///         as governance external actions. The ecosystem leg — `applyL1Upgrade(coreTransition)`
+    ///         on the `CoreUpgradeExecutor` — is derived by the merge.
     function prepareDefaultGovernanceCalls() public virtual returns (Call[] memory calls) {
         calls = prepareGovernanceCalls();
         string memory governanceCallsSerialized = vm.serializeBytes("governance_calls", "calls", abi.encode(calls));
