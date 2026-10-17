@@ -29,6 +29,12 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     // ChainTypeManager
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
+    // Registry upgrade executors: an upgrade's legs (CoreUpgradeExecutor, CTMUpgradeExecutor) and
+    // the owner-gated `forward` (a replacement, the bootstrap's ServerNotifier acceptance)
+    "applyL1Upgrade(address)",
+    "applyInfrastructureUpgrade(address)",
+    "applyCTMUpgrade(address)",
+    "forward((address,uint256,bytes)[])",
     // ChainAssetHandler
     "pauseMigration()",
     "unpauseMigration()",
@@ -158,6 +164,10 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
         "scheduleTransparent" => Some(format!("delay {} s", uint(1)?)),
         "transferOwnership" | "setPendingAdmin" => Some(format!(
             "to `{}`",
+            args.first().and_then(as_address)?.to_checksum(None)
+        )),
+        "applyL1Upgrade" | "applyInfrastructureUpgrade" | "applyCTMUpgrade" => Some(format!(
+            "object `{}`",
             args.first().and_then(as_address)?.to_checksum(None)
         )),
         _ => None,

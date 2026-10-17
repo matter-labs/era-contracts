@@ -13,8 +13,6 @@ import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymen
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IRegisterCTM} from "contracts/script-interfaces/IRegisterCTM.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 
 contract RegisterCTM is Script, IRegisterCTM {
     using stdToml for string;
@@ -87,16 +85,14 @@ contract RegisterCTM is Script, IRegisterCTM {
     }
 
     /// @dev Governance's registration batch: the CTM on the Bridgehub, its asset handler on the asset
-    ///      router and the deployment tracker, and — unless already bound — its executor on the
-    ///      coordinator.
+    ///      router and the deployment tracker.
     /// @param _bridgehub The Bridgehub.
     /// @param _ctm The CTM being registered.
     function _registrationCalls(IL1Bridgehub _bridgehub, address _ctm) internal view returns (Call[] memory calls) {
         ICTMDeploymentTracker ctmDT = _bridgehub.l1CtmDeployer();
         IL1AssetRouter sharedBridge = IL1AssetRouter(address(_bridgehub.assetRouter()));
-        (EcosystemUpgradeExecutor coordinator, CTMUpgradeExecutor executor) = _ctmExecutorBinding(_ctm);
-        bool bind = address(coordinator.ctmExecutor()) != address(executor);
-        calls = new Call[](bind ? 4 : 3);
+        _requireCTMExecutor(_ctm);
+        calls = new Call[](3);
         calls[0] = Call({
             target: address(_bridgehub),
             value: 0,
@@ -111,17 +107,11 @@ contract RegisterCTM is Script, IRegisterCTM {
             )
         });
         calls[2] = Call({target: address(ctmDT), value: 0, data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (_ctm))});
-        if (bind) {
-            calls[3] = Call({
-                target: address(coordinator),
-                value: 0,
-                data: abi.encodeCall(EcosystemUpgradeExecutor.setCTMExecutor, (ICTMUpgradeExecutor(address(executor))))
-            });
-        }
     }
 
     function registerChainTypeManagerForTest(address bridgehubProxy, address chainTypeManagerProxy) internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubProxy);
+        _requireCTMExecutor(chainTypeManagerProxy);
         vm.startBroadcast(getDeployerAddress());
         bridgehub.addChainTypeManager(chainTypeManagerProxy);
         console.log("ChainTypeManager registered");
@@ -133,15 +123,8 @@ contract RegisterCTM is Script, IRegisterCTM {
         console.log("CTM DT whitelisted");
 
         ctmDT.registerCTMAssetOnL1(chainTypeManagerProxy);
-        // In the test flows the deployer still owns the coordinator: governance accepts afterwards.
-        (EcosystemUpgradeExecutor coordinator, CTMUpgradeExecutor executor) = _ctmExecutorBinding(
-            chainTypeManagerProxy
-        );
-        if (address(coordinator.ctmExecutor()) != address(executor)) {
-            coordinator.setCTMExecutor(executor);
-        }
         vm.stopBroadcast();
-        console.log("CTM registered in CTMDeploymentTracker and its executor bound to the coordinator");
+        console.log("CTM registered in CTMDeploymentTracker");
 
         bytes32 assetId = bridgehub.ctmAssetIdFromAddress(chainTypeManagerProxy);
         console.log(
@@ -151,18 +134,14 @@ contract RegisterCTM is Script, IRegisterCTM {
         );
     }
 
-    /// @dev The CTM executor `DeployCTM` handed the CTM to, and the coordinator it was built to answer
-    ///      to. Registration binds the two (`setCTMExecutor`), which puts the CTM under the ecosystem's
-    ///      upgrade lifecycle.
+    /// @dev Requires the CTM to be under the registry upgrade lifecycle: owned by the CTM executor
+    ///      `DeployCTM` handed it to.
     /// @param _ctm The CTM being registered.
-    function _ctmExecutorBinding(
-        address _ctm
-    ) internal view returns (EcosystemUpgradeExecutor coordinator, CTMUpgradeExecutor executor) {
+    function _requireCTMExecutor(address _ctm) internal view {
         address ctmOwner = IOwnable(_ctm).owner();
         require(ctmOwner.code.length != 0, "the CTM is not owned by a CTMUpgradeExecutor");
-        executor = CTMUpgradeExecutor(payable(ctmOwner));
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(ctmOwner));
         require(address(executor.CHAIN_TYPE_MANAGER()) == _ctm, "the CTM owner is not the executor bound to it");
-        coordinator = EcosystemUpgradeExecutor(payable(executor.coordinator()));
     }
 
     function saveOutput(Output memory output, string memory outputPath) internal {

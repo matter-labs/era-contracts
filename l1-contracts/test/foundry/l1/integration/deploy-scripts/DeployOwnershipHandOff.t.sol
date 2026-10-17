@@ -17,7 +17,6 @@ import {BootstrapExecutorOwnerMismatch, InvalidDAForPermanentRollup} from "contr
 import {RegistryAuthorityLib} from "contracts/upgrades/registry/libraries/RegistryAuthorityLib.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 /// @notice Checks that the hand-off `protocol-ops hub init` / `ctm init` performs after the deploy scripts leaves
@@ -68,9 +67,8 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         _assertHandedOff(ctmAddresses.daAddresses.daContracts.rollupDAManager, ctmGovernance);
         _assertHandedOff(validatorTimelock, ownerEoa);
 
-        // The registry authority: governance owns the three executors, the CTM domain is the CTM executor's.
+        // The registry authority: governance owns both executors, the CTM domain is the CTM executor's.
         _assertHandedOff(upgradeExecutors.coreExecutor, governance);
-        _assertHandedOff(upgradeExecutors.coordinator, governance);
         _assertHandedOff(upgradeExecutors.ctmExecutor, governance);
         _assertHandedOff(ctm, upgradeExecutors.ctmExecutor);
         _assertHandedOff(serverNotifier, upgradeExecutors.ctmExecutor);
@@ -112,7 +110,6 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
             address(addresses.bridgehub)
         );
         assertEq(Ownable2Step(upgradeExecutors.coreExecutor).owner(), ecosystemAddresses.shared.governance);
-        assertEq(Ownable2Step(upgradeExecutors.coordinator).owner(), ecosystemAddresses.shared.governance);
         vm.expectRevert(
             abi.encodeWithSelector(
                 BootstrapExecutorOwnerMismatch.selector,
@@ -124,16 +121,12 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         this.checkFreshAuthority();
     }
 
-    /// @notice The executors are born bound to each other and to the domains they hold, and constructed
-    ///         exactly as the deploy outputs record them (the record protocol-ops re-derives them from).
+    /// @notice The executors are born bound to the domains they hold, and constructed exactly as the deploy
+    ///         outputs record them (the record protocol-ops re-derives them from).
     function test_freshEcosystem_executorsAreBoundAndRecorded() public view {
         CoreUpgradeExecutor coreExecutor = CoreUpgradeExecutor(payable(upgradeExecutors.coreExecutor));
-        EcosystemUpgradeExecutor coordinator = EcosystemUpgradeExecutor(payable(upgradeExecutors.coordinator));
         CTMUpgradeExecutor ctmExecutor = CTMUpgradeExecutor(payable(upgradeExecutors.ctmExecutor));
-        assertEq(coreExecutor.coordinator(), address(coordinator), "the core executor answers to the coordinator");
-        assertEq(address(coordinator.CORE_EXECUTOR()), address(coreExecutor), "the coordinator drives it");
-        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor), "registration bound the CTM executor");
-        assertEq(ctmExecutor.coordinator(), address(coordinator), "the CTM executor answers to the coordinator");
+        assertEq(address(coreExecutor.PROXY_ADMIN()), ecosystemAddresses.shared.transparentProxyAdmin);
         assertEq(address(ctmExecutor.CHAIN_TYPE_MANAGER()), address(addresses.chainTypeManager));
         assertEq(address(ctmExecutor.CTM_PROXY_ADMIN()), ctmAddresses.admin.transparentProxyAdmin);
         assertTrue(
@@ -158,18 +151,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
             "the core executor re-derives from its record"
         );
         assertEq(vm.parseTomlAddress(l1Output, "$.upgrade_executors.core_executor.address"), address(coreExecutor));
-        assertEq(
-            Utils.canonicalCreate2Address(
-                vm.parseTomlBytes32(l1Output, "$.upgrade_executors.coordinator.create2_salt"),
-                vm.getCode("EcosystemUpgradeExecutor.sol:EcosystemUpgradeExecutor"),
-                abi.encode(
-                    vm.parseTomlAddress(l1Output, "$.upgrade_executors.coordinator.initial_owner"),
-                    vm.parseTomlAddress(l1Output, "$.upgrade_executors.coordinator.core_executor")
-                )
-            ),
-            address(coordinator),
-            "the coordinator re-derives from its record"
-        );
+        assertFalse(vm.keyExistsToml(l1Output, "$.upgrade_executors.coordinator"), "no coordinator is deployed");
         assertEq(
             Utils.canonicalCreate2Address(
                 vm.parseTomlBytes32(ctmOutput, "$.upgrade_executors.ctm_executor.create2_salt"),
@@ -177,8 +159,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
                 abi.encode(
                     vm.parseTomlAddress(ctmOutput, "$.upgrade_executors.ctm_executor.initial_owner"),
                     vm.parseTomlAddress(ctmOutput, "$.upgrade_executors.ctm_executor.chain_type_manager"),
-                    vm.parseTomlAddress(ctmOutput, "$.upgrade_executors.ctm_executor.ctm_proxy_admin"),
-                    vm.parseTomlAddress(ctmOutput, "$.upgrade_executors.ctm_executor.coordinator")
+                    vm.parseTomlAddress(ctmOutput, "$.upgrade_executors.ctm_executor.ctm_proxy_admin")
                 )
             ),
             address(ctmExecutor),
@@ -197,7 +178,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
     }
 
     /// @dev The accept steps protocol-ops runs: `hub init` (`governanceAcceptOwnerAggregated`, which now also
-    ///      accepts the core executor and the coordinator) and `ctm init` (the CTM admin through the ChainAdmin,
+    ///      accepts the core executor) and `ctm init` (the CTM admin through the ChainAdmin,
     ///      the CTM executor through governance, the validator timelock by the owner EOA). The ChainAdmin and
     ///      owner-EOA steps broadcast as the script `--sender`, which a test cannot choose, so they are issued as
     ///      the call each helper broadcasts.
@@ -226,7 +207,6 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
                 serverNotifier: ctmAddresses.stateTransition.proxies.serverNotifier,
                 ctmExecutor: upgradeExecutors.ctmExecutor,
                 coreExecutor: upgradeExecutors.coreExecutor,
-                coordinator: upgradeExecutors.coordinator,
                 governance: ecosystemAddresses.shared.governance
             });
     }

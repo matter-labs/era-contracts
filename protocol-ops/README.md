@@ -61,17 +61,29 @@ missing inputs fail before deployment.
 
 The merged package `<env-out>/ecosystem.toml` carries ONE governance bundle, `[governance_calls] calls`, in this
 order: the merge's own extras (the PUH/Guardians wiring when the release redeploys the governance set, then any CTM
-`acceptOwnership()` normalization), the core prepare's declared calls, the derived
-`EcosystemUpgradeExecutor.execute(operation)` (recurring upgrades only), then the CTM prepare's declared calls.
-Every call but `execute` is declared in `external_actions`. A recurring upgrade's bundle is therefore one call
-when nothing else is declared; the bootstrap edge's is the list `RegistryBootstrapSequence.actions()` derives,
-ending in the edge's completion check `validateApplied()`, so an edge that does not complete reverts the whole
-bundle. `ecosystem upgrade-governance` replays that bundle on a fork as the governance owner.
+`acceptOwnership()` normalization), the core prepare's declared calls, the derived executor legs, then the CTM
+prepare's declared calls. The legs are one contiguous run in canonical order, each present only when its prepare
+reported the object (`[registry]` of the core and CTM prepare outputs), all with no value:
+
+1. `CoreUpgradeExecutor.applyL1Upgrade(core_transition_addr)` on `core_upgrade_executor_addr`;
+2. `CTMUpgradeExecutor.applyInfrastructureUpgrade(ctm_infrastructure_transition_addr)` on
+   `ctm_upgrade_executor_addr`;
+3. `CTMUpgradeExecutor.applyCTMUpgrade(ctm_transition_addr)` on `ctm_upgrade_executor_addr`.
+
+Governance executes the whole bundle in one transaction that reverts on any failing call, so the legs apply in
+that order or not at all (see
+[the coordination doc](../protocol-docs/ecosystem-upgrade-coordination.md)). A core-only upgrade needs no CTM leg.
+Every call but a leg is declared in `external_actions`, and each prepare must emit its declared actions in
+declaration order. The merge refuses a package that would leave a reported object unapplied or that upgrades
+nothing, and a leg whose executor is missing or zero. The bootstrap edge derives no leg: its bundle is the list
+`RegistryBootstrapSequence.actions()` derives (the core transition included), ending in the edge's completion
+check `validateApplied()`, so an edge that does not complete reverts the whole bundle. `ecosystem
+upgrade-governance` replays that bundle on a fork as the governance owner.
 
 A fresh ecosystem (`ecosystem init`, or `hub init` + `ctm init`) is born into the registry model: the
-deployer creates the core executor, the coordinator and the CTM executor, hands them the ProxyAdmins, the CTM
-and the ServerNotifier, and nominates the ecosystem governance, which `hub init` / `ctm init` accept. Its first
-upgrade is therefore a recurring one, never the bootstrap edge. Owner operations on its CTM go through
+deployer creates the core executor and the CTM executor, hands them the ProxyAdmins, the CTM and the
+ServerNotifier, and nominates the ecosystem governance, which `hub init` / `ctm init` accept. Its first upgrade
+is therefore an ordinary one, never the bootstrap edge. Owner operations on its CTM go through
 `CTMUpgradeExecutor.forward`.
 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
@@ -103,9 +115,9 @@ cargo run --release --bin protocol_ops -- ecosystem upgrade-prepare-all --env <e
 
 The prepare deploys only the replacement `CTMTransition` (under the CTM salt), landing on an existing release,
 and emits one governance call, `CTMUpgradeExecutor.forward([replaceUpgradeTransition(expected,
-replacement)])`, optionally followed in the same `forward` by `setProtocolVersionDeadline`. The merged package
-has no `[operation]`; `upgrade-governance` replays it like any other. Verify it with `verify-package` before it
-is signed (see below).
+replacement)])`, optionally followed in the same `forward` by `setProtocolVersionDeadline`. The merge derives no
+executor leg for it and refuses a core transition or a CTM infrastructure object beside it; `upgrade-governance`
+replays it like any other. Verify it with `verify-package` before it is signed (see below).
 
 ## Environment inputs
 
@@ -136,9 +148,13 @@ any Safe-bundle-aware executor.
 ## Verifying a registry-driven upgrade before it is signed
 
 `ecosystem verify-bootstrap` (alias `verify-package`) is the verifier for current packages. It
-reads the merged `ecosystem.toml`, decides from the package itself whether it drives a recurring
-upgrade, the one-time bootstrap edge or a transition replacement, and refuses a package that is none
-of them. It is read-only and needs nothing but that file, an L1 RPC and the reviewer's inputs.
+reads the merged `ecosystem.toml` and decides from its calldata whether it drives an upgrade (executor
+legs), the one-time bootstrap edge (`migrate()`) or a transition replacement (a `forward` carrying
+`replaceUpgradeTransition`). It refuses a package that is none of them or mixes them. For an upgrade it
+recovers each leg's executor and object from the calldata and reconciles them with the prepare
+summaries (`[core.registry]`, `[ctms.*.registry]`), both ways: a reported object without its leg, a
+leg without its reported object, a substituted object or executor, a duplicated leg, a leg carrying
+value and any other call to an executor are refused at load. It is read-only and needs nothing but that file, an L1 RPC and the reviewer's inputs.
 
 ```bash
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
@@ -154,9 +170,10 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 It answers two questions and keeps them apart.
 
 **What does this upgrade do?** is answered by reviewing the objects the package names — the
-operation, the transition it may carry, the release pair, the core registry, and the lifecycle
-objects it runs through (the coordinator and both domain executors; for the bootstrap edge also the
-migration and the sequence its calls are derived from). Each is held against its own
+Core-domain and CTM-domain `ProxyUpgradeTransition`s and the `CTMTransition` its legs apply, the
+release pair, and the domain executors it runs through (for the bootstrap edge also the migration
+and the sequence its calls are derived from). Each `ProxyUpgradeTransition`'s domain is held
+against the domain of the leg that applies it, fixed by the leg rather than read from the object. Each is held against its own
 construction: the reviewed creation code, run on that object's reviewed constructor arguments,
 must land at the object's address. For a write-once object those arguments are the manifest it
 serves; for an executor they are the ones its record states (below), and for the bootstrap
@@ -176,7 +193,7 @@ its own), passed with the repeatable `--executor-record`. The record's salt and 
 arguments re-derive the address; its immutable bindings are still held against the package's values,
 and its initial owner is only reported — a fresh ecosystem constructs its executors for the deployer
 and nominates governance. An executor without a record is unverified, which is an error. The live
-owner, pending owner and coordinator are checked separately. Each write-once object's live code is
+owner and pending owner are checked separately, against the reviewed governance. Each write-once object's live code is
 also compared with the reviewed build's deployed bytecode of its contract. Every release the package installs is
 held against the reviewed genesis: `genesisBatchHash` against the `genesis_root` of
 `configs/genesis/zksync-os/latest.json`, `genesisIndexRepeatedStorageChanges` against zero, and
@@ -216,10 +233,10 @@ bytecode of the contract its `L2EcosystemContract` slot names (`EmptyContract` f
 GWAssetTracker), its system-proxy shell `SystemContractProxy`'s, a plan's delegate
 `L2DefaultUpgrade`'s and each extra bytecode some reviewed contract's.
 
-**Every proxy row names the proxy of its slot.** Row `i` of a core transition's ecosystem inventory
-is `L1EcosystemContract` member `i`, of an operation's or the bootstrap's CTM-domain inventory
-`CTMContract` member `i`, and that member's proxy is discovered on chain: the Bridgehub (from the
-CTM's `BRIDGE_HUB()`) and its `assetRouter()`, the router's `L1_NULLIFIER()` and
+**Every proxy row names the proxy of its slot.** Row `i` of a Core-domain inventory is
+`L1EcosystemContract` member `i`, of a CTM-domain one or the bootstrap's `CTMContract` member `i`,
+and that member's proxy is discovered on chain: the Bridgehub (from the CTM's `BRIDGE_HUB()`, or the
+core prepare's `bridgehub_proxy_addr` for a core-only package naming no CTM) and its `assetRouter()`, the router's `L1_NULLIFIER()` and
 `nativeTokenVault()`, the Bridgehub's `messageRoot()`, `l1CtmDeployer()`, `chainAssetHandler()` and
 `chainRegistrationSender()`, the nullifier's `l1InteropHandler()`; the CTM itself and its
 `validatorTimelockPostV29()`, `L1_BYTECODES_SUPPLIER()`, `PERMISSIONLESS_VALIDATOR()` and
@@ -242,11 +259,14 @@ and any `setProtocolVersionDeadline` riding the `forward` are reported. The dest
 existing release, possibly built by an earlier commit, so neither its genesis nor its members are
 judged on this path; the replacement's own engine, composer and L2 bytecodes are.
 
-**Does the signed transaction invoke it?** is answered, for a recurring upgrade, by re-encoding
-`EcosystemUpgradeExecutor.execute(operation)` on the reviewed coordinator and comparing byte for
-byte; the bundle must carry it exactly once. The operation's internal calls are deliberately not
-re-derived — the executors derive them on chain from the same pinned object. Any call that is
-neither the executor call nor a declared governance external action fails the run. For the
+**Does the signed transaction invoke it?** is answered, for an upgrade, by re-encoding each leg
+from the reviewed executor and object and requiring the run — core, then CTM infrastructure, then
+CTM transition, each only when present — to appear exactly once, contiguous and in that order; a
+swapped order or another call between two legs fails the run. The legs' internal calls are
+deliberately not re-derived — the executors derive them on chain from the same pinned objects. Every
+other call must be a declared governance external action, matched one for one and in declared order,
+with every declaration present, and none may reach the upgrade's authorities (the executors, the
+objects, the CTM, either ProxyAdmin) whether declared or not. For the
 bootstrap edge the bundle must END with the run `actions()` of the construction-verified sequence
 derives, in order — whose last call is `validateApplied()` on the migration, so a failing completion
 check reverts the whole bootstrap — and every call before it must be a declared external action to
@@ -255,7 +275,9 @@ object is an error whether declared or not. A replacement's bundle must carry th
 sent to the executor that owns the CTM, and nothing else may reach the CTM or its executor.
 
 Around those it checks what the objects cannot answer for themselves: authority bound where the
-review says (governance, coordinator, both domain executors, the CTM and both ProxyAdmins), the
+review says (governance owning each executor with no nomination outstanding, the CTM executor bound
+to the reviewed CTM and CTM-domain ProxyAdmin, the core executor to the ecosystem ProxyAdmin, and
+each domain still held by its executor), the
 live state the upgrade departs from, and readiness — the L2 factory dependencies published on the
 CTM's supplier. Readiness is reported apart
 from anything about value. For the bootstrap edge it also lists, as warnings, every chain on the

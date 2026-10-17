@@ -6,9 +6,9 @@
  *
  *   1. Boot the ecosystem of the current sources: the `stateVersion` chain states, or a fresh
  *      deployment with `ANVIL_INTEROP_FRESH_DEPLOY=1`.
- *   2. Discover the upgrade executors the deployment created from chain (CTM owner = CTM executor,
- *      its `coordinator()`, the coordinator's `CORE_EXECUTOR()`) and assert the bound shape a fresh
- *      ecosystem is born with — nothing is bootstrapped here.
+ *   2. Discover the upgrade executors the deployment created through the custody each holds (the
+ *      CTM's owner = the CTM executor, the ecosystem ProxyAdmin's owner = the core executor), and
+ *      assert the bound shape a fresh ecosystem is born with — nothing is bootstrapped here.
  *   3. Deploy the new-version implementations of a synthetic minor bump (fresh facets except
  *      Mailbox, `DefaultUpgrade` engine, verifier, `DiamondInit`, and an `L1MessageRoot`
  *      implementation for the ecosystem leg) from the `registry-deterministic` forge profile. The
@@ -16,11 +16,15 @@
  *      reproducible run-to-run and machine-to-machine.
  *   4. CONSUME the committed manifest scripts/registry-manifests/v35-local.json (any drift from the
  *      live deployment fails), or with `REGEN_REGISTRIES=1` EMIT it from the live deployment; then
- *      deploy the `CTMRelease` / `CoreTransition` / `CTMTransition` from it and `validate()` them.
+ *      deploy the `CTMRelease`, the Core-domain `ProxyUpgradeTransition` (plus a CTM-domain one when
+ *      the manifest changes a CTM-domain proxy) and the `CTMTransition` from it and `validate()` them.
  *      The transition departs from the CTM's live `currentRelease`.
- *   5. Execute the operation through the existing coordinator's `execute(operation)` and upgrade
- *      each chain through the CTM executor's `upgradeChain`, every call sent by the executor's live
- *      owner (impersonated).
+ *   5. Governance accepts its nomination on both executors (a fresh deployment only nominates it),
+ *      then executes ONE bundle through the ecosystem `Governance` (`scheduleTransparent` +
+ *      `execute`): `applyL1Upgrade` -> [`applyInfrastructureUpgrade`] -> `applyCTMUpgrade`. A bundle
+ *      whose last leg fails is executed first and must leave nothing applied. Each chain is then
+ *      upgraded through the CTM executor's `upgradeChain`, sent by the executor's live owner
+ *      (impersonated).
  *   6. Assert the L1 end state, then relay each chain's transition-composed L2 upgrade transaction
  *      through the real `L2ComplexUpgrader`.
  *
@@ -55,15 +59,25 @@ import {
 import { createProvider, impersonateAndRun } from "../core/utils";
 import {
   coreInitArgs,
+  ctmInfrastructureInitArgs,
   l2BytecodeInfoRows,
   l2BytecodeInfoSlots,
-  operationInitArgs,
   releaseInitArgs,
   transitionInitArgs,
 } from "./registry-manifest";
 import { assertServerNotifierState } from "./bootstrap-upgrade-stage";
+import type { ExpectedCall, UpgradeLeg } from "./governance-bundle";
 import type { ChainRole } from "../core/types";
-import { clearGenesisUpgradeTxHash, selectUpgradeChains, traceFailedTx } from "./upgrade-test-utils";
+import {
+  assertLegsApplied,
+  clearGenesisUpgradeTxHash,
+  discoverDomainExecutors,
+  readProxyImplementation,
+  selectUpgradeChains,
+  snapshotProxyUpgradeLegs,
+  traceFailedTx,
+  upgradeLegCall,
+} from "./upgrade-test-utils";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -111,8 +125,7 @@ const DETERMINISTIC_SOURCES = [
   "contracts/dev-contracts/MockContractDeployer.sol",
   "contracts/upgrades/registry/objects/CTMRelease.sol",
   "contracts/upgrades/registry/objects/CTMTransition.sol",
-  "contracts/upgrades/registry/objects/CoreTransition.sol",
-  "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol",
+  "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol",
 ];
 
 // Mirror L2GenesisForceDeploymentsHelper.generateRandomAddress: the delegate must be
@@ -259,10 +272,9 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     console.log(`  live AdminFacet: ${live.oldAdminFacet} (${live.adminSelectors.length} selectors)`);
 
     console.log("\n── Discovering the upgrade executors ──");
-    const executors = await discoverUpgradeExecutors(l1Provider, ctm.address, live);
+    const executors = await discoverUpgradeExecutors(l1Provider, ctm.address, live, l1Addresses.governance);
     const ctmExecutor = new ethers.Contract(executors.ctmExecutor, getAbi("CTMUpgradeExecutor"), l1Provider);
     const coreExecutor = new ethers.Contract(executors.coreExecutor, getAbi("CoreUpgradeExecutor"), l1Provider);
-    const coordinator = new ethers.Contract(executors.coordinator, getAbi("EcosystemUpgradeExecutor"), l1Provider);
 
     // ── 3. Deploy the new-version implementations ──
     console.log("\n── Deploying new-version implementations ──");
@@ -275,7 +287,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     });
 
     // ── 4. Regenerate (EMIT) or validate (CONSUME) the committed manifest, then deploy the
-    //       release / core transition / CTM transition from it ──
+    //       release / proxy upgrade transition(s) / CTM transition from it ──
     const manifestPath = path.join(l1ContractsDir, REGISTRY_MANIFEST_REL);
     if (regenRegistries) {
       console.log(`\n── ${REGEN_ENV_VAR}=1: regenerating the committed registry manifest ──`);
@@ -289,26 +301,44 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     }
     const manifestJson = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     const objects = await deployUpgradeObjectsFromManifest(deployer, manifestJson, deployed);
-    console.log(`  CTM release:     ${objects.release}`);
-    console.log(`  CTM transition:  ${objects.transition}`);
-    console.log(`  core transition: ${objects.coreTransition}`);
+    console.log(`  CTM release:               ${objects.release}`);
+    console.log(`  CTM transition:            ${objects.transition}`);
+    console.log(`  core transition:           ${objects.coreTransition}`);
+    console.log(`  CTM infrastructure object: ${objects.ctmInfrastructureTransition ?? "(none: no CTM-domain row)"}`);
+
+    // The bundle's legs, in canonical order; absent objects leave their leg out.
+    const legs: UpgradeLeg[] = [
+      { kind: "core", executor: executors.coreExecutor, object: objects.coreTransition },
+      ...(objects.ctmInfrastructureTransition
+        ? [
+            {
+              kind: "ctmInfrastructure" as const,
+              executor: executors.ctmExecutor,
+              object: objects.ctmInfrastructureTransition,
+            },
+          ]
+        : []),
+      { kind: "ctmTransition", executor: executors.ctmExecutor, object: objects.transition },
+    ];
 
     // `validate()` is what the executors call on the execution path; running it here makes a
-    // manifest naming an address without code fail in this step rather than mid-upgrade.
+    // manifest naming an address without code fail in this step rather than mid-upgrade. The row
+    // objects' snapshot validates them, checks their domain and records each row's source.
     const releaseContract = new ethers.Contract(objects.release, getAbi("ICTMRelease"), l1Provider);
     const transition = new ethers.Contract(objects.transition, getAbi("ICTMTransition"), l1Provider);
-    const coreTransitionContract = new ethers.Contract(objects.coreTransition, getAbi("ICoreTransition"), l1Provider);
+    let rowSnapshots: Awaited<ReturnType<typeof snapshotProxyUpgradeLegs>>;
     try {
       await releaseContract.callStatic.validate();
       await transition.callStatic.validate();
-      await coreTransitionContract.callStatic.validate();
+      rowSnapshots = await snapshotProxyUpgradeLegs(l1Provider, legs);
       assertEq(await transition.fromRelease(), live.fromRelease, "transition departs from the CTM's live release");
       assertEq(
         (await transition.newProtocolVersion()).toString(),
         live.newVersion.toString(),
         "transition commits the new protocol version"
       );
-      assertTrue((await coreTransitionContract.ecosystemRows()).length > 0, "core transition has ecosystem rows");
+      const coreRows = rowSnapshots.find((snapshot) => snapshot.leg.kind === "core")?.rows ?? [];
+      assertTrue(coreRows.length > 0, "core transition has ecosystem rows");
     } catch (error) {
       throw regenRegistries ? error : staleRegistriesError(error);
     }
@@ -318,41 +348,65 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     await publishFactoryDeps(l1Provider, supplier, [getDeterministicBytecode("MockContractDeployer")]);
     console.log("  ✓ the L2 delegate's bytecode is published on the CTM's supplier");
 
-    // ── 5. Execute the operation through the coordinator ──
-    console.log("\n── Executing the registry-driven upgrade via the coordinator ──");
-    const operationFactory = new ethers.ContractFactory(
-      getAbi("EcosystemUpgradeOperation"),
-      getDeterministicCreationBytecode("EcosystemUpgradeOperation"),
-      deployer
-    );
-    const operationContract = await operationFactory.deploy(
-      operationInitArgs(
-        (manifestJson.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME),
-        objects.coreTransition,
-        objects.transition
-      )
-    );
-    await operationContract.deployed();
-    const operation: string = operationContract.address;
-    console.log(`  operation: ${operation}`);
+    // ── 5. Governance executes the upgrade as one bundle ──
+    console.log("\n── Executing the registry-driven upgrade as one governance bundle ──");
+    await acceptExecutorNominations(l1Provider, executors);
+    const bundle = legs.map(upgradeLegCall);
 
-    const executeReceipt = await sendAsOwner(
+    // A bundle whose last leg fails must leave nothing applied: governance executes its calls in one
+    // transaction and propagates any failure. The core leg is first shown to succeed on its own,
+    // so the revert is the substituted last leg's and the unchanged MessageRoot is the rollback.
+    await coreExecutor.callStatic.applyL1Upgrade(objects.coreTransition, { from: executors.governance });
+    const substitutedLastLeg: ExpectedCall = {
+      ...upgradeLegCall({ kind: "ctmTransition", executor: executors.ctmExecutor, object: objects.coreTransition }),
+      label: "CTMUpgradeExecutor.applyCTMUpgrade(<the core transition, not a CTM transition>)",
+    };
+    await executeGovernanceBundle(
       l1Provider,
-      coordinator,
-      (c) => c.execute(operation, { gasLimit: DEFAULT_GAS_LIMIT }),
-      "coordinator.execute(operation)"
+      executors.governance,
+      [...bundle.slice(0, -1), substitutedLastLeg],
+      "registry-driven upgrade, last leg substituted",
+      true
     );
-    const executed = eventsIn(executeReceipt, coordinator, "OperationExecuted");
-    assertEq(executed.length, 1, "execute emitted OperationExecuted once");
-    assertEq(executed[0].args.operation, operation, "OperationExecuted names the operation");
-    const coreApplied = eventsIn(executeReceipt, coreExecutor, "L1UpgradeApplied");
-    assertEq(coreApplied.length, 1, "the core leg ran inside execute (one L1UpgradeApplied)");
-    assertEq(coreApplied[0].args.coreTransition, objects.coreTransition, "L1UpgradeApplied names the core transition");
-    const ctmApplied = eventsIn(executeReceipt, ctmExecutor, "CTMUpgradeApplied");
-    assertEq(ctmApplied.length, 1, "the CTM leg ran inside execute (one CTMUpgradeApplied)");
-    assertEq(ctmApplied[0].args.transition, objects.transition, "CTMUpgradeApplied names the transition");
+    assertEq(
+      await readProxyImplementation(l1Provider, live.messageRootProxy),
+      live.messageRootImplOld,
+      "a failing last leg rolls back the core leg's swap"
+    );
+    assertEq((await ctm.protocolVersion()).toString(), live.oldVersion.toString(), "the CTM version is unchanged");
+
+    const executeReceipt = await executeGovernanceBundle(
+      l1Provider,
+      executors.governance,
+      bundle,
+      "registry-driven upgrade"
+    );
+    const applied = await assertLegsApplied(l1Provider, executeReceipt, legs, rowSnapshots);
+    console.log(
+      `  ✓ one governance execution applied ${legs.map((leg) => leg.kind).join(" -> ")} in order ` +
+        `(${applied.rows} row(s) at implNew, ${applied.swaps} swap(s) emitted)`
+    );
+    const swaps = eventsIn(executeReceipt, coreExecutor, "ProxyImplementationUpgraded");
+    assertEq(swaps.length, 1, "the core leg swapped exactly one proxy");
+    assertEq(swaps[0].args.proxy, live.messageRootProxy, "ProxyImplementationUpgraded names the MessageRoot proxy");
+    assertEq(
+      swaps[0].args.newImpl,
+      deployed.newMessageRootImpl,
+      "ProxyImplementationUpgraded names the fresh implementation"
+    );
+    const [ctmApplied] = eventsIn(executeReceipt, ctmExecutor, "CTMUpgradeApplied");
+    assertEq(
+      ctmApplied.args.oldProtocolVersion.toString(),
+      live.oldVersion.toString(),
+      "CTMUpgradeApplied records the departing version"
+    );
+    assertEq(
+      ctmApplied.args.newProtocolVersion.toString(),
+      live.newVersion.toString(),
+      "CTMUpgradeApplied records the new version"
+    );
     await ctmExecutor.validateTransitionApplied(objects.transition);
-    console.log("  ✓ validateTransitionApplied(transition) holds after execute");
+    console.log("  ✓ validateTransitionApplied(transition) holds after the bundle");
 
     // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains (see
     // module docs); cleared once, before the first bump.
@@ -601,26 +655,32 @@ async function readLiveUpgradeInputs(
   };
 }
 
-type UpgradeExecutors = { ctmExecutor: string; coordinator: string; coreExecutor: string };
+type UpgradeExecutors = { ctmExecutor: string; coreExecutor: string; governance: string };
 
 /**
- * The executors the deployment created, read from chain (CTM owner -> its `coordinator()` -> the
- * coordinator's `CORE_EXECUTOR()`), asserted to be in the bound shape a fresh ecosystem is born
- * with: every binding both ways, the CTM, its ProxyAdmin and the ServerNotifier held by the CTM
- * executor, the ecosystem ProxyAdmin by the core executor, and one owner over all three executors.
+ * The executors the deployment created, each found through the custody it holds (the CTM's owner,
+ * the ecosystem ProxyAdmin's owner) and asserted to be in the bound shape a fresh ecosystem is born
+ * with: the CTM, its ProxyAdmin and the ServerNotifier held by the CTM executor, the ecosystem
+ * ProxyAdmin by the core executor, and both executors answering to the ecosystem governance — as
+ * owner, or as the pending nominee a fresh deployment leaves.
  */
 async function discoverUpgradeExecutors(
   l1Provider: ethers.providers.JsonRpcProvider,
   ctmAddr: string,
-  live: LiveUpgradeInputs
+  live: LiveUpgradeInputs,
+  ecosystemGovernance: string
 ): Promise<UpgradeExecutors> {
+  const { ctmExecutor: ctmExecutorAddr, coreExecutor: coreExecutorAddr } = await discoverDomainExecutors(
+    l1Provider,
+    ctmAddr,
+    live.ecosystemProxyAdmin
+  );
+  console.log(`  ✓ the CTM's owner ${ctmExecutorAddr} is a CTM executor bound to it`);
+  console.log(`  ✓ the ecosystem ProxyAdmin's owner ${coreExecutorAddr} is a core executor bound to it`);
   const ctmOwnable = new ethers.Contract(ctmAddr, getAbi("Ownable2Step"), l1Provider);
-  const ctmExecutorAddr: string = await ctmOwnable.owner();
-  assertTrue((await l1Provider.getCode(ctmExecutorAddr)) !== "0x", `CTM owner ${ctmExecutorAddr} is a contract`);
   assertEq(await ctmOwnable.pendingOwner(), ethers.constants.AddressZero, "CTM has no pending owner");
 
   const ctmExecutor = new ethers.Contract(ctmExecutorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
-  assertEq(await ctmExecutor.CHAIN_TYPE_MANAGER(), ctmAddr, "CTM executor is bound to the CTM");
   assertEq(await ctmExecutor.CTM_PROXY_ADMIN(), live.ctmProxyAdmin, "CTM executor is bound to the CTM's ProxyAdmin");
   const ctmProxyAdmin = new ethers.Contract(live.ctmProxyAdmin, getAbi("ProxyAdmin"), l1Provider);
   assertEq(await ctmProxyAdmin.owner(), ctmExecutorAddr, "CTM-domain ProxyAdmin owned by the CTM executor");
@@ -636,33 +696,101 @@ async function discoverUpgradeExecutors(
     "held by the CTM executor under the CTM-domain ProxyAdmin"
   );
 
-  const coordinatorAddr: string = await ctmExecutor.coordinator();
-  const coordinator = new ethers.Contract(coordinatorAddr, getAbi("EcosystemUpgradeExecutor"), l1Provider);
-  assertEq(await coordinator.ctmExecutor(), ctmExecutorAddr, "coordinator is bound to the CTM executor");
-  const coreExecutorAddr: string = await coordinator.CORE_EXECUTOR();
-  const coreExecutor = new ethers.Contract(coreExecutorAddr, getAbi("CoreUpgradeExecutor"), l1Provider);
-  assertEq(await coreExecutor.coordinator(), coordinatorAddr, "core executor answers to the coordinator");
-  assertEq(
-    await coreExecutor.PROXY_ADMIN(),
-    live.ecosystemProxyAdmin,
-    "core executor is bound to the ecosystem ProxyAdmin"
-  );
-  const ecosystemProxyAdmin = new ethers.Contract(live.ecosystemProxyAdmin, getAbi("ProxyAdmin"), l1Provider);
-  assertEq(await ecosystemProxyAdmin.owner(), coreExecutorAddr, "ecosystem ProxyAdmin owned by the core executor");
-
   // Governance on a production ecosystem; on a fresh anvil deployment the deployer, with
-  // governance's nomination never accepted.
-  const owner: string = await coordinator.owner();
-  const pendingOwner: string = await coordinator.pendingOwner();
-  for (const executor of [ctmExecutor, coreExecutor]) {
-    assertEq(await executor.owner(), owner, `executor ${executor.address} shares the coordinator's owner`);
-    assertEq(await executor.pendingOwner(), pendingOwner, `executor ${executor.address} shares its pending owner`);
-  }
+  // governance's nomination not yet accepted.
+  const coreExecutor = new ethers.Contract(coreExecutorAddr, getAbi("CoreUpgradeExecutor"), l1Provider);
+  const owner: string = await ctmExecutor.owner();
+  const pendingOwner: string = await ctmExecutor.pendingOwner();
+  assertEq(await coreExecutor.owner(), owner, "the core executor shares the CTM executor's owner");
+  assertEq(await coreExecutor.pendingOwner(), pendingOwner, "the core executor shares its pending owner");
+  const governance = pendingOwner === ethers.constants.AddressZero ? owner : pendingOwner;
+  assertEq(governance, ecosystemGovernance, "both executors answer to the ecosystem governance");
+  assertTrue((await l1Provider.getCode(governance)) !== "0x", `governance ${governance} is a contract`);
   console.log(`  CTM executor:  ${ctmExecutorAddr}`);
-  console.log(`  coordinator:   ${coordinatorAddr}`);
   console.log(`  core executor: ${coreExecutorAddr}`);
   console.log(`  owner: ${owner} (pending: ${pendingOwner})`);
-  return { ctmExecutor: ctmExecutorAddr, coordinator: coordinatorAddr, coreExecutor: coreExecutorAddr };
+  return { ctmExecutor: ctmExecutorAddr, coreExecutor: coreExecutorAddr, governance };
+}
+
+// ── Governance ───────────────────────────────────────────────────────
+
+/**
+ * Schedules `calls` as one `Governance` operation (`scheduleTransparent` at the timelock's
+ * `minDelay`) and executes it, both sent by the governance owner (impersonated). The operation's
+ * salt is derived from `label`, so two operations of the same calls stay apart. With `expectRevert`,
+ * the execution must be mined and revert; its receipt is returned either way.
+ */
+async function executeGovernanceBundle(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  governanceAddr: string,
+  calls: ExpectedCall[],
+  label: string,
+  expectRevert = false
+): Promise<ethers.providers.TransactionReceipt> {
+  const governance = new ethers.Contract(governanceAddr, getAbi("Governance"), l1Provider);
+  const operation = {
+    calls: calls.map((call) => ({ target: call.target, value: call.value ?? 0, data: call.data })),
+    predecessor: ethers.constants.HashZero,
+    salt: ethers.utils.keccak256(ethers.utils.toUtf8Bytes(label)),
+  };
+  const delay: ethers.BigNumber = await governance.minDelay();
+  const owner: string = await governance.owner();
+  console.log(`  governance bundle "${label}": ${calls.map((call) => call.label).join(" -> ")}`);
+  return impersonateAndRun(l1Provider, owner, async (signer) => {
+    const connected = governance.connect(signer);
+    await sendAndCheck(
+      l1Provider,
+      connected.scheduleTransparent(operation, delay, { gasLimit: DEFAULT_GAS_LIMIT }),
+      `${label}: Governance.scheduleTransparent`
+    );
+    if (!delay.isZero()) {
+      await l1Provider.send("evm_increaseTime", [delay.toNumber()]);
+      await l1Provider.send("evm_mine", []);
+    }
+    const execute = connected.execute(operation, { gasLimit: DEFAULT_GAS_LIMIT });
+    if (!expectRevert) {
+      return sendAndCheck(l1Provider, execute, `${label}: Governance.execute`);
+    }
+    const tx = await execute;
+    const receipt = await l1Provider.waitForTransaction(tx.hash);
+    if (receipt.status !== 0) {
+      throw new Error(`${label}: Governance.execute was expected to revert, but succeeded (${tx.hash})`);
+    }
+    return receipt;
+  });
+}
+
+/**
+ * On a fresh deployment the executors' owner is the deployer and governance only their nominee:
+ * governance accepts both nominations, through itself, before it can send the upgrade bundle.
+ */
+async function acceptExecutorNominations(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  executors: UpgradeExecutors
+): Promise<void> {
+  const ownable = new ethers.utils.Interface(getAbi("Ownable2Step"));
+  const accepts: ExpectedCall[] = [];
+  for (const [name, address] of [
+    ["coreExecutor", executors.coreExecutor],
+    ["ctmExecutor", executors.ctmExecutor],
+  ] as const) {
+    const executor = new ethers.Contract(address, getAbi("Ownable2Step"), l1Provider);
+    if ((await executor.owner()).toLowerCase() !== executors.governance.toLowerCase()) {
+      accepts.push({
+        label: `${name}.acceptOwnership()`,
+        target: address,
+        data: ownable.encodeFunctionData("acceptOwnership"),
+      });
+    }
+  }
+  if (accepts.length !== 0) {
+    await executeGovernanceBundle(l1Provider, executors.governance, accepts, "accept the executor nominations");
+  }
+  for (const address of [executors.coreExecutor, executors.ctmExecutor]) {
+    const executor = new ethers.Contract(address, getAbi("Ownable2Step"), l1Provider);
+    assertEq(await executor.owner(), executors.governance, `executor ${address} is owned by governance`);
+    assertEq(await executor.pendingOwner(), ethers.constants.AddressZero, `executor ${address} has no pending owner`);
+  }
 }
 
 // ── Deployment ───────────────────────────────────────────────────────
@@ -940,6 +1068,8 @@ function assertCommittedManifestMatchesLiveDeployment(
     ["ctm.transition.upgradeEngine.address", ctm?.transition?.upgradeEngine?.address, deployed.newDefaultUpgrade],
     // No facet swaps in the manifest at all: the delta is DERIVED on-chain from the release pair.
     ["ctm.transition.facetSwaps", ctm?.transition?.facetSwaps === undefined, true],
+    // CTM-domain rows are their own object's (`ctm.infrastructure.contracts`), never the transition's.
+    ["ctm.transition.proxyUpgrades (retired)", ctm?.transition?.proxyUpgrades === undefined, true],
     ["ctm.release.genesisFacets[AdminFacet].address", genesisFacet("AdminFacet")?.address, deployed.newAdminFacet],
     [
       "ctm.release.genesisFacets[MailboxFacet].address",
@@ -977,23 +1107,24 @@ function assertCommittedManifestMatchesLiveDeployment(
 }
 
 /**
- * Deploy the release / core transition / CTM transition from the manifest — each takes its manifest
- * as a constructor argument. The release deploys first: the transition's constructor validates its
- * target release and derives the facet/L2 delta from the release pair.
+ * Deploy the release / proxy upgrade transition(s) / CTM transition from the manifest — each takes
+ * its manifest as a constructor argument. The release deploys first: the transition's constructor
+ * validates its target release and derives the facet/L2 delta from the release pair. The CTM-domain
+ * `ProxyUpgradeTransition` exists only when the manifest changes a CTM-domain proxy.
  */
 async function deployUpgradeObjectsFromManifest(
   deployer: ethers.Wallet,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   manifest: any,
   deployed: DeployedImplementations
-): Promise<{ release: string; transition: string; coreTransition: string }> {
+): Promise<{ release: string; transition: string; coreTransition: string; ctmInfrastructureTransition?: string }> {
   const ctm = (manifest.ctms || []).find((c: { name?: string }) => c.name === CTM_REGISTRY_NAME);
   if (!ctm) {
     throw new Error(`manifest has no "${CTM_REGISTRY_NAME}" CTM entry`);
   }
 
   const deployObject = async (
-    name: "CTMRelease" | "CTMTransition" | "CoreTransition",
+    name: "CTMRelease" | "CTMTransition" | "ProxyUpgradeTransition",
     manifestArg: unknown
   ): Promise<string> => {
     const factory = new ethers.ContractFactory(getAbi(name), getDeterministicCreationBytecode(name), deployer);
@@ -1003,7 +1134,10 @@ async function deployUpgradeObjectsFromManifest(
   };
 
   const release = await deployObject("CTMRelease", releaseInitArgs(manifest, ctm));
-  const coreTransition = await deployObject("CoreTransition", coreInitArgs(manifest));
+  const coreTransition = await deployObject("ProxyUpgradeTransition", coreInitArgs(manifest));
+  const infrastructureArgs = ctmInfrastructureInitArgs(ctm);
+  const ctmInfrastructureTransition =
+    infrastructureArgs === undefined ? undefined : await deployObject("ProxyUpgradeTransition", infrastructureArgs);
   return {
     release,
     transition: await deployObject(
@@ -1011,6 +1145,7 @@ async function deployUpgradeObjectsFromManifest(
       transitionInitArgs(manifest, ctm, release, deployed.delegateComposer)
     ),
     coreTransition,
+    ctmInfrastructureTransition,
   };
 }
 

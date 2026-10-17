@@ -11,6 +11,8 @@
  * - `assertBootstrapBundle`: the merged prepare's governance bundle is the one
  *   `RegistryBootstrapSequence.actions()` derives, ending in the completion check.
  * - `assertBootstrapCompleted`: the completion check re-run read-only after the governance replay.
+ * - `assertBootstrapExecutorsGoverned`: the domain executors the migration names are the ones later
+ *   hops discover through custody, and governance owns both outright.
  * - `assertServerNotifierState`: the ServerNotifier's custody (also used by the recurring runner).
  */
 
@@ -19,8 +21,8 @@ import { getAbi } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
 import type { ExpectedCall, MergedGovernanceOutput } from "./governance-bundle";
 import { assertBundleIs, governanceCallsOf } from "./governance-bundle";
-import { proxyUpgradeSlotIndex } from "./registry-manifest";
-import { readProxyAdmin, readProxyImplementation } from "./upgrade-test-utils";
+import { proxyUpgradeDomain, proxyUpgradeSlotIndex } from "./registry-manifest";
+import { discoverDomainExecutors, readProxyAdmin, readProxyImplementation } from "./upgrade-test-utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -83,14 +85,22 @@ export async function installLegacyFacet(
  * `RegistryBootstrapSequence.actions()` derives, re-derived from the migration's manifest and live
  * state so the prepare output is checked against an independent derivation. Read after the
  * prepare: both accepts depend on live owners.
- * @param coreTransition The core transition the core prepare pinned (the sequence's
- *        `CORE_TRANSITION`, which the migration's manifest does not name).
+ * @param coreTransition The Core-domain `ProxyUpgradeTransition` the core prepare pinned (the
+ *        sequence's `CORE_TRANSITION`, which the migration's manifest does not name).
  */
 export async function deriveBootstrapBundle(
   l1Provider: ethers.providers.JsonRpcProvider,
   migrationAddr: string,
   coreTransition: string
 ): Promise<ExpectedCall[]> {
+  const coreDomain: number = await new ethers.Contract(
+    coreTransition,
+    getAbi("IProxyUpgradeTransition"),
+    l1Provider
+  ).domain();
+  if (coreDomain !== proxyUpgradeDomain("Core")) {
+    throw new Error(`the bootstrap's core transition ${coreTransition} is of domain ${coreDomain}, not Core`);
+  }
   const migration = new ethers.Contract(migrationAddr, getAbi("RegistryBootstrapMigration"), l1Provider);
   const m = await migration.getManifest();
   const coreExecutor = new ethers.Contract(m.coreExecutor, getAbi("CoreUpgradeExecutor"), l1Provider);
@@ -99,7 +109,6 @@ export async function deriveBootstrapBundle(
   const ownable = new ethers.utils.Interface(getAbi("Ownable2Step"));
   const proxyAdmin = new ethers.utils.Interface(getAbi("ProxyAdmin"));
   const ctmExecutor = new ethers.utils.Interface(getAbi("CTMUpgradeExecutor"));
-  const coordinator = new ethers.utils.Interface(getAbi("EcosystemUpgradeExecutor"));
 
   const bundle: ExpectedCall[] = [];
   // The prepare's ownership normalization nominates governance (the CTM's owner until the
@@ -128,16 +137,6 @@ export async function deriveBootstrapBundle(
     });
   }
   bundle.push(
-    {
-      label: "coreExecutor.setCoordinator(coordinator)",
-      target: m.coreExecutor,
-      data: coreExecutor.interface.encodeFunctionData("setCoordinator", [m.coordinator]),
-    },
-    {
-      label: "coordinator.setCTMExecutor(ctmExecutor)",
-      target: m.coordinator,
-      data: coordinator.encodeFunctionData("setCTMExecutor", [m.ctmExecutor]),
-    },
     {
       label: "ecosystem ProxyAdmin.transferOwnership(coreExecutor)",
       target: await coreExecutor.PROXY_ADMIN(),
@@ -219,6 +218,40 @@ export async function assertBootstrapCompleted(
     throw new Error(`RegistryBootstrapMigration ${migrationAddr}: validateApplied() reverted: ${reason}`);
   }
   console.log("  ✓ RegistryBootstrapMigration.validateApplied() holds");
+}
+
+/**
+ * After the governance replay: the executors later hops discover through custody (the CTM's owner,
+ * the ecosystem ProxyAdmin's owner) are exactly the two the migration names, and governance owns
+ * both with no nomination pending.
+ * @param ecosystemProxyAdmin The ecosystem ProxyAdmin (the MessageRoot proxy's admin).
+ */
+export async function assertBootstrapExecutorsGoverned(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  migrationAddr: string,
+  ecosystemProxyAdmin: string,
+  governance: string
+): Promise<void> {
+  const migration = new ethers.Contract(migrationAddr, getAbi("RegistryBootstrapMigration"), l1Provider);
+  const m = await migration.getManifest();
+  if (m.governance.toLowerCase() !== governance.toLowerCase()) {
+    throw new Error(`the migration hands the executors to ${m.governance}, not the ecosystem governance ${governance}`);
+  }
+  const discovered = await discoverDomainExecutors(l1Provider, m.ctm, ecosystemProxyAdmin);
+  const expected = { coreExecutor: m.coreExecutor as string, ctmExecutor: m.ctmExecutor as string };
+  for (const key of ["coreExecutor", "ctmExecutor"] as const) {
+    if (discovered[key].toLowerCase() !== expected[key].toLowerCase()) {
+      throw new Error(`custody names ${key} ${discovered[key]}, the migration names ${expected[key]}`);
+    }
+    const executor = new ethers.Contract(discovered[key], getAbi("Ownable2Step"), l1Provider);
+    const [owner, pendingOwner]: [string, string] = [await executor.owner(), await executor.pendingOwner()];
+    if (owner.toLowerCase() !== governance.toLowerCase() || pendingOwner !== ethers.constants.AddressZero) {
+      throw new Error(`${key} ${discovered[key]} is owned by ${owner} (pending ${pendingOwner}), not governance`);
+    }
+  }
+  console.log(
+    `  ✓ governance owns both domain executors (core ${discovered.coreExecutor}, CTM ${discovered.ctmExecutor})`
+  );
 }
 
 /** The CTM's ServerNotifier, read live. */

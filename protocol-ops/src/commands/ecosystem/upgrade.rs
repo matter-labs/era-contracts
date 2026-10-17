@@ -85,7 +85,7 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
         // output. `upgrade-prepare-all` writes a single `ecosystem.toml`
         // directly at `<env-out>/ecosystem.toml` (canonical tracked path)
         // whose top-level `[governance_calls] calls` is the merged bundle
-        // (the merger's appends, core, the derived executor call, the CTM),
+        // (the merger's appends, core, the derived executor legs, the CTM),
         // so we no longer need to merge multiple files at replay time.
         if args.governance_toml.is_empty() {
             let candidate = env_out_base.join("ecosystem.toml");
@@ -186,20 +186,24 @@ pub(super) struct ExtraGovernanceCall {
 }
 
 alloy::sol! {
-    /// The coordinating `EcosystemUpgradeExecutor`'s one entrypoint — the only executor call a
-    /// registry-driven package carries. It is a function of the operation's address alone, so the
-    /// merge DERIVES it rather than reading it from a prepare bundle.
-    interface IEcosystemUpgradeExecutorEntrypoint {
-        function execute(address _operation);
+    /// The domain executors' governance entrypoints — the executor legs a registry-driven package
+    /// carries. Each is a function of an (executor, object) pair the prepares report, so the merge
+    /// DERIVES them rather than reading them from a prepare bundle. `zkstack-out` does not export
+    /// the executors, so only these entrypoints are mirrored.
+    interface IUpgradeExecutorEntrypoints {
+        function applyL1Upgrade(address _coreTransition);
+        function applyInfrastructureUpgrade(address _infrastructureTransition);
+        function applyCTMUpgrade(address _transition);
     }
 }
 
-/// The provenance invariant of one prepare output: every call of its governance bundle IS one of
-/// the `external_actions` the script declared for the governance phase — same target, same value,
-/// same calldata — and every such declared action appears in it. A script that composes a call it
-/// never declared fails the merge instead of shipping it; so does one that declares an action it
-/// then omits. The executor call itself is not in any prepare's bundle: the merge derives it from
-/// the operation the CTM prepare deployed.
+/// The provenance invariant of one prepare output: the governance bundle IS the
+/// `external_actions` the script declared for the governance phase, in declaration order — same
+/// target, same value, same calldata, one for one (`ExternalActionsLib.callsForPhase` emits it from
+/// the same ledger). A script that composes a call it never declared fails the merge instead of
+/// shipping it; so does one that declares an action it then omits, or emits the declared ones in
+/// another order. The executor legs are not in any prepare's bundle: the merge derives them from
+/// the objects the prepares report.
 fn check_bundle_provenance(
     source: &str,
     gov: &GovernanceCallsTable,
@@ -215,18 +219,22 @@ fn check_bundle_provenance(
     // Matched one-for-one rather than by set membership, so a bundle cannot carry a declared call
     // twice over while a second declaration goes unemitted.
     let mut claimed = vec![false; for_phase.len()];
+    let mut order = Vec::with_capacity(calls.len());
     for call in &calls {
         let matched = for_phase
             .iter()
             .enumerate()
             .position(|(i, action)| !claimed[i] && action.is_call(call));
         match matched {
-            Some(i) => claimed[i] = true,
+            Some(i) => {
+                claimed[i] = true;
+                order.push(i);
+            }
             None => anyhow::bail!(
                 "{source}: the governance bundle carries a call no declared external action \
                  accounts for — target {:#x}, value {}, selector 0x{}. Every emitted call must be \
-                 a declared action (see ExternalActionsLib); the executor call is derived by the \
-                 merge from the operation",
+                 a declared action (see ExternalActionsLib); the executor legs are derived by the \
+                 merge from the objects the prepares report",
                 call.target,
                 call.value,
                 hex::encode(&call.data[..call.data.len().min(4)])
@@ -239,68 +247,170 @@ fn check_bundle_provenance(
             for_phase[i].describe()
         );
     }
+    // The verifier holds the merged bundle's external actions to their declared order, so a
+    // prepare that emits them in another one is refused here rather than there.
+    anyhow::ensure!(
+        order.windows(2).all(|pair| pair[0] < pair[1]),
+        "{source}: emits its declared governance external actions in another order than it \
+         declares them"
+    );
     Ok(())
 }
 
-/// The upgrade's executor call: `EcosystemUpgradeExecutor.execute(operation)` on the coordinator.
-/// Nothing about it is authored — it is a pure function of the operation's address, which is why
-/// it is computed here instead of being carried through a prepare bundle and re-checked against
-/// this same encoding.
-fn coordinator_execute_call(
-    coordinator: Address,
-    operation: Address,
+/// The objects a prepare reported in its `[registry]` summary, nonzero only.
+fn registry_object(body: &toml::value::Table, key: &str) -> anyhow::Result<Option<Address>> {
+    let Some(value) = body.get("registry").and_then(|registry| registry.get(key)) else {
+        return Ok(None);
+    };
+    let raw = value
+        .as_str()
+        .with_context(|| format!("[registry] {key} must be an address string"))?;
+    let address: Address = raw
+        .parse()
+        .with_context(|| format!("[registry] {key} = {raw:?} is not an address"))?;
+    Ok((!address.is_zero()).then_some(address))
+}
+
+/// One derived executor leg, in canonical order (`LegKind`'s order in the verifier).
+fn executor_leg(
+    executor: Address,
+    data: Vec<u8>,
 ) -> crate::common::governance_calls::GovernanceCall {
     crate::common::governance_calls::GovernanceCall {
-        target: coordinator,
+        target: executor,
         value: alloy::primitives::U256::ZERO,
-        data: IEcosystemUpgradeExecutorEntrypoint::executeCall {
-            _operation: operation,
-        }
-        .abi_encode(),
+        data,
     }
 }
 
-/// The `(coordinator, operation)` pair the CTM prepare reported, or `None` when it deployed no
-/// operation — a bootstrap edge, which has no transition to associate and drives its own declared
-/// bundle instead.
+/// The executor legs the merged bundle carries, DERIVED from the prepare summaries in canonical
+/// order — core, then CTM infrastructure, then the CTM transition — each only when its object is
+/// nonzero, all with no value:
 ///
-/// One operation names one transition, so a package with several CTM prepares would carry several;
-/// the prepare boundary already admits exactly one ZKsync OS CTM, and this refuses the rest rather
-/// than silently emitting one upgrade's executor call for another's.
-fn sole_operation(
-    ctm_entries: &[crate::commands::ecosystem::upgrade_inner::CtmPrepareEntry],
-) -> anyhow::Result<Option<(Address, Address)>> {
-    let mut found: Option<(Address, Address)> = None;
-    for entry in ctm_entries {
-        let raw = fs::read_to_string(&entry.toml)
-            .with_context(|| format!("read {}", entry.toml.display()))?;
-        let top: toml::Value =
-            toml::from_str(&raw).with_context(|| format!("parse {}", entry.toml.display()))?;
-        let read = |key: &str| -> Option<Address> {
-            top.get("registry")
-                .and_then(|r| r.get(key))
-                .and_then(|v| v.as_str())
-                .and_then(|v| v.parse::<Address>().ok())
-                .filter(|a| !a.is_zero())
+/// 1. `CoreUpgradeExecutor.applyL1Upgrade(core_transition_addr)` on `core_upgrade_executor_addr`;
+/// 2. `CTMUpgradeExecutor.applyInfrastructureUpgrade(ctm_infrastructure_transition_addr)` on
+///    `ctm_upgrade_executor_addr`;
+/// 3. `CTMUpgradeExecutor.applyCTMUpgrade(ctm_transition_addr)` on `ctm_upgrade_executor_addr`.
+///
+/// A bootstrap edge (`bootstrap_migration_addr` nonzero) and a transition replacement
+/// (`replacement_transition_addr` nonzero) derive none: the bootstrap's core transition rides its
+/// own derived sequence, and a replacement is one declared `forward`. Either one reporting an
+/// object only a leg would apply is refused, as is a leg whose executor is missing or zero and a
+/// package that is none of the three kinds yet derives no leg.
+fn derive_executor_legs(
+    core: &toml::value::Table,
+    ctms: &[(Address, &toml::value::Table)],
+) -> anyhow::Result<Vec<crate::common::governance_calls::GovernanceCall>> {
+    let core_transition = registry_object(core, "core_transition_addr").context("core prepare")?;
+    let core_executor =
+        registry_object(core, "core_upgrade_executor_addr").context("core prepare")?;
+
+    let mut infrastructure = None;
+    let mut transition = None;
+    let mut ctm_executor = None;
+    let mut bootstrap = None;
+    let mut replacement = None;
+    for (proxy, body) in ctms {
+        let read = |key: &str| {
+            registry_object(body, key).with_context(|| format!("CTM prepare {proxy:#x}"))
         };
-        let Some(operation) = read("operation_addr") else {
-            continue;
-        };
-        let coordinator = read("coordinator_addr").with_context(|| {
-            format!(
-                "{} names operation_addr {operation:#x} but no coordinator_addr to drive it",
-                entry.toml.display()
-            )
-        })?;
-        if let Some((_, previous)) = found {
-            anyhow::bail!(
-                "two CTM prepares reported an operation ({previous:#x} and {operation:#x}); \
-                 one upgrade carries exactly one"
-            );
+        for (slot, key) in [
+            (&mut infrastructure, "ctm_infrastructure_transition_addr"),
+            (&mut transition, "ctm_transition_addr"),
+            (&mut ctm_executor, "ctm_upgrade_executor_addr"),
+            (&mut bootstrap, "bootstrap_migration_addr"),
+            (&mut replacement, "replacement_transition_addr"),
+        ] {
+            if let Some(address) = read(key)? {
+                anyhow::ensure!(
+                    slot.is_none(),
+                    "two CTM prepares report a {key}; one upgrade drives exactly one CTM"
+                );
+                *slot = Some(address);
+            }
         }
-        found = Some((coordinator, operation));
     }
-    Ok(found)
+
+    if let Some(migration) = bootstrap {
+        anyhow::ensure!(
+            replacement.is_none(),
+            "the CTM prepare reports both a bootstrap migration ({migration:#x}) and a \
+             replacement transition: one package is one kind"
+        );
+        for (key, object) in [
+            ("ctm_infrastructure_transition_addr", infrastructure),
+            ("ctm_transition_addr", transition),
+        ] {
+            if let Some(object) = object {
+                anyhow::bail!(
+                    "the bootstrap edge {migration:#x} derives no executor leg, but its CTM \
+                     prepare reports {key} {object:#x}, which nothing in the edge would apply"
+                );
+            }
+        }
+        return Ok(Vec::new());
+    }
+    if let Some(replacement) = replacement {
+        for (key, object) in [
+            ("core_transition_addr", core_transition),
+            ("ctm_infrastructure_transition_addr", infrastructure),
+        ] {
+            if let Some(object) = object {
+                anyhow::bail!(
+                    "the transition replacement {replacement:#x} carries no executor leg, but \
+                     the package reports {key} {object:#x}, which nothing in it would apply"
+                );
+            }
+        }
+        return Ok(Vec::new());
+    }
+
+    let require_executor = |executor: Option<Address>, key: &str, object: Address| {
+        executor.with_context(|| {
+            format!(
+                "the prepares report {object:#x} for an executor leg but no {key} (missing or \
+                 zero) to send it to"
+            )
+        })
+    };
+    let mut legs = Vec::new();
+    if let Some(object) = core_transition {
+        let executor = require_executor(core_executor, "core_upgrade_executor_addr", object)?;
+        legs.push(executor_leg(
+            executor,
+            IUpgradeExecutorEntrypoints::applyL1UpgradeCall {
+                _coreTransition: object,
+            }
+            .abi_encode(),
+        ));
+    }
+    if let Some(object) = infrastructure {
+        let executor = require_executor(ctm_executor, "ctm_upgrade_executor_addr", object)?;
+        legs.push(executor_leg(
+            executor,
+            IUpgradeExecutorEntrypoints::applyInfrastructureUpgradeCall {
+                _infrastructureTransition: object,
+            }
+            .abi_encode(),
+        ));
+    }
+    if let Some(object) = transition {
+        let executor = require_executor(ctm_executor, "ctm_upgrade_executor_addr", object)?;
+        legs.push(executor_leg(
+            executor,
+            IUpgradeExecutorEntrypoints::applyCTMUpgradeCall {
+                _transition: object,
+            }
+            .abi_encode(),
+        ));
+    }
+    anyhow::ensure!(
+        !legs.is_empty(),
+        "the prepares report no core transition, no CTM infrastructure transition and no CTM \
+         transition, and the package is neither a bootstrap edge nor a transition replacement: \
+         it upgrades nothing"
+    );
+    Ok(legs)
 }
 
 /// Replay the governance bundle of one or more prepared TOMLs, in the order given.
@@ -1003,19 +1113,22 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     Ok(())
 }
 
-/// Merge the core + per-CTM prepare TOMLs, the derived coordinator call and the merger's own
-/// extras (the in-memory PUH/Guardians wiring and the CTM `acceptOwnership()` normalization) into
-/// a single ecosystem TOML at `dst`.
+/// Merge the core + per-CTM prepare TOMLs, the derived executor legs and the merger's own extras
+/// (the in-memory PUH/Guardians wiring and the CTM `acceptOwnership()` normalization) into a
+/// single ecosystem TOML at `dst`.
 ///
 /// The merger COMPOSES nothing. The one bundle is, in order: the extras (they must precede a
 /// bootstrap's `ctm.transferOwnership(migration)`, which assumes governance already owns the
-/// CTM), the core prepare's declared calls, the DERIVED `coordinator.execute(operation)` (recurring
-/// upgrades only), then the CTM prepare's declared calls. Every call other than the derived one is
-/// declared in `external_actions` with phase `governance`; a prepare bundle carrying a call the
-/// artifact does not name fails the merge (`check_bundle_provenance`). Shape:
+/// CTM), the core prepare's declared calls, the DERIVED executor legs ([`derive_executor_legs`]:
+/// one contiguous run in canonical order, none for a bootstrap or a replacement), then the CTM
+/// prepare's declared calls. Every call other than a leg is declared in `external_actions` with
+/// phase `governance`; a prepare bundle carrying a call the artifact does not name fails the
+/// merge (`check_bundle_provenance`). The legs need no summary table of their own: the verifier
+/// recovers them from the calldata and reconciles them with `[core.registry]` and
+/// `[ctms.*.registry]`. Shape:
 ///
 /// ```toml
-/// [[external_actions]]            # every governance/admin call that is NOT the executor call,
+/// [[external_actions]]            # every governance/admin call that is NOT an executor leg,
 /// phase = "governance"            # carrying the call itself (see `common::external_actions`)
 /// label = "…"
 /// authority = "…"
@@ -1023,8 +1136,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// value = "0"
 /// data = "0x…"
 ///
-/// [governance_calls]              # the one bundle: extras, core actions, the DERIVED
-/// calls = "0x..."                 # execute(operation) (registry-driven only), CTM actions
+/// [governance_calls]              # the one bundle: extras, core actions, the DERIVED legs,
+/// calls = "0x..."                 # CTM actions
 ///
 /// [test_upgrade_calls]            # the CTM prepare's simulator probes, when it wrote any
 /// test_create_chain_zkos = "0x..."
@@ -1032,12 +1145,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// test_upgrade_chain_zkos = "0x..."
 /// test_upgrade_chain_zkos_caller = "0x..."
 ///
-/// [operation]                     # registry-driven upgrades only: the operation the CTM
-/// operation_addr = "0x..."        # prepare deployed, and the coordinator its executor call
-/// coordinator_addr = "0x..."      # is derived on
-///
-/// [core]                          # whole core TOML minus its [governance_calls]
-/// ...
+/// [core]                          # whole core TOML minus its [governance_calls]; its
+/// ...                             # [registry] names the core leg's object and executor
 ///
 /// [ctms.zksync_os]                # whole CTM TOML minus its [governance_calls] and probes;
 /// ...                             # one section per ZKsyncOS CTM.
@@ -1061,17 +1170,11 @@ fn write_merged_ecosystem_toml(
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent)?;
     }
-    let operation = sole_operation(ctm_entries)?;
     let mut ctm_outputs = Vec::with_capacity(ctm_entries.len());
     for entry in ctm_entries {
         ctm_outputs.push((entry.proxy, load_prepare_output(&entry.toml)?));
     }
-    let mut doc = merge_prepare_outputs(
-        load_prepare_output(core_toml)?,
-        ctm_outputs,
-        operation,
-        extras,
-    )?;
+    let mut doc = merge_prepare_outputs(load_prepare_output(core_toml)?, ctm_outputs, extras)?;
     if let Some(zk_governance) = zk_governance {
         let mut table = toml::value::Table::new();
         table.insert(
@@ -1097,9 +1200,10 @@ fn write_merged_ecosystem_toml(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] calls is\n\
          # the one governance bundle of {} prepare TOML(s) — the merger's extras,\n\
-         # the prepares' calls in source order and the derived executor call,\n\
+         # the core prepare's calls, the derived executor legs (applyL1Upgrade ->\n\
+         # applyInfrastructureUpgrade -> applyCTMUpgrade) and the CTM prepare's calls,\n\
          # never composed here; `external_actions` names every call in it that is\n\
-         # not `EcosystemUpgradeExecutor.execute(operation)`.\n\
+         # not an executor leg.\n\
          # [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.zksync_os]\n\
          # mirrors the ZKsyncOS CTM prepare output\n\
@@ -1170,12 +1274,10 @@ fn load_prepare_output(path: &Path) -> anyhow::Result<PrepareOutputParts> {
 
 /// The merged document of [`write_merged_ecosystem_toml`] minus `[zk_governance]`:
 /// `external_actions`, `[governance_calls]`, the optional `[test_upgrade_calls]`, `[core]`,
-/// `[ctms.*]`, the optional `[operation]` and `[misc]`. `toml::to_string` writes the keys in
-/// alphabetical order.
+/// `[ctms.*]` and `[misc]`. `toml::to_string` writes the keys in alphabetical order.
 fn merge_prepare_outputs(
     core: PrepareOutputParts,
     ctms: Vec<(Address, PrepareOutputParts)>,
-    operation: Option<(Address, Address)>,
     extras: &[ExtraGovernanceCall],
 ) -> anyhow::Result<toml::value::Table> {
     use crate::common::governance_calls::{encode_calls, merge_call_array_hex};
@@ -1187,6 +1289,13 @@ fn merge_prepare_outputs(
         external_actions: core_actions,
     } = core;
     check_bundle_provenance("core prepare", &core_gov, &core_actions)?;
+    let legs = derive_executor_legs(
+        &core_body,
+        &ctms
+            .iter()
+            .map(|(proxy, ctm)| (*proxy, &ctm.body))
+            .collect::<Vec<_>>(),
+    )?;
     let misc_body = match core_body.remove("misc") {
         Some(Value::Table(table)) => Some(table),
         Some(other) => anyhow::bail!(
@@ -1207,23 +1316,8 @@ fn merge_prepare_outputs(
         core_gov.calls,
     ];
 
-    // The executor call over the operation the CTM prepare deployed, DERIVED from its address and
-    // ordered after the core prepare's declared actions and before the CTM's. A bootstrap edge
-    // deploys no operation (it has no transition) and names none.
-    let operation_body: Option<Table> = operation.map(|(coordinator, operation)| {
-        let call = coordinator_execute_call(coordinator, operation);
-        chunks.push(format!("0x{}", hex::encode(encode_calls(&[call]))));
-        let mut table = Table::new();
-        table.insert(
-            "operation_addr".into(),
-            Value::String(format!("{operation:#x}")),
-        );
-        table.insert(
-            "coordinator_addr".into(),
-            Value::String(format!("{coordinator:#x}")),
-        );
-        table
-    });
+    // The derived legs sit after the core prepare's declared actions and before the CTM's.
+    chunks.push(format!("0x{}", hex::encode(encode_calls(&legs))));
 
     // `UpgradeInner::prepare` rejects any non-ZKsync-OS CTM, so every CTM that
     // reaches the merge is ZKsync OS. The merge keys per-CTM sections by the fixed
@@ -1279,9 +1373,6 @@ fn merge_prepare_outputs(
     }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
-    if let Some(body) = operation_body {
-        doc.insert("operation".into(), Value::Table(body));
-    }
     if let Some(body) = misc_body {
         doc.insert("misc".into(), Value::Table(body));
     }
@@ -1533,25 +1624,304 @@ mod tests {
         );
     }
 
-    /// The executor call is the coordinator as target, no value, and `execute(address)` over the
-    /// operation. The selector is transcribed rather than re-derived from the same `sol!` block the
-    /// code under test uses, so this is a real check of the encoding and not of itself.
+    /// A prepare that emits its declared actions in another order than it declares them fails:
+    /// the verifier holds the merged bundle's external actions to their declared order.
     #[test]
-    fn the_derived_call_is_execute_on_the_coordinator() {
-        let coordinator = Address::repeat_byte(0xc0);
-        let operation = Address::repeat_byte(0x0b);
-        let mut expected = vec![0x4b, 0x64, 0xe4, 0x92];
-        expected.extend_from_slice(&[0u8; 12]);
-        expected.extend_from_slice(operation.as_slice());
+    fn a_bundle_out_of_its_declared_order_fails() {
+        let (first, second) = (call(0x11, &[0xaa]), call(0x22, &[0xbb]));
+        let declared = vec![
+            ExternalAction::governance("l", "a", &first),
+            ExternalAction::governance("l", "a", &second),
+        ];
+        let err = check_bundle_provenance("t", &gov(&[second, first]), &declared)
+            .expect_err("a reordered bundle must fail");
+        assert!(err.to_string().contains("another order"), "{err}");
+    }
 
-        let derived = coordinator_execute_call(coordinator, operation);
-        assert_eq!(derived.target, coordinator);
-        assert!(derived.value.is_zero());
-        assert_eq!(derived.data, expected);
+    const CORE_EXECUTOR: Address = Address::repeat_byte(0xe0);
+    const CTM_EXECUTOR: Address = Address::repeat_byte(0xe7);
+    const CORE_TRANSITION: Address = Address::repeat_byte(0xee);
+    const INFRASTRUCTURE: Address = Address::repeat_byte(0x1f);
+    const TRANSITION: Address = Address::repeat_byte(0xcc);
+
+    /// The encoding of one leg, transcribed independently of the `sol!` block the merge uses:
+    /// the selector from the executors' compiled `methodIdentifiers`, then the object word.
+    fn transcribed_leg(executor: Address, selector: [u8; 4], object: Address) -> GovernanceCall {
+        let mut data = selector.to_vec();
+        data.extend_from_slice(&[0u8; 12]);
+        data.extend_from_slice(object.as_slice());
+        GovernanceCall {
+            target: executor,
+            value: alloy::primitives::U256::ZERO,
+            data,
+        }
+    }
+
+    fn core_leg() -> GovernanceCall {
+        transcribed_leg(CORE_EXECUTOR, [0x60, 0x93, 0xa2, 0x59], CORE_TRANSITION)
+    }
+
+    fn infrastructure_leg() -> GovernanceCall {
+        transcribed_leg(CTM_EXECUTOR, [0x68, 0xe9, 0x89, 0x78], INFRASTRUCTURE)
+    }
+
+    fn transition_leg() -> GovernanceCall {
+        transcribed_leg(CTM_EXECUTOR, [0x7b, 0x1b, 0x71, 0x6a], TRANSITION)
+    }
+
+    /// The transcribed selectors are the entrypoints' real ones.
+    #[test]
+    fn the_transcribed_selectors_are_the_executor_entrypoints() {
+        for (leg, signature) in [
+            (core_leg(), "applyL1Upgrade(address)"),
+            (infrastructure_leg(), "applyInfrastructureUpgrade(address)"),
+            (transition_leg(), "applyCTMUpgrade(address)"),
+        ] {
+            assert_eq!(
+                &leg.data[..4],
+                &alloy::primitives::keccak256(signature.as_bytes())[..4],
+                "{signature}"
+            );
+        }
+    }
+
+    fn address_value(address: Address) -> toml::Value {
+        toml::Value::String(format!("{address:#x}"))
+    }
+
+    /// A prepare body whose `[registry]` reports `entries`.
+    fn registry_body(entries: &[(&str, Address)]) -> toml::value::Table {
+        let mut registry = toml::value::Table::new();
+        for (key, address) in entries {
+            registry.insert(key.to_string(), address_value(*address));
+        }
+        let mut body = toml::value::Table::new();
+        body.insert("registry".into(), toml::Value::Table(registry));
+        body
+    }
+
+    /// The core prepare's summary: its executor always, its transition when it deployed one.
+    fn core_body(transition: Option<Address>) -> toml::value::Table {
+        registry_body(&[
+            ("core_transition_addr", transition.unwrap_or(Address::ZERO)),
+            ("core_upgrade_executor_addr", CORE_EXECUTOR),
+        ])
+    }
+
+    /// The CTM prepare's summary, every object zero unless set.
+    fn ctm_body(entries: &[(&str, Address)]) -> toml::value::Table {
+        let mut all: Vec<(&str, Address)> = vec![
+            ("ctm_transition_addr", Address::ZERO),
+            ("ctm_infrastructure_transition_addr", Address::ZERO),
+            ("bootstrap_migration_addr", Address::ZERO),
+            ("ctm_upgrade_executor_addr", CTM_EXECUTOR),
+        ];
+        for (key, address) in entries {
+            match all.iter_mut().find(|(k, _)| k == key) {
+                Some(entry) => entry.1 = *address,
+                None => all.push((key, *address)),
+            }
+        }
+        registry_body(&all)
+    }
+
+    fn derive(
+        core: toml::value::Table,
+        ctm: Option<toml::value::Table>,
+    ) -> anyhow::Result<Vec<GovernanceCall>> {
+        let ctms: Vec<(Address, toml::value::Table)> = ctm
+            .into_iter()
+            .map(|body| (Address::repeat_byte(0x77), body))
+            .collect();
+        derive_executor_legs(
+            &core,
+            &ctms
+                .iter()
+                .map(|(proxy, body)| (*proxy, body))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    fn targets_and_data(calls: &[GovernanceCall]) -> Vec<(Address, Vec<u8>)> {
+        calls.iter().map(|c| (c.target, c.data.clone())).collect()
+    }
+
+    /// All three legs, in canonical order: core, CTM infrastructure, CTM transition — each sent
+    /// to its domain's executor with no value.
+    #[test]
+    fn all_three_legs_derive_in_canonical_order() {
+        let legs = derive(
+            core_body(Some(CORE_TRANSITION)),
+            Some(ctm_body(&[
+                ("ctm_transition_addr", TRANSITION),
+                ("ctm_infrastructure_transition_addr", INFRASTRUCTURE),
+            ])),
+        )
+        .unwrap();
         assert_eq!(
-            &alloy::primitives::keccak256(b"execute(address)")[..4],
-            &expected[..4]
+            targets_and_data(&legs),
+            targets_and_data(&[core_leg(), infrastructure_leg(), transition_leg()])
         );
+        assert!(legs.iter().all(|leg| leg.value.is_zero()));
+    }
+
+    /// Each leg alone — a core-only package needing no CTM prepare at all.
+    #[test]
+    fn each_leg_derives_alone() {
+        let core_only = derive(core_body(Some(CORE_TRANSITION)), None).unwrap();
+        assert_eq!(
+            targets_and_data(&core_only),
+            targets_and_data(&[core_leg()])
+        );
+
+        let infrastructure_only = derive(
+            core_body(None),
+            Some(ctm_body(&[(
+                "ctm_infrastructure_transition_addr",
+                INFRASTRUCTURE,
+            )])),
+        )
+        .unwrap();
+        assert_eq!(
+            targets_and_data(&infrastructure_only),
+            targets_and_data(&[infrastructure_leg()])
+        );
+
+        let transition_only = derive(
+            core_body(None),
+            Some(ctm_body(&[("ctm_transition_addr", TRANSITION)])),
+        )
+        .unwrap();
+        assert_eq!(
+            targets_and_data(&transition_only),
+            targets_and_data(&[transition_leg()])
+        );
+    }
+
+    /// A bootstrap edge derives no leg: its core transition rides the bootstrap's own sequence.
+    #[test]
+    fn a_bootstrap_derives_no_leg() {
+        let legs = derive(
+            core_body(Some(CORE_TRANSITION)),
+            Some(ctm_body(&[(
+                "bootstrap_migration_addr",
+                Address::repeat_byte(0x55),
+            )])),
+        )
+        .unwrap();
+        assert!(legs.is_empty());
+    }
+
+    /// A bootstrap reporting a CTM-domain object would ship an object nothing applies.
+    #[test]
+    fn a_bootstrap_with_a_ctm_object_is_refused() {
+        for key in ["ctm_transition_addr", "ctm_infrastructure_transition_addr"] {
+            let err = derive(
+                core_body(None),
+                Some(ctm_body(&[
+                    ("bootstrap_migration_addr", Address::repeat_byte(0x55)),
+                    (key, TRANSITION),
+                ])),
+            )
+            .unwrap_err();
+            assert!(err.to_string().contains("derives no executor leg"), "{err}");
+            assert!(err.to_string().contains(key), "{err}");
+        }
+    }
+
+    /// A replacement derives no leg: its `ctm_transition_addr` is the replacement, which its one
+    /// declared `forward` installs.
+    #[test]
+    fn a_replacement_derives_no_leg() {
+        let legs = derive(
+            core_body(None),
+            Some(ctm_body(&[
+                ("ctm_transition_addr", TRANSITION),
+                ("replacement_transition_addr", TRANSITION),
+            ])),
+        )
+        .unwrap();
+        assert!(legs.is_empty());
+    }
+
+    /// A core transition (or an infrastructure object) prepared beside a replacement is refused.
+    #[test]
+    fn a_core_transition_on_a_replacement_is_refused() {
+        let err = derive(
+            core_body(Some(CORE_TRANSITION)),
+            Some(ctm_body(&[
+                ("ctm_transition_addr", TRANSITION),
+                ("replacement_transition_addr", TRANSITION),
+            ])),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("core_transition_addr"), "{err}");
+        assert!(err.to_string().contains("carries no executor leg"), "{err}");
+
+        let err = derive(
+            core_body(None),
+            Some(ctm_body(&[
+                ("ctm_infrastructure_transition_addr", INFRASTRUCTURE),
+                ("replacement_transition_addr", TRANSITION),
+            ])),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("ctm_infrastructure_transition_addr"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn a_bootstrap_beside_a_replacement_is_refused() {
+        let err = derive(
+            core_body(None),
+            Some(ctm_body(&[
+                ("bootstrap_migration_addr", Address::repeat_byte(0x55)),
+                ("replacement_transition_addr", TRANSITION),
+            ])),
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("one package is one kind"), "{err}");
+    }
+
+    /// A leg whose executor is missing or zero has nowhere to be sent.
+    #[test]
+    fn a_leg_without_its_executor_is_refused() {
+        let mut core = core_body(Some(CORE_TRANSITION));
+        core.get_mut("registry")
+            .unwrap()
+            .as_table_mut()
+            .unwrap()
+            .remove("core_upgrade_executor_addr");
+        let err = derive(core, None).unwrap_err();
+        assert!(
+            err.to_string().contains("core_upgrade_executor_addr"),
+            "{err}"
+        );
+
+        let err = derive(
+            core_body(None),
+            Some(ctm_body(&[
+                ("ctm_transition_addr", TRANSITION),
+                ("ctm_upgrade_executor_addr", Address::ZERO),
+            ])),
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("ctm_upgrade_executor_addr"),
+            "{err}"
+        );
+    }
+
+    /// Neither a bootstrap nor a replacement, and no object to apply: it upgrades nothing.
+    #[test]
+    fn a_package_with_no_leg_is_refused() {
+        let err = derive(core_body(None), Some(ctm_body(&[]))).unwrap_err();
+        assert!(err.to_string().contains("upgrades nothing"), "{err}");
+        let err = derive(core_body(None), None).unwrap_err();
+        assert!(err.to_string().contains("upgrades nothing"), "{err}");
     }
 
     /// An `admin` action rides no governance bundle, so it does not account for one of its calls.
@@ -1564,9 +1934,9 @@ mod tests {
             .expect_err("an admin declaration cannot cover a governance call");
     }
 
-    fn prepare_output(calls: &[GovernanceCall]) -> PrepareOutputParts {
+    fn prepare_output(body: toml::value::Table, calls: &[GovernanceCall]) -> PrepareOutputParts {
         PrepareOutputParts {
-            body: toml::value::Table::new(),
+            body,
             gov: gov(calls),
             external_actions: calls
                 .iter()
@@ -1582,22 +1952,28 @@ mod tests {
 
     /// The one bundle's order: the merger's extras first — a bootstrap's
     /// `ctm.transferOwnership(migration)` assumes governance already accepted the CTM — then the
-    /// core prepare's calls, the derived `execute(operation)`, then the CTM prepare's calls.
-    /// Every call but the derived one is declared, the extras included.
+    /// core prepare's calls, the derived legs as one contiguous run, then the CTM prepare's calls.
+    /// Every call but the legs is declared, the extras included, and no summary table is added.
     #[test]
-    fn the_merged_bundle_runs_extras_core_execute_then_ctm() {
+    fn the_merged_bundle_runs_extras_core_legs_then_ctm() {
         let extra = call(0xe1, &[0x01]);
         let core = call(0xc1, &[0x02]);
         let ctm = call(0xd1, &[0x03]);
-        let coordinator = Address::repeat_byte(0xc0);
-        let operation = Address::repeat_byte(0x0b);
         let doc = merge_prepare_outputs(
-            prepare_output(std::slice::from_ref(&core)),
+            prepare_output(
+                core_body(Some(CORE_TRANSITION)),
+                std::slice::from_ref(&core),
+            ),
             vec![(
                 Address::repeat_byte(0x77),
-                prepare_output(std::slice::from_ref(&ctm)),
+                prepare_output(
+                    ctm_body(&[
+                        ("ctm_transition_addr", TRANSITION),
+                        ("ctm_infrastructure_transition_addr", INFRASTRUCTURE),
+                    ]),
+                    std::slice::from_ref(&ctm),
+                ),
             )],
-            Some((coordinator, operation)),
             &[ExtraGovernanceCall {
                 label: "extra",
                 authority: "protocol governance",
@@ -1607,17 +1983,16 @@ mod tests {
         .unwrap();
 
         let bundle = merged_bundle(&doc);
-        let execute = coordinator_execute_call(coordinator, operation);
-        let order: Vec<(Address, Vec<u8>)> =
-            bundle.iter().map(|c| (c.target, c.data.clone())).collect();
         assert_eq!(
-            order,
-            vec![
-                (extra.target, extra.data.clone()),
-                (core.target, core.data.clone()),
-                (execute.target, execute.data.clone()),
-                (ctm.target, ctm.data.clone()),
-            ]
+            targets_and_data(&bundle),
+            targets_and_data(&[
+                extra,
+                core,
+                core_leg(),
+                infrastructure_leg(),
+                transition_leg(),
+                ctm
+            ])
         );
         assert_eq!(
             doc["governance_calls"].as_table().unwrap().len(),
@@ -1629,20 +2004,50 @@ mod tests {
         assert!(declared.iter().all(|a| a.phase == GOVERNANCE_PHASE));
         for (i, c) in bundle.iter().enumerate() {
             let is_declared = declared.iter().any(|a| a.is_call(c));
-            assert_eq!(is_declared, i != 2, "call {i}");
+            assert_eq!(is_declared, !(2..5).contains(&i), "call {i}");
         }
-        assert_eq!(
-            doc["operation"]["operation_addr"].as_str().unwrap(),
-            format!("{operation:#x}")
+        assert!(doc.get("operation").is_none());
+    }
+
+    /// The merged bundle is exactly what the verifier's loader classifies as an upgrade, with the
+    /// legs it recovers reconciling against the summaries the merge carried over.
+    #[test]
+    fn the_merged_package_loads_as_an_upgrade() {
+        use crate::upgrade_verification::registry::package::RegistryPackage;
+        let core = core_body(Some(CORE_TRANSITION));
+        let mut ctm = ctm_body(&[("ctm_transition_addr", TRANSITION)]);
+        let mut state_transition = toml::value::Table::new();
+        state_transition.insert(
+            "chain_type_manager_proxy".into(),
+            address_value(Address::repeat_byte(0x77)),
         );
+        ctm.insert(
+            "state_transition".into(),
+            toml::Value::Table(state_transition),
+        );
+        let doc = merge_prepare_outputs(
+            prepare_output(core, &[]),
+            vec![(Address::repeat_byte(0x77), prepare_output(ctm, &[]))],
+            &[],
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ecosystem.toml");
+        fs::write(&path, toml::to_string(&doc).unwrap()).unwrap();
+        let RegistryPackage::Upgrade(package) = RegistryPackage::load(&path).unwrap() else {
+            panic!("a merged package with legs must load as an upgrade");
+        };
+        assert_eq!(package.legs.len(), 2);
+        assert_eq!(package.legs[0].object, CORE_TRANSITION);
+        assert_eq!(package.legs[1].object, TRANSITION);
     }
 
     /// The CTM prepare's probes reach the simulator: the merge lifts them out of
     /// `[ctms.zksync_os]`, where the simulator does not look, to the top level under ZKsync OS tags.
     #[test]
     fn the_ctm_prepare_probes_reach_the_simulator() {
-        let governance = call(0xc1, &[0x02]);
-        let mut ctm = prepare_output(std::slice::from_ref(&governance));
+        // The bundle is the one derived transition leg: one simulator transaction.
+        let mut ctm = prepare_output(ctm_body(&[("ctm_transition_addr", TRANSITION)]), &[]);
         let mut probes = toml::value::Table::new();
         for probe in ["test_create_chain", "test_upgrade_chain"] {
             probes.insert(probe.into(), bundle_hex(&[call(0x51, &[0x04])]).into());
@@ -1654,9 +2059,8 @@ mod tests {
         ctm.body
             .insert("test_upgrade_calls".into(), toml::Value::Table(probes));
         let doc = merge_prepare_outputs(
-            prepare_output(&[]),
+            prepare_output(core_body(None), &[]),
             vec![(Address::repeat_byte(0x77), ctm)],
-            None,
             &[],
         )
         .unwrap();
@@ -1675,19 +2079,21 @@ mod tests {
         );
     }
 
-    /// A bootstrap edge deploys no operation: no executor call is derived and no `[operation]`
-    /// section is written, so the bundle is the extras followed by the prepares' declared calls.
+    /// A bootstrap merge derives no leg, so the bundle is the extras followed by the prepares'
+    /// declared calls.
     #[test]
-    fn a_bootstrap_merge_derives_no_executor_call() {
+    fn a_bootstrap_merge_derives_no_executor_leg() {
         let extra = call(0xe1, &[0x01]);
         let ctm = call(0xd1, &[0x03]);
         let doc = merge_prepare_outputs(
-            prepare_output(&[]),
+            prepare_output(core_body(Some(CORE_TRANSITION)), &[]),
             vec![(
                 Address::repeat_byte(0x77),
-                prepare_output(std::slice::from_ref(&ctm)),
+                prepare_output(
+                    ctm_body(&[("bootstrap_migration_addr", Address::repeat_byte(0x55))]),
+                    std::slice::from_ref(&ctm),
+                ),
             )],
-            None,
             &[ExtraGovernanceCall {
                 label: "extra",
                 authority: "protocol governance",
@@ -1696,10 +2102,7 @@ mod tests {
         )
         .unwrap();
         let bundle = merged_bundle(&doc);
-        assert_eq!(bundle.len(), 2);
-        assert_eq!(bundle[0].target, extra.target);
-        assert_eq!(bundle[1].target, ctm.target);
-        assert!(doc.get("operation").is_none());
+        assert_eq!(targets_and_data(&bundle), targets_and_data(&[extra, ctm]));
     }
 }
 

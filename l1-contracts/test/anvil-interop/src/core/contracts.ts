@@ -28,12 +28,13 @@ const ARTIFACTS = {
   BytecodesSupplier: "BytecodesSupplier.sol/BytecodesSupplier.json",
   CTMUpgradeExecutor: "CTMUpgradeExecutor.sol/CTMUpgradeExecutor.json",
   CoreUpgradeExecutor: "CoreUpgradeExecutor.sol/CoreUpgradeExecutor.json",
-  EcosystemUpgradeExecutor: "EcosystemUpgradeExecutor.sol/EcosystemUpgradeExecutor.json",
-  EcosystemUpgradeOperation: "EcosystemUpgradeOperation.sol/EcosystemUpgradeOperation.json",
+  // The ecosystem's legacy timelock (`scheduleTransparent` + `execute`): the registry runner sends
+  // its one upgrade bundle through it.
+  Governance: "Governance.sol/Governance.json",
   ISelfDescribingFacet: "ISelfDescribingFacet.sol/ISelfDescribingFacet.json",
   ICTMRelease: "ICTMRelease.sol/ICTMRelease.json",
   ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
-  ICoreTransition: "ICoreTransition.sol/ICoreTransition.json",
+  IProxyUpgradeTransition: "IProxyUpgradeTransition.sol/IProxyUpgradeTransition.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
   BootstrapUpgrade: "BootstrapUpgrade.sol/BootstrapUpgrade.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
@@ -41,13 +42,13 @@ const ARTIFACTS = {
   ZKsyncOSVerifierPlonk: "ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",
-  // Write-once release/CTM-transition/core-transition objects (contracts/upgrades/registry). Each
+  // Write-once release/CTM-transition/proxy-upgrade-transition objects (contracts/upgrades/registry). Each
   // takes its manifest as a CONSTRUCTOR argument, so a plain deployment is the whole creation
   // step. The committed manifest they are built from regenerates via
   // `yarn regen:registry-manifest` (emit mode of the registry upgrade runner).
   CTMRelease: "CTMRelease.sol/CTMRelease.json",
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
-  CoreTransition: "CoreTransition.sol/CoreTransition.json",
+  ProxyUpgradeTransition: "ProxyUpgradeTransition.sol/ProxyUpgradeTransition.json",
   ServerNotifier: "ServerNotifier.sol/ServerNotifier.json",
   // Bootstrap edge (see bootstrap-upgrade-stage.ts): the one-time entry into the registry-driven
   // model, plus the legacy cut-taking entrypoint a fixture may need installed.

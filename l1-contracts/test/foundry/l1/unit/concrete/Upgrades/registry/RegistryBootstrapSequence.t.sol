@@ -15,11 +15,10 @@ import {UpgradeExecutorBase} from "contracts/governance/UpgradeExecutorBase.sol"
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
-import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
-import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
+import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
 import {BootstrapAction} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
@@ -27,18 +26,18 @@ import {
     BootstrapAuthorityNotHeld,
     BootstrapNominationPending,
     BootstrapNotYetExecuted,
+    ProxyUpgradeDomainMismatch,
     RegistryTargetHasNoCode,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IDomainUpgradeExecutor} from "contracts/upgrades/registry/executors/IDomainUpgradeExecutor.sol";
-import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {
     BootstrapManifest,
-    CoreTransitionManifest,
     GenesisFacet,
+    ProxyUpgradeDomain,
     ProxyUpgradeRow,
+    ProxyUpgradeTransitionManifest,
     ReleaseGenesisData,
     ReleaseManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
@@ -71,7 +70,7 @@ contract SeqImplNew {
 ///         edge already deploys, call for call, and that executing it as one bundle performs the
 ///         whole edge and ends in the passing completion check — or reverts as a whole.
 /// @dev Driven against real objects throughout — a real `ChainTypeManager`, real OpenZeppelin
-///      `ProxyAdmin`s for both domains, a real `CoreTransition` and a real
+///      `ProxyAdmin`s for both domains, a real Core-domain `ProxyUpgradeTransition` and a real
 ///      `RegistryBootstrapMigration` — because the property under test is the derivation, and a
 ///      mocked object would be deriving from the test's own answers.
 contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
@@ -79,9 +78,8 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     RegistryBootstrapSequence internal sequence;
     CTMUpgradeExecutor internal ctmExecutor;
     CoreUpgradeExecutor internal coreExecutor;
-    EcosystemUpgradeExecutor internal coordinator;
     CTMRelease internal genesisRelease;
-    ICoreTransition internal coreTransition;
+    IProxyUpgradeTransition internal coreTransition;
 
     /// @dev Production shape: the CTM domain sits under its OWN admin, the ecosystem singletons
     ///      under the shared one. The edge hands each to a different executor.
@@ -134,13 +132,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         vm.etch(upgradeEngine, hex"600043");
 
         coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
-        ctmExecutor = new CTMUpgradeExecutor(
-            governor,
-            IChainTypeManager(address(chainContractAddress)),
-            ctmProxyAdmin,
-            address(coordinator)
-        );
+        ctmExecutor = new CTMUpgradeExecutor(governor, IChainTypeManager(address(chainContractAddress)), ctmProxyAdmin);
 
         // Governance holds both ProxyAdmins before the edge, as in production.
         ctmProxyAdmin.transferOwnership(governor);
@@ -183,8 +175,9 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
 
     /// @dev One participating ecosystem row, so the core leg the derived bundle applies is a real
     ///      edge.
-    function _deployCoreTransition() internal returns (ICoreTransition) {
-        CoreTransitionManifest memory manifest;
+    function _deployCoreTransition() internal returns (IProxyUpgradeTransition) {
+        ProxyUpgradeTransitionManifest memory manifest;
+        manifest.domain = ProxyUpgradeDomain.Core;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(bridgehubProxy),
@@ -192,7 +185,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             implNew: implNew,
             callInitializeUpgrade: false
         });
-        return ICoreTransition(address(new CoreTransition(manifest)));
+        return new ProxyUpgradeTransition(manifest);
     }
 
     function _manifest() internal view returns (BootstrapManifest memory) {
@@ -222,8 +215,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                 upgradeTimestamp: 0,
                 ctmExecutor: address(ctmExecutor),
                 coreExecutor: address(coreExecutor),
-                governance: governor,
-                coordinator: address(coordinator)
+                governance: governor
             });
     }
 
@@ -267,43 +259,33 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     /// @dev The bundle the sequence derives, without the notifier accept once it is no longer due:
     ///      every call but the accept, in order, as this suite expects them.
     function _expectedBundleAfterTheAccept() internal view returns (Call[] memory calls) {
-        calls = new Call[](8);
+        calls = new Call[](6);
         calls[0] = Call({
-            target: address(coreExecutor),
-            value: 0,
-            data: abi.encodeCall(IDomainUpgradeExecutor.setCoordinator, (address(coordinator)))
-        });
-        calls[1] = Call({
-            target: address(coordinator),
-            value: 0,
-            data: abi.encodeCall(EcosystemUpgradeExecutor.setCTMExecutor, (ICTMUpgradeExecutor(address(ctmExecutor))))
-        });
-        calls[2] = Call({
             target: address(ecosystemProxyAdmin),
             value: 0,
             data: abi.encodeCall(Ownable.transferOwnership, (address(coreExecutor)))
         });
-        calls[3] = Call({
+        calls[1] = Call({
             target: address(coreExecutor),
             value: 0,
             data: abi.encodeCall(CoreUpgradeExecutor.applyL1Upgrade, (coreTransition))
         });
-        calls[4] = Call({
+        calls[2] = Call({
             target: address(chainContractAddress),
             value: 0,
             data: abi.encodeCall(Ownable2Step.transferOwnership, (address(migration)))
         });
-        calls[5] = Call({
+        calls[3] = Call({
             target: address(ctmProxyAdmin),
             value: 0,
             data: abi.encodeCall(Ownable.transferOwnership, (address(migration)))
         });
-        calls[6] = Call({
+        calls[4] = Call({
             target: address(migration),
             value: 0,
             data: abi.encodeCall(RegistryBootstrapMigration.migrate, ())
         });
-        calls[7] = Call({
+        calls[5] = Call({
             target: address(migration),
             value: 0,
             data: abi.encodeCall(RegistryBootstrapMigration.validateApplied, ())
@@ -323,7 +305,6 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.owner(), governor, "governance keeps the CTM");
         assertEq(ctmProxyAdmin.owner(), governor, "and the CTM-domain ProxyAdmin");
         assertEq(ecosystemProxyAdmin.owner(), governor, "and the ecosystem ProxyAdmin");
-        assertEq(coreExecutor.coordinator(), address(0), "no binding stands");
         assertEq(
             ecosystemProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(address(bridgehubProxy))),
             implOld,
@@ -394,12 +375,35 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     function test_revertWhen_theCoreTransitionIsNotDeployed() public {
         address codeless = makeAddr("codelessCoreTransition");
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
-        new RegistryBootstrapSequence(migration, ICoreTransition(codeless));
+        new RegistryBootstrapSequence(migration, IProxyUpgradeTransition(codeless));
+    }
+
+    /// @dev The sequence's core leg runs through the core executor, so a CTM-domain object is
+    ///      refused when the sequence is built rather than when governance executes it.
+    function test_revertWhen_theCoreTransitionIsACTMDomainObject() public {
+        ProxyUpgradeTransitionManifest memory manifest;
+        manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+            proxy: address(ctmDomainProxy),
+            expectedOldImpl: implOld,
+            implNew: implNew,
+            callInitializeUpgrade: false
+        });
+        ProxyUpgradeTransition ctmDomain = new ProxyUpgradeTransition(manifest);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProxyUpgradeDomainMismatch.selector,
+                uint8(ProxyUpgradeDomain.Core),
+                uint8(ProxyUpgradeDomain.CTM)
+            )
+        );
+        new RegistryBootstrapSequence(migration, ctmDomain);
     }
 
     function test_revertWhen_anInputIsZero() public {
         vm.expectRevert(ZeroAddress.selector);
-        new RegistryBootstrapSequence(migration, ICoreTransition(address(0)));
+        new RegistryBootstrapSequence(migration, IProxyUpgradeTransition(address(0)));
 
         vm.expectRevert(ZeroAddress.selector);
         new RegistryBootstrapSequence(RegistryBootstrapMigration(address(0)), coreTransition);
@@ -430,8 +434,6 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             "the ecosystem row is applied"
         );
         assertEq(ecosystemProxyAdmin.owner(), address(coreExecutor), "the ecosystem admin is the core executor's");
-        assertEq(coreExecutor.coordinator(), address(coordinator), "the core executor is bound");
-        assertEq(address(coordinator.ctmExecutor()), address(ctmExecutor), "the coordinator is bound");
         assertEq(chainContractAddress.owner(), address(ctmExecutor), "the CTM is the executor's");
         assertEq(ctmProxyAdmin.owner(), address(ctmExecutor), "and so is its ProxyAdmin");
         assertEq(Ownable2Step(address(notifierProxy)).owner(), address(ctmExecutor), "and the notifier");
@@ -469,12 +471,12 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     function test_migrateRefusesWithoutTheEcosystemHandover() public {
         _chainAdminHandsOverTheNotifier();
         Call[] memory derived = _calls(sequence.actions());
-        // The derived bundle minus the ecosystem ProxyAdmin handover (index 3, after the accept)
-        // and the core leg that needs it (index 4).
+        // The derived bundle minus the ecosystem ProxyAdmin handover (index 1, after the accept)
+        // and the core leg that needs it (index 2).
         Call[] memory bundle = new Call[](derived.length - 2);
         uint256 next = 0;
         for (uint256 i = 0; i < derived.length; ++i) {
-            if (i == 3 || i == 4) {
+            if (i == 1 || i == 2) {
                 continue;
             }
             bundle[next] = derived[i];
@@ -488,16 +490,16 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         _assertEdgeNotApplied();
     }
 
-    /// @notice A nomination left on an executor the edge binds is refused by `migrate()` itself
-    ///         (the completion check would refuse it too): the bundle reverts as a whole.
+    /// @notice A nomination left on an executor the edge hands a domain to is refused by `migrate()`
+    ///         itself (the completion check would refuse it too): the bundle reverts as a whole.
     function test_aPendingExecutorNominationRevertsTheWholeBootstrap() public {
         _chainAdminHandsOverTheNotifier();
         address attacker = makeAddr("attacker");
         vm.prank(governor);
-        coordinator.transferOwnership(attacker);
+        coreExecutor.transferOwnership(attacker);
 
         Call[] memory bundle = _calls(sequence.actions());
-        vm.expectRevert(abi.encodeWithSelector(BootstrapNominationPending.selector, address(coordinator), attacker));
+        vm.expectRevert(abi.encodeWithSelector(BootstrapNominationPending.selector, address(coreExecutor), attacker));
         this.runBundle(bundle);
         _assertEdgeNotApplied();
     }

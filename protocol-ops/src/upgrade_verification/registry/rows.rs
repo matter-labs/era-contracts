@@ -1,6 +1,6 @@
-//! The enum-indexed proxy inventories an upgrade carries — a core transition's ecosystem rows,
-//! an operation's or a bootstrap's CTM-domain rows — held against live state, the same way on
-//! every path.
+//! The enum-indexed proxy inventories an upgrade carries — a Core-domain `ProxyUpgradeTransition`'s
+//! ecosystem rows, a CTM-domain one's or a bootstrap's CTM-domain rows — held against live state,
+//! the same way on every path.
 //!
 //! Each participating row (a non-zero `implNew`) answers three questions:
 //!
@@ -19,7 +19,9 @@
 use alloy::primitives::Address;
 use alloy::providers::Provider;
 
-use crate::upgrade_verification::constants::{CTM_CONTRACTS, L1_ECOSYSTEM_CONTRACTS};
+use crate::upgrade_verification::constants::{
+    CTM_CONTRACTS, L1_ECOSYSTEM_CONTRACTS, PROXY_UPGRADE_DOMAIN_CORE, PROXY_UPGRADE_DOMAIN_CTM,
+};
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::ReviewedBuild;
@@ -28,18 +30,35 @@ use super::views::{
     BridgehubView, CtmView, L1AssetRouterView, L1NullifierView, ProxyAdminView, ProxyUpgradeRow,
 };
 
-/// Which enum indexes an inventory.
+/// Which enum indexes an inventory — equivalently, which `ProxyUpgradeDomain` it belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Inventory {
-    /// `L1EcosystemContract`: a core transition's `proxyUpgrades`, applied through the ecosystem
-    /// `ProxyAdmin`.
+    /// `L1EcosystemContract`: a Core-domain `ProxyUpgradeTransition`'s `proxyUpgrades`, applied
+    /// through the ecosystem `ProxyAdmin`.
     Ecosystem,
-    /// `CTMContract`: an operation's `ctmInfrastructure` or a bootstrap's `ctmProxyUpgrades`,
-    /// applied through the CTM-domain `ProxyAdmin`.
+    /// `CTMContract`: a CTM-domain `ProxyUpgradeTransition`'s `proxyUpgrades` or a bootstrap's
+    /// `ctmProxyUpgrades`, applied through the CTM-domain `ProxyAdmin`.
     CtmDomain,
 }
 
 impl Inventory {
+    /// The `ProxyUpgradeDomain` tag a `ProxyUpgradeTransition` carrying this inventory has.
+    pub(super) fn domain_tag(self) -> u8 {
+        match self {
+            Self::Ecosystem => PROXY_UPGRADE_DOMAIN_CORE,
+            Self::CtmDomain => PROXY_UPGRADE_DOMAIN_CTM,
+        }
+    }
+
+    /// The `ProxyUpgradeDomain` member name of `tag`, for the report.
+    pub(super) fn domain_name(tag: u8) -> String {
+        match tag {
+            PROXY_UPGRADE_DOMAIN_CORE => "Core".to_string(),
+            PROXY_UPGRADE_DOMAIN_CTM => "CTM".to_string(),
+            other => format!("unknown ({other})"),
+        }
+    }
+
     fn enum_name(self) -> &'static str {
         match self {
             Self::Ecosystem => "L1EcosystemContract",

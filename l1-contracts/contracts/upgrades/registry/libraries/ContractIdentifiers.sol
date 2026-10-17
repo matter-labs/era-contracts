@@ -50,8 +50,8 @@ enum L2EcosystemContract {
 /// @notice Canonical identifier for CTM / state-transition contracts.
 ///         The enum value is VM-neutral; `DeployCTML1OrGateway.resolve` maps it to
 ///         the correct Era or ZKsyncOS contract / artifact name.
-///         Also the index space of the CTM-domain upgrade inventory: operation
-///         (`ctmInfrastructure`) and bootstrap (`ctmProxyUpgrades`) manifests carry
+///         Also the index space of the CTM-domain upgrade inventory: CTM-domain
+///         `ProxyUpgradeTransition` (`proxyUpgrades`) and bootstrap (`ctmProxyUpgrades`) manifests carry
 ///         `ProxyUpgradeRow[]` inventories of length `CTM_CONTRACT_COUNT` indexed by this enum (same slot semantics as `L1EcosystemContract`). Only the members that are
 ///         TUPPs under the CTM-domain `ProxyAdmin` can meaningfully participate
 ///         (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator,
@@ -98,8 +98,8 @@ enum ZKsyncOSUpgradeType {
 
 /// @notice Canonical identifier for L1 ecosystem (core) contracts — the shared singletons of
 ///         the ecosystem domain. ONE enum for both deployment identity and upgrades: member
-///         names are the deploy artifact names, and a `CoreTransitionManifest` carries its
-///         upgrades as a `ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT]` fixed array indexed by
+///         names are the deploy artifact names, and a Core-domain `ProxyUpgradeTransitionManifest`
+///         carries its upgrades as a `ProxyUpgradeRow[L1_ECOSYSTEM_CONTRACT_COUNT]` array indexed by
 ///         this enum — slot `uint256(member)` IS that contract's row, and a zero `implNew` in it
 ///         is the "not upgraded" statement. The fixed length guarantees every member HAS a slot;
 ///         it does not guarantee that preparation wrote every intended change into one, since an

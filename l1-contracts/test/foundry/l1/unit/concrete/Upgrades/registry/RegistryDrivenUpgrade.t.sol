@@ -6,10 +6,6 @@ import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_Cha
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
-import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
-import {OperationFixtures} from "./OperationFixtures.sol";
 import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {ChainRouting} from "test-utils/ChainRouting.sol";
@@ -67,14 +63,12 @@ import {
 /// @dev The registry is a storage-backed double (fixture addresses are dynamic), but everything
 ///      it pins here is real: live facet addresses/selectors, a real replacement `AdminFacet`,
 ///      the real `DefaultUpgrade`, real verifier contracts.
-/// @dev Each hop rides a one-leg operation through the coordinator's `execute`
-///      ({protocol-docs/ecosystem-upgrade-coordination.md}), which commits it; `upgradeChain`
-///      then crosses the chain. No ecosystem leg is named (the hops are CTM-only). The
-///      coordinator's own rules are covered in OperationExecution.t.sol.
-abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, OperationFixtures {
+/// @dev Each hop is committed by governance's `applyCTMUpgrade` on the CTM executor
+///      ({protocol-docs/ecosystem-upgrade-coordination.md}); `upgradeChain` then crosses the chain.
+///      No ecosystem leg is named (the hops are CTM-only). Multi-leg governance bundles are covered
+///      in UpgradeBundleExecution.t.sol.
+abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
     CTMUpgradeExecutor internal ctmExecutor;
-    CoreUpgradeExecutor internal coreExecutor;
-    EcosystemUpgradeExecutor internal coordinator;
     CTMTransition internal transitionV32;
     CTMTransition internal transitionV33;
     /// @dev The v33 hop's pinned delegate-calldata composer: a test-only stand-in returning
@@ -139,21 +133,12 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         chainAddress = createNewChain(getDiamondCutData(diamondInit));
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        // The coordinator over the ecosystem domain, and the CTM executor constructed answering
-        // to it — the shape the v35 bootstrap leaves behind.
-        coreExecutor = new CoreUpgradeExecutor(governor, new ProxyAdmin());
-        coordinator = new EcosystemUpgradeExecutor(governor, coreExecutor);
-        vm.prank(governor);
-        coreExecutor.setCoordinator(address(coordinator));
+        // The CTM executor, owned by governance — the shape the v35 bootstrap leaves behind.
         ctmExecutor = new CTMUpgradeExecutor(
             governor,
             IChainTypeManager(address(chainContractAddress)),
-            new ProxyAdmin(),
-            address(coordinator)
+            new ProxyAdmin()
         );
-
-        vm.prank(governor);
-        coordinator.setCTMExecutor(ctmExecutor);
 
         // Real v33 artifacts: a fresh AdminFacet implementation (same selectors, new address)
         // and the plain DefaultUpgrade as the upgrade-init contract.
@@ -186,7 +171,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         UtilsFacet(chainAddress).util_setL2SystemContractsUpgradeTxHash(bytes32(0));
 
         // Every bytecode the v33 hop installs must be published on the CTM's supplier before
-        // the operation commits the edge — the prepare pipeline's publish step.
+        // governance commits the edge — the prepare pipeline's publish step.
         assertEq(chainContractAddress.L1_BYTECODES_SUPPLIER(), address(bytecodesSupplier));
         L2PlanFixtures.publish(
             bytecodesSupplier,
@@ -298,20 +283,14 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest, Operati
         );
     }
 
-    /// @dev The one-leg operation a hop rides.
-    function _operationFor(CTMTransition _transition) internal returns (EcosystemUpgradeOperation) {
-        return _cachedOperationFor(ICTMTransition(address(_transition)));
-    }
-
-    /// @dev The coordinator executes the hop's operation: the hop is committed on the CTM.
+    /// @dev Governance commits the hop on the CTM.
     function _commitHop(CTMTransition _transition) internal {
-        EcosystemUpgradeOperation operation = _operationFor(_transition);
         vm.prank(governor);
-        coordinator.execute(operation);
+        ctmExecutor.applyCTMUpgrade(ICTMTransition(address(_transition)));
         assertEq(
             chainContractAddress.upgradeTransition(_transition.oldProtocolVersion()),
             address(_transition),
-            "the operation must commit the hop"
+            "governance must commit the hop"
         );
     }
 

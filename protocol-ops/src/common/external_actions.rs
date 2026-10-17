@@ -8,7 +8,7 @@
 //! ```toml
 //! [[external_actions]]
 //! phase = "governance"        # "governance" for the governance bundle, "admin" for admin ones
-//! label = "bind the coordinator to the CTM executor"
+//! label = "hand the ecosystem ProxyAdmin to the bound core executor"
 //! authority = "protocol governance"
 //! target = "0x…"
 //! value = "0"                 # decimal: the field is a uint256
@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn round_trips_through_toml() {
         let actions = vec![ExternalAction::governance(
-            "bind the coordinator to the CTM executor",
+            "hand the ecosystem ProxyAdmin to the bound core executor",
             "protocol governance",
             &call(0x11, 7, &[0xde, 0xad, 0xbe, 0xef, 0x01]),
         )];

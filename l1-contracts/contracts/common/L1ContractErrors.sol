@@ -115,8 +115,6 @@ error ChainRequiresValidatorsSignaturesForCommit();
 error ChainTypeManagerNotRegistered(address chainTypeManager);
 // 0x8746f42f
 error ConstructorsNotSupported();
-// 0x957f207b
-error CoordinatorCTMMismatch(address expected, address actual);
 // 0xec273439
 error CTMAlreadyRegistered();
 // 0xc630ef3c
@@ -159,8 +157,6 @@ error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 error ExecutionDelayNotIncreased(uint32 currentDelay, uint32 newDelay);
 // 0xedfc1f1c
 error ExecutionDelayTooLarge(uint32 delay, uint32 maxDelay);
-// 0x8bd334a8
-error ExecutorCoordinatorMismatch(address expected, address actual);
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0xba87a28b
@@ -354,12 +350,8 @@ error OnlyNormalMode();
 error OnlyPriorityMode();
 // 0x6c167909
 error OnlySelfAllowed();
-// 0xcfc11a41
-error OperationChangesNothing();
 // 0x1a21feed
 error OperationExists();
-// 0xe27b2c86
-error OperationManifestChanged(bytes32 committed, bytes32 served);
 // 0xeda2fbb1
 error OperationMustBePending();
 // 0xe1c1ff37
@@ -390,6 +382,8 @@ error ProofTooShort();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0x896ad688
+error ProxyUpgradeDomainMismatch(uint8 expected, uint8 actual);
 // 0x929dc94b
 error ProxyUpgradeRowMismatch(address proxy, address expectedOldImpl, address actualImpl);
 // 0xd95d4d82

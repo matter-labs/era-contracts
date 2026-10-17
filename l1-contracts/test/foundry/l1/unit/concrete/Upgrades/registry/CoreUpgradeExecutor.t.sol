@@ -7,20 +7,24 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
-import {IDomainUpgradeExecutor} from "contracts/upgrades/registry/executors/IDomainUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {CoreTransition} from "contracts/upgrades/registry/objects/CoreTransition.sol";
-import {ICoreTransition} from "contracts/upgrades/registry/objects/ICoreTransition.sol";
+import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
 import {MockProxyUpgradeInitImpl} from "contracts/dev-contracts/test/MockProxyUpgradeInitImpl.sol";
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
-import {ProxyUpgradeRowMismatch, RegistryTargetHasNoCode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
-    CoreTransitionManifest,
-    OperationManifest,
-    ProxyUpgradeRow
+    ProxyUpgradeDomainMismatch,
+    ProxyUpgradeRowMismatch,
+    RegistryTargetHasNoCode
+} from "contracts/common/L1ContractErrors.sol";
+import {
+    ProxyUpgradeDomain,
+    ProxyUpgradeRow,
+    ProxyUpgradeTransitionManifest
 } from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
 import {
     CTM_CONTRACT_COUNT,
+    CTMContract,
     L1_ECOSYSTEM_CONTRACT_COUNT,
     L1EcosystemContract
 } from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
@@ -38,24 +42,19 @@ contract DummyImplB {
     }
 }
 
-/// @notice Tests the ecosystem-domain executor on its own: the owner path (how the bootstrap
-///         edge applies a registry) and the coordinator path (`applyOperation`). Deliberately owned
-///         by a DIFFERENT governance address than the CTM-scoped executor in
-///         CTMUpgradeExecutor.t.sol: the two authority domains are separable.
-/// @dev Registries are REAL, write-once `CoreTransition` instances rather than mutable test
+/// @notice Tests the ecosystem-domain executor on its own: `applyL1Upgrade` (the bootstrap edge's
+///         core leg and every later upgrade's). Deliberately owned by a DIFFERENT governance address
+///         than the CTM-scoped executor in CTMUpgradeExecutor.t.sol: the two authority domains are
+///         separable. Multi-leg governance bundles are UpgradeBundleExecution.t.sol.
+/// @dev Transitions are REAL, write-once `ProxyUpgradeTransition` instances rather than mutable test
 ///      doubles: the rows the executor applies are the rows a governance-reviewed object serves.
-/// @dev The COORDINATOR IS A PLAIN ADDRESS here, pranked: this suite isolates the executor's own
-///      rules (who may apply, and what) from the coordinator's. Each call hands in a manifest the
-///      way the coordinator does; the real coordinator drives the same callback end to end in
-///      OperationExecution.t.sol and EcosystemUpgradeCoordination.t.sol.
 contract CoreUpgradeExecutorTest is Test {
     bytes32 internal constant EIP1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     address internal ecosystemGovernor = makeAddr("ecosystemGovernor");
-    address internal coordinator = makeAddr("coordinator");
 
     CoreUpgradeExecutor internal coreExecutor;
-    ICoreTransition internal coreTransition;
+    IProxyUpgradeTransition internal coreTransition;
     ProxyAdmin internal proxyAdmin;
 
     DummyImplA internal implOld;
@@ -80,23 +79,9 @@ contract CoreUpgradeExecutorTest is Test {
         coreTransition = _deployRegistry(rows);
 
         // The executor is BOUND to (and owns) one immutable ecosystem ProxyAdmin, mirroring the
-        // production ownership chain; the owner then points it at the coordinator (the v35
-        // bootstrap's binding).
+        // production ownership chain.
         coreExecutor = new CoreUpgradeExecutor(ecosystemGovernor, proxyAdmin);
         proxyAdmin.transferOwnership(address(coreExecutor));
-        vm.prank(ecosystemGovernor);
-        coreExecutor.setCoordinator(coordinator);
-    }
-
-    /// @dev A manifest whose ecosystem leg is `_coreTransition` (zero for none). The CTM side is a
-    ///      labelled stand-in — the core executor reads only its own leg.
-    function _manifestNaming(address _coreTransition) internal returns (OperationManifest memory) {
-        return
-            OperationManifest({
-                coreTransition: _coreTransition,
-                ctmInfrastructure: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
-                ctmTransition: makeAddr("transition")
-            });
     }
 
     function _row(
@@ -113,11 +98,12 @@ contract CoreUpgradeExecutorTest is Test {
             });
     }
 
-    /// @dev The registry takes the enum-indexed inventory; these tests exercise row semantics
+    /// @dev The transition takes the enum-indexed inventory; these tests exercise row semantics
     ///      with two synthetic proxies, so they occupy the `L1Bridgehub` and `L1MessageRoot`
     ///      slots (the slot is a label — the row's own proxy address is its identity).
-    function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (ICoreTransition) {
-        CoreTransitionManifest memory manifest;
+    function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (IProxyUpgradeTransition) {
+        ProxyUpgradeTransitionManifest memory manifest;
+        manifest.domain = ProxyUpgradeDomain.Core;
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         if (_rows.length > 0) {
             manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = _rows[0];
@@ -125,7 +111,7 @@ contract CoreUpgradeExecutorTest is Test {
         if (_rows.length > 1) {
             manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)] = _rows[1];
         }
-        return ICoreTransition(address(new CoreTransition(manifest)));
+        return new ProxyUpgradeTransition(manifest);
     }
 
     function _liveImpl(TransparentUpgradeableProxy _proxy) internal view returns (address) {
@@ -140,6 +126,8 @@ contract CoreUpgradeExecutorTest is Test {
     // ─────────────────────────── the owner path ───────────────────────────
 
     function test_applyL1Upgrade_upgradesChangedProxiesOnly() public {
+        vm.expectEmit(true, true, true, true, address(coreExecutor));
+        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreTransition));
         vm.recordLogs();
         _applyL1Upgrade();
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -185,7 +173,7 @@ contract CoreUpgradeExecutorTest is Test {
             implNew: address(initImpl),
             callInitializeUpgrade: true
         });
-        ICoreTransition initRegistry = _deployRegistry(rows);
+        IProxyUpgradeTransition initRegistry = _deployRegistry(rows);
 
         vm.prank(ecosystemGovernor);
         coreExecutor.applyL1Upgrade(initRegistry);
@@ -198,18 +186,42 @@ contract CoreUpgradeExecutorTest is Test {
         );
     }
 
-    function test_revertWhen_applyL1UpgradeByStrangerOrCoordinator() public {
+    function test_revertWhen_applyL1UpgradeByStranger() public {
         // Not even the CTM-scope governor may drive the ecosystem executor: authority domains
-        // are separate, and the owner path admits the owner only — the coordinator applies
-        // through `applyOperation`.
+        // are separate, and the entrypoint admits the owner only.
         address ctmGovernor = makeAddr("ctmGovernor");
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(ctmGovernor);
         coreExecutor.applyL1Upgrade(coreTransition);
         vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(coordinator);
+        vm.prank(makeAddr("stranger"));
         coreExecutor.applyL1Upgrade(coreTransition);
         assertEq(_liveImpl(bridgehubProxy), address(implOld));
+    }
+
+    /// @dev A CTM-domain object never applies through the ecosystem admin, even when its rows would
+    ///      resolve there: the domain is the object's pinned statement of which executor applies it.
+    function test_revertWhen_applyL1UpgradeWithACTMDomainTransition() public {
+        ProxyUpgradeTransitionManifest memory manifest;
+        manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(
+            address(bridgehubProxy),
+            address(implOld),
+            address(implNew)
+        );
+        ProxyUpgradeTransition ctmDomain = new ProxyUpgradeTransition(manifest);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProxyUpgradeDomainMismatch.selector,
+                uint8(ProxyUpgradeDomain.Core),
+                uint8(ProxyUpgradeDomain.CTM)
+            )
+        );
+        vm.prank(ecosystemGovernor);
+        coreExecutor.applyL1Upgrade(ctmDomain);
+        assertEq(_liveImpl(bridgehubProxy), address(implOld), "a refused transition applies nothing");
     }
 
     /// @dev Retargeted from the removed codehash anchor to the check that still guards this
@@ -220,7 +232,7 @@ contract CoreUpgradeExecutorTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
         vm.prank(ecosystemGovernor);
-        coreExecutor.applyL1Upgrade(ICoreTransition(codeless));
+        coreExecutor.applyL1Upgrade(IProxyUpgradeTransition(codeless));
         assertEq(_liveImpl(bridgehubProxy), address(implOld), "a refused registry applies nothing");
     }
 
@@ -233,7 +245,7 @@ contract CoreUpgradeExecutorTest is Test {
         DummyImplA implNewer = new DummyImplA();
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
         rows[0] = _row(address(bridgehubProxy), address(implNew), address(implNewer));
-        ICoreTransition laterRegistry = _deployRegistry(rows);
+        IProxyUpgradeTransition laterRegistry = _deployRegistry(rows);
         vm.prank(ecosystemGovernor);
         coreExecutor.applyL1Upgrade(laterRegistry);
 
@@ -249,80 +261,11 @@ contract CoreUpgradeExecutorTest is Test {
         coreExecutor.applyL1Upgrade(coreTransition);
     }
 
-    // ─────────────────────────── coordinator binding ───────────────────────────
-
-    function test_setCoordinator_rebindsAndEmits() public {
-        address successor = makeAddr("successor");
-        vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit IDomainUpgradeExecutor.CoordinatorChanged(coordinator, successor);
-        vm.prank(ecosystemGovernor);
-        coreExecutor.setCoordinator(successor);
-        assertEq(coreExecutor.coordinator(), successor, "the binding must be recorded");
-
-        // The old coordinator has lost its standing.
-        OperationManifest memory manifest = _manifestNaming(address(coreTransition));
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, coordinator));
-        vm.prank(coordinator);
-        coreExecutor.applyOperation(manifest);
-        assertEq(_liveImpl(bridgehubProxy), address(implOld));
-    }
-
-    function test_revertWhen_setCoordinatorByStranger() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(makeAddr("stranger"));
-        coreExecutor.setCoordinator(makeAddr("successor"));
-        assertEq(coreExecutor.coordinator(), coordinator);
-    }
-
-    // ─────────────────────────── the coordinator path ───────────────────────────
-
-    function test_coordinatorAppliesTheManifestsCoreTransition() public {
-        OperationManifest memory manifest = _manifestNaming(address(coreTransition));
-        vm.expectEmit(true, true, true, true, address(coreExecutor));
-        emit ICoreUpgradeExecutor.L1UpgradeApplied(address(coreTransition));
-        vm.prank(coordinator);
-        coreExecutor.applyOperation(manifest);
-
-        assertEq(_liveImpl(bridgehubProxy), address(implNew), "the manifest's leg must be applied");
-        assertEq(_liveImpl(messageRootProxy), address(implNew), "a row already at its target stays there");
-    }
-
-    function test_revertWhen_applyOperationByNonCoordinator() public {
-        // The owner included: the coordinator path is the coordinator's, and only the coordinator's.
-        OperationManifest memory manifest = _manifestNaming(address(coreTransition));
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ecosystemGovernor));
-        vm.prank(ecosystemGovernor);
-        coreExecutor.applyOperation(manifest);
-        address stranger = makeAddr("stranger");
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, stranger));
-        vm.prank(stranger);
-        coreExecutor.applyOperation(manifest);
-        assertEq(_liveImpl(bridgehubProxy), address(implOld));
-    }
-
-    /// @dev The leg must be deployed: a call into a codeless address succeeds silently, so without
-    ///      the check the leg would report itself applied over nothing. A manifest without a core
-    ///      leg is never handed to this executor; a raw call names the zero address and is refused
-    ///      the same way.
-    function test_revertWhen_applyOperationWithAnUndeployedCoreTransition() public {
-        address codeless = makeAddr("codelessRegistry");
-        OperationManifest memory misnamed = _manifestNaming(codeless);
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
-        vm.prank(coordinator);
-        coreExecutor.applyOperation(misnamed);
-
-        OperationManifest memory ctmOnly = _manifestNaming(address(0));
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, address(0)));
-        vm.prank(coordinator);
-        coreExecutor.applyOperation(ctmOnly);
-        assertEq(_liveImpl(bridgehubProxy), address(implOld), "a refused leg applies nothing");
-    }
-
     function test_manifestHashCommitsToTheRows() public {
         // The manifest hash is what distinguishes two instances of the same audited code.
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](1);
         rows[0] = _row(address(bridgehubProxy), address(implOld), address(implNew));
-        ICoreTransition first = _deployRegistry(rows);
+        IProxyUpgradeTransition first = _deployRegistry(rows);
         assertEq(
             first.manifestHash(),
             _deployRegistry(rows).manifestHash(),

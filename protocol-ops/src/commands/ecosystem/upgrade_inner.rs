@@ -258,23 +258,21 @@ impl<'a> UpgradeInner<'a> {
         logger::info(format!(
             "ChainRegistrationSender (core prepare): {chain_registration_sender:#x}"
         ));
-        let ecosystem_upgrade_executor = read_ecosystem_upgrade_executor(
-            &self
-                .contracts_path
-                .join(inputs.core_output_path.trim_start_matches('/')),
-        )?;
+        let core_output = self
+            .contracts_path
+            .join(inputs.core_output_path.trim_start_matches('/'));
+        // The bootstrap edge's call sequence covers both domains, so it names the ecosystem
+        // domain's executor and core transition; the CTM prepare also counts a core transition as
+        // a change when deciding whether the package changes anything.
+        // `CTMUpgradeParams.ecosystemUpgradeExecutor` keeps its name: the struct's ABI is stable.
+        let core_upgrade_executor =
+            read_core_registry_address(&core_output, "core_upgrade_executor_addr")?;
         logger::info(format!(
-            "EcosystemUpgradeExecutor (core prepare): {ecosystem_upgrade_executor:#x}"
+            "CoreUpgradeExecutor (core prepare): {core_upgrade_executor:#x}"
         ));
-        // Only the bootstrap edge reads it: its call sequence covers both domains, so the object
-        // describing that sequence needs the ecosystem inventory alongside the edge.
-        let core_transition = read_core_transition(
-            &self
-                .contracts_path
-                .join(inputs.core_output_path.trim_start_matches('/')),
-        )?;
+        let core_transition = read_core_registry_address(&core_output, "core_transition_addr")?;
         logger::info(format!(
-            "CoreTransition (core prepare): {core_transition:#x}"
+            "Core-domain ProxyUpgradeTransition (core prepare): {core_transition:#x}"
         ));
         // Per-CTM CREATE2 salt, so two CTMs prepared in one ecosystem never land a
         // contract with env-wide constant constructor args at the same address.
@@ -315,7 +313,7 @@ impl<'a> UpgradeInner<'a> {
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
                         testnetVerifier: inputs.testnet_verifier,
-                        ecosystemUpgradeExecutor: ecosystem_upgrade_executor,
+                        ecosystemUpgradeExecutor: core_upgrade_executor,
                         coreTransition: core_transition,
                     },
                 }
@@ -417,55 +415,22 @@ fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Addr
     })
 }
 
-/// The `[registry].core_transition_addr` the core prepare wrote — the ecosystem leg the operation
-/// names. Zero when the core prepare deployed no ecosystem implementation (the upgrade then has
-/// no ecosystem leg).
-fn read_core_transition(core_toml: &Path) -> anyhow::Result<Address> {
+/// An address the core prepare wrote under `[registry]`: `core_transition_addr` (the Core-domain
+/// `ProxyUpgradeTransition`, zero when the prepare deployed no ecosystem implementation) or
+/// `core_upgrade_executor_addr` (the ecosystem domain's `CoreUpgradeExecutor`).
+fn read_core_registry_address(core_toml: &Path, key: &str) -> anyhow::Result<Address> {
     let raw =
         fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
     let top: toml::Value =
         toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
     let value = top
         .get("registry")
-        .and_then(|v| v.get("core_transition_addr"))
+        .and_then(|v| v.get(key))
         .and_then(|v| v.as_str())
-        .with_context(|| {
-            format!(
-                "missing registry.core_transition_addr in {}",
-                core_toml.display()
-            )
-        })?;
+        .with_context(|| format!("missing registry.{key} in {}", core_toml.display()))?;
     value.parse().with_context(|| {
         format!(
-            "core_transition_addr in {} is not a valid address: {}",
-            core_toml.display(),
-            value,
-        )
-    })
-}
-
-/// The `[registry].ecosystem_upgrade_executor_addr` the core prepare wrote — the coordinator
-/// (`EcosystemUpgradeExecutor`) the CTM prepare's executor answers to, and the target of the
-/// derived `execute(operation)` call.
-fn read_ecosystem_upgrade_executor(core_toml: &Path) -> anyhow::Result<Address> {
-    let raw =
-        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
-    let top: toml::Value =
-        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
-    let value = top
-        .get("registry")
-        .and_then(|v| v.get("ecosystem_upgrade_executor_addr"))
-        .and_then(|v| v.as_str())
-        .with_context(|| {
-            format!(
-                "missing registry.ecosystem_upgrade_executor_addr in {}",
-                core_toml.display()
-            )
-        })?;
-
-    value.parse().with_context(|| {
-        format!(
-            "ecosystem_upgrade_executor_addr in {} is not a valid address: {}",
+            "{key} in {} is not a valid address: {}",
             core_toml.display(),
             value,
         )

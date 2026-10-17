@@ -6,12 +6,13 @@ pragma solidity ^0.8.24;
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Call} from "contracts/governance/Common.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {EcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/EcosystemUpgradeExecutor.sol";
-import {IEcosystemUpgradeExecutor} from "contracts/upgrades/registry/executors/IEcosystemUpgradeExecutor.sol";
-import {IEcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/IEcosystemUpgradeOperation.sol";
+import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 
@@ -35,9 +36,10 @@ import {EmergencyUpgradeFixture, ProtocolUpgradeHandlerDouble} from "./_Emergenc
 ///         are doubles (`_EmergencyGovernanceDoubles.sol`); the prepare, the package and every
 ///         contract the calls reach are real.
 /// @dev The package is written as the protocol-ops merge writes it (`upgrade.rs::write_merged_ecosystem_toml`):
-///      one bundle of the core prepare's calls, the coordinator's `execute(operation)`, then the CTM
-///      prepare's calls. The coordinator is handed to the handler with a real two-step ownership
-///      transfer, the acceptance being the handler's first emergency proposal.
+///      one bundle of the core prepare's calls, the ordered executor legs (`applyL1Upgrade`,
+///      `applyInfrastructureUpgrade`, `applyCTMUpgrade` — those the hop prepared), then the CTM
+///      prepare's calls. Both executors are handed to the handler with a real two-step ownership
+///      transfer, the acceptances being the handler's first emergency proposal.
 contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, EmergencyUpgradeFixture {
     using stdToml for string;
 
@@ -51,7 +53,8 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
     address internal rollupDAManager;
     address internal governance;
     address internal eip7702Checker;
-    EcosystemUpgradeExecutor internal coordinator;
+    address internal coreExecutor;
+    address internal ctmExecutor;
     VerifyEmergencyUpgrade internal dryRun;
 
     function setUp() public override {
@@ -67,18 +70,23 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
         rollupDAManager = deployCTM.readAddress("$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr");
         governance = deployL1.readAddress("$.deployed_addresses.governance_addr");
         eip7702Checker = ctmUpgrade.getAddresses().admin.eip7702Checker;
-        coordinator = EcosystemUpgradeExecutor(payable(coreUpgrade.getEcosystemUpgradeExecutor()));
+        coreExecutor = address(coreUpgrade.getCoreUpgradeExecutor());
+        ctmExecutor = IOwnable(ctm).owner();
 
-        vm.prank(coordinator.owner());
-        coordinator.transferOwnership(address(handler));
-        IProtocolUpgradeHandler.Call[] memory accept = new IProtocolUpgradeHandler.Call[](1);
-        accept[0] = IProtocolUpgradeHandler.Call({
-            target: address(coordinator),
-            value: 0,
-            data: abi.encodeCall(coordinator.acceptOwnership, ())
-        });
+        address[2] memory executors = [coreExecutor, ctmExecutor];
+        IProtocolUpgradeHandler.Call[] memory accept = new IProtocolUpgradeHandler.Call[](2);
+        for (uint256 i = 0; i < executors.length; ++i) {
+            vm.prank(IOwnable(executors[i]).owner());
+            IOwnable(executors[i]).transferOwnership(address(handler));
+            accept[i] = IProtocolUpgradeHandler.Call({
+                target: executors[i],
+                value: 0,
+                data: abi.encodeCall(IOwnable.acceptOwnership, ())
+            });
+        }
         _approveAndExecute(tool.buildEmergencyProposal(IProtocolUpgradeHandler(address(handler)), accept));
-        assertEq(coordinator.owner(), address(handler), "the handler governs the coordinator");
+        assertEq(IOwnable(coreExecutor).owner(), address(handler), "the handler governs the core executor");
+        assertEq(IOwnable(ctmExecutor).owner(), address(handler), "and the CTM executor");
     }
 
     /// @notice A chain-release upgrade — new release, transition, committed version edge — runs as one
@@ -86,7 +94,6 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
     function test_chainRelease_executesAsOneEmergencyProposal() public {
         RecurringCTMUpgradeForTests hop = new CTMUpgradeVerifierRelease();
         string memory package = _prepareAndMerge(hop, NEXT_VERSION_INPUT, "emergency-release");
-        IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(hop.preparedOperation());
         ICTMTransition transition = ICTMTransition(hop.preparedTransition());
         uint256 nextVersion = vm.readFile(string.concat(vm.projectRoot(), NEXT_VERSION_INPUT)).readUint(
             "$.contracts.latest_protocol_version"
@@ -94,9 +101,9 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
 
         tool.run(address(handler), package);
         IProtocolUpgradeHandler.Call[] memory calls = tool.loadGovernanceCalls(package);
-        assertEq(calls.length, 1, "a registry-driven upgrade carries the one coordinator call only");
-        assertEq(calls[0].target, address(coordinator));
-        assertEq(calls[0].data, abi.encodeCall(EcosystemUpgradeExecutor.execute, (operation)));
+        assertEq(calls.length, 1, "a transition-only upgrade carries the one commit call only");
+        assertEq(calls[0].target, ctmExecutor);
+        assertEq(calls[0].data, abi.encodeCall(ICTMUpgradeExecutor.applyCTMUpgrade, (transition)));
 
         EmergencyUpgradeCalldata.EmergencyProposal memory proposal = tool.buildEmergencyProposal(
             IProtocolUpgradeHandler(address(handler)),
@@ -104,8 +111,8 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
         );
         _approve(proposal, type(uint256).max);
         bytes memory executeCalldata = tool.executeCalldata(proposal);
-        vm.expectEmit(true, false, false, false, address(coordinator));
-        emit IEcosystemUpgradeExecutor.OperationExecuted(address(operation));
+        vm.expectEmit(true, false, false, false, ctmExecutor);
+        emit ICTMUpgradeExecutor.CTMUpgradeApplied(address(transition), 0, 0);
         vm.expectEmit(true, false, false, false, address(handler));
         emit ProtocolUpgradeHandlerDouble.EmergencyUpgradeExecuted(proposal.id);
         _send(proposal, executeCalldata);
@@ -121,8 +128,18 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
     function test_infrastructureOnly_dryRunExecutesThePackage() public {
         RecurringCTMUpgradeForTests hop = new CTMUpgradeValidatorTimelockOnly();
         string memory package = _prepareAndMerge(hop, SAME_VERSION_INPUT, "emergency-infra");
-        ProxyUpgradeRow[] memory rows = IEcosystemUpgradeOperation(hop.preparedOperation()).ctmInfrastructureRows();
+        ProxyUpgradeRow[] memory rows = IProxyUpgradeTransition(hop.preparedInfrastructure()).rows();
         assertEq(rows.length, 1, "the hop swaps the timelock");
+        IProtocolUpgradeHandler.Call[] memory calls = tool.loadGovernanceCalls(package);
+        assertEq(calls.length, 1, "the one infrastructure leg");
+        assertEq(calls[0].target, ctmExecutor);
+        assertEq(
+            calls[0].data,
+            abi.encodeCall(
+                ICTMUpgradeExecutor.applyInfrastructureUpgrade,
+                (IProxyUpgradeTransition(hop.preparedInfrastructure()))
+            )
+        );
 
         dryRun.verify(address(handler), package);
 
@@ -178,38 +195,65 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
 
         Call[] memory coreCalls = core.prepareDefaultGovernanceCalls();
         Call[] memory ctmCalls = _hop.prepareDefaultGovernanceCalls();
-        IEcosystemUpgradeOperation operation = IEcosystemUpgradeOperation(_hop.preparedOperation());
-        package = _writeBundlePackage(
-            _name,
-            _merge(coreCalls, abi.encodeCall(EcosystemUpgradeExecutor.execute, (operation)), ctmCalls)
-        );
+        package = _writeBundlePackage(_name, _merge(coreCalls, _legs(address(core.coreTransition()), _hop), ctmCalls));
     }
 
-    /// @dev The merge: the core bundle, the coordinator call, the CTM bundle.
-    function _merge(
-        Call[] memory _core,
-        bytes memory _coordinatorCall,
-        Call[] memory _ctm
-    ) internal view returns (IProtocolUpgradeHandler.Call[] memory merged) {
-        merged = new IProtocolUpgradeHandler.Call[](_core.length + 1 + _ctm.length);
-        for (uint256 i = 0; i < _core.length; ++i) {
-            merged[i] = IProtocolUpgradeHandler.Call({
-                target: _core[i].target,
-                value: _core[i].value,
-                data: _core[i].data
+    /// @dev The executor legs the merge derives, in canonical order: core, CTM infrastructure, commit.
+    function _legs(
+        address _coreTransition,
+        RecurringCTMUpgradeForTests _hop
+    ) internal view returns (Call[] memory legs) {
+        address infrastructure = _hop.preparedInfrastructure();
+        address transition = _hop.preparedTransition();
+        legs = new Call[](
+            (_coreTransition != address(0) ? 1 : 0) +
+                (infrastructure != address(0) ? 1 : 0) +
+                (transition != address(0) ? 1 : 0)
+        );
+        uint256 next = 0;
+        if (_coreTransition != address(0)) {
+            legs[next++] = Call({
+                target: coreExecutor,
+                value: 0,
+                data: abi.encodeCall(ICoreUpgradeExecutor.applyL1Upgrade, (IProxyUpgradeTransition(_coreTransition)))
             });
         }
-        merged[_core.length] = IProtocolUpgradeHandler.Call({
-            target: address(coordinator),
-            value: 0,
-            data: _coordinatorCall
-        });
-        for (uint256 i = 0; i < _ctm.length; ++i) {
-            merged[_core.length + 1 + i] = IProtocolUpgradeHandler.Call({
-                target: _ctm[i].target,
-                value: _ctm[i].value,
-                data: _ctm[i].data
+        if (infrastructure != address(0)) {
+            legs[next++] = Call({
+                target: ctmExecutor,
+                value: 0,
+                data: abi.encodeCall(
+                    ICTMUpgradeExecutor.applyInfrastructureUpgrade,
+                    (IProxyUpgradeTransition(infrastructure))
+                )
             });
+        }
+        if (transition != address(0)) {
+            legs[next++] = Call({
+                target: ctmExecutor,
+                value: 0,
+                data: abi.encodeCall(ICTMUpgradeExecutor.applyCTMUpgrade, (ICTMTransition(transition)))
+            });
+        }
+    }
+
+    /// @dev The merge: the core bundle, the executor legs, the CTM bundle.
+    function _merge(
+        Call[] memory _core,
+        Call[] memory _legsInOrder,
+        Call[] memory _ctm
+    ) internal pure returns (IProtocolUpgradeHandler.Call[] memory merged) {
+        merged = new IProtocolUpgradeHandler.Call[](_core.length + _legsInOrder.length + _ctm.length);
+        uint256 next = 0;
+        Call[][3] memory parts = [_core, _legsInOrder, _ctm];
+        for (uint256 p = 0; p < parts.length; ++p) {
+            for (uint256 i = 0; i < parts[p].length; ++i) {
+                merged[next++] = IProtocolUpgradeHandler.Call({
+                    target: parts[p][i].target,
+                    value: parts[p][i].value,
+                    data: parts[p][i].data
+                });
+            }
         }
     }
 }

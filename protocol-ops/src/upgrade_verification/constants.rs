@@ -71,6 +71,15 @@ pub const L2_ECOSYSTEM_FIXED_ADDRESSES: [(&str, usize, Address); 21] = [
 /// The source-sync test below fails the build if the append-only enum moves it.
 pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 19;
 
+/// `ProxyUpgradeDomain.Core` — the domain tag of a `ProxyUpgradeTransition` whose inventory is
+/// indexed by `L1EcosystemContract` and applied by the `CoreUpgradeExecutor`. The source-sync test
+/// below fails the build if the append-only enum moves it.
+pub const PROXY_UPGRADE_DOMAIN_CORE: u8 = 0;
+
+/// `ProxyUpgradeDomain.CTM` — the domain tag of a `ProxyUpgradeTransition` whose inventory is
+/// indexed by `CTMContract` and applied by a `CTMUpgradeExecutor`.
+pub const PROXY_UPGRADE_DOMAIN_CTM: u8 = 1;
+
 /// `enum L1EcosystemContract`, in declaration order: the slot names of a core transition's
 /// ecosystem inventory. The source-sync test below fails the build if the enum changes.
 pub const L1_ECOSYSTEM_CONTRACTS: [&str; 9] = [
@@ -85,9 +94,9 @@ pub const L1_ECOSYSTEM_CONTRACTS: [&str; 9] = [
     "ChainRegistrationSender",
 ];
 
-/// `enum CTMContract`, in declaration order: the slot names of a CTM-domain inventory (an
-/// operation's `ctmInfrastructure`, a bootstrap's `ctmProxyUpgrades`). The source-sync test below
-/// fails the build if the enum changes.
+/// `enum CTMContract`, in declaration order: the slot names of a CTM-domain inventory (a
+/// CTM-domain `ProxyUpgradeTransition`'s rows, a bootstrap's `ctmProxyUpgrades`). The source-sync
+/// test below fails the build if the enum changes.
 pub const CTM_CONTRACTS: [&str; 21] = [
     "AdminFacet",
     "MailboxFacet",
@@ -423,12 +432,17 @@ mod tests {
         "../../../l1-contracts/contracts/upgrades/registry/libraries/ContractIdentifiers.sol"
     );
 
-    /// The members of `enum <name>` in ContractIdentifiers.sol, in declaration order. Comments
-    /// are dropped before looking for the closing brace: they cite docs as `{path}`.
+    /// The members of `enum <name>` in ContractIdentifiers.sol, in declaration order.
     fn enum_members(name: &str) -> Vec<&'static str> {
-        let body = CONTRACT_IDENTIFIERS
+        enum_members_in(CONTRACT_IDENTIFIERS, "ContractIdentifiers.sol", name)
+    }
+
+    /// The members of `enum <name>` in `source`, in declaration order. Comments are dropped before
+    /// looking for the closing brace: they cite docs as `{path}`.
+    fn enum_members_in(source: &'static str, file: &str, name: &str) -> Vec<&'static str> {
+        let body = source
             .split_once(&format!("enum {name} {{"))
-            .unwrap_or_else(|| panic!("ContractIdentifiers.sol must declare `enum {name}`"))
+            .unwrap_or_else(|| panic!("{file} must declare `enum {name}`"))
             .1;
         let mut members = Vec::new();
         for line in body.lines() {
@@ -446,6 +460,24 @@ mod tests {
             }
         }
         panic!("enum {name} must be closed");
+    }
+
+    /// The domain tags are the positions of `enum ProxyUpgradeDomain` in RegistryTypes.sol: a
+    /// verifier holding an object to the wrong tag would accept the other domain's inventory.
+    #[test]
+    fn the_proxy_upgrade_domains_are_the_solidity_enum() {
+        const REGISTRY_TYPES: &str =
+            include_str!("../../../l1-contracts/contracts/upgrades/registry/RegistryTypes.sol");
+        let members = enum_members_in(REGISTRY_TYPES, "RegistryTypes.sol", "ProxyUpgradeDomain");
+        assert_eq!(members, vec!["Core", "CTM"]);
+        assert_eq!(
+            members.iter().position(|m| *m == "Core"),
+            Some(usize::from(PROXY_UPGRADE_DOMAIN_CORE))
+        );
+        assert_eq!(
+            members.iter().position(|m| *m == "CTM"),
+            Some(usize::from(PROXY_UPGRADE_DOMAIN_CTM))
+        );
     }
 
     #[test]

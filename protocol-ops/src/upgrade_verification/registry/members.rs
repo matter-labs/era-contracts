@@ -17,7 +17,7 @@
 //! | transition, bootstrap migration | `l2Plan.delegateComposer` | [`DELEGATE_COMPOSERS`] |
 //! | transition, bootstrap migration | `l2Plan.delegateBytecodeInfo` | the bytecode info of one of [`L2_DELEGATES`] |
 //! | transition, bootstrap migration | each `l2Plan.extraBytecodeInfos` entry | the bytecode info of a reviewed contract |
-//! | core transition, operation, bootstrap migration | each row's `implNew` | the contract of the row's slot ([`super::rows`]) |
+//! | proxy upgrade transition (either domain), bootstrap migration | each row's `implNew` | the contract of the row's slot ([`super::rows`]) |
 //!
 //! An L1 member is identified by its RUNTIME: the live code against the reviewed artifact of each
 //! contract its role admits, immutable slots masked ([`super::provenance::expect_code_identity`]).

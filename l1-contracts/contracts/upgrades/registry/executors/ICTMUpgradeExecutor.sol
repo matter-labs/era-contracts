@@ -2,16 +2,19 @@
 pragma solidity 0.8.28;
 
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
+import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
-import {IDomainUpgradeExecutor} from "./IDomainUpgradeExecutor.sol";
 
 /// @title ICTMUpgradeExecutor
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The CTM domain's executor: the coordinator surface ({IDomainUpgradeExecutor}) plus what
-///         only the CTM domain does — committing an operation's transition on the bound CTM, and
-///         per-chain upgrades. See {protocol-docs/ecosystem-upgrade-coordination.md}.
-interface ICTMUpgradeExecutor is IDomainUpgradeExecutor {
+/// @notice The CTM domain's executor: applies CTM-domain proxy upgrade transitions through the
+///         CTM `ProxyAdmin` it owns, commits transitions on the bound CTM, and upgrades chains. See
+///         {protocol-docs/ecosystem-upgrade-coordination.md}.
+interface ICTMUpgradeExecutor {
+    /// @notice Emitted after a CTM-domain transition's rows were applied through the bound admin.
+    event CTMInfrastructureUpgradeApplied(address indexed infrastructureTransition);
+
     /// @notice Emitted after the bound CTM was moved to the transition's new protocol version.
     event CTMUpgradeApplied(address indexed transition, uint256 oldProtocolVersion, uint256 newProtocolVersion);
 
@@ -28,13 +31,25 @@ interface ICTMUpgradeExecutor is IDomainUpgradeExecutor {
     ///      handover inside one transaction, so authority is never parked between calls.
     function acceptCTMOwnership() external;
 
+    /// @notice Applies a CTM-domain transition's source-checked implementation swaps through the
+    ///         bound CTM `ProxyAdmin`, and verifies every row at its `implNew` before returning.
+    /// @param _infrastructureTransition The write-once transition approved by governance; its domain
+    ///        must be `CTM`.
+    function applyInfrastructureUpgrade(IProxyUpgradeTransition _infrastructureTransition) external;
+
+    /// @notice Commits `_transition` on the bound CTM, after checking both of its edges against the
+    ///         CTM's current release and version and that every L2 bytecode it depends on is
+    ///         published, then holds the result to {validateTransitionApplied}.
+    /// @param _transition The write-once transition approved by governance.
+    function applyCTMUpgrade(ICTMTransition _transition) external;
+
     /// @notice Reverts unless `_transition` ITSELF is the transition committed on the bound CTM
-    ///         and the CTM has reached its target — the check `applyOperation` ends with, readable
+    ///         and the CTM has reached its target — the check `applyCTMUpgrade` ends with, readable
     ///         afterwards; a replaced transition fails it.
     function validateTransitionApplied(ICTMTransition _transition) external view;
 
     /// @notice Upgrades a single chain diamond to the transition's new protocol version with the
-    ///         same composed cut that `applyOperation` committed to.
+    ///         same composed cut that `applyCTMUpgrade` committed to.
     /// @dev Execution policy, in order of precedence:
     ///      - the OWNER may upgrade any chain at any time;
     ///      - a CHAIN'S OWN ADMIN may upgrade that chain at any time — upgrading is the chain's

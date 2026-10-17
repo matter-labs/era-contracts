@@ -5,9 +5,9 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
+import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
 import {ICTMUpgradeExecutor} from "./ICTMUpgradeExecutor.sol";
-import {IDomainUpgradeExecutor} from "./IDomainUpgradeExecutor.sol";
-import {DomainUpgradeExecutorBase} from "./DomainUpgradeExecutorBase.sol";
+import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
     TransitionNotCommitted,
@@ -18,8 +18,7 @@ import {
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
-import {CTM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
-import {OperationManifest} from "../RegistryTypes.sol";
+import {ProxyUpgradeDomain} from "../RegistryTypes.sol";
 import {L2PlanLib} from "../libraries/L2PlanLib.sol";
 import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 
@@ -27,35 +26,31 @@ import {BytecodesSupplier} from "../../BytecodesSupplier.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Domain executor BOUND to one immutable ChainTypeManager: it owns that CTM and its
-///         `ProxyAdmin`, and applies an operation's CTM leg — its infrastructure rows and the
-///         pinned, write-once `CTMTransition` — on the coordinating `EcosystemUpgradeExecutor`'s
-///         instruction, plus the per-chain `upgradeChain`. See
+///         `ProxyAdmin`, applies CTM-domain `ProxyUpgradeTransition` objects, commits write-once
+///         `CTMTransition` objects on the CTM, and runs the per-chain `upgradeChain`. See
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Fixed logic, no generic delegatecall. The transition it commits is the exact deployed
-///      object governance approved, never a proxy. The fixed entrypoints are `applyOperation` and
-///      `upgradeChain`; every other owner operation of the CTM (freezing a chain, moving a
-///      deadline, replacing a committed transition, ...) goes through the owner-gated,
-///      event-logged `forward`.
-contract CTMUpgradeExecutor is DomainUpgradeExecutorBase, ICTMUpgradeExecutor {
+///      object governance approved, never a proxy. Every other owner operation of the CTM (freezing
+///      a chain, moving a deadline, replacing a committed transition, ...) goes through the
+///      owner-gated, event-logged `forward`.
+contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
     using ObjectAnchorLib for address;
 
     /// @notice The one ChainTypeManager this executor governs. Transitions carry no CTM pointer;
-    ///         the binding is this immutable, so a transition cannot be aimed at a foreign CTM.
+    ///         the binding is this immutable, so a transition cannot be aimed at a foreign CTM
+    ///         through this executor.
     IChainTypeManager public immutable CHAIN_TYPE_MANAGER;
 
     /// @notice The CTM DOMAIN's `ProxyAdmin` — the admin of the CTM proxy itself and of the
-    ///         per-CTM proxies under the CTM's own administration. Owned by this executor, so an
-    ///         operation's infrastructure rows apply through the same authority that commits its
-    ///         transition.
+    ///         per-CTM proxies under the CTM's own administration. Owned by this executor.
     ProxyAdmin public immutable CTM_PROXY_ADMIN;
 
     constructor(
         address _initialOwner,
         IChainTypeManager _ctm,
-        ProxyAdmin _ctmProxyAdmin,
-        address _coordinator
-    ) DomainUpgradeExecutorBase(_initialOwner, _coordinator) {
-        if (address(_ctm) == address(0) || address(_ctmProxyAdmin) == address(0) || _coordinator == address(0)) {
+        ProxyAdmin _ctmProxyAdmin
+    ) UpgradeExecutorBase(_initialOwner) {
+        if (address(_ctm) == address(0) || address(_ctmProxyAdmin) == address(0)) {
             revert ZeroAddress();
         }
         CHAIN_TYPE_MANAGER = _ctm;
@@ -67,21 +62,16 @@ contract CTMUpgradeExecutor is DomainUpgradeExecutorBase, ICTMUpgradeExecutor {
         Ownable2Step(address(CHAIN_TYPE_MANAGER)).acceptOwnership();
     }
 
-    /// @inheritdoc IDomainUpgradeExecutor
-    /// @dev The CTM leg: the infrastructure rows, then the transition when the operation carries
-    ///      one. The rows go FIRST — the commit may need setters that only exist on the
-    ///      implementation this very operation installs — and any failure reverts the
-    ///      coordinator's whole call, so a failed row leg cannot leave a version commit standing.
-    function applyOperation(OperationManifest calldata _manifest) external onlyCoordinator {
-        ProxyUpgradeRowLib.applyRows(
-            CTM_PROXY_ADMIN,
-            ProxyUpgradeRowLib.toRows(_manifest.ctmInfrastructure, CTM_CONTRACT_COUNT)
-        );
-        ICTMTransition transition = ICTMTransition(_manifest.ctmTransition);
-        if (address(transition) != address(0)) {
-            _applyCTMUpgrade(transition);
-            _requireTransitionApplied(transition);
-        }
+    /// @inheritdoc ICTMUpgradeExecutor
+    function applyInfrastructureUpgrade(IProxyUpgradeTransition _infrastructureTransition) external onlyOwner {
+        ProxyUpgradeRowLib.applyTransition(CTM_PROXY_ADMIN, _infrastructureTransition, ProxyUpgradeDomain.CTM);
+        emit CTMInfrastructureUpgradeApplied(address(_infrastructureTransition));
+    }
+
+    /// @inheritdoc ICTMUpgradeExecutor
+    function applyCTMUpgrade(ICTMTransition _transition) external onlyOwner {
+        _applyCTMUpgrade(_transition);
+        _requireTransitionApplied(_transition);
     }
 
     /// @inheritdoc ICTMUpgradeExecutor
@@ -138,8 +128,7 @@ contract CTMUpgradeExecutor is DomainUpgradeExecutorBase, ICTMUpgradeExecutor {
         }
     }
 
-    /// @dev Installs the transition and points new-chain genesis at its target release. Private by
-    ///      design — only an operation commits a transition.
+    /// @dev Installs the transition and points new-chain genesis at its target release.
     function _applyCTMUpgrade(ICTMTransition _transition) private {
         address(_transition).requireCode();
         _transition.validate();

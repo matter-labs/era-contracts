@@ -107,7 +107,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
         console.log("setupUpgrade: Preparing core + CTM upgrades");
         coreUpgrade.prepareEcosystemUpgrade();
         // What protocol-ops passes through `CTMUpgradeParams` from the core output TOML.
-        ctmUpgrade.setEcosystemUpgradeExecutor(coreUpgrade.getEcosystemUpgradeExecutor());
+        ctmUpgrade.setCoreUpgradeExecutor(address(coreUpgrade.getCoreUpgradeExecutor()));
         ctmUpgrade.setCoreTransition(address(coreUpgrade.coreTransition()));
         ctmUpgrade.prepareCTMUpgrade();
 

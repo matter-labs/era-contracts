@@ -5,10 +5,10 @@ import {Vm} from "forge-std/Vm.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
-/// @notice One governance (or admin) call a prepare emits that is NOT the
-///         `EcosystemUpgradeExecutor.execute(operation)` call — an action the on-chain upgrade
-///         objects do not describe, declared with its phase, a label and the authority that
-///         performs it, so the output can never imply the executor call covers it.
+/// @notice One governance (or admin) call a prepare emits that is NOT one of the executor calls the
+///         merge derives (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) — an
+///         action the on-chain upgrade objects do not describe, declared with its phase, a label and
+///         the authority that performs it, so the output can never imply the executor calls cover it.
 /// @param phase The bundle it rides: `"governance"` for the governance bundle, `"admin"` for
 ///        separately emitted admin actions.
 struct ExternalAction {

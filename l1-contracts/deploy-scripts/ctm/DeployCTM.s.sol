@@ -358,11 +358,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("Owners updated");
     }
 
-    /// @notice Deploys the CTM executor bound to the ecosystem's coordinator and hands it the whole CTM
-    ///         domain — the CTM (whose nomination its permissionless `acceptCTMOwnership` completes),
-    ///         the CTM-domain ProxyAdmin and the ServerNotifier (accepted through `forward`) — then
-    ///         nominates the coordinator's governance on it: the CTM half of what the v35 bootstrap
-    ///         ends with. `RegisterCTM` binds it to the coordinator. Constructed for the deployer,
+    /// @notice Deploys the CTM executor and hands it the whole CTM domain — the CTM (whose nomination
+    ///         its permissionless `acceptCTMOwnership` completes), the CTM-domain ProxyAdmin and the
+    ///         ServerNotifier (accepted through `forward`) — then nominates the ecosystem governance on
+    ///         it: the CTM half of what the v35 bootstrap ends with. Constructed for the deployer,
     ///         which performs the handover; governance accepts afterwards.
     /// @dev Rides the CREATE2 factory like every deployment of this script.
     function deployCTMUpgradeExecutor() internal {
@@ -370,12 +369,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address ctmProxyAdmin = ctmAddresses.admin.transparentProxyAdmin;
         address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
-        address coordinator = _ecosystemCoordinator();
+        address governance = _ecosystemGovernance();
         CTMUpgradeExecutor executor = CTMUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(
                     type(CTMUpgradeExecutor).creationCode,
-                    abi.encode(deployer, ctm, ctmProxyAdmin, coordinator),
+                    abi.encode(deployer, ctm, ctmProxyAdmin),
                     "CTMUpgradeExecutor"
                 )
             )
@@ -385,8 +384,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             create2Salt: _create2FactorySalt,
             initialOwner: deployer,
             chainTypeManager: ctm,
-            ctmProxyAdmin: ctmProxyAdmin,
-            coordinator: coordinator
+            ctmProxyAdmin: ctmProxyAdmin
         });
 
         Call[] memory acceptNotifier = new Call[](1);
@@ -397,32 +395,31 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ProxyAdmin(ctmProxyAdmin).transferOwnership(address(executor));
         IOwnable(notifier).transferOwnership(address(executor));
         executor.forward(acceptNotifier);
-        executor.transferOwnership(_coordinatorGovernance(coordinator));
+        executor.transferOwnership(governance);
         vm.stopBroadcast();
         console.log("CTM upgrade executor deployed and handed the CTM domain");
     }
 
-    /// @dev The ecosystem's coordinator, read off the ecosystem ProxyAdmin's owner — the core executor
-    ///      `DeployL1CoreContracts` handed it to.
-    function _ecosystemCoordinator() internal view returns (address coordinator) {
+    /// @dev The ecosystem governance, read off the core executor `DeployL1CoreContracts` handed the
+    ///      ecosystem ProxyAdmin to: the executor's nominee while a fresh ecosystem deployment's
+    ///      nomination is still to be accepted — never the deployer that still owns it — and its owner
+    ///      afterwards. Both executors end owned by this one governance.
+    function _ecosystemGovernance() internal view returns (address governance) {
         address coreExecutor = ProxyAdmin(coreAddresses.shared.transparentProxyAdmin).owner();
         require(
             coreExecutor.code.length != 0,
             "the ecosystem ProxyAdmin is not held by a CoreUpgradeExecutor: the ecosystem predates the registry model"
         );
-        coordinator = CoreUpgradeExecutor(payable(coreExecutor)).coordinator();
-        require(coordinator != address(0), "the core executor is bound to no coordinator");
-    }
-
-    /// @dev The governance the coordinator answers to: its owner, or — while a fresh ecosystem
-    ///      deployment's nomination is still to be accepted — the nominee. All three executors end
-    ///      owned by this one governance.
-    /// @param _coordinator The ecosystem's coordinator.
-    function _coordinatorGovernance(address _coordinator) internal view returns (address governance) {
-        governance = Ownable2Step(_coordinator).pendingOwner();
+        require(
+            address(CoreUpgradeExecutor(payable(coreExecutor)).PROXY_ADMIN()) ==
+                coreAddresses.shared.transparentProxyAdmin,
+            "the ecosystem ProxyAdmin owner is not the core executor bound to it"
+        );
+        governance = Ownable2Step(coreExecutor).pendingOwner();
         if (governance == address(0)) {
-            governance = Ownable2Step(_coordinator).owner();
+            governance = Ownable2Step(coreExecutor).owner();
         }
+        require(governance != address(0), "the core executor has no governance");
     }
 
     function saveOutput(string memory outputPath) internal virtual {
@@ -574,8 +571,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     /// @dev Pins the ECOSYSTEM governance (the one the CTM executor is nominated to), not
     ///      `ctmAddresses.admin.governance`: without `reuseGovAndAdmin` the latter is the CTM's own.
     function prepareForceDeploymentsData() internal returns (bytes memory) {
-        address governance = _coordinatorGovernance(_ecosystemCoordinator());
-        require(governance != address(0), "the coordinator has no governance");
+        address governance = _ecosystemGovernance();
 
         FixedForceDeploymentsData memory data = _buildForceDeploymentsData(governance);
 

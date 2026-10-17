@@ -1,9 +1,10 @@
 //! `protocol-ops ecosystem verify-bootstrap` (alias `verify-package`) — read-only verification
 //! of a v35 registry-driven upgrade package against the live L1 it targets.
 //!
-//! Handles every kind of package and decides which from the package itself: a RECURRING upgrade
-//! driven through its coordinator, the one-time BOOTSTRAP edge onto the registry model, and a
-//! transition REPLACEMENT forwarded through the CTM executor. The name kept its original spelling
+//! Handles every kind of package and decides which from its calldata: an UPGRADE whose
+//! governance bundle calls the domain executors directly (1..3 legs in canonical order), the
+//! one-time BOOTSTRAP edge onto the registry model, and a transition REPLACEMENT forwarded through
+//! the CTM executor. The name kept its original spelling
 //! because the docs and runbooks that reference it predate the other paths.
 //!
 //! A registry package's reviewable content is the write-once objects and the authority they land
@@ -32,9 +33,8 @@ pub struct VerifyBootstrapArgs {
     pub l1_rpc_url: String,
 
     /// The reviewed governance address the upgrade must be driven by — for a bootstrap, the
-    /// owner the CTM domain lands on permanently (held against the manifest's); for a recurring
-    /// upgrade or a replacement, the owner of the whole lifecycle, which every executor's live
-    /// owner is held against. Without it a bootstrap's owner is reported but not checked against
+    /// owner the CTM domain lands on permanently (held against the manifest's); for an upgrade or
+    /// a replacement, the owner every executor the package drives must have. Without it a bootstrap's owner is reported but not checked against
     /// the review, and any other package fails — so supply it for any package that will actually
     /// be signed.
     #[clap(long)]
@@ -52,7 +52,7 @@ pub struct VerifyBootstrapArgs {
     /// A file carrying `[upgrade_executors]` records, repeatable: the forge output of `ecosystem
     /// init` / `ctm init` (`DeployL1CoreContracts`, `DeployCTM`) or a merged bootstrap package.
     /// Each executor is re-derived from the salt and ORIGINAL constructor arguments its record
-    /// states, so one whose owner or coordinator moved since its deployment still verifies; an
+    /// states, so one whose owner moved since its deployment still verifies; an
     /// executor with no record is unverified — an error. Adds to the records the package carries
     /// (a bootstrap package carries its own); two different records of one executor are refused.
     #[clap(long = "executor-record")]

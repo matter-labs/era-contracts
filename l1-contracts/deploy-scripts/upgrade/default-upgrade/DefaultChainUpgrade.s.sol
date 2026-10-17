@@ -2,8 +2,8 @@
 pragma solidity 0.8.28;
 
 // TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
-// (contracts/upgrades/registry: EcosystemUpgradeExecutor coordinating CoreUpgradeExecutor /
-// CTMUpgradeExecutor + release/transition registries) has fully replaced off-chain
+// (contracts/upgrades/registry: the CoreUpgradeExecutor / CTMUpgradeExecutor domain executors +
+// release/transition objects) has fully replaced off-chain
 // governance-calldata generation. Kept for the v35 bootstrap edge, which still ships a
 // script-composed governance bundle.
 

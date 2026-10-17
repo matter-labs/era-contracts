@@ -1,11 +1,12 @@
 # Creating an upgrade
 
 Upgrade authors use the scripts under `l1-contracts/deploy-scripts/upgrade/` to deploy
-implementations and the write-once objects of a release (the `CTMRelease`, the `CTMTransition`, a
-`CoreTransition` when ecosystem contracts change, and the `EcosystemUpgradeOperation` that names
-them) and to emit the one governance call that executes the operation, plus any declared external
-actions. The deployed objects must match the verifier, bootloader/system-contract bytecode hashes,
-facet set, protocol version, and any one-time migrations described by that release; the facet cuts
+implementations and the write-once objects of a release (the `CTMRelease`, the `CTMTransition`, and
+a `ProxyUpgradeTransition` for each domain whose proxies change); the governance calls that apply
+them — one executor call per object, in a fixed order — are derived from those objects, and any
+other call is a declared external action. The deployed objects must match the verifier,
+bootloader/system-contract bytecode hashes, facet set, protocol version, and any one-time migrations
+described by that release; the facet cuts
 and the L2 upgrade transaction are derived from the objects rather than authored, and the package is
 checked by re-deriving every object's address from reviewed code (see "Provenance and validation" in
 [Registry-driven protocol upgrades](../../../../docs/registry-driven-upgrades.md#provenance-and-validation)).

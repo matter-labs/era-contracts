@@ -8,8 +8,8 @@ import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_Cha
 import {RegistryDrivenUpgradeTestBase} from "./RegistryDrivenUpgrade.t.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
-import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
-import {EcosystemUpgradeOperation} from "contracts/upgrades/registry/objects/EcosystemUpgradeOperation.sol";
+import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -25,7 +25,9 @@ import {
 import {ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {
     AuthoredL2Plan,
+    ProxyUpgradeDomain,
     ProxyUpgradeRow,
+    ProxyUpgradeTransitionManifest,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest
@@ -34,8 +36,8 @@ import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 
 /// @notice Individual-contract upgrades through the registry model, end to end on a real ZKsync OS
 ///         chain: a facet-only edge, a verifier-only edge and a ValidatorTimelock-only SemVer
-///         patch. Each is ONE release (or none) and ONE transition, executed through the
-///         coordinator exactly like a full minor upgrade — and each proves that everything it
+///         patch. Each is ONE release (or none) and ONE transition, applied through the CTM
+///         executor exactly like a full minor upgrade — and each proves that everything it
 ///         does not name stays as it was: the other facets, the verifier, the CTM implementation,
 ///         the L2 side (no transaction is committed) and the release the CTM is on.
 /// @dev Departs from the state the base fixture's first hop leaves behind (0.32.0 on the v32
@@ -150,10 +152,14 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         // One release per version: the patch lands on a copy of the v32 release at 0.32.1.
         CTMRelease patchRelease = _release(address(0), before.verifier, V32_PATCH_1);
         CTMTransition timelockOnly = _transition(transitionV32.newRelease(), address(patchRelease));
-        _operationWithInfrastructure(ICTMTransition(address(timelockOnly)), rows);
         assertEq(timelockOnly.l2Plan().deployments.length, 0, "a version-only patch has no L2 side");
         assertEq(timelockOnly.facetCuts().length, 0, "and no facet cut");
 
+        // The row rides its own CTM-domain object, applied before the commit (one governance
+        // bundle in production; its atomicity is UpgradeBundleExecution.t.sol's).
+        ProxyUpgradeTransition infrastructure = _infrastructure(rows);
+        vm.prank(governor);
+        ctmExecutor.applyInfrastructureUpgrade(infrastructure);
         _runHop(timelockOnly);
 
         assertEq(_liveImpl(timelock), implNew, "the timelock proxy points at the new implementation");
@@ -170,13 +176,13 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         assertEq(IGetters(chainAddress).getL2SystemContractsUpgradeTxHash(), bytes32(0), "no L2 transaction");
     }
 
-    /// @notice THE decoupling test: replacing an ecosystem singleton behind a CTM-domain proxy is
-    ///         an operation with NO transition at all, so it costs no chain-version edge. Nothing
-    ///         about what any chain runs moves — see "Infrastructure-only operations" in
+    /// @notice THE decoupling test: replacing an implementation behind a CTM-domain proxy is an
+    ///         upgrade with NO transition at all, so it costs no chain-version edge. Nothing about
+    ///         what any chain runs moves — see "Infrastructure-only upgrades" in
     ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
-    function test_validatorTimelockOnlyOperation_movesNoProtocolVersion() public {
+    function test_validatorTimelockOnlyUpgrade_movesNoProtocolVersion() public {
         // Two hops first, so there is a real committed transition, a real pending L2 upgrade and a
-        // real old-version deadline for the infrastructure-only operation to leave alone.
+        // real old-version deadline for the infrastructure-only upgrade to leave alone.
         _runHop(transitionV32);
         _runHop(transitionV33);
         UnrelatedState memory before = _snapshot();
@@ -194,11 +200,12 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
             ProxyUpgradeRow[] memory rows
         ) = _timelockRowFixture();
         assertEq(_liveImpl(timelock), implOld, "fixture: the proxy starts at the old implementation");
-        EcosystemUpgradeOperation operation = _deployOperation(address(0), rows, address(0));
-        assertEq(operation.ctmTransition(), address(0), "an infrastructure-only operation carries no transition");
+        ProxyUpgradeTransition infrastructure = _infrastructure(rows);
 
+        vm.expectEmit(true, true, true, true, address(ctmExecutor));
+        emit ICTMUpgradeExecutor.CTMInfrastructureUpgradeApplied(address(infrastructure));
         vm.prank(governor);
-        coordinator.execute(operation);
+        ctmExecutor.applyInfrastructureUpgrade(infrastructure);
 
         // The one thing that changed.
         assertEq(_liveImpl(timelock), implNew, "the timelock proxy points at the new implementation");
@@ -225,9 +232,9 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
         assertEq(vm.load(address(chainContractAddress), EIP1967_IMPLEMENTATION_SLOT), before.ctmImplementationSlot);
         assertFalse(chainAssetHandler.migrationPausedFor(address(chainContractAddress)), "no migration pause is taken");
 
-        // Re-executing it changes nothing: every row already sits at its target.
+        // Re-applying it changes nothing: every row already sits at its target.
         vm.prank(governor);
-        coordinator.execute(operation);
+        ctmExecutor.applyInfrastructureUpgrade(infrastructure);
         assertEq(_liveImpl(timelock), implNew, "a re-execution leaves the row where it is");
         assertEq(chainContractAddress.protocolVersion(), ctmVersionBefore, "and moves no version");
     }
@@ -382,6 +389,14 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
     /// @dev A `ValidatorTimelock` proxy under the executor's bound CTM-domain `ProxyAdmin` (which
     ///      the executor must own to apply a row — the bootstrap edge hands that admin over), and
     ///      the inventory holding its `implOld -> implNew` row.
+    /// @dev The CTM-domain object over `_rows`.
+    function _infrastructure(ProxyUpgradeRow[] memory _rows) internal returns (ProxyUpgradeTransition) {
+        return
+            new ProxyUpgradeTransition(
+                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: _rows})
+            );
+    }
+
     function _timelockRowFixture()
         internal
         returns (TransparentUpgradeableProxy timelock, address implOld, address implNew, ProxyUpgradeRow[] memory rows)

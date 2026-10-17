@@ -12,8 +12,7 @@ library TrimmedUpgradeOutput {
         address ctmUpgradeExecutor;
         address ctmRelease;
         address bootstrapMigration;
-        address operation;
-        address coordinator;
+        address ctmInfrastructureTransition;
     }
 
     /// @dev What `protocol-ops ecosystem verify-package` reads beside the registry block: the
@@ -52,11 +51,14 @@ library TrimmedUpgradeOutput {
         // block: every object the production output names has to survive here too, or a package
         // verified from the harness is not the shape a package verified in production is.
         _vm.serializeAddress("registry", "bootstrap_migration_addr", _registry.bootstrapMigration);
-        _vm.serializeAddress("registry", "ctm_upgrade_executor_addr", _registry.ctmUpgradeExecutor);
-        // The merge derives this upgrade's `execute` call from exactly these two addresses, so a
-        // trimmed output that omitted them would produce a package with no executor call at all.
-        _vm.serializeAddress("registry", "coordinator_addr", _registry.coordinator);
-        string memory registry = _vm.serializeAddress("registry", "operation_addr", _registry.operation);
+        // The merge derives this upgrade's executor calls from these addresses, so a trimmed output
+        // that omitted them would produce a package with no CTM leg at all.
+        _vm.serializeAddress("registry", "ctm_infrastructure_transition_addr", _registry.ctmInfrastructureTransition);
+        string memory registry = _vm.serializeAddress(
+            "registry",
+            "ctm_upgrade_executor_addr",
+            _registry.ctmUpgradeExecutor
+        );
         string memory deployedAddresses = _vm.serializeAddress(
             "deployed_addresses",
             "transparent_proxy_admin",

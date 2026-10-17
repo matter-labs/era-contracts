@@ -1,36 +1,41 @@
 # Ecosystem upgrade coordination
 
-> The canonical description of the coordinator (`EcosystemUpgradeExecutor`), its operation
-> object (`EcosystemUpgradeOperation`) and the domain executors it drives.
+> How governance coordinates the upgrade domains: what each domain executor applies, the order
+> governance calls them in within one proposal, where ordering and atomicity are enforced, and the
+> repair of a committed transition. The objects and the authority model around it are
+> [docs/registry-driven-upgrades.md](../docs/registry-driven-upgrades.md).
 
 ## Execution domains
 
-`CoreUpgradeExecutor` owns the ecosystem ProxyAdmin and applies write-once core transitions.
-`CTMUpgradeExecutor` retains ownership of one CTM and its ProxyAdmin. `EcosystemUpgradeExecutor`
-executes an operation across those domains; it does not acquire their proxy administration
-directly.
+An upgrade touches up to two authority domains, each held by one executor that governance owns:
 
-## Operation commitment
+- `CoreUpgradeExecutor` owns the ecosystem `ProxyAdmin` and applies Core-domain proxy upgrade
+  transitions to the shared singletons (`applyL1Upgrade`).
+- `CTMUpgradeExecutor` is bound by immutables to one CTM and that CTM's `ProxyAdmin`, and owns both.
+  It applies CTM-domain proxy upgrade transitions (`applyInfrastructureUpgrade`) and commits
+  chain-version transitions on its CTM (`applyCTMUpgrade`).
 
-One immutable operation contains `{coreTransition, ctmInfrastructure, ctmTransition}`: an optional
-ecosystem change, an optional set of CTM-domain proxy rows and an optional chain-version edge. The
-coordinator is bound to one core executor and one CTM executor. The operation describes the change;
-it does not repeat the executor addresses. One CTM can manage many chains; their individual
-upgrades and lagging chain behavior are unchanged.
+No executor calls or names another, and no contract spans both domains: governance calls each
+executor directly, and the proposal that does so is what coordinates them. One CTM can manage many
+chains; their individual upgrades and lagging chain behavior are unchanged.
 
-Each of the three changes is optional, but an operation must carry at least one: a nonzero core
-registry, a nonempty row set, or a nonzero transition. An all-inert inventory does not count — the
-mere presence of the container must never make an operation that upgrades nothing look like one
-that upgrades something — so such a manifest is refused at construction.
+## What an upgrade applies
 
-The coordinator is the operation's only reader. `execute` reads `getManifest()` once, requires it to
-hash to the operation's `manifestHash()`, and passes that manifest to the domain executors, which
-take their legs from it; no domain executor calls the operation, and its per-field getters
-(`coreTransition()`, `ctmTransition()`, …) serve tooling and never steer execution.
+Up to three write-once objects, each optional, at least one present:
+
+- a Core-domain `ProxyUpgradeTransition`: source-checked implementation swaps of the ecosystem
+  proxies;
+- a CTM-domain `ProxyUpgradeTransition`: the same for the CTM-domain proxies, the CTM included;
+- a `CTMTransition`: one chain-version edge of the CTM.
+
+A `ProxyUpgradeTransition`'s domain is part of its manifest, so `manifestHash()` and its CREATE2
+address commit to it, and its inventory length is the domain's member count rather than a caller's
+choice. An object with no participating row is refused at construction: an upgrade that leaves a
+domain alone omits that domain's object and its call, so an object present always means a change.
 
 ### One home per responsibility
 
-- **Operation**: infrastructure changes and participation.
+- **Proxy upgrade transition**: infrastructure changes, one domain each.
 - **Transition**: what chains upgrade from and to, including their adoption deadline.
 - **Release**: what a chain runs.
 
@@ -39,11 +44,12 @@ from chain versions: a transition refuses unless the protocol version strictly i
 every chain must then adopt the new version one by one, so a `ValidatorTimelock` swap carried by a
 transition would buy fleet-wide work for a change to nothing any chain runs.
 
-### Infrastructure-only operations
+### Infrastructure-only upgrades
 
-An operation with rows and no transition replaces implementations behind CTM-domain proxies and
-moves no version: not the CTM's `protocolVersion`, not its `currentRelease`, no chain's version, no
-version deadline and no pending L2 upgrade. It is executed like any other operation.
+An upgrade with proxy upgrade transitions and no `CTMTransition` replaces implementations behind
+proxies and moves no version: not the CTM's `protocolVersion`, not its `currentRelease`, no chain's
+version, no version deadline and no pending L2 upgrade. Its proposal carries `applyL1Upgrade` and/or
+`applyInfrastructureUpgrade` and no `applyCTMUpgrade`; it executes like any other upgrade.
 
 Preparation emits one because the version script **declares** it does
 (`DefaultCTMUpgrade.upgradeKind`), never because the version numbers happen to match. Two releases
@@ -59,46 +65,87 @@ The transition's `upgradeTimestamp` is the earliest a CHAIN may execute its own 
 and `oldProtocolVersionDeadline` is when the departing version stops being usable. The transition
 enforces `oldProtocolVersionDeadline >= upgradeTimestamp`; both operands are its own. Neither is
 related to when governance executes: a chain cannot upgrade before `upgradeChain` finds its
-transition committed on the CTM, which only `execute` does, so the commit itself orders the two.
+transition committed on the CTM, which only `applyCTMUpgrade` does, so the commit itself orders the
+two.
 
 ## Execution
 
-`execute(operation)` (coordinator owner) is one transaction:
+Governance executes an upgrade as ONE proposal. Its executor legs are, in this canonical order and
+with no other call between them:
 
-1. It validates the operation (`validate()`: every row's implementation, and the core and CTM
-   transitions' own `validate()`) and holds the manifest to `manifestHash()`.
-2. When the manifest names a core transition, the core executor applies it (`applyOperation`).
-3. The CTM executor applies the CTM leg (`applyOperation`): the infrastructure rows first, then —
-   when the operation carries one — the transition's version commit, after checking both of its
-   edges against the live CTM. The rows go first because the commit may need a setter that only the
-   implementation this very operation installs has.
-4. Each leg verifies what it applied before it returns: every row's proxy runs its `implNew`, and
-   the CTM commits exactly this transition for its departure and has reached its target version.
-5. The coordinator emits `OperationExecuted(operation)`.
+1. `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)`;
+2. `CTMUpgradeExecutor.applyInfrastructureUpgrade(infrastructureTransition)`;
+3. `CTMUpgradeExecutor.applyCTMUpgrade(transition)`.
 
-Any failure reverts the whole call, so rows that already applied are rolled back when a later leg
-fails; no CTM callback applies core upgrades independently. Execution concerns L1; it does not
-claim that every chain has completed its L2 upgrade.
+An upgrade carries the subsequence its objects call for. The ecosystem goes first, so the CTM
+domain's code and the commit run against the ecosystem implementations the upgrade installs; the
+CTM-domain rows go before the commit, because the commit may need a setter that only an
+implementation this very upgrade installs has. Any other call of the proposal is a declared
+external action.
+
+Each leg is owner-only and checks its object before acting:
+
+- `applyL1Upgrade` and `applyInfrastructureUpgrade` require the object to have code, to be of the
+  executor's own domain (`ProxyUpgradeDomainMismatch`) and to `validate()`. They apply its rows
+  through the executor's bound `ProxyAdmin`, each departing from its `expectedOldImpl` or already at
+  its `implNew`, then require every row's proxy to run its `implNew`, and emit `L1UpgradeApplied` /
+  `CTMInfrastructureUpgradeApplied`.
+- `applyCTMUpgrade` requires the transition to have code and to `validate()`, checks both of its
+  edges against the live CTM (`currentRelease`, `protocolVersion`) and that every L2 factory
+  dependency is published on the CTM's `BytecodesSupplier`, and commits it
+  (`setNewVersionUpgradeFromTransition`: transition, version and target release together). It then
+  requires the CTM to commit exactly this transition for its departure and to have reached its
+  target, and emits `CTMUpgradeApplied`.
+
+The proposal is the atomicity boundary: one `Governance` or `ProtocolUpgradeHandler` execution runs
+its calls in order and reverts all of them when one fails, so rows an earlier leg applied are rolled
+back when a later leg fails. Legs sent as separate transactions lose that. Execution concerns L1; it
+does not claim that every chain has completed its L2 upgrade.
 
 Chain migrations are not paused around execution. The CTM's migration paths already require the
 migrating chain to be at the CTM's protocol version (`forwardedBridgeBurn` / `forwardedBridgeMint`),
 and Gateway migration is unsupported, so no migration is in flight for a version commit to wait out.
 
+## Ordering and atomicity
+
+No contract associates the legs of one upgrade. Each guarantee such a contract would give lives
+elsewhere:
+
+| Guarantee                                                                           | Where it lives                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The ecosystem leg precedes the CTM legs; the CTM-domain rows precede the commit     | The merge derives the legs in canonical order; package verification requires exactly that order, as one contiguous run                                                                                             |
+| An upgrade's legs apply together or not at all                                      | One governance proposal execution                                                                                                                                                                                  |
+| Each object is applied by its own domain                                            | Each entrypoint checks the object's domain and validates it before acting                                                                                                                                          |
+| The legs governance signs apply the reviewed objects through the reviewed executors | Package verification recovers every (executor, object) pair from the calldata, re-encodes each leg from the reviewed values and reconciles the prepare's summaries; a missing, duplicated or substituted leg fails |
+| The CTM legs reach the intended CTM                                                 | The CTM executor's immutable binding, which package verification holds against the independently reviewed CTM and `ProxyAdmin`                                                                                     |
+| An executed upgrade is identifiable                                                 | The governance proposal and its transaction, and each leg's domain event                                                                                                                                           |
+
+What no contract enforces: the executors cannot see each other, so none of them can tell whether
+another domain's leg is compatible with its own, or whether a leg the upgrade needs was included at
+all. That obligation lies with the prepare output and the merge, which derive the legs from what
+was deployed, with ordered package verification, and with rehearsing the whole proposal
+(`ecosystem upgrade-governance` on a fork, the transaction simulator). Moving it on chain would
+take a coordinating contract, which this design deliberately does not have.
+
+An executor's binding stops a call through it from reaching another CTM; it does not tie a
+transition to one CTM. A transition carries no CTM pointer, so another CTM on the same release and
+version would accept it through its own executor. Verification therefore compares the CTM of the
+executor the legs target with the reviewed one.
+
 ## Authorization and recovery
 
-Each domain explicitly authorizes its coordinator (`setCoordinator`, owner only). An address
-declaring the same governance owner is not evidence of authorization: `applyOperation` accepts only
-the configured coordinator and takes its leg from the manifest the coordinator hash-checked. Outside
-an operation, the core executor's owner may apply a whole `CoreTransition` with `applyL1Upgrade`
-(the bootstrap edge and recovery). Every other owner operation of a domain — freezing a chain,
-moving a deadline, replacing a committed transition — is an ordinary call through the executor's
-owner-gated, event-logged `forward`; the executors carry no typed passthroughs for them.
+The three entrypoints and `forward` are owner-only, and governance owns both executors. Ownership is
+the only authorization; there is no binding between executors to configure or keep in sync. Every
+other owner operation of a domain — freezing a chain, moving a deadline, replacing a committed
+transition — is an ordinary call through the executor's owner-gated, event-logged `forward`; the
+executors carry no typed passthroughs for them. An urgent fix of one domain is a proposal of the one
+leg it needs.
 
-The coordinator's owner binds `ctmExecutor` using `setCTMExecutor` — in the bootstrap bundle, or
-when a fresh ecosystem registers its CTM. The executor must already name this coordinator, and a
-replacement must preserve its `CHAIN_TYPE_MANAGER` identity. Governance approval of deployed code
-and authority remains required; these binding checks do not authenticate arbitrary executor code.
-Replacing the coordinator is an operational procedure (`docs/upgrade-operations.md`).
+A domain moves to a successor executor through the predecessor's `forward`; nothing else names an
+executor, so nothing else is rebound. The successor's immutable bindings say which domain it acts
+on, not that its code is the reviewed code, so governance approval of its construction remains
+required. The procedure is
+[executor succession](../docs/upgrade-operations.md#executor-succession).
 
 ## Replacing a committed transition
 
@@ -106,7 +153,7 @@ A transition already committed for a departed version can be repaired without mo
 `ChainTypeManager.replaceUpgradeTransition(expected, replacement)`, called by governance through the
 CTM executor's `forward`. It is compare-and-replace — `expected` must be the transition committed
 for that departure now, so a stale proposal fails — and it moves neither `protocolVersion` nor
-`currentRelease`, so it needs no operation.
+`currentRelease`, so it is not an upgrade leg.
 
 **Recovery invariant.** Every committed departure keeps a path to the CTM's current release. A
 replacement therefore departs from the SAME release object (and so the same version) with the same
@@ -139,34 +186,50 @@ this run's engine and authored L2 side, bytecodes published on the CTM's supplie
 one's source release, deadline and timestamp onto the continuation release, and refuses a stale
 `expected` or a replacement that pins the replaced edge unchanged. The package carries one governance
 call, `CTMUpgradeExecutor.forward([replaceUpgradeTransition(expected, replacement)])`, optionally
-followed by `setProtocolVersionDeadline` in the same `forward`. `protocol-ops ecosystem verify-package`
-recognises it and holds it to the [recovery invariant](#replacing-a-committed-transition) against live
-state before the vote.
+followed by `setProtocolVersionDeadline` in the same `forward`, and no executor leg.
+`protocol-ops ecosystem verify-package` recognises it and holds it to the
+[recovery invariant](#replacing-a-committed-transition) against live state before the vote.
 
 ## Future multi-CTM extension
 
-Multi-CTM participation is deliberately absent from this version, so an ecosystem has exactly one
-CTM: registering a second one reverts with `CoordinatorCTMMismatch`, because registration binds the
-new CTM's executor on the coordinator (`setCTMExecutor`), which accepts only a successor governing
-the CTM already bound. Restore it at these boundaries:
+Multi-CTM upgrades are deliberately absent from this version. Nothing on chain limits an ecosystem to
+one CTM: each CTM has its own `CTMUpgradeExecutor`, bound to that CTM and its `ProxyAdmin`, and
+registering another CTM binds nothing. The limit is the package's: preparation targets one ZKsync OS
+CTM, and package verification admits exactly one reviewed CTM — one `[ctms.*]` section and one CTM
+executor, held to that CTM and its `ProxyAdmin`. Restore multi-CTM packages at these boundaries:
 
-1. Change `OperationManifest.ctmTransition` and `ctmInfrastructure` into an ordered list of explicit
-   CTM participation records (each CTM's rows beside its own transition), and update
-   `EcosystemUpgradeOperation` to reject duplicate CTMs and empty participation.
-2. Replace the coordinator's single `ctmExecutor` binding with explicit participant authorization,
-   and have `execute` apply every participant's leg after the one core leg, in the same transaction.
-3. Update the compose input, Rust/TypeScript readers and bootstrap bindings in the same schema
-   change. Test a failing participant reverting every leg, duplicate participants and a shared core
-   leg.
+1. Preparation and the merge: one CTM leg pair (infrastructure, transition) per participating CTM,
+   each on that CTM's own executor, after the one core leg and in a fixed order over the CTMs, so a
+   package still means one thing.
+2. Package verification: one reviewed CTM, executor binding and `[ctms.*]` section per participant,
+   each leg pair held to its own CTM, duplicated participants refused, the whole run still
+   contiguous and in canonical order.
+3. The Anvil runners' derivation and assertions, in the same change. Test a failing participant's
+   leg reverting every leg of the proposal, duplicated participants and a shared core leg.
 
 Keep the domain executor's single-CTM responsibility and the per-chain upgrade APIs. Do not
 introduce placeholder lists, loops or a second CTM today solely for this extension.
 
 ## Integration gate
 
-Cover the no-change rejection, each change on its own (core-only, infrastructure-only,
-transition-only), an infrastructure-only operation moving no version, a manifest that does not hash
-to its commitment, rollback of applied rows when the transition leg fails, a row left off its
-target failing execution, a wrong coordinator binding, a different-CTM replacement refusal, valid
-same-CTM executor succession, and per-chain upgrades. Exercise the bootstrap bundle and the
-recurring operation through production preparation and both Anvil pipelines.
+- `UpgradeBundleExecution.t.sol` runs the legs as one real `Governance` proposal: all three in
+  canonical order with their domain events; each alone (core-only and infrastructure-only moving no
+  version, transition-only); the final leg failing after both proxy legs swapped, rolling every swap
+  back; a duplicated transition leg; a leg naming the other domain's object; a CTM-domain object
+  naming an ecosystem proxy; an undeployed object; a stale transition; a row departing from an
+  unexpected implementation or ending off its target; legs sent outside the proposal; an executor
+  that does not own its CTM; no migration pause needed or touched.
+- `CTMExecutorDomains.t.sol` adds a second real CTM with its own executor: each executor commits on
+  its own CTM only and applies rows through its own `ProxyAdmin` only, and a same-CTM successor
+  takes over through `forward`.
+- protocol-ops: the merge derives the legs in canonical order, each alone, and none for a bootstrap
+  or a replacement (`commands/ecosystem/upgrade.rs`); the package loader refuses mixed kinds and
+  missing, duplicated, substituted or value-carrying legs and unknown executor selectors
+  (`upgrade_verification/registry/package.rs`); `verify_upgrade_calls` refuses a swapped or
+  interrupted run, undeclared, duplicated, missing or reordered external actions, and any other call
+  reaching an upgrade authority (`upgrade_verification/registry/upgrade.rs`).
+- Production preparation and both Anvil pipelines: `UpgradeTestRecurring_Local.t.sol` prepares the
+  infrastructure-only, chain-release, mixed and three-leg shapes and the refused ones, and runs each
+  as its ordered bundle; `yarn test:upgrade` drives the bootstrap and then recurring hops, verifying
+  each merged package and asserting that one transaction emitted every leg's domain event in order;
+  `yarn test:upgrade-recurring` runs a hop over objects the harness deploys.

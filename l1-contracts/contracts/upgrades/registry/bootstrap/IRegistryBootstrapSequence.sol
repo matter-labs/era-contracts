@@ -23,7 +23,7 @@ interface IRegistryBootstrapSequence {
     /// @notice The edge this sequence describes.
     function MIGRATION() external view returns (address);
 
-    /// @notice The ecosystem inventory the edge's core leg applies.
+    /// @notice The Core-domain transition the edge's core leg applies.
     function CORE_TRANSITION() external view returns (address);
 
     /// @notice The bootstrap bundle's calls, in execution order. Governance executes them as one

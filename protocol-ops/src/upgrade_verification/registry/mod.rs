@@ -4,22 +4,24 @@
 //!
 //! The pre-registry verifier had one module per release, because the reviewable artifact WAS the
 //! calldata: every release produced different calls, so every release needed its own re-derivation
-//! of them. A registry-driven package inverts that. Governance signs one call naming one
-//! write-once object, and everything executable is derived on-chain from that object at execution
-//! time. What a reviewer checks is therefore the same for v36 as for v37 — the objects, and that
-//! the signed transaction invokes them — so there is one verifier, not one per release.
+//! of them. A registry-driven package inverts that. Governance signs at most three executor calls,
+//! each naming one write-once object, and everything executable is derived on-chain from those
+//! objects at execution time. What a reviewer checks is therefore the same for v36 as for v37 —
+//! the objects, and that the signed transaction invokes them in canonical order — so there is one
+//! verifier, not one per release.
 //!
 //! The single exception is the one-time BOOTSTRAP edge ([`bootstrap`]), and it is an exception
 //! because it happens exactly once: it is how a CTM that predates the registry model enters it.
-//! Every upgrade after it is an ordinary operation ([`operation`]). Repairing a committed
-//! transition is not an upgrade but a CTM owner operation, and has its own path ([`replacement`]).
+//! Every upgrade after it is an ordinary one ([`upgrade`]). Repairing a committed transition is not
+//! an upgrade but a CTM owner operation, and has its own path ([`replacement`]).
 //!
 //! # What it asks
 //!
 //!   1. Was every object PRODUCED by the reviewed code's constructor from its reviewed
-//!      arguments? ([`construction`]) — the manifest a write-once object serves, an executor's
-//!      deploy-time record ([`lifecycle`]), or the migration and core transition the bootstrap
-//!      sequence was built over. The question a runtime codehash cannot answer, and
+//!      arguments? ([`construction`]) — the manifest a write-once object serves (a
+//!      `ProxyUpgradeTransition`'s domain included), an executor's deploy-time record
+//!      ([`lifecycle`]), or the migration and core transition the bootstrap sequence was built
+//!      over. The question a runtime codehash cannot answer, and
 //!      the reason the chain no longer pretends to answer it. Every object a package names gets
 //!      this check, on every path.
 //!   2. Does every object, and every MEMBER an object names, run the code the reviewed build
@@ -27,18 +29,20 @@
 //!      reviewed artifact, byte for byte outside its immutable slots: each release's facets,
 //!      `DiamondInit`, genesis upgrade and verifier tree, each L2 bytecode the release's table or
 //!      a plan names, each engine and composer, each row's `implNew`.
-//!   3. Does every proxy row name the proxy of its slot, discovered on chain from the
-//!      Bridgehub or the CTM? ([`rows`])
+//!   3. Does every proxy inventory belong to the domain its leg applies, and does every row name
+//!      the proxy of its slot, discovered on chain from the Bridgehub or the CTM? ([`rows`])
 //!   4. Does every release the package installs pin the reviewed genesis — the genesis config's
 //!      root and the force deployments the prepare wrote? ([`genesis`])
-//!   5. Is authority bound where the review says, and to the expected governance owner — with
-//!      no nomination outstanding on any authority the upgrade drives?
+//!   5. Is authority bound where the review says — each executor to the independently reviewed
+//!      CTM and ProxyAdmin — and to the expected governance owner, with no nomination outstanding
+//!      on any authority the upgrade drives?
 //!   6. Does every proxy row depart from the implementation that is actually live, read through
-//!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — completion does not
-//!      re-read implementations (`protocol-docs/ecosystem-upgrade-coordination.md`).
+//!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — the bootstrap's
+//!      completion check does not re-read implementations (`docs/registry-driven-upgrades.md`).
 //!   7. Do chains crossing an edge keep the system-proxy logic new chains get? ([`shell`])
 //!   8. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
-//!      address — and nothing else?
+//!      addresses, as one contiguous run in canonical order — and is every other call a reviewed
+//!      external action, in its declared position and multiplicity?
 //!
 //! None of it is "does an object's own fingerprint of a member match that member's code": the
 //! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
@@ -68,7 +72,6 @@ pub(crate) mod construction;
 pub(crate) mod genesis;
 pub(crate) mod lifecycle;
 pub(crate) mod members;
-pub(crate) mod operation;
 pub(crate) mod package;
 pub(crate) mod provenance;
 pub(crate) mod records;
@@ -77,6 +80,7 @@ pub(crate) mod rows;
 pub(crate) mod shell;
 #[cfg(test)]
 mod shell_path_tests;
+pub(crate) mod upgrade;
 pub(crate) mod views;
 
 use construction::ReviewedBuild;
@@ -87,16 +91,17 @@ use views::CommittedUpgradeView;
 
 /// Verify a registry-driven upgrade package against the live L1 it targets.
 ///
-/// The package's own content decides which verifier runs — a recurring operation, a bootstrap
-/// edge or a transition replacement (see [`RegistryPackage::load`]); a package that is none of
-/// them is refused rather than verified as the nearest match.
+/// The package's own calldata decides which verifier runs — an upgrade, a bootstrap edge or a
+/// transition replacement (see [`RegistryPackage::load`]); a package that is none of them, or
+/// mixes them, is refused rather than verified as the nearest match.
 ///
 /// `expected_governance_owner` is the reviewed address the upgrade must be driven by. For a
 /// bootstrap that is the owner the CTM domain lands on permanently; otherwise it is the owner of
 /// the whole lifecycle. `executor_records` are files whose `[upgrade_executors]` records add to
 /// the package's own ([`records`]). `env` names the upgrade env whose permanent values hold the
 /// reviewed ZK token asset id an installed release's force deployments are held against
-/// ([`genesis`]); a replacement installs no release and does not need it. `contract_hashes`
+/// ([`genesis`]); a replacement, or an upgrade without a transition leg, installs no release and
+/// does not need it. `contract_hashes`
 /// replaces the committed `AllContractsHashes.json` the build is held against (see the
 /// `--contract-hashes` help).
 #[allow(clippy::too_many_arguments)]
@@ -126,7 +131,7 @@ pub(crate) async fn verify(
 
     let mut package = RegistryPackage::load(ecosystem_toml)?;
     let held = match &mut package {
-        RegistryPackage::Operation(p) => &mut p.executor_records,
+        RegistryPackage::Upgrade(p) => &mut p.executor_records,
         RegistryPackage::Bootstrap(p) => &mut p.executor_records,
         RegistryPackage::Replacement(p) => &mut p.executor_records,
     };
@@ -149,8 +154,13 @@ pub(crate) async fn verify(
             )
             .await
         }
-        RegistryPackage::Operation(package) => {
-            let zk_token_asset_id = reviewed_zk_token_asset_id(env)?;
+        RegistryPackage::Upgrade(package) => {
+            // Only a transition leg installs a release whose force deployments pin the token.
+            let zk_token_asset_id = if package.leg(package::LegKind::Transition).is_some() {
+                reviewed_zk_token_asset_id(env)?
+            } else {
+                B256::ZERO
+            };
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
@@ -158,7 +168,7 @@ pub(crate) async fn verify(
                 force_deployments_data: package.force_deployments_data.clone(),
                 force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };
-            operation::verify(
+            upgrade::verify(
                 &provider,
                 &build,
                 &genesis,

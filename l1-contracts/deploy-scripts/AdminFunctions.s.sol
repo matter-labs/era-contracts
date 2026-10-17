@@ -95,8 +95,8 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     /// Walk every Bridgehub-discoverable ecosystem ownable (bridgehub itself,
     /// asset router, l1 nullifier, ctm deployer, chain asset handler, and the
-    /// ecosystem's upgrade executors — the core executor holding the ecosystem
-    /// ProxyAdmin and its coordinator) and accept the pending ownership transfer
+    /// ecosystem's upgrade executor — the core executor holding the ecosystem
+    /// ProxyAdmin) and accept the pending ownership transfer
     /// where one is targeted at `_governor`. Idempotent — running against an
     /// already-correct ecosystem is a no-op.
     function governanceAcceptOwnerAggregated(address _governor, address _bridgehub) public {
@@ -143,12 +143,8 @@ contract AdminFunctions is Script, IAdminFunctions {
                 address(coreExecutor.PROXY_ADMIN()) == proxyAdmin,
                 "ecosystem ProxyAdmin owner is not the executor bound to it"
             );
-            address coordinator = coreExecutor.coordinator();
             if (coreExecutor.pendingOwner() == _governor) {
                 governanceAcceptOwner(_governor, address(coreExecutor));
-            }
-            if (coordinator != address(0) && Ownable2Step(coordinator).pendingOwner() == _governor) {
-                governanceAcceptOwner(_governor, coordinator);
             }
         }
     }

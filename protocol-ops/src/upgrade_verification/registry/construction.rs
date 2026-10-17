@@ -88,10 +88,8 @@ const OBJECT_ARTIFACTS: &[(&str, &str)] = &[
     ),
     ("RegistryBootstrapSequence.sol", "RegistryBootstrapSequence"),
     ("CTMRelease.sol", "CTMRelease"),
-    ("CoreTransition.sol", "CoreTransition"),
+    ("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
     ("CTMTransition.sol", "CTMTransition"),
-    ("EcosystemUpgradeOperation.sol", "EcosystemUpgradeOperation"),
-    ("EcosystemUpgradeExecutor.sol", "EcosystemUpgradeExecutor"),
     ("CoreUpgradeExecutor.sol", "CoreUpgradeExecutor"),
     ("CTMUpgradeExecutor.sol", "CTMUpgradeExecutor"),
 ];
@@ -457,9 +455,9 @@ pub(crate) fn expect_canonical_construction(
     }
 }
 
-/// The constructor arguments of the lifecycle objects, ABI-encoded exactly as the prepare passes
-/// them (`abi.encode(...)` of the constructor's parameter list, in `CoreUpgrade_v35` /
-/// `CTMUpgrade_v35` / `DefaultCTMUpgrade.getCreationCalldata`).
+/// The constructor arguments of the lifecycle objects, ABI-encoded exactly as the deploying run
+/// passes them (`abi.encode(...)` of the constructor's parameter list, in `DeployL1CoreContracts` /
+/// `DeployCTM` / `CoreUpgrade_v35` / `CTMUpgrade_v35` / `DefaultCTMUpgrade.getCreationCalldata`).
 ///
 /// Every value is a REVIEWED one — the manifest's, the package's or the reviewer's — never a
 /// read off the object: an object answers with whatever it was built from, so a check that took
@@ -469,31 +467,23 @@ pub(crate) fn expect_canonical_construction(
 pub(crate) mod constructor_args {
     use super::*;
 
-    /// `EcosystemUpgradeExecutor(address _initialOwner, CoreUpgradeExecutor _coreExecutor)`.
-    pub(crate) fn ecosystem_upgrade_executor(
-        initial_owner: Address,
-        core_executor: Address,
-    ) -> Vec<u8> {
-        (initial_owner, core_executor).abi_encode_params()
-    }
-
     /// `CoreUpgradeExecutor(address _initialOwner, ProxyAdmin _proxyAdmin)`.
     pub(crate) fn core_upgrade_executor(initial_owner: Address, proxy_admin: Address) -> Vec<u8> {
         (initial_owner, proxy_admin).abi_encode_params()
     }
 
-    /// `CTMUpgradeExecutor(address _initialOwner, IChainTypeManager _ctm, ProxyAdmin _ctmProxyAdmin,
-    /// address _coordinator)`.
+    /// `CTMUpgradeExecutor(address _initialOwner, IChainTypeManager _ctm,
+    /// ProxyAdmin _ctmProxyAdmin)`.
     pub(crate) fn ctm_upgrade_executor(
         initial_owner: Address,
         ctm: Address,
         ctm_proxy_admin: Address,
-        coordinator: Address,
     ) -> Vec<u8> {
-        (initial_owner, ctm, ctm_proxy_admin, coordinator).abi_encode_params()
+        (initial_owner, ctm, ctm_proxy_admin).abi_encode_params()
     }
 
-    /// `RegistryBootstrapSequence(RegistryBootstrapMigration _migration, ICoreTransition _coreTransition)`.
+    /// `RegistryBootstrapSequence(RegistryBootstrapMigration _migration, IProxyUpgradeTransition
+    /// _coreTransition)` — the core transition a Core-domain `ProxyUpgradeTransition`.
     pub(crate) fn registry_bootstrap_sequence(
         migration: Address,
         core_transition: Address,
@@ -675,7 +665,7 @@ mod tests {
             &mut result,
             "the core transition",
             Address::repeat_byte(0x99),
-            "CoreTransition",
+            "ProxyUpgradeTransition",
             &args(),
             &[SALT_A],
         ));
@@ -892,25 +882,18 @@ mod tests {
     #[test]
     fn executor_arguments_encode_as_the_prepares_abi_encode() {
         let owner = Address::repeat_byte(0x01);
-        let core_executor = Address::repeat_byte(0x02);
-        let encoded = constructor_args::ecosystem_upgrade_executor(owner, core_executor);
-        assert_eq!(encoded.len(), 64);
-        assert_eq!(word_of_address(&encoded, 0), owner);
-        assert_eq!(word_of_address(&encoded, 1), core_executor);
-
         let proxy_admin = Address::repeat_byte(0x03);
         let encoded = constructor_args::core_upgrade_executor(owner, proxy_admin);
         assert_eq!(encoded.len(), 64);
+        assert_eq!(word_of_address(&encoded, 0), owner);
         assert_eq!(word_of_address(&encoded, 1), proxy_admin);
 
         let ctm = Address::repeat_byte(0x04);
-        let coordinator = Address::repeat_byte(0x05);
-        let encoded = constructor_args::ctm_upgrade_executor(owner, ctm, proxy_admin, coordinator);
-        assert_eq!(encoded.len(), 128);
+        let encoded = constructor_args::ctm_upgrade_executor(owner, ctm, proxy_admin);
+        assert_eq!(encoded.len(), 96);
         assert_eq!(word_of_address(&encoded, 0), owner);
         assert_eq!(word_of_address(&encoded, 1), ctm);
         assert_eq!(word_of_address(&encoded, 2), proxy_admin);
-        assert_eq!(word_of_address(&encoded, 3), coordinator);
 
         let migration = Address::repeat_byte(0x06);
         let registry = Address::repeat_byte(0x07);
@@ -925,19 +908,19 @@ mod tests {
     /// does not control — never its own `owner()`.
     #[test]
     fn an_executor_built_for_another_owner_is_a_different_object() {
-        let core_executor = Address::repeat_byte(0x02);
+        let proxy_admin = Address::repeat_byte(0x02);
         let reviewed_owner = Address::repeat_byte(0x01);
         let attacker = Address::repeat_byte(0xBA);
         let genuine_for_attacker = canonical_create2_address(
             SALT_A,
             &creation_code(),
-            &constructor_args::ecosystem_upgrade_executor(attacker, core_executor),
+            &constructor_args::core_upgrade_executor(attacker, proxy_admin),
         );
         assert!(matches!(
             classify_construction(
                 genuine_for_attacker,
                 &creation_code(),
-                &constructor_args::ecosystem_upgrade_executor(reviewed_owner, core_executor),
+                &constructor_args::core_upgrade_executor(reviewed_owner, proxy_admin),
                 &[SALT_A],
             ),
             ConstructionVerdict::NotCanonical { .. }

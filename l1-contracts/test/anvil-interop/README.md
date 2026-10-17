@@ -86,13 +86,17 @@ are checked and logged too. These calls impersonate the bundle signer: the measu
 the outer Safe/governance envelope and do not validate Glamsterdam's future gas schedule.
 
 A fresh deployment is born into the registry-driven model: `DeployL1CoreContracts` gives the
-ecosystem ProxyAdmin to the `CoreUpgradeExecutor`, `DeployCTM` gives the CTM, its own ProxyAdmin and
-the ServerNotifier to the `CTMUpgradeExecutor`, and `RegisterCTM` binds it to the coordinator
-(`EcosystemUpgradeExecutor`). Governance is only nominated on the three executors, and anvil never
-accepts, so they stay owned by the deployer; anything needing the CTM, ServerNotifier or a ProxyAdmin
-owner must go through that executor's `forward`. `run-recurring-upgrade-test.ts` discovers the executors
-from chain and drives the hop through the existing coordinator's one `execute(operation)` call, with no
-bootstrap. It builds its objects from the committed manifest `scripts/registry-manifests/v35-local.json`
+ecosystem ProxyAdmin to the `CoreUpgradeExecutor`, and `DeployCTM` gives the CTM, its own ProxyAdmin and
+the ServerNotifier to the `CTMUpgradeExecutor`. Governance is only nominated on the two executors, and
+the deployment never accepts, so they stay owned by the deployer; anything needing the CTM,
+ServerNotifier or a ProxyAdmin owner must go through that executor's `forward`.
+`run-recurring-upgrade-test.ts` finds each executor through the custody it holds (the CTM's owner, the
+ecosystem ProxyAdmin's owner), has governance accept both nominations, and drives the hop, with no
+bootstrap, as one `Governance` bundle of the ordered legs `applyL1Upgrade` -> `applyCTMUpgrade`
+(`applyInfrastructureUpgrade` between them when a CTM-domain proxy changes); a bundle whose last leg
+fails must first roll back completely. (`yarn test:upgrade`'s hops hold the merged package to the same
+contiguous leg run and assert that one transaction emitted every leg's domain event, in order.)
+The recurring runner builds its objects from the committed manifest `scripts/registry-manifests/v35-local.json`
 and fails on any drift; `yarn regen:registry-manifest` (`REGEN_REGISTRIES=1`) rewrites it from the live deployment.
 `ANVIL_INTEROP_FRESH_DEPLOY=1` runs it against a fresh deployment instead of the chain states. The
 committed manifest describes the chain states, which are built with the `anvil-interop` profile, so a

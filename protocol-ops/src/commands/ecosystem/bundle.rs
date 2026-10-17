@@ -598,7 +598,7 @@ fn ensure_bundle_chain_id(
 /// A package records neither the expected governance owner nor the CREATE2 salts, so both come
 /// from the upgrade input the bundle was generated from: the env's `owner_address`
 /// (`bridgehub.owner()`, the signer of the governance bundle) and its core and per-CTM salts.
-/// Executor records the package does not carry itself (a recurring operation's executors were
+/// Executor records the package does not carry itself (an ordinary upgrade's executors were
 /// deployed by `ecosystem init` / `ctm init`) are the caller's `--executor-record` files.
 fn package_verification_args(
     env_cfg: &EnvConfig,
@@ -783,7 +783,7 @@ pub struct RehearseUpgradeArgs {
     pub zk_governance_commit: String,
     /// An `[upgrade_executors]` record file for `verify-bootstrap --executor-record`, repeatable
     /// (`prepare-all` only). Needed when the package does not carry the records of the executors
-    /// it drives itself, as a recurring operation's package does not.
+    /// it drives itself, as an ordinary upgrade's package does not.
     #[clap(long = "executor-record")]
     pub executor_records: Vec<PathBuf>,
     /// foundry-zksync version used for the build; recorded in the bundle (part of the bytecode identity).
@@ -996,7 +996,7 @@ pub struct ReplayBundleArgs {
     pub gw_rpc_url: Option<String>,
     /// An `[upgrade_executors]` record file for `verify-bootstrap --executor-record`, repeatable
     /// (`prepare-all` only). Needed when the package does not carry the records of the executors
-    /// it drives itself, as a recurring operation's package does not.
+    /// it drives itself, as an ordinary upgrade's package does not.
     #[clap(long = "executor-record")]
     pub executor_records: Vec<PathBuf>,
 }
