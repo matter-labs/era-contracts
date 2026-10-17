@@ -214,7 +214,7 @@ test("a leg with value, extra calldata or a dirty address word is refused", () =
   assert.throws(() => recoverUpgradeLegs(dirty, SELECTORS), /exactly one address argument/);
 });
 
-test("a missing, unexpected, mis-targeted or substituted leg differs from the reported upgrade", () => {
+test("a missing, unexpected, misdirected or substituted leg differs from the reported upgrade", () => {
   const decode = (legs: UpgradeLeg[]) => decodeGovernanceCalls(encodeGovernanceCalls(legs.map(legCall)));
   assert.throws(
     () => assertUpgradeLegs(decode([TRANSITION_LEG]), SELECTORS, [CORE_LEG, TRANSITION_LEG]),
