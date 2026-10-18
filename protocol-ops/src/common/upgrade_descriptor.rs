@@ -8,8 +8,10 @@
 //! - `prepare = "forge-script"`: one forge script, run on a fork as the deployer. Its
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
 //!   The upgrade supplies its own checks, since PUVT only knows the release's upgrade. An optional
-//!   `[execution]` script writes the transactions whoever executes sends by hand; the
-//!   pipeline replays them on the fork and renders `EXECUTE.md` from them.
+//!   `[execution]` script writes the transactions whoever executes sends by hand on a
+//!   ProtocolUpgradeHandler env; on a legacy-`Governance` env the pipeline takes them from the
+//!   `[governance_operations]` of the prepare's `ecosystem.toml` instead. Either way it replays
+//!   them on the fork and renders `EXECUTE.md` from them.
 
 use std::path::{Path, PathBuf};
 
@@ -59,7 +61,7 @@ pub struct ForgeScriptUpgrade {
 
 /// A read-only forge script that writes the transactions whoever executes the upgrade sends
 /// (a format `common::execution_runbook` reads), run on the generation fork after the deploy
-/// bundle was replayed there.
+/// bundle was replayed there. Only run on envs whose `governance_kind` is `puh`.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionScript {
