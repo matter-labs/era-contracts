@@ -13,8 +13,10 @@
 //!   "checks" mean comes from `upgrade-envs/<upgrade>/upgrade.toml`: `prepare-all` is the
 //!   release's `upgrade-prepare-all` + PUVT (only for [`DEFAULT_UPGRADE`]), a `forge-script`
 //!   upgrade runs one script and its own checks.
-//!   A `forge-script` upgrade with an `[execution]` script also gets `EXECUTE.md`, the
-//!   runbook of the txs whoever executes sends by hand, checked on the same fork.
+//!   A `forge-script` upgrade also gets `EXECUTE.md`, the runbook of the txs whoever
+//!   executes sends by hand, checked on the same fork: on a ProtocolUpgradeHandler env from
+//!   its `[execution]` script, on a legacy-`Governance` env from the `[governance_operations]`
+//!   its prepare wrote.
 //! - `replay-bundle` (CONSUME): rehearse a packed bundle on a fresh fork, broadcast the
 //!   deployer's bundles for real, or only run PUVT against an already-upgraded chain.
 //! - `verify-bundle`: the integrity check on its own.
@@ -37,12 +39,12 @@ use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_upgrade::{self, VerifyUpgradeArgs};
 use crate::common::anvil::{send_impersonated_tx, set_balance};
 use crate::common::env_config::{
-    default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE,
+    default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, GovernanceKind, DEFAULT_UPGRADE,
 };
 use crate::common::ethereum::get_provider;
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
-use crate::common::upgrade_descriptor::{ExecutionScript, ForgeScriptUpgrade, UpgradeDescriptor};
+use crate::common::upgrade_descriptor::{ForgeScriptUpgrade, UpgradeDescriptor};
 use crate::common::{logger, paths};
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
@@ -934,20 +936,37 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     )
     .await?;
     broadcast_impersonated(&rpc_url, &paths).await?;
-    if let UpgradeDescriptor::ForgeScript(ForgeScriptUpgrade {
-        execution: Some(execution),
-        ..
-    }) = &descriptor
-    {
-        write_execution_runbook(
-            &args.upgrade,
-            execution,
-            &env_cfg,
-            &rpc_url,
-            &output_dir,
-            forked_at_block,
-        )
-        .await?;
+    if let UpgradeDescriptor::ForgeScript(ForgeScriptUpgrade { execution, .. }) = &descriptor {
+        let source = match (env_cfg.governance_kind(), execution) {
+            (GovernanceKind::Legacy, _) => {
+                write_governance_operations(&env_cfg, &rpc_url, &paths.ecosystem_toml, &output_dir)
+                    .await?
+            }
+            (GovernanceKind::Puh, Some(execution)) => {
+                logger::step("execution runbook");
+                upgrade::run_execution_script(execution, &env_cfg.env, &rpc_url)?;
+                let source = output_dir.join(&execution.output);
+                anyhow::ensure!(
+                    source.is_file(),
+                    "{} did not write {}",
+                    execution.script,
+                    source.display()
+                );
+                Some(source)
+            }
+            (GovernanceKind::Puh, None) => None,
+        };
+        if let Some(source) = source {
+            write_execution_runbook(
+                &args.upgrade,
+                &source,
+                &env_cfg,
+                &rpc_url,
+                &output_dir,
+                forked_at_block,
+            )
+            .await?;
+        }
     }
     check_upgrade(
         &descriptor,
@@ -964,27 +983,19 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     Ok(())
 }
 
-/// Run the upgrade's `[execution]` script on the fork, where the deploy bundle was just
-/// replayed; replay the transactions it wrote, each from its sender (the fork is restored
-/// afterwards, so the upgrade's own checks still start from the pre-governance state); and
-/// write `EXECUTE.md` next to them with what the replay measured.
+/// Replay the transactions of `source` (written by the upgrade's `[execution]` script, or
+/// by [`write_governance_operations`]) on the fork, where the deploy bundle was just
+/// replayed, each from its sender (the fork is restored afterwards, so the upgrade's own
+/// checks still start from the pre-governance state); and write `EXECUTE.md` next to them
+/// with what the replay measured.
 async fn write_execution_runbook(
     upgrade_name: &str,
-    execution: &ExecutionScript,
+    source: &Path,
     env_cfg: &EnvConfig,
     rpc_url: &str,
     output_dir: &Path,
     forked_at_block: u64,
 ) -> anyhow::Result<()> {
-    logger::step("execution runbook");
-    upgrade::run_execution_script(execution, &env_cfg.env, rpc_url)?;
-    let source = output_dir.join(&execution.output);
-    anyhow::ensure!(
-        source.is_file(),
-        "{} did not write {}",
-        execution.script,
-        source.display()
-    );
     let path = output_dir.join(execution_runbook::RUNBOOK_FILE);
     let options = execution_runbook::LoadOptions {
         chain_id: env_cfg.l1_chain_id(),
@@ -993,7 +1004,7 @@ async fn write_execution_runbook(
         names: execution_runbook::env_names(env_cfg),
         ..Default::default()
     };
-    let mut runbook = execution_runbook::load(&source, &path, &options)?;
+    let mut runbook = execution_runbook::load(source, &path, &options)?;
     runbook.facts = Some(
         execution_runbook::check_on_fork(
             rpc_url,
@@ -1006,6 +1017,92 @@ async fn write_execution_runbook(
     execution_runbook::write(&runbook, &path)?;
     logger::success(format!("Execution runbook: {}", path.display()));
     Ok(())
+}
+
+/// `output/<env>/` file the transactions of a legacy-`Governance` env are written to.
+const GOVERNANCE_OPERATIONS_EXECUTION: &str = "execution.json";
+
+/// One transaction of a transaction-simulator list, the format the runbook loader reads.
+#[derive(Serialize)]
+struct ExecutionTx {
+    description: String,
+    network: &'static str,
+    from: String,
+    to: String,
+    data: String,
+    value: &'static str,
+}
+
+/// On a legacy-`Governance` env, write the `[governance_operations]` of the upgrade's
+/// `ecosystem.toml` (`scheduleTransparent` + `execute` per stage, see
+/// `ZKsyncOSVerifierOnlyUpgrade`) as the transactions the `Governance` owner sends, to
+/// `output/<env>/execution.json`. `None` when the upgrade writes no such section.
+async fn write_governance_operations(
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
+    ecosystem_toml: &Path,
+    output_dir: &Path,
+) -> anyhow::Result<Option<PathBuf>> {
+    let content = fs::read_to_string(ecosystem_toml)
+        .with_context(|| format!("read {}", ecosystem_toml.display()))?;
+    let parsed: toml::Table =
+        toml::from_str(&content).with_context(|| format!("parse {}", ecosystem_toml.display()))?;
+    let Some(operations) = parsed
+        .get("governance_operations")
+        .and_then(|v| v.as_table())
+    else {
+        logger::info("No [governance_operations] in the ecosystem toml, so no execution runbook");
+        return Ok(None);
+    };
+    logger::step("execution runbook ([governance_operations])");
+    let field = |key: &str| -> anyhow::Result<&str> {
+        operations
+            .get(key)
+            .and_then(|v| v.as_str())
+            .with_context(|| format!("governance_operations.{key} missing"))
+    };
+    let delay = operations.get("delay").and_then(|v| v.as_integer());
+    anyhow::ensure!(
+        delay == Some(0),
+        "governance_operations.delay is {delay:?}: a Governance delay needs a wait between schedule and execute"
+    );
+    let network = match env_cfg.l1_chain_id() {
+        Some(1) => "mainnet",
+        Some(11_155_111) => "sepolia",
+        other => anyhow::bail!("no transaction-simulator network for L1 chain id {other:?}"),
+    };
+    let governance =
+        crate::common::l1_contracts::resolve_governance(rpc_url, env_cfg.bridgehub()).await?;
+    let owner: Address = field("governance_owner")?
+        .parse()
+        .context("governance_owner")?;
+    let onchain_owner =
+        crate::common::l1_contracts::resolve_governance_owner(rpc_url, env_cfg.bridgehub()).await?;
+    anyhow::ensure!(
+        owner == onchain_owner,
+        "governance_operations.governance_owner {owner:#x} is not Governance({governance:#x}).owner() {onchain_owner:#x}"
+    );
+    let mut txs = Vec::new();
+    for stage in 0..3 {
+        let operation = field(&format!("stage{stage}_operation_id"))?.to_lowercase();
+        for (call, kind) in [
+            (format!("scheduleTransparent({operation}, 0)"), "schedule"),
+            (format!("execute({operation})"), "execute"),
+        ] {
+            txs.push(ExecutionTx {
+                description: format!("Stage {stage}: Governance.{call}"),
+                network,
+                from: owner.to_checksum(None),
+                to: governance.to_checksum(None),
+                data: field(&format!("stage{stage}_{kind}_calldata"))?.to_lowercase(),
+                value: "0",
+            });
+        }
+    }
+    let path = output_dir.join(GOVERNANCE_OPERATIONS_EXECUTION);
+    fs::write(&path, serde_json::to_string_pretty(&txs)? + "\n")
+        .with_context(|| format!("write {}", path.display()))?;
+    Ok(Some(path))
 }
 
 // ─── replay-bundle ───────────────────────────────────────────────────────────────

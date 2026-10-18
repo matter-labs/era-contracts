@@ -3,8 +3,9 @@
 #   1. `protocol_ops ecosystem rehearse-upgrade --upgrade v0.33.2-verifier`, the command the
 #      generate-ecosystem-upgrade-calldata workflow runs (see upgrade.toml): on a fork, the prepare
 #      (ZKsyncOSVerifierOnlyUpgrade) -> output/<env>/ecosystem.toml and the deploy bundle
-#      (output/<env>/deploy-bundle/, not committed); the bundle replayed; the `[execution]` script ->
-#      output/<env>/execution.json and its runbook output/<env>/EXECUTE.md; then rehearse.sh <env>
+#      (output/<env>/deploy-bundle/, not committed); the bundle replayed; the governance txs (testnet: the
+#      `[execution]` script, stage3: `[governance_operations]`) -> output/<env>/execution.json and its
+#      runbook output/<env>/EXECUTE.md; then rehearse.sh <env>
 #   2. protocol_ops governance-toml-to-simulator -> <env>/simulator/<date>-v0.33.2-verifier-<env>-1-ecosystem.json
 #
 # Nothing is sent to the network. Once the deployments are live, the prepare deploys nothing at the tip and the

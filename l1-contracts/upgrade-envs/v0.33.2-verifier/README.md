@@ -42,9 +42,9 @@ How the CTM owner sends the stages depends on the ecosystem:
   board owner's `approveHash` on each member Safe then `executeEmergencyUpgrade`. One proposal is equivalent
   to three because the timer delay is 0.
 
-Either way `ZKsyncOSVerifierOnlyExecution.s.sol` writes the transactions to `output/<env>/execution.json` (for a
-ProtocolUpgradeHandler through `EmergencyStageUpgradeCalldata.s.sol`), and the pipeline renders them as
-`output/<env>/EXECUTE.md`.
+Either way the pipeline writes the transactions to `output/<env>/execution.json` and renders them as
+`output/<env>/EXECUTE.md`: for a ProtocolUpgradeHandler through the `[execution]` script
+(`EmergencyStageUpgradeCalldata.s.sol`), for a `Governance` from `[governance_operations]` itself.
 
 `createNewVerifierOnlyUpgrade` builds the cut itself: no facet cuts, `initAddress` = the stored
 `defaultUpgrade`, `initCalldata` = `upgradeVerifierOnly(0x2100000002)`. It also carries the chain creation
@@ -59,7 +59,7 @@ chain keeps its validator pair and pubdata content.
 ## Files
 
 - `upgrade.toml` tells the generate / deploy pipeline (`protocol-ops/src/common/upgrade_descriptor.rs`) how to
-  run this upgrade: the prepare script, the `[execution]` script, and the checks (`rehearse.sh` on a fork,
+  run this upgrade: the prepare script, the `[execution]` script (ProtocolUpgradeHandler envs), and the checks (`rehearse.sh` on a fork,
   `check-deployment.sh` against the real chain).
 - `<env>.toml` is the input: bridgehub, CTM, the expected current version, the governance kind, the verifier
   flavour, the timer delay, the CREATE2 salt and the chain list. The script checks it against the live state.
