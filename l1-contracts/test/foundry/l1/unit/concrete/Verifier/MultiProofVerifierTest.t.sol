@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ProofSystem, DisabledProofSystems} from "contracts/common/Config.sol";
+import {
+    ProofSystem,
+    DisabledProofSystems,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZISK_SNARK_PROOF_LENGTH
+} from "contracts/common/Config.sol";
 
 import {Test} from "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -370,8 +375,8 @@ contract MultiProofVerifierTest is Test {
     function testFuzz_subVerifiers_receiveExactSections(uint8 _airbenderLen, uint8 _trailingLen, uint256 _seed) public {
         uint256[] memory pis = _rangePublicInputs();
         uint256 ziskStart = 3 + uint256(_airbenderLen);
-        uint256[] memory proof = new uint256[](ziskStart + 24 + _trailingLen);
-        proof[0] = 5;
+        uint256[] memory proof = new uint256[](ziskStart + ZISK_SNARK_PROOF_LENGTH + _trailingLen);
+        proof[0] = ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE;
         proof[2] = _airbenderLen;
         for (uint256 i = 3; i < proof.length; ++i) {
             proof[i] = uint256(keccak256(abi.encode(_seed, i)));
@@ -381,8 +386,8 @@ contract MultiProofVerifierTest is Test {
         for (uint256 i = 0; i < _airbenderLen; ++i) {
             airbenderSection[i] = proof[3 + i];
         }
-        uint256[] memory ziskSection = new uint256[](24);
-        for (uint256 i = 0; i < 24; ++i) {
+        uint256[] memory ziskSection = new uint256[](ZISK_SNARK_PROOF_LENGTH);
+        for (uint256 i = 0; i < ZISK_SNARK_PROOF_LENGTH; ++i) {
             ziskSection[i] = proof[ziskStart + i];
         }
 
