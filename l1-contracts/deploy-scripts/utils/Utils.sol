@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 import {BytecodeUtils} from "./bytecode/BytecodeUtils.s.sol";
+import {Blake2s} from "./bytecode/Blake2s.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
@@ -19,6 +20,11 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
 import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol";
 import {IEmergencyUpgrageBoard} from "../interfaces/IEmergencyUpgrageBoard.sol";
@@ -26,10 +32,15 @@ import {ISecurityCouncil} from "../interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "../interfaces/IMultisig.sol";
 import {ISafe} from "../interfaces/ISafe.sol";
 
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+/// @dev The offset from which the built-in, but user space contracts are located.
+uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
+
+// address constant
+address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
+
+uint256 constant SECURITY_COUNCIL_SIZE = 12;
+
+uint256 constant GUARDIANS_SIZE = 8;
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -49,13 +60,13 @@ bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
 /// @dev EIP-712 TypeHash for protocol upgrades approval by the Security Council.
 bytes32 constant APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256("ApproveUpgradeSecurityCouncil(bytes32 id)");
 
-/// @dev The offset from which the built-in, but user space contracts are located.
-uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
+/// @dev The salt of every emergency proposal the scripts emit: two proposals differ by their calls.
+bytes32 constant EMERGENCY_UPGRADE_SALT = bytes32(0);
 
-// address constant
-address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
-
-uint256 constant SECURITY_COUNCIL_SIZE = 12;
+/// @dev Separates the CTM-domain `ProxyAdmin`'s CREATE2 salt from the ecosystem's: both are deployed
+///      for the same owner under the same run salt, and the two domains' admins must be distinct
+///      objects (each is held by its own upgrade executor).
+bytes32 constant CTM_PROXY_ADMIN_SALT_DOMAIN = keccak256("ctm-domain-proxy-admin");
 
 /// @dev We need to use a struct instead of list of params to prevent stack too deep error
 struct PrepareL1L2TransactionParams {
@@ -172,24 +183,27 @@ library Utils {
             selectors[i] = selector;
         }
 
-        // Remove `getName()` selector if existing
-        bool hasGetName = false;
+        // Remove the unregistered helper views if present: every facet serves them,
+        // so registering them in the diamond would collide across facets.
+        selectors = removeSelector(selectors, bytes4(keccak256("getName()")));
+        selectors = removeSelector(selectors, bytes4(keccak256("selectors()")));
+
+        return selectors;
+    }
+
+    /// @dev Removes a single occurrence of `target` from `selectors` (order not preserved).
+    function removeSelector(bytes4[] memory selectors, bytes4 target) internal pure returns (bytes4[] memory) {
         uint256 selectorsLength = selectors.length;
         for (uint256 i = 0; i < selectorsLength; ++i) {
-            if (selectors[i] == bytes4(keccak256("getName()"))) {
-                selectors[i] = selectors[selectors.length - 1];
-                hasGetName = true;
-                break;
+            if (selectors[i] == target) {
+                selectors[i] = selectors[selectorsLength - 1];
+                bytes4[] memory newSelectors = new bytes4[](selectorsLength - 1);
+                for (uint256 j = 0; j < selectorsLength - 1; ++j) {
+                    newSelectors[j] = selectors[j];
+                }
+                return newSelectors;
             }
         }
-        if (hasGetName) {
-            bytes4[] memory newSelectors = new bytes4[](selectorsLength - 1);
-            for (uint256 i = 0; i < selectorsLength - 1; ++i) {
-                newSelectors[i] = selectors[i];
-            }
-            return newSelectors;
-        }
-
         return selectors;
     }
 
@@ -305,7 +319,14 @@ library Utils {
         // even when this function is called from a contract created via `new` during the script.
         vm.broadcast(getBroadcasterAddress());
         (bool success, bytes memory data) = _factory.call(getDeterministicCreate2FactoryCalldata(_salt, _bytecode));
-        contractAddress = bytesToAddress(data);
+
+        // The EVM deterministic factory returns the raw 20-byte address; the ZKsync shim at the
+        // same address ABI-encodes it into 32 bytes. Parse whichever shape came back.
+        if (data.length == 32) {
+            contractAddress = abi.decode(data, (address));
+        } else {
+            contractAddress = bytesToAddress(data);
+        }
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
             revert("Failed to deploy contract via create2");
@@ -333,6 +354,25 @@ library Utils {
     /// @return The computed CREATE2 address.
     function getL2AddressViaDeterministicCreate2(bytes32 salt, bytes memory initCode) internal pure returns (address) {
         return vm.computeCreate2Address(salt, keccak256(initCode), DETERMINISTIC_CREATE2_ADDRESS);
+    }
+
+    /// @notice The address the deterministic factory produces for `_creationCode` run on
+    ///         `_constructorArgs` under `_salt`.
+    /// @dev The Solidity twin of `protocol-ops`'s construction check
+    ///      (`upgrade_verification::registry::construction`), which is what establishes that
+    ///      a registry object was produced by the AUDITED constructor rather than merely running
+    ///      audited runtime code. Kept in step with it by
+    ///      `test/foundry/l1/upgrades/CounterfeitObject.t.sol`, which builds a counterfeit and
+    ///      asserts this derivation rejects it.
+    /// @param _salt The run's CREATE2 salt.
+    /// @param _creationCode The object type's creation code, from the build artifact.
+    /// @param _constructorArgs The ABI-encoded manifest.
+    function canonicalCreate2Address(
+        bytes32 _salt,
+        bytes memory _creationCode,
+        bytes memory _constructorArgs
+    ) internal pure returns (address) {
+        return getL2AddressViaDeterministicCreate2(_salt, abi.encodePacked(_creationCode, _constructorArgs));
     }
 
     /// @notice Deploys an L2 contract from L1 through the deterministic CREATE2 factory.
@@ -1090,14 +1130,6 @@ library Utils {
         });
     }
 
-    function blakeHashBytecode(bytes memory _bytecode) internal returns (bytes32 hashedBytecode) {
-        string[] memory input = new string[](3);
-        input[0] = "node";
-        input[1] = "./scripts/blake2s256.js";
-        input[2] = vm.toString(_bytecode);
-        hashedBytecode = bytes32(vm.ffi(input));
-    }
-
     /// Per-regen salt for legacy `Governance.sol` ceremonies. The op id is
     /// `hash(targets, values, calldatas, predecessor, salt)`; rotating the salt
     /// each regen prevents collisions with prior op ids that may still sit in
@@ -1157,15 +1189,15 @@ library Utils {
         bytes32 _emergencyUpgradeBoardDigest,
         bytes32 _upgradeId
     ) internal returns (bytes memory fullSignatures) {
-        address[] memory guardiansMembers = new address[](8);
+        address[] memory guardiansMembers = new address[](GUARDIANS_SIZE);
         {
             IMultisig guardians = IMultisig(_protocolUpgradeHandler.guardians());
-            for (uint256 i = 0; i < 8; i++) {
+            for (uint256 i = 0; i < GUARDIANS_SIZE; i++) {
                 guardiansMembers[i] = guardians.members(i);
             }
         }
-        bytes[] memory guardiansRawSignatures = new bytes[](8);
-        for (uint256 i = 0; i < 8; i++) {
+        bytes[] memory guardiansRawSignatures = new bytes[](GUARDIANS_SIZE);
+        for (uint256 i = 0; i < GUARDIANS_SIZE; i++) {
             bytes32 safeDigest;
             {
                 bytes32 guardiansDigest = EIP712Utils.buildDigest(
@@ -1311,11 +1343,11 @@ library Utils {
         }
 
         bytes[] memory securityCouncilRawSignatures = new bytes[](SECURITY_COUNCIL_SIZE);
-        address[] memory securityCouncilMembers = new address[](12);
+        address[] memory securityCouncilMembers = new address[](SECURITY_COUNCIL_SIZE);
         {
             {
                 IMultisig securityCouncil = IMultisig(_protocolUpgradeHandler.securityCouncil());
-                for (uint256 i = 0; i < 12; i++) {
+                for (uint256 i = 0; i < SECURITY_COUNCIL_SIZE; i++) {
                     securityCouncilMembers[i] = securityCouncil.members(i);
                 }
             }
@@ -1413,7 +1445,7 @@ library Utils {
     }
 
     function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
-        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
+        bytes32 bytecodeBlakeHash = Blake2s.hash(bytecode);
         bytes32 observableBytecodeHash = keccak256(bytecode);
         bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
             bytecodeBlakeHash,

@@ -38,7 +38,10 @@ governance_kind = "puh"
 # TODO(EVM-1200): Retained for consumers of the legacy single-CTM shape; points to Atlas.
 [ctm_contracts]
 ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
-l1_bytecodes_supplier_addr = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+# Atlas CTM's live BytecodesSupplier (CTM.L1_BYTECODES_SUPPLIER()). The previous
+# 0x3ad11E8B… is stale (a pre-v31 supplier lacking `evmPublishingBlock`); testnet's
+# v31 upgrade re-pointed the CTMs at new suppliers.
+l1_bytecodes_supplier_addr = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 
 # Multi-CTM list for `protocol-ops ecosystem upgrade-prepare-all`. Only
@@ -50,5 +53,6 @@ rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"
 # CTM and still points at the old RollupDAManager `0x2732eA4D...`; the v31
 # upgrade flow targets the current v30 state, so we pin the v30 value.
 proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
-bytecodes_supplier = "0x3ad11E8BAAa24708086EEdaEE28722B8c1489e3b"
+# CTM.L1_BYTECODES_SUPPLIER() on-chain (v31 re-pointed it; old 0x3ad11E8B… is stale).
+bytecodes_supplier = "0x4332c61541c4aD8ffFB158c51d9C915e8114E845"
 rollup_da_manager = "0xC90E4E4897421E9380d734b72221f5485C3fd116"

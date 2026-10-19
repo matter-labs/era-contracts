@@ -1,0 +1,18 @@
+name: Install Amsterdam anvil
+description: >
+  Installs the anvil pinned in .github/amsterdam-anvil.env into $RUNNER_TEMP/anvil-amsterdam and
+  exports its path as ANVIL_AMSTERDAM_BIN.
+
+runs:
+  using: composite
+  steps:
+    - name: Install the pinned Amsterdam anvil
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        FOUNDRY_DISABLE_NIGHTLY_WARNING: "1"
+      run: |
+        set -euo pipefail
+        anvil_bin="$(bash "${ACTION_PATH}/../../../l1-contracts/test/anvil-interop/scripts/install-amsterdam-anvil.sh" "${RUNNER_TEMP}/anvil-amsterdam")"
+        "$anvil_bin" --version
+        echo "ANVIL_AMSTERDAM_BIN=${anvil_bin}" >> "$GITHUB_ENV"

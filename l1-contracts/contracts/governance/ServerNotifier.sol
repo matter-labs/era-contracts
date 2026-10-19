@@ -22,7 +22,9 @@ import {ChainNotReadyForMigration} from "../core/bridgehub/L1BridgehubErrors.sol
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract enables chain admins to emit migration events for the server.
-/// @dev The `owner` of this contract is expected to be the admin of the chainTypeManager contract.
+/// @dev The proxy sits under the CTM-domain `ProxyAdmin`, and its `owner` is the CTM's governing
+///      authority: the bound `CTMUpgradeExecutor` once the registry bootstrap ran (see
+///      {docs/upgrade-operations.md}).
 contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServerNotifier {
     /// @notice The chainTypeManager, which is used to retrieve chain administrator addresses.
     IChainTypeManager public chainTypeManager;
@@ -113,7 +115,12 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
             revert ZeroUpgradeTimestamp();
         }
         uint256 oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
-        if (chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)) {
+        // A registry-driven edge commits a transition; a legacy edge commits a cut hash. Either
+        // proves an upgrade is actually scheduled for the version the chain departs from.
+        if (
+            chainTypeManager.upgradeTransition(oldProtocolVersion) == address(0) &&
+            chainTypeManager.upgradeCutHash(oldProtocolVersion) == bytes32(0)
+        ) {
             revert CutDataForProtocolVersionNotAvailable(oldProtocolVersion);
         }
         IUpgradePreconditionChecker checker = upgradePreconditionChecker[oldProtocolVersion];

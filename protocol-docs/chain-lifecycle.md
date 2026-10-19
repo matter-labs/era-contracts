@@ -42,6 +42,12 @@ version, fee params, the priority tree, and the `nativeTokenVault` reference (th
 constant `L2_NATIVE_TOKEN_VAULT_ADDR` when running under the L2 Bridgehub, otherwise derived from
 the Bridgehub's asset router — no immutable needed).
 
+Every address and hash it reads is zero-checked, so creation fails rather than leave a chain
+without one. On L1 this includes the Bridgehub's asset router, that router's native token vault, and
+the CTM's `PERMISSIONLESS_VALIDATOR`, the settler of a chain in priority mode (an L1-only feature);
+each refuses with `ZeroAddress`. The L1 CTM also refuses a zero permissionless validator at
+construction.
+
 It also stores the chain's genesis (batch 0) chain batch root:
 `s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot()`. Batch 0 has no
 L2->L1 logs, no multichain root, and a freshly seeded (empty) interop commitment tree at both batch
@@ -106,8 +112,9 @@ The chain asset handler treats chains themselves as bridgeable assets of their C
 on the source settlement layer collects the chain's migration data (protocol version, batch
 number, base-token bridging data, etc.) and de-registers it locally; `bridgeMint` on the
 destination layer deploys/re-registers the chain there. Both are callable only via the asset
-router, and both are guarded by the runtime `migrationPaused` flag (a governance pause used for
-upgrades) **and** the release-level migrations ban below. On migration to a settlement layer,
+router, and both are guarded by two runtime pauses for incident response, the ecosystem-wide one
+of the handler's owner (`pauseMigration`) and the per-CTM one of that CTM's owner
+(`pauseCTMMigration`), **and** by the release-level migrations ban below, which is checked first. On migration to a settlement layer,
 `bridgeBurn` also fills `originToken`/`originChainId` of the base-token bridging data, which the
 destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's base token.
 
@@ -125,7 +132,7 @@ risks for the time being:
 - The switch is `CHAIN_MIGRATIONS_ENABLED = false` in `common/Config.sol`, surfaced via
   `ChainAssetHandlerBase.migrationsEnabled()` and enforced by the `whenMigrationsEnabled` modifier
   on `bridgeBurn` and `bridgeMint`, which revert with `ChainMigrationsDisabled`.
-- This is a **release-level** ban, unlike the runtime `migrationPaused` flag: it cannot be lifted
+- This is a **release-level** ban, unlike the runtime pauses: it cannot be lifted
   by a governance call and requires a protocol upgrade that redeploys the chain asset handler with
   the constant set to `true`.
 - Recovery of a failed migration (`bridgeConfirmTransferResult`) is intentionally **not** gated by
@@ -177,7 +184,7 @@ An in-place upgrade has to reach the same state a from-scratch deployment produc
 not follow from swapping implementations are:
 
 - **`L1InteropHandler`** is new in this release, so the upgrade deploys it (proxy included) and wires it
-  into `L1Nullifier` and `L1AssetRouter` with governance calls in stage 1. Without it every interop
+  into `L1Nullifier` and `L1AssetRouter` with governance calls. Without it every interop
   withdrawal finalization on L1 reverts, since the asset router only accepts calls from the configured
   handler. Both setters are one-shot, so the upgrade emits them only for an ecosystem that has no handler.
 - **`Bridgehub.chainRegistrationSender`** is only written by `setAddresses` on a fresh deployment, so an
@@ -205,7 +212,7 @@ installs the protocol version's verifier, and this release deploys a fresh one, 
 proof under the old verifier would stop being provable.
 
 Address discovery (`AddressIntrospector`) reads the getters of the current release only
-(`chainRegistrationSender`, `l1InteropHandler`, `defaultUpgrade`, …): this line only upgrades ecosystems
+(`chainRegistrationSender`, `l1InteropHandler`, …): this line only upgrades ecosystems
 that are already on v33 or later, so there is no per-era discovery path to choose between.
 
 Every chain registered in the bridgehub must have run its per-chain v31 upgrade before this release, and in

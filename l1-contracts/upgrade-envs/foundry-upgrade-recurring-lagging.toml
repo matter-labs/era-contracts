@@ -1,0 +1,13 @@
+# Foundry-specific upgrade configuration for the recurring hop that departs from a CTM whose chains
+# all lag behind it (test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol). A first
+# chain-release hop moves the CTM to v37.0.0 (`foundry-upgrade-recurring.toml`) and no chain
+# follows, so this hop targets v38.0.0 from a version no chain runs.
+
+old_protocol_version = 0x2500000000 # v37.0.0 (informational: the prepare reads it from the CTM)
+
+# Kept explicit for the same reason as in `foundry-upgrade-recurring.toml`.
+pre_v32_introspection = false
+
+[contracts]
+new_protocol_version = 0x2600000000  # v38.0.0 (target of the hop past the lagging chains)
+latest_protocol_version = 0x2600000000  # v38.0.0

@@ -46,10 +46,9 @@ pub async fn set_balance(rpc_url: &str, address: Address) -> anyhow::Result<()> 
 }
 
 /// Bump anvil's L1 timestamp by `seconds` and mine a new block so the
-/// increase is reflected in subsequent calls' `block.timestamp`. Used to
-/// step over `GovernanceUpgradeTimer` deadlines between v31 stage 0 and
-/// stage 1 governance replays — stage 1's `checkDeadline()` requires
-/// `block.timestamp >= deadline` set by stage 0.
+/// increase is reflected in subsequent calls' `block.timestamp`. Used by the
+/// execution-runbook check to step over a runbook tx's declared delay (its
+/// `time_increase`), e.g. a timelock between two steps of a manual execution.
 pub async fn evm_increase_time_and_mine(rpc_url: &str, seconds: u64) -> anyhow::Result<()> {
     let provider = get_provider(rpc_url)?;
     provider
@@ -102,7 +101,7 @@ pub async fn evm_revert(rpc_url: &str, snapshot_id: &str) -> anyhow::Result<()> 
 /// downstream Safe-bundle JSON), while still mutating the fork state.
 ///
 /// Use this to apply governance-style calls on the prepare fork to bring
-/// it into a "post-stage-N" state without polluting the deployer's bundle.
+/// it into a post-governance state without polluting the deployer's bundle.
 ///
 /// Reverts on the wire are surfaced as `anyhow::Error` (receipt status != 1).
 pub async fn send_impersonated_tx(

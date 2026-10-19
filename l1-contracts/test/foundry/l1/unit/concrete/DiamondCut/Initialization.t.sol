@@ -7,7 +7,6 @@ import {ReturnSomething} from "contracts/dev-contracts/ReturnSomething.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DelegateCallFailed, NonEmptyCalldata} from "contracts/common/L1ContractErrors.sol";
-import {Utils} from "../Utils/Utils.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 
 contract InitializationTest is DiamondCutTest {
@@ -37,10 +36,8 @@ contract InitializationTest is DiamondCutTest {
 
     function test_RevertWhen_DelegateCallWithWrongInitializeData() public {
         DiamondInit diamondInit = new DiamondInit();
-        bytes memory diamondInitData = abi.encodeWithSelector(
-            diamondInit.initialize.selector,
-            Utils.makeInitializeData(address(0))
-        );
+        // Zero admin makes the initializer revert.
+        bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, uint256(1), address(0));
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

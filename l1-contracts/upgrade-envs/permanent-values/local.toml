@@ -1,6 +1,7 @@
-# Dummy ZK token asset ID for test fixtures. On mainnet this would be
-# DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).
-zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
+# The localhost ZK token asset ID: the value protocol-ops pins on a local L1 when no env is given
+# (`LOCAL_ZK_TOKEN_ASSET_ID`), so a package prepared on anvil verifies with `--env local`. On
+# mainnet this would be DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).
+zk_token_asset_id = "0x50c8daa176d24869d010ad74c2d374427601375ca2264e94f73784e299d572d4"
 
 # Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.
 # Non-mainnet envs run `ZKsyncOSTestnetVerifier`, which accepts unproven batches.

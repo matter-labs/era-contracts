@@ -38,6 +38,9 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {UpgradeChainCall} from "./utils/UpgradeChainCall.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
@@ -91,10 +94,11 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Walk every Bridgehub-discoverable ecosystem ownable (bridgehub itself,
-    /// asset router, l1 nullifier, ctm deployer, chain asset handler) and
-    /// accept the pending ownership transfer where one is targeted at
-    /// `_governor`. Idempotent — running against an already-correct ecosystem
-    /// is a no-op.
+    /// asset router, l1 nullifier, ctm deployer, chain asset handler, and the
+    /// ecosystem's upgrade executor — the core executor holding the ecosystem
+    /// ProxyAdmin) and accept the pending ownership transfer
+    /// where one is targeted at `_governor`. Idempotent — running against an
+    /// already-correct ecosystem is a no-op.
     function governanceAcceptOwnerAggregated(address _governor, address _bridgehub) public {
         address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
         address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
@@ -129,6 +133,19 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
         if (Ownable2Step(chainRegistrationSender).pendingOwner() == _governor) {
             governanceAcceptOwner(_governor, chainRegistrationSender);
+        }
+        // A fresh ecosystem's ProxyAdmin is held by its core executor; a pre-registry one's by governance.
+        address proxyAdmin = address(uint160(uint256(vm.load(_bridgehub, Utils.ADMIN_SLOT))));
+        address paOwner = IOwnableSingleStep(proxyAdmin).owner();
+        if (paOwner != _governor && paOwner.code.length != 0) {
+            CoreUpgradeExecutor coreExecutor = CoreUpgradeExecutor(payable(paOwner));
+            require(
+                address(coreExecutor.PROXY_ADMIN()) == proxyAdmin,
+                "ecosystem ProxyAdmin owner is not the executor bound to it"
+            );
+            if (coreExecutor.pendingOwner() == _governor) {
+                governanceAcceptOwner(_governor, address(coreExecutor));
+            }
         }
     }
 
@@ -187,8 +204,8 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// CTM (Ownable2Step) and its EIP-1967 ProxyAdmin (single-step Ownable) are
     /// owned by `_governance`. Each individual transfer is conditional, so
     /// re-running this against an already-correct ecosystem is a no-op. Intended
-    /// for upgrade pre-stages where governance must own these contracts before
-    /// stage 1 governance calls (e.g. ProxyAdmin.upgradeAndCall) execute.
+    /// for upgrade preparation where governance must own these contracts before
+    /// the governance bundle (e.g. ProxyAdmin.upgradeAndCall) executes.
     ///
     /// Requires anvil `--auto-impersonate` (or a runner that has unlocked the
     /// resolved owner addresses) — broadcasts switch sender per-step.
@@ -220,13 +237,16 @@ contract AdminFunctions is Script, IAdminFunctions {
         // `acceptOwnership()` on each Ownable2Step CTM whose pendingOwner is
         // `_governance` must execute as PUH on real chain — which means going
         // through PUH's governance flow, not impersonation. We collect these
-        // calls here and persist them so protocol-ops folds them into stage 0
+        // calls here and persist them so protocol-ops folds them into the front
         // of governance_calls in the merged ecosystem.toml. Sized to
         // chainIds.length (max possible), trimmed before serialization.
         // Sized for up to two deferred accepts per CTM (the CTM proxy + its
         // ValidatorTimelock), each Ownable2Step transfer deferring its accept.
         Call[] memory acceptCalls = new Call[](chainIds.length * 2);
         uint256 acceptCount = 0;
+        // From the bootstrap edge on, the CTM domain and the ecosystem ProxyAdmin are owned by the
+        // bound upgrade executors, which governance owns — the governed shape, not a drift.
+        bool registryDriven = false;
 
         for (uint256 i = 0; i < chainIds.length; i++) {
             address ctm = IL1Bridgehub(_bridgehub).chainTypeManager(chainIds[i]);
@@ -242,6 +262,10 @@ contract AdminFunctions is Script, IAdminFunctions {
 
             Ownable2Step ctmOwnable = Ownable2Step(ctm);
             address ctmOwner = ctmOwnable.owner();
+            if (_isUnderBoundCTMExecutor(ctm, ctmOwner, _governance)) {
+                registryDriven = true;
+                continue;
+            }
             if (ctmOwner != _governance && ctmOwnable.pendingOwner() != _governance) {
                 _issueAsOwner(ctmOwner, ctm, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
             }
@@ -275,17 +299,61 @@ contract AdminFunctions is Script, IAdminFunctions {
 
         // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
         // by `governanceAcceptOwnerAggregated`, since the same ProxyAdmins gate
-        // their `upgradeAndCall` invocations during stage 1 governance calls.
+        // their `upgradeAndCall` invocations during the governance bundle.
         address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
         address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
         address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
         address l1Nullifier = address(IL1AssetRouter(assetRouter).L1_NULLIFIER());
 
+        if (registryDriven && _isUnderBoundEcosystemExecutor(_bridgehub, _governance)) {
+            return;
+        }
         _ensureProxyAdminOwnedByGovernance(_bridgehub, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(assetRouter, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(chainAssetHandler, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, _governance, _wraps);
         _ensureProxyAdminOwnedByGovernance(l1Nullifier, _governance, _wraps);
+    }
+
+    /// @dev Whether `_ctm` (a registry-era CTM, v35+) is owned by a `CTMUpgradeExecutor` bound to
+    ///      it and owned by `_governance`: the CTM domain — the CTM and its ProxyAdmin — then lives
+    ///      where the bootstrap edge put it. A registry-era CTM owned by any other contract is a
+    ///      misconfiguration this fails on (the executor getters revert on a stranger).
+    function _isUnderBoundCTMExecutor(
+        address _ctm,
+        address _ctmOwner,
+        address _governance
+    ) private view returns (bool) {
+        if (_ctmOwner == _governance || _ctmOwner.code.length == 0) {
+            return false;
+        }
+        if (IChainTypeManager(_ctm).protocolVersion() < UpgradeChainCall.V35_THRESHOLD) {
+            return false;
+        }
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(_ctmOwner));
+        require(
+            address(executor.CHAIN_TYPE_MANAGER()) == _ctm,
+            "CTM owner is a contract but not the executor bound to it"
+        );
+        require(executor.owner() == _governance, "the CTM executor is not owned by governance");
+        return true;
+    }
+
+    /// @dev Whether the ecosystem `ProxyAdmin` (read off the Bridgehub proxy) is owned by a
+    ///      `CoreUpgradeExecutor` bound to it and owned by `_governance`.
+    function _isUnderBoundEcosystemExecutor(address _bridgehub, address _governance) private view returns (bool) {
+        address proxyAdmin = address(uint160(uint256(vm.load(_bridgehub, Utils.ADMIN_SLOT))));
+        address paOwner = IOwnableSingleStep(proxyAdmin).owner();
+        if (paOwner == _governance || paOwner.code.length == 0) {
+            return false;
+        }
+        CoreUpgradeExecutor executor = CoreUpgradeExecutor(payable(paOwner));
+        require(
+            address(executor.PROXY_ADMIN()) == proxyAdmin,
+            "ecosystem ProxyAdmin owner is not the executor bound to it"
+        );
+        require(executor.owner() == _governance, "the core executor is not owned by governance");
+        return true;
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
@@ -333,7 +401,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Persist the trimmed `acceptOwnership()` Call list to a TOML so
-    /// `protocol_ops ecosystem upgrade-prepare-all` can fold it into stage 0
+    /// `protocol_ops ecosystem upgrade-prepare-all` can fold it into the front
     /// of the merged governance_calls. Always written (even when empty) so
     /// the Rust side can `vm.readFile` unconditionally.
     function _savePreGovernanceAcceptOwnershipCalls(Call[] memory _calls, uint256 _count) private {
@@ -347,11 +415,10 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Execute zero-value calls against Ownable targets as their current
-    /// owners. This is used for operational admin surfaces that intentionally
-    /// stay outside governance ownership, such as the ServerNotifier
-    /// ProxyAdmin. Contract owners without an explicit registry entry are
-    /// treated as ChainAdmin-style wrappers, matching the ServerNotifier
-    /// ownership model used by CTM deployments.
+    /// owners: the CTM-admin calls of a prepare (`[ctm_admin_calls]`), today
+    /// only the bootstrap's one-time ServerNotifier handover. Contract owners
+    /// without an explicit registry entry are treated as ChainAdmin-style
+    /// wrappers, the pre-v35 ServerNotifier ownership model.
     function executeOwnableCallsWithWraps(bytes memory _callsToExecute, OwnerWrap[] memory _wraps) public {
         Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
         for (uint256 i = 0; i < calls.length; i++) {
@@ -637,16 +704,12 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _chainDiamondProxy
     ) public {
         uint256 oldProtocolVersion = IZKChain(_chainDiamondProxy).getProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
         Utils.adminExecute({
             _admin: _adminAddr,
             _accessControlRestriction: _accessControlRestriction,
             _target: _chainDiamondProxy,
-            _data: abi.encodeCall(
-                IAdmin.upgradeChainFromVersion,
-                (_chainDiamondProxy, oldProtocolVersion, upgradeCutData)
-            ),
+            _data: UpgradeChainCall.encodeFromEncodedCut(_chainDiamondProxy, oldProtocolVersion, _diamondCut),
             _value: 0
         });
     }
@@ -658,8 +721,8 @@ contract AdminFunctions is Script, IAdminFunctions {
     ///
     ///      The cut and the DA calls go out as ONE `ChainAdmin.multicall`. They cannot be split:
     ///      `setPubdataContent` only exists on the facets the cut installs, and between the cut and
-    ///      a later DA transaction the chain would commit v33 batches under the old pair — which
-    ///      for a no-DA validium do not prove.
+    ///      a later DA transaction the chain would commit the new version's batches under the old
+    ///      pair — which for a no-DA validium do not prove.
     function upgradeChainFromCTM(IAdminFunctions.ChainUpgradeParams calldata _params) public {
         address _chainAddress = _params.chainAddress;
         console.log("AdminFunctions: upgrading chain", _chainAddress);
@@ -679,15 +742,20 @@ contract AdminFunctions is Script, IAdminFunctions {
             "AdminFunctions: new protocol version must be greater than current"
         );
 
-        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
-            address(ctm),
-            currentProtocolVersion
-        );
-
-        bytes memory upgradeCall = abi.encodeCall(
-            IAdmin.upgradeChainFromVersion,
-            (_chainAddress, currentProtocolVersion, diamondCut)
-        );
+        // Pick the call the chain's CURRENT generation exposes FIRST, and only reconstruct a cut
+        // for the legacy edge that is handed one. A v35+ chain reads the cut from its own CTM, and
+        // a registry-driven edge leaves nothing to reconstruct from (`upgradeCutDataBlock` is
+        // deprecated and zero), so fetching one first would revert on the supported path.
+        bytes memory callData;
+        if (UpgradeChainCall.requiresCut(currentProtocolVersion)) {
+            Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
+                address(ctm),
+                currentProtocolVersion
+            );
+            callData = UpgradeChainCall.encode(_chainAddress, currentProtocolVersion, diamondCut);
+        } else {
+            callData = UpgradeChainCall.encodeWithoutCut(_chainAddress, currentProtocolVersion);
+        }
 
         uint256 callCount = 1;
         if (_params.shouldSetDaValidatorPair) {
@@ -698,7 +766,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         }
         Call[] memory calls = new Call[](callCount);
         uint256 next;
-        calls[next++] = Call({target: _chainAddress, value: 0, data: upgradeCall});
+        calls[next++] = Call({target: _chainAddress, value: 0, data: callData});
         // After the cut, so the pair the first batch of the new version commits with is already
         // the new one.
         if (_params.shouldSetDaValidatorPair) {

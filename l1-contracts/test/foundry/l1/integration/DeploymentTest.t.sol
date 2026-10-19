@@ -94,8 +94,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 _chainId: chainId,
                 _baseTokenAssetId: baseTokenAssetId,
                 _admin: owner,
-                _protocolVersion: addresses.chainTypeManager.protocolVersion(),
-                _storedBatchZero: addresses.chainTypeManager.storedBatchZero(),
                 _bridgehub: address(addresses.bridgehub),
                 _chainTypeManager: address(addresses.chainTypeManager)
             });
@@ -135,8 +133,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 _chainId: chainId,
                 _baseTokenAssetId: baseTokenAssetId,
                 _admin: owner,
-                _protocolVersion: addresses.chainTypeManager.protocolVersion(),
-                _storedBatchZero: addresses.chainTypeManager.storedBatchZero(),
                 _bridgehub: address(addresses.bridgehub),
                 _chainTypeManager: address(addresses.chainTypeManager)
             });

@@ -84,7 +84,17 @@ pub async fn hub_init(
     let output = deploy(runner, deployer, &deploy_input)?;
     logger::info(format!("[timing] hub.deploy: {:.2?}", t.elapsed()));
 
-    logger::step("Accepting ownership of Bridgehub contracts...");
+    // DeployL1CoreContracts also deploys the core executor (owning the ecosystem ProxyAdmin),
+    // nominating governance; `governanceAcceptOwnerAggregated` accepts that nomination with the
+    // Bridgehub-discoverable ones.
+    if let Some(core_executor) = output
+        .upgrade_executors
+        .as_ref()
+        .and_then(|executors| executors.core_executor.as_ref())
+    {
+        logger::info(format!("Core executor: {:#x}", core_executor.address));
+    }
+    logger::step("Accepting ownership of Bridgehub contracts and the upgrade executors...");
     let deployed = &output.deployed_addresses;
     let bridgehub = deployed.bridgehub.bridgehub_proxy_addr;
     let accept_scripts = [

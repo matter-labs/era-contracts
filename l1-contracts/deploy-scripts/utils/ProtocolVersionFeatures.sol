@@ -9,9 +9,9 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 /// a feature checks `has(<their protocol version>, <feature>)` instead of comparing minor versions itself; a new such
 /// feature gets a row here.
 library ProtocolVersionFeatures {
-    /// @dev The production verifier exports the testnet-verifier flag (`isTestnetVerifier()`). Earlier production
-    /// verifiers export no flag; v31/v32/v33 testnet verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
-    uint32 internal constant VERIFIER_TESTNET_FLAG = 34;
+    /// @dev The CTM exposes its current release (`currentRelease()`).
+    uint32 internal constant CTM_RELEASE_REGISTRY = 35;
+
     /// @dev The CTM exposes the L1 interop fee manager (`L1_INTEROP_FEE_MANAGER()`).
     uint32 internal constant CTM_INTEROP_FEE_MANAGER = 35;
 

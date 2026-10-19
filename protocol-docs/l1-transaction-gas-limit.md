@@ -9,14 +9,12 @@ ceiling do not change. The chain-configured L2 transaction gas limit is independ
 ceiling and the default for new chains. The chain type manager may set a lower
 `priorityTxMaxGasLimit`, including zero, but cannot exceed the ceiling.
 
-The v34 per-chain upgrade (`V34UpgradeZKsyncOS`, the default ZKsync OS upgrade
-used as the initializer of `CTMUpgrade_v34`'s cut) clamps the stored
-limit to the protocol ceiling and emits `NewPriorityTxMaxGasLimit` if it
-changes. This happens atomically with the facet upgrade and preserves lower
-limits, including zero. New chains initialize with the ceiling, so from v34 on
-no chain stores a limit above it: admission checks the stored limit, and the
-getter returns it directly. The CTM default upgrade, used by later releases, does
-not touch the limit.
+The v34 per-chain upgrade clamped the stored limit to the protocol ceiling and
+emitted `NewPriorityTxMaxGasLimit` where it changed. This happened atomically
+with the facet upgrade and preserved lower limits, including zero. New chains
+initialize with the ceiling, so from v34 on no chain stores a limit above it:
+admission checks the stored limit, and the getter returns it directly. Later
+upgrades do not touch the limit.
 
 Service transactions, gateway relay wrappers, and priority-request tooling use
 the same ceiling. Genesis and protocol-upgrade transactions retain a separate

@@ -12,6 +12,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IRegisterCTM} from "contracts/script-interfaces/IRegisterCTM.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 
 contract RegisterCTM is Script, IRegisterCTM {
     using stdToml for string;
@@ -52,32 +53,12 @@ contract RegisterCTM is Script, IRegisterCTM {
         bool shouldSend
     ) internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubProxy);
-        address ctmDeploymentTrackerProxy = address(bridgehub.l1CtmDeployer());
         address l1AssetRouterProxy = address(bridgehub.assetRouter());
 
         vm.startBroadcast(getDeployerAddress());
         IGovernance governance = IGovernance(IOwnable(bridgehubProxy).owner());
-        Call[] memory calls = new Call[](3);
-        calls[0] = Call({
-            target: bridgehubProxy,
-            value: 0,
-            data: abi.encodeCall(bridgehub.addChainTypeManager, (chainTypeManagerProxy))
-        });
-        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(ctmDeploymentTrackerProxy);
+        Call[] memory calls = _registrationCalls(bridgehub, chainTypeManagerProxy);
         IL1AssetRouter sharedBridge = IL1AssetRouter(l1AssetRouterProxy);
-        calls[1] = Call({
-            target: address(sharedBridge),
-            value: 0,
-            data: abi.encodeCall(
-                sharedBridge.setAssetDeploymentTracker,
-                (bytes32(uint256(uint160(chainTypeManagerProxy))), address(ctmDT))
-            )
-        });
-        calls[2] = Call({
-            target: address(ctmDT),
-            value: 0,
-            data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (chainTypeManagerProxy))
-        });
 
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,
@@ -103,8 +84,34 @@ contract RegisterCTM is Script, IRegisterCTM {
         saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
     }
 
+    /// @dev Governance's registration batch: the CTM on the Bridgehub, its asset handler on the asset
+    ///      router and the deployment tracker.
+    /// @param _bridgehub The Bridgehub.
+    /// @param _ctm The CTM being registered.
+    function _registrationCalls(IL1Bridgehub _bridgehub, address _ctm) internal view returns (Call[] memory calls) {
+        ICTMDeploymentTracker ctmDT = _bridgehub.l1CtmDeployer();
+        IL1AssetRouter sharedBridge = IL1AssetRouter(address(_bridgehub.assetRouter()));
+        _requireCTMExecutor(_ctm);
+        calls = new Call[](3);
+        calls[0] = Call({
+            target: address(_bridgehub),
+            value: 0,
+            data: abi.encodeCall(_bridgehub.addChainTypeManager, (_ctm))
+        });
+        calls[1] = Call({
+            target: address(sharedBridge),
+            value: 0,
+            data: abi.encodeCall(
+                sharedBridge.setAssetDeploymentTracker,
+                (bytes32(uint256(uint160(_ctm))), address(ctmDT))
+            )
+        });
+        calls[2] = Call({target: address(ctmDT), value: 0, data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (_ctm))});
+    }
+
     function registerChainTypeManagerForTest(address bridgehubProxy, address chainTypeManagerProxy) internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubProxy);
+        _requireCTMExecutor(chainTypeManagerProxy);
         vm.startBroadcast(getDeployerAddress());
         bridgehub.addChainTypeManager(chainTypeManagerProxy);
         console.log("ChainTypeManager registered");
@@ -125,6 +132,16 @@ contract RegisterCTM is Script, IRegisterCTM {
             sharedBridge.assetHandlerAddress(assetId),
             bridgehub.ctmAssetIdToAddress(assetId)
         );
+    }
+
+    /// @dev Requires the CTM to be under the registry upgrade lifecycle: owned by the CTM executor
+    ///      `DeployCTM` handed it to.
+    /// @param _ctm The CTM being registered.
+    function _requireCTMExecutor(address _ctm) internal view {
+        address ctmOwner = IOwnable(_ctm).owner();
+        require(ctmOwner.code.length != 0, "the CTM is not owned by a CTMUpgradeExecutor");
+        CTMUpgradeExecutor executor = CTMUpgradeExecutor(payable(ctmOwner));
+        require(address(executor.CHAIN_TYPE_MANAGER()) == _ctm, "the CTM owner is not the executor bound to it");
     }
 
     function saveOutput(Output memory output, string memory outputPath) internal {
