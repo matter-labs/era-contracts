@@ -33,6 +33,7 @@ pub mod stage3;
 pub mod upgrade;
 pub mod upgrade_full;
 pub mod upgrade_inner;
+pub mod verifier_only_check;
 pub mod verify_upgrade;
 pub mod zk_governance;
 

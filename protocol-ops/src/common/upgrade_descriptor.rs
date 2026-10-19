@@ -1,10 +1,15 @@
 //! `l1-contracts/upgrade-envs/<upgrade>/upgrade.toml`: how the generate / replay / deploy
 //! pipeline produces and checks one protocol upgrade.
 //!
-//! Two kinds exist:
+//! Three kinds exist:
 //! - `prepare = "prepare-all"`: the release's flow, `upgrade-prepare-all` plus PUVT. Only the
 //!   release's own upgrade directory (`env_config::DEFAULT_UPGRADE`) can use it, since that is
 //!   where those commands read their inputs.
+//! - `prepare = "prepare-all"` with `verifier_only = true`: `upgrade-prepare-all --verifier-only`,
+//!   an upgrade that only replaces the ZKsync OS verifier (new VK, same facets). Any upgrade
+//!   directory can use it: the directory needs nothing but this file and one `<env>.toml` input
+//!   per environment ([`VERIFIER_ONLY_SCRIPT`]'s). Its checks and its execution transactions are
+//!   built in (`commands::ecosystem::verifier_only_check`, [`verifier_only_execution`]).
 //! - `prepare = "forge-script"`: one forge script, run on a fork as the deployer. Its
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
 //!   The upgrade supplies its own checks, since PUVT only knows the release's upgrade. An optional
@@ -27,13 +32,72 @@ pub const UPGRADE_DESCRIPTOR_FILE: &str = "upgrade.toml";
 /// Placeholder in `args` for the environment name.
 const ENV_PLACEHOLDER: &str = "{env}";
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-#[serde(tag = "prepare", rename_all = "kebab-case", deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpgradeDescriptor {
-    /// `upgrade-prepare-all` and PUVT. A struct variant so unknown keys are rejected.
-    PrepareAll {},
+    /// `upgrade-prepare-all` and PUVT.
+    PrepareAll,
+    /// `upgrade-prepare-all --verifier-only` and the built-in verifier-only checks.
+    VerifierOnly,
     /// One forge script whose broadcasts are the deployer's bundle.
     ForgeScript(ForgeScriptUpgrade),
+}
+
+/// `upgrade.toml` as written.
+#[derive(Deserialize)]
+#[serde(tag = "prepare", rename_all = "kebab-case", deny_unknown_fields)]
+enum RawDescriptor {
+    /// A struct variant so unknown keys are rejected.
+    PrepareAll {
+        #[serde(default)]
+        verifier_only: bool,
+    },
+    ForgeScript(ForgeScriptUpgrade),
+}
+
+/// The prepare script of a verifier-only upgrade, relative to `l1-contracts/`.
+pub const VERIFIER_ONLY_SCRIPT: &str =
+    "deploy-scripts/upgrade/verifier-only/ZKsyncOSVerifierOnlyUpgrade.s.sol:ZKsyncOSVerifierOnlyUpgrade";
+
+/// `upgrade-envs/<upgrade>/<env>.toml`, the verifier-only prepare's input.
+pub fn verifier_only_input(upgrade: &str, env: &str) -> anyhow::Result<PathBuf> {
+    Ok(upgrade_dir(upgrade)?.join(format!("{env}.toml")))
+}
+
+/// The verifier-only prepare as a forge-script run: [`VERIFIER_ONLY_SCRIPT`]'s
+/// `prepare(input, output)` with `upgrade-envs/<upgrade>/<env>.toml` in and
+/// `output/<env>/ecosystem.toml` out. Its checks are built in, so it declares none.
+pub fn verifier_only_prepare(upgrade: &str) -> anyhow::Result<ForgeScriptUpgrade> {
+    validate_upgrade_name(upgrade)?;
+    Ok(ForgeScriptUpgrade {
+        script: VERIFIER_ONLY_SCRIPT.to_string(),
+        signature: "prepare(string,string)".to_string(),
+        args: vec![
+            format!("/upgrade-envs/{upgrade}/{ENV_PLACEHOLDER}.toml"),
+            format!("/upgrade-envs/{upgrade}/output/{ENV_PLACEHOLDER}/ecosystem.toml"),
+        ],
+        verify_fork: Vec::new(),
+        verify_chain: Vec::new(),
+        execution: None,
+    })
+}
+
+/// How a verifier-only upgrade is executed on a ProtocolUpgradeHandler env: stages 0-2 as one
+/// emergency proposal of its Emergency Upgrade Board, written to `output/<env>/execution.json`.
+/// (A legacy-`Governance` env takes its transactions from the prepare's
+/// `[governance_operations]` instead.)
+pub fn verifier_only_execution(upgrade: &str) -> anyhow::Result<ExecutionScript> {
+    validate_upgrade_name(upgrade)?;
+    Ok(ExecutionScript {
+        script: "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+            .to_string(),
+        signature: "emergencyUpgradeAllStages(string,string,string)".to_string(),
+        args: vec![
+            format!("/upgrade-envs/permanent-values/{ENV_PLACEHOLDER}.toml"),
+            format!("/upgrade-envs/{upgrade}/output/{ENV_PLACEHOLDER}/ecosystem.toml"),
+            format!("/upgrade-envs/{upgrade}/output/{ENV_PLACEHOLDER}/execution.json"),
+        ],
+        output: "execution.json".to_string(),
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -108,7 +172,15 @@ impl UpgradeDescriptor {
     }
 
     fn parse(raw: &str) -> anyhow::Result<Self> {
-        let descriptor: Self = toml::from_str(raw)?;
+        let descriptor = match toml::from_str(raw)? {
+            RawDescriptor::PrepareAll {
+                verifier_only: false,
+            } => Self::PrepareAll,
+            RawDescriptor::PrepareAll {
+                verifier_only: true,
+            } => Self::VerifierOnly,
+            RawDescriptor::ForgeScript(upgrade) => Self::ForgeScript(upgrade),
+        };
         if let Self::ForgeScript(upgrade) = &descriptor {
             anyhow::ensure!(
                 !upgrade.verify_fork.is_empty() && !upgrade.verify_chain.is_empty(),
@@ -216,7 +288,39 @@ verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--pu
     fn parses_prepare_all() {
         assert_eq!(
             UpgradeDescriptor::parse("prepare = \"prepare-all\"\n").unwrap(),
-            UpgradeDescriptor::PrepareAll {}
+            UpgradeDescriptor::PrepareAll
+        );
+        assert_eq!(
+            UpgradeDescriptor::parse("prepare = \"prepare-all\"\nverifier_only = false\n").unwrap(),
+            UpgradeDescriptor::PrepareAll
+        );
+    }
+
+    #[test]
+    fn parses_verifier_only_and_builds_its_scripts() {
+        assert_eq!(
+            UpgradeDescriptor::parse("prepare = \"prepare-all\"\nverifier_only = true\n").unwrap(),
+            UpgradeDescriptor::VerifierOnly
+        );
+        let prepare = verifier_only_prepare("v0.33.2-verifier").unwrap();
+        assert_eq!(
+            prepare.args_for("testnet"),
+            vec![
+                "/upgrade-envs/v0.33.2-verifier/testnet.toml".to_string(),
+                "/upgrade-envs/v0.33.2-verifier/output/testnet/ecosystem.toml".to_string(),
+            ]
+        );
+        prepare.calldata("testnet").unwrap();
+        let execution = verifier_only_execution("v0.33.2-verifier").unwrap();
+        assert_eq!(
+            execution.args_for("testnet")[2],
+            "/upgrade-envs/v0.33.2-verifier/output/testnet/execution.json"
+        );
+        execution.calldata("testnet").unwrap();
+        assert!(verifier_only_prepare("../x").is_err());
+        // `verifier_only` belongs to prepare-all only.
+        assert!(
+            UpgradeDescriptor::parse(&format!("{FORGE_SCRIPT}verifier_only = true\n")).is_err()
         );
     }
 

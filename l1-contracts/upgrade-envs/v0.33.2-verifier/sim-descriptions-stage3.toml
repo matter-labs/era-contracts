@@ -1,5 +1,5 @@
 # Human-readable descriptions for this upgrade's transaction-simulator scenario, read by
-# `protocol_ops ecosystem governance-toml-to-simulator --descriptions` (see generate-stage.sh).
+# `protocol_ops ecosystem governance-toml-to-simulator --descriptions` (the generate and per-chain workflows).
 # Each `[[entries]]` block matches a tx by `(target, selector)`; an unmatched tx fails the emit.
 
 [labels]

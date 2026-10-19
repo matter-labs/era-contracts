@@ -26,10 +26,10 @@ carries the production verifier `0x2aEa8C51…` from the original deployment.
 `0xb2f19079…`); the CTM is on v0.33.2 with the new verifier. Chains 27271 and 27273 have taken their cut;
 2727, 2728, 2729 and 27272 are still on v0.33.0 (as of 2026-10-16). `prepare` therefore no longer runs
 against live stage3: it requires the CTM on v0.33.0. To reproduce the artifact, fork Sepolia before the first
-deployment (block 11854783): `FORK_BLOCK=11854782 ./generate.sh stage3 2026-10-05`, or the
-generate-ecosystem-upgrade-calldata workflow with `upgrade=v0.33.2-verifier`, `environment=stage3`,
-`fork_block=11854782` and `deployer_address=0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`. Both reproduce
-`ecosystem.toml`, `execution.json` and the ecosystem scenario byte for byte.
+deployment (block 11854783): the generate-ecosystem-upgrade-calldata workflow with
+`upgrade=v0.33.2-verifier`, `environment=stage3`, `fork_block=11854782` and
+`deployer_address=0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`, or `rehearse-upgrade` with the same values
+locally. Both reproduce `ecosystem.toml`, `execution.json` and `EXECUTE.md` byte for byte.
 
 `test_create_chain_zkos` names the script's sender as the test chain's admin (`DefaultCTMUpgrade`), so it
 follows the deployer the pipeline runs as; the artifact first generated on 2026-10-05 named forge's default

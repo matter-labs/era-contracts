@@ -1,29 +1,6 @@
 # How the generate / replay / deploy pipeline handles this upgrade
-# (protocol-ops/src/common/upgrade_descriptor.rs). One forge script prepares it; its only L1 transactions are
-# the four CREATE2 deployments (both verifiers, the stage validator and the governance timer).
-prepare = "forge-script"
-script = "deploy-scripts/upgrade/verifier-only/ZKsyncOSVerifierOnlyUpgrade.s.sol:ZKsyncOSVerifierOnlyUpgrade"
-signature = "prepare(string,string)"
-args = [
-  "/upgrade-envs/v0.33.2-verifier/{env}.toml",
-  "/upgrade-envs/v0.33.2-verifier/output/{env}/ecosystem.toml",
-]
-# On the fork the bundle was replayed on: governance stages, the committed chain bundles, a test chain, L1
-# assertions.
-verify_fork = ["bash", "upgrade-envs/v0.33.2-verifier/rehearse.sh"]
-# Read-only against the real chain: the deployments, their VK and wiring.
-verify_chain = ["bash", "upgrade-envs/v0.33.2-verifier/check-deployment.sh"]
-
-# The governance stages of a ProtocolUpgradeHandler env (testnet) as one emergency proposal through its Emergency
-# Upgrade Board. A `Governance` env (stage3) needs no script: the pipeline takes its `scheduleTransparent` +
-# `execute` txs from the `[governance_operations]` the prepare wrote. Either way it replays the txs on the
-# generation fork after the deploy bundle and renders EXECUTE.md from them.
-[execution]
-script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
-signature = "emergencyUpgradeAllStages(string,string,string)"
-args = [
-  "/upgrade-envs/permanent-values/{env}.toml",
-  "/upgrade-envs/v0.33.2-verifier/output/{env}/ecosystem.toml",
-  "/upgrade-envs/v0.33.2-verifier/output/{env}/execution.json",
-]
-output = "execution.json"
+# (protocol-ops/src/common/upgrade_descriptor.rs): `upgrade-prepare-all --verifier-only`, whose input is
+# `<env>.toml` next to this file. Its only L1 transactions are four CREATE2 deployments (both verifiers, the
+# stage validator and the governance timer); its checks and the execution transactions are built in.
+prepare = "prepare-all"
+verifier_only = true

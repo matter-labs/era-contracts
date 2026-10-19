@@ -286,6 +286,9 @@ jobs:
             echo "::error::this checkout has no $DESCRIPTOR for the bundle's upgrade"; exit 1
           fi
           KIND="$(sed -nE 's/^[[:space:]]*prepare[[:space:]]*=[[:space:]]*"([a-z-]+)".*/\1/p' "$DESCRIPTOR" | head -1)"
+          if [ "$KIND" = "prepare-all" ] && grep -qE '^[[:space:]]*verifier_only[[:space:]]*=[[:space:]]*true' "$DESCRIPTOR"; then
+            KIND=verifier-only
+          fi
           echo "Bundle upgrade: $UPGRADE (prepare = $KIND)"
           {
             echo "UPGRADE=$UPGRADE"
@@ -484,10 +487,11 @@ jobs:
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
 
-      # A forge-script upgrade declares a read-only `verify_chain` check, run here against the
-      # real chain. A prepare-all upgrade's post-deploy check is PUVT, which stays a separate step.
-      - name: Check the broadcast on L1 (the upgrade's declared check)
-        if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
+      # A verifier-only upgrade's built-in read-only check, or the `verify_chain` check a
+      # forge-script upgrade declares, run here against the real chain. A prepare-all upgrade's
+      # post-deploy check is PUVT, which stays a separate step.
+      - name: Check the broadcast on L1 (the upgrade's own check)
+        if: ${{ !inputs.verify_only && env.UPGRADE_KIND != 'prepare-all' }}
         run: |
           set -euo pipefail
           ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
@@ -523,7 +527,7 @@ jobs:
           fi
           LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
           if [ ! -f "$LOG" ]; then
-            if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then
+            if [ "${UPGRADE_KIND:-}" != "prepare-all" ]; then
               echo "The bundle logged no contract deployments to verify ($UPGRADE)."; exit 0
             fi
             echo "::error::extra-verification-logs.txt not found"; exit 1
