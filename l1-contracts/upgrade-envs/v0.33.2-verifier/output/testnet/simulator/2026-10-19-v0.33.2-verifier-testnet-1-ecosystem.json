@@ -7,7 +7,8 @@
     "data": "0xac700e63",
     "value": "0",
     "valueToMint": "1",
-    "tag": "stage0"
+    "tag": "stage0",
+    "alreadyExecuted": true
   },
   {
     "description": "Stage 0: start the governance upgrade timer (GovernanceUpgradeTimer.startTimer)",
@@ -16,7 +17,19 @@
     "to": "0x8041c49aefba4c0f96af9db80ca76139e69c925e",
     "data": "0xa39f7449",
     "value": "0",
-    "tag": "stage0"
+    "tag": "stage0",
+    "alreadyExecuted": true
+  },
+  {
+    "description": "Stage 1: pause chain migrations (ChainAssetHandler.pauseMigration) — the CTM refuses a new version otherwise",
+    "network": "sepolia",
+    "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
+    "to": "0xdfa2193b161d7bd45fc81b4e80225eebdc3cf96c",
+    "data": "0xac700e63",
+    "value": "0",
+    "valueToMint": "1",
+    "tag": "stage1",
+    "alreadyExecuted": true
   },
   {
     "description": "Stage 1: check the upgrade timer deadline has passed (GovernanceUpgradeTimer.checkDeadline)",
@@ -26,7 +39,8 @@
     "data": "0x43bf9936",
     "value": "0",
     "timeIncrease": 200000,
-    "tag": "stage1"
+    "tag": "stage1",
+    "alreadyExecuted": true
   },
   {
     "description": "Stage 1: check chain migrations are paused (UpgradeStageValidator.checkMigrationsPaused)",
@@ -35,7 +49,8 @@
     "to": "0xc04fc5ed2ffd03b27e953afe4020fac1e2f0f885",
     "data": "0x386584cf",
     "value": "0",
-    "tag": "stage1"
+    "tag": "stage1",
+    "alreadyExecuted": true
   },
   {
     "description": "Stage 1: register v0.33.2 as an upgrade of v0.33.0 with the new ZKsyncOSTestnetVerifier (CTM.createNewVerifierOnlyUpgrade)",
@@ -44,7 +59,8 @@
     "to": "0x54d55e74de9c6003e7a68a1fe70e633f05761eb5",
     "data": "0xca4ea3570000000000000000000000000000000000000000000000000000002100000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000021000000020000000000000000000000009308cc5518feff18edff1b4937f042034cd9dca1",
     "value": "0",
-    "tag": "stage1"
+    "tag": "stage1",
+    "alreadyExecuted": true
   },
   {
     "description": "Stage 2: check v0.33.2 is registered on the CTM (UpgradeStageValidator.checkProtocolUpgradePresence)",
@@ -54,7 +70,8 @@
     "data": "0x37076ce3",
     "value": "0",
     "valueToMint": "10",
-    "tag": "stage2"
+    "tag": "stage2",
+    "alreadyExecuted": true
   },
   {
     "description": "Stage 2: unpause chain migrations (ChainAssetHandler.unpauseMigration)",
@@ -63,7 +80,8 @@
     "to": "0xdfa2193b161d7bd45fc81b4e80225eebdc3cf96c",
     "data": "0xf7c7eb92",
     "value": "0",
-    "tag": "stage2"
+    "tag": "stage2",
+    "alreadyExecuted": true
   },
   {
     "description": "Stage 2: check chain migrations are unpaused (UpgradeStageValidator.checkMigrationsUnpaused)",
@@ -72,7 +90,8 @@
     "to": "0xc04fc5ed2ffd03b27e953afe4020fac1e2f0f885",
     "data": "0x407a5a0b",
     "value": "0",
-    "tag": "stage2"
+    "tag": "stage2",
+    "alreadyExecuted": true
   },
   {
     "description": "test: create chain 556 on v0.33.2 from the unchanged chain creation params (Bridgehub.createNewChain)",
