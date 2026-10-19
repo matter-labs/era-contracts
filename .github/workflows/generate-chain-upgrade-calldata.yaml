@@ -128,7 +128,9 @@ jobs:
         working-directory: protocol-ops
         run: cargo build --release
 
-      # One transaction-simulator scenario for the bundles above, in manifest order. The cut
+      # One transaction-simulator scenario for the bundles above, in manifest order: the
+      # set-upgrade-timestamp txs are tagged chain_upgrade_<id>_schedule and the upgrade txs
+      # chain_upgrade_<id>_execute. The cut
       # reverts `NotAllBatchesExecuted()` on a fork of a live chain with batches in flight, so
       # the simulator is told to settle this chain's diamond first (a real rollout waits instead).
       - name: Emit the chain's simulator scenario

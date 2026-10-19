@@ -791,7 +791,8 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         transactions.push(SimulatorTransaction {
             description: format!(
                 "Placeholder: {tag} is absent from this artifact. The per-chain upgrades are the \
-                 separate per-chain scenarios (tag chain_upgrade_<chainId>)."
+                 separate per-chain scenarios (tags chain_upgrade_<chainId>_schedule and \
+                 chain_upgrade_<chainId>_execute)."
             ),
             network: network.to_string(),
             from: format!("{from:#x}"),
@@ -939,7 +940,9 @@ pub struct ManifestToSimulatorArgs {
     #[clap(long, default_value = "sepolia")]
     pub network: String,
 
-    /// Tag applied to every emitted transaction, e.g. `chain_upgrade_8022833`.
+    /// Tag applied to every emitted transaction, e.g. `chain_upgrade_8022833`. A
+    /// `chain set-upgrade-timestamp` bundle's txs get `_schedule` appended and a `chain upgrade`
+    /// bundle's `_execute`, so the scenario shows the two phases of the rollout apart.
     #[clap(long)]
     pub tag: String,
 
@@ -1060,6 +1063,7 @@ pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow:
     let descriptions = load_descriptions(args.descriptions.as_deref());
     let mut transactions = Vec::new();
     for manifest in &args.manifest {
+        let phases = bundle_phases(manifest)?;
         let mut batch = manifest_to_simulator_transactions(
             manifest,
             &args.network,
@@ -1079,10 +1083,22 @@ pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow:
             manifest.display(),
             batch.len()
         ));
+        // `manifest_to_simulator_transactions` tags each tx `bundle_<index>`; swap that for the
+        // caller's tag plus the bundle's phase, so the scenario reads schedule-then-execute.
+        for tx in &mut batch {
+            let phase = tx
+                .tag
+                .strip_prefix("bundle_")
+                .and_then(|index| index.parse::<u32>().ok())
+                .and_then(|index| phases.get(&index).copied());
+            tx.tag = match phase {
+                Some(phase) => format!("{}_{phase}", args.tag),
+                None => args.tag.clone(),
+            };
+        }
         transactions.append(&mut batch);
     }
     for tx in &mut transactions {
-        tx.tag = args.tag.clone();
         if let Some(diamond) = args.emulate_all_batches_executed_for {
             tx.emulate_all_batches_executed = Some(true);
             tx.emulate_all_batches_executed_for = Some(format!("{diamond:#x}"));
@@ -1106,6 +1122,33 @@ pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow:
         None => println!("{body}"),
     }
     Ok(())
+}
+
+/// The phase a per-chain bundle plays in the rollout, keyed by its manifest step:
+/// `chain set-upgrade-timestamp` schedules the upgrade with the server, `chain upgrade` executes
+/// the cut. Other steps have no phase and keep the bare tag.
+fn chain_bundle_phase(steps: &[String]) -> Option<&'static str> {
+    match steps {
+        [step] if step == "chain.set-upgrade-timestamp" => Some("schedule"),
+        [step] if step == "chain.upgrade" => Some("execute"),
+        _ => None,
+    }
+}
+
+/// [`chain_bundle_phase`] of every bundle in `manifest_path`, keyed by bundle index.
+fn bundle_phases(
+    manifest_path: &Path,
+) -> anyhow::Result<std::collections::HashMap<u32, &'static str>> {
+    let manifest: PrepareManifest = serde_json::from_str(
+        &fs::read_to_string(manifest_path)
+            .with_context(|| format!("failed to read {}", manifest_path.display()))?,
+    )
+    .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
+    Ok(manifest
+        .bundles
+        .iter()
+        .filter_map(|b| chain_bundle_phase(&b.steps).map(|phase| (b.index, phase)))
+        .collect())
 }
 
 /// Write `EXECUTE.md` next to the sim-inputs directory: the copy-into-MetaMask runbook of the
@@ -1572,5 +1615,51 @@ desc = "unpause"
             registry.lookup(cah, "0xf7c7eb92").as_deref(),
             Some("unpause")
         );
+    }
+}
+
+#[cfg(test)]
+mod chain_phase_tests {
+    use super::*;
+
+    #[test]
+    fn chain_bundles_are_tagged_schedule_then_execute() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "../l1-contracts/upgrade-envs/v0.33.0-atomic-interop/output/testnet/chain-upgrades/42111",
+        );
+        let out = std::env::temp_dir().join(format!(
+            "manifest-to-simulator-phase-{}.json",
+            std::process::id()
+        ));
+        let args = ManifestToSimulatorArgs {
+            manifest: vec![dir.join("manifest.json")],
+            network: "sepolia".to_string(),
+            tag: "chain_upgrade_42111".to_string(),
+            camp_a_signers: vec![],
+            descriptions: None,
+            emulate_all_batches_executed_for: None,
+            out: Some(out.clone()),
+        };
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(run_manifest_to_simulator(args))
+            .unwrap();
+        let emitted: Vec<serde_json::Value> =
+            serde_json::from_str(&fs::read_to_string(&out).unwrap()).unwrap();
+        fs::remove_file(&out).ok();
+        let tags: Vec<&str> = emitted.iter().map(|t| t["tag"].as_str().unwrap()).collect();
+        assert_eq!(
+            tags,
+            [
+                "chain_upgrade_42111_schedule",
+                "chain_upgrade_42111_execute"
+            ]
+        );
+    }
+
+    #[test]
+    fn steps_without_a_phase_keep_the_bare_tag() {
+        assert_eq!(chain_bundle_phase(&["ecosystem.deploy".to_string()]), None);
+        assert_eq!(chain_bundle_phase(&[]), None);
     }
 }
