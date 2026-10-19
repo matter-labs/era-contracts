@@ -14,13 +14,15 @@ import {
     DEFAULT_PUBDATA_PRICING_MODE,
     DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
 } from "../../common/Config.sol";
-import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../IChainTypeManager.sol";
+import {ICTMRelease} from "../../upgrades/registry/objects/ICTMRelease.sol";
+import {ReleaseFacetReader} from "../../upgrades/registry/libraries/ReleaseFacetReader.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
-import {EmptyAssetId, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyAssetId, GenesisBatchHashZero, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -37,56 +39,93 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     constructor() reentrancyGuardInitializer {}
 
     /// @notice ZK chain diamond contract initialization
+    /// @dev `_chainId` and `_admin` are the ONLY per-chain inputs. The ChainTypeManager is
+    ///      `msg.sender`: the CTM is the one deploying the diamond proxy (`_deployNewChain`, for
+    ///      both chain creation and migration mint), and the proxy constructor delegatecalls
+    ///      into this init, preserving the sender. Everything else — bridgehub, protocol
+    ///      version, validator timelock, genesis batch hash, base token asset id, facet set and
+    ///      verifier — is read from the CTM, its current release and the bridgehub.
+    /// @dev Every address and hash read from the CTM, the release, the bridgehub and the asset
+    ///      router is zero-checked (the permissionless validator on L1 only: priority mode is L1-only).
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
-    function initialize(
-        InitializeData calldata _initializeData
-    ) public virtual reentrancyGuardInitializer returns (bytes32) {
-        if (_initializeData.admin == address(0)) {
+    function initialize(uint256 _chainId, address _admin) public virtual reentrancyGuardInitializer returns (bytes32) {
+        IChainTypeManager ctm = IChainTypeManager(msg.sender);
+        address bridgehub = ctm.BRIDGE_HUB();
+        if (bridgehub == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.validatorTimelock == address(0)) {
+        uint256 protocolVersion = ctm.protocolVersion();
+        address validatorTimelock = ctm.validatorTimelockPostV29();
+        // Registered by the bridgehub before it calls into the CTM, in both the chain-creation
+        // and the migration-mint flow.
+        bytes32 baseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(_chainId);
+
+        if (_admin == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.bridgehub == address(0)) {
+        if (validatorTimelock == address(0)) {
             revert ZeroAddress();
         }
-        if (_initializeData.chainTypeManager == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_initializeData.baseTokenAssetId == bytes32(0)) {
+        if (baseTokenAssetId == bytes32(0)) {
             revert EmptyAssetId();
         }
 
-        s.chainId = _initializeData.chainId;
-        s.bridgehub = _initializeData.bridgehub;
-        s.chainTypeManager = _initializeData.chainTypeManager;
-        if (_initializeData.bridgehub == L2_BRIDGEHUB_ADDR) {
-            s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
-        } else {
-            s.nativeTokenVault = address(
-                IL1AssetRouter(address(IBridgehubBase(_initializeData.bridgehub).assetRouter())).nativeTokenVault()
+        // Everything chain-independent is read from the current release the CTM pins. Facets are
+        // installed here, by the init itself, from the release's facet rows and each facet's own
+        // self-description.
+        address currentRelease = ctm.currentRelease();
+        if (currentRelease == address(0)) {
+            revert ZeroAddress();
+        }
+        ICTMRelease release = ICTMRelease(currentRelease);
+        Diamond.FacetCut[] memory facetCuts = ReleaseFacetReader.newChainInstallations(release);
+        if (facetCuts.length != 0) {
+            Diamond.diamondCut(
+                Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""})
             );
         }
-        s.baseTokenAssetId = _initializeData.baseTokenAssetId;
-        s.protocolVersion = _initializeData.protocolVersion;
 
-        // Fetch verifier from CTM based on protocol version to keep CTM as the single source of truth
-        // and avoid including the verifier address in the diamond cut init calldata.
-        address verifier = IChainTypeManager(_initializeData.chainTypeManager).protocolVersionVerifier(
-            _initializeData.protocolVersion
-        );
+        s.chainId = _chainId;
+        s.bridgehub = bridgehub;
+        s.chainTypeManager = msg.sender;
+        address permissionlessValidator = ctm.PERMISSIONLESS_VALIDATOR();
+        if (bridgehub == L2_BRIDGEHUB_ADDR) {
+            s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+        } else {
+            address assetRouter = address(IBridgehubBase(bridgehub).assetRouter());
+            if (assetRouter == address(0)) {
+                revert ZeroAddress();
+            }
+            address nativeTokenVault = address(IL1AssetRouter(assetRouter).nativeTokenVault());
+            if (nativeTokenVault == address(0)) {
+                revert ZeroAddress();
+            }
+            if (permissionlessValidator == address(0)) {
+                revert ZeroAddress();
+            }
+            s.nativeTokenVault = nativeTokenVault;
+        }
+        s.baseTokenAssetId = baseTokenAssetId;
+        s.protocolVersion = protocolVersion;
+
+        // The verifier is part of the release's installed chain state, so it comes from the same
+        // object as the facets and base-system hashes rather than from a separate CTM lookup.
+        address verifier = release.verifier();
         if (verifier == address(0)) {
             revert ZeroAddress();
         }
         s.verifier = IVerifier(verifier);
-        s.admin = _initializeData.admin;
-        s.validators[_initializeData.validatorTimelock] = true;
+        s.admin = _admin;
+        s.validators[validatorTimelock] = true;
 
-        s.storedBatchHashes[0] = _initializeData.storedBatchZero;
+        bytes32 storedBatchZero = ctm.storedBatchZero();
+        if (storedBatchZero == bytes32(0)) {
+            revert GenesisBatchHashZero();
+        }
+        s.storedBatchHashes[0] = storedBatchZero;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
-        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(_initializeData.chainTypeManager)
-            .PERMISSIONLESS_VALIDATOR();
+        s.priorityModeInfo.permissionlessValidator = permissionlessValidator;
         s.feeParams = FeeParams({
             pubdataPricingMode: DEFAULT_PUBDATA_PRICING_MODE,
             batchOverheadL1Gas: DEFAULT_BATCH_OVERHEAD_L1_GAS,

@@ -8,6 +8,7 @@
 > line's `versions/v31/mod.rs`. `dev manifest-to-simulator` works the same on every line. The v34
 > line has no pre-v31 total-supply backfill (`protocol-docs/bridging.md`), so the calculation script
 > and `chain set-zkos-pre-v31-total-supply` below exist only on the `draft-v31` and v33 lines.
+> The v35 line has no PUVT: its verifier is `ecosystem verify-bootstrap` (see `protocol-ops/README.md`).
 
 In the examples below I use `--upgrade-timestamp 1` for both Era and Zksync OS. This can be used to start an immediate upgrade.
 

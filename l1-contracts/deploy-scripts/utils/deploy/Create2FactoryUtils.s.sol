@@ -140,6 +140,27 @@ abstract contract Create2FactoryUtils is Script {
         return Create2AndTransfer(deployerAddr).deployedAddress();
     }
 
+    /// @notice {create2WithDeterministicOwner} for a contract another deployment of the same run may
+    ///         share code and owner with: `_saltDomain` separates the salt `Create2AndTransfer`
+    ///         deploys it under, so the two never land on one address.
+    /// @param initCode The concatenated initialization code.
+    /// @param owner The address to be set as the owner.
+    /// @param _saltDomain The domain separating this deployment's inner salt.
+    /// @return The deployed contract address.
+    function create2WithDeterministicOwner(
+        bytes memory initCode,
+        address owner,
+        bytes32 _saltDomain
+    ) internal returns (address) {
+        _ensureCreate2Factory();
+        bytes memory creatorInitCode = abi.encodePacked(
+            type(Create2AndTransfer).creationCode,
+            abi.encode(initCode, keccak256(abi.encode(_create2FactorySalt, _saltDomain)), owner)
+        );
+        address deployerAddr = deployViaCreate2(creatorInitCode);
+        return Create2AndTransfer(deployerAddr).deployedAddress();
+    }
+
     /// @notice Deploys a contract via Create2 with a deterministic owner and notifies via console logs.
     /// @param initCode The initialization code for the contract.
     /// @param constructorParams The encoded constructor arguments.

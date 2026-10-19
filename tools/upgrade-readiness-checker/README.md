@@ -20,12 +20,22 @@ The upgrade can be safely finalized on L1 once:
 
 1. Resolves `ChainTypeManager` via
    `Bridgehub.chainTypeManager(chainId)` on the settlement layer.
-2. Scans for `NewUpgradeCutData(targetProtocolVersion, ...)` on the CTM and
-   decodes the embedded `L2CanonicalTransaction` from the diamond cut init
-   calldata.
-3. Replays the per-chain upgrade-data rewrite for v31+ upgrades (trying the current ABI,
-   then the legacy ABI used by already-published upgrades) and computes the canonical tx
-   hash: `keccak256(tx.abi_encode())`.
+2. Scans for the newest `NewUpgradeCutData(targetProtocolVersion, ...)` on the CTM
+   and dispatches on the cut's init calldata:
+   - a registry edge (`upgradeFromTransition(transition)`) is resolved per chain,
+     because the event is keyed by the target version only and a replaced edge
+     leaves several cuts under it. A chain below the target reads the transition
+     its CTM commits for the chain's own version (`upgradeTransition`), which
+     must land on the target, and takes `l2UpgradeTx(bridgehub, chainId)` from
+     it. A chain at or past the target already crossed, so the hash comes from
+     its diamond's `UpgradeComplete(target)` event;
+   - the bootstrap edge (`upgradeFromBootstrap(migration)`) reads the
+     transaction from the migration's `l2UpgradeTx(chainId)`;
+   - a legacy pre-v35 cut embeds it in `ProposedUpgrade`.
+3. For a legacy cut, replays the per-chain upgrade-data rewrite for v31+ upgrades
+   (trying the current ABI, then the legacy ABI used by already-published upgrades).
+   Computes the canonical tx hash: `keccak256(tx.abi_encode())`. An upgrade with
+   no L2 transaction (`txType == 0`) exits with a diagnostic.
 4. Polls the chain's L2 RPC:
    - `eth_getTransactionReceipt(hash)` — once present, we have block **N**.
    - `eth_getBlockByNumber("finalized", false)` — waits until the returned

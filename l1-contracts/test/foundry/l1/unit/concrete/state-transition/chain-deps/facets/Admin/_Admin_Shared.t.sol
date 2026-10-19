@@ -18,6 +18,8 @@ contract AdminTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
+    address internal adminFacetImpl;
+    address internal utilsFacetImpl;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](21);
@@ -46,25 +48,31 @@ contract AdminTest is UtilsCallMockerTest {
         return selectors;
     }
 
-    function setUp() public virtual {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
+    /// @notice The diamond's routing, one `Add` cut per facet.
+    function diamondRouting() internal view returns (Diamond.FacetCut[] memory facetCuts) {
+        facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
+            facet: adminFacetImpl,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getAdminSelectors()
         });
         facetCuts[1] = Diamond.FacetCut({
-            facet: address(new UtilsFacet()),
+            facet: utilsFacetImpl,
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getUtilsFacetSelectors()
         });
+    }
+
+    function setUp() public virtual {
+        adminFacetImpl = address(new AdminFacet(block.chainid, RollupDAManager(address(0))));
+        utilsFacetImpl = address(new UtilsFacet());
 
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
         mockChainTypeManagerVerifier(testnetVerifier);
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
+        address diamondProxy = Utils.makeDiamondProxy(diamondRouting(), address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

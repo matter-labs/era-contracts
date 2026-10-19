@@ -2,14 +2,16 @@
 //! pipeline produces and checks one protocol upgrade.
 //!
 //! Two kinds exist:
-//! - `prepare = "prepare-all"`: the release's flow, `upgrade-prepare-all` plus PUVT. Only the
-//!   release's own upgrade directory (`env_config::DEFAULT_UPGRADE`) can use it, since that is
-//!   where those commands read their inputs.
+//! - `prepare = "prepare-all"`: the release's flow, `upgrade-prepare-all` and then
+//!   `verify-bootstrap` (the registry verifier) on its output. Only the release's own upgrade
+//!   directory (`env_config::DEFAULT_UPGRADE`) can use it, since that is where those commands
+//!   read their inputs.
 //! - `prepare = "forge-script"`: one forge script, run on a fork as the deployer. Its
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
-//!   The upgrade supplies its own checks, since PUVT only knows the release's upgrade. An optional
-//!   `[execution]` script writes the transactions whoever executes sends by hand; the
-//!   pipeline replays them on the fork and renders `EXECUTE.md` from them.
+//!   The upgrade supplies its own checks, since `verify-bootstrap` only knows the release's
+//!   registry packages. An optional `[execution]` script writes the transactions whoever
+//!   executes sends by hand; the pipeline replays them on the fork and renders `EXECUTE.md`
+//!   from them.
 
 use std::path::{Path, PathBuf};
 
@@ -28,7 +30,7 @@ const ENV_PLACEHOLDER: &str = "{env}";
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(tag = "prepare", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum UpgradeDescriptor {
-    /// `upgrade-prepare-all` and PUVT. A struct variant so unknown keys are rejected.
+    /// `upgrade-prepare-all`, then `verify-bootstrap`. A struct variant so unknown keys are rejected.
     PrepareAll {},
     /// One forge script whose broadcasts are the deployer's bundle.
     ForgeScript(ForgeScriptUpgrade),

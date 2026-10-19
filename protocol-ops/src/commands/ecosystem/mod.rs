@@ -13,7 +13,7 @@ use crate::{
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
-    commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
+    commands::ecosystem::verify_bootstrap::VerifyBootstrapArgs,
 };
 
 pub mod broadcast;
@@ -23,7 +23,7 @@ pub mod simulator;
 pub mod upgrade;
 pub mod upgrade_full;
 pub mod upgrade_inner;
-pub mod verify_upgrade;
+pub mod verify_bootstrap;
 pub mod zk_governance;
 
 #[derive(Subcommand, Debug)]
@@ -38,16 +38,19 @@ pub enum EcosystemCommands {
     /// Phase 2 to replay.
     #[command(name = "upgrade-prepare-all")]
     UpgradePrepareAll(UpgradePrepareAllArgs),
-    /// Phase 2 of the ecosystem upgrade: replays governance stages 0+1+2 on
-    /// a single anvil fork (governance owner signs). Emits one Safe bundle
-    /// containing all three governance calls. Auto-discovers
-    /// `<env-out>/ecosystem.toml` when `--env` is set, or pass
-    /// `--governance-toml` explicitly.
+    /// Phase 2 of the ecosystem upgrade: replays the package's one governance
+    /// bundle on an anvil fork (governance owner signs) and emits one Safe
+    /// bundle carrying it. Auto-discovers `<env-out>/ecosystem.toml` when
+    /// `--env` is set, or pass `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
-    /// Verify ecosystem upgrade artifacts produced by upgrade-prepare.
-    #[command(name = "verify-upgrade")]
-    VerifyUpgrade(VerifyUpgradeArgs),
+    /// Verify a v35 registry-driven upgrade package — an upgrade of 1..3 executor legs, the
+    /// one-time bootstrap edge or a transition replacement, decided from its calldata. Checks
+    /// object provenance and construction, the authority binding and the owner it lands on, every
+    /// proxy row's slot and departing implementation, readiness, and that the governance calldata
+    /// invokes the reviewed legs as one contiguous run in canonical order. Read-only.
+    #[command(name = "verify-bootstrap", visible_alias = "verify-package")]
+    VerifyBootstrap(VerifyBootstrapArgs),
     /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
     /// fork) RPC under the supplied EOA keys. Multi-bundle dispatcher around
     /// `dev execute-safe`: reads `manifest.json`, replays each bundle in order
@@ -56,11 +59,12 @@ pub enum EcosystemCommands {
     UpgradeBroadcast(UpgradeBroadcastArgs),
     /// Fork L1, run the release's `upgrade-prepare-all` (or a `forge-script` upgrade's own
     /// script, per `upgrade-envs/<upgrade>/upgrade.toml`), pack the deploy bundle, replay every
-    /// bundle under impersonation and run the upgrade's checks (PUVT for `prepare-all`).
+    /// bundle under impersonation and run the upgrade's checks (`verify-bootstrap` for
+    /// `prepare-all`).
     /// Nothing is signed; the fork is stopped afterwards.
     RehearseUpgrade(RehearseUpgradeArgs),
     /// Consume a deploy bundle: rehearse it on a fresh fork, broadcast the deployer's bundles
-    /// for real, or only run PUVT against a chain it was already broadcast to.
+    /// for real, or only run the upgrade's checks against a chain it was already broadcast to.
     ReplayBundle(ReplayBundleArgs),
     /// Check a deploy bundle's files against the digests in its `bundle-metadata.json`.
     VerifyBundle(VerifyBundleArgs),
@@ -87,7 +91,7 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
             simulator::run_manifest_to_simulator(args).await
         }
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
-        EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
+        EcosystemCommands::VerifyBootstrap(args) => verify_bootstrap::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
         EcosystemCommands::RehearseUpgrade(args) => bundle::run_rehearse_upgrade(args).await,
         EcosystemCommands::ReplayBundle(args) => bundle::run_replay_bundle(args).await,

@@ -17,7 +17,7 @@ import {
     L2TransactionRequestTwoBridgesInner,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
+import {MockChainTypeManagerWBH} from "contracts/dev-contracts/test/MockChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
@@ -78,7 +78,7 @@ contract ExperimentalBridgeTest is Test {
     DummyBridgehubSetter internal dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
-    DummyChainTypeManagerWBH internal mockCTM;
+    MockChainTypeManagerWBH internal mockCTM;
     DummyZKChain internal mockChainContract;
     // These are real `L1AssetRouter` instances used as stand-in asset routers in the
     // bridgehub tests; the legacy `DummySharedBridge` dev stub has been removed.
@@ -158,7 +158,7 @@ contract ExperimentalBridgeTest is Test {
             )
         );
         weth = makeAddr("WETH");
-        mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
+        mockCTM = new MockChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
         mockChainContract = new DummyZKChain(address(bridgehub), block.chainid, address(0), eip7702Checker);
 
@@ -564,11 +564,7 @@ contract ExperimentalBridgeTest is Test {
     uint256 internal newChainId;
     address internal admin;
 
-    function test_pause_createNewChain(
-        uint256 chainId,
-        uint256 salt,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
+    function test_pause_createNewChain(uint256 chainId, uint256 randomValue) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
 
@@ -594,10 +590,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
 
         vm.prank(bridgeOwner);
@@ -609,16 +602,12 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
     function test_RevertWhen_CTMNotRegisteredOnCreate(
         uint256 chainId,
-        uint256 salt,
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
@@ -638,16 +627,12 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
     function test_RevertWhen_wrongChainIdOnCreate(
         uint256 chainId,
-        uint256 salt,
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
@@ -667,10 +652,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
 
         chainId = 0;
@@ -680,17 +662,11 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
-    function test_RevertWhen_hardcodedChainIdOnMainnet(
-        uint256 salt,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
+    function test_RevertWhen_hardcodedChainIdOnMainnet(uint256 randomValue) public useRandomToken(randomValue) {
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
@@ -705,17 +681,11 @@ contract ExperimentalBridgeTest is Test {
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
-    function test_RevertWhen_hardcodedChainIdOnSepolia(
-        uint256 salt,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
+    function test_RevertWhen_hardcodedChainIdOnSepolia(uint256 randomValue) public useRandomToken(randomValue) {
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
@@ -730,16 +700,12 @@ contract ExperimentalBridgeTest is Test {
             _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
     function test_RevertWhen_assetIdNotRegistered(
         uint256 chainId,
-        uint256 salt,
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
@@ -762,18 +728,11 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
-    function test_RevertWhen_wethBridgeNotSet(
-        uint256 chainId,
-        uint256 salt,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
+    function test_RevertWhen_wethBridgeNotSet(uint256 chainId, uint256 randomValue) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
         admin = makeAddr("NEW_CHAIN_ADMIN");
@@ -794,16 +753,12 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
     function test_RevertWhen_chainIdAlreadyRegistered(
         uint256 chainId,
-        uint256 salt,
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         admin = makeAddr("NEW_CHAIN_ADMIN");
@@ -822,19 +777,13 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: new bytes[](0)
+            _admin: admin
         });
     }
 
     function test_createNewChain(
         address randomCaller,
         uint256 chainId,
-        bytes memory mockInitCalldata,
-        bytes[] memory factoryDeps,
-        uint256 salt,
         uint256 randomValue,
         address newChainAddress
     ) public useRandomToken(randomValue) {
@@ -857,10 +806,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: salt,
-            _admin: admin,
-            _initData: bytes(""),
-            _factoryDeps: factoryDeps
+            _admin: admin
         });
 
         vm.prank(mockCTM.owner());
@@ -872,14 +818,7 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(deployerAddress);
         vm.mockCall(
             address(mockCTM),
-            abi.encodeWithSelector(
-                mockCTM.createNewChain.selector,
-                chainId,
-                tokenAssetId,
-                admin,
-                mockInitCalldata,
-                factoryDeps
-            ),
+            abi.encodeWithSelector(mockCTM.createNewChain.selector, chainId, admin),
             abi.encode(newChainAddress)
         );
         // The Bridgehub seeds the fresh chain's genesis root right after registration by pulling
@@ -898,10 +837,7 @@ contract ExperimentalBridgeTest is Test {
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
-            _salt: uint256(chainId * 2),
-            _admin: admin,
-            _initData: mockInitCalldata,
-            _factoryDeps: factoryDeps
+            _admin: admin
         });
 
         vm.stopPrank();

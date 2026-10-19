@@ -21,9 +21,10 @@ import { join, relative } from "path";
 //   1. `configs/genesis/zksync-os/latest.json` `protocol_semantic_version`: minor + 1, patch 0. The default
 //      upgrade scripts read their target version from it, and the upgrade tests assert it.
 //   2. `l1-contracts/upgrade-envs/v0.<minor>.0-<name>/`: the local upgrade input and every per-environment
-//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's: owner, era_chain_id and the
-//      upgrade timer carry over, and every CREATE2 and legacy-Gov salt is regenerated, so the new release's
-//      deployments do not resolve to the previous release's addresses.
+//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's: owner and era_chain_id
+//      carry over, every CREATE2 and legacy-Gov salt is regenerated, so the new release's
+//      deployments do not resolve to the previous release's addresses, and the per-release switch
+//      `redeploy_zk_governance` is dropped.
 //   3. protocol-ops' current upgrade-env dir (`current_upgrade_env_dir!` in
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
 //   4. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
@@ -31,8 +32,9 @@ import { join, relative } from "path";
 //      given), `stateVersion` moves to the new release, and the previous source chain states are deleted.
 //   5. `l1-contracts/deploy-scripts/upgrade/v<minor>/`: the new release's `CoreUpgrade_v<minor>` and
 //      `CTMUpgrade_v<minor>`, generated as plain subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` for the
-//      release's own preparation to go into. The outgoing release's scripts are deleted, and protocol-ops'
-//      prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones.
+//      release's own preparation to go into, unless the branch already carries them (a next edge prepared and
+//      tested ahead of the bump), in which case they are kept. The outgoing release's scripts are deleted, and
+//      protocol-ops' prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones.
 //
 // What it leaves to you (printed at the end): regenerating the new release's chain states, reviewing the
 // copied per-environment inputs, and removing or updating whatever still uses the outgoing release's scripts
@@ -59,6 +61,8 @@ const ENV_DIR_MACRO_RE = /(macro_rules! current_upgrade_env_dir \{\s*\(\) => \{\
 type SemVer = { major: number; minor: number; patch: number };
 
 const SALT_KEYS = ["create2_factory_salt", "legacy_gov_salt"];
+// Per-release switches: a release declares them for itself, so the copy for the next one drops them.
+const RELEASE_ONLY_KEYS = ["redeploy_zk_governance"];
 // The upgrade pipeline's descriptor (`protocol-ops/src/common/upgrade_descriptor.rs`), not an env input.
 const UPGRADE_DESCRIPTOR_FILE = "upgrade.toml";
 
@@ -89,7 +93,10 @@ function envInputHeader(env: string, release: SemVer): string {
   return `# Upgrade input for the ${env} environment on the v${release.minor} release. See protocol-ops/README.md "Environment inputs".\n`;
 }
 
-/** A per-environment input for the next release: new header and versions, fresh salts. */
+/**
+ * A per-environment input for the next release: new header and versions, fresh salts, and no
+ * release-only switch (with the comment block directly above it).
+ */
 function rotateEnvInput(contents: string, env: string, next: SemVer): string {
   const lines = contents.split("\n");
   let start = 0;
@@ -97,6 +104,9 @@ function rotateEnvInput(contents: string, env: string, next: SemVer): string {
     start++;
   }
   let body = lines.slice(start).join("\n");
+  for (const key of RELEASE_ONLY_KEYS) {
+    body = body.replace(new RegExp(`^(?:#.*\\n)*${key}\\s*=.*(?:\\n|$)(?:[ \\t]*\\n)?`, "m"), "");
+  }
   for (const key of SALT_KEYS) {
     body = body.replace(new RegExp(`^(${key}\\s*=\\s*)"0x[0-9a-fA-F]{64}"`, "m"), (_m, prefix) => prefix + freshSalt());
   }
@@ -241,11 +251,15 @@ function main(): void {
   // 5. Release scripts.
   const currentScriptsDir = join(UPGRADE_SCRIPTS_DIR, `v${current.minor}`);
   const nextScriptsDir = join(UPGRADE_SCRIPTS_DIR, `v${next.minor}`);
-  if (fs.existsSync(nextScriptsDir)) {
-    throw new Error(`${repoPath(nextScriptsDir)} already exists`);
-  }
   for (const kind of RELEASE_SCRIPT_KINDS) {
-    write(join(nextScriptsDir, `${kind}Upgrade_v${next.minor}.s.sol`), releaseScript(kind, next));
+    const script = join(nextScriptsDir, `${kind}Upgrade_v${next.minor}.s.sol`);
+    if (!fs.existsSync(script)) {
+      write(script, releaseScript(kind, next));
+    } else if (fs.readFileSync(script, "utf-8").includes(`contract ${kind}Upgrade_v${next.minor} is `)) {
+      changed.push(`keep   ${repoPath(script)}`);
+    } else {
+      throw new Error(`${repoPath(script)} exists but does not define ${kind}Upgrade_v${next.minor}`);
+    }
   }
   const outgoingNames = RELEASE_SCRIPT_KINDS.map((kind) => `${kind}Upgrade_v${current.minor}`);
   const moveToNextScripts = (path: string, contents: string) => {

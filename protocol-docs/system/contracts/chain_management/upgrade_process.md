@@ -1,37 +1,68 @@
 # Protocol upgrade process
 
 Protocol upgrades are coordinated by the chain type manager (CTM) and executed by each chain diamond.
-An upgrade is a `DiamondCutData` value containing facet cuts plus an optional initializer delegate-call.
-The initializer may update shared diamond storage and enqueue an L2 system-upgrade transaction.
+What the CTM publishes is a write-once `CTMTransition` between two `CTMRelease` objects, and the cut a
+chain executes is derived from it: no facet cuts of its own, the transition's upgrade engine as the
+initializer and `upgradeFromTransition(transition)` as its calldata. The engine applies the
+transition's facet cuts, updates shared diamond storage and enqueues the L2 system-upgrade
+transaction. The objects, and why the cut is derived rather than supplied, are described in
+[Registry-driven protocol upgrades](../../../../docs/registry-driven-upgrades.md).
 
 ## Publishing a version
 
-CTM governance calls `setNewVersionUpgrade` with:
+Governance publishes a version with `CTMUpgradeExecutor.applyCTMUpgrade(transition)`, the transition
+leg of its upgrade proposal; the executor, the CTM's owner, commits it as
+`setNewVersionUpgradeFromTransition(transition)`
+([Ecosystem upgrade coordination](../../../ecosystem-upgrade-coordination.md#execution)). The
+transition carries everything the CTM commits for the edge:
 
-- the expected old protocol version and its deadline;
-- the new semver protocol version;
-- the verifier for the new version;
-- the approved diamond cut and initialization calldata.
+- the old protocol version and its deadline (none by default);
+- the new semver protocol version and the upgrade timestamp;
+- the target release, including the verifier for the new version;
+- the facet cuts, derived from the two releases when the transition was constructed, and the L2 plan
+  the chain's upgrade transaction is composed from.
 
-The CTM stores the upgrade cut hash/data and verifier under the new version. A verifier-only release can
-use `createNewVerifierOnlyUpgrade`; it advances the protocol version without changing facets. Patch,
-minor, and major components are packed by `SemVer.sol`, and version activity/deadlines are enforced by
-the CTM rather than inferred from deployment time.
+The CTM checks that the transition departs from its current version and release, moves its
+`protocolVersion`, records the transition under the old version (`upgradeTransition`) and installs
+the target release as `currentRelease`, which new chains start from. It stores no cut:
+`upgradeCutForVersion(oldVersion)` derives it from the recorded transition on every read. A
+verifier-only release is a patch transition between releases that differ only in the verifier
+("Patches" in
+[Rules enforced at construction](../../../../docs/registry-driven-upgrades.md#rules-enforced-at-construction)).
+Patch, minor, and major components are packed by `SemVer.sol`, and version activity/deadlines are
+enforced by the CTM rather than inferred from deployment time. The cut-taking `setNewVersionUpgrade`
+remains only for the v35 bootstrap edge, whose departing version has no release to derive a cut
+from.
 
 ## Applying a version to a chain
 
-1. The chain admin submits the exact CTM-approved cut through `upgradeChainFromVersion` or the CTM's
-   execution entry point.
-2. `AdminFacet` verifies the old version and cut, applies facet changes, and delegate-calls the upgrade
-   initializer.
-3. If the release changes L2 code or state, the initializer records the canonical system-upgrade
-   transaction. It is consumed in the next compatible batch.
+1. The chain admin calls `upgradeChainFromVersion(chainAddress, oldVersion)` on the chain, or the
+   crossing goes through the CTM with `CTMUpgradeExecutor.upgradeChain(transition, chainId)`, which
+   the executor's owner may call at any time and the chain's admin for its own chain; anyone else is
+   refused. The caller supplies no cut. A validator holding
+   the chain's `UPGRADER_ROLE` on the `ValidatorTimelock` may send the same call through it once the
+   chain's ServerNotifier upgrade timestamp has passed; the timelock forwards both this form and the
+   cut-taking one chains below v35 still serve, so it needs no swap when a chain crosses v35.
+   `upgradeChain` cannot cross a chain below v35: such a chain departs from a version committed
+   through the legacy path, which has no transition. Its admin hands it the committed cut through
+   the cut-taking `upgradeChainFromVersion(chainAddress, oldVersion, cut)`, and governance does the
+   same through `ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)`, sent through
+   `CTMUpgradeExecutor.forward`. The chain refuses a cut whose hash differs from the one its CTM
+   committed.
+2. `AdminFacet` checks the old version, reads the cut from its CTM (`upgradeCutForVersion`) and
+   executes it: the engine applies the transition's facet cuts, then installs the target release's
+   verifier and the new version.
+3. If the release changes L2 code or state, the engine records the canonical system-upgrade
+   transaction, composed from the transition's L2 plan for this chain. It is consumed in the next
+   compatible batch.
 4. The diamond records the new protocol version. Chains that remain on an expired version cannot
    continue normal batch processing until upgraded.
 
-Upgrade implementations derive from `BaseZkSyncUpgrade`; `DefaultUpgrade` covers the common verifier,
-bootloader, system-contract, fee, and protocol-version changes. Releases with one-time migrations use a
-version-specific implementation and staged governance calls.
+Upgrade engines derive from `BaseZkSyncUpgrade`; `DefaultUpgrade` covers the common verifier,
+bootloader, system-contract, fee, and protocol-version changes and is the engine a transition pins
+unless the release overrides it (the v35 bootstrap edge uses `BootstrapUpgrade`). Work a release
+needs outside the chain diamonds is part of the same governance call: proxy rows of the operation,
+or declared external actions.
 
 ## Safety properties
 

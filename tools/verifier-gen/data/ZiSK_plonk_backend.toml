@@ -1,0 +1,14 @@
+# The snarkJS Plonk backend `ZiskVerifier.PLONK_VERIFIER()` must run, pinned by the keccak256 of its
+# deployed runtime. `protocol-ops ecosystem verify-package` / `verify-bootstrap` require the code
+# at that address to hash to a pin below; an unpinned or different backend fails the review.
+# How to recompute: l1-contracts/contracts/state-transition/verifiers/README.md, "Pinning the
+# backend for review". Re-pin in the same change as the verification key below.
+
+[[backend]]
+runtime_keccak256 = "0x7b3d122f524b2e6482220b39938f8271c1c738620e612944cd17146ae3b76b9a"
+runtime_length = 7660
+verification_key = "ZiSK_plonk_verification_key.json"
+verification_key_sha256 = "c32e6fad8f833e1de4c0dbcce67fe1430d9a53f1fc1861ab9c6df8adf7e7c9fc"
+template = "snarkjs 0.7.6 templates/verifier_plonk.sol.ejs, rendered with ejs 3.1.10"
+compiler = "solc 0.8.28, evm prague, optimizer 9999999 runs, cbor_metadata false, bytecode_hash none (forge v1.5.1)"
+builder = "matter-labs/zksync-os-integration-tests@d1be31737c3d68346cf36495ec0991cefd5233e3 bin/zk-deployer/tools/zisk-backend/zisk-backend.js prepare"

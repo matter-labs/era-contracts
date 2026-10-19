@@ -158,12 +158,12 @@
                 "internalType": "address"
               },
               {
-                "name": "defaultUpgrade",
+                "name": "chainTypeManagerProxyAdmin",
                 "type": "address",
                 "internalType": "address"
               },
               {
-                "name": "chainTypeManagerProxyAdmin",
+                "name": "currentRelease",
                 "type": "address",
                 "internalType": "address"
               }
@@ -417,13 +417,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "run",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

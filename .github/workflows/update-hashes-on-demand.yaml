@@ -52,8 +52,10 @@ jobs:
 
       - name: Checkout PR branch
         run: |
+          set -euo pipefail
           git fetch origin "${{ steps.pr.outputs.head_ref }}"
           git checkout "${{ steps.pr.outputs.head_ref }}"
+          git merge --ff-only FETCH_HEAD
 
       - name: Use Node.js
         uses: actions/setup-node@v6

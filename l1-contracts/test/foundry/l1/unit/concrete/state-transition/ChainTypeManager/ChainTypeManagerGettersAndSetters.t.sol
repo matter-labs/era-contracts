@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
     function setUp() public {
@@ -40,14 +39,6 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         assertEq(result, address(0), "getZKChain should return zero for non-existent chain");
     }
 
-    // Test getZKChainLegacy - returns from deprecated map
-    function test_getZKChainLegacy() public view {
-        // Since the deprecated map is not populated in normal flow,
-        // this should return address(0)
-        address result = chainContractAddress.getZKChainLegacy(chainId);
-        assertEq(result, address(0), "getZKChainLegacy should return zero for chains not in legacy map");
-    }
-
     // Test getChainAdmin
     function test_getChainAdmin() public {
         address chainAddress = createNewChain(getDiamondCutData(diamondInit));
@@ -57,56 +48,6 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         address chainAdmin = chainContractAddress.getChainAdmin(chainId);
         // newChainAdmin is set in createNewChain
         assertEq(chainAdmin, newChainAdmin, "getChainAdmin should return the chain admin");
-    }
-
-    // Test getHyperchain (legacy function)
-    function test_getHyperchain() public {
-        address chainAddress = createNewChain(getDiamondCutData(diamondInit));
-
-        // Mock the bridgehub's getZKChain
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(chainAddress)
-        );
-
-        // getHyperchain first checks legacy map, then falls back to getZKChain
-        address result = chainContractAddress.getHyperchain(chainId);
-        assertEq(result, chainAddress, "getHyperchain should return chain address");
-    }
-
-    // Test setLegacyValidatorTimelock
-    function test_setLegacyValidatorTimelock() public {
-        address newLegacyTimelock = makeAddr("newLegacyTimelock");
-
-        vm.prank(governor);
-        chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
-
-        address result = chainContractAddress.validatorTimelock();
-        assertEq(result, newLegacyTimelock, "Legacy validator timelock should be updated");
-    }
-
-    // Test setLegacyValidatorTimelock emits event
-    function test_setLegacyValidatorTimelockEmitsEvent() public {
-        address newLegacyTimelock = makeAddr("newLegacyTimelock");
-
-        vm.expectEmit(true, true, true, true);
-        emit NewValidatorTimelock(address(0), newLegacyTimelock);
-
-        vm.prank(governor);
-        chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
-    }
-
-    // Test setLegacyValidatorTimelock reverts when not owner
-    function test_RevertWhen_setLegacyValidatorTimelockNotOwner() public {
-        vm.stopPrank();
-
-        address notOwner = makeAddr("notOwner");
-        address newLegacyTimelock = makeAddr("newLegacyTimelock");
-
-        vm.prank(notOwner);
-        vm.expectRevert("Ownable: caller is not the owner");
-        chainContractAddress.setLegacyValidatorTimelock(newLegacyTimelock);
     }
 
     // Test setServerNotifier
@@ -131,36 +72,27 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         chainContractAddress.setServerNotifier(newServerNotifier);
     }
 
-    // Test setServerNotifier by admin (not just owner)
-    function test_setServerNotifierByAdmin() public {
-        // First set an admin
+    /// @dev The notifier is part of the governed CTM domain: once the bootstrap hands it to the CTM
+    ///      executor, only governance (through the CTM's owner) may re-point the CTM at another one.
+    function test_RevertWhen_setServerNotifierByAdmin() public {
         address ctmAdmin = makeAddr("ctmAdmin");
         vm.prank(governor);
         chainContractAddress.setPendingAdmin(ctmAdmin);
-
         vm.prank(ctmAdmin);
         chainContractAddress.acceptAdmin();
 
-        // Now admin can call setServerNotifier
-        address newServerNotifier = makeAddr("newServerNotifier");
-
+        address before = chainContractAddress.serverNotifierAddress();
         vm.prank(ctmAdmin);
-        chainContractAddress.setServerNotifier(newServerNotifier);
-
-        address result = chainContractAddress.serverNotifierAddress();
-        assertEq(result, newServerNotifier, "Server notifier should be updated by admin");
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setServerNotifier(makeAddr("newServerNotifier"));
+        assertEq(chainContractAddress.serverNotifierAddress(), before, "the notifier is unchanged");
     }
 
-    // Test setServerNotifier reverts when not owner or admin
-    function test_RevertWhen_setServerNotifierNotOwnerOrAdmin() public {
+    function test_RevertWhen_setServerNotifierByStranger() public {
         vm.stopPrank();
-
-        address notOwnerOrAdmin = makeAddr("notOwnerOrAdmin");
-        address newServerNotifier = makeAddr("newServerNotifier");
-
-        vm.prank(notOwnerOrAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notOwnerOrAdmin));
-        chainContractAddress.setServerNotifier(newServerNotifier);
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setServerNotifier(makeAddr("newServerNotifier"));
     }
 
     // Test getSemverProtocolVersion
@@ -186,14 +118,6 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         assertFalse(isActive, "Unset protocol version should be inactive");
     }
 
-    // Test validatorTimelock (deprecated getter)
-    function test_validatorTimelock() public view {
-        // Initially the deprecated validator timelock is address(0)
-        address result = chainContractAddress.validatorTimelock();
-        assertEq(result, address(0), "Deprecated validator timelock should be zero initially");
-    }
-
     // Events
-    event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
     event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
 }
