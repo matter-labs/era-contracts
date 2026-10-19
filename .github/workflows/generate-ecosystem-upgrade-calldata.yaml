@@ -4,6 +4,12 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # prepared and checked (protocol-ops/src/common/upgrade_descriptor.rs). The notes below describe
 # the default, v0.33.0-atomic-interop (`upgrade-prepare-all` + PUVT; only the release's own
 # upgrade directory can use `prepare-all`).
+#
+# A verifier-only upgrade (a new ZKsync OS VK, nothing else) needs no script of its own: a
+# directory with an upgrade.toml of `prepare = "prepare-all"` + `verifier_only = true` and one
+# `<env>.toml` input per environment (see upgrade-envs/v0.33.2-verifier/). The pipeline then runs
+# `upgrade-prepare-all --verifier-only` and its built-in checks, and writes the execution
+# transactions (EXECUTE.md) and the simulator scenario.
 
 # ═════════════════════════════════════════════════════════════════════════════
 # RUNBOOK — from "nothing" to "this chain is upgraded"
@@ -59,7 +65,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                         sim-inputs/ + transaction-simulator.json for
 #                                         prepare-all, a dated
 #                                         simulator/…-<env>-1-ecosystem.json scenario
-#                                         for a forge-script upgrade
+#                                         for a verifier-only or forge-script upgrade
 #   ecosystem-upgrade-deploy-inputs-<env> the DEPLOY BUNDLE (see below): the
 #                                         deployer calls + provenance
 #
@@ -168,8 +174,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # ═════════════════════════════════════════════════════════════════════════════
 
 # Regenerates the `upgrade` input's ecosystem calldata for one environment and
-# verifies it (PUVT for prepare-all, the declared checks for a forge-script
-# upgrade), on a Linux runner so the compiled bytecode — and
+# verifies it (PUVT for prepare-all, the built-in checks for a verifier-only
+# upgrade, the declared checks for a forge-script upgrade), on a Linux runner so the compiled bytecode — and
 # therefore the CREATE2 addresses baked into `ecosystem.toml` — is
 # bit-identical with CI (the whole reason this can't be trusted from a dev's
 # macOS checkout).
@@ -282,7 +288,7 @@ on:
   workflow_dispatch:
     inputs:
       upgrade:
-        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.33.0-atomic-interop is the release's prepare-all + PUVT flow; a forge-script upgrade runs its declared script and checks."
+        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.33.0-atomic-interop is the release's prepare-all + PUVT flow; a verifier-only upgrade (verifier_only = true) runs the built-in verifier-only prepare and checks; a forge-script upgrade runs its declared script and checks."
         required: false
         default: "v0.33.0-atomic-interop"
         type: string
@@ -433,9 +439,12 @@ jobs:
               echo "::error::No config for upgrade '$UPGRADE' / env '$ENVIRONMENT' at $f — commit it first."; exit 1
             fi
           done
-          # `prepare-all` emits sim-inputs/ + transaction-simulator.json below, a `forge-script`
-          # upgrade a dated simulator/ scenario.
+          # `prepare-all` emits sim-inputs/ + transaction-simulator.json below, a verifier-only
+          # (`prepare-all` + `verifier_only = true`) or `forge-script` upgrade a dated simulator/ scenario.
           PREPARE_KIND="$(sed -nE 's/^[[:space:]]*prepare[[:space:]]*=[[:space:]]*"([a-z-]+)".*/\1/p' "$UPGRADE_TOML" | head -1)"
+          if [ "$PREPARE_KIND" = "prepare-all" ] && grep -qE '^[[:space:]]*verifier_only[[:space:]]*=[[:space:]]*true' "$UPGRADE_TOML"; then
+            PREPARE_KIND=verifier-only
+          fi
           echo "upgrade=$UPGRADE prepare=$PREPARE_KIND"
           echo "PREPARE_KIND=$PREPARE_KIND" >> "$GITHUB_ENV"
           # Which L1 to fork comes from the env itself, so a new ecosystem needs no
@@ -542,12 +551,12 @@ jobs:
             --env "$ENVIRONMENT" \
             --out "$OUT/transaction-simulator.json"
 
-      # A forge-script upgrade's ecosystem scenario: the governance stages as their governance
-      # sends them (`from` = the CTM's owner at the fork block: the ProtocolUpgradeHandler or the
+      # A verifier-only or forge-script upgrade's ecosystem scenario: the governance stages as their
+      # governance sends them (`from` = the CTM's owner at the fork block: the ProtocolUpgradeHandler or the
       # Governance contract), named like the committed v0.33.2 ones so the transaction-simulator
       # walks it before the per-chain scenarios (`-1-` sorts before `-2-`).
-      - name: Emit the ecosystem simulator scenario (forge-script)
-        if: ${{ env.PREPARE_KIND == 'forge-script' }}
+      - name: Emit the ecosystem simulator scenario (verifier-only, forge-script)
+        if: ${{ env.PREPARE_KIND == 'verifier-only' || env.PREPARE_KIND == 'forge-script' }}
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           FORK_BLOCK: ${{ inputs.fork_block }}
