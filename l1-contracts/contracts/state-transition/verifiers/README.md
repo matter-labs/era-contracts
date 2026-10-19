@@ -50,12 +50,12 @@ the committed key (domain, SRS point, omega, coset constants and circuit
 commitments) matches the upstream v1.3.2-alpha `zisk-contracts/PlonkVerifier.sol`.
 Existing backends for that circuit can be reused.
 
-The real-proof fixtures are still the 1.3.0-alpha ones from
-[GPU run 36396740141](https://github.com/matter-labs/zksync-os-zisk/actions/runs/36396740141)
-and do not match these pins. They must come from a fixture-session run on
-release 0.0.9 before this rotation merges. `MultiProofRangeVectorTest` already
-pins the 0.0.9 binding digest, `keccak256(innerProgramVK || rootCVadcopFinal ||
-chainedPI)`.
+The real-proof fixtures come from
+[fixture-session run 39274149227](https://github.com/matter-labs/zksync-os-zisk/actions/runs/39274149227),
+which reproduced both release 0.0.9 guest ELFs, proved four deterministic
+batches on the release pins, compared their commitments with native execution,
+and produced the aggregated binding digest
+`0xec1bf9cd08fde7ce771e6ceb96064b0fa73b3a475e7f6da8675989c3c40b13a2`.
 
 ## Preparing the backend
 
