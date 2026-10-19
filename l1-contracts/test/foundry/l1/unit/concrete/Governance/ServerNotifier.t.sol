@@ -79,6 +79,31 @@ contract ServerNotifierTest is Test {
         serverNotifier.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
     }
 
+    /// @dev Pins the storage layout the deployed (pre-bootstrap) notifiers carry. The bootstrap
+    ///      swaps the notifier's implementation and then reads its owner, nomination and CTM through
+    ///      the NEW layout, so a reordered declaration would make those reads describe other slots
+    ///      (boot-55).
+    function test_storageLayoutIsTheDeployedOne() public {
+        uint256 deadline = block.timestamp + 7 days;
+        chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
+        vm.prank(chainAdmin);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
+        address nominee = makeAddr("nominee");
+        vm.prank(owner);
+        serverNotifier.transferOwnership(nominee);
+
+        address notifier = address(serverNotifier);
+        assertEq(address(uint160(uint256(vm.load(notifier, bytes32(uint256(0)))))), owner, "slot 0: owner");
+        assertEq(address(uint160(uint256(vm.load(notifier, bytes32(uint256(1)))))), nominee, "slot 1: pendingOwner");
+        assertEq(
+            address(uint160(uint256(vm.load(notifier, bytes32(uint256(2)))))),
+            address(chainTypeManager),
+            "slot 2: chainTypeManager"
+        );
+        bytes32 timestampSlot = keccak256(abi.encode(protocolVersion, keccak256(abi.encode(chainId, uint256(3)))));
+        assertEq(uint256(vm.load(notifier, timestampSlot)), deadline, "slot 3: protocolVersionToUpgradeTimestamp");
+    }
+
     function test_setUpgradeTimestampValidProtocolVersionSucceeds() public {
         uint256 deadline = block.timestamp + 7 days;
 

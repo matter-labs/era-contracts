@@ -6,9 +6,6 @@ import {CTMDeployedAddresses, Config} from "../../deploy-scripts/ctm/DeployCTMUt
 /// @title IDeployCTM
 /// @notice Interface for the Chain Type Manager (CTM) deployment script
 interface IDeployCTM {
-    /// @notice Runs the deployment with default paths
-    function run() external;
-
     /// @notice Runs the deployment with a specific bridgehub
     /// @param bridgehub The address of the bridgehub contract
     /// @param reuseGovAndAdmin Whether to reuse existing governance and admin contracts

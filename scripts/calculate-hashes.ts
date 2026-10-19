@@ -8,7 +8,12 @@ import * as blakejs from "blakejs";
 const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/"];
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
-const SKIPPED_FOLDERS = ["l1-contracts/deploy-scripts", "l1-contracts/test", "l1-contracts/contracts/dev-contracts"];
+const SKIPPED_FOLDERS = [
+  "l1-contracts/deploy-scripts",
+  "l1-contracts/dev",
+  "l1-contracts/test",
+  "l1-contracts/contracts/dev-contracts",
+];
 const FORCE_INCLUDE = ["Create2AndTransfer.sol"];
 
 // Opens a Solidity file and returns all the contracts/libraries created inside of it.
@@ -277,17 +282,26 @@ const findDifferences = (newHashes: ContractsInfo[], oldHashes: ContractsInfo[])
   return differencesList;
 };
 
+const USAGE =
+  "Usage: calculate-hashes.ts [--check-only | --output <path>]. Use --check-only to check without updating " +
+  `${OUTPUT_FILE_PATH}; --output writes the hashes of the current build to <path> and leaves ${OUTPUT_FILE_PATH} alone.`;
+
 const main = async () => {
   const args = process.argv.slice(2);
+  const outputIndex = args.indexOf("--output");
+  const outputPath = outputIndex === -1 ? undefined : args[outputIndex + 1];
+  const flags = outputIndex === -1 ? args : args.filter((_arg, i) => i !== outputIndex && i !== outputIndex + 1);
   const allowedArgs = new Set(["--check-only"]);
-  if (args.some((arg) => !allowedArgs.has(arg)) || new Set(args).size !== args.length) {
-    console.log(
-      `Usage: calculate-hashes.ts [--check-only]. Use --check-only to check without updating ${OUTPUT_FILE_PATH}.`
-    );
+  if (
+    (outputIndex !== -1 && !outputPath) ||
+    flags.some((arg) => !allowedArgs.has(arg)) ||
+    new Set(flags).size !== flags.length ||
+    (outputPath && flags.length > 0)
+  ) {
+    console.log(USAGE);
     process.exit(1);
   }
-  const checkOnly = args.includes("--check-only");
-  const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
+  const checkOnly = flags.includes("--check-only");
 
   // Strict manifest: exactly the ordinary-EVM artifacts this branch builds. Rows for
   // artifacts that can no longer be rebuilt (EraVM zkout, removed workspaces) are not carried.
@@ -301,6 +315,13 @@ const main = async () => {
     })
   );
 
+  if (outputPath) {
+    fs.writeFileSync(outputPath, JSON.stringify(newSystemContractsHashes, null, 2) + os.EOL);
+    console.log(`Wrote ${newSystemContractsHashes.length} hashes of the current build to ${outputPath}`);
+    return;
+  }
+
+  const oldSystemContractsHashes = readSystemContractsHashesFile(OUTPUT_FILE_PATH);
   console.log("New hashes: ", newSystemContractsHashes.length);
   if (_.isEqual(newSystemContractsHashes, oldSystemContractsHashes)) {
     console.log(`Calculated hashes match the hashes in the ${OUTPUT_FILE_PATH} file.`);

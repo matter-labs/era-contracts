@@ -4,7 +4,8 @@
 add scheduling prerequisites by registering an `IUpgradePreconditionChecker` for the protocol
 version the chain upgrades **from**.
 
-The notifier owner calls `setUpgradePreconditionChecker(oldProtocolVersion, checker)`. Setting zero
+The notifier owner — after the registry bootstrap, the CTM's `CTMUpgradeExecutor`, so governance
+goes through its `forward` — calls `setUpgradePreconditionChecker(oldProtocolVersion, checker)`. Setting zero
 removes the checker; versions without a checker retain their existing scheduling behavior.
 
 Scheduling validates the caller, non-zero timestamp and upgrade cut, then calls the checker's
@@ -22,3 +23,8 @@ or removes it.
 The per-version registry lets future releases add prerequisites without embedding release logic
 in the notifier. This change does not register a checker for any existing upgrade; release-specific
 implementation, deployment and end-to-end validation belong to the release that adopts it.
+
+Scheduling is a per-chain operational decision and not part of upgrade composition. The
+notifier's own implementation swap in an upgrade is an ordinary CTM-domain inventory row (its
+authority is the CTM domain's, see `docs/upgrade-operations.md`); the chain crossing it
+schedules is `CTMUpgradeExecutor.upgradeChain` (`docs/registry-driven-upgrades.md`).

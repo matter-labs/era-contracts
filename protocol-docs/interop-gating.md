@@ -37,8 +37,8 @@ one-way (`SecondProofSystemAlreadyRequired`) and is read with `isSecondProofSyst
 - **ZiSK-off is governance's.** `setProofSystemStatus(ProofSystem.Zisk, false)` is reserved for the Bridgehub owner,
   for emergencies such as a ZiSK bug. Turning ZiSK back on stays with the chain admin.
 - **Upgrades keep the second proof system.** An upgrade that installs a verifier (`BaseZkSyncUpgrade._setVerifier`,
-  used by protocol upgrades and `upgradeVerifierOnly`) reverts with `NotMultiProofMode` unless the new verifier
-  reports multi-proof mode with no proof system disabled. The `AdminFacet` checks the chain's verifier the same way
+  used by every upgrade whose target release ships a new verifier, a same-minor verifier patch included) reverts with
+  `NotMultiProofMode` unless the new verifier reports multi-proof mode with no proof system disabled. The `AdminFacet` checks the chain's verifier the same way
   after every diamond cut, so an upgrade that sets the verifier another way can't drop it either.
 
 The requirement doesn't change which proofs the chain accepts. It only takes the way back to a single proof system

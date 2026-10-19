@@ -22,8 +22,6 @@ error DepositsNotPaused();
 error DepositsPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
-// 0xc866ff2c
-error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
 // 0xc06789fa
@@ -50,6 +48,8 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
+// 0xd798040a
+error LegacyCutForRegistryDrivenVersion(uint256 protocolVersion);
 // 0x9b5f85eb
 error MessageRootIsZero();
 // 0xf148c8da
@@ -60,8 +60,6 @@ error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expec
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6
 error NotAllBatchesExecuted();
-// 0x1c3944f4
-error NotAVerifierOnlyUpgrade(uint256 oldProtocolVersion, uint256 newProtocolVersion);
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
 // 0xa7050bf6
@@ -98,8 +96,12 @@ error SettlementLayerChainIdMismatch();
 error SettlementLayerCTMMismatch();
 // 0x97f58c80
 error TotalPriorityTxsIsZero();
+// 0x0c946faf
+error TransitionDeadlineMismatch(uint256 expected, uint256 actual);
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
+// 0x16bb1290
+error UpgradeTransitionUnchanged(address transition);
 // 0x52595598
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2

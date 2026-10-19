@@ -26,7 +26,7 @@ avoid `ZKsyncOSUnsafeForceDeployment` as much as possible and prefer the
 
 ### Upgrade process
 
-The fixed force deployments data as well as factory dependencies for the upgrades are defined inside the deployment and upgrade preparation scripts and then the hash of the actual upgrade transaction to execute is read from `DefaultUpgrade`.
+A release carries the L2 implementations twice — its `l2BytecodeInfos` table, from which an upgrade's L2 deployments and factory dependencies are derived, and the genesis `fixedForceDeploymentsData` — and refuses at construction unless the two agree. The per-chain L2 upgrade transaction is composed on-chain and read through `ICTMTransition.l2UpgradeTx`.
 
 ### Consistency between genesis and upgrade
 
@@ -36,18 +36,19 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 
 ### V35 upgrade
 
-The upgrade that is incoming is v35 (an in-place v34 → v35 upgrade; only ZKsync OS chains are
-supported). Its only release-specific preparation is the `L1InteropFeeManager` proxy `CTMUpgrade_v35`
-deploys for the new CTM ({protocol-docs/interop-fee.md#the-switch}), so its per-chain upgrade contract is the
-default:
+The incoming upgrade is v35 (the v34 -> v35 bootstrap edge into the registry-driven model; only
+ZKsync OS chains are supported). Besides the bootstrap objects, `CTMUpgrade_v35` deploys the
+`L1InteropFeeManager` proxy the new CTM is constructed with
+({protocol-docs/interop-fee.md#the-switch}). Its per-chain upgrade contract is:
 
-- DefaultUpgradeZKsyncOS.sol (deployed by `CTMUpgrade_v35`; a release that needs a per-chain step adds a
-  `V35UpgradeZKsyncOS` extending it and deploys it from `CTMUpgrade_v35`)
+- DefaultUpgrade.sol (composes the per-chain L2 upgrade transaction once, from the delegate
+  composer the transition names, with the executing chain's ID and Bridgehub)
 
 And the corresponding L2 upgrade contract that should be used is the release-agnostic:
 
-- L2DefaultUpgrade.sol (wired in by `DefaultL2UpgradeStrategy`; it must stay safe to re-run on a chain
-  at any version from v33 on, so it never reaches a one-shot `initL2` — those run at genesis only)
+- L2DefaultUpgrade.sol (the upgrade-time re-initialization: it must stay safe to re-run on a chain
+  at any version from v33 on, so unlike the genesis path it never reaches a one-shot `initL2` — those
+  run at genesis only)
 
 The only assumption the upgrade logic can use is that the ComplexUpgrader contract is present
 and force deployment via the ZKsync OS hook works

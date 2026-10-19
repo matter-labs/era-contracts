@@ -64,6 +64,7 @@ struct StateTransitionDeployedAddresses {
     Verifiers verifiers;
     Facets facets;
     address genesisUpgrade;
-    address defaultUpgrade;
     address chainTypeManagerProxyAdmin;
+    /// @notice The bootstrap `CTMRelease` that defines chain genesis.
+    address currentRelease;
 }
