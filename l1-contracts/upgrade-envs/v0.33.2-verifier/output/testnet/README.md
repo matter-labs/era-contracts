@@ -49,8 +49,12 @@ directly; the other three were matched by Etherscan to identical bytecode it had
 ## Executing it
 
 1. Deploy: done.
-2. Governance: follow [`EXECUTE.md`](EXECUTE.md). The board owner `0xD64e1365…` sends the 12 `approveHash`
-   txs and then `executeEmergencyUpgrade` (tx 13), which runs stages 0-2 atomically.
+2. Governance: **done on 2026-10-19**, one emergency proposal per stage: stage 0 at block 11947773 (tx
+   `0x92c76054…`), stage 1 at 11947835 (`0x5db4f943…`, starting with the repeated `pauseMigration`) and
+   stage 2 at 11947839 (`0x109a8f3e…`). The CTM is on v0.33.2 and migrations are unpaused.
+   [`EXECUTE.md`](EXECUTE.md) lists the three proposals, each 12 `approveHash` txs then
+   `executeEmergencyUpgrade`. Before stage 1 carried the repeated pause, stage 1 on its own reverted with
+   `MigrationsNotPaused` (reproduced on a fork at block 11947772).
 3. Per chain, once the v0.33.2 prover is live and the chain has no unexecuted batches, the ChainAdmin's owner
    follows `chain-upgrades/<id>/EXECUTE.md`: `01_*` (`setUpgradeTimestamp`), then `02_*` (the cut). See
    [`chain-upgrades/README.md`](./chain-upgrades/README.md).

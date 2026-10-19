@@ -26,6 +26,7 @@ import {GetDiamondCutData} from "../../utils/GetDiamondCutData.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
+import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 
 /// @dev `Governance.minDelay()` is not part of {IGovernance}.
 interface IGovernanceMinDelay {
@@ -161,12 +162,20 @@ contract ZKsyncOSVerifierOnlyUpgrade is Script, DefaultCTMUpgrade {
     }
 
     /// @inheritdoc DefaultCTMUpgrade
-    /// @dev No proxy, default upgrade, creation params or DA changes: only the new version.
+    /// @dev No proxy, default upgrade, creation params or DA changes: only the new version. Under a
+    /// ProtocolUpgradeHandler the stage first pauses migrations again: `executeEmergencyUpgrade` unpauses them
+    /// before its calls, so a stage-1 emergency proposal of its own would otherwise fail
+    /// `checkMigrationsPaused()`. A `Governance` executes the calls as given and needs no repeat.
     function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        calls = new Call[](3);
-        calls[0] = prepareGovernanceUpgradeTimerCheckCall()[0];
-        calls[1] = prepareCheckMigrationsPausedCalls()[0];
-        calls[2] = provideSetNewVersionUpgradeCall()[0];
+        Call[][] memory allCalls = new Call[][](2);
+        if (!verifierOnlyInput.ownerIsGovernance) {
+            allCalls[0] = preparePauseGatewayMigrationsCall();
+        }
+        allCalls[1] = new Call[](3);
+        allCalls[1][0] = prepareGovernanceUpgradeTimerCheckCall()[0];
+        allCalls[1][1] = prepareCheckMigrationsPausedCalls()[0];
+        allCalls[1][2] = provideSetNewVersionUpgradeCall()[0];
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @inheritdoc DefaultCTMUpgrade
