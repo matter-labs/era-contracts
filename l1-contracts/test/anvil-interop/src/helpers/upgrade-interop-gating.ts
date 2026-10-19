@@ -151,42 +151,59 @@ async function enableInterop(
   const assetIds: string[] = [
     ...new Set<string>([await ntv.BASE_TOKEN_ASSET_ID(), await l1Bridgehub.baseTokenAssetId(_chain.chainId)]),
   ];
+  // The upgrade opened the backfill window of every chain registered before it ({protocol-docs/interop-gating.md#backfill}).
+  if (!(await ntv.chainBalanceBackfillPending(_chain.chainId))) {
+    throw new Error(`Chain ${_chain.chainId} is not pending its backfill after the upgrade`);
+  }
   const backfills: BigNumber[] = [];
   for (const assetId of assetIds) {
     const backfill = await preUpgradeBalance(_context, _chain.chainId, assetId, _lastPreUpgradeBlock);
     if (backfill.lte(0)) {
       throw new Error(`Chain ${_chain.chainId} held no asset ${assetId} before the upgrade`);
     }
-    await expectRevert(
-      () => simulateWithdrawal(_context, ntv, _chain.chainId, assetId, backfill),
-      `withdraw the pre-upgrade balance of chain ${_chain.chainId} before the backfill`,
-      customError("L1NativeTokenVault", "ChainBalanceExceeded(uint256,bytes32,uint256,uint256)", [
-        _chain.chainId,
-        assetId,
-        (await ntv.chainTotalWithdrawn(_chain.chainId, assetId)).add(backfill),
-        await ntv.chainTotalDeposited(_chain.chainId, assetId),
-      ]),
-      l1Provider
-    );
+    // Not capped while pending ({protocol-docs/interop-gating.md#per-chain-balance-cap}).
+    await simulateWithdrawal(_context, ntv, _chain.chainId, assetId, backfill);
     backfills.push(backfill);
   }
 
-  await asOwnerOf(_context, ntv, (signer) =>
-    ntv.connect(signer).setChainBalanceBackfill(_chain.chainId, assetIds, backfills)
-  );
+  // One asset per call, as governance does when a chain holds more assets than fit a transaction.
   for (const [i, assetId] of assetIds.entries()) {
-    const { amount, set } = await ntv.chainBalanceBackfill(_chain.chainId, assetId);
-    if (!set || !amount.eq(backfills[i])) {
-      throw new Error(`Chain ${_chain.chainId} backfill of asset ${assetId} is ${amount} (set: ${set})`);
+    await asOwnerOf(_context, ntv, (signer) =>
+      ntv.connect(signer).setChainBalanceBackfill(_chain.chainId, [assetId], [backfills[i]])
+    );
+  }
+  await asOwnerOf(_context, ntv, (signer) => ntv.connect(signer).markBackfilled(_chain.chainId));
+  if (await ntv.chainBalanceBackfillPending(_chain.chainId)) {
+    throw new Error(`Chain ${_chain.chainId} is still pending its backfill`);
+  }
+  for (const [i, assetId] of assetIds.entries()) {
+    const backfill = await ntv.chainBalanceBackfill(_chain.chainId, assetId);
+    if (!backfill.eq(backfills[i])) {
+      throw new Error(`Chain ${_chain.chainId} backfill of asset ${assetId} is ${backfill}, expected ${backfills[i]}`);
     }
+    const limit = (await ntv.chainTotalDeposited(_chain.chainId, assetId)).add(backfills[i]);
+    const withdrawn = await ntv.chainTotalWithdrawn(_chain.chainId, assetId);
+    const overTheCap = limit.sub(withdrawn).add(1);
+    await expectRevert(
+      () => simulateWithdrawal(_context, ntv, _chain.chainId, assetId, overTheCap),
+      `withdraw more than the backfilled balance of chain ${_chain.chainId}`,
+      customError("L1NativeTokenVault", "ChainBalanceExceeded(uint256,bytes32,uint256,uint256)", [
+        _chain.chainId,
+        assetId,
+        withdrawn.add(overTheCap),
+        limit,
+      ]),
+      l1Provider
+    );
   }
   // The default upgrade keeps the chain's single-proof verifier, so the chain can't require a second proof system.
   // Governance enables it without the requirement, as it may for a chain it trusts for reasons checked offchain
   // ({protocol-docs/interop-gating.md#enabling-interop}). `enableInterop` belongs to the Bridgehub owner.
   await asOwnerOf(_context, l1Bridgehub, (signer) => messageRoot.connect(signer).enableInterop(_chain.chainId, false));
   for (const [i, assetId] of assetIds.entries()) {
-    const deposited = await ntv.chainTotalDeposited(_chain.chainId, assetId);
+    const balance = (await ntv.chainTotalDeposited(_chain.chainId, assetId)).add(backfills[i]);
     const withdrawn = await ntv.chainTotalWithdrawn(_chain.chainId, assetId);
+    const expectedMoved = balance.gt(withdrawn) ? balance.sub(withdrawn) : ethers.constants.Zero;
     const poolDepositedBefore = await ntv.chainTotalDeposited(INTEROP_POOL_CHAIN_ID, assetId);
     const poolWithdrawnBefore = await ntv.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, assetId);
     await (await ntv.connect(_context.chainAdminOwner).moveChainBalanceToInteropPool(_chain.chainId, assetId)).wait();
@@ -194,13 +211,12 @@ async function enableInterop(
     const poolWithdrawnDelta = (await ntv.chainTotalWithdrawn(INTEROP_POOL_CHAIN_ID, assetId)).sub(poolWithdrawnBefore);
     if (
       !(await ntv.chainBalanceInInteropPool(_chain.chainId, assetId)) ||
-      !poolDepositedDelta.eq(deposited.add(backfills[i])) ||
-      !poolWithdrawnDelta.eq(withdrawn)
+      !poolDepositedDelta.eq(expectedMoved) ||
+      !poolWithdrawnDelta.isZero()
     ) {
       throw new Error(
         `Chain ${_chain.chainId} balance of asset ${assetId} was not moved to the interop pool: ` +
-          `pool deposits +${poolDepositedDelta}, expected +${deposited.add(backfills[i])}; ` +
-          `pool withdrawals +${poolWithdrawnDelta}, expected +${withdrawn}`
+          `pool deposits +${poolDepositedDelta}, expected +${expectedMoved}; pool withdrawals +${poolWithdrawnDelta}`
       );
     }
     await simulateWithdrawal(_context, ntv, _chain.chainId, assetId, backfills[i]);

@@ -36,6 +36,9 @@ uint256 constant HARD_CODED_CHAIN_ID = 270;
 /// Bridgehub caps chain IDs at `type(uint48).max`. See {protocol-docs/interop-gating.md#interop-pool}.
 uint256 constant INTEROP_POOL_CHAIN_ID = uint256(keccak256("interop.pool")) - 1;
 
+/// @dev ERC-1967 storage slot of a proxy's admin.
+bytes32 constant ERC1967_ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
+
 /// @dev Pubdata capacity of a blob: 4096 field elements with 31 bytes of data each.
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 

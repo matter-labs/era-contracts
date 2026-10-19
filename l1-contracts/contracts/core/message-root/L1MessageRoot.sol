@@ -6,7 +6,6 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 import {
-    ChainNotSettlingOnL1,
     InteropAlreadyEnabled,
     InvalidSettlementLayerForBatch,
     LocallyNoChainsAtGenesis,
@@ -71,8 +70,6 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         require(msg.sender == IOwnable(BRIDGE_HUB).owner(), Unauthorized(msg.sender));
         address zkChain = IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
-        uint256 settlementLayer = IBridgehubBase(BRIDGE_HUB).settlementLayer(_chainId);
-        require(settlementLayer == block.chainid, ChainNotSettlingOnL1(_chainId, settlementLayer));
         require(!interopEnabled[_chainId], InteropAlreadyEnabled(_chainId));
         if (_requireSecondProofSystem) {
             require(IGetters(zkChain).isSecondProofSystemRequired(), SecondProofSystemNotRequired(_chainId));

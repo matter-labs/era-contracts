@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
@@ -15,7 +15,6 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
-    ChainNotSettlingOnL1,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
     InteropPeerNotAllowed,
@@ -33,7 +32,6 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
     using LogFinder for Vm.Log[];
 
     uint256 internal constant UNREGISTERED_CHAIN_ID = 123456;
-    uint256 internal constant GATEWAY_CHAIN_ID = 506;
 
     uint256 internal chainId;
     uint256 internal peerChainId;
@@ -146,23 +144,6 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         _enableInterop(chainId);
         vm.prank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(InteropNotEnabled.selector, peerChainId));
-        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
-    }
-
-    /// @notice The settlement layer is mocked to isolate this check from the separately-tested migration
-    /// machinery.
-    function test_allowInteropPeer_revertWhen_chainNotSettlingOnL1() public {
-        _mockSettlementLayer(chainId, GATEWAY_CHAIN_ID);
-        vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, chainId, GATEWAY_CHAIN_ID));
-        addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
-    }
-
-    /// @dev See `test_allowInteropPeer_revertWhen_chainNotSettlingOnL1` for why the settlement layer is mocked.
-    function test_allowInteropPeer_revertWhen_peerNotSettlingOnL1() public {
-        _mockSettlementLayer(peerChainId, GATEWAY_CHAIN_ID);
-        vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, peerChainId, GATEWAY_CHAIN_ID));
         addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
@@ -397,14 +378,6 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         vm.prank(admin);
         IAdmin(chain).acceptAdmin();
         assertEq(IGetters(chain).getAdmin(), admin);
-    }
-
-    function _mockSettlementLayer(uint256 _chainId, uint256 _settlementLayer) internal {
-        vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeCall(IBridgehubBase.settlementLayer, (_chainId)),
-            abi.encode(_settlementLayer)
-        );
     }
 
     /// @dev Runs requestL2TransactionTwoBridges through ChainRegistrationSender; only ETH for base-token gas.

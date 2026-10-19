@@ -52,6 +52,8 @@ import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentif
 import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 /// @notice Stands in for the genesis engine a pre-v35 CTM runs: its only entrypoint is the
 ///         six-argument `genesisUpgrade` the pre-v35 Admin facet called, not the argument-less one
@@ -669,6 +671,17 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
 
         _assertBootstrapJoinsTheRegistryModel(bootstrap, ctm, bridgehub, executor);
         _assertInteropFeeManagerKept(ctm, bridgehub);
+        _assertBackfillWindowOpened(bridgehub);
+    }
+
+    /// @dev The vault's swap opened the backfill window of the chains registered before the upgrade, and only theirs
+    ///      ({protocol-docs/interop-gating.md#backfill}).
+    function _assertBackfillWindowOpened(address _bridgehub) private view {
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(
+            address(IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault())
+        );
+        assertTrue(nativeTokenVault.chainBalanceBackfillPending(eraZKChainId), "pre-upgrade chain not pending");
+        assertFalse(nativeTokenVault.chainBalanceBackfillPending(NEW_CHAIN_ID), "new chain pending");
     }
 
     /// @dev The upgraded CTM keeps the interop fee manager it had, with the chains' prepaid

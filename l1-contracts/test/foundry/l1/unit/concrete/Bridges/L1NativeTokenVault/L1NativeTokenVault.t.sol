@@ -140,12 +140,9 @@ abstract contract L1NativeTokenVaultTestBase is Test {
             _assetRouter: address(assetRouter),
             _l1Nullifier: l1Nullifier
         });
-        TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
-            address(nativeTokenVaultImpl),
-            proxyAdmin,
-            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
+        nativeTokenVault = L1NativeTokenVaultTestHelper(
+            payable(_deployNativeTokenVaultProxy(address(nativeTokenVaultImpl)))
         );
-        nativeTokenVault = L1NativeTokenVaultTestHelper(payable(nativeTokenVaultProxy));
 
         // Setup mocks
         vm.mockCall(
@@ -191,6 +188,18 @@ abstract contract L1NativeTokenVaultTestBase is Test {
         vm.prank(address(nativeTokenVault));
         nativeTokenVault.registerToken(address(testToken));
         nativeTokenVault.registerEthToken();
+    }
+
+    /// @dev Deploys the vault's proxy in front of `_impl`, freshly initialized.
+    function _deployNativeTokenVaultProxy(address _impl) internal virtual returns (address) {
+        return
+            address(
+                new TransparentUpgradeableProxy(
+                    _impl,
+                    proxyAdmin,
+                    abi.encodeCall(L1NativeTokenVault.initialize, (owner, tokenBeacon))
+                )
+            );
     }
 
     function _mockInteropEnabled(uint256 _chainId, bool _enabled) internal {

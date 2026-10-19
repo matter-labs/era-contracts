@@ -21,7 +21,6 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
-    ChainNotSettlingOnL1,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
     InteropPeerNotAllowed,
@@ -38,7 +37,6 @@ contract ChainRegistrationSenderUnitTest is Test {
     uint256 internal constant PEER_CHAIN_ID = 272;
     uint256 internal constant THIRD_CHAIN_ID = 273;
     uint256 internal constant UNREGISTERED_CHAIN_ID = 123456;
-    uint256 internal constant GATEWAY_CHAIN_ID = 506;
     bytes32 internal constant PEER_BASE_TOKEN_ASSET_ID = keccak256("peerBaseToken");
     bytes32 internal constant CHAIN_BASE_TOKEN_ASSET_ID = keccak256("chainBaseToken");
 
@@ -143,22 +141,6 @@ contract ChainRegistrationSenderUnitTest is Test {
         vm.prank(chainAdmin);
         vm.expectRevert(ZKChainNotRegistered.selector);
         sender.allowInteropPeer(CHAIN_ID, UNREGISTERED_CHAIN_ID);
-    }
-
-    function test_allowInteropPeer_revertWhen_chainNotSettlingOnL1() public {
-        _mockSettlementLayer(CHAIN_ID, GATEWAY_CHAIN_ID);
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, CHAIN_ID, GATEWAY_CHAIN_ID));
-        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-    }
-
-    function test_allowInteropPeer_revertWhen_peerNotSettlingOnL1() public {
-        _mockSettlementLayer(PEER_CHAIN_ID, GATEWAY_CHAIN_ID);
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, PEER_CHAIN_ID, GATEWAY_CHAIN_ID));
-        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
     }
 
     function test_allowInteropPeer_revertWhen_chainNotEnabled() public {
