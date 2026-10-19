@@ -6,7 +6,7 @@
 #      (output/<env>/deploy-bundle/, not committed); the bundle replayed; the governance txs (testnet: the
 #      `[execution]` script, stage3: `[governance_operations]`) -> output/<env>/execution.json and its
 #      runbook output/<env>/EXECUTE.md; then rehearse.sh <env>
-#   2. protocol_ops governance-toml-to-simulator -> <env>/simulator/<date>-v0.33.2-verifier-<env>-1-ecosystem.json
+#   2. protocol_ops governance-toml-to-simulator -> output/<env>/simulator/<date>-v0.33.2-verifier-<env>-1-ecosystem.json
 #
 # Nothing is sent to the network. Once the deployments are live, the prepare deploys nothing at the tip and the
 # pipeline refuses the empty bundle: set FORK_BLOCK to a block before the first deployment (stage3: 11854782,
@@ -24,7 +24,7 @@ L1=$(cd "$HERE/../.." && pwd)
 REPO=$(cd "$L1/.." && pwd)
 OUT=$HERE/output/$ENV/ecosystem.toml
 DATE=${2:-$(date -u +%Y-%m-%d)}
-SCENARIO=$HERE/$ENV/simulator/$DATE-v0.33.2-verifier-$ENV-1-ecosystem.json
+SCENARIO=$HERE/output/$ENV/simulator/$DATE-v0.33.2-verifier-$ENV-1-ecosystem.json
 PROTOCOL_OPS=${PROTOCOL_OPS:-$REPO/protocol-ops/target/release/protocol_ops}
 
 toml_get() { python3 -c "import tomllib,sys; d=tomllib.load(open(sys.argv[2],'rb')); v=d
@@ -48,19 +48,4 @@ mkdir -p "$(dirname "$SCENARIO")"
   --ack test_upgrade_chain_zkos \
   --out "$SCENARIO"
 
-# The transaction-simulator no longer handles `ack_` markers: an absent checked tag is an inert
-# `alreadyExecuted` entry carrying the tag itself. The per-chain scenarios cover the upgrade.
-python3 - "$SCENARIO" "$DATE" "$ENV" <<'PY'
-import json, sys
-path, date, env = sys.argv[1:]
-scenario = json.load(open(path))
-for tx in scenario:
-    if tx["tag"] == "ack_test_upgrade_chain_zkos":
-        tx.update({"to": tx["from"], "data": "0x", "value": "0", "tag": "test_upgrade_chain_zkos", "alreadyExecuted": True,
-                   "description": "Placeholder: test_upgrade_chain_zkos is absent from this artifact (v0.33.2 emits none). "
-                                  f"The real per-chain upgrades are the {date}-v0.33.2-verifier-{env}-2-chain-*.json "
-                                  "scenarios (tag chain_upgrade_<chainId>)."})
-json.dump(scenario, open(path, "w"), indent=2)
-open(path, "a").write("\n")
-PY
 echo "scenario: $SCENARIO"

@@ -9,10 +9,10 @@ It never took v0.33.1 (#2497), and `createNewVerifierOnlyUpgrade` allows skippin
 | v0.33.0 (live before the upgrade) | `0x29651d5f044e1671ff820f85018ed87b26f57402222eb31dd453206e2379bc9c` |
 | v0.33.2 (`zksync-os/latest.json`) | `0xec24ed291193c0f86d53b242e45490f05e2328817d9decb8cc4188b582682bfa` |
 
-| env       | ecosystem                                                | governance                                       | details                                |
-| --------- | -------------------------------------------------------- | ------------------------------------------------ | -------------------------------------- |
-| `stage3`  | atomic-interop stage ("stage3"), bridgehub `0xb9415d43…` | `Governance` `0xFF657F25…` (EOA owner)           | [stage3/README.md](stage3/README.md)   |
-| `testnet` | public ZKsync OS testnet, bridgehub `0xc4FD2580…`        | ProtocolUpgradeHandler `0x803e5E7a…` (emergency) | [testnet/README.md](testnet/README.md) |
+| env       | ecosystem                                                | governance                                       | details                                              |
+| --------- | -------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| `stage3`  | atomic-interop stage ("stage3"), bridgehub `0xb9415d43…` | `Governance` `0xFF657F25…` (EOA owner)           | [output/stage3/README.md](output/stage3/README.md)   |
+| `testnet` | public ZKsync OS testnet, bridgehub `0xc4FD2580…`        | ProtocolUpgradeHandler `0x803e5E7a…` (emergency) | [output/testnet/README.md](output/testnet/README.md) |
 
 The env name is the basename of `../permanent-values/<env>.toml` and `<env>.toml` here, as everywhere in the
 generate / deploy pipeline. `stage3` is not `stage`: `permanent-values/stage.toml` is the older stage ecosystem.
@@ -63,25 +63,27 @@ chain keeps its validator pair and pubdata content.
   `check-deployment.sh` against the real chain).
 - `<env>.toml` is the input: bridgehub, CTM, the expected current version, the governance kind, the verifier
   flavour, the timer delay, the CREATE2 salt and the chain list. The script checks it against the live state.
-- `output/<env>/` is what the pipeline writes; `rehearse-upgrade` clears it on every run, all but
-  `transactions.txt`:
-  - `ecosystem.toml`, the artifact. On top of the standard `DefaultCTMUpgrade` output (`[state_transition]`,
-    `[deployed_addresses]`, `[contracts_config]`, `chain_upgrade_diamond_cut`, `[governance_calls]`,
-    `[test_upgrade_calls]` with `test_create_chain_zkos`), it carries `[verification_key]` (the old and new VK
-    hashes), `[deploy_calls]` (the four CREATE2 factory calls), `[governance_operations]` (Governance-owned
-    ecosystems: the `scheduleTransparent` / `execute` calldata) and `[chain_upgrades.<id>]` (each ChainAdmin's
-    `multicall` calldata);
-  - `execution.json` and `EXECUTE.md`: the governance transactions and their MetaMask runbook;
-  - `transactions.txt`: the Sepolia deployment hashes;
-  - not committed: `deploy-bundle/` (the deployer's calls, what the deploy workflow broadcasts), `prepare/`,
-    `fork-rehearsal/`.
-- `<env>/` holds what this directory's scripts add, which the pipeline does not regenerate:
-  - `README.md`: the env's addresses, status and validation;
-  - `chain-upgrades/<id>/`: the per-chain bundles from `protocol_ops chain set-upgrade-timestamp` and
-    `chain upgrade`, as for the v33 testnet chains: `01_chain.set-upgrade-timestamp_*.safe.json`,
-    `02_chain.upgrade_*.safe.json`, `manifest.json` and, for testnet, the chain's `EXECUTE.md`;
-  - `simulator/`: the transaction-simulator scenarios, `…-<env>-1-ecosystem.json` and one
-    `…-<env>-2-chain-<id>.json` per chain.
+- `output/<env>/` holds everything for one environment. `rehearse-upgrade` (and the generate workflow) rewrite
+  what they produce on every run and leave the rest alone:
+  - written by the pipeline:
+    - `ecosystem.toml`, the artifact. On top of the standard `DefaultCTMUpgrade` output (`[state_transition]`,
+      `[deployed_addresses]`, `[contracts_config]`, `chain_upgrade_diamond_cut`, `[governance_calls]`,
+      `[test_upgrade_calls]` with `test_create_chain_zkos`), it carries `[verification_key]` (the old and new
+      VK hashes), `[deploy_calls]` (the four CREATE2 factory calls), `[governance_operations]`
+      (Governance-owned ecosystems: the `scheduleTransparent` / `execute` calldata) and
+      `[chain_upgrades.<id>]` (each ChainAdmin's `multicall` calldata);
+    - `execution.json` and `EXECUTE.md`: the governance transactions and their MetaMask runbook;
+    - `extra-verification-logs.txt`: the Etherscan commands;
+    - `simulator/…-<env>-1-ecosystem.json`: the ecosystem transaction-simulator scenario (generate workflow);
+    - not committed: `deploy-bundle/` (the deployer's calls, what the deploy workflow broadcasts), `prepare/`,
+      `fork-rehearsal/`;
+  - written by the per-chain workflow (`generate-chain-upgrade-calldata.yaml`) or `generate-chain-upgrades.sh`:
+    - `chain-upgrades/<id>/`: the per-chain bundles from `protocol_ops chain set-upgrade-timestamp` and
+      `chain upgrade`, as for the v33 testnet chains: `01_chain.set-upgrade-timestamp_*.safe.json`,
+      `02_chain.upgrade_*.safe.json`, `manifest.json` and the chain's `EXECUTE.md`;
+    - `simulator/…-<env>-2-chain-<id>.json`: one scenario per chain;
+  - by hand: `README.md` (the env's addresses, status and validation) and `transactions.txt` (the Sepolia
+    deployment hashes, from the deploy workflow's result).
 - `sim-descriptions-<env>.toml`: the scenarios' human-readable descriptions.
 
 Scripts, each taking the env:

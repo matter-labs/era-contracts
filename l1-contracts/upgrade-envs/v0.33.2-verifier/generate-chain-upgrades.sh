@@ -6,9 +6,9 @@
 #   2. per chain in <env>.toml's `chain_ids`:
 #        protocol_ops chain set-upgrade-timestamp --upgrade-timestamp 1  -> 01_chain.set-upgrade-timestamp_*.safe.json
 #        protocol_ops chain upgrade                                     -> 02_chain.upgrade_*.safe.json
-#      into <env>/chain-upgrades/<id>/ (with the EXECUTE.md the chain commands write), and checks the cut bundle equals the script's
+#      into output/<env>/chain-upgrades/<id>/ (with the EXECUTE.md the chain commands write), and checks the cut bundle equals the script's
 #      `[chain_upgrades.<id>].chain_admin_calldata`
-#   3. protocol_ops ecosystem manifest-to-simulator -> <env>/simulator/<date>-v0.33.2-verifier-<env>-2-chain-<id>.json
+#   3. protocol_ops ecosystem manifest-to-simulator -> output/<env>/simulator/<date>-v0.33.2-verifier-<env>-2-chain-<id>.json
 #
 # `chain upgrade` replays the cut on the fork, and the cut reverts with `NotAllBatchesExecuted()` while
 # the chain has committed-but-unexecuted batches. For a chain in that state the generation fork (never a
@@ -36,8 +36,8 @@ export FOUNDRY_HARDFORK=${FOUNDRY_HARDFORK:-amsterdam}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$HERE/../../.." && pwd)
 OUT=$HERE/output/$ENV/ecosystem.toml
-CHAINS_DIR=$HERE/$ENV/chain-upgrades
-SIM_DIR=$HERE/$ENV/simulator
+CHAINS_DIR=$HERE/output/$ENV/chain-upgrades
+SIM_DIR=$HERE/output/$ENV/simulator
 DATE=${2:-$(date -u +%Y-%m-%d)}
 PROTOCOL_OPS=${PROTOCOL_OPS:-$REPO/protocol-ops/target/release/protocol_ops}
 PORT=${PORT:-8735}

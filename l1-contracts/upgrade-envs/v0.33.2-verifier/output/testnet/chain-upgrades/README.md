@@ -1,6 +1,6 @@
 # Per-chain v0.33.0 → v0.33.2 calldata (testnet)
 
-The emergency proposal in `../../output/testnet/execution.json` registers the cut on the ZKsync OS CTM. It does
+The emergency proposal in `../execution.json` registers the cut on the ZKsync OS CTM. It does
 not move any chain. Each chain then takes the cut itself, through its own ChainAdmin.
 
 Each `<id>/` holds two bundles, **in execution order**, and the `EXECUTE.md` runbook for them:
@@ -9,7 +9,7 @@ Each `<id>/` holds two bundles, **in execution order**, and the `EXECUTE.md` run
 2. `02_chain.upgrade`: `upgradeChainFromVersion(chain, 0x2100000000, cut)`
 
 Both are `ChainAdmin.multicall` (`0x69340beb`), signed by that ChainAdmin's owner. Every cut bundle is
-byte-identical to `[chain_upgrades.<id>].chain_admin_calldata` in `../../output/testnet/ecosystem.toml`;
+byte-identical to `[chain_upgrades.<id>].chain_admin_calldata` in `../ecosystem.toml`;
 `generate-chain-upgrades.sh testnet` and `rehearse.sh testnet` both check it.
 
 | chain   | ChainAdmin (the `to`)                        | signer (ChainAdmin owner)                    | DA today (unchanged by the upgrade) |

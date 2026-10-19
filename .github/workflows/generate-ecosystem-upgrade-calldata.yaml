@@ -49,16 +49,24 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #
 # Two artifacts come out:
 #
-#   ecosystem-upgrade-calldata-<env>      the review set: ecosystem.toml (addresses
-#                                         + governance stage 0/1/2 calldata),
-#                                         sim-inputs/, transaction-simulator.json,
-#                                         and EXECUTE.md: the txs whoever executes
-#                                         sends by hand, one copy-into-MetaMask table
-#                                         per sender, next to the list it is rendered
-#                                         from (sim-inputs/ for prepare-all, the `[execution]`
-#                                         script's output for a forge-script upgrade)
+#   ecosystem-upgrade-calldata-<env>      the env dir output/<env>/ as it should be
+#                                         committed: ecosystem.toml (addresses +
+#                                         governance stage 0/1/2 calldata), EXECUTE.md
+#                                         (the txs whoever executes sends by hand, one
+#                                         copy-into-MetaMask table per sender) next to
+#                                         the list it is rendered from, the Etherscan
+#                                         commands, and the simulator inputs:
+#                                         sim-inputs/ + transaction-simulator.json for
+#                                         prepare-all, a dated
+#                                         simulator/…-<env>-1-ecosystem.json scenario
+#                                         for a forge-script upgrade
 #   ecosystem-upgrade-deploy-inputs-<env> the DEPLOY BUNDLE (see below): the
 #                                         deployer calls + provenance
+#
+# With `commit_outputs`, a third job commits that env dir to the dispatched branch
+# once both jobs pass (RELEASE_TOKEN; branches of this repository only). The
+# per-chain bundles and their scenarios come from generate-chain-upgrade-calldata.yaml,
+# which can commit them the same way.
 #
 # The `verify-bundle-handoff` job then re-deploys and re-verifies that bundle from
 # scratch with no contract build. If it is green, the bundle is provably enough to
@@ -307,6 +315,11 @@ on:
         required: false
         default: ""
         type: string
+      commit_outputs:
+        description: "Commit the generated files (output/<env>/ minus the deploy bundle and fork scratch: ecosystem.toml, EXECUTE.md, the governance transactions, Etherscan commands, simulator scenario) to the dispatched branch, once both jobs pass. Needs the RELEASE_TOKEN secret and a branch of this repository."
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -420,7 +433,8 @@ jobs:
               echo "::error::No config for upgrade '$UPGRADE' / env '$ENVIRONMENT' at $f — commit it first."; exit 1
             fi
           done
-          # `prepare-all` also emits the simulator JSON below; other kinds do not.
+          # `prepare-all` emits sim-inputs/ + transaction-simulator.json below, a `forge-script`
+          # upgrade a dated simulator/ scenario.
           PREPARE_KIND="$(sed -nE 's/^[[:space:]]*prepare[[:space:]]*=[[:space:]]*"([a-z-]+)".*/\1/p' "$UPGRADE_TOML" | head -1)"
           echo "upgrade=$UPGRADE prepare=$PREPARE_KIND"
           echo "PREPARE_KIND=$PREPARE_KIND" >> "$GITHUB_ENV"
@@ -466,6 +480,7 @@ jobs:
           {
             echo "L1_FORK_URL=$rpc"
             echo "DEPLOYER_ADDR=$deployer"
+            echo "L1_NETWORK=$net"
           } >> "$GITHUB_ENV"
           if [ -n "${GW_RPC_URL:-}" ]; then
             echo "::add-mask::$GW_RPC_URL"
@@ -527,6 +542,42 @@ jobs:
             --env "$ENVIRONMENT" \
             --out "$OUT/transaction-simulator.json"
 
+      # A forge-script upgrade's ecosystem scenario: the governance stages as their governance
+      # sends them (`from` = the CTM's owner at the fork block: the ProtocolUpgradeHandler or the
+      # Governance contract), named like the committed v0.33.2 ones so the transaction-simulator
+      # walks it before the per-chain scenarios (`-1-` sorts before `-2-`).
+      - name: Emit the ecosystem simulator scenario (forge-script)
+        if: ${{ env.PREPARE_KIND == 'forge-script' }}
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          FORK_BLOCK: ${{ inputs.fork_block }}
+        run: |
+          set -euo pipefail
+          DIR="l1-contracts/upgrade-envs/$UPGRADE"
+          OUT="$DIR/output/$ENVIRONMENT"
+          toml_get() { python3 -c "import tomllib,sys; v=tomllib.load(open(sys.argv[2],'rb'))
+          for k in sys.argv[1].split('.'): v=v.get(k, {}) if isinstance(v, dict) else {}
+          print(v if v != {} else '')" "$1" "$2"; }
+          CTM="$(toml_get state_transition.chain_type_manager_proxy "$OUT/ecosystem.toml")"
+          [ -n "$CTM" ] || { echo "::error::$OUT/ecosystem.toml has no state_transition.chain_type_manager_proxy"; exit 1; }
+          BLOCK=()
+          [ -z "$FORK_BLOCK" ] || BLOCK=(--block "$FORK_BLOCK")
+          FROM="$(cast call "$CTM" 'owner()(address)' "${BLOCK[@]}" --rpc-url "$L1_FORK_URL")"
+          args=(--governance-toml "$OUT/ecosystem.toml" --from "$FROM" --network "$L1_NETWORK")
+          for d in "$DIR/sim-descriptions-$ENVIRONMENT.toml" "$DIR/sim-descriptions.toml"; do
+            if [ -f "$d" ]; then args+=(--descriptions "$d"); break; fi
+          done
+          # The per-chain upgrade is its own scenario: acknowledge a checked tag the artifact
+          # does not carry, so the simulator's provenance check finds it.
+          [ -n "$(toml_get test_upgrade_calls.test_upgrade_chain_zkos "$OUT/ecosystem.toml")" ] \
+            || args+=(--ack test_upgrade_chain_zkos)
+          mkdir -p "$OUT/simulator"
+          rm -f "$OUT"/simulator/*-"$UPGRADE-$ENVIRONMENT"-1-ecosystem.json
+          SCENARIO="$OUT/simulator/$(date -u +%Y-%m-%d)-$UPGRADE-$ENVIRONMENT-1-ecosystem.json"
+          ./protocol-ops/target/release/protocol_ops ecosystem governance-toml-to-simulator \
+            "${args[@]}" --out "$SCENARIO"
+          echo "scenario: $SCENARIO"
+
       # Upload only the calldata deliverables; the verification logs travel in the
       # deploy bundle below.
       - name: Upload calldata artifacts
@@ -534,12 +585,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-calldata-${{ inputs.environment }}
+          # The env dir as it should be committed: everything this run wrote (ecosystem.toml,
+          # EXECUTE.md and the transactions it renders, Etherscan commands, simulator inputs)
+          # next to the committed files it left alone. The deploy bundle has its own artifact.
           path: |
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/ecosystem.toml
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/sim-inputs/
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/transaction-simulator.json
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/EXECUTE.md
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/emergency-upgrade-board.json
+            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/
+            !l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/deploy-bundle/
+            !l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/prepare/
+            !l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/fork-rehearsal/
           if-no-files-found: warn
           retention-days: 30
 
@@ -691,3 +744,60 @@ jobs:
           args=(--bundle "$GITHUB_WORKSPACE/deploy-bundle" --fork-url "$L1_FORK_URL")
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
           ./protocol-ops/target/release/protocol_ops ecosystem replay-bundle "${args[@]}"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Opt-in (`commit_outputs`): commit the env dir the regen uploaded to the dispatched
+  # branch, once the bundle hand-off was proven too. Pushes with RELEASE_TOKEN, as
+  # update-hashes-on-demand.yaml does, so the branch must live in this repository.
+  # ─────────────────────────────────────────────────────────────────────────────
+  commit-outputs:
+    needs: [regen, verify-bundle-handoff]
+    if: ${{ inputs.commit_outputs && github.ref_type == 'branch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: upgrade-outputs-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout the dispatched branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      # The run replaced the dated ecosystem scenario; drop the old one so the download does
+      # not leave both. Everything else in the artifact overwrites its committed copy.
+      - name: Drop the previous ecosystem scenario
+        env:
+          UPGRADE: ${{ inputs.upgrade }}
+          ENVIRONMENT: ${{ inputs.environment }}
+        run: rm -f "l1-contracts/upgrade-envs/$UPGRADE/output/$ENVIRONMENT"/simulator/*-"$UPGRADE-$ENVIRONMENT"-1-ecosystem.json
+
+      - name: Download the generated env dir
+        uses: actions/download-artifact@v4
+        with:
+          name: ecosystem-upgrade-calldata-${{ inputs.environment }}
+          path: l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}
+
+      - name: Commit and push
+        env:
+          UPGRADE: ${{ inputs.upgrade }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          BRANCH: ${{ github.ref_name }}
+          SOURCE_SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          git config user.name "zksync[bot]"
+          git config user.email "zksync[bot]@users.noreply.github.com"
+          # Only the env dir; its gitignore keeps any scratch out.
+          git add -A "l1-contracts/upgrade-envs/$UPGRADE/output/$ENVIRONMENT"
+          if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
+          git --no-pager diff --cached --stat
+          git commit -m "chore(upgrade): regenerate $UPGRADE $ENVIRONMENT outputs" \
+            -m "Generated from $SOURCE_SHA by $RUN_URL"
+          for attempt in 1 2 3; do
+            git push origin "HEAD:$BRANCH" && exit 0
+            git pull --rebase origin "$BRANCH"
+          done
+          echo "::error::could not push to $BRANCH"; exit 1
