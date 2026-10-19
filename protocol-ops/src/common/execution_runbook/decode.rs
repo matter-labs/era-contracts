@@ -22,12 +22,22 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     // ChainAdmin
     "multicall((address,uint256,bytes)[],bool)",
     "setUpgradeTimestamp(uint256,uint256)",
-    // ZK chain Admin facet: the current and the pre-v31 signature
+    // ZK chain Admin facet (and the ValidatorTimelock forwarding it): v35+, v31 to v34, pre-v31
+    "upgradeChainFromVersion(address,uint256)",
     "upgradeChainFromVersion(address,uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     "upgradeChainFromVersion(uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     // ChainTypeManager
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
+    // Registry upgrade executors: an upgrade's legs (CoreUpgradeExecutor, CTMUpgradeExecutor) and
+    // the owner-gated `forward` (a replacement, the bootstrap's ServerNotifier acceptance)
+    "applyL1Upgrade(address)",
+    "applyInfrastructureUpgrade(address)",
+    "applyCTMUpgrade(address)",
+    "forward((address,uint256,bytes)[])",
+    // RegistryBootstrapMigration (the v35 bootstrap edge and its completion check)
+    "migrate()",
+    "validateApplied()",
     // ChainAssetHandler
     "pauseMigration()",
     "unpauseMigration()",
@@ -134,8 +144,12 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
             protocol_version(uint(1)?),
             protocol_version(uint(3)?)
         )),
+        // The pre-v31 form leads with the version, the later ones with the chain address.
         "upgradeChainFromVersion" => {
-            let old = if args.len() == 3 { uint(1)? } else { uint(0)? };
+            let old = match args.first()? {
+                DynSolValue::Address(_) => uint(1)?,
+                _ => uint(0)?,
+            };
             Some(format!("from {}", protocol_version(old)))
         }
         // ChainAdmin's `setUpgradeTimestamp(protocolVersion, ts)` and ServerNotifier's
@@ -153,6 +167,10 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
         "scheduleTransparent" => Some(format!("delay {} s", uint(1)?)),
         "transferOwnership" | "setPendingAdmin" => Some(format!(
             "to `{}`",
+            args.first().and_then(as_address)?.to_checksum(None)
+        )),
+        "applyL1Upgrade" | "applyInfrastructureUpgrade" | "applyCTMUpgrade" => Some(format!(
+            "object `{}`",
             args.first().and_then(as_address)?.to_checksum(None)
         )),
         _ => None,

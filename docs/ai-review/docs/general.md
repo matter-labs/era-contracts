@@ -15,6 +15,7 @@ The entire repo.
 7. Contracts that can be deployed on L2 must not have any constructors or immutables.
 8. General stylistic issues: unused items, logic that can be simplified etc.
 9. A contract deployable on L2 is present in the repo, but not reflected inside the genesis tool.
+10. Breaking changes to what live code calls. A change to an interface that deployed upgrade code or chains call at execution time (e.g. a bridgehub getter the L2 delegate composer reads, a CTM view an older Admin facet reads) must be checked against every protocol version live on mainnet and testnet, not only the next one: a lagging chain still executes the engine and composer its committed transition names. When deleting an upgrade file, confirm no live upgrade edge still needs it.
 
 The exceptions for the rules above can exist, but they should be clearly described in the natspec.
 

@@ -2,8 +2,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 
 # Generic over the `upgrade` input: `upgrade-envs/<upgrade>/upgrade.toml` says how that upgrade is
 # prepared and checked (protocol-ops/src/common/upgrade_descriptor.rs). The notes below describe
-# the default, v0.35.0-upgrade-system (`upgrade-prepare-all` + PUVT; only the release's own
-# upgrade directory can use `prepare-all`).
+# the default, v0.35.0-upgrade-system (`upgrade-prepare-all` + `verify-bootstrap`, the registry
+# verifier; only the release's own upgrade directory can use `prepare-all`).
 
 # ═════════════════════════════════════════════════════════════════════════════
 # RUNBOOK — from "nothing" to "this chain is upgraded"
@@ -52,7 +52,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # Two artifacts come out:
 #
 #   ecosystem-upgrade-calldata-<env>      the review set: ecosystem.toml (addresses
-#                                         + governance stage 0/1/2 calldata),
+#                                         + the governance bundle's calldata),
 #                                         sim-inputs/, transaction-simulator.json,
 #                                         and EXECUTE.md: the txs whoever executes
 #                                         sends by hand, one copy-into-MetaMask table
@@ -63,8 +63,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                         deployer calls + provenance
 #
 # The `verify-bundle-handoff` job then re-deploys and re-verifies that bundle from
-# scratch with no contract build. If it is green, the bundle is provably enough to
-# deploy and verify from — that is the artifact to hand to whoever deploys.
+# scratch, from the artifact plus the image it names (the verifier re-derives
+# addresses from the image's contract build). If it is green, the bundle is
+# provably enough to deploy and verify from — that is the artifact to hand to
+# whoever deploys.
 #
 # ── 2. Deploy the new contracts ─────────────────────────────────────────────
 # In CI (signs with `DEPLOYER_PRIVATE_KEY_<net>`):
@@ -88,21 +90,22 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # Do NOT re-generate to "refresh" a bundle: bytecode is specific to the build that
 # produced it, so a re-run yields different addresses and different calldata.
 #
-# ── 3. Verify what landed (PUVT), yourself ─────────────────────────────────
-# From the bundle, in its image (PUVT matches deployed code against its
-# `AllContractsHashes.json`), from a checkout of the commit it names:
+# ── 3. Verify what landed (verify-bootstrap), yourself ─────────────────────
+# From the bundle, in its image, from a checkout of the commit it names:
+# `verify-bootstrap` re-derives every object from the image's contract build,
+# held against its `AllContractsHashes.json`, and checks it on L1. The
+# governance owner and CREATE2 salts it needs come from the env config:
 #
 #   EXTRA_MOUNTS="$PWD/<unpacked-bundle>:/contracts/bundle" \
 #     ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
 #     --bundle /contracts/bundle --rpc <l1-rpc> --verify-only    # already deployed
 #   #  … or --fork-url <l1-rpc> to rehearse the whole thing on a throw-away fork
+#   #  (a recurring upgrade also needs --executor-record <ecosystem/ctm init output>)
 #
 # ── 4. Execute the governance ceremony ────────────────────────────────────
-# `ecosystem.toml`'s `[governance_calls]` holds stages 0/1/2;
+# `ecosystem.toml`'s `[governance_calls] calls` is the one governance bundle;
 # `transaction-simulator.json` is the ready-to-paste simulator input for a dry run
-# before signing. Stage timing is enforced on-chain by the GovernanceUpgradeTimer.
-# Re-run step 3 afterwards: pre-ceremony PUVT reports the expected exemptions for
-# contracts still owned by the old governor, and those must be gone after it.
+# before signing.
 #
 # ── 5. Upgrade an individual chain ────────────────────────────────────────
 # Once the ecosystem is on the new version, per chain (`chain_id` is the numeric
@@ -127,20 +130,11 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # ── TROUBLESHOOTING ───────────────────────────────────────────────────────
 # prepare reverts on owner-gated calls        → the ecosystem is already upgraded;
 # `old protocol version must be ...`            pin `fork_block` and rotate the
-# `.owner() mismatch: expected governance`      env's salts. See ALREADY-UPGRADED
+#                                               env's salts. See ALREADY-UPGRADED
 #                                               ECOSYSTEMS above — the usable
-#                                               window is narrow and all three
+#                                               window is narrow and both
 #                                               symptoms come from picking it
 #                                               wrong.
-# `used salt ... not in the env-declared      → a rotated salt vs. a stale log.
-#  salt set`                                    This run's own log is salt-gated;
-#                                               the committed real-network log is
-#                                               passed as
-#                                               `--reference-transactions-log`
-#                                               and exempt. Seeing this means the
-#                                               PREPARE used an undeclared salt —
-#                                               it fell back to a random one, so
-#                                               the regen is not reproducible.
 # `No deploy bundle was published`            → the prepare died before the pack
 #                                               step; fix the generate job first.
 # `image has no revision label`               → the tag was not built by
@@ -159,8 +153,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # ═════════════════════════════════════════════════════════════════════════════
 
 # Regenerates the `upgrade` input's ecosystem calldata for one environment and
-# verifies it (PUVT for prepare-all, the declared checks for a forge-script
-# upgrade), inside the released protocol-ops image (`protocol_ops_tag`): its
+# verifies it (`verify-bootstrap` for prepare-all, the declared checks for a
+# forge-script upgrade), inside the released protocol-ops image (`protocol_ops_tag`): its
 # compiled contracts, protocol_ops and zk-governance checkout produce the
 # calldata, so the bytecode — and therefore the CREATE2 addresses baked into
 # `ecosystem.toml` — is the image's, whoever runs it. Nothing is compiled here.
@@ -170,7 +164,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #     -> protocol_ops ecosystem upgrade-prepare-all   (writes ecosystem.toml)
 #     -> pack the deploy bundle                       (the transferable handoff)
 #     -> fund + fork-replay the prepare bundles
-#     -> protocol_ops ecosystem verify-upgrade (PUVT)
+#     -> protocol_ops ecosystem verify-bootstrap (the registry verifier)
 #   then emit the git-portable `sim-inputs/` handoff set AND the ready-to-paste
 #   `transaction-simulator.json` (the full mainnet calldata artifact set, i.e.
 #   the same deliverables PR #2268 committed).
@@ -190,8 +184,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # the Etherscan verify commands, and a `bundle-metadata.json` pinning the image,
 # contracts commit / `AllContractsHashes.json` hash / fork height / toolchain
 # versions that the bytecode identity depends on. The `verify-bundle-handoff` job
-# below then proves the bundle is sufficient by deploying + PUVT-ing it from
-# nothing but that artifact, with NO contract build at all.
+# below then proves the bundle is sufficient by deploying + verifying it from
+# that artifact and the image it names — the image's contract build is held
+# against its `AllContractsHashes.json`, which the bundle pins, so it adds
+# nothing the bundle does not already name.
 #
 # ─── ALREADY-UPGRADED ECOSYSTEMS: PICKING `fork_block` ───
 # An ecosystem whose upgrade has already EXECUTED cannot be rehearsed at the
@@ -202,9 +198,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #
 #   1. AFTER every governance step the prepare treats as a prerequisite.
 #      These are separate proposals, executed shortly before the upgrade itself,
-#      that consolidate ownership under governance. Fork before them and PUVT
-#      reports the pre-consolidation owner, e.g. "zksync_os.ValidatorTimelock
-#      .owner() mismatch: expected governance ..., got 0x5555...643c".
+#      that consolidate ownership under governance. Fork before them and the
+#      prepare and its checks run against the pre-consolidation owners.
 #   2. BEFORE the block that bumped the CTM protocol versions — that is the
 #      upgrade execution itself, and past it constraint 1's gate flips.
 #   3. Rotate the salts in `upgrade-envs/<upgrade>/<env>.toml` first (the
@@ -215,10 +210,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #      deployment — which violates constraint 1.
 #
 # Do NOT simply fork before the deployment. It satisfies constraint 2 and lets
-# the old salts work, but it breaks constraint 1 AND the committed
-# `output/<env>/transactions.txt` is then entirely in the future, so every entry
-# is unresolvable ("N tx(s) not found on the RPC") and the CREATE2 provenance
-# pass over the real broadcast is vacuous.
+# the old salts work, but it breaks constraint 1.
 #
 # Worked example — the v31 upgrade on Sepolia `testnet`:
 #   deployment broadcast   blocks 11147277..11165542
@@ -261,15 +253,15 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                    key is needed — this is a fork rehearsal
 #                                    that impersonates the deployer and signs
 #                                    nothing)
-#   GW_RPC_URL                    — Gateway RPC, passed to PUVT as
-#                                   `--gw-rpc-url` when set (the PUVT has no
-#                                   Gateway-side checks and ignores it).
+#   GW_RPC_URL                    — Gateway RPC, passed as `--gw-rpc-url`
+#                                   when set (the release's checks read L1
+#                                   only and ignore it).
 
 on:
   workflow_dispatch:
     inputs:
       upgrade:
-        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.35.0-upgrade-system is the release's prepare-all + PUVT flow; a forge-script upgrade runs its declared script and checks."
+        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.35.0-upgrade-system is the release's prepare-all + verify-bootstrap flow; a forge-script upgrade runs its declared script and checks."
         required: false
         default: "v0.35.0-upgrade-system"
         type: string
@@ -436,8 +428,8 @@ jobs:
         run: |
           set -euo pipefail
           # L1_FORK_URL (masked), DEPLOYER_ADDR and GW_RPC_URL come from $GITHUB_ENV.
-          # The command forks L1_FORK_URL into a local anvil and runs prepare/PUVT
-          # against localhost, so only anvil sees the real RPC; the deployer is
+          # The command forks L1_FORK_URL into a local anvil and runs the prepare and
+          # its checks against localhost, so only anvil sees the real RPC; the deployer is
           # impersonated (no signing key needed).
           args=(--upgrade "$UPGRADE" --env "$ENVIRONMENT" --fork-url "$L1_FORK_URL" --deployer-address "$DEPLOYER_ADDR")
           [ -z "${GW_RPC_URL:-}" ] || args+=(--gw-rpc-url "$GW_RPC_URL")
@@ -470,7 +462,7 @@ jobs:
             --camp-a-signers "$DEPLOYER_ADDR" \
             --emit-sim-inputs "$OUT/sim-inputs"
           # 2) The full transaction-simulator.json (Camp-B manifest bundles + the
-          #    PUH stage 0/1/2 governance ceremony + post-upgrade smoke tests).
+          #    governance bundle + post-upgrade smoke tests).
           #    --include-manifest defaults to sim-inputs/manifest.json (step 1).
           po ecosystem governance-toml-to-simulator \
             --env "$ENVIRONMENT" \
@@ -494,16 +486,16 @@ jobs:
 
       # The DEPLOY BUNDLE: everything needed to broadcast this run's contracts and
       # re-verify them, and nothing else. Packed by `rehearse-upgrade` during
-      # the regen (right after the prepare, so it exists even if PUVT fails):
+      # the regen (right after the prepare, so it exists even if the checks fail):
       #
       #   prepare/manifest.json + prepare/*.safe.json  the deployer calls to send
-      #   ecosystem.toml                               addresses + gov stages
+      #   ecosystem.toml                               addresses + governance calls
       #   extra-verification-logs.txt                  Etherscan verify commands
       #   bundle-metadata.json                         provenance (commit, hashes,
       #                                                fork block, toolchain)
       #
       # Consumed by `deploy-ecosystem-upgrade.yaml` (real broadcast) and by the
-      # `verify-bundle-handoff` job below (fork rehearsal + PUVT). Safe to publish:
+      # `verify-bundle-handoff` job below (fork rehearsal + verify-bootstrap). Safe to publish:
       # tx calldata + addresses only, never keys or the RPC URL.
       - name: Upload the deploy bundle (for the Deploy workflow + local replay)
         if: always()
@@ -523,18 +515,22 @@ jobs:
   #
   # This job has only the artifact and the image the bundle names (by digest,
   # from `bundle-metadata.json`) — exactly what an operator downloading the
-  # bundle has. It forks L1 at the height recorded in the bundle, replays every
-  # bundle under impersonation, and runs PUVT against the result.
+  # bundle has. The image carries the contract build `verify-bootstrap`
+  # re-derives every object from; `verify-bootstrap` holds that build against
+  # the image's `AllContractsHashes.json`, and `replay-bundle` holds that file
+  # against the bundle's pinned hash, so the image cannot substitute different
+  # contracts. It forks L1 at the height recorded in the bundle, replays every
+  # bundle under impersonation, and runs `verify-bootstrap` against the result.
   #
-  # If this job is green, "deploy the contracts and run the PUVT yourself"
-  # provably works from the artifact alone. If the bundle were missing anything
+  # If this job is green, "deploy the contracts and verify them yourself"
+  # provably works from the artifact and the image it names. If the bundle were missing anything
   # (a call, an address, the fork height, the bytecode identity), it fails here
   # instead of failing on somebody's laptop.
   # ─────────────────────────────────────────────────────────────────────────────
   verify-bundle-handoff:
     needs: regen
     # Runs whenever the bundle exists — the regen job packs it before its own
-    # replay/PUVT steps, so a PUVT failure upstream still lets us check the
+    # replay/verify steps, so a verify failure upstream still lets us check the
     # handoff itself.
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
@@ -585,7 +581,7 @@ jobs:
           echo "=== files"
           find "$RUNNER_TEMP/deploy-bundle" -type f | sed "s|$RUNNER_TEMP/||" | sort
 
-      - name: Select + mask the L1 RPC to fork (and the GW RPC for PUVT)
+      - name: Select + mask the L1 RPC to fork (and the GW RPC, if set)
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           INPUT_RPC: ${{ inputs.l1_rpc_url }}
@@ -617,7 +613,7 @@ jobs:
           fi
 
       # The same command an operator runs locally against a downloaded bundle.
-      - name: Replay the bundle on a fresh fork + PUVT
+      - name: Replay the bundle on a fresh fork + verify-bootstrap
         env:
           BUNDLE_IMAGE: ${{ steps.bundle.outputs.image }}
           # Mounted at the same path in the image.

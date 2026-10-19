@@ -3,8 +3,8 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # Step 2 of the two-step ecosystem-upgrade flow. Step 1
 # (`generate-ecosystem-upgrade-calldata.yaml`) produces the calldata + the
 # deployer prepare bundles on a fork; THIS workflow takes those deployer
-# bundles and actually BROADCASTS them to a real L1, producing the
-# `transactions.txt` the PUVT (`ecosystem verify-upgrade`) consumes, then
+# bundles and actually BROADCASTS them to a real L1, producing
+# `transactions.txt` (the record of what was broadcast), then
 # verifies the freshly deployed contracts on Etherscan.
 # To verify an existing deployment without loading its signing key or sending
 # any transactions, dispatch with verify_only=true and run_verify=true using
@@ -288,7 +288,7 @@ jobs:
 
       # A failed broadcast can already have mined some CREATE2 transactions.
       # Restore its journal before retrying so idempotently skipped calls do not
-      # disappear from the PUVT's provenance input.
+      # disappear from the deployment record.
       - name: Initialize or restore the deployment receipt journal
         if: ${{ !inputs.verify_only }}
         env:
@@ -428,7 +428,8 @@ jobs:
           } >> "$GITHUB_ENV"
 
       # Broadcast ONLY the deployer bundles (target == deployer), robustly, one
-      # at a time. Writes transactions.txt next to --out for the PUVT.
+      # at a time. Writes transactions.txt next to --out, the record of what was
+      # broadcast.
       - name: Broadcast deployer bundles to L1
         if: ${{ !inputs.verify_only }}
         env:
@@ -455,7 +456,9 @@ jobs:
           cat "$TXLOG" || true
 
       # A forge-script upgrade declares a read-only `verify_chain` check, run here against the
-      # real chain. A prepare-all upgrade's post-deploy check is PUVT, which stays a separate step.
+      # real chain. A prepare-all upgrade's post-deploy check is `verify-bootstrap` (the registry
+      # verifier, run by `replay-bundle --verify-only`), which stays a separate step: see
+      # docs/ecosystem-upgrade-deploy.md.
       - name: Check the broadcast on L1 (the upgrade's declared check)
         if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
         run: |
@@ -463,8 +466,7 @@ jobs:
           bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem replay-bundle \
             --bundle "$DEPLOY_BUNDLE_DIR" \
             --rpc "$L1_RPC_URL" \
-            --verify-only \
-            --transactions-log "$TXLOG"
+            --verify-only
 
       - name: Upload transactions.txt + executed log
         if: ${{ always() && !inputs.verify_only }}

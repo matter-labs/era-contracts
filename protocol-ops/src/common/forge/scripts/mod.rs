@@ -11,14 +11,16 @@ use crate::common::abi::{
 
 pub mod deploy_ctm;
 pub mod deploy_ecosystem;
+pub mod member_deployments;
 pub mod register_chain;
+pub mod upgrade_executors;
 
 pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 
-/// The current release's core and CTM upgrade scripts, the prepare defaults. `scripts/new-release.ts`
-/// generates them as subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` and moves these paths on a
-/// release bump.
+/// The current release's core and CTM upgrade scripts, the prepare defaults. This line's current release is the
+/// registry bootstrap edge (`v35/`); the recurring edge (`v36/`) is selected with `--core-script-path` /
+/// `--ctm-script-path`. `scripts/new-release.ts` moves these paths on a release bump.
 pub const CURRENT_CORE_UPGRADE_SCRIPT_PATH: &str =
     "deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
 pub const CURRENT_CTM_UPGRADE_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";

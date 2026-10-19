@@ -61,8 +61,10 @@ jobs:
 
       - name: Checkout PR branch
         run: |
+          set -euo pipefail
           git fetch origin "${{ steps.pr.outputs.head_ref }}"
           git checkout "${{ steps.pr.outputs.head_ref }}"
+          git merge --ff-only FETCH_HEAD
           # The recursive checkout above already populated submodules at their
           # (branch-identical) pins via the checkout action's smarter fetch. A
           # plain `git submodule update` can fail on pins the submodule remote no

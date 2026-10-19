@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "../AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "../libraries/LibMap.sol";
-import {Diamond} from "../libraries/Diamond.sol";
 import {IZKChain} from "../chain-interfaces/IZKChain.sol";
 import {
     ExecutionDelayNotIncreased,
@@ -16,6 +15,7 @@ import {MAX_VALIDATOR_TIMELOCK_EXECUTION_DELAY} from "../../common/Config.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
+import {Diamond} from "../libraries/Diamond.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -349,8 +349,16 @@ contract ValidatorTimelock is
     /// @inheritdoc IChainUpgrader
     function upgradeChainFromVersion(
         address _chainAddress,
+        uint256 // _oldProtocolVersion (unused in this specific implementation)
+    ) external onlyRole(_chainAddress, UPGRADER_ROLE) {
+        _propagateToAddress(_chainAddress);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function upgradeChainFromVersion(
+        address _chainAddress,
         uint256, // _oldProtocolVersion (unused in this specific implementation)
-        Diamond.DiamondCutData calldata // _diamondCut (unused in this specific implementation)
+        Diamond.DiamondCutData calldata // _cutData (unused in this specific implementation)
     ) external onlyRole(_chainAddress, UPGRADER_ROLE) {
         _propagateToAddress(_chainAddress);
     }
