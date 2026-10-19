@@ -16,6 +16,7 @@ import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTest
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {
+    EmptyProof,
     InvalidDisabledProofSystemsMask,
     NonZeroCarriedHash,
     ProofTooShort,
@@ -196,7 +197,37 @@ contract MultiProofVerifierTest is Test {
         assertEq(address(verifier.ZISK_RANGE_VERIFIER()), address(passVerifier));
     }
 
+    function test_isTestnetVerifier_false() public view {
+        assertFalse(verifier.isTestnetVerifier());
+    }
+
+    /// @dev The two sub-verifiers report different key hashes, so this tells
+    ///      which one is forwarded: the Airbender one.
+    function test_verificationKeyHash_isAirbenderKeyHash() public {
+        MultiProofVerifier split = new MultiProofVerifier(
+            IVerifier(address(passVerifier)),
+            IVerifier(address(failVerifier))
+        );
+
+        assertEq(split.verificationKeyHash(), passVerifier.verificationKeyHash());
+    }
+
     // --- Proof-type gating ---
+
+    function test_emptyProof_reverts() public {
+        vm.expectRevert(EmptyProof.selector);
+        verifier.verify(_singlePublicInputs(), new uint256[](0));
+    }
+
+    /// @dev A multi-proof shorter than its three header words is refused
+    ///      before the Airbender length is read.
+    function test_proofShorterThanHeader_reverts() public {
+        uint256[] memory proof = new uint256[](2);
+        proof[0] = ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE;
+
+        vm.expectRevert(ProofTooShort.selector);
+        verifier.verify(_singlePublicInputs(), proof);
+    }
 
     function test_mockProof_rejected_in_prod() public {
         uint256[] memory publicInputs = _singlePublicInputs();
