@@ -81,16 +81,16 @@ pub fn verifier_only_prepare(upgrade: &str) -> anyhow::Result<ForgeScriptUpgrade
     })
 }
 
-/// How a verifier-only upgrade is executed on a ProtocolUpgradeHandler env: stages 0-2 as one
-/// emergency proposal of its Emergency Upgrade Board, written to `output/<env>/execution.json`.
-/// (A legacy-`Governance` env takes its transactions from the prepare's
-/// `[governance_operations]` instead.)
+/// How a verifier-only upgrade is executed on a ProtocolUpgradeHandler env: one emergency proposal
+/// of its Emergency Upgrade Board per stage, written to `output/<env>/execution.json`, so each
+/// stage can be executed on its own. (A legacy-`Governance` env takes its transactions from the
+/// prepare's `[governance_operations]` instead.)
 pub fn verifier_only_execution(upgrade: &str) -> anyhow::Result<ExecutionScript> {
     validate_upgrade_name(upgrade)?;
     Ok(ExecutionScript {
         script: "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
             .to_string(),
-        signature: "emergencyUpgradeAllStages(string,string,string)".to_string(),
+        signature: "emergencyUpgradeEachStage(string,string,string)".to_string(),
         args: vec![
             format!("/upgrade-envs/permanent-values/{ENV_PLACEHOLDER}.toml"),
             format!("/upgrade-envs/{upgrade}/output/{ENV_PLACEHOLDER}/ecosystem.toml"),

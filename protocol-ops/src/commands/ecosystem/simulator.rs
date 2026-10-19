@@ -37,6 +37,8 @@ alloy::sol! {
 ///   an address. Disambiguates same-`(target, selector)` calls with
 ///   different first args (e.g. `TPA.upgrade(<proxy>, <impl>)` across
 ///   multiple proxies in stage 1).
+/// - `tag`: only the governance-toml transactions of that tag (`stage0`, `stage1`, …), e.g. when one
+///   call (`ChainAssetHandler.pauseMigration`) recurs in two stages.
 /// - `inner_target` + `inner_selector`: for *wrapper* selectors
 ///   (`ChainAdmin.multicall`, legacy `Governance.scheduleTransparent` /
 ///   `executeInstant`), match against the FIRST inner call's target and/or
@@ -72,6 +74,8 @@ struct RawSimDescriptionEntry {
     inner_target: Option<String>,
     #[serde(default)]
     inner_selector: Option<String>,
+    #[serde(default)]
+    tag: Option<String>,
     desc: String,
 }
 
@@ -102,6 +106,8 @@ struct SimDescriptionEntry {
     inner_target: Option<Address>,
     /// For wrapper selectors — match the first inner call's 4-byte selector.
     inner_selector: Option<String>,
+    /// Only transactions emitted under this tag.
+    tag: Option<String>,
     desc: String,
 }
 
@@ -158,6 +164,7 @@ fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescripti
             second_bridge_address: resolve_opt("second_bridge_address", e.second_bridge_address)?,
             inner_target: resolve_opt("inner_target", e.inner_target)?,
             inner_selector: e.inner_selector,
+            tag: e.tag,
             desc: e.desc,
         });
     }
@@ -169,10 +176,18 @@ fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescripti
 
 impl SimDescriptionRegistry {
     fn lookup(&self, target: Address, data_hex: &str) -> Option<String> {
+        self.lookup_tagged(target, data_hex, None)
+    }
+
+    /// [`Self::lookup`] for a transaction emitted under `tag`: entries naming another tag are skipped.
+    fn lookup_tagged(&self, target: Address, data_hex: &str, tag: Option<&str>) -> Option<String> {
         let selector = data_hex.get(..10)?;
         let inner = parse_first_inner_call(data_hex);
         for entry in &self.entries {
             if entry.target != target {
+                continue;
+            }
+            if entry.tag.is_some() && entry.tag.as_deref() != tag {
                 continue;
             }
             if !entry.selector.eq_ignore_ascii_case(selector) {
@@ -1337,7 +1352,7 @@ fn governance_toml_to_simulator_transactions(
                 None
             };
             let description = descriptions
-                .lookup(call.target, &data_hex)
+                .lookup_tagged(call.target, &data_hex, Some(&format!("stage{stage}")))
                 .unwrap_or_else(|| {
                     let selector = data_hex.get(..10).unwrap_or("0x");
                     format!(
@@ -1392,7 +1407,7 @@ fn append_test_upgrade_calls(
         for (idx, call) in calls.into_iter().enumerate() {
             let data_hex = format!("0x{}", hex::encode(&call.data));
             let description = descriptions
-                .lookup(call.target, &data_hex)
+                .lookup_tagged(call.target, &data_hex, Some(tag))
                 .unwrap_or_else(|| {
                     let selector = data_hex.get(..10).unwrap_or("0x");
                     format!(
@@ -1501,5 +1516,61 @@ mod value_conversion_tests {
                 + U256::from_str_radix(&frac, 10).unwrap();
             assert_eq!(back, U256::from(wei), "round-trip failed for {wei} -> {s}");
         }
+    }
+}
+
+#[cfg(test)]
+mod description_tag_tests {
+    use super::*;
+
+    /// One call in two stages: each stage gets its own tagged entry, and an untagged entry
+    /// still matches every tag.
+    #[test]
+    fn a_tagged_entry_matches_only_its_tag() {
+        let raw: RawSimDescriptionRegistry = toml::from_str(
+            r#"
+[labels]
+cah = "0x0000000000000000000000000000000000000001"
+
+[[entries]]
+target = "cah"
+selector = "0xac700e63"
+tag = "stage0"
+desc = "stage 0 pause"
+
+[[entries]]
+target = "cah"
+selector = "0xac700e63"
+tag = "stage1"
+desc = "stage 1 pause"
+
+[[entries]]
+target = "cah"
+selector = "0xf7c7eb92"
+desc = "unpause"
+"#,
+        )
+        .unwrap();
+        let registry = build_registry(raw).unwrap();
+        let cah = Address::with_last_byte(1);
+        let lookup = |data: &str, tag| registry.lookup_tagged(cah, data, tag);
+        assert_eq!(
+            lookup("0xac700e63", Some("stage0")).as_deref(),
+            Some("stage 0 pause")
+        );
+        assert_eq!(
+            lookup("0xac700e63", Some("stage1")).as_deref(),
+            Some("stage 1 pause")
+        );
+        assert_eq!(lookup("0xac700e63", Some("stage2")), None);
+        assert_eq!(lookup("0xac700e63", None), None);
+        assert_eq!(
+            lookup("0xf7c7eb92", Some("stage2")).as_deref(),
+            Some("unpause")
+        );
+        assert_eq!(
+            registry.lookup(cah, "0xf7c7eb92").as_deref(),
+            Some("unpause")
+        );
     }
 }

@@ -26,24 +26,25 @@ stage 0/1/2 scaffold, the test calls and the standard output. Stage 1 differs: i
 with `createNewVerifierOnlyUpgrade`, and skips the proxy upgrades, `setDefaultUpgrade`,
 `setChainCreationParams` and `setNewVersionUpgrade`.
 
-| step                    | sender                                 | calls                                                                                                                                       |
-| ----------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| deploy (permissionless) | any EOA                                | CREATE2 factory: `ZKsyncOSVerifierPlonk`, `ZKsyncOSTestnetVerifier(plonk)`, `UpgradeStageValidator(ctm, v0.33.2)`, `GovernanceUpgradeTimer` |
-| stage 0                 | the CTM owner                          | `ChainAssetHandler.pauseMigration()`, `GovernanceUpgradeTimer.startTimer()`                                                                 |
-| stage 1                 | the CTM owner                          | `checkDeadline()`, `checkMigrationsPaused()`, `CTM.createNewVerifierOnlyUpgrade(0x2100000000, type(uint256).max, 0x2100000002, verifier)`   |
-| stage 2                 | the CTM owner                          | `checkProtocolUpgradePresence()`, `ChainAssetHandler.unpauseMigration()`, `checkMigrationsUnpaused()`                                       |
-| per chain               | the chain's ChainAdmin, from its owner | `ServerNotifier.setUpgradeTimestamp(chainId, 1)`, then `upgradeChainFromVersion(chain, 0x2100000000, cut)`                                  |
+| step                    | sender                                 | calls                                                                                                                                                                                                             |
+| ----------------------- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| deploy (permissionless) | any EOA                                | CREATE2 factory: `ZKsyncOSVerifierPlonk`, `ZKsyncOSTestnetVerifier(plonk)`, `UpgradeStageValidator(ctm, v0.33.2)`, `GovernanceUpgradeTimer`                                                                       |
+| stage 0                 | the CTM owner                          | `ChainAssetHandler.pauseMigration()`, `GovernanceUpgradeTimer.startTimer()`                                                                                                                                       |
+| stage 1                 | the CTM owner                          | ProtocolUpgradeHandler only: `ChainAssetHandler.pauseMigration()`; then `checkDeadline()`, `checkMigrationsPaused()`, `CTM.createNewVerifierOnlyUpgrade(0x2100000000, type(uint256).max, 0x2100000002, verifier)` |
+| stage 2                 | the CTM owner                          | `checkProtocolUpgradePresence()`, `ChainAssetHandler.unpauseMigration()`, `checkMigrationsUnpaused()`                                                                                                             |
+| per chain               | the chain's ChainAdmin, from its owner | `ServerNotifier.setUpgradeTimestamp(chainId, 1)`, then `upgradeChainFromVersion(chain, 0x2100000000, cut)`                                                                                                        |
 
 How the CTM owner sends the stages depends on the ecosystem:
 
 - a `Governance` with an EOA owner: one operation per stage, `scheduleTransparent(op, 0)` then `execute(op)`
   (`[governance_operations]` in the output);
-- a ProtocolUpgradeHandler: stages 0-2 as one emergency proposal through the Emergency Upgrade Board, the
-  board owner's `approveHash` on each member Safe then `executeEmergencyUpgrade`. One proposal is equivalent
-  to three because the timer delay is 0.
+- a ProtocolUpgradeHandler: one emergency proposal per stage through the Emergency Upgrade Board, each the
+  board owner's `approveHash` on each member Safe then `executeEmergencyUpgrade`. `executeEmergencyUpgrade`
+  unpauses migrations before it runs a proposal's calls, which undoes stage 0's pause, so stage 1 pauses them
+  again first (as the release's stage 1 does); a `Governance` runs the calls as given and needs no repeat.
 
 Either way the pipeline writes the transactions to `output/<env>/execution.json` and renders them as
-`output/<env>/EXECUTE.md`: for a ProtocolUpgradeHandler through `EmergencyStageUpgradeCalldata.s.sol`, for a
+`output/<env>/EXECUTE.md`: for a ProtocolUpgradeHandler through `EmergencyStageUpgradeCalldata.emergencyUpgradeEachStage`, for a
 `Governance` from `[governance_operations]` itself.
 
 `createNewVerifierOnlyUpgrade` builds the cut itself: no facet cuts, `initAddress` = the stored

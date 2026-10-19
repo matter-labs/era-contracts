@@ -750,3 +750,44 @@ fn rendered_pages_are_prettier_stable() {
         .unwrap();
     assert!(status.success(), "prettier would reformat a rendered page");
 }
+
+/// One proposal per stage: rounds of approvals, each closed by its own executeEmergencyUpgrade.
+#[test]
+fn emergency_lists_take_one_proposal_after_another() {
+    let sepolia = LoadOptions {
+        chain_id: Some(11_155_111),
+        ..Default::default()
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let renumber = |txs: &mut Vec<serde_json::Value>| {
+        for (i, tx) in txs.iter_mut().enumerate() {
+            tx["step"] = serde_json::json!(i + 1);
+        }
+    };
+
+    let path = emergency_fixture(dir.path(), |json| {
+        let mut txs = json["transactions"].as_array().unwrap().clone();
+        txs.extend(txs.clone());
+        renumber(&mut txs);
+        json["transactions"] = serde_json::Value::Array(txs);
+    });
+    let out = dir.path().join(RUNBOOK_FILE);
+    let runbook = load(&path, &out, &sepolia).unwrap();
+    assert_eq!(runbook.txs.len(), 26);
+    write(&out, &render(&runbook));
+    let page = fs::read_to_string(&out).unwrap();
+    assert!(
+        page.contains("2 emergency proposals, one after the other: txs 1 to 12 approve, tx 13 executes; txs 14 to 25 approve, tx 26 executes"),
+        "{page}"
+    );
+
+    // An execute must follow approvals of its own.
+    let path = emergency_fixture(dir.path(), |json| {
+        let mut txs = json["transactions"].as_array().unwrap().clone();
+        let execute = txs.last().unwrap().clone();
+        txs.push(execute);
+        renumber(&mut txs);
+        json["transactions"] = serde_json::Value::Array(txs);
+    });
+    assert!(load_error(&path, &sepolia).contains("must follow its proposal's approveHash txs"));
+}

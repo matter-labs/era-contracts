@@ -25,7 +25,14 @@ upgrade_stage_validator = "0xC04FC5Ed2fFD03b27E953afe4020fAC1e2f0f885"
 [[entries]]
 target = "chain_asset_handler"
 selector = "0xac700e63"
+tag = "stage0"
 desc = "Stage 0: pause chain migrations (ChainAssetHandler.pauseMigration) — the CTM refuses a new version otherwise"
+
+[[entries]]
+target = "chain_asset_handler"
+selector = "0xac700e63"
+tag = "stage1"
+desc = "Stage 1: pause chain migrations again (ChainAssetHandler.pauseMigration) — ProtocolUpgradeHandler.executeEmergencyUpgrade unpauses them before a proposal's calls, so a separate stage-1 proposal would fail checkMigrationsPaused"
 
 [[entries]]
 target = "gov_upgrade_timer"
