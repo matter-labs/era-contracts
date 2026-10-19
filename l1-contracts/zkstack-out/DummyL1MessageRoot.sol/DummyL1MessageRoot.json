@@ -1097,22 +1097,6 @@
   },
   {
     "type": "error",
-    "name": "ChainNotSettlingOnL1",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "settlementLayer",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "HashedLogIsDefault",
     "inputs": []
   },
