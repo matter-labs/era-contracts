@@ -847,17 +847,16 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         args.deployer_address
     ));
 
-    // Wipe the previous run's output, keeping only the committed real-network transaction log.
+    // Remove what the previous run wrote, so nothing stale survives into this one. Only those
+    // entries: the env dir also holds committed files no run regenerates (the real-network
+    // `transactions.txt`, READMEs, per-chain bundles, simulator scenarios).
     fs::create_dir_all(&output_dir)?;
-    for entry in fs::read_dir(&output_dir)? {
-        let entry = entry?;
-        if entry.file_name() != TRANSACTIONS_LOG {
-            let path = entry.path();
-            if path.is_dir() {
-                fs::remove_dir_all(&path)?;
-            } else {
-                fs::remove_file(&path)?;
-            }
+    for name in pipeline_outputs(&descriptor) {
+        let path = output_dir.join(name);
+        if path.is_dir() {
+            fs::remove_dir_all(&path)?;
+        } else if path.exists() {
+            fs::remove_file(&path)?;
         }
     }
     let paths = BundlePaths {
@@ -1017,6 +1016,31 @@ async fn write_execution_runbook(
     execution_runbook::write(&runbook, &path)?;
     logger::success(format!("Execution runbook: {}", path.display()));
     Ok(())
+}
+
+/// The `output/<env>/` entries a `rehearse-upgrade` run (and the generate workflow's simulator
+/// step after it) writes.
+fn pipeline_outputs(descriptor: &UpgradeDescriptor) -> Vec<&str> {
+    let mut names = vec![
+        "ecosystem.toml",
+        "prepare",
+        "deploy-bundle",
+        "fork-rehearsal",
+        EXTRA_VERIFICATION_LOGS,
+        "gw-verification-logs.txt",
+        execution_runbook::RUNBOOK_FILE,
+        GOVERNANCE_OPERATIONS_EXECUTION,
+        "sim-inputs",
+        "transaction-simulator.json",
+    ];
+    if let UpgradeDescriptor::ForgeScript(ForgeScriptUpgrade {
+        execution: Some(execution),
+        ..
+    }) = descriptor
+    {
+        names.push(execution.output.as_str());
+    }
+    names
 }
 
 /// `output/<env>/` file the transactions of a legacy-`Governance` env are written to.

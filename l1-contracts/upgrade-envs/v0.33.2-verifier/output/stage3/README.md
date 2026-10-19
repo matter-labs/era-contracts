@@ -29,7 +29,7 @@ against live stage3: it requires the CTM on v0.33.0. To reproduce the artifact, 
 deployment (block 11854783): `FORK_BLOCK=11854782 ./generate.sh stage3 2026-10-05`, or the
 generate-ecosystem-upgrade-calldata workflow with `upgrade=v0.33.2-verifier`, `environment=stage3`,
 `fork_block=11854782` and `deployer_address=0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`. Both reproduce
-`../output/stage3/ecosystem.toml`, `execution.json` and the ecosystem scenario byte for byte.
+`ecosystem.toml`, `execution.json` and the ecosystem scenario byte for byte.
 
 `test_create_chain_zkos` names the script's sender as the test chain's admin (`DefaultCTMUpgrade`), so it
 follows the deployer the pipeline runs as; the artifact first generated on 2026-10-05 named forge's default
@@ -38,7 +38,7 @@ sender there. The governance calls, the only calls executed, are unchanged.
 ## Deployed on Sepolia
 
 The four contracts were deployed on 2026-10-06 with `deploy.sh stage` and are source-verified on Etherscan.
-Hashes are in `../output/stage3/transactions.txt`.
+Hashes are in `transactions.txt`.
 
 | contract                  | address                                      | deploy tx     |
 | ------------------------- | -------------------------------------------- | ------------- |
@@ -54,7 +54,7 @@ already verified.
 ## Executing it
 
 1. Deploy: done.
-2. Governance: done. As the Governance owner, the six txs of [`../output/stage3/EXECUTE.md`](../output/stage3/EXECUTE.md):
+2. Governance: done. As the Governance owner, the six txs of [`EXECUTE.md`](EXECUTE.md):
    `stageN_schedule_calldata` then `stageN_execute_calldata` to the Governance for N = 0, 1, 2
    (`[governance_operations]`; `yarn execute-governance-instant` in the transaction-simulator sends the same
    transactions).

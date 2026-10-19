@@ -6,7 +6,7 @@
 #   2. governance stages 0/1/2: as the Governance owner's `scheduleTransparent` + `execute`, or as the
 #      Emergency Upgrade Board owner's `approveHash` txs + `executeEmergencyUpgrade`
 #      (output/<env>/execution.json), impersonated
-#   3. per chain, the committed bundles in <env>/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
+#   3. per chain, the committed bundles in output/<env>/chain-upgrades/<id>/: 01 (`setUpgradeTimestamp`)
 #      then 02 (the cut), both through the chain's ChainAdmin. A chain with committed-but-unexecuted batches at the fork
 #      block must refuse the cut (`NotAllBatchesExecuted`); every other chain must upgrade
 #   4. `[test_upgrade_calls].test_create_chain_zkos` as the bridgehub admin
@@ -165,7 +165,7 @@ chk "migrations unpaused again" "$(call "$CAH" 'migrationPaused()(bool)')" "fals
 bundle_tx() { python3 -c "import glob,json,sys; t=json.load(open(glob.glob(sys.argv[1])[0]))['transactions']; assert len(t)==1, t; print(t[0]['to'], t[0]['data'])" "$1"; }
 UPGRADED=0
 CHAIN_IDS=$(python3 -c "import tomllib; print(' '.join(tomllib.load(open('$OUT','rb'))['chain_upgrades']))")
-if [ ! -d "$HERE/$ENV/chain-upgrades" ]; then
+if [ ! -d "$HERE/output/$ENV/chain-upgrades" ]; then
   echo "no per-chain bundles in $ENV/chain-upgrades/ yet (generate-chain-upgrades.sh $ENV): chain step skipped"
   CHAIN_IDS=""
 fi
@@ -176,8 +176,8 @@ for CHAIN_ID in $CHAIN_IDS; do
   FACETS_BEFORE=$(cast call "$CHAIN" 'facetAddresses()(address[])' --rpc-url "$RPC")
   COMMITTED=$(call "$CHAIN" 'getTotalBatchesCommitted()(uint256)')
   EXECUTED=$(call "$CHAIN" 'getTotalBatchesExecuted()(uint256)')
-  read -r TS_TO TS_DATA < <(bundle_tx "$HERE/$ENV/chain-upgrades/$CHAIN_ID/01_*.safe.json")
-  read -r CUT_TO CUT_DATA < <(bundle_tx "$HERE/$ENV/chain-upgrades/$CHAIN_ID/02_*.safe.json")
+  read -r TS_TO TS_DATA < <(bundle_tx "$HERE/output/$ENV/chain-upgrades/$CHAIN_ID/01_*.safe.json")
+  read -r CUT_TO CUT_DATA < <(bundle_tx "$HERE/output/$ENV/chain-upgrades/$CHAIN_ID/02_*.safe.json")
   chk "chain $CHAIN_ID bundles go to its ChainAdmin" "$TS_TO $CUT_TO" "$ADMIN $ADMIN"
   chk "chain $CHAIN_ID cut bundle = chain_admin_calldata" "$CUT_DATA" "$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_calldata)"
   st=$(send "$OWNER" "$ADMIN" "$TS_DATA"); [ "$st" = "0x1" ] || fail "chain $CHAIN_ID setUpgradeTimestamp failed"

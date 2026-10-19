@@ -416,9 +416,9 @@ pub struct GovernanceTomlToSimulatorArgs {
 
     /// Acknowledge a checked tag that this artifact deliberately does not carry.
     ///
-    /// Emits an empty-calldata marker transaction tagged `ack_<tag>`. The transaction-simulator's
-    /// era-contracts provenance check accepts the marker in place of a derived entry, recording
-    /// that the reviewer knows the work exists elsewhere — for v33 that is the per-chain upgrade,
+    /// Emits an empty-calldata `alreadyExecuted` placeholder tagged `<tag>`, which the
+    /// transaction-simulator records without sending, so its provenance check finds the tag and
+    /// the reviewer sees that the work exists elsewhere — for v33 that is the per-chain upgrade,
     /// which `protocol_ops chain upgrade` produces as its own bundle because it needs
     /// preconditions (a recorded priority-op lower bound, an upgrade timestamp) that a single
     /// generated call cannot express.
@@ -576,6 +576,10 @@ struct SimulatorTransaction {
     )]
     emulate_all_batches_executed_for: Option<String>,
     tag: String,
+    /// Recorded but not sent: the simulator skips the entry. Used for the placeholder that stands
+    /// in for a checked tag an artifact deliberately does not carry (`--ack`).
+    #[serde(rename = "alreadyExecuted", skip_serializing_if = "Option::is_none")]
+    already_executed: Option<bool>,
 }
 
 /// Selector → time-advance map. When a sim tx targets one of these,
@@ -762,17 +766,17 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             })?;
     transactions.extend(governance);
 
-    // Acknowledgement markers, appended last. Empty calldata is load-bearing: the simulator
-    // rejects an `ack_` entry that carries any, precisely so it can never smuggle in a real call,
-    // and skips executing it. `to` is the governance sender so the entry is well-formed without
-    // naming a contract it does not touch.
+    // Acknowledgement placeholders, appended last: an inert `alreadyExecuted` entry carrying the
+    // checked tag itself, which the simulator records without sending. Empty calldata keeps it
+    // from ever standing for a real call; `to` is the governance sender so the entry is
+    // well-formed without naming a contract it does not touch.
     for tag in &args.acks {
         let tag = tag.trim_start_matches("ack_");
         logger::info(format!("Acknowledging absent tag {tag}"));
         transactions.push(SimulatorTransaction {
             description: format!(
-                "ACK: {tag} is deliberately absent from this artifact and is covered outside it. \
-                 The reviewer is responsible for checking wherever it is covered."
+                "Placeholder: {tag} is absent from this artifact. The per-chain upgrades are the \
+                 separate per-chain scenarios (tag chain_upgrade_<chainId>)."
             ),
             network: network.to_string(),
             from: format!("{from:#x}"),
@@ -783,7 +787,8 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             time_increase: None,
             emulate_all_batches_executed: None,
             emulate_all_batches_executed_for: None,
-            tag: format!("ack_{tag}"),
+            tag: tag.to_string(),
+            already_executed: Some(true),
         });
     }
 
@@ -1272,6 +1277,7 @@ fn manifest_to_simulator_transactions(
                 tag: ctm_admin_calls_tag(ctm_admin_calls_tags, tx)
                     .map(str::to_string)
                     .unwrap_or_else(|| format!("bundle_{}", bundle.index)),
+                already_executed: None,
             });
         }
     }
@@ -1352,6 +1358,7 @@ fn governance_toml_to_simulator_transactions(
                 emulate_all_batches_executed: None,
                 emulate_all_batches_executed_for: None,
                 tag: format!("stage{stage}"),
+                already_executed: None,
             });
         }
     }
@@ -1406,6 +1413,7 @@ fn append_test_upgrade_calls(
                 emulate_all_batches_executed,
                 emulate_all_batches_executed_for: None,
                 tag: tag.to_string(),
+                already_executed: None,
             });
         }
     }

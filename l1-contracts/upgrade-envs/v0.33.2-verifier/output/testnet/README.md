@@ -32,7 +32,7 @@ Two inputs in `../../testnet.toml` differ from stage:
 
 ## Deployed on Sepolia
 
-The four contracts were deployed on 2026-10-16 with `deploy.sh testnet` (hashes in `../output/testnet/transactions.txt`) and
+The four contracts were deployed on 2026-10-16 with `deploy.sh testnet` (hashes in `transactions.txt`) and
 are source-verified on Etherscan. They are inert until the emergency proposal names them.
 
 | contract                  | address                                      | deploy tx     |
@@ -49,7 +49,7 @@ directly; the other three were matched by Etherscan to identical bytecode it had
 ## Executing it
 
 1. Deploy: done.
-2. Governance: follow [`../output/testnet/EXECUTE.md`](../output/testnet/EXECUTE.md). The board owner `0xD64e1365…` sends the 12 `approveHash`
+2. Governance: follow [`EXECUTE.md`](EXECUTE.md). The board owner `0xD64e1365…` sends the 12 `approveHash`
    txs and then `executeEmergencyUpgrade` (tx 13), which runs stages 0-2 atomically.
 3. Per chain, once the v0.33.2 prover is live and the chain has no unexecuted batches, the ChainAdmin's owner
    follows `chain-upgrades/<id>/EXECUTE.md`: `01_*` (`setUpgradeTimestamp`), then `02_*` (the cut). See
