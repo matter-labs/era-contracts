@@ -8,17 +8,24 @@
 #   4. CREATE2 provenance of every deployer transaction
 #   5. on the fork, as the real senders (impersonated): the ServerNotifier upgrade, governance stages 0/1/2,
 #      chain 499's timestamp, its upgrade reverting while batches are in flight, the drain, the upgrade,
-#      a test chain, and the L1 state after each step
+#      a test chain, and the L1 state after each step; then v34's L1 behaviour on chain 499: the 15M cap on
+#      user L1->L2 transactions (before and after the upgrade), its first v34 batches committed, proved and
+#      executed (test/foundry/fork/V34EraStageFirstBatch.t.sol, in forge's memory), and the proof-system
+#      switches
 #
-# Needs: foundry (cast/anvil; forge for step 1), python3 >= 3.11 (tomllib), and for step 1 the Linux CI
-# build artifacts in {system,l1,l2}-contracts/zkout and l1-contracts/out (macOS zksolc hashes differ).
+# Needs: foundry (cast/anvil; forge for step 1 and the first-batch test), python3 >= 3.11 (tomllib), and for
+# step 1 the Linux CI build artifacts in {system,l1,l2}-contracts/zkout and l1-contracts/out (macOS zksolc
+# hashes differ).
 # Usage: L1_FORK_URL=<sepolia rpc> [FORK_BLOCK=<n>] ./rehearse-stage.sh      (PORT defaults to 8634)
 # Only the anvil it starts is stopped (by PID).
+# The first-batch test compiles contracts/ into FORK_TEST_OUT (default: a temp dir; never out/, zkout/ or
+# cache-forge/, which step 1 reads). FIRST_BATCH_TEST=0 skips it.
 #
 # The generate / deploy pipeline (upgrade.toml in this directory) reuses it:
 #   L1_RPC_URL=<fork>  ECOSYSTEM_TOML=<bundle's toml>  — check a fork the bundle was already replayed on
 #       (`protocol_ops ecosystem rehearse-upgrade` / `replay-bundle`): no anvil is started and step 1 is
-#       skipped. The deployer transactions are read from prepare/ next to ECOSYSTEM_TOML.
+#       skipped. The deployer transactions are read from prepare/ next to ECOSYSTEM_TOML. The first-batch
+#       test runs only with FIRST_BATCH_TEST=1.
 #   ... --published-only — read-only: only step 2, then stop. Safe against a real chain.
 # Steps 3–5 refuse any RPC that is not an Anvil fork of Sepolia.
 set -uo pipefail
@@ -36,6 +43,7 @@ OUT=${ECOSYSTEM_TOML:-$WT$OUT_REL}
 DEPLOYER=${DEPLOYER:-0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7}
 BROADCAST_LOG=
 FAILED=0
+SKIPPED=0
 python3 -c 'import tomllib' 2>/dev/null || { echo "REHEARSAL FAILED: needs python3 >= 3.11 (tomllib)"; exit 1; }
 
 # ---------------------------------------------------------------- stage facts (Sepolia)
@@ -73,8 +81,11 @@ chk() { [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo " 
 
 if [ -n "${L1_RPC_URL:-}" ]; then
   RPC="$L1_RPC_URL"
+  # Opt-in here: CI's verify-bundle-handoff has no build, and an RPC may cap the log search.
+  FIRST_BATCH_TEST=${FIRST_BATCH_TEST:-0}
   echo "using the chain at L1_RPC_URL, block $(cast block-number --rpc-url "$RPC")"
 else
+  FIRST_BATCH_TEST=${FIRST_BATCH_TEST:-1}
   : "${L1_FORK_URL:?set L1_FORK_URL to a Sepolia RPC}"
   RPC=http://127.0.0.1:$PORT
   anvil --fork-url "$L1_FORK_URL" ${FORK_BLOCK:+--fork-block-number "$FORK_BLOCK"} --port "$PORT" \
@@ -84,6 +95,8 @@ else
   for _ in $(seq 1 60); do cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 1; done
   echo "fork block: $(cast block-number --rpc-url "$RPC")"
 fi
+# The first-batch test searches the chain's history up to here.
+START_BLOCK=$(cast block-number --rpc-url "$RPC")
 export RPC
 
 # ---------------------------------------------------------------- 1. prepare
@@ -476,15 +489,19 @@ PYPROVENANCE
 
 # ---------------------------------------------------------------- 5. the fork flow
 call() { cast call "$@" --rpc-url "$RPC"; }
-# send FROM TO DATA LABEL — impersonated; cast waits for the receipt, kept in $S/receipt.json.
+# send FROM TO DATA LABEL [VALUE [GAS_PRICE]] — impersonated; cast waits for the receipt, kept in $S/receipt.json.
 send() {
-  cast send --unlocked --from "$1" "$2" "$3" --rpc-url "$RPC" --json 2> "$S/send.err" | grep '^{' | tail -1 > "$S/receipt.json"
+  cast send --unlocked --from "$1" "$2" "$3" ${5:+--value "$5"} ${6:+--gas-price "$6"} --rpc-url "$RPC" --json 2> "$S/send.err" | grep '^{' | tail -1 > "$S/receipt.json"
   st=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('status'))" "$S/receipt.json" 2>/dev/null)
   [ "$st" = "0x1" ] && echo "  OK   $4" || fail "$4 (status ${st:-none}: $(head -c 300 "$S/send.err"))"
 }
-# reverts LABEL FROM TO DATA [ERROR_SIGNATURE] — eth_call must revert, with that error when given.
+# calls LABEL FROM TO DATA [VALUE] — eth_call must succeed. No fee fields: it runs at gas price 0.
+calls() {
+  out=$(cast call --from "$2" "$3" "$4" ${5:+--value "$5"} --rpc-url "$RPC" 2>&1) && echo "  OK   $1" || fail "$1: $(echo "$out" | tail -1 | head -c 200)"
+}
+# reverts LABEL FROM TO DATA [ERROR_SIGNATURE [VALUE]] — eth_call must revert, with that error when given.
 reverts() {
-  out=$(cast call --from "$2" "$3" "$4" --rpc-url "$RPC" 2>&1) && { fail "$1: did not revert"; return; }
+  out=$(cast call --from "$2" "$3" "$4" ${6:+--value "$6"} --rpc-url "$RPC" 2>&1) && { fail "$1: did not revert"; return; }
   echo "$out" | grep -qi revert || { fail "$1: the call failed without a revert: $(echo "$out" | tail -1 | head -c 200)"; return; }
   if [ -n "${5:-}" ]; then
     # cast prints the error's selector, or its name when it can decode it.
@@ -493,6 +510,25 @@ reverts() {
   else
     echo "  OK   $1"
   fi
+}
+# emitted LABEL ADDRESS EVENT_SIGNATURE TOPICS DATA — $S/receipt.json holds exactly one such log. TOPICS: its
+# leading indexed arguments, space-separated numbers, or - for none; DATA: its exact (lowercase) hex data, or - for any.
+emitted() {
+  python3 - "$S/receipt.json" "$2" "$(cast keccak "$3")" "$4" "$5" <<'PYEMITTED' && echo "  OK   $1" || fail "$1"
+import json, sys
+receipt, address, topic0, topics, data = sys.argv[1:]
+# An empty TOPICS is an unread value, not "none".
+if not topics.strip():
+    sys.exit("     no topics given")
+want = [] if topics == "-" else [int(t, 0) for t in topics.split()]
+try:
+    logs = json.load(open(receipt))["logs"]
+except (OSError, ValueError, KeyError):
+    sys.exit("     no receipt")
+logs = [l for l in logs if l["address"].lower() == address.lower() and l["topics"][:1] == [topic0]]
+sys.exit(0 if len(logs) == 1 and [int(t, 16) for t in logs[0]["topics"][1:1 + len(want)]] == want
+         and data in ("-", logs[0]["data"].lower()) else 1)
+PYEMITTED
 }
 first() { awk '{print $1}'; }
 for a in "$PUH" "$ECO_ADMIN" "$ECO_ADMIN_OWNER" "$CHAIN_ADMIN_OWNER"; do
@@ -616,10 +652,132 @@ raise SystemExit(0 if ok else 1)
 PYFACETS
 }
 
+echo "== Chain 499's cap on user L1->L2 transactions, before the upgrade (a depositor's eth_call)"
+# A fresh address with no code: well-known dev-key addresses can carry EIP-7702 code on Sepolia.
+DEPOSITOR=0x5995a0003D4AbbF54CbD8C6B4DC3A83C1Ea5912B
+# The 15M cap bounds the tx body: l2GasLimit minus the overhead, 10,000 with no calldata or factory deps.
+CAP_GAS_LIMIT=15010000
+GAS_PER_PUBDATA=800 # REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+GAS_PRICE=100000000000 # 100 gwei: MINT covers the base cost up to it (eth_calls run at gas price 0)
+[ "$(cast code "$DEPOSITOR" --rpc-url "$RPC")" = "0x" ] || fail "depositor $DEPOSITOR has code on the fork"
+cast rpc anvil_setBalance "$DEPOSITOR" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
+MINT=$(call "$BRIDGEHUB" 'l2TransactionBaseCost(uint256,uint256,uint256,uint256)(uint256)' "$CHAIN_ID" "$GAS_PRICE" $((CAP_GAS_LIMIT + 1)) "$GAS_PER_PUBDATA" | first)
+case "$MINT" in '' | *[!0-9]*) fail "chain 499's l2TransactionBaseCost unreadable: ${MINT:-no answer}" ;; esac
+# deposit L2_GAS_LIMIT — requestL2TransactionDirect for chain 499: no L2 value or calldata, refunds to the depositor.
+deposit() {
+  cast calldata 'requestL2TransactionDirect((uint256,uint256,address,uint256,bytes,uint256,uint256,bytes[],address))' \
+    "($CHAIN_ID,$MINT,$DEPOSITOR,0,0x,$1,$GAS_PER_PUBDATA,[],$DEPOSITOR)"
+}
+chk "chain 499 priorityTxMaxGasLimit" "$(call "$DIAMOND" 'getPriorityTxMaxGasLimit()(uint256)' | first)" 72000000
+calls "before v34: l2GasLimit 15,010,001 is accepted" "$DEPOSITOR" "$BRIDGEHUB" "$(deposit $((CAP_GAS_LIMIT + 1)))" "$MINT"
+
 echo "== Chain 499's upgrade, sent by the ChainAdmin's owner"
 send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$UPGRADE_CALLDATA" "ChainAdmin multicall(upgradeChainFromVersion)"
 chain_state "chain 499:" "$DIAMOND"
 chk "chain 499: L2 upgrade tx hash = keccak(abi.encode(tx))" "$(call "$DIAMOND" 'getL2SystemContractsUpgradeTxHash()(bytes32)')" "$EXP_L2_TX_HASH"
+
+echo "== Chain 499's cap on user L1->L2 transactions on v34"
+calls "v34: l2GasLimit 15,010,000 (body = 15M) is accepted" "$DEPOSITOR" "$BRIDGEHUB" "$(deposit "$CAP_GAS_LIMIT")" "$MINT"
+reverts "v34: l2GasLimit 15,010,001 reverts with TooMuchGas" "$DEPOSITOR" "$BRIDGEHUB" "$(deposit $((CAP_GAS_LIMIT + 1)))" 'TooMuchGas()' "$MINT"
+PRIORITY_TXS=$(call "$DIAMOND" 'getTotalPriorityTxs()(uint256)' | first)
+send "$DEPOSITOR" "$BRIDGEHUB" "$(deposit "$CAP_GAS_LIMIT")" "v34: a deposit with l2GasLimit 15,010,000 at 100 gwei" "$MINT" "$GAS_PRICE"
+emitted "NewPriorityRequestId($PRIORITY_TXS, …) emitted by chain 499" "$DIAMOND" 'NewPriorityRequestId(uint256,bytes32)' "$PRIORITY_TXS" -
+chk "chain 499 getTotalPriorityTxs up by one" "$(call "$DIAMOND" 'getTotalPriorityTxs()(uint256)' | first)" "$((PRIORITY_TXS + 1))"
+
+echo "== Chain 499's first v34 batches, committed, proved and executed in forge's fork of this fork"
+FIRST_BATCH_TESTS=8 # the test_ functions in V34EraStageFirstBatch.t.sol
+# first_batches — the last v33 batch's stored info from its execute tx, then the fork test. Stops at the first failure.
+first_batches() {
+  local committed verified executed topic0 window from n=0 h prev want out_dir wt_dir lc_out lc_wt
+  read -r committed verified executed <<< "$(counts)"
+  case "$executed" in '' | *[!0-9]*) fail "first v34 batches: not run (chain 499's batch counts unreadable)"; return ;; esac
+  if [ "$committed" != "$executed" ] || [ "$verified" != "$executed" ] \
+    || [ "$(call "$DIAMOND" 'getProtocolVersion()(uint256)' | first)" != "$NEW" ]; then
+    fail "first v34 batches: not run (chain 499 not drained or not on v0.34.0)"; return
+  fi
+  case "$START_BLOCK" in '' | *[!0-9]*) fail "first v34 batches: not run (no start block)"; return ;; esac
+
+  # Only the calldata of the tx that executed it has the full stored info. Before START_BLOCK, Anvil asks upstream.
+  topic0=$(cast keccak 'BlockExecution(uint256,bytes32,bytes32)')
+  for window in 5000 50000; do
+    from=$((START_BLOCK > window ? START_BLOCK - window : 0))
+    cast logs --rpc-url "$RPC" --address "$DIAMOND" --from-block "$from" --to-block "$START_BLOCK" --json \
+      "$topic0" "$(cast to-uint256 "$executed")" > "$S/execution_logs.json" 2> "$S/execution_logs.err" \
+      || { fail "first v34 batches: cast logs failed: $(head -c 300 "$S/execution_logs.err")"; return; }
+    n=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$S/execution_logs.json") \
+      || { fail "first v34 batches: cast logs gave no JSON"; return; }
+    [ "$n" = "0" ] || break
+  done
+  [ "$n" = "1" ] || { fail "first v34 batches: $n BlockExecution logs for batch $executed in the $window blocks before $START_BLOCK"; return; }
+  h=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))[0]["transactionHash"])' "$S/execution_logs.json")
+  cast tx "$h" input --rpc-url "$RPC" > "$S/execute_input.hex" 2> "$S/execute_input.err" \
+    || { fail "first v34 batches: cannot read tx $h: $(head -c 300 "$S/execute_input.err")"; return; }
+  prev=$(python3 - "$S/execute_input.hex" "$executed" <<'PYPREV'
+import json, os, subprocess, sys
+
+def cast(*args):
+    r = subprocess.run(["cast", *args], capture_output=True, text=True)
+    if r.returncode:
+        raise SystemExit(f"     cast {args[0]} failed: {r.stderr.strip()[:400]}")
+    return r.stdout.strip()
+
+SIG = "executeBatchesSharedBridge(address,uint256,uint256,bytes)"
+# v33's StoredBatchInfo (no airbenderCommitment) and execute data, after the version byte 0x01.
+STORED = "(uint64,bytes32,uint64,uint256,bytes32,bytes32,bytes32,uint256,bytes32)"
+EXECUTE = f"f({STORED}[],(bytes32[],bytes32[],bytes32[])[],(uint256,uint256,bytes32[])[][],(uint8,bool,uint16,address,bytes32,bytes32)[][],bytes[][],bytes32[],address)"
+tx_input, batch = open(sys.argv[1]).read().strip(), int(sys.argv[2])
+if tx_input[:10] != cast("sig", SIG):
+    raise SystemExit(f"     not {SIG}: {tx_input[:10]}")
+# --json: the plain output appends annotations such as [1.077e5].
+chain, _, _, data = json.loads(cast("calldata-decode", "--json", SIG, tx_input))
+if chain.lower() != os.environ["DIAMOND"].lower() or data[:4] != "0x01":
+    raise SystemExit(f"     not chain 499's v33 execute data: chain {chain}, version byte {data[:4]}")
+stored = [b for b in json.loads(cast("abi-decode", "--input", "--json", EXECUTE, "0x" + data[4:]))[0] if int(str(b[0]), 0) == batch]
+if len(stored) != 1:
+    raise SystemExit(f"     batch {batch} appears {len(stored)} times in the execute data")
+print(cast("abi-encode", f"f({STORED})", "(" + ",".join(str(x) for x in stored[0]) + ")"))
+PYPREV
+  ) || { fail "first v34 batches: batch $executed's execute tx $h does not decode (see above)"; return; }
+  want=$(call "$DIAMOND" 'storedBatchHash(uint256)(bytes32)' "$executed")
+  [ -n "$want" ] && [ "$(cast keccak "$prev" | tr A-F a-f)" = "$(echo "$want" | tr A-F a-f)" ] \
+    || { fail "first v34 batches: batch $executed's stored info from tx $h does not hash to storedBatchHash ${want:-(unreadable)}"; return; }
+  echo "  OK   batch $executed's stored info, decoded from its execute tx $h, reproduces storedBatchHash"
+
+  # Step 1 needs out/, zkout/ and cache-forge/ to hold the CI build and nothing else.
+  FORK_TEST_OUT=${FORK_TEST_OUT:-$S/forge}
+  out_dir=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$FORK_TEST_OUT") && wt_dir=$(cd "$WT" && pwd -P) \
+    || { fail "first v34 batches: cannot resolve FORK_TEST_OUT=$FORK_TEST_OUT"; return; }
+  # Compared in lower case: macOS file systems ignore case.
+  lc_out=$(echo "$out_dir/" | tr '[:upper:]' '[:lower:]'); lc_wt=$(echo "$wt_dir" | tr '[:upper:]' '[:lower:]')
+  case "$lc_out" in "$lc_wt/" | "$lc_wt"/out/* | "$lc_wt"/zkout/* | "$lc_wt"/cache-forge/*)
+    fail "first v34 batches: FORK_TEST_OUT must be outside l1-contracts/{out,zkout,cache-forge}"; return ;;
+  esac
+  echo "     forge test, build in $out_dir"
+  (cd "$WT" && V34_PREV_BATCH="$prev" forge test --fork-url "$RPC" --no-storage-caching \
+    --match-path test/foundry/fork/V34EraStageFirstBatch.t.sol --out "$out_dir/out" --cache-path "$out_dir/cache" \
+    --json > "$S/first_batch.json" 2> "$S/first_batch.err")
+  # Every test must pass: a skipped or missing one fails too.
+  python3 - "$S/first_batch.json" "$FIRST_BATCH_TESTS" <<'PYFORGE' && echo "  OK   first v34 batches: all $FIRST_BATCH_TESTS fork tests passed" \
+    || { fail "first v34 batches (forge stderr: $S/first_batch.err)"; tail -30 "$S/first_batch.err" | sed 's/^/     /'; }
+import json, sys
+try:
+    suites = json.load(open(sys.argv[1]))
+except ValueError as e:
+    raise SystemExit(f"     forge wrote no JSON results: {e}")
+results = [(f"{suite.split(':')[-1]}.{name}", t["status"], t.get("reason")) for suite, r in suites.items() for name, t in r["test_results"].items()]
+for name, status, reason in results:
+    if status != "Success":
+        print(f"     {status} {name}: {reason}")
+passed = sum(status == "Success" for _, status, _ in results)
+print(f"     {passed} of {len(results)} passed, {sys.argv[2]} expected")
+sys.exit(0 if passed == len(results) == int(sys.argv[2]) else 1)
+PYFORGE
+}
+case "$FIRST_BATCH_TEST" in
+  1) first_batches ;;
+  0) echo "  SKIP first v34 batches (set FIRST_BATCH_TEST=1)"; SKIPPED=$((SKIPPED + 1)) ;;
+  *) fail "FIRST_BATCH_TEST must be 0 or 1, got '$FIRST_BATCH_TEST'" ;;
+esac
 
 echo "== Test chain created with the new params, as the bridgehub admin"
 read -r TC_TARGET TC_DATA < "$S/test_create_chain.txt"
@@ -631,9 +789,39 @@ else
   fail "test chain not registered"
 fi
 
+# Last: it changes chain 499's disabledProofSystems, which chain_state expects at (false, false). It restores them.
+echo "== Chain 499's proof-system switches, sent by the ChainAdmin's owner"
+BOOJUM=0 AIRBENDER=1 # ProofSystem ordinals; the disabledProofSystems mask bit is 1 << ordinal
+SET_PS='setProofSystemStatus(uint8,bool)'
+NOTIFY_PS='notifyProofSystemStatus(uint256,(bool,bool))'
+MULTICALL='multicall((address,uint256,bytes)[],bool)'
+chk "verifier supportedProofSystems = Boojum | Airbender" "$(call "$VERIFIER" 'supportedProofSystems()(uint8)')" 3
+reverts "setProofSystemStatus from the ChainAdmin's owner directly reverts" "$CHAIN_ADMIN_OWNER" "$DIAMOND" \
+  "$(cast calldata "$SET_PS" "$AIRBENDER" false)" 'Unauthorized(address)'
+reverts "notifyProofSystemStatus from the ChainAdmin's owner directly reverts" "$CHAIN_ADMIN_OWNER" "$SN" \
+  "$(cast calldata "$NOTIFY_PS" "$CHAIN_ID" '(false,true)')" 'Unauthorized(address)'
+NOTIFY=$(cast calldata "$NOTIFY_PS" "$CHAIN_ID" '(false,true)')
+SET=$(cast calldata "$SET_PS" "$AIRBENDER" false)
+send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$(cast calldata "$MULTICALL" "[($SN,0,$NOTIFY),($DIAMOND,0,$SET)]" true)" \
+  "ChainAdmin multicall(notify (false, true), disable Airbender)"
+emitted "ProofSystemStatusNotified(499, (false, true)) emitted by the ServerNotifier" "$SN" \
+  'ProofSystemStatusNotified(uint256,(bool,bool))' "$CHAIN_ID" "$(cast abi-encode 'f(bool,bool)' false true)"
+emitted "NewDisabledProofSystems(0, 2) emitted by chain 499" "$DIAMOND" 'NewDisabledProofSystems(uint8,uint8)' "0 2" 0x
+chk "chain 499: disabledProofSystems = (false, true)" "$(call "$DIAMOND" 'disabledProofSystems()((bool,bool))')" "(false, true)"
+reverts "disabling Boojum too reverts with InvalidDisabledProofSystemsMask" "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" \
+  "$(cast calldata "$MULTICALL" "[($DIAMOND,0,$(cast calldata "$SET_PS" "$BOOJUM" false))]" true)" 'InvalidDisabledProofSystemsMask(uint8)'
+NOTIFY=$(cast calldata "$NOTIFY_PS" "$CHAIN_ID" '(false,false)')
+SET=$(cast calldata "$SET_PS" "$AIRBENDER" true)
+send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$(cast calldata "$MULTICALL" "[($SN,0,$NOTIFY),($DIAMOND,0,$SET)]" true)" \
+  "ChainAdmin multicall(notify (false, false), re-enable Airbender)"
+emitted "ProofSystemStatusNotified(499, (false, false)) emitted by the ServerNotifier" "$SN" \
+  'ProofSystemStatusNotified(uint256,(bool,bool))' "$CHAIN_ID" "$(cast abi-encode 'f(bool,bool)' false false)"
+emitted "NewDisabledProofSystems(2, 0) emitted by chain 499" "$DIAMOND" 'NewDisabledProofSystems(uint8,uint8)' "2 0" 0x
+chk "chain 499: disabledProofSystems = (false, false) again" "$(call "$DIAMOND" 'disabledProofSystems()((bool,bool))')" "(false, false)"
+
 echo
 if [ "$FAILED" = "0" ]; then
-  echo "REHEARSAL PASSED"
+  [ "$SKIPPED" = "0" ] && echo "REHEARSAL PASSED" || echo "REHEARSAL PASSED ($SKIPPED check skipped)"
 else
   echo "REHEARSAL FAILED ($FAILED)"
   exit 1

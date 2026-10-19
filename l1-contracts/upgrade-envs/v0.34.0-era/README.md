@@ -73,8 +73,9 @@ Script: `deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol`.
 
 `rehearse-stage.sh` decodes and encodes with `cast` and derives every expected value itself, from stage's
 facts, `AllContractsHashes.json`, the v34 genesis and v33's committed output (for the 31 force deployments).
-It needs Foundry and python3 (for TOML and JSON), but no contract build. Apart from the read-only
-`--published-only` check, it runs only against an Anvil fork of Sepolia. It checks:
+It needs Foundry and python3 (for TOML and JSON), but no contract build (the first-batch test builds its
+own). Apart from the read-only `--published-only` check, it runs only against an Anvil fork of Sepolia. It
+checks:
 
 - every deployer transaction: each CREATE2 deployment uses the env's salt, its init code is a reviewed
   bytecode (`evmBytecodeHash`) plus the expected constructor arguments, and its address is the one in
@@ -88,10 +89,23 @@ It needs Foundry and python3 (for TOML and JSON), but no contract build. Apart f
   chain 499's timestamp (the `UpgradeTimestampUpdated` event); its upgrade reverting with
   `NotAllBatchesExecuted`; the drain, by a `REVERTER_ROLE` holder through the ValidatorTimelock; the
   upgrade (version, hashes, verifier, facets, selectors, freezable flags, the L2 tx hash, both proofs
-  required, the 15M cap); every factory dep published; and a test chain created with the new parameters.
+  required, the 15M cap); every factory dep published; and a test chain created with the new parameters;
+- the 15M cap on user L1→L2 transactions, through the bridgehub. It bounds the body, `l2GasLimit` minus a
+  10,000 overhead, so 15,010,001 is accepted before the upgrade and reverts with `TooMuchGas` after it,
+  while 15,010,000 is accepted and sent;
+- chain 499's first v34 batches (`test/foundry/fork/V34EraStageFirstBatch.t.sol`, which forge runs on a
+  fork of the rehearsal's fork): the upgrade batch commits on the last v33 batch, decoded from its execute
+  transaction, proves with an empty proof and executes, clearing the pending upgrade; a second batch chains
+  on it. A missing or wrong upgrade log, a missing Airbender heap hash, executing before proving, a
+  malformed proof, v33's encoding and a v34 predecessor without its Airbender commitment revert. The
+  batches are synthetic (calldata DA, no L2 execution), so public inputs and verification keys are not
+  checked;
+- last, the proof-system switches: through the ChainAdmin, disabling Airbender (both events,
+  `disabledProofSystems = (false, true)`), disabling Boojum too (reverts) and re-enabling; sent directly,
+  both calls revert.
 
 Not covered: the L2 side, that is, the L2 upgrade transaction's execution and a new chain's genesis
-transaction.
+transaction; real batches and proofs.
 
 ## Running it
 
@@ -113,6 +127,12 @@ factory-dep check against the genesis hashes fails on it.
 
   Without protocol_ops, `L1_FORK_URL=<rpc> ./rehearse-stage.sh` prepares and checks on its own Anvil fork.
   Against a real chain, only `--published-only` applies.
+
+- **First-batch test:** on by default with `L1_FORK_URL`; through protocol_ops only with
+  `FIRST_BATCH_TEST=1` in its environment (CI doesn't set it; skipped, the run ends
+  `REHEARSAL PASSED (1 check skipped)`). It builds `contracts/` and the test (about 470 files, 16 s on a
+  laptop) into a temporary directory, or into `FORK_TEST_OUT` to reuse the build; that must be outside
+  `out/`, `zkout/` and `cache-forge/`. It needs chain 499 to have executed a batch in the last 50,000 blocks.
 
 Executing it (not done for this dummy) follows `AGENTS.md`, "Executing Stage and Testnet Upgrades": the
 deployments, then the emergency proposal, then the ServerNotifier upgrade, then per chain the timestamp
