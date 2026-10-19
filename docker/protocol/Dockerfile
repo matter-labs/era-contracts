@@ -208,8 +208,10 @@ COPY --from=forge-builder /zk-governance /zk-governance
 
 # The wrapper in local mode, for harnesses that call `./protocol-ops.sh` from
 # the contracts root (build-docker.yaml rehearses the anvil-interop upgrade
-# test inside the image).
+# test inside the image). The test also hashes the image's build with
+# scripts/calculate-hashes.ts for `verify-bootstrap --contract-hashes`.
 COPY --from=forge-builder /contracts/protocol-ops.sh /contracts/protocol-ops.sh
+COPY --from=forge-builder /contracts/scripts/calculate-hashes.ts /contracts/scripts/calculate-hashes.ts
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help && \
