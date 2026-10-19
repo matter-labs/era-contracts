@@ -421,9 +421,23 @@
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
-      },
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "chainBalanceBackfillPending",
+    "inputs": [
       {
-        "name": "set",
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "pending",
         "type": "bool",
         "internalType": "bool"
       }
@@ -565,6 +579,13 @@
   },
   {
     "type": "function",
+    "name": "initializeUpgrade",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "legacyBridgedOut",
     "inputs": [
       {
@@ -594,6 +615,19 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "markBackfilled",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1021,15 +1055,22 @@
         "internalType": "bytes32"
       },
       {
-        "name": "deposited",
+        "name": "amount",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
-      },
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ChainMarkedBackfilled",
+    "inputs": [
       {
-        "name": "withdrawn",
+        "name": "chainId",
         "type": "uint256",
-        "indexed": false,
+        "indexed": true,
         "internalType": "uint256"
       }
     ],
@@ -1238,17 +1279,23 @@
   },
   {
     "type": "error",
-    "name": "ChainBalanceBackfillNotSet",
+    "name": "ChainBalanceBackfillNotPending",
     "inputs": [
       {
         "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
-      },
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ChainBalanceBackfillPending",
+    "inputs": [
       {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
