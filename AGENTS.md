@@ -473,6 +473,18 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 
 Whenever an agent makes changes in a PR, it **MUST** update the PR description to reflect the current state of the changes and ensure it is up to date. If the PR already has a description with existing styling or wording, the agent **MUST** follow that same style and tone when updating it.
 
+### Description Structure
+
+The description explains the change at a high level. Keep the headers of `.github/pull_request_template.md` (What / Why / Checklist). Under **What**:
+
+- **Goal:** 1–2 sentences.
+- **How it works:** 3–4 sentences, more only if needed. Describe the flows, not contract names.
+- **Affected contracts**, **breaking changes** and **upgrade** (how the upgrade is supposed to happen): each only if relevant. If one needs more than 1–2 sentences, summarize it in 1–2 and link the docs the PR adds or changes (e.g. under `protocol-docs/`).
+
+Under **Why**: the problem behind the change, briefly, without repeating the Goal.
+
+Test results, regenerated files and other status don't go at the top: fold them into a `<details>` block before the Checklist.
+
 ## Git Best Practices
 
 ### Pushing and Creating PRs
