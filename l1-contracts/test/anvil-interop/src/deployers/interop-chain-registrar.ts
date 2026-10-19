@@ -25,14 +25,12 @@ export class InteropChainRegistrar {
     const l1Bridgehub = new ethers.Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), this.l1Wallet);
     const ntv = new ethers.Contract(this.l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), this.l1Wallet);
     // When interop is enabled, a chain holds only ETH and its base token. The chains are created on this release,
-    // so the vault's counters cover their whole history and every backfill is zero.
+    // so the vault's counters cover their whole history and nothing is backfilled.
     const assetIds: string[] = [
       ...new Set<string>([await ntv.BASE_TOKEN_ASSET_ID(), await l1Bridgehub.baseTokenAssetId(chainId)]),
     ];
 
     await this.requireChainAdmin(zkChain);
-    const zeroBackfills = assetIds.map(() => 0);
-    await (await ntv.setChainBalanceBackfill(chainId, assetIds, zeroBackfills)).wait();
     await (await zkChain.permanentlyRequireSecondProofSystem()).wait();
     await (await messageRoot.enableInterop(chainId, true)).wait();
     for (const assetId of assetIds) {

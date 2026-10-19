@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ProofSystem, ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/Config.sol";
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
-    ChainNotSettlingOnL1,
     InteropAlreadyEnabled,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
@@ -20,7 +18,6 @@ import {InteropGatingDeployer} from "../_SharedInteropGatingDeployer.t.sol";
 /// {protocol-docs/interop-gating.md#enabling-interop}.
 contract EnableInteropTest is InteropGatingDeployer {
     uint256 internal constant UNREGISTERED_CHAIN_ID = 123456;
-    uint256 internal constant GATEWAY_CHAIN_ID = 506;
 
     uint256 internal chainId;
     address internal chain;
@@ -90,23 +87,6 @@ contract EnableInteropTest is InteropGatingDeployer {
             governance,
             UNREGISTERED_CHAIN_ID,
             abi.encodeWithSelector(ZKChainNotRegistered.selector)
-        );
-    }
-
-    /// @dev The Bridgehub's settlement layer is mocked: moving the chain off L1 needs a Gateway, which this
-    /// suite stays clear of.
-    function test_enableInterop_revertWhen_notSettlingOnL1() public {
-        _permanentlyRequireSecondProofSystem(chainId);
-        vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeCall(IBridgehubBase.settlementLayer, (chainId)),
-            abi.encode(GATEWAY_CHAIN_ID)
-        );
-
-        _expectEnableInteropRevert(
-            governance,
-            chainId,
-            abi.encodeWithSelector(ChainNotSettlingOnL1.selector, chainId, GATEWAY_CHAIN_ID)
         );
     }
 

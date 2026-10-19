@@ -5,11 +5,12 @@ pragma solidity 0.8.28;
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {ChainBalanceBackfill, IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
+import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
 import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
@@ -17,7 +18,7 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {IWETH9} from "../interfaces/IWETH9.sol";
 
-import {ETH_TOKEN_ADDRESS, INTEROP_POOL_CHAIN_ID, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
+import {ERC1967_ADMIN_SLOT, ETH_TOKEN_ADDRESS, INTEROP_POOL_CHAIN_ID, MAX_TOKEN_BALANCE} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
@@ -29,6 +30,7 @@ import {
     InvalidChainId,
     NoFundsTransferred,
     OriginChainIdNotFound,
+    Unauthorized,
     WithdrawFailed,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
@@ -36,7 +38,8 @@ import {
     AssetNotNativeToL1,
     ChainBalanceAlreadyInInteropPool,
     ChainBalanceBackfillAlreadySet,
-    ChainBalanceBackfillNotSet,
+    ChainBalanceBackfillNotPending,
+    ChainBalanceBackfillPending,
     ChainBalanceExceeded,
     OnlyFailureStatusAllowed,
     WrongCounterpart
@@ -46,13 +49,14 @@ import {ILegacyL1AssetTracker} from "../asset-tracker/ILegacyL1AssetTracker.sol"
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {InteropNotEnabled} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
+import {IProxyUpgradeInitializable} from "../../upgrades/registry/IUpgradeInit.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The L1 vault holding native ETH and ERC20 tokens bridged into the ZK chains.
 /// See {protocol-docs/bridging.md#native-token-vault}.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVaultBase {
+contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, IProxyUpgradeInitializable, NativeTokenVaultBase {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
@@ -95,10 +99,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public chainTotalWithdrawn;
 
     /// @inheritdoc IL1NativeTokenVault
-    mapping(uint256 chainId => mapping(bytes32 assetId => ChainBalanceBackfill backfill)) public chainBalanceBackfill;
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public chainBalanceBackfill;
 
     /// @inheritdoc IL1NativeTokenVault
     mapping(uint256 chainId => mapping(bytes32 assetId => bool moved)) public chainBalanceInInteropPool;
+
+    /// @inheritdoc IL1NativeTokenVault
+    mapping(uint256 chainId => bool pending) public chainBalanceBackfillPending;
 
     /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
@@ -219,25 +226,35 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(assetIdsLength == _amounts.length, ArrayLengthMismatch(assetIdsLength, _amounts.length));
         for (uint256 i = 0; i < assetIdsLength; ++i) {
             bytes32 assetId = _assetIds[i];
-            require(!chainBalanceBackfill[_chainId][assetId].set, ChainBalanceBackfillAlreadySet(_chainId, assetId));
-            chainBalanceBackfill[_chainId][assetId] = ChainBalanceBackfill({amount: _amounts[i], set: true});
+            require(chainBalanceBackfill[_chainId][assetId] == 0, ChainBalanceBackfillAlreadySet(_chainId, assetId));
+            if (chainBalanceInInteropPool[_chainId][assetId]) {
+                // The chain's own totals stopped changing when it got interop, so this is exactly what the
+                // move would have added with the backfill set.
+                chainTotalDeposited[INTEROP_POOL_CHAIN_ID][assetId] +=
+                    _netChainBalance(_chainId, assetId, _amounts[i]) - _netChainBalance(_chainId, assetId, 0);
+            }
+            chainBalanceBackfill[_chainId][assetId] = _amounts[i];
             emit ChainBalanceBackfilled(_chainId, assetId, _amounts[i]);
         }
     }
 
     /// @inheritdoc IL1NativeTokenVault
+    function markBackfilled(uint256 _chainId) external onlyOwner {
+        require(chainBalanceBackfillPending[_chainId], ChainBalanceBackfillNotPending(_chainId));
+        chainBalanceBackfillPending[_chainId] = false;
+        emit ChainMarkedBackfilled(_chainId);
+    }
+
+    /// @inheritdoc IL1NativeTokenVault
     function moveChainBalanceToInteropPool(uint256 _chainId, bytes32 _assetId) external {
         require(_messageRoot().isInteropEnabled(_chainId), InteropNotEnabled(_chainId));
+        require(!chainBalanceBackfillPending[_chainId], ChainBalanceBackfillPending(_chainId));
         require(!chainBalanceInInteropPool[_chainId][_assetId], ChainBalanceAlreadyInInteropPool(_chainId, _assetId));
-        ChainBalanceBackfill memory backfill = chainBalanceBackfill[_chainId][_assetId];
-        require(backfill.set, ChainBalanceBackfillNotSet(_chainId, _assetId));
 
-        uint256 deposited = chainTotalDeposited[_chainId][_assetId] + backfill.amount;
-        uint256 withdrawn = chainTotalWithdrawn[_chainId][_assetId];
+        uint256 amount = _netChainBalance(_chainId, _assetId, chainBalanceBackfill[_chainId][_assetId]);
         chainBalanceInInteropPool[_chainId][_assetId] = true;
-        chainTotalDeposited[INTEROP_POOL_CHAIN_ID][_assetId] += deposited;
-        chainTotalWithdrawn[INTEROP_POOL_CHAIN_ID][_assetId] += withdrawn;
-        emit ChainBalanceMovedToInteropPool(_chainId, _assetId, deposited, withdrawn);
+        chainTotalDeposited[INTEROP_POOL_CHAIN_ID][_assetId] += amount;
+        emit ChainBalanceMovedToInteropPool(_chainId, _assetId, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -265,6 +282,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_owner != address(0), ZeroAddress());
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         _transferOwnership(_owner);
+    }
+
+    /// @inheritdoc IProxyUpgradeInitializable
+    /// @dev Marks every chain registered before the upgrade as pending its backfill.
+    /// See {protocol-docs/interop-gating.md#backfill}.
+    /// @dev Only the proxy admin, i.e. through `upgradeToAndCall`: a vault deployed after the upgrade is at version 1 too.
+    function initializeUpgrade() external reinitializer(2) {
+        require(msg.sender == StorageSlot.getAddressSlot(ERC1967_ADMIN_SLOT).value, Unauthorized(msg.sender));
+        uint256[] memory chainIds = IBridgehubBase(address(L1_NULLIFIER.BRIDGE_HUB())).getAllZKChainChainIDs();
+        uint256 chainIdsLength = chainIds.length;
+        for (uint256 i = 0; i < chainIdsLength; ++i) {
+            chainBalanceBackfillPending[chainIds[i]] = true;
+        }
     }
 
     /// @inheritdoc IL1NativeTokenVault
@@ -417,12 +447,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         (bool tracked, uint256 balanceChainId) = _trackedBalance(_chainId, assetOriginChainId);
         if (tracked) {
             uint256 newWithdrawn = chainTotalWithdrawn[balanceChainId][_assetId] + _amount;
-            uint256 available = chainTotalDeposited[balanceChainId][_assetId];
-            // No backfill is ever set for `INTEROP_POOL_CHAIN_ID`, so the pool reads zero here.
-            uint256 backfill = chainBalanceBackfill[balanceChainId][_assetId].amount;
-            // Written as two comparisons so that a backfill close to `type(uint256).max` cannot overflow.
-            if (newWithdrawn > available && newWithdrawn - available > backfill) {
-                revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, available + backfill);
+            if (!chainBalanceBackfillPending[balanceChainId]) {
+                uint256 limit = chainTotalDeposited[balanceChainId][_assetId] +
+                    chainBalanceBackfill[balanceChainId][_assetId];
+                if (newWithdrawn > limit) {
+                    revert ChainBalanceExceeded(_chainId, _assetId, newWithdrawn, limit);
+                }
             }
             chainTotalWithdrawn[balanceChainId][_assetId] = newWithdrawn;
         }
@@ -444,6 +474,17 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             return (!messageRoot.isInteropEnabled(_assetOriginChainId), INTEROP_POOL_CHAIN_ID);
         }
         return (_assetOriginChainId != _chainId, _chainId);
+    }
+
+    /// @notice Returns what `_chainId` holds in `_assetId` by its own totals and the given backfill, zero if it
+    /// withdrew more. See {protocol-docs/interop-gating.md#interop-pool}.
+    /// @param _chainId The chain.
+    /// @param _assetId The asset.
+    /// @param _backfill The backfill to count.
+    function _netChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _backfill) internal view returns (uint256) {
+        uint256 balance = chainTotalDeposited[_chainId][_assetId] + _backfill;
+        uint256 withdrawn = chainTotalWithdrawn[_chainId][_assetId];
+        return balance > withdrawn ? balance - withdrawn : 0;
     }
 
     /// @notice Returns the L1 message root, which records the chains with interop.

@@ -169,8 +169,8 @@ tokens) and rejects fee-on-transfer tokens (`TokensWithFeesNotSupported`).
   with `safeTransfer`). Chain-balance bookkeeping is decreased **before** funds are handed out so that a
   malicious token or ETH recipient cannot overwrite the transient values from `L1Nullifier`.
   The mint amount's correctness is guaranteed by the ZK proofs of the sending chain (plus 2FA on ZKsync OS
-  chains). On L1, chains without interop are additionally capped at what was deposited into them
-  ({protocol-docs/interop-gating.md#per-chain-balance-cap}). Token _metadata_ in the mint data is not
+  chains). On L1, chains without interop are additionally capped at what was deposited into them, chains
+  registered before the cap once they are backfilled ({protocol-docs/interop-gating.md#per-chain-balance-cap}). Token _metadata_ in the mint data is not
   verified — a known issue affecting UX only, never loss of funds, acceptable while chain type managers are
   decently trusted.
 - Bridged tokens are `BridgedStandardERC20` beacon proxies deployed via CREATE2 at a deterministic address

@@ -1,23 +1,23 @@
 # Interop gating
 
-Interop between L1-settled chains is opt-in at two levels:
+Interop is opt-in at two levels:
 
 - Chains are **disabled** by default. Governance (the Bridgehub owner) enables a chain manually and one-way,
   normally only after the chain has permanently required its second proof system.
 - A chain's admin chooses its interop peers on L1. Both chains of a pair must be enabled.
 
-|                   | Disabled chain (default)                                                                       | Enabled chain                                                                                              |
-| ----------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| L1 escrow         | capped: the chain can withdraw only what was deposited into it ([cap](#per-chain-balance-cap)) | capped together: the enabled chains can withdraw only what was deposited into them ([pool](#interop-pool)) |
-| Interop peers     | none can be whitelisted                                                                        | enabled chains its admin whitelisted ([whitelist](#interop-peer-whitelist))                                |
-| L1 asset handlers | the native token vault and the chain asset handler ([restriction](#asset-handler-restriction)) | any                                                                                                        |
+|                   | Disabled chain (default)                                                                                       | Enabled chain                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| L1 escrow         | capped once backfilled: the chain can withdraw only what was deposited into it ([cap](#per-chain-balance-cap)) | capped together: the enabled chains can withdraw only what was deposited into them ([pool](#interop-pool)) |
+| Interop peers     | none can be whitelisted                                                                                        | enabled chains its admin whitelisted ([whitelist](#interop-peer-whitelist))                                |
+| L1 asset handlers | the native token vault and the chain asset handler ([restriction](#asset-handler-restriction))                 | any                                                                                                        |
 
 ## Safety argument
 
 Moving a chain's balance into the [interop pool](#interop-pool) at enabling already requires governance to trust the
 chain's whole history, so forged interop state is covered by the same attestation. An enabled chain's broken prover
-can lose the pool, but not the escrow of disabled chains. Before enabling, a disabled chain's broken prover can only
-lose funds deposited into that chain:
+can lose the pool, but not the escrow of disabled chains. Before enabling, and once it is [backfilled](#backfill), a
+disabled chain's broken prover can only lose funds deposited into that chain:
 
 - the [cap](#per-chain-balance-cap) stops it from withdrawing more than was deposited into it;
 - the [asset handler restriction](#asset-handler-restriction) keeps it away from L1 handlers that don't apply the cap;
@@ -47,7 +47,7 @@ out of the chain admin's hands.
 ## Enabling interop
 
 `L1MessageRoot.enableInterop(chainId, requireSecondProofSystem)` is callable only by the Bridgehub owner. It
-requires the chain to be registered and to settle on L1. It is one-way: there is no way to disable interop again
+requires the chain to be registered. It is one-way: there is no way to disable interop again
 (`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads the result.
 
 With `requireSecondProofSystem`, the chain must also permanently require its second proof system
@@ -67,8 +67,10 @@ the vault since the cap was introduced:
   withdrawals and claimed failed deposits.
 
 A withdrawal or failed-deposit claim that would make `chainTotalWithdrawn` exceed
-`chainTotalDeposited + chainBalanceBackfill` reverts with `ChainBalanceExceeded`. Once the chain is enabled, its
-flows count in the [interop pool](#interop-pool) instead, and these counters stop.
+`chainTotalDeposited + chainBalanceBackfill` reverts with `ChainBalanceExceeded`, unless the chain is pending its
+[backfill](#backfill): its balance from before the upgrade is not known yet, so its withdrawals are not capped, but they
+still count in `chainTotalWithdrawn`. Once the chain is enabled, its flows count in the [interop pool](#interop-pool)
+instead, and these counters stop.
 
 - Assets native to the chain are not tracked. The chain mints them anyway, so a forged withdrawal of one only
   affects the holders of that chain's token.
@@ -85,7 +87,7 @@ which no chain can have: the Bridgehub caps chain IDs at `type(uint48).max` (`Ch
 - `chainTotalDeposited[INTEROP_POOL_CHAIN_ID][assetId]`: everything bridged to enabled chains since they were
   enabled, plus the moved balances.
 - `chainTotalWithdrawn[INTEROP_POOL_CHAIN_ID][assetId]`: everything released or minted on L1 for enabled chains since
-  they were enabled, plus the withdrawals of the moved balances.
+  they were enabled.
 
 A withdrawal or failed-deposit claim from an enabled chain that would make the pool's withdrawn total exceed its
 deposited total reverts with `ChainBalanceExceeded`, which then carries the pool's totals. The pool has no backfill of
@@ -95,23 +97,33 @@ its own: the moved balances bring theirs.
   other enabled chains without passing L1, so the pool can't bound them. An asset whose origin chain is enabled
   later stops being tracked from then on.
 - A chain's balance from before it was enabled stays outside the pool until
-  `moveChainBalanceToInteropPool(chainId, assetId)` adds `chainTotalDeposited + chainBalanceBackfill` and
-  `chainTotalWithdrawn` to the pool. Anyone can call it, once per chain and asset (`ChainBalanceAlreadyInInteropPool`),
-  after the chain is enabled and once its [backfill](#backfill) for the asset is set (`ChainBalanceBackfillNotSet`).
-- Until the move, the chain's withdrawals draw only on the pool and may revert, so the backfill is set before
+  `moveChainBalanceToInteropPool(chainId, assetId)` adds it, `chainTotalDeposited + chainBalanceBackfill -
+chainTotalWithdrawn`, to the pool's deposits. A negative balance, possible only for withdrawals made while the chain
+  was pending its backfill, moves zero: the pool doesn't take on the chain's deficit. Anyone can call it, once per
+  chain and asset (`ChainBalanceAlreadyInInteropPool`), after the chain is enabled and once it is no longer pending
+  its [backfill](#backfill) (`ChainBalanceBackfillPending`).
+- Until the move, the chain's withdrawals draw only on the pool and may revert, so the chain is backfilled before
   enabling and the balance is moved right after ([Order per chain](#order-per-chain)).
 
 ## Backfill
 
-The counters start at zero when the cap is introduced, while chains already hold escrow. The vault owner
-(governance) supplies each chain's pre-upgrade balance as `chainBalanceBackfill[chainId][assetId]`, an amount and a
-flag that tells a zero backfill from none:
+The counters start at zero when the cap is introduced, while chains already hold escrow. The upgrade that introduces
+the cap marks every chain registered so far as pending its backfill (`chainBalanceBackfillPending`), from the vault's
+`initializeUpgrade`, which only the proxy admin can call (`upgradeToAndCall`), once; chains registered later are
+capped from creation. The vault owner (governance) supplies a pending chain's pre-upgrade balance as
+`chainBalanceBackfill[chainId][assetId]` and then closes the chain's window:
 
 - `setChainBalanceBackfill(chainId, assetIds, amounts)` sets the amounts, once per chain and asset
-  (`ChainBalanceBackfillAlreadySet`). It refuses `INTEROP_POOL_CHAIN_ID` (`InvalidChainId`): the pool has no backfill.
+  (`ChainBalanceBackfillAlreadySet`; a zero amount leaves the asset settable). A chain's assets may take several
+  calls. It refuses `INTEROP_POOL_CHAIN_ID` (`InvalidChainId`), which has no backfill.
+- `markBackfilled(chainId)` ends the chain's pending state (`ChainBalanceBackfillNotPending` otherwise), which caps
+  it in every asset from then on.
 
-Until a chain's backfill is set, its users can only withdraw what was deposited after the upgrade, and its balance
-can't move to the pool. The amounts are in [Backfill amounts](#backfill-amounts).
+While a chain is pending, it is not capped ([cap](#per-chain-balance-cap)), and its balances can't move to the pool.
+A backfill set on a chain that is not pending raises its cap at once, so governance can still add an asset it missed.
+If the asset was already moved to the pool, the pool's deposits grow instead, by what the move would have added with
+the backfill set: the chain's own counters no longer change once it is enabled.
+The amounts are in [Backfill amounts](#backfill-amounts).
 
 ## Asset handler restriction
 
@@ -133,7 +145,7 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 - **`allowInteropPeer(chainId, peerChainId)`** is callable only by `chainId`'s admin. It sets the flag and sends an
   L2 service transaction to `chainId`'s `L2Bridgehub.allowInteropPeer`, which sets `isPeerAllowed` and the peer's
   `baseTokenAssetId`.
-  - Both chains must be registered, settle on L1 and be enabled (`InteropNotEnabled`). The peer can be neither the
+  - Both chains must be registered and enabled (`InteropNotEnabled`). The peer can be neither the
     chain itself nor L1 (`InvalidInteropPeer`), and must have a batch in L1's message root
     ({protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}).
   - An allowed peer stays allowed (`InteropPeerAlreadyAllowed` on a second call) until `deregisterInteropPairs`
@@ -219,13 +231,13 @@ Before `enableInterop(X)`:
 - check X's whole history:
   - the proof modes since the upgrade (no single-proven batches is recommended);
   - the interop X finalized or refunded while it was disabled;
-- set X's backfill for every asset X holds.
+- set X's backfill for every asset X holds, then mark X backfilled.
 
 ### Order per chain
 
 1. Chain upgrade.
 2. Governance deregisters the chain's legacy pairs.
-3. Backfill.
+3. Governance sets the chain's backfill and marks it backfilled.
 4. The admin turns ZiSK on and calls `permanentlyRequireSecondProofSystem`.
 5. Governance calls `enableInterop`.
 6. Anyone calls `moveChainBalanceToInteropPool` for each asset the chain holds.
@@ -248,14 +260,16 @@ SDKs should check both whitelists on L1 before sending.
 ### K2: undetermined backfill credits
 
 A [backfill credit](#backfill-amounts) that depends on a chain that stays disabled may never be determined. Since the
-backfill is set once, governance either includes it at its own risk or leaves it out, and then the affected users
-can't withdraw it.
+backfill of an asset is set once, governance either includes it at its own risk or leaves it out, and then the
+affected users can't withdraw it.
 
 ### Other limitations
 
 - Enabled chains stay in the pool, even after an emergency ZiSK-off.
 - Assets native to an enabled chain are not tracked by the pool ([interop pool](#interop-pool)).
 - Pre-upgrade history is trusted.
+- A chain registered before the upgrade is not capped until governance marks it backfilled, so governance does that
+  soon after the chain's upgrade.
 - The CTM, the upgrade contracts and the verifier code are trusted.
 - Disabled chains' L2->L1 messages stay verifiable, so apps that accept them take on that chain's prover risk.
 - Custom-handler deposits to disabled chains would be stranded ([restriction](#asset-handler-restriction)). There

@@ -6,15 +6,6 @@ import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
-/// @notice A governance-provided amount of an asset a chain held before its deposits and withdrawals were
-/// recorded. See {protocol-docs/interop-gating.md#backfill}.
-/// @param amount The backfill amount.
-/// @param set Whether governance set the backfill, which tells a zero backfill from none.
-struct ChainBalanceBackfill {
-    uint256 amount;
-    bool set;
-}
-
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -65,20 +56,23 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     function chainTotalDeposited(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Total amount of `_assetId` withdrawn from `_chainId`, failed-deposit claims included, while
-    /// the chain had no interop. For `INTEROP_POOL_CHAIN_ID`, the total withdrawn from the chains with interop,
-    /// moved chain balances included.
+    /// the chain had no interop. For `INTEROP_POOL_CHAIN_ID`, the total withdrawn from the chains with interop.
     function chainTotalWithdrawn(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Governance-provided amount of `_assetId` the chain held before its deposits and withdrawals
-    /// were recorded, and whether it was set. See {protocol-docs/interop-gating.md#backfill}.
-    function chainBalanceBackfill(uint256 _chainId, bytes32 _assetId) external view returns (uint256 amount, bool set);
+    /// were recorded. See {protocol-docs/interop-gating.md#backfill}.
+    function chainBalanceBackfill(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     /// @notice Whether the balance of `_chainId` in `_assetId` was moved to the interop pool.
     /// See {protocol-docs/interop-gating.md#interop-pool}.
     function chainBalanceInInteropPool(uint256 _chainId, bytes32 _assetId) external view returns (bool);
 
-    /// @notice Sets the backfill of `_chainId` for each asset, once per chain and asset. Not for `INTEROP_POOL_CHAIN_ID`.
-    /// See {protocol-docs/interop-gating.md#backfill}.
+    /// @notice Whether `_chainId` was registered before the upgrade and governance hasn't marked it backfilled yet;
+    /// such a chain is not capped. See {protocol-docs/interop-gating.md#backfill}.
+    function chainBalanceBackfillPending(uint256 _chainId) external view returns (bool);
+
+    /// @notice Sets the backfill of `_chainId` for each asset, once per chain and asset, and adds it to the interop
+    /// pool for an asset already moved there. Not for `INTEROP_POOL_CHAIN_ID`. See {protocol-docs/interop-gating.md#backfill}.
     /// @param _chainId The chain to set the backfill for.
     /// @param _assetIds The assets to set the backfill for.
     /// @param _amounts The backfill amounts, one per entry of `_assetIds`.
@@ -88,8 +82,13 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
         uint256[] calldata _amounts
     ) external;
 
-    /// @notice Moves the balance of `_chainId` in `_assetId`, its backfill included, to the interop pool.
-    /// Callable by anyone once the chain has interop and its backfill for the asset is set.
+    /// @notice Marks a pending chain backfilled, which caps it from then on.
+    /// See {protocol-docs/interop-gating.md#backfill}.
+    /// @param _chainId The pending chain.
+    function markBackfilled(uint256 _chainId) external;
+
+    /// @notice Moves what `_chainId` holds in `_assetId`, its backfill included, to the interop pool.
+    /// Callable by anyone once the chain has interop and is not pending its backfill.
     /// See {protocol-docs/interop-gating.md#interop-pool}.
     /// @param _chainId The chain with interop.
     /// @param _assetId The asset to move.
@@ -100,13 +99,11 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
     /// @notice Emitted with the new backfill of `assetId` on `chainId`.
     event ChainBalanceBackfilled(uint256 indexed chainId, bytes32 indexed assetId, uint256 amount);
 
-    /// @notice Emitted when the balance of `chainId` in `assetId` moves to the interop pool.
-    event ChainBalanceMovedToInteropPool(
-        uint256 indexed chainId,
-        bytes32 indexed assetId,
-        uint256 deposited,
-        uint256 withdrawn
-    );
+    /// @notice Emitted when governance marks the pending `chainId` backfilled.
+    event ChainMarkedBackfilled(uint256 indexed chainId);
+
+    /// @notice Emitted with the amount added to the interop pool when the balance of `chainId` in `assetId` moves there.
+    event ChainBalanceMovedToInteropPool(uint256 indexed chainId, bytes32 indexed assetId, uint256 amount);
 
     /// @notice Emitted for every asset folded into `bridgedOut`, including zero amounts.
     event BridgedOutPopulated(bytes32 indexed assetId, uint256 amount);

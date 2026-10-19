@@ -20,8 +20,6 @@ error ChainExists();
 error ChainHasNoBatchesInMessageRoot(uint256 chainId);
 // 0xf8d5f418
 error ChainNotReadyForMigration(uint256 chainId);
-// 0xdffa46a4
-error ChainNotSettlingOnL1(uint256 chainId, uint256 settlementLayer);
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
 // 0x48857c1d

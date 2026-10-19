@@ -19,7 +19,6 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
-    ChainNotSettlingOnL1,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
     InteropPeerNotAllowed,
@@ -82,8 +81,6 @@ contract ChainRegistrationSender is
         _checkPeerPair(_chainId, _peerChainId);
         require(BRIDGE_HUB.getZKChain(_peerChainId) != address(0), ZKChainNotRegistered());
         require(!interopPeerAllowed[_chainId][_peerChainId], InteropPeerAlreadyAllowed(_chainId, _peerChainId));
-        _checkSettlesOnL1(_chainId);
-        _checkSettlesOnL1(_peerChainId);
         IL1MessageRoot messageRoot = IL1MessageRoot(address(BRIDGE_HUB.messageRoot()));
         require(messageRoot.isInteropEnabled(_chainId), InteropNotEnabled(_chainId));
         require(messageRoot.isInteropEnabled(_peerChainId), InteropNotEnabled(_peerChainId));
@@ -181,15 +178,6 @@ contract ChainRegistrationSender is
             BRIDGE_HUB.settlementLayer(_peerChainId) == _chainId
         ) {
             revert InvalidInteropPeer(_chainId, _peerChainId);
-        }
-    }
-
-    /// @notice Reverts unless `_chainId` settles on L1.
-    /// @param _chainId The chain to check.
-    function _checkSettlesOnL1(uint256 _chainId) internal view {
-        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
-        if (settlementLayer != block.chainid) {
-            revert ChainNotSettlingOnL1(_chainId, settlementLayer);
         }
     }
 

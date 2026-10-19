@@ -13,7 +13,6 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE, ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/Config.sol";
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
-    ChainNotSettlingOnL1,
     InteropAlreadyEnabled,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
@@ -52,10 +51,9 @@ contract L1MessageRootEnableInteropTest is Test {
             )
         );
 
-        // A registered chain that settles on L1 and is ready for interop; each test breaks one condition.
+        // A registered chain that is ready for interop; each test breaks one condition.
         vm.mockCall(bridgehub, abi.encodeCall(IOwnable.owner, ()), abi.encode(governance));
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.getZKChain, (CHAIN_ID)), abi.encode(zkChain));
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.settlementLayer, (CHAIN_ID)), abi.encode(block.chainid));
         vm.mockCall(zkChain, abi.encodeCall(IGetters.isSecondProofSystemRequired, ()), abi.encode(true));
         vm.mockCall(
             zkChain,
@@ -88,18 +86,6 @@ contract L1MessageRootEnableInteropTest is Test {
 
         vm.prank(governance);
         vm.expectRevert(ZKChainNotRegistered.selector);
-        messageRoot.enableInterop(CHAIN_ID, true);
-    }
-
-    function test_enableInterop_revertWhen_notSettlingOnL1() public {
-        vm.mockCall(
-            bridgehub,
-            abi.encodeCall(IBridgehubBase.settlementLayer, (CHAIN_ID)),
-            abi.encode(GATEWAY_CHAIN_ID)
-        );
-
-        vm.prank(governance);
-        vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, CHAIN_ID, GATEWAY_CHAIN_ID));
         messageRoot.enableInterop(CHAIN_ID, true);
     }
 
@@ -143,19 +129,6 @@ contract L1MessageRootEnableInteropTest is Test {
         messageRoot.enableInterop(CHAIN_ID, false);
 
         assertTrue(messageRoot.isInteropEnabled(CHAIN_ID));
-    }
-
-    /// @notice The registration, settlement-layer and one-way checks hold without the flag too.
-    function test_enableInterop_withoutSecondProofSystem_revertWhen_notSettlingOnL1() public {
-        vm.mockCall(
-            bridgehub,
-            abi.encodeCall(IBridgehubBase.settlementLayer, (CHAIN_ID)),
-            abi.encode(GATEWAY_CHAIN_ID)
-        );
-
-        vm.prank(governance);
-        vm.expectRevert(abi.encodeWithSelector(ChainNotSettlingOnL1.selector, CHAIN_ID, GATEWAY_CHAIN_ID));
-        messageRoot.enableInterop(CHAIN_ID, false);
     }
 
     // add this to be excluded from coverage report
