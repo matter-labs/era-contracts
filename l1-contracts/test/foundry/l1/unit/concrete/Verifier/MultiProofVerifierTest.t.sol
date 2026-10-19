@@ -364,6 +364,37 @@ contract MultiProofVerifierTest is Test {
         assertTrue(expecting.verify(pis, _type5Proof(0, 2)));
     }
 
+    /// @dev Each sub-verifier receives exactly its own section: the Airbender
+    ///      words after the three header words, then the 24 ZiSK words. Words
+    ///      after the ZiSK section reach neither.
+    function testFuzz_subVerifiers_receiveExactSections(uint8 _airbenderLen, uint8 _trailingLen, uint256 _seed) public {
+        uint256[] memory pis = _rangePublicInputs();
+        uint256 ziskStart = 3 + uint256(_airbenderLen);
+        uint256[] memory proof = new uint256[](ziskStart + 24 + _trailingLen);
+        proof[0] = 5;
+        proof[2] = _airbenderLen;
+        for (uint256 i = 3; i < proof.length; ++i) {
+            proof[i] = uint256(keccak256(abi.encode(_seed, i)));
+        }
+
+        uint256[] memory airbenderSection = new uint256[](_airbenderLen);
+        for (uint256 i = 0; i < _airbenderLen; ++i) {
+            airbenderSection[i] = proof[3 + i];
+        }
+        uint256[] memory ziskSection = new uint256[](24);
+        for (uint256 i = 0; i < 24; ++i) {
+            ziskSection[i] = proof[ziskStart + i];
+        }
+
+        MockPassVerifier airbender = new MockPassVerifier();
+        MockPassVerifier zisk = new MockPassVerifier();
+        MultiProofVerifier split = new MultiProofVerifier(IVerifier(address(airbender)), IVerifier(address(zisk)));
+
+        vm.expectCall(address(airbender), abi.encodeCall(IVerifier.verify, (pis, airbenderSection)), 1);
+        vm.expectCall(address(zisk), abi.encodeCall(IVerifier.verify, (pis, ziskSection)), 1);
+        assertTrue(split.verify(pis, proof));
+    }
+
     // --- Sub-verifier seen by the deployment tooling ---
 
     /// @dev The chain's verifier is a multi-proof wrapper, and the deployment
