@@ -138,10 +138,10 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
             revert NonZeroCarriedHash();
         }
 
-        uint256 airbenderLen = _proof[2];
+        uint256 ziskStart = 3 + _proof[2];
         // 24 = the ZiSK SNARK proof words. The ZiSK public values are no
         // longer carried: the range verifier reconstructs them on-chain.
-        if (_proof.length < 3 + airbenderLen + ZISK_SNARK_PROOF_LENGTH) {
+        if (_proof.length < ziskStart + ZISK_SNARK_PROOF_LENGTH) {
             revert ProofTooShort();
         }
 
@@ -151,11 +151,7 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         // as well would apply the truncation of a one-element fold twice, and
         // the Airbender lane behind this wrapper would see a value the lane
         // without the wrapper never sees.
-        uint256[] memory airbenderProof = new uint256[](airbenderLen);
-        for (uint256 i = 0; i < airbenderLen; ++i) {
-            airbenderProof[i] = _proof[3 + i];
-        }
-        if (!AIRBENDER_VERIFIER.verify(_publicInputs, airbenderProof)) {
+        if (!AIRBENDER_VERIFIER.verify(_publicInputs, _proof[3:ziskStart])) {
             revert AirbenderVerificationFailed();
         }
 
@@ -168,12 +164,7 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         // inherent: a ZiSK proof attesting to a different transition would
         // reconstruct a different signal and fail here. Only the 24-word SNARK
         // is passed through.
-        uint256 ziskStart = 3 + airbenderLen;
-        uint256[] memory ziskProof = new uint256[](ZISK_SNARK_PROOF_LENGTH);
-        for (uint256 i = 0; i < ZISK_SNARK_PROOF_LENGTH; ++i) {
-            ziskProof[i] = _proof[ziskStart + i];
-        }
-        if (!ZISK_RANGE_VERIFIER.verify(_publicInputs, ziskProof)) {
+        if (!ZISK_RANGE_VERIFIER.verify(_publicInputs, _proof[ziskStart:ziskStart + ZISK_SNARK_PROOF_LENGTH])) {
             revert ZiskVerificationFailed();
         }
 

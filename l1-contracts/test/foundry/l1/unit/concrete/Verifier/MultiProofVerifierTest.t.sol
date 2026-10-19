@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ProofSystem, DisabledProofSystems} from "contracts/common/Config.sol";
+import {
+    ProofSystem,
+    DisabledProofSystems,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZISK_SNARK_PROOF_LENGTH
+} from "contracts/common/Config.sol";
 
 import {Test} from "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -11,6 +16,7 @@ import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTest
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {
+    EmptyProof,
     InvalidDisabledProofSystemsMask,
     NonZeroCarriedHash,
     ProofTooShort,
@@ -191,7 +197,37 @@ contract MultiProofVerifierTest is Test {
         assertEq(address(verifier.ZISK_RANGE_VERIFIER()), address(passVerifier));
     }
 
+    function test_isTestnetVerifier_false() public view {
+        assertFalse(verifier.isTestnetVerifier());
+    }
+
+    /// @dev The two sub-verifiers report different key hashes, so this tells
+    ///      which one is forwarded: the Airbender one.
+    function test_verificationKeyHash_isAirbenderKeyHash() public {
+        MultiProofVerifier split = new MultiProofVerifier(
+            IVerifier(address(passVerifier)),
+            IVerifier(address(failVerifier))
+        );
+
+        assertEq(split.verificationKeyHash(), passVerifier.verificationKeyHash());
+    }
+
     // --- Proof-type gating ---
+
+    function test_emptyProof_reverts() public {
+        vm.expectRevert(EmptyProof.selector);
+        verifier.verify(_singlePublicInputs(), new uint256[](0));
+    }
+
+    /// @dev A multi-proof shorter than its three header words is refused
+    ///      before the Airbender length is read.
+    function test_proofShorterThanHeader_reverts() public {
+        uint256[] memory proof = new uint256[](2);
+        proof[0] = ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE;
+
+        vm.expectRevert(ProofTooShort.selector);
+        verifier.verify(_singlePublicInputs(), proof);
+    }
 
     function test_mockProof_rejected_in_prod() public {
         uint256[] memory publicInputs = _singlePublicInputs();
@@ -362,6 +398,37 @@ contract MultiProofVerifierTest is Test {
         );
 
         assertTrue(expecting.verify(pis, _type5Proof(0, 2)));
+    }
+
+    /// @dev Each sub-verifier receives exactly its own section: the Airbender
+    ///      words after the three header words, then the 24 ZiSK words. Words
+    ///      after the ZiSK section reach neither.
+    function testFuzz_subVerifiers_receiveExactSections(uint8 _airbenderLen, uint8 _trailingLen, uint256 _seed) public {
+        uint256[] memory pis = _rangePublicInputs();
+        uint256 ziskStart = 3 + uint256(_airbenderLen);
+        uint256[] memory proof = new uint256[](ziskStart + ZISK_SNARK_PROOF_LENGTH + _trailingLen);
+        proof[0] = ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE;
+        proof[2] = _airbenderLen;
+        for (uint256 i = 3; i < proof.length; ++i) {
+            proof[i] = uint256(keccak256(abi.encode(_seed, i)));
+        }
+
+        uint256[] memory airbenderSection = new uint256[](_airbenderLen);
+        for (uint256 i = 0; i < _airbenderLen; ++i) {
+            airbenderSection[i] = proof[3 + i];
+        }
+        uint256[] memory ziskSection = new uint256[](ZISK_SNARK_PROOF_LENGTH);
+        for (uint256 i = 0; i < ZISK_SNARK_PROOF_LENGTH; ++i) {
+            ziskSection[i] = proof[ziskStart + i];
+        }
+
+        MockPassVerifier airbender = new MockPassVerifier();
+        MockPassVerifier zisk = new MockPassVerifier();
+        MultiProofVerifier split = new MultiProofVerifier(IVerifier(address(airbender)), IVerifier(address(zisk)));
+
+        vm.expectCall(address(airbender), abi.encodeCall(IVerifier.verify, (pis, airbenderSection)), 1);
+        vm.expectCall(address(zisk), abi.encodeCall(IVerifier.verify, (pis, ziskSection)), 1);
+        assertTrue(split.verify(pis, proof));
     }
 
     // --- Sub-verifier seen by the deployment tooling ---
