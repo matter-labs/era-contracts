@@ -105,10 +105,12 @@ image's, and the outputs land there.
      --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
    ```
 
-3. Send the governance calls (in the bundle's `ecosystem.toml`) through your Governance, from its
-   owner. The deploy bundle's governance Safe bundle schedules them with no delay and executes them,
-   which only a zero `minDelay` allows: with a delay (ADI's is three days), schedule them with it and
-   execute once it has passed, or have your security council execute them.
+3. Send the governance calls, stages 0, 1 and 2 under `[governance_calls]` in the bundle's
+   `ecosystem.toml`, through your Governance from its owner: schedule each stage with at least your
+   `minDelay` (three days for ADI), then execute it once the delay has passed, or have your security
+   council execute it instantly. Steps 1 and 2 don't run these calls, so the delay doesn't affect
+   them. `ecosystem upgrade-governance` writes the calls as a Safe bundle that schedules with no
+   delay, which a Governance with a `minDelay` refuses (`InvalidDelay`), on a fork too.
 
 How to mount the bundle (`/contracts/bundle` above), rehearse the broadcast on a fork first and
 verify it afterwards:
