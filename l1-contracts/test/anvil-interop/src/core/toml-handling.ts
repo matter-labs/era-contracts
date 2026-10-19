@@ -2,6 +2,7 @@ import * as path from "path";
 import { parseForgeScriptOutput, saveTomlConfig } from "./utils";
 import {
   ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE,
+  ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
   ANVIL_INTEROP_GATEWAY_VOTE_CONFIG_RELATIVE,
   ANVIL_INTEROP_GATEWAY_VOTE_OUTPUT_RELATIVE,
 } from "./paths";
@@ -52,15 +53,19 @@ export function prepareGatewayChainConfig(outputDir: string, gatewayChainId: num
 
 /**
  * Create the GatewayVotePreparation config used to deploy gateway-side CTM contracts.
+ * The force-deployments blob is the one `DeployCTM` built (its output's `contracts_config`), not the
+ * deployment input's placeholder: the Gateway release decodes it and checks it against its L2 table.
  */
 export function prepareGatewayVoteConfig(outputDir: string, gatewayChainId: number): void {
   const ctmConfigPath = resolveInteropPath(outputDir, ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE);
+  const ctmOutputPath = resolveInteropPath(outputDir, ANVIL_INTEROP_CTM_OUTPUT_RELATIVE);
   const gatewayVoteConfigPath = resolveInteropPath(outputDir, ANVIL_INTEROP_GATEWAY_VOTE_CONFIG_RELATIVE);
   const ctmConfig = parseForgeScriptOutput(ctmConfigPath);
   const contracts = asRecord(ctmConfig.contracts);
+  const ctmContractsConfig = asRecord(parseForgeScriptOutput(ctmOutputPath).contracts_config);
 
   saveTomlConfig(gatewayVoteConfigPath, {
-    force_deployments_data: readTomlString(contracts, "force_deployments_data"),
+    force_deployments_data: readTomlString(ctmContractsConfig, "force_deployments_data"),
     gateway_chain_id: gatewayChainId,
     owner_address: readTomlString(ctmConfig, "owner_address"),
     refund_recipient: ANVIL_DEFAULT_ACCOUNT_ADDR,

@@ -1,0 +1,1718 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.28;
+
+import {Test} from "forge-std/Test.sol";
+
+import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
+import {MockSelfDescribingFacet} from "contracts/dev-contracts/test/MockSelfDescribingFacet.sol";
+
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {CTMTransition} from "contracts/upgrades/registry/objects/CTMTransition.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {IL2DelegateCalldataComposer} from "contracts/upgrades/registry/objects/IL2DelegateCalldataComposer.sol";
+import {FixedDelegateCalldataComposer} from "contracts/dev-contracts/FixedDelegateCalldataComposer.sol";
+import {CTMUpgradeComposer} from "contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol";
+import {ReleaseFacetReader} from "contracts/upgrades/registry/libraries/ReleaseFacetReader.sol";
+import {TransitionDerivationLib} from "contracts/upgrades/registry/libraries/TransitionDerivationLib.sol";
+import {L2InventoryLib} from "contracts/upgrades/registry/libraries/L2InventoryLib.sol";
+import {L2PlanFixtures} from "./L2PlanFixtures.sol";
+import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {
+    MAX_ALLOWED_MINOR_VERSION_DELTA,
+    MAX_NEW_FACTORY_DEPS,
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
+} from "contracts/common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {
+    L2BytecodeInfoLength,
+    L2BytecodeRowRemoved,
+    L2BytecodeTableShrunk,
+    L2PlanDelegateNeedsComposer,
+    L2PlanNeedsDelegate,
+    L2PlanTooManyFactoryDeps,
+    PatchCannotCarryL2Upgrade,
+    L1OnlyEdgeChangesL2State,
+    RegistryDuplicateFacetRow,
+    RegistryDuplicateProxyRow,
+    RegistrySelfEdgeProxyRow,
+    RegistryDuplicateSelector,
+    RegistryEmptySelectors,
+    RegistryInventoryLengthMismatch,
+    RegistryMemberHasNoFixedAddress,
+    RegistryTargetHasNoCode,
+    ReleaseForceDeploymentMismatch,
+    RegistryUnknownKey,
+    TransitionDeadlineBeforeUpgrade,
+    TransitionDeadlineZero,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
+import {
+    NewProtocolMajorVersionNotZero,
+    ProtocolVersionMinorDeltaTooBig,
+    ProtocolVersionTooSmall
+} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {
+    AuthoredL2Plan,
+    ProxyUpgradeDomain,
+    ProxyUpgradeRow,
+    ProxyUpgradeTransitionManifest,
+    GenesisFacet,
+    L2UpgradePlan,
+    ReleaseGenesisData,
+    ReleaseDiff,
+    ReleaseManifest,
+    TransitionManifest
+} from "../../../../../../../contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract,
+    L1_ECOSYSTEM_CONTRACT_COUNT,
+    L1EcosystemContract,
+    L2_ECOSYSTEM_CONTRACT_COUNT,
+    L2EcosystemContract
+} from "../../../../../../../contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+
+/// @notice Unit tests for the write-once upgrade objects in the DERIVED model: releases carry
+///         explicit routing + inline mandatory pins; transitions derive their facet delta
+///         from the `(fromRelease, newRelease)` pair at initialization.
+contract StorageRegistriesTest is Test {
+    ProxyUpgradeTransition internal coreTransition;
+    CTMRelease internal fromRelease;
+    CTMRelease internal newRelease;
+    /// @dev `newRelease` one patch version up and otherwise identical: the target of a version-only patch.
+    CTMRelease internal patchRelease;
+    CTMTransition internal transition;
+
+    address internal diamondInit;
+
+    // Pinned synthetic contracts (etched with distinct bytecode so each is a real deployed member).
+    address internal facetOldAdmin; // replaced by the hop
+    address internal facetNewAdmin; // its replacement (different selectors)
+    address internal facetShared; // carried over unchanged
+    address internal facetFrozen; // carried over unchanged, freezable
+    address internal genesisUpgrade;
+    address internal verifier;
+    address internal upgradeEngine;
+    address internal coreImplNew;
+    /// @dev The pinned delegate-calldata composer of the default transition: a test-only stand-in
+    ///      returning `DELEGATE_CALLDATA` regardless of its inputs, so this suite can pin a real
+    ///      composer without a version-specific L2 migration behind it.
+    FixedDelegateCalldataComposer internal delegateComposer;
+    /// @dev The ecosystem Bridgehub the composer is handed. Only forwarded to the pinned composer
+    ///      (which ignores it here), so a bare labelled address is all this suite needs.
+    address internal bridgehub;
+
+    uint256 internal constant OLD_VERSION = uint256(98) << 32;
+    uint256 internal constant NEW_VERSION = uint256(99) << 32;
+    /// @dev The chain the L2 transaction is composed for; forwarded to the pinned composer like
+    ///      the Bridgehub.
+    uint256 internal constant CHAIN_ID = 271;
+    bytes internal constant DELEGATE_CALLDATA = hex"beef";
+
+    // Dummy EVM bytecodes standing in for the L2 artifacts a hop installs (see {L2PlanFixtures}):
+    // the authored extras (the upgrade delegate and one more Unsafe deployment) and the
+    // system-proxied members a target release's table can carry.
+    bytes internal constant DELEGATE_CODE = hex"aa01";
+    bytes internal constant EXTRA_CODE = hex"aa02";
+    bytes internal constant BRIDGEHUB_IMPL_CODE = hex"dd01";
+    bytes internal constant SYSTEM_CONTEXT_IMPL_CODE = hex"dd02";
+    bytes internal constant SYSTEM_PROXY_CODE = hex"dd00";
+    // Distinct stand-ins for the release-pair L2 diff tests: a changed SystemContext
+    // implementation and a member new to the set.
+    bytes internal constant CHANGED_SYSTEM_CONTEXT_IMPL_CODE = hex"dd12";
+    bytes internal constant ASSET_ROUTER_IMPL_CODE = hex"dd13";
+    bytes internal constant CHANGED_SYSTEM_PROXY_CODE = hex"dd10";
+
+    function setUp() public {
+        // Facets must actually self-describe their routing (the registry objects read it from
+        // `ISelfDescribingFacet.selectors()`), so they are real mock deployments, not etches.
+        facetOldAdmin = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(1)), bytes4(uint32(2)))));
+        facetNewAdmin = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(2)), bytes4(uint32(3)))));
+        facetShared = address(new MockSelfDescribingFacet(_selectors2(bytes4(uint32(0x10)), bytes4(uint32(0x11)))));
+        facetFrozen = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
+        genesisUpgrade = _deployedStub("genesisUpgrade");
+        verifier = _deployedStub("verifier");
+        upgradeEngine = _deployedStub("upgradeEngine");
+        coreImplNew = _deployedStub("coreImplNew");
+        delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
+        bridgehub = makeAddr("bridgehub");
+        // A real DiamondInit, the one every fixture release pins.
+        diamondInit = address(new DiamondInit());
+
+        coreTransition = new ProxyUpgradeTransition(_coreManifest());
+        // Releases deploy through the canonical factory: transition initialization enforces
+        // factory provenance on BOTH edges.
+        fromRelease = new CTMRelease(_fromReleaseManifest());
+        newRelease = new CTMRelease(_newReleaseManifest());
+        patchRelease = new CTMRelease(_patchReleaseManifest());
+        transition = new CTMTransition(_transitionManifest());
+    }
+
+    /// @dev Deploys a distinct-bytecode stand-in at a labelled address so EXTCODEHASH pins are
+    ///      real (an empty address would pin the zero hash).
+    function _deployedStub(string memory _name) internal returns (address addr) {
+        addr = makeAddr(_name);
+        vm.etch(addr, bytes.concat(hex"00", bytes(_name)));
+    }
+
+    function _coreManifest() internal view returns (ProxyUpgradeTransitionManifest memory manifest) {
+        // One participating slot in the enum-indexed inventory — every other slot's zero
+        // `implNew` is the explicit "not upgraded" statement and produces no row.
+        manifest.domain = ProxyUpgradeDomain.Core;
+        manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
+            proxy: address(0xB001),
+            expectedOldImpl: address(0xB101),
+            implNew: coreImplNew,
+            callInitializeUpgrade: false
+        });
+    }
+
+    function _releaseManifest(
+        address _adminFacet,
+        uint256 _protocolVersion
+    ) internal view returns (ReleaseManifest memory manifest) {
+        GenesisFacet[] memory facets = new GenesisFacet[](3);
+        facets[0] = GenesisFacet({facet: _adminFacet, isFreezable: false});
+        facets[1] = GenesisFacet({facet: facetShared, isFreezable: false});
+        facets[2] = GenesisFacet({facet: facetFrozen, isFreezable: true});
+        return
+            ReleaseManifest({
+                protocolVersion: _protocolVersion,
+                diamondInit: diamondInit,
+                verifier: verifier,
+                genesisUpgrade: genesisUpgrade,
+                genesisFacets: facets,
+                genesis: ReleaseGenesisData({
+                    fixedForceDeploymentsData: L2PlanFixtures.emptyTableForceDeploymentsData(),
+                    genesisBatchHash: bytes32(uint256(1)),
+                    genesisIndexRepeatedStorageChanges: 54
+                }),
+                // Length-checked inventory; content is irrelevant to this fixture. The shell is
+                // the one `_tableRelease()` rows sit behind.
+                l2BytecodeInfos: new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT),
+                l2SystemProxyBytecodeInfo: L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE)
+            });
+    }
+
+    function _fromReleaseManifest() internal view returns (ReleaseManifest memory) {
+        return _releaseManifest(facetOldAdmin, OLD_VERSION);
+    }
+
+    function _newReleaseManifest() internal view returns (ReleaseManifest memory) {
+        // The hop replaces the admin facet (new address AND new selector set); the shared +
+        // frozen facets carry over unchanged.
+        return _releaseManifest(facetNewAdmin, NEW_VERSION);
+    }
+
+    function _patchReleaseManifest() internal view returns (ReleaseManifest memory manifest) {
+        manifest = _newReleaseManifest();
+        manifest.protocolVersion = NEW_VERSION + 1;
+    }
+
+    /// @dev The authored L2 input with everything a version can author: the delegate's bytecode
+    ///      info, one extra bytecode info, and the pinned composer defining the delegate's
+    ///      calldata. The object constructs both Unsafe deployments, the delegate target and the
+    ///      factory dependencies from it.
+    function _l2Plan() internal view returns (AuthoredL2Plan memory plan) {
+        return L2PlanFixtures.delegatePlanWithExtra(DELEGATE_CODE, EXTRA_CODE, address(delegateComposer));
+    }
+
+    /// @dev The deployments the object constructs for `_l2Plan()`: the delegate first, the extra after.
+    function _authoredDeployments()
+        internal
+        pure
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory list)
+    {
+        list = new IComplexUpgrader.UniversalContractUpgradeInfo[](2);
+        list[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
+        list[1] = L2PlanFixtures.unsafeDeployment(EXTRA_CODE);
+    }
+
+    /// @dev The zero pin: no composer (the delegate is called with empty calldata), no ecosystem leg.
+    /// @dev The L2 transaction `_transition` composes against this suite's Bridgehub and chain.
+    function _l2Tx(CTMTransition _transition) internal view returns (L2CanonicalTransaction memory) {
+        return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(address(_transition)), bridgehub, CHAIN_ID);
+    }
+
+    /// @dev The factory dependencies a hop toward `_tableRelease()` with `_l2Plan()` constructs:
+    ///      the table rows' bytecodes in member order (the shared proxy shell once), then the
+    ///      authored delegate's and extra's.
+    function _tableHopDeps() internal pure returns (uint256[] memory) {
+        return
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(
+                    BRIDGEHUB_IMPL_CODE,
+                    SYSTEM_PROXY_CODE,
+                    SYSTEM_CONTEXT_IMPL_CODE,
+                    DELEGATE_CODE,
+                    EXTRA_CODE
+                )
+            );
+    }
+
+    function _transitionManifest() internal view returns (TransitionManifest memory manifest) {
+        return
+            TransitionManifest({
+                fromRelease: address(fromRelease),
+                newRelease: address(newRelease),
+                upgradeEngine: upgradeEngine,
+                oldProtocolVersionDeadline: type(uint256).max,
+                upgradeTimestamp: 1234567,
+                l2Plan: _l2Plan()
+            });
+    }
+
+    function _selectors1(bytes4 _a) internal pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](1);
+        selectors[0] = _a;
+    }
+
+    function _selectors2(bytes4 _a, bytes4 _b) internal pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](2);
+        selectors[0] = _a;
+        selectors[1] = _b;
+    }
+
+    // ─────────────────────────── write-once + lookups ───────────────────────────
+
+    function test_manifestsAreCommitted() public view {
+        assertEq(coreTransition.manifestHash(), keccak256(abi.encode(_coreManifest())));
+        assertEq(newRelease.manifestHash(), keccak256(abi.encode(_newReleaseManifest())));
+        assertEq(transition.manifestHash(), keccak256(abi.encode(_transitionManifest())));
+    }
+
+    function test_releasePinsPostUpgradeGenesis() public view {
+        // The version schedule is a transition concern; the verifier is installed chain state and
+        // therefore lives on the release, so both paths resolve it from the same object.
+        assertEq(transition.newProtocolVersion(), NEW_VERSION);
+        assertEq(newRelease.verifier(), verifier);
+        assertEq(newRelease.diamondInit(), diamondInit);
+        assertEq(newRelease.fixedForceDeploymentsData(), L2PlanFixtures.emptyTableForceDeploymentsData());
+        Diamond.FacetCut[] memory installations = ReleaseFacetReader.newChainInstallations(
+            ICTMRelease(address(newRelease))
+        );
+        assertEq(installations.length, 3);
+        assertEq(installations[0].facet, facetNewAdmin);
+        assertEq(installations[0].selectors.length, 2);
+        assertEq(installations[2].facet, facetFrozen);
+        assertTrue(installations[2].isFreezable);
+    }
+
+    // ─────────────────────────── derived delta ───────────────────────────
+
+    /// @dev The version edge is not authored: it is the two releases' own versions, and the
+    ///      transition serves exactly those.
+    function test_transitionReadsItsVersionEdgeOffItsReleases() public view {
+        assertEq(fromRelease.protocolVersion(), OLD_VERSION, "a release serves its version");
+        assertEq(newRelease.protocolVersion(), NEW_VERSION);
+        assertEq(transition.oldProtocolVersion(), fromRelease.protocolVersion(), "departs from fromRelease's");
+        assertEq(transition.newProtocolVersion(), newRelease.protocolVersion(), "lands on newRelease's");
+        (uint256 targetVersion, , address targetRelease) = transition.upgradeTarget();
+        assertEq(targetVersion, NEW_VERSION, "and commits the same edge to chains");
+        assertEq(targetRelease, address(newRelease));
+    }
+
+    function test_transitionDerivesFacetDeltaFromReleasePair() public view {
+        assertEq(transition.oldProtocolVersion(), OLD_VERSION);
+        assertEq(transition.fromRelease(), address(fromRelease));
+        assertEq(transition.newRelease(), address(newRelease));
+        assertEq(transition.upgradeEngine(), upgradeEngine);
+
+        // Derived, not authored — and stored as final cuts: a FULL REINSTALL, removals first.
+        // One Remove cut per departing facet (facet address zero per Diamond semantics), one Add
+        // cut per arriving facet; no selector-level diffing and no Replace bucket.
+        Diamond.FacetCut[] memory derivedCuts = transition.facetCuts();
+        assertEq(derivedCuts.length, 6);
+        assertEq(derivedCuts[0].facet, address(0));
+        assertTrue(derivedCuts[0].action == Diamond.Action.Remove);
+        assertEq(derivedCuts[0].selectors.length, 2, "old admin routing removed");
+        assertTrue(derivedCuts[1].action == Diamond.Action.Remove);
+        assertTrue(derivedCuts[2].action == Diamond.Action.Remove);
+        assertEq(derivedCuts[3].facet, facetNewAdmin);
+        assertTrue(derivedCuts[3].action == Diamond.Action.Add);
+        assertEq(derivedCuts[3].selectors.length, 2);
+        assertFalse(derivedCuts[3].isFreezable);
+        assertEq(derivedCuts[4].facet, facetShared);
+        assertEq(derivedCuts[5].facet, facetFrozen);
+        assertTrue(derivedCuts[5].isFreezable);
+    }
+
+    function test_composerBuildsL2TxAndProposalFromTransition() public {
+        // The delegate calldata is DEFINED by the pinned composer, which the library asks with the
+        // TARGET release, the Bridgehub and the chain it was handed — never with authored bytes.
+        vm.expectCall(
+            address(delegateComposer),
+            abi.encodeCall(
+                IL2DelegateCalldataComposer.composeDelegateCalldata,
+                (ICTMRelease(address(newRelease)), bridgehub, CHAIN_ID)
+            )
+        );
+        L2CanonicalTransaction memory transaction = _l2Tx(transition);
+        // VM identity single-source: the target release's DiamondInit was built with true.
+        assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE);
+        assertEq(transaction.from, uint256(uint160(L2_FORCE_DEPLOYER_ADDR)));
+        assertEq(transaction.to, uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)));
+        (, uint32 minor, ) = SemVer.unpackSemVer(uint96(NEW_VERSION));
+        assertEq(transaction.nonce, minor);
+        assertEq(transaction.factoryDeps.length, 2);
+        L2UpgradePlan memory plan = transition.l2Plan();
+        assertEq(
+            transaction.data,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (plan.deployments, plan.delegateTo, DELEGATE_CALLDATA)
+            ),
+            "the delegate is called with what the pinned composer composed"
+        );
+    }
+
+    /// @dev Regression: the MINIMAL L2 plan — the delegate alone (its own Unsafe deployment is
+    ///      constructed, so a plan can never be delegate-only) — must still compose a transaction;
+    ///      previously such committed data was silently discarded when no table-derived
+    ///      deployment rode along.
+    function test_composerBuildsMinimalDelegatePlanL2Tx() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.extraBytecodeInfos = new bytes[](0);
+        CTMTransition minimal = new CTMTransition(manifest);
+
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory delegateOnly = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        delegateOnly[0] = L2PlanFixtures.unsafeDeployment(DELEGATE_CODE);
+        L2CanonicalTransaction memory transaction = _l2Tx(minimal);
+        assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "minimal delegate plan must compose a tx");
+        assertEq(
+            transaction.data,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (delegateOnly, delegateOnly[0].newAddress, DELEGATE_CALLDATA)
+            )
+        );
+        assertEq(transaction.factoryDeps.length, 1, "only the delegate's bytecode rides as a factory dep");
+    }
+
+    // ─────────────────────────── patches ───────────────────────────
+
+    /// @dev A version-only SemVer patch: from `newRelease` to its copy one patch version up, with
+    ///      NO L2 payload. One release per version, so even a bump that changes nothing names a
+    ///      release of its own.
+    function _patchManifest() internal view returns (TransitionManifest memory manifest) {
+        manifest = _transitionManifest();
+        manifest.fromRelease = address(newRelease);
+        manifest.newRelease = address(patchRelease);
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+    }
+
+    function test_versionOnlyPatchInitializes() public {
+        CTMTransition patchTransition = new CTMTransition(_patchManifest());
+        assertEq(patchTransition.oldProtocolVersion(), NEW_VERSION);
+        assertEq(patchTransition.newProtocolVersion(), NEW_VERSION + 1);
+        // The derived delta of two releases that differ in their version alone is empty by value:
+        // identical routing derives no cut, an identical table no L2 deployment.
+        assertEq(patchTransition.facetCuts().length, 0);
+        assertEq(patchTransition.l2Plan().deployments.length, 0, "an identical table derives no deployments");
+        patchTransition.validate();
+    }
+
+    /// @dev A release IS one version, so a transition naming the same release on both edges would
+    ///      move the version nowhere — refused by the version rule itself.
+    function test_revertWhen_theSameReleaseIsNamedOnBothEdges() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(newRelease);
+        manifest.newRelease = address(newRelease);
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, NEW_VERSION, NEW_VERSION));
+        new CTMTransition(manifest);
+    }
+
+    /// @dev A PATCH may name a new release: the release is the snapshot of the intended
+    ///      contracts, and replacing an L1 member of it changes no chain-visible L2 state. Here
+    ///      the target release replaces the admin facet, so the patch even derives real cuts.
+    function test_patchMayTargetANewRelease() public {
+        CTMRelease oldAdminRelease = new CTMRelease(_releaseManifest(facetOldAdmin, NEW_VERSION));
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.fromRelease = address(oldAdminRelease);
+
+        CTMTransition patch = new CTMTransition(manifest);
+
+        assertEq(patch.fromRelease(), address(oldAdminRelease));
+        assertEq(patch.newRelease(), address(patchRelease));
+        assertTrue(patch.facetCuts().length != 0, "the target release replaces a facet, so cuts are derived");
+        assertEq(patch.l2Plan().deployments.length, 0, "an unchanged L2 table derives no L2 deployment");
+    }
+
+    /// @dev What a patch may NOT do: carry an L2 upgrade transaction.
+    ///      `BaseZkSyncUpgrade._setL2SystemContractUpgrade` refuses one on a patch edge, and a
+    ///      patch deliberately skips the "previous L2 upgrade finalized" check — so an L2 payload
+    ///      on a patch would commit fine, bump the CTM, and then revert on every chain.
+    function test_revertWhen_patchCarriesAnAuthoredL2Payload() public {
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.l2Plan = _l2Plan();
+
+        vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The DERIVED half of the same rule: a patch whose target release changes the L2
+    ///      bytecode table derives force deployments, which is an L2 upgrade by another name. The
+    ///      plan here is otherwise well-formed (delegate and composer), so the patch rule is what
+    ///      rejects it.
+    function test_revertWhen_patchDerivesL2DeploymentsFromItsTargetRelease() public {
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(_tableReleaseAt(NEW_VERSION + 1));
+        manifest.l2Plan = _l2Plan();
+
+        vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The genesis half of the same rule: a patch whose target release describes a different
+    ///      L2 genesis is never executed on existing chains, so chains created after the patch
+    ///      would start from a state the patched chains never reached. An empty DERIVED deployment
+    ///      list does not cover this — only the tables agree there.
+    function test_revertWhen_patchTargetsAReleaseWithDifferentGenesisState() public {
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
+        releaseManifest.genesis.fixedForceDeploymentsData = L2PlanFixtures.forceDeploymentsData(
+            releaseManifest.l2BytecodeInfos,
+            releaseManifest.l2SystemProxyBytecodeInfo,
+            2
+        );
+        CTMRelease genesisRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(genesisRelease);
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_patchTargetsAReleaseWithADifferentGenesisBatch() public {
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
+        releaseManifest.genesis.genesisBatchHash = bytes32(uint256(2));
+        CTMRelease genesisRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(genesisRelease);
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The shell is part of the release's L2 description like the table it belongs to: a
+    ///      patch derives no L2 deployment, so a changed shell would reach no existing chain.
+    function test_revertWhen_patchTargetsAReleaseWithADifferentSystemProxyShell() public {
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
+        releaseManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        CTMRelease shellRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(shellRelease);
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The rule follows the L2 side, not the patch component: a MINOR edge that sends existing
+    ///      chains no L2 transaction must not change the genesis a new chain starts from either.
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheForceDeploymentsBlob() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.fixedForceDeploymentsData = L2PlanFixtures.forceDeploymentsData(
+            releaseManifest.l2BytecodeInfos,
+            releaseManifest.l2SystemProxyBytecodeInfo,
+            2
+        );
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheGenesisBatch() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.genesisIndexRepeatedStorageChanges = 55;
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The genesis upgrade composes a new chain's L2 genesis transaction, so replacing it
+    ///      changes the L2 state chains created after the edge start from.
+    function test_revertWhen_l1OnlyMinorEdgeChangesTheGenesisUpgrade() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesisUpgrade = _deployedStub("otherGenesisUpgrade");
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The same release change on a minor edge WITH an L2 side: the authored delegate is what
+    ///      brings existing chains to the new description, so the edge constructs.
+    function test_minorEdgeWithAnL2SideMayChangeTheGenesis() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.genesis.genesisBatchHash = bytes32(uint256(2));
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+
+        CTMTransition edge = new CTMTransition(manifest);
+
+        assertTrue(edge.releaseDiff().genesisBatch, "the edge changes the genesis batch");
+        assertEq(edge.l2Plan().delegateTo, L2PlanFixtures.unsafeDeployment(DELEGATE_CODE).newAddress);
+    }
+
+    // ─────────────────────────── releaseDiff ───────────────────────────
+
+    /// @dev Counts the set members of a `ReleaseDiff`, so a test can say "this flag, and only
+    ///      this flag" in two asserts.
+    function _setFlags(ReleaseDiff memory _diff) internal pure returns (uint256 count) {
+        bool[8] memory flags = [
+            _diff.diamondInit,
+            _diff.verifier,
+            _diff.genesisUpgrade,
+            _diff.genesisFacets,
+            _diff.l2BytecodeInfos,
+            _diff.l2SystemProxyBytecodeInfo,
+            _diff.fixedForceDeploymentsData,
+            _diff.genesisBatch
+        ];
+        for (uint256 i = 0; i < flags.length; ++i) {
+            if (flags[i]) {
+                ++count;
+            }
+        }
+    }
+
+    function test_releaseDiff_isEmptyForAVersionOnlyRelease() public {
+        CTMTransition patchTransition = new CTMTransition(_patchManifest());
+
+        assertEq(_setFlags(patchTransition.releaseDiff()), 0, "a copy one version up differs nowhere else");
+    }
+
+    /// @dev The fixture releases differ in the admin facet alone, so the hop's diff is exactly the
+    ///      facet flag — the same fact `facetCuts()` spells out in full.
+    function test_releaseDiff_namesOnlyTheFacetsForTheFixtureHop() public view {
+        ReleaseDiff memory diff = transition.releaseDiff();
+
+        assertTrue(diff.genesisFacets, "the hop replaces the admin facet");
+        assertEq(_setFlags(diff), 1, "and changes nothing else");
+    }
+
+    /// @dev A verifier-only patch is the reviewer's common case: one flag set and an empty
+    ///      `facetCuts()` say everything about the edge.
+    function test_releaseDiff_namesOnlyTheVerifierForAVerifierOnlyRelease() public {
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
+        releaseManifest.verifier = _deployedStub("verifierNext");
+        CTMRelease verifierRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(verifierRelease);
+        CTMTransition patch = new CTMTransition(manifest);
+
+        ReleaseDiff memory diff = patch.releaseDiff();
+        assertTrue(diff.verifier, "the target release swaps the verifier");
+        assertEq(_setFlags(diff), 1, "and nothing else");
+        assertEq(patch.facetCuts().length, 0, "a verifier swap derives no facet cut");
+    }
+
+    // ─────────────────────────── schedule / version guards ───────────────────────────
+
+    function test_revertWhen_transitionVersionNotIncreasing() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, OLD_VERSION)));
+
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, OLD_VERSION, OLD_VERSION));
+        new CTMTransition(manifest);
+    }
+
+    /// @dev A split-row release (the same facet address in two rows) is now refused by the release
+    ///      itself, at construction — so no transition can ever be derived toward one. Retargeted
+    ///      from the derivation-time `RegistryDuplicateSelector` this used to trip: the check moved
+    ///      earlier, it did not go away. `ReleaseFacetRows.t.sol` carries the rest of it (the same
+    ///      refusal from `validate()`, on an object whose constructor never ran the check); the
+    ///      derivation-time selector check is still exercised by the collision test below, which
+    ///      uses a DISTINCT facet carrying an already-routed selector.
+    function test_revertWhen_releaseSplitsOneFacetAcrossTwoRows() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        // Same facet address in two rows: its selectors would appear twice in the routing.
+        manifest.genesisFacets[2].facet = facetShared;
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateFacetRow.selector, facetShared));
+        new CTMRelease(manifest);
+    }
+
+    /// @dev Regression: the transition must enforce the SAME version shape chains enforce at
+    ///      execution (`BaseZkSyncUpgrade._setNewProtocolVersion`). Otherwise the transition pins,
+    ///      the commit bumps the CTM, and every per-chain upgrade then reverts.
+    function test_revertWhen_transitionUsesNonzeroMajorVersion() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        // major = 1 — rejected per-chain, so it must be rejected at pin time too.
+        manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, SemVer.packSemVer(1, 0, 0))));
+
+        vm.expectRevert(NewProtocolMajorVersionNotZero.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_transitionMinorDeltaTooBig() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        (, uint32 oldMinor, ) = SemVer.unpackSemVer(uint96(OLD_VERSION));
+        uint32 tooFar = oldMinor + uint32(MAX_ALLOWED_MINOR_VERSION_DELTA) + 1;
+        manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, SemVer.packSemVer(0, tooFar, 0))));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ProtocolVersionMinorDeltaTooBig.selector,
+                MAX_ALLOWED_MINOR_VERSION_DELTA,
+                uint256(tooFar - oldMinor)
+            )
+        );
+        new CTMTransition(manifest);
+    }
+
+    /// @dev Regression: a plan whose CONSTRUCTED factory dependencies exceed what
+    ///      `BaseZkSyncUpgrade` accepts must be rejected at pin time. Otherwise the commit bumps
+    ///      the CTM version and every per-chain upgrade then reverts, stranding chains on an
+    ///      unexecutable transition. The delegate plus `MAX_NEW_FACTORY_DEPS` distinct extras is
+    ///      one dependency past the cap; one extra fewer constructs.
+    function test_revertWhen_transitionExceedsFactoryDepCap() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.extraBytecodeInfos = _distinctExtraInfos(MAX_NEW_FACTORY_DEPS);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(L2PlanTooManyFactoryDeps.selector, MAX_NEW_FACTORY_DEPS + 1, MAX_NEW_FACTORY_DEPS)
+        );
+        new CTMTransition(manifest);
+
+        manifest.l2Plan.extraBytecodeInfos = _distinctExtraInfos(MAX_NEW_FACTORY_DEPS - 1);
+        CTMTransition atCap = new CTMTransition(manifest);
+        assertEq(atCap.l2Plan().factoryDepHashes.length, MAX_NEW_FACTORY_DEPS, "exactly the cap constructs");
+    }
+
+    /// @dev `_count` bytecode infos of pairwise-distinct dummy codes.
+    function _distinctExtraInfos(uint256 _count) internal pure returns (bytes[] memory infos) {
+        infos = new bytes[](_count);
+        for (uint256 i = 0; i < _count; ++i) {
+            infos[i] = L2PlanFixtures.bytecodeInfo(abi.encodePacked(bytes2(0xee00), uint8(i)));
+        }
+    }
+
+    function test_revertWhen_deadlineBeforeUpgradeTimestamp() public {
+        // A deadline before the upgrade timestamp would disable the old protocol before chains
+        // are even allowed to upgrade.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.oldProtocolVersionDeadline = manifest.upgradeTimestamp - 1;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                TransitionDeadlineBeforeUpgrade.selector,
+                manifest.upgradeTimestamp - 1,
+                manifest.upgradeTimestamp
+            )
+        );
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_deadlineZero() public {
+        // A zeroed deadline satisfies the relative check (`0 >= 0`) but expires the departing
+        // version the instant the edge is committed, halting batch commitment for every chain
+        // still on it — before any of them has had the chance to upgrade.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.upgradeTimestamp = 0;
+        manifest.oldProtocolVersionDeadline = 0;
+
+        vm.expectRevert(TransitionDeadlineZero.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_upgradeTimestampZeroStaysValid() public {
+        // Zero is a legitimate `upgradeTimestamp`: it means chains may upgrade as soon as the
+        // edge is committed. Only the deadline carries a lower bound.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.upgradeTimestamp = 0;
+
+        CTMTransition newTransition = new CTMTransition(manifest);
+
+        assertEq(newTransition.upgradeTimestamp(), 0, "upgradeTimestamp");
+        assertEq(
+            newTransition.oldProtocolVersionDeadline(),
+            manifest.oldProtocolVersionDeadline,
+            "oldProtocolVersionDeadline"
+        );
+    }
+
+    /// @dev The CTM reads the deadline on every batch commit of a chain on the departing version
+    ///      (`protocolVersionIsActive`), so it is served from its own slot, not by decoding the
+    ///      manifest.
+    function test_oldProtocolVersionDeadlineIsServedWithoutDecodingTheManifest() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        CTMTransition newTransition = new CTMTransition(manifest);
+
+        uint256 gasBefore = gasleft();
+        uint256 deadline = newTransition.oldProtocolVersionDeadline();
+        uint256 scalarReadGas = gasBefore - gasleft();
+        gasBefore = gasleft();
+        uint256 manifestDeadline = newTransition.getManifest().oldProtocolVersionDeadline;
+        uint256 manifestReadGas = gasBefore - gasleft();
+
+        assertEq(deadline, manifest.oldProtocolVersionDeadline, "the pinned deadline");
+        assertEq(deadline, manifestDeadline, "the manifest's deadline");
+        assertLt(scalarReadGas, manifestReadGas / 2, "the getter must not decode the manifest");
+    }
+
+    function test_revertWhen_fromReleaseZero() public {
+        // Pre-registry migration is one-time migration code in the legacy scripts, not a
+        // permanent zero-source special case.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(0);
+
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_newReleaseOrEngineZero() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(0);
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMTransition(manifest);
+
+        manifest = _transitionManifest();
+        manifest.upgradeEngine = address(0);
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMTransition(manifest);
+    }
+
+    // ─────────────────────────── proxy upgrade transition domains ───────────────────────────
+
+    /// @dev Each domain's object serves its domain and the participating rows of ITS inventory.
+    function test_eachDomainServesItsOwnInventory() public {
+        assertEq(uint8(coreTransition.domain()), uint8(ProxyUpgradeDomain.Core));
+        assertEq(coreTransition.rows().length, 1, "one participating core row");
+
+        ProxyUpgradeTransitionManifest memory manifest = _ctmManifestWithTwoRows();
+        ProxyUpgradeTransition infrastructure = new ProxyUpgradeTransition(manifest);
+        assertEq(uint8(infrastructure.domain()), uint8(ProxyUpgradeDomain.CTM));
+        assertEq(infrastructure.rows().length, 2, "both participating slots become rows");
+        assertEq(infrastructure.manifestHash(), keccak256(abi.encode(manifest)), "the domain is committed too");
+        assertEq(keccak256(abi.encode(infrastructure.getManifest())), keccak256(abi.encode(manifest)));
+    }
+
+    /// @dev The inventory length is the DOMAIN's: a Core manifest carrying the CTM inventory's length
+    ///      (or the reverse) is refused, so an object cannot be built over the other domain's index
+    ///      space by choosing its own length.
+    function test_revertWhen_theInventoryHasTheOtherDomainsLength() public {
+        ProxyUpgradeTransitionManifest memory ctmShaped = _ctmManifestWithTwoRows();
+        ctmShaped.domain = ProxyUpgradeDomain.Core;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryInventoryLengthMismatch.selector,
+                L1_ECOSYSTEM_CONTRACT_COUNT,
+                CTM_CONTRACT_COUNT
+            )
+        );
+        new ProxyUpgradeTransition(ctmShaped);
+
+        ProxyUpgradeTransitionManifest memory coreShaped = _coreManifest();
+        coreShaped.domain = ProxyUpgradeDomain.CTM;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryInventoryLengthMismatch.selector,
+                CTM_CONTRACT_COUNT,
+                L1_ECOSYSTEM_CONTRACT_COUNT
+            )
+        );
+        new ProxyUpgradeTransition(coreShaped);
+    }
+
+    function test_revertWhen_ctmInventoryLengthMismatch() public {
+        ProxyUpgradeTransitionManifest memory manifest = _ctmManifestWithTwoRows();
+        ProxyUpgradeRow[] memory tooShort = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT - 1);
+        tooShort[uint256(CTMContract.ChainTypeManager)] = manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)];
+        manifest.proxyUpgrades = tooShort;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RegistryInventoryLengthMismatch.selector, CTM_CONTRACT_COUNT, CTM_CONTRACT_COUNT - 1)
+        );
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    /// @dev An all-inert CTM inventory changes nothing: an upgrade that leaves the CTM domain alone
+    ///      omits that leg instead of deploying an empty object.
+    function test_revertWhen_aCtmInventoryChangesNothing() public {
+        ProxyUpgradeTransitionManifest memory manifest = ProxyUpgradeTransitionManifest({
+            domain: ProxyUpgradeDomain.CTM,
+            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT)
+        });
+        vm.expectRevert(RegistryUnknownKey.selector);
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    /// @dev The rows are exactly the participating slots, in slot order — never one with a zero
+    ///      `implNew`, including an inert slot naming a proxy but no implementation (objlib-46).
+    function testFuzz_rowsAreExactlyTheParticipatingSlots(uint256 _implMask, uint256 _proxyMask) public {
+        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        uint256 participating = 0;
+        for (uint256 i = 0; i < slots.length; ++i) {
+            if ((_implMask >> i) & 1 == 1) {
+                // A participating slot is a full, unique edge.
+                slots[i] = ProxyUpgradeRow({
+                    proxy: address(uint160(0xA000 + i)),
+                    expectedOldImpl: address(uint160(0xC000 + i)),
+                    implNew: address(uint160(0xB000 + i)),
+                    callInitializeUpgrade: false
+                });
+                ++participating;
+            } else if ((_proxyMask >> i) & 1 == 1) {
+                slots[i].proxy = address(uint160(0xA000 + i));
+            }
+        }
+        vm.assume(participating != 0);
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeTransition(
+            ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: slots})
+        ).rows();
+        assertEq(rows.length, participating, "one row per participating slot");
+        uint256 next = 0;
+        for (uint256 i = 0; i < slots.length; ++i) {
+            if (slots[i].implNew != address(0)) {
+                assertEq(rows[next].implNew, slots[i].implNew, "in slot order");
+                assertEq(rows[next].proxy, slots[i].proxy, "with the slot's proxy");
+                ++next;
+            }
+        }
+        for (uint256 i = 0; i < rows.length; ++i) {
+            assertTrue(rows[i].implNew != address(0), "no row has a zero implNew");
+        }
+    }
+
+    /// @dev A domain outside the enum is not representable: the constructor's ABI decoding refuses
+    ///      it before any check of ours runs, so no inventory length can be read off it.
+    function test_revertWhen_theDomainIsUnknown() public {
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        bytes memory args = abi.encode(manifest);
+        // The manifest is one dynamic tuple: [offset][domain][rows offset]... — word 1 is the domain.
+        assembly {
+            mstore(add(args, 0x40), 2)
+        }
+        bytes memory initCode = bytes.concat(type(ProxyUpgradeTransition).creationCode, args);
+        address deployed;
+        assembly {
+            deployed := create(0, add(initCode, 0x20), mload(initCode))
+        }
+        assertEq(deployed, address(0), "an unknown domain must not construct");
+    }
+
+    // ─────────────────────────── L2 plan shape ───────────────────────────
+
+    function test_revertWhen_delegateComposerWithoutDelegate() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.delegateBytecodeInfo = "";
+        manifest.l2Plan.extraBytecodeInfos = new bytes[](0);
+        // The composer stays — code defining calldata for a delegate call that never happens.
+
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_extrasWithoutDelegate() public {
+        // Force-deployments but no delegate: `L2ComplexUpgrader` always ends with the final
+        // delegatecall, so a deployments-only plan would initialize here yet revert on L2 forever.
+        // (The composer is cleared so ONLY the deployments-without-delegate rule can fire.)
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.delegateBytecodeInfo = "";
+        manifest.l2Plan.delegateComposer = address(0);
+
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
+        new CTMTransition(manifest);
+    }
+
+    // ─────────────────────────── delegate composer ───────────────────────────
+
+    /// @dev The composer is version-specific CODE in place of authored calldata, so the plan is
+    ///      unexecutable if nothing is deployed at the address the manifest names — held on the
+    ///      execution paths by `validate()`, not at construction (see {CTMRelease}).
+    function test_revertWhen_transitionDelegateComposerHasNoCode() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        CTMTransition committed = new CTMTransition(manifest);
+        assertEq(
+            committed.l2Plan().delegateComposer,
+            address(delegateComposer),
+            "the composer is served like every other member"
+        );
+
+        vm.etch(address(delegateComposer), "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, address(delegateComposer)));
+        committed.validate();
+    }
+
+    /// @dev Without a composer the delegate would be called with EMPTY calldata, which the upgrade
+    ///      delegate rejects on every chain (see `ComposedL2UpgradeTxExecution.t.sol`), so the
+    ///      transition refuses to exist.
+    function test_revertWhen_delegateWithoutComposer() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.delegateComposer = address(0);
+
+        vm.expectRevert(L2PlanDelegateNeedsComposer.selector);
+        new CTMTransition(manifest);
+    }
+
+    // ─────────────────────────── derived L2 deployments ───────────────────────────
+
+    /// @dev A target release whose table carries implementation rows at two fixed-address members
+    ///      (behind the fixture's shared shell). Distinct bytecodes from the authored extras so
+    ///      the two sets are distinguishable in the combined plan; their dependencies are
+    ///      `_tableDeps()`.
+    function _tableRelease() internal returns (CTMRelease) {
+        return new CTMRelease(_tableReleaseManifest());
+    }
+
+    /// @dev {_tableRelease} at another version: a departing table release, or a patch target.
+    function _tableReleaseAt(uint256 _protocolVersion) internal returns (CTMRelease) {
+        ReleaseManifest memory manifest = _tableReleaseManifest();
+        manifest.protocolVersion = _protocolVersion;
+        return new CTMRelease(manifest);
+    }
+
+    function _tableReleaseManifest() internal view returns (ReleaseManifest memory manifest) {
+        manifest = _newReleaseManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
+            BRIDGEHUB_IMPL_CODE
+        );
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(
+            SYSTEM_CONTEXT_IMPL_CODE
+        );
+        L2PlanFixtures.syncForceDeployments(manifest);
+    }
+
+    function test_deriveL2DeploymentsFromTableSkipsEmptyRowsAndResolvesMembers() public pure {
+        bytes[] memory table = new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+        table[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(BRIDGEHUB_IMPL_CODE);
+        table[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(SYSTEM_CONTEXT_IMPL_CODE);
+        bytes memory shell = L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE);
+
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory derived = TransitionDerivationLib
+            .deriveL2DeploymentsFromTable(table, shell);
+
+        // Only the nonempty rows become deployments, in enum order, each at its member's
+        // canonical fixed address, each carrying the `(implementation, proxy)` pair the L2 side
+        // decodes — the shared shell joined to the member's own row.
+        assertEq(derived.length, 2, "empty rows must derive no deployment");
+        assertTrue(derived[0].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade);
+        assertEq(
+            derived[0].deployedBytecodeInfo,
+            L2PlanFixtures.systemProxyRow(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE),
+            "row = (implementation, shell)"
+        );
+        assertEq(derived[0].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.L2Bridgehub));
+        assertTrue(derived[1].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade);
+        assertEq(
+            derived[1].deployedBytecodeInfo,
+            L2PlanFixtures.systemProxyRow(SYSTEM_CONTEXT_IMPL_CODE, SYSTEM_PROXY_CODE),
+            "every row is joined to the SAME shell"
+        );
+        assertEq(derived[1].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.SystemContext));
+    }
+
+    /// @dev The shell is stored once on the release and served beside the table.
+    function test_releaseServesTheSharedSystemProxyShell() public {
+        CTMRelease release = _tableRelease();
+        assertEq(release.l2SystemProxyBytecodeInfo(), L2PlanFixtures.bytecodeInfo(SYSTEM_PROXY_CODE));
+    }
+
+    function test_revertWhen_transitionDerivesRowForAddresslessMember() public {
+        // BeaconProxy is a bytecode-identity member: it has no fixed L2 address, so a table row
+        // for it is unexecutable and must refuse to derive — at transition construction, before
+        // anything is committed.
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.BeaconProxy)] = hex"dd03";
+        CTMRelease rowRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(rowRelease);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(RegistryMemberHasNoFixedAddress.selector, uint256(L2EcosystemContract.BeaconProxy))
+        );
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The `L2DefaultUpgrade` delegate is force-deployed at the address its bytecode info
+    ///      derives (`AuthoredL2Plan.delegateBytecodeInfo`), so it has no fixed address either: a
+    ///      table row in its slot is refused like any other bytecode-identity member.
+    function test_revertWhen_transitionDerivesRowForTheDelegate() public {
+        ReleaseManifest memory releaseManifest = _newReleaseManifest();
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2DefaultUpgrade)] = hex"dd04";
+        CTMRelease rowRelease = new CTMRelease(releaseManifest);
+
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(rowRelease);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryMemberHasNoFixedAddress.selector,
+                uint256(L2EcosystemContract.L2DefaultUpgrade)
+            )
+        );
+        new CTMTransition(manifest);
+    }
+
+    /// @dev A release names each table member's implementation twice — its table row and its field
+    ///      of the genesis force-deployments blob — and the constructor refuses any disagreement.
+    ///      Every compared field is corrupted in turn; each refusal names the member.
+    function test_revertWhen_forceDeploymentsDisagreeWithTheTable() public {
+        ReleaseManifest memory manifest = _tableReleaseManifest();
+        // Fill every compared member so each field has a row to disagree with.
+        L2EcosystemContract[9] memory members = [
+            L2EcosystemContract.L2Bridgehub,
+            L2EcosystemContract.L2AssetRouter,
+            L2EcosystemContract.L2NativeTokenVault,
+            L2EcosystemContract.L2MessageRoot,
+            L2EcosystemContract.L2ChainAssetHandler,
+            L2EcosystemContract.InteropCenter,
+            L2EcosystemContract.L2InteropHandler,
+            L2EcosystemContract.L2AssetTracker,
+            L2EcosystemContract.BaseTokenHolder
+        ];
+        for (uint256 i = 0; i < members.length; ++i) {
+            manifest.l2BytecodeInfos[uint256(members[i])] = L2PlanFixtures.bytecodeInfo(abi.encodePacked(hex"ee", i));
+        }
+        L2PlanFixtures.syncForceDeployments(manifest);
+        new CTMRelease(manifest);
+
+        bytes memory consistent = manifest.genesis.fixedForceDeploymentsData;
+        for (uint256 i = 0; i < members.length; ++i) {
+            FixedForceDeploymentsData memory data = abi.decode(consistent, (FixedForceDeploymentsData));
+            _corruptField(data, i);
+            manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+            vm.expectRevert(abi.encodeWithSelector(ReleaseForceDeploymentMismatch.selector, uint256(members[i])));
+            new CTMRelease(manifest);
+        }
+    }
+
+    /// @dev A row the blob omits, or a blob field for a member the table leaves empty, is a
+    ///      disagreement too; the beacon deployer has no table member and is not compared.
+    function test_forceDeploymentsMatchEmptyRowsAndIgnoreTheBeaconDeployer() public {
+        ReleaseManifest memory manifest = _tableReleaseManifest();
+        FixedForceDeploymentsData memory data = abi.decode(
+            manifest.genesis.fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
+        data.beaconDeployerInfo = hex"beac";
+        manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+        CTMRelease release = new CTMRelease(manifest);
+        assertEq(release.fixedForceDeploymentsData(), abi.encode(data), "the blob is pinned as given");
+
+        data.l2NtvBytecodeInfo = abi.encode(L2PlanFixtures.bytecodeInfo(hex"ee"), manifest.l2SystemProxyBytecodeInfo);
+        manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ReleaseForceDeploymentMismatch.selector,
+                uint256(L2EcosystemContract.L2NativeTokenVault)
+            )
+        );
+        new CTMRelease(manifest);
+
+        data.l2NtvBytecodeInfo = "";
+        data.bridgehubBytecodeInfo = "";
+        manifest.genesis.fixedForceDeploymentsData = abi.encode(data);
+        vm.expectRevert(
+            abi.encodeWithSelector(ReleaseForceDeploymentMismatch.selector, uint256(L2EcosystemContract.L2Bridgehub))
+        );
+        new CTMRelease(manifest);
+    }
+
+    /// @dev A blob that is not a `FixedForceDeploymentsData` encoding cannot be compared at all.
+    function test_revertWhen_forceDeploymentsAreNotTheGenesisStruct() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesis.fixedForceDeploymentsData = hex"f1f2";
+        vm.expectRevert();
+        new CTMRelease(manifest);
+    }
+
+    function _corruptField(FixedForceDeploymentsData memory _data, uint256 _index) internal pure {
+        bytes memory other = hex"0bad";
+        if (_index == 0) {
+            _data.bridgehubBytecodeInfo = other;
+        } else if (_index == 1) {
+            _data.l2AssetRouterBytecodeInfo = other;
+        } else if (_index == 2) {
+            _data.l2NtvBytecodeInfo = other;
+        } else if (_index == 3) {
+            _data.messageRootBytecodeInfo = other;
+        } else if (_index == 4) {
+            _data.chainAssetHandlerBytecodeInfo = other;
+        } else if (_index == 5) {
+            _data.interopCenterBytecodeInfo = other;
+        } else if (_index == 6) {
+            _data.interopHandlerBytecodeInfo = other;
+        } else if (_index == 7) {
+            _data.assetTrackerBytecodeInfo = other;
+        } else {
+            _data.baseTokenHolderBytecodeInfo = other;
+        }
+    }
+
+    function test_transitionL2PlanIsDerivedPlusConstructedAuthored() public {
+        CTMRelease tableRelease = _tableRelease();
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(tableRelease);
+        CTMTransition combined = new CTMTransition(manifest);
+
+        // The FINAL plan: the target release's table-derived set first, then the authored
+        // bytecodes as Unsafe deployments — the delegate first, the extra after.
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory expectedDerived = TransitionDerivationLib
+            .deriveL2DeploymentsFromTable(tableRelease.l2BytecodeInfos(), tableRelease.l2SystemProxyBytecodeInfo());
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory expectedAuthored = _authoredDeployments();
+        L2UpgradePlan memory plan = combined.l2Plan();
+        assertEq(
+            plan.deployments.length,
+            expectedDerived.length + expectedAuthored.length,
+            "final plan must be derived ++ authored"
+        );
+        for (uint256 i = 0; i < expectedDerived.length; ++i) {
+            assertEq(abi.encode(plan.deployments[i]), abi.encode(expectedDerived[i]), "derived prefix mismatch");
+        }
+        for (uint256 i = 0; i < expectedAuthored.length; ++i) {
+            assertEq(
+                abi.encode(plan.deployments[expectedDerived.length + i]),
+                abi.encode(expectedAuthored[i]),
+                "authored suffix mismatch"
+            );
+        }
+        assertEq(plan.delegateTo, expectedAuthored[0].newAddress, "the delegate is the first authored deployment");
+        assertEq(plan.delegateComposer, address(delegateComposer), "the pinned composer is served");
+        // The factory dependencies are CONSTRUCTED from what the deployments install: each table
+        // row's implementation and the shared proxy shell (once), then the authored bytecodes.
+        assertEq(plan.factoryDepHashes, _tableHopDeps(), "constructed factory dependencies");
+        // ...and the composed transaction executes the COMBINED deployments, then the delegate
+        // with the calldata the pinned composer defines, carrying the constructed dependencies.
+        L2CanonicalTransaction memory transaction = _l2Tx(combined);
+        assertEq(
+            transaction.data,
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (plan.deployments, plan.delegateTo, DELEGATE_CALLDATA)
+            ),
+            "composed data must be derived ++ authored, delegate, composer calldata"
+        );
+        assertEq(transaction.factoryDeps, plan.factoryDepHashes, "the transaction carries the constructed deps");
+    }
+
+    /// @dev The L2 set is derived from the release PAIR: a member whose descriptor is identical in
+    ///      both releases is not touched, so a facet-only or verifier-only upgrade toward a release
+    ///      carrying the same table has no L2 leg at all — no delegate, no factory dependency.
+    function test_transitionDerivesNoL2RowsWhenTheTableIsUnchanged() public {
+        CTMRelease departing = _tableReleaseAt(OLD_VERSION);
+        CTMRelease target = _tableRelease();
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(departing);
+        manifest.newRelease = address(target);
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+        CTMTransition l1Only = new CTMTransition(manifest);
+
+        assertEq(l1Only.l2Plan().deployments.length, 0, "identical table rows derive no L2 deployment");
+        assertEq(_l2Tx(l1Only).txType, 0, "an unchanged table composes the all-zero L2 transaction");
+    }
+
+    /// @dev Only the members whose descriptor changed are derived (a member new to the set counts as
+    ///      changed); the rows identical to the departing release stay out of the L2 leg.
+    function test_transitionDerivesOnlyTheChangedL2Rows() public {
+        CTMRelease departing = _tableReleaseAt(OLD_VERSION);
+        ReleaseManifest memory targetManifest = _newReleaseManifest();
+        // Unchanged member, changed implementation, member new to the set.
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = L2PlanFixtures.bytecodeInfo(
+            BRIDGEHUB_IMPL_CODE
+        );
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.SystemContext)] = L2PlanFixtures.bytecodeInfo(
+            CHANGED_SYSTEM_CONTEXT_IMPL_CODE
+        );
+        targetManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2AssetRouter)] = L2PlanFixtures.bytecodeInfo(
+            ASSET_ROUTER_IMPL_CODE
+        );
+        L2PlanFixtures.syncForceDeployments(targetManifest);
+        CTMRelease target = new CTMRelease(targetManifest);
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(departing);
+        manifest.newRelease = address(target);
+        manifest.l2Plan = _l2Plan();
+        CTMTransition newTransition = new CTMTransition(manifest);
+
+        L2UpgradePlan memory plan = newTransition.l2Plan();
+        assertEq(plan.deployments.length, 4, "only the two changed members are derived, then the authored two");
+        // Derived rows follow the table (member) order: L2AssetRouter precedes SystemContext.
+        assertEq(
+            plan.deployments[0].newAddress,
+            L2InventoryLib.fixedAddress(L2EcosystemContract.L2AssetRouter),
+            "the member new to the set is derived"
+        );
+        assertEq(
+            plan.deployments[1].newAddress,
+            L2InventoryLib.fixedAddress(L2EcosystemContract.SystemContext),
+            "the member whose implementation changed is derived"
+        );
+        assertEq(
+            plan.deployments[1].deployedBytecodeInfo,
+            L2PlanFixtures.systemProxyRow(CHANGED_SYSTEM_CONTEXT_IMPL_CODE, SYSTEM_PROXY_CODE),
+            "the derived row carries the TARGET release's implementation behind its shell"
+        );
+        // Only the CHANGED rows' bytecodes are dependencies: the unchanged L2Bridgehub
+        // implementation is not installed, so it does not ride.
+        assertEq(
+            plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(
+                    ASSET_ROUTER_IMPL_CODE,
+                    SYSTEM_PROXY_CODE,
+                    CHANGED_SYSTEM_CONTEXT_IMPL_CODE,
+                    DELEGATE_CODE,
+                    EXTRA_CODE
+                )
+            ),
+            "dependencies follow the derived rows (member order), then the authored bytecodes"
+        );
+    }
+
+    /// @dev A shell change alone is not an L2 delta: an existing member's proxy is never
+    ///      redeployed by `updateZKsyncOSContract`, so only implementation rows are compared. The
+    ///      edge still needs an L2 side of its own (here the authored delegate alone) to change the
+    ///      release's L2 description — without one it is refused (`L1OnlyEdgeChangesL2State`).
+    function test_transitionDerivesNoL2RowsWhenOnlyTheShellChanges() public {
+        CTMRelease departing = _tableReleaseAt(OLD_VERSION);
+        ReleaseManifest memory targetManifest = _tableReleaseManifest();
+        targetManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        L2PlanFixtures.syncForceDeployments(targetManifest);
+        CTMRelease target = new CTMRelease(targetManifest);
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(departing);
+        manifest.newRelease = address(target);
+        manifest.l2Plan = L2PlanFixtures.delegatePlan(DELEGATE_CODE, address(delegateComposer));
+
+        CTMTransition shellOnly = new CTMTransition(manifest);
+
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = shellOnly.l2Plan().deployments;
+        assertEq(deployments.length, 1, "a shell-only change derives no L2 deployment beyond the authored delegate");
+        assertEq(deployments[0].newAddress, L2PlanFixtures.unsafeDeployment(DELEGATE_CODE).newAddress);
+    }
+
+    function test_revertWhen_l1OnlyEdgeChangesTheShell() public {
+        ReleaseManifest memory targetManifest = _tableReleaseManifest();
+        targetManifest.l2SystemProxyBytecodeInfo = L2PlanFixtures.bytecodeInfo(CHANGED_SYSTEM_PROXY_CODE);
+        L2PlanFixtures.syncForceDeployments(targetManifest);
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(_tableReleaseAt(OLD_VERSION));
+        manifest.newRelease = address(new CTMRelease(targetManifest));
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L1OnlyEdgeChangesL2State.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The enum is append-only: a departing release built against a shorter enum has no row
+    ///      to compare for the appended members, which therefore count as changed.
+    function test_changedL2RowsTreatsAppendedMembersAsChanged() public pure {
+        bytes[] memory fromTable = new bytes[](1);
+        fromTable[0] = hex"01";
+        bytes[] memory newTable = new bytes[](3);
+        newTable[0] = hex"01";
+        newTable[2] = hex"02";
+
+        bytes[] memory changed = TransitionDerivationLib.changedL2Rows(fromTable, newTable);
+
+        assertEq(changed.length, 3, "the diff is indexed like the target table");
+        assertEq(changed[0].length, 0, "an identical row is not a change");
+        assertEq(changed[1].length, 0, "an empty target row is never a change");
+        assertEq(changed[2], hex"02", "a row past the departing table's length is a change");
+    }
+
+    /// @dev External re-entry into the library so `vm.expectRevert` can observe its revert.
+    function changedL2RowsExternal(bytes[] memory _fromTable, bytes[] memory _newTable) external pure {
+        TransitionDerivationLib.changedL2Rows(_fromTable, _newTable);
+    }
+
+    /// @dev The other side of append-only: a target table shorter than the departing one is a
+    ///      release built against a truncated enum, and the diff refuses it instead of reading
+    ///      past the target's end.
+    function test_revertWhen_changedL2RowsTargetTableIsShorter() public {
+        bytes[] memory fromTable = new bytes[](2);
+        bytes[] memory newTable = new bytes[](1);
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeTableShrunk.selector, 2, 1));
+        this.changedL2RowsExternal(fromTable, newTable);
+    }
+
+    /// @dev A member the departing release ships cannot vanish from the target: upgraded chains
+    ///      would keep its old code while chains created from the target get none.
+    function test_revertWhen_changedL2RowsDropsAMember() public {
+        bytes[] memory fromTable = new bytes[](2);
+        fromTable[0] = hex"01";
+        fromTable[1] = hex"02";
+        bytes[] memory newTable = new bytes[](2);
+        newTable[0] = hex"01";
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeRowRemoved.selector, 1));
+        this.changedL2RowsExternal(fromTable, newTable);
+    }
+
+    function test_revertWhen_derivedDeploymentsWithoutDelegateTarget() public {
+        // The shape rules run against the COMBINED plan: a derived-nonempty transition with no
+        // delegate target is unexecutable on L2 even when the manifest authors NO extras.
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(_tableRelease());
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        vm.expectRevert(L2PlanNeedsDelegate.selector);
+        new CTMTransition(manifest);
+    }
+
+    // ─────────────────────────── authored L2 plan construction ───────────────────────────
+    // The manifest names bytecodes; the object constructs everything else of the L2 side (see
+    // L2PlanLib): one Unsafe deployment per authored bytecode info at its bytecode-derived
+    // address, the delegate target, and the deduplicated factory dependencies. What cannot be
+    // constructed into an executable plan refuses to exist.
+
+    function test_authoredPlanIsConstructedFromItsBytecodeInfos() public view {
+        L2UpgradePlan memory plan = transition.l2Plan();
+        AuthoredL2Plan memory authored = _l2Plan();
+
+        // No table rows on the target release: the final plan IS the constructed authored set.
+        assertEq(plan.deployments.length, 2, "the delegate and the extra");
+        for (uint256 i = 0; i < plan.deployments.length; ++i) {
+            assertTrue(
+                plan.deployments[i].upgradeType == IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                "authored bytecodes are Unsafe deployments"
+            );
+            assertEq(
+                plan.deployments[i].newAddress,
+                L2GenesisForceDeploymentsHelper.generateRandomAddress(plan.deployments[i].deployedBytecodeInfo),
+                "each sits at its bytecode-derived address"
+            );
+        }
+        assertEq(plan.deployments[0].deployedBytecodeInfo, authored.delegateBytecodeInfo, "the delegate comes first");
+        assertEq(plan.deployments[1].deployedBytecodeInfo, authored.extraBytecodeInfos[0], "the extra follows");
+        assertEq(plan.delegateTo, plan.deployments[0].newAddress, "the delegate target is its derived address");
+        assertEq(plan.delegateComposer, address(delegateComposer));
+        assertEq(
+            plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(L2PlanFixtures.codes(DELEGATE_CODE, EXTRA_CODE)),
+            "the dependencies are the observable hashes of the authored bytecodes"
+        );
+    }
+
+    /// @dev An L1-only hop: no delegate, no extras, no composer. The plan constructs to nothing.
+    function test_l1OnlyTransitionWithoutL2PlanInitializes() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan = L2PlanFixtures.emptyPlan();
+
+        CTMTransition l1Only = new CTMTransition(manifest);
+
+        L2UpgradePlan memory plan = l1Only.l2Plan();
+        assertEq(plan.deployments.length, 0, "an L1-only hop deploys nothing on L2");
+        assertEq(plan.delegateTo, address(0));
+        assertEq(plan.delegateComposer, address(0));
+        // No L2 side: the composer emits the all-zero transaction `BaseZkSyncUpgrade` skips.
+        assertEq(_l2Tx(l1Only).txType, 0, "an L1-only hop composes no L2 transaction");
+    }
+
+    function test_revertWhen_delegateBytecodeInfoIsMalformed() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        // Not a canonical (blake, length, keccak) tuple: no address can be derived from it.
+        manifest.l2Plan.delegateBytecodeInfo = hex"aa01";
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeInfoLength.selector, 2, BYTECODE_INFO_LENGTH));
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_extraBytecodeInfoIsMalformed() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.l2Plan.extraBytecodeInfos[0] = hex"aa02";
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeInfoLength.selector, 2, BYTECODE_INFO_LENGTH));
+        new CTMTransition(manifest);
+    }
+
+    /// @dev Factory dependencies are one entry per DISTINCT bytecode: the proxy shell shared by
+    ///      every table row rides once, and an authored bytecode identical to a table row's
+    ///      implementation adds nothing.
+    function test_constructedFactoryDepsAreDeduplicated() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(_tableRelease());
+        manifest.l2Plan = L2PlanFixtures.delegatePlanWithExtra(
+            DELEGATE_CODE,
+            BRIDGEHUB_IMPL_CODE,
+            address(delegateComposer)
+        );
+        CTMTransition deduplicated = new CTMTransition(manifest);
+
+        L2UpgradePlan memory plan = deduplicated.l2Plan();
+        assertEq(plan.deployments.length, 4, "two table rows, the delegate, the extra");
+        assertEq(
+            plan.factoryDepHashes,
+            L2PlanFixtures.factoryDepHashes(
+                L2PlanFixtures.codes(BRIDGEHUB_IMPL_CODE, SYSTEM_PROXY_CODE, SYSTEM_CONTEXT_IMPL_CODE, DELEGATE_CODE)
+            ),
+            "the shared shell and the duplicated implementation ride once each, first occurrence wins"
+        );
+    }
+
+    // ─────────────────────────── routing hygiene ───────────────────────────
+
+    function test_selectorlessFacetPinsButNoTransitionDerivesTowardIt() public {
+        // A facet describing no selectors constructs — the release is pinned data and does not
+        // read routing at construction — but `validate()` refuses it, so a transition toward it
+        // is refused before it could derive (and a chain later install) an empty `Add` cut.
+        address emptyFacet = address(new MockSelfDescribingFacet(new bytes4[](0)));
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets[1].facet = emptyFacet;
+
+        CTMRelease release = new CTMRelease(manifest);
+        assertEq(release.manifestHash(), keccak256(abi.encode(manifest)), "unvalidated routing still pins");
+
+        TransitionManifest memory transitionManifest = _transitionManifest();
+        transitionManifest.newRelease = address(release);
+        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
+        new CTMTransition(transitionManifest);
+    }
+
+    function test_revertWhen_releaseHasNoFacets() public {
+        // A release IS a complete chain routing: an empty facet set describes an unusable chain
+        // and would derive a remove-everything delta. Rejected at the release boundary.
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets = new GenesisFacet[](0);
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
+        new CTMRelease(manifest);
+    }
+
+    function test_revertWhen_releaseNamesCodelessFacet() public {
+        // A facet must be ACTUAL code: the release reads its routing out of it, and a codeless
+        // address answers that read with an empty revert. Refused by `validate()`, which holds the
+        // requirement on every execution path. The facet self-describes normally at construction;
+        // its code is stripped afterwards to model a member that no longer carries code at
+        // validation time.
+        address codeless = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x99)))));
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets[0].facet = codeless;
+        CTMRelease codelessRelease = new CTMRelease(manifest);
+        vm.etch(codeless, "");
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
+        codelessRelease.validate();
+    }
+
+    function test_revertWhen_transitionDerivesTowardSelectorCollision() public {
+        // A selector routed twice constructs as a release (the routing lives in the facets' code)
+        // but fails the `validate()` a transition runs on both releases at construction —
+        // pre-commit, so a malformed routing can never strand chains behind a bumped CTM version.
+        // The colliding facet self-describes a selector facetFrozen also carries (0x20).
+        address collidingFacet = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets[1].facet = collidingFacet;
+        CTMRelease collidingRelease = new CTMRelease(manifest);
+
+        TransitionManifest memory transitionManifest = _transitionManifest();
+        transitionManifest.newRelease = address(collidingRelease);
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, bytes4(uint32(0x20))));
+        new CTMTransition(transitionManifest);
+    }
+
+    // ─────────────────────────── release provenance ───────────────────────────
+
+    function test_transitionDefersReleaseProvenanceToCtm() public {
+        // Which release object is genuine is deliberately NOT a transition concern: a
+        // permissionless manifest could name any object, so the transition validates only each
+        // edge's routing and members, and leaves WHICH object is trusted to governance reviewing
+        // the deployed release the CTM is pointed at. So a hand-deployed but VALID release is
+        // accepted here and derives a normal delta.
+        CTMRelease handDeployed = new CTMRelease(_newReleaseManifest());
+
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(handDeployed);
+
+        CTMTransition deferred = new CTMTransition(manifest);
+        assertEq(deferred.newRelease(), address(handDeployed), "transition accepts a valid hand-deployed release");
+    }
+
+    // ─────────────────────────── named members must be deployed ───────────────────────────
+
+    function test_revertWhen_transitionEngineHasNoCode() public {
+        // The engine is the committed cut's init delegatecall target: a codeless one would make
+        // every chain's upgrade a no-op delegatecall that silently "succeeds".
+        CTMTransition committed = new CTMTransition(_transitionManifest());
+
+        vm.etch(upgradeEngine, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeEngine));
+        committed.validate();
+    }
+
+    /// @dev The verifier belongs to the release along with the rest of the installed chain state.
+    function test_revertWhen_releaseVerifierHasNoCode() public {
+        CTMRelease committed = new CTMRelease(_newReleaseManifest());
+
+        vm.etch(verifier, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, verifier));
+        committed.validate();
+    }
+
+    /// @dev A release checks its own members. A transition checks only the code it names itself:
+    ///      its releases are validated at its construction and where they are installed.
+    function test_validateRejectsAMemberThatLostItsCode() public {
+        newRelease.validate();
+        transition.validate();
+
+        vm.etch(facetOldAdmin, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, facetOldAdmin));
+        fromRelease.validate();
+        transition.validate();
+    }
+
+    // ─────────────────────────── Core-domain inventory ───────────────────────────
+
+    function test_revertWhen_inventoryLengthDoesNotMatchTheEnum() public {
+        // The dynamic inventory must be exactly one slot per enum member, so every contract of
+        // the domain HAS a slot and none can be smuggled in. Whether the slot says what the
+        // upgrade meant is preparation's job, not this length check's.
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeRow[] memory tooShort = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT - 1);
+        tooShort[uint256(L1EcosystemContract.L1Bridgehub)] = manifest.proxyUpgrades[
+            uint256(L1EcosystemContract.L1Bridgehub)
+        ];
+        manifest.proxyUpgrades = tooShort;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryInventoryLengthMismatch.selector,
+                L1_ECOSYSTEM_CONTRACT_COUNT,
+                L1_ECOSYSTEM_CONTRACT_COUNT - 1
+            )
+        );
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    function test_revertWhen_upgradingRowMissingSource() public {
+        // A participating slot must be a full edge: known source implementation.
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = address(0);
+
+        vm.expectRevert(ZeroAddress.selector);
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    function test_inertSlotIsExplicitNotUpgradedAndProducesNoRow() public {
+        // A slot with zero `implNew` is the inventory's explicit "not upgraded" statement:
+        // it never becomes a row, even when it documents the proxy address it refers to.
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)].proxy = address(0xB002);
+
+        ProxyUpgradeTransition registry = new ProxyUpgradeTransition(manifest);
+        assertEq(registry.rows().length, 1, "the inert slot must be dropped at the flatten boundary");
+        assertEq(registry.rows()[0].proxy, address(0xB001), "the participating slot must survive");
+    }
+
+    function test_revertWhen_everyInventorySlotIsInert() public {
+        // A registry whose whole inventory is "not upgraded" upgrades nothing — refused.
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].implNew = address(0);
+
+        vm.expectRevert(RegistryUnknownKey.selector);
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    function test_revertWhen_coreTransitionHasDuplicateProxyRow() public {
+        // A proxy is routed once: two slots naming the same proxy are rejected.
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        // same proxy again, in another contract's slot
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1MessageRoot)] = manifest.proxyUpgrades[
+            uint256(L1EcosystemContract.L1Bridgehub)
+        ];
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                RegistryDuplicateProxyRow.selector,
+                manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].proxy
+            )
+        );
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    function test_revertWhen_coreTransitionHasSelfEdgeRow() public {
+        // A row whose source is its target swaps nothing and would skip its initializer: an
+        // authoring mistake, rejected at construction.
+        ProxyUpgradeTransitionManifest memory manifest = _coreManifest();
+        ProxyUpgradeRow memory row = manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)];
+        manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)].expectedOldImpl = row.implNew;
+
+        vm.expectRevert(abi.encodeWithSelector(RegistrySelfEdgeProxyRow.selector, row.proxy));
+        new ProxyUpgradeTransition(manifest);
+    }
+
+    // ─────────────────────────── CTM-domain inventory ───────────────────────────
+
+    /// @dev The enum is append-only and the inventory length is derived from it: the fee manager
+    ///      slot must be the LAST member, and the count must have grown with it.
+    function test_ctmInventoryEndsWithTheInteropFeeManagerSlot() public pure {
+        assertEq(
+            uint256(CTMContract.L1InteropFeeManager),
+            uint256(type(CTMContract).max),
+            "L1InteropFeeManager must be the last member"
+        );
+        assertEq(
+            CTM_CONTRACT_COUNT,
+            uint256(CTMContract.L1InteropFeeManager) + 1,
+            "the inventory length must cover the fee manager slot"
+        );
+    }
+
+    /// @dev The participating inventory slots ride the manifest into the flattened rows unchanged,
+    ///      the notifier's included, and are part of the committed manifest hash.
+    function test_ctmRowsCarryTheirInventorySlots() public {
+        ProxyUpgradeTransitionManifest memory manifest = _ctmManifestWithTwoRows();
+
+        ProxyUpgradeTransition withRows = new ProxyUpgradeTransition(manifest);
+        ProxyUpgradeRow[] memory rows = withRows.rows();
+        assertEq(rows.length, 2, "both participating slots become rows, in inventory order");
+        assertEq(rows[0].proxy, address(0xC001));
+        assertEq(rows[0].implNew, manifest.proxyUpgrades[uint256(CTMContract.ChainTypeManager)].implNew);
+        assertEq(rows[1].proxy, address(0xC002));
+        assertEq(rows[1].implNew, manifest.proxyUpgrades[uint256(CTMContract.ServerNotifier)].implNew);
+        assertEq(withRows.manifestHash(), keccak256(abi.encode(manifest)), "the rows are part of the commitment");
+    }
+
+    // ─────────────────────────── CTM-domain fixtures ───────────────────────────
+
+    /// @dev Two participating CTM-domain slots: the CTM itself and the ServerNotifier.
+    function _ctmManifestWithTwoRows() internal returns (ProxyUpgradeTransitionManifest memory manifest) {
+        manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.proxyUpgrades = _ctmInventoryWithTwoRows();
+    }
+
+    function _ctmInventoryWithTwoRows() internal returns (ProxyUpgradeRow[] memory inventory) {
+        inventory = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        inventory[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
+            proxy: address(0xC001),
+            expectedOldImpl: address(0xC101),
+            implNew: _deployedStub("ctmImplNew"),
+            callInitializeUpgrade: false
+        });
+        inventory[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: address(0xC002),
+            expectedOldImpl: address(0xC102),
+            implNew: _deployedStub("notifierImplNew"),
+            callInitializeUpgrade: false
+        });
+    }
+}

@@ -105,18 +105,19 @@ image's, and the outputs land there.
      --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
    ```
 
-3. Send the governance calls, stages 0, 1 and 2 under `[governance_calls]` in the bundle's
-   `ecosystem.toml`, through your Governance from its owner: schedule each stage with at least your
-   `minDelay` (three days for ADI), then execute it once the delay has passed, or have your security
-   council execute it instantly. Steps 1 and 2 don't run these calls, so the delay doesn't affect
-   them. `ecosystem upgrade-governance` writes the calls as a Safe bundle that schedules with no
-   delay, which a Governance with a `minDelay` refuses (`InvalidDelay`), on a fork too.
+3. Verify the deployment before governance signs: the same command with `--verify-only` in place
+   of `--key`.
+
+4. Send the governance bundle, `[governance_calls] calls` in the bundle's `ecosystem.toml`, through
+   your Governance from its owner: schedule it with at least your `minDelay` (three days for ADI),
+   then execute it once the delay has passed, or have your security council execute it instantly.
+   Steps 1 to 3 don't run these calls, so the delay doesn't affect them.
+   `ecosystem upgrade-governance` writes the calls as a Safe bundle that schedules with no delay,
+   which a Governance with a `minDelay` refuses (`InvalidDelay`), on a fork too.
 
 How to mount the bundle (`/contracts/bundle` above), rehearse the broadcast on a fork first and
 verify it afterwards:
 [Deploying + verifying from a deploy bundle](ecosystem-upgrade-deploy.md#deploying--verifying-from-a-deploy-bundle).
-PUVT does not model a standalone, `Governance`-owned ecosystem yet, so read its output rather than
-trusting its exit code.
 
 ## Changing a config
 

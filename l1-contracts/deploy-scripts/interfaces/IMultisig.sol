@@ -6,4 +6,6 @@ pragma solidity 0.8.28;
 /// @custom:security-contact security@matterlabs.dev
 interface IMultisig {
     function members(uint256) external view returns (address);
+
+    function EIP1271_THRESHOLD() external view returns (uint256);
 }

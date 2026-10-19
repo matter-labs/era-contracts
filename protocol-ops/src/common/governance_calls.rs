@@ -1,12 +1,10 @@
 //! ABI helpers for the `Call[]` payloads embedded in our governance TOMLs.
 //!
-//! Every prepare command writes a TOML of the form:
+//! Every prepare command, and the merged package, writes the governance bundle as:
 //!
 //! ```toml
 //! [governance_calls]
-//! stage0_calls = "0x…"   # abi.encode(Call[])
-//! stage1_calls = "0x…"
-//! stage2_calls = "0x…"
+//! calls = "0x…"   # abi.encode(Call[])
 //! ```
 //!
 //! `Call` matches the Solidity struct in `contracts/governance/Common.sol`:
@@ -20,6 +18,16 @@ use alloy::primitives::{Address, U256};
 use alloy::sol;
 use alloy::sol_types::SolValue;
 use anyhow::Context;
+use serde::Deserialize;
+
+/// The `[governance_calls]` table: the one bundle governance executes. Unknown keys are refused,
+/// so a package still carrying per-stage keys fails to load instead of having them ignored.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GovernanceCallsTable {
+    /// `abi.encode(Call[])` as `0x…` hex.
+    pub calls: String,
+}
 
 sol! {
     /// Mirror of `struct Call { address target; uint256 value; bytes data; }`
@@ -72,10 +80,10 @@ pub fn decode_calls(hex_str: &str) -> anyhow::Result<Vec<GovernanceCall>> {
 /// Concatenated re-encoding of multiple `Call[]` hex strings, in the order
 /// supplied. Used to merge per-script (core + per-CTM + gov-upgrade) TOMLs
 /// into one merged `<env-out>/ecosystem.toml`.
-pub fn merge_call_array_hex(stages: &[&str]) -> anyhow::Result<String> {
+pub fn merge_call_array_hex(chunks: &[&str]) -> anyhow::Result<String> {
     let mut merged: Vec<GovernanceCall> = Vec::new();
-    for stage in stages {
-        merged.extend(decode_calls(stage)?);
+    for chunk in chunks {
+        merged.extend(decode_calls(chunk)?);
     }
     Ok(format!("0x{}", hex::encode(encode_calls(&merged))))
 }
@@ -83,4 +91,33 @@ pub fn merge_call_array_hex(stages: &[&str]) -> anyhow::Result<String> {
 /// Empty `Call[]` encoded as `0x…`.
 pub fn empty_calls_hex() -> String {
     format!("0x{}", hex::encode(encode_calls(&[])))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Deserialize)]
+    struct Package {
+        governance_calls: GovernanceCallsTable,
+    }
+
+    #[test]
+    fn the_bundle_is_read_from_its_one_key() {
+        let package: Package =
+            toml::from_str("[governance_calls]\ncalls = \"0x\"\n").expect("one bundle");
+        assert!(decode_calls(&package.governance_calls.calls)
+            .unwrap()
+            .is_empty());
+    }
+
+    /// A package with per-stage keys is refused rather than read with those calls dropped.
+    #[test]
+    fn a_package_with_stage_keys_is_refused() {
+        let err = toml::from_str::<Package>(
+            "[governance_calls]\ncalls = \"0x\"\nstage1_calls = \"0x\"\n",
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("stage1_calls"), "{err}");
+    }
 }

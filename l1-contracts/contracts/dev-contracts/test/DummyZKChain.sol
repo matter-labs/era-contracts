@@ -46,6 +46,8 @@ contract DummyZKChain is MailboxFacet {
             });
     }
 
+    function genesisUpgrade() external {}
+
     // add this to be excluded from coverage report
     function test() internal {}
 }

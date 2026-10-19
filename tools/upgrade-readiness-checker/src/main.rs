@@ -2,10 +2,15 @@
 //!
 //! Flow:
 //!   1. Resolve the chain's ChainTypeManager on the settlement layer.
-//!   2. Scan for `NewUpgradeCutData(target_protocol_version, ...)` on the CTM and
-//!      extract the embedded `L2CanonicalTransaction`.
-//!   3. Replay its v31+ per-chain data rewrite and compute
-//!      `keccak256(tx.abi_encode())` — the canonical L2 upgrade-tx hash.
+//!   2. Scan for the newest `NewUpgradeCutData(target_protocol_version, ...)` on the
+//!      CTM; its init calldata tells the upgrade's shape.
+//!   3. Resolve the `L2CanonicalTransaction` the chain executes and compute
+//!      `keccak256(tx.abi_encode())` — the canonical L2 upgrade-tx hash. A registry
+//!      edge is resolved per chain (the transition its CTM commits for the chain's
+//!      version, or the hash its diamond recorded once it crossed), because
+//!      `replaceUpgradeTransition` can publish a second cut under the same target. A
+//!      bootstrap or legacy cut is read from the cut itself, replaying the legacy v31+
+//!      per-chain data rewrite.
 //!   4. Poll the chain's L2 RPC for a receipt; once present, the server processed
 //!      the upgrade in L2 block N.
 //!   5. Poll `eth_getBlockByNumber("finalized")` until the finalized block is
@@ -117,8 +122,9 @@ async fn run() -> Result<()> {
         .connect_http(settlement_rpc_url)
         .erased();
 
-    // Step 1-3: find the pending upgrade's canonical L2 tx hash. Static once the
-    // upgrade cut is published — the hash never changes.
+    // Step 1-3: find the pending upgrade's canonical L2 tx hash, once. A registry edge
+    // the chain has not crossed is resolved against the transition committed now: a later
+    // `replaceUpgradeTransition` of that edge needs a re-run.
     let ctm = upgrade::resolve_ctm(&settlement_provider, cli.bridgehub_address, cli.chain_id)
         .await
         .context("resolving ChainTypeManager from bridgehub")?;

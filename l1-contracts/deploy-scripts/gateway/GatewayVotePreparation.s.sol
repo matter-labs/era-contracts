@@ -23,6 +23,7 @@ import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/T
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {GatewayCTMDeployerHelper, DirectCreate2Calldata, DeployerCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
+import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
@@ -82,12 +83,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             salt: toml.readBytes32("$.contracts.create2_factory_salt"),
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
-            adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
-            executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
-            mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
-            gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
-            migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
-            committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
+            // No facet selectors: the Gateway genesis cut installs no facets directly; the genesis
+            // release the CTM points at drives installation, and DiamondInit reads each facet's own
+            // `selectors()` at chain creation. ZKsync OS has no base-system bytecode hashes.
             genesisRoot: config.contracts.chainCreationParams.genesisRoot,
             genesisRollupLeafIndex: uint64(config.contracts.chainCreationParams.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.chainCreationParams.genesisBatchCommitment,
@@ -150,7 +148,12 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
-        ) = GatewayCTMDeployerHelper.calculateAddresses(gatewayCTMDeployerConfig.salt, gatewayCTMDeployerConfig);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(
+                gatewayCTMDeployerConfig.salt,
+                gatewayCTMDeployerConfig,
+                getL2BytecodeInfoTable(),
+                getL2SystemProxyBytecodeInfo()
+            );
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
@@ -209,6 +212,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         // Deploy Multicall3
         runGatewayL1L2Transaction(targetAddr, directCalldata.multicall3Calldata);
+
+        runGatewayL1L2Transaction(targetAddr, directCalldata.currentReleaseCalldata);
     }
 
     function runGatewayL1L2TransactionWithFactoryDeps(
@@ -299,9 +304,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
             });
         }
-        // else: existing ServerNotifier proxy stays in place. The per-CTM
-        // upgrade flow (`DefaultCTMUpgrade.prepareUpgradeServerNotifierCall`)
-        // already emits a `ProxyAdmin.upgrade(existing, newImpl)` for it, so
+        // else: existing ServerNotifier proxy stays in place; its implementation
+        // swaps ride the per-CTM upgrade's CTM-domain rows, so
         // GatewayVotePreparation has no extra work to do — `ecosystemAdminCalls`
         // is left empty (length 0).
 
@@ -379,11 +383,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             "genesis_upgrade_addr",
             output.gatewayStateTransition.genesisUpgrade
         );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "default_upgrade_addr",
-            output.gatewayStateTransition.defaultUpgrade
-        );
+        // The Gateway CTM deployer builds no upgrade engine, so this has always been zero on this
+        // path. Written anyway: the key belongs to the output schema protocol-ops reads.
+        vm.serializeAddress("gateway_state_transition", "default_upgrade_addr", address(0));
         vm.serializeAddress(
             "gateway_state_transition",
             "validator_timelock_addr",
@@ -415,5 +417,16 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), vm.envString("GATEWAY_VOTE_PREPARATION_OUTPUT"));
         vm.writeToml(toml, path);
+    }
+
+    /// @dev Virtual so bytecode-light test harnesses can substitute the release's L2 bytecode
+    ///      table: the real builder reads every L2 contract's bytecode from artifacts.
+    function getL2BytecodeInfoTable() internal virtual override returns (bytes[] memory) {
+        return SystemContractsProcessing.buildL2BytecodeInfoTable();
+    }
+
+    /// @dev Same as {getL2BytecodeInfoTable}, for the table's shared proxy shell.
+    function getL2SystemProxyBytecodeInfo() internal virtual override returns (bytes memory) {
+        return SystemContractsProcessing.systemProxyBytecodeInfo();
     }
 }

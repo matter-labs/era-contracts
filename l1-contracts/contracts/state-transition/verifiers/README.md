@@ -76,6 +76,39 @@ node bin/zk-deployer/tools/zisk-backend/zisk-backend.js deploy /path/to/era-cont
 The helper prints `zisk_plonk_verifier_addr` for the deployment config. Its
 `prepare` command only builds and prints the external artifact path.
 
+### Pinning the backend for review
+
+No build in this repository describes the backend, so `protocol-ops ecosystem
+verify-package` holds the code at `ZiskVerifier.PLONK_VERIFIER()` to the
+runtime pinned in `tools/verifier-gen/data/ZiSK_plonk_backend.toml`, next to the
+verification key it renders. The pin is the keccak256 of the backend's
+deployed runtime under the recipe the file records (template, compiler and
+builder). The backend has no constructor and no immutables, so that runtime is
+a pure function of the key and the recipe: one pin serves every L1, and the
+backend's address is not pinned. An entry may restrict itself to some upgrade
+envs with `envs = [...]`; without it, it applies to every env.
+
+To recompute the pin, extract the helper at the commit the file names and run
+`prepare` against this checkout under the pinned upstream Foundry
+(`.github/foundry-versions.env`; the helper refuses another). The cache must
+sit outside any Git checkout, and `npm ci` needs network access:
+
+```bash
+mkdir -p /tmp/zk-deployer && git -C /path/to/zksync-os-integration-tests archive \
+  d1be31737c3d68346cf36495ec0991cefd5233e3 bin/zk-deployer/tools/zisk-backend | tar -x -C /tmp/zk-deployer
+ARTIFACT=$(ZISK_BACKEND_CACHE=/tmp/zisk-backend-cache \
+  node /tmp/zk-deployer/bin/zk-deployer/tools/zisk-backend/zisk-backend.js prepare /path/to/era-contracts)
+jq -r '.deployedBytecode.object' "$ARTIFACT" | cast keccak   # runtime_keccak256
+jq '.deployedBytecode.immutableReferences // {}' "$ARTIFACT" # must be {}
+shasum -a 256 tools/verifier-gen/data/ZiSK_plonk_verification_key.json
+```
+
+`immutableReferences` must be empty: a backend with immutables would need its
+slots masked, which the pin does not do. After a SNARK circuit or setup change,
+re-pin in the same change as the verification key; the
+`the_committed_pin_matches_the_committed_verification_key` protocol-ops test
+fails until the file's `verification_key_sha256` matches the key again.
+
 ## Generating the range verifier
 
 From `tools/verifier-gen/`, regenerate our wrapper after updating the guest VKs:

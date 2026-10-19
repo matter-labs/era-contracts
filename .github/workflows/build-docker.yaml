@@ -33,7 +33,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # The zk-governance commit baked into the image (PUH/Guardians redeploy, PUVT).
+  # The zk-governance commit baked into the image (PUH/Guardians redeploy).
   # build-and-push-docker.yaml and bundle.rs's DEFAULT_ZK_GOVERNANCE_COMMIT use the same one.
   ZK_GOVERNANCE_COMMIT: 9b06a16159cd58add109f25598e79731450d1772
 

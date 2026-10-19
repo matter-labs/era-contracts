@@ -104,6 +104,8 @@ We really want to account for anything that can disturb the users guarantee to g
 2. **`SoftFreeze`** – It can happen only once for a duration of 12 hours before 9/12 Security Council members are able to trigger it again. We always assume the worst-case impact, namely that a soft freeze has happened.
 3. `Normal Protocol Upgrade` - It can change the implementation of the chain. We always assume the worst-case impact, namely that the chain’s security properties may be broken after the upgrade. Therefore, the exit window is calculated from the moment a malicious protocol upgrade is initiated, giving users time up to the point when the upgrade is executed. The start of the upgrade is assumed to be the point at which the governance proposal passes voting and is submitted to L1.
 
+Both freezes, and the unfreeze, reach every chain through its `ChainTypeManager`, which takes them from the `ProtocolUpgradeHandler` as its owner or as the Bridgehub's owner, so a CTM owned by its `CTMUpgradeExecutor` is covered too ([freezing a chain](../../../ecosystem-upgrade-coordination.md#freezing-a-chain)).
+
 To make the exit window 7 days, we will:
 
 1. Increase the Normal Protocol Upgrade notice period to 12 days.

@@ -11,12 +11,13 @@
 //! - `rehearse-upgrade` (GENERATE): fork L1, prepare the upgrade, pack the bundle, replay
 //!   every bundle under impersonation and run the upgrade's checks. What "prepare" and
 //!   "checks" mean comes from `upgrade-envs/<upgrade>/upgrade.toml`: `prepare-all` is the
-//!   release's `upgrade-prepare-all` + PUVT (only for [`DEFAULT_UPGRADE`]), a `forge-script`
-//!   upgrade runs one script and its own checks.
+//!   release's `upgrade-prepare-all` + `verify-bootstrap`, the registry verifier (only for
+//!   [`DEFAULT_UPGRADE`]); a `forge-script` upgrade runs one script and its own checks.
 //!   A `forge-script` upgrade with an `[execution]` script also gets `EXECUTE.md`, the
 //!   runbook of the txs whoever executes sends by hand, checked on the same fork.
 //! - `replay-bundle` (CONSUME): rehearse a packed bundle on a fresh fork, broadcast the
-//!   deployer's bundles for real, or only run PUVT against an already-upgraded chain.
+//!   deployer's bundles for real, or only run the upgrade's checks against a chain the
+//!   deployer's bundles were already broadcast to.
 //! - `verify-bundle`: the integrity check on its own.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,7 +25,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use alloy::primitives::{Address, Bytes, U256};
+use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::SolCall;
 use anyhow::Context;
@@ -34,11 +35,9 @@ use sha2::{Digest, Sha256};
 
 use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
-use crate::commands::ecosystem::verify_upgrade::{self, VerifyUpgradeArgs};
+use crate::commands::ecosystem::verify_bootstrap::{self, VerifyBootstrapArgs};
 use crate::common::anvil::{send_impersonated_tx, set_balance};
-use crate::common::env_config::{
-    default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE,
-};
+use crate::common::env_config::{protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE};
 use crate::common::ethereum::get_provider;
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
@@ -55,12 +54,13 @@ const REQUIRED_BUNDLE_FILES: [&str; 2] = [MANIFEST_FILE, "ecosystem.toml"];
 /// Etherscan verification command logs; `gw-verification-logs.txt` only exists on gateway-enabled envs.
 const OPTIONAL_BUNDLE_FILES: [&str; 2] =
     ["extra-verification-logs.txt", "gw-verification-logs.txt"];
-/// The per-env real-network broadcast log, committed under `output/<env>/` and read by PUVT.
-/// A run's own log carries the same basename inside the bundle work dir.
+/// The per-env real-network broadcast log, committed under `output/<env>/` as the record of
+/// what was deployed; a regen keeps it. A run's own log carries the same basename inside the
+/// bundle work dir.
 const TRANSACTIONS_LOG: &str = "transactions.txt";
 
-/// The reviewed zk-governance commit PUVT verifies governance bytecodes against by default
-/// (the one build-docker.yaml checks out into the image).
+/// The zk-governance commit the governance redeploy is built from by default (the one
+/// build-docker.yaml checks out into the image). Recorded in the bundle as provenance only.
 const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
@@ -80,13 +80,14 @@ const FUNDING_TX_GAS_LIMIT: u64 = 500_000;
 /// Tracked paths whose modification changes the bytecode or calldata a generation run
 /// produces. `contracts_worktree_dirty` is scoped to these, so the generated files the run
 /// itself rewrites (`output/<env>/`, `zkstack-out/`) do not count.
-const CONTRACT_SOURCE_PATHSPECS: [&str; 10] = [
+const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
     "*/foundry.toml",
     "AllContractsHashes.json",
     "SystemConfig.json",
     "configs/genesis",
     "l1-contracts/contracts",
     "l1-contracts/deploy-scripts",
+    "l1-contracts/dev",
     "l1-contracts/upgrade-envs/permanent-values",
     "l2-contracts/contracts",
     "protocol-ops/src",
@@ -639,85 +640,68 @@ fn ensure_bundle_chain_id(
     }
 }
 
-/// Pick the receipt journal PUVT resolves CREATE2 deployments from: an explicit
-/// `--transactions-log`, else the journal this command writes itself.
+/// The `verify-bootstrap` invocation for a `prepare-all` bundle: its `ecosystem.toml`, held
+/// against `rpc_url` with the reviewer inputs the env config supplies.
 ///
-/// The default only exists if *this* machine did the broadcast, so a consumer verifying
-/// someone else's must pass one. Failing with the artifact to fetch beats a bare
-/// missing-file error.
-fn resolve_transactions_log(
-    override_path: Option<&Path>,
-    default_path: PathBuf,
-) -> anyhow::Result<PathBuf> {
-    match override_path {
-        Some(path) => {
-            anyhow::ensure!(
-                path.is_file(),
-                "--transactions-log {} does not exist",
-                path.display()
-            );
-            Ok(path.to_path_buf())
-        }
-        None => {
-            anyhow::ensure!(
-                default_path.is_file(),
-                "no receipt journal at {} — this run did not broadcast, so there is nothing \
-                 to resolve CREATE2 deployments from. Verifying a broadcast performed \
-                 elsewhere needs that broadcast's journal: download \
-                 `deploy-result/transactions.txt` from the Deploy workflow run \
-                 (artifact `ecosystem-upgrade-deploy-result-<env>`) and pass it as \
-                 --transactions-log.",
-                default_path.display()
-            );
-            Ok(default_path)
-        }
-    }
-}
-
-/// Run PUVT against `rpc_url`. It resolves CREATE2 deployments from transaction hashes, so
-/// this run's own log is verified and the committed real-network log is passed alongside it
-/// as a reference.
-///
-/// The two logs are kept apart rather than concatenated. Only this run's deploys are
-/// salt-gated: they must carry the salts the env config declares, which is what catches a
-/// prepare that fell back to a random salt. The committed log records a *previous* regen's
-/// broadcast, whose deploys carry that regen's salts — and because every regen rotates
-/// `create2_factory_salt`, gating them would turn the whole committed file into errors.
-async fn verify_upgrade(
+/// A package records neither the expected governance owner nor the CREATE2 salts, so both come
+/// from the upgrade input the bundle was generated from: the env's `owner_address`
+/// (`bridgehub.owner()`, the signer of the governance bundle) and its core and per-CTM salts.
+/// Executor records the package does not carry itself (an ordinary upgrade's executors were
+/// deployed by `ecosystem init` / `ctm init`) are the caller's `--executor-record` files.
+fn package_verification_args(
     env_cfg: &EnvConfig,
     rpc_url: &str,
-    zk_governance_commit: &str,
+    ecosystem_toml: &Path,
+    executor_records: &[PathBuf],
+) -> anyhow::Result<VerifyBootstrapArgs> {
+    let expected_governance_owner = env_cfg.owner_address()?.ok_or_else(|| {
+        anyhow::anyhow!(
+            "the {} upgrade input has no owner_address: the governance owner the upgrade must \
+             be driven by is a reviewer input of verify-bootstrap",
+            env_cfg.env
+        )
+    })?;
+    let mut create2_salts: Vec<B256> = env_cfg
+        .create2_factory_salt_for_upgrade()?
+        .into_iter()
+        .chain(
+            env_cfg
+                .create2_factory_salt_for_upgrade_per_ctm()?
+                .into_values(),
+        )
+        .collect();
+    create2_salts.sort();
+    create2_salts.dedup();
+    Ok(VerifyBootstrapArgs {
+        ecosystem_toml: ecosystem_toml.to_path_buf(),
+        l1_rpc_url: rpc_url.to_string(),
+        expected_governance_owner: Some(expected_governance_owner),
+        create2_salts,
+        executor_records: executor_records.to_vec(),
+        contract_hashes: None,
+        env: Some(env_cfg.env.clone()),
+        expected_bridgehub: None,
+    })
+}
+
+/// Run `verify-bootstrap`, the registry verifier, on the bundle's `ecosystem.toml` against
+/// `rpc_url`: after the deployer's bundles landed there, before governance signs. It re-derives
+/// every object from the reviewed creation code, so the contracts must be built
+/// (`l1-contracts/out`) from the commit whose `AllContractsHashes.json` the bundle records.
+async fn verify_package(
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
     paths: &BundlePaths,
-    transactions_log_override: Option<&Path>,
+    executor_records: &[PathBuf],
 ) -> anyhow::Result<()> {
-    logger::step("verify-upgrade (PUVT)");
-    fs::create_dir_all(&paths.work_dir)?;
-    let transactions_log = resolve_transactions_log(
-        transactions_log_override,
-        paths.work_dir.join(TRANSACTIONS_LOG),
-    )?;
-    let reference_log = default_protocol_ops_out_dir(&env_cfg.env)?.join(TRANSACTIONS_LOG);
-    let mut args = [
-        "verify-upgrade".to_string(),
-        "--env".into(),
-        env_cfg.env.clone(),
-        "--ecosystem-toml".into(),
-        paths.ecosystem_toml.display().to_string(),
-        "--l1-rpc-url".into(),
-        rpc_url.to_string(),
-        "--transactions-log".into(),
-        transactions_log.display().to_string(),
-        "--zk-governance-commit".into(),
-        zk_governance_commit.to_string(),
-    ]
-    .to_vec();
-    if reference_log.is_file() {
-        args.extend([
-            "--reference-transactions-log".to_string(),
-            reference_log.display().to_string(),
-        ]);
-    }
-    verify_upgrade::run(VerifyUpgradeArgs::try_parse_from(args)?).await
+    logger::step("verify-bootstrap (registry verifier)");
+    verify_bootstrap::run(package_verification_args(
+        env_cfg,
+        rpc_url,
+        &paths.ecosystem_toml,
+        executor_records,
+    )?)
+    .await
 }
 
 /// Fund the bundle's signers on a fork. `prepare-all` also mints ZK ([`fund_bundle_targets`]);
@@ -758,27 +742,19 @@ enum CheckTarget {
     Chain,
 }
 
-/// Check the upgrade's effects: PUVT for `prepare-all`, the upgrade's declared command otherwise.
-#[allow(clippy::too_many_arguments)]
+/// Check the upgrade's effects: `verify-bootstrap` for `prepare-all`, the upgrade's declared
+/// command otherwise.
 async fn check_upgrade(
     descriptor: &UpgradeDescriptor,
     target: CheckTarget,
     env_cfg: &EnvConfig,
     rpc_url: &str,
-    zk_governance_commit: &str,
     paths: &BundlePaths,
-    transactions_log_override: Option<&Path>,
+    executor_records: &[PathBuf],
 ) -> anyhow::Result<()> {
     match descriptor {
         UpgradeDescriptor::PrepareAll {} => {
-            verify_upgrade(
-                env_cfg,
-                rpc_url,
-                zk_governance_commit,
-                paths,
-                transactions_log_override,
-            )
-            .await
+            verify_package(env_cfg, rpc_url, paths, executor_records).await
         }
         UpgradeDescriptor::ForgeScript(upgrade) => {
             let command = match target {
@@ -818,10 +794,10 @@ fn run_upgrade_check(
 }
 
 /// `--gw-rpc-url` is still accepted on `rehearse-upgrade` / `replay-bundle` for callers that
-/// pass it unconditionally, but the release's PUVT runs no Gateway-side checks.
+/// pass it unconditionally, but the release's checks (`verify-bootstrap`) read L1 only.
 fn warn_ignored_gw_rpc_url(gw_rpc_url: Option<&str>) {
     if gw_rpc_url.is_some() {
-        logger::warn("--gw-rpc-url is ignored: the release's PUVT has no Gateway-side checks");
+        logger::warn("--gw-rpc-url is ignored: the release's checks have no Gateway side");
     }
 }
 
@@ -847,18 +823,24 @@ pub struct RehearseUpgradeArgs {
     #[clap(long)]
     pub fork_block: Option<u64>,
     /// Accepted so existing callers (the generate workflow passes it when `GW_RPC_URL` is set)
-    /// keep working, and ignored: the release's PUVT has no Gateway-side checks.
+    /// keep working, and ignored: the release's checks have no Gateway side.
     #[clap(long, hide = true)]
     pub gw_rpc_url: Option<String>,
-    /// zk-governance commit PUVT verifies the governance bytecodes against; recorded in the bundle.
+    /// zk-governance commit the governance redeploy's sources (`ZK_GOVERNANCE_DIR`) are checked
+    /// out at; recorded in the bundle as provenance.
     #[clap(long, default_value = DEFAULT_ZK_GOVERNANCE_COMMIT)]
     pub zk_governance_commit: String,
+    /// An `[upgrade_executors]` record file for `verify-bootstrap --executor-record`, repeatable
+    /// (`prepare-all` only). Needed when the package does not carry the records of the executors
+    /// it drives itself, as an ordinary upgrade's package does not.
+    #[clap(long = "executor-record")]
+    pub executor_records: Vec<PathBuf>,
     /// foundry-zksync version used for the build; recorded in the bundle (part of the bytecode identity).
     #[clap(long)]
     pub foundry_zksync_version: Option<String>,
 }
 
-/// Fork L1, prepare the upgrade, pack the deploy bundle, replay it and run PUVT.
+/// Fork L1, prepare the upgrade, pack the deploy bundle, replay it and run the upgrade's checks.
 pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<()> {
     warn_ignored_gw_rpc_url(args.gw_rpc_url.as_deref());
     let env_cfg = EnvConfig::load(&args.env)?;
@@ -985,9 +967,8 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         CheckTarget::Fork,
         &env_cfg,
         &rpc_url,
-        &args.zk_governance_commit,
         &paths,
-        None,
+        &args.executor_records,
     )
     .await?;
     drop(anvil);
@@ -1049,29 +1030,24 @@ pub struct ReplayBundleArgs {
     /// Rehearse: fork this L1 RPC at the bundle's recorded height and replay every bundle under impersonation.
     #[clap(long, conflicts_with_all = ["rpc", "key", "verify_only"])]
     pub fork_url: Option<String>,
-    /// Use this chain as-is: with `--key` broadcast the deployer's bundles for real, with `--verify-only` just run the upgrade's checks (PUVT for `prepare-all`).
+    /// Use this chain as-is: with `--key` broadcast the deployer's bundles for real, with `--verify-only` just run the upgrade's checks (`verify-bootstrap` for `prepare-all`).
     #[clap(long, requires = "rpc_mode")]
     pub rpc: Option<String>,
     /// Deployer private key for a real broadcast; only its bundles are sent (`--skip-unkeyed`).
     #[clap(long, group = "rpc_mode", requires = "rpc")]
     pub key: Option<String>,
-    /// Run PUVT only, against a chain the bundle was already broadcast to.
+    /// Only run the upgrade's checks, against a chain the bundle was already broadcast to.
     #[clap(long, group = "rpc_mode", requires = "rpc")]
     pub verify_only: bool,
     /// Accepted so existing callers (the generate workflow passes it when `GW_RPC_URL` is set)
-    /// keep working, and ignored: the release's PUVT has no Gateway-side checks.
+    /// keep working, and ignored: the release's checks have no Gateway side.
     #[clap(long, hide = true)]
     pub gw_rpc_url: Option<String>,
-    /// zk-governance commit for PUVT; defaults to the one recorded in the bundle.
-    #[clap(long)]
-    pub zk_governance_commit: Option<String>,
-    /// The receipt journal PUVT resolves CREATE2 deployments from: one 0x-prefixed L1 tx
-    /// hash per line. Defaults to the journal this command writes itself, which only
-    /// exists if *this* machine did the broadcast. A `--verify-only` consumer verifying
-    /// someone else's broadcast has to pass the journal that broadcast produced —
-    /// `deploy-result/transactions.txt` from the Deploy workflow's run artifact.
-    #[clap(long)]
-    pub transactions_log: Option<PathBuf>,
+    /// An `[upgrade_executors]` record file for `verify-bootstrap --executor-record`, repeatable
+    /// (`prepare-all` only). Needed when the package does not carry the records of the executors
+    /// it drives itself, as an ordinary upgrade's package does not.
+    #[clap(long = "executor-record")]
+    pub executor_records: Vec<PathBuf>,
 }
 
 /// How a deploy bundle is consumed.
@@ -1113,13 +1089,13 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
     let env_cfg = EnvConfig::load(&metadata.env)?;
     // The bundle names the upgrade it was generated for; its descriptor says how to check it.
     let descriptor = UpgradeDescriptor::load(&metadata.upgrade)?;
-    // `prepare-all` means this release's `upgrade-prepare-all` + PUVT. A bundle another line
-    // generated with its own `prepare-all` (e.g. a v31 bundle) would be checked by the wrong
-    // verifier — after a real broadcast, at that — so refuse it before anything is sent.
+    // `prepare-all` means this release's `upgrade-prepare-all` + `verify-bootstrap`. A bundle
+    // another line generated with its own `prepare-all` (e.g. a v31 bundle) would be checked by
+    // the wrong verifier — after a real broadcast, at that — so refuse it before anything is sent.
     anyhow::ensure!(
         !matches!(descriptor, UpgradeDescriptor::PrepareAll {}) || metadata.upgrade == DEFAULT_UPGRADE,
         "the bundle was generated for {}, but `prepare-all` here is the {DEFAULT_UPGRADE} flow and \
-         its PUVT; replay it with the protocol_ops of the line that generated it",
+         its verifier; replay it with the protocol_ops of the line that generated it",
         metadata.upgrade
     );
     let deployer = metadata
@@ -1131,23 +1107,19 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
             "the supplied private key belongs to {signer:#x}, not the bundle deployer {deployer:#x}"
         );
     }
-    // PUVT recognises deployed code through the checkout's AllContractsHashes.json.
+    // `verify-bootstrap` holds the local build and the deployed code against the checkout's
+    // AllContractsHashes.json.
     let local_hashes = sha256_file(&paths::contracts_root().join("AllContractsHashes.json"))?;
     anyhow::ensure!(
         local_hashes == metadata.all_contracts_hashes_sha256,
         "AllContractsHashes.json differs from the bundle's (bundle {}, commit {}; local {}). \
-         PUVT will not recognise the deployed bytecode: replay from a checkout of {}, or in the \
-         bundle's protocol_ops_image when it names one.",
+         The verifier will not recognise the deployed bytecode: replay from a checkout of {}, or \
+         in the bundle's protocol_ops_image when it names one.",
         metadata.all_contracts_hashes_sha256,
         metadata.contracts_commit,
         local_hashes,
         metadata.contracts_commit
     );
-    let zk_governance_commit = args
-        .zk_governance_commit
-        .clone()
-        .or(metadata.zk_governance_commit.clone())
-        .unwrap_or_else(|| DEFAULT_ZK_GOVERNANCE_COMMIT.to_string());
     // Replay state goes next to the env's other outputs, never into the bundle (the handoff artifact).
     let paths = BundlePaths {
         manifest: bundle_dir.join(MANIFEST_FILE),
@@ -1194,9 +1166,8 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 CheckTarget::Fork,
                 &env_cfg,
                 &rpc_url,
-                &zk_governance_commit,
                 &paths,
-                args.transactions_log.as_deref(),
+                &args.executor_records,
             )
             .await?;
             drop(anvil);
@@ -1222,9 +1193,8 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 CheckTarget::Chain,
                 &env_cfg,
                 &rpc_url,
-                &zk_governance_commit,
                 &paths,
-                args.transactions_log.as_deref(),
+                &args.executor_records,
             )
             .await?;
         }
@@ -1234,9 +1204,8 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 CheckTarget::Chain,
                 &env_cfg,
                 &rpc_url,
-                &zk_governance_commit,
                 &paths,
-                args.transactions_log.as_deref(),
+                &args.executor_records,
             )
             .await?;
         }
@@ -1269,7 +1238,8 @@ mod tests {
             format!("l1-contracts/upgrade-envs/{DEFAULT_UPGRADE}/output/mainnet/ecosystem.toml");
         let (input, output) = (input.as_str(), output.as_str());
         let source = "l1-contracts/contracts/Example.sol";
-        for path in [input, output, source] {
+        let simulation = "l1-contracts/dev/simulation/UpgradeSimulation.s.sol";
+        for path in [input, output, source, simulation] {
             write(&repo.path().join(path), "original\n");
         }
         for args in [vec!["init"], vec!["add", "."]] {
@@ -1305,7 +1275,7 @@ mod tests {
             status().is_empty(),
             "generated TOML must not mark sources dirty"
         );
-        for path in [input, source] {
+        for path in [input, source, simulation] {
             write(&repo.path().join(path), "changed\n");
             assert!(
                 status().contains(path),
@@ -1539,8 +1509,7 @@ mod tests {
             key: None,
             verify_only: false,
             gw_rpc_url: None,
-            zk_governance_commit: None,
-            transactions_log: None,
+            executor_records: Vec::new(),
         };
         assert!(replay_mode(&base).is_err(), "--rpc alone must be rejected");
         assert!(replay_mode(&ReplayBundleArgs {
@@ -1590,48 +1559,45 @@ mod tests {
         assert!(warnings[0].contains("no l1.chain_id"), "{}", warnings[0]);
     }
 
-    // ─── receipt journal resolution (P2) ────────────────────────────────────
+    // ─── verify-bootstrap inputs ────────────────────────────────────────────
 
+    /// The reviewer inputs a package does not record come from the env config the bundle was
+    /// generated from: the governance owner, every declared CREATE2 salt and the env itself.
     #[test]
-    fn an_explicit_journal_is_used_when_it_exists() {
-        let dir = tempfile::tempdir().unwrap();
-        let journal = dir.path().join("deploy-result").join(TRANSACTIONS_LOG);
-        write(&journal, "0xabc\n");
-        assert_eq!(
-            resolve_transactions_log(Some(&journal), dir.path().join("unused")).unwrap(),
-            journal
-        );
-    }
-
-    #[test]
-    fn a_missing_explicit_journal_names_the_path() {
-        let dir = tempfile::tempdir().unwrap();
-        let missing = dir.path().join("nope.txt");
-        let err = resolve_transactions_log(Some(&missing), dir.path().join("unused"))
-            .expect_err("a missing --transactions-log must fail");
-        assert!(err.to_string().contains("nope.txt"), "{err}");
-    }
-
-    #[test]
-    fn the_local_journal_is_the_default() {
-        let dir = tempfile::tempdir().unwrap();
-        let local = dir.path().join("replay").join(TRANSACTIONS_LOG);
-        write(&local, "0xabc\n");
-        assert_eq!(
-            resolve_transactions_log(None, local.clone()).unwrap(),
-            local
-        );
-    }
-
-    /// A downloaded bundle carries no journal, so `--verify-only` on a consumer machine
-    /// must say which artifact to fetch rather than report a missing file.
-    #[test]
-    fn a_consumer_with_no_journal_is_told_which_artifact_to_download() {
-        let dir = tempfile::tempdir().unwrap();
-        let err = resolve_transactions_log(None, dir.path().join("replay").join(TRANSACTIONS_LOG))
-            .expect_err("no journal must fail");
-        let msg = err.to_string();
-        assert!(msg.contains("deploy-result/transactions.txt"), "{msg}");
-        assert!(msg.contains("--transactions-log"), "{msg}");
+    fn package_verification_takes_its_reviewer_inputs_from_the_env_config() {
+        for env in ["stage", "testnet", "mainnet"] {
+            let cfg = match EnvConfig::load(env) {
+                Ok(cfg) => cfg,
+                // no checkout around the test binary
+                Err(_) if crate::common::paths::resolve_l1_contracts_path().is_err() => return,
+                Err(e) => panic!("{env}: {e:#}"),
+            };
+            let record = PathBuf::from("output-deploy-l1.toml");
+            let args = package_verification_args(
+                &cfg,
+                "http://localhost:8545",
+                Path::new("ecosystem.toml"),
+                std::slice::from_ref(&record),
+            )
+            .unwrap();
+            assert_eq!(
+                args.expected_governance_owner,
+                cfg.owner_address().unwrap(),
+                "{env}"
+            );
+            let core_salt = cfg.create2_factory_salt_for_upgrade().unwrap();
+            assert!(core_salt.is_some(), "{env}: no core salt declared");
+            for salt in core_salt.into_iter().chain(
+                cfg.create2_factory_salt_for_upgrade_per_ctm()
+                    .unwrap()
+                    .into_values(),
+            ) {
+                assert!(args.create2_salts.contains(&salt), "{env}: {salt} missing");
+            }
+            assert_eq!(args.env.as_deref(), Some(env));
+            // The Bridgehub is the env's own.
+            assert_eq!(args.expected_bridgehub, None);
+            assert_eq!(args.executor_records, vec![record]);
+        }
     }
 }

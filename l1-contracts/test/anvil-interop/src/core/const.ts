@@ -39,7 +39,6 @@ export const L2_BASE_TOKEN_HOLDER_ADDR = "0x000000000000000000000000000000000001
 export const L2_REMOVED_GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010";
 export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
 export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
-
 // ZK-VM system hook addresses: SYSTEM_HOOKS_OFFSET (0x7000) + offset
 export const L1_MESSENGER_HOOK_ADDR = "0x0000000000000000000000000000000000007001";
 export const MINT_BASE_TOKEN_HOOK_ADDR = "0x0000000000000000000000000000000000007100";
@@ -59,18 +58,56 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
-// EIP-1967 admin slot: bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1)
-export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-
-// EIP-1967 implementation slot: bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
-export const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
-
 // Default gas limits for test transactions.
 // Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
 // via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed) insert
 // grows the tree and rehashes the populated path, so `sendBundle` needs a generous gas cap.
 export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+// Current Ethereum L1 transaction cap, independent of the block gas limit (EIP-7825).
+export const ETHEREUM_L1_TX_GAS_LIMIT = 2 ** 24;
+
+// ── Glamsterdam L1 gas rules (L1_GAS_RULES=amsterdam) ──
+// Mainnet's block gas limit: under EIP-8037 a transaction's state gas may take its tx.gas up to it.
+export const AMSTERDAM_L1_BLOCK_GAS_LIMIT = 60_000_000;
+// EIP-8037 state gas: the cost per state byte times the bytes a transaction adds, a new account counting
+// as 120 bytes and a new storage slot as 64.
+export const GLAMSTERDAM_COST_PER_STATE_BYTE = 1530;
+export const GLAMSTERDAM_NEW_ACCOUNT_BYTES = 120;
+export const GLAMSTERDAM_STORAGE_SLOT_BYTES = 64;
+// EIP-2780 intrinsic gas: a base, plus a cold recipient other than the sender or a contract creation,
+// plus a value transfer to another account.
+export const GLAMSTERDAM_TX_BASE_GAS = 12_000;
+export const GLAMSTERDAM_TX_COLD_RECIPIENT_GAS = 3_000;
+export const GLAMSTERDAM_TX_CREATE_GAS = 12_000;
+export const GLAMSTERDAM_TX_VALUE_GAS = 6_000;
+// Calldata: 4 / 16 gas per zero / non-zero byte, 2 per 32-byte initcode word (EIP-3860), and
+// EIP-7976's floor of 64 per byte.
+export const CALLDATA_ZERO_BYTE_GAS = 4;
+export const CALLDATA_NONZERO_BYTE_GAS = 16;
+export const INITCODE_WORD_GAS = 2;
+export const EVM_WORD_BYTES = 32;
+export const GLAMSTERDAM_CALLDATA_FLOOR_GAS_PER_BYTE = 64;
+// EIP-3529: the refund applied is at most a fifth of the gas used before it.
+export const MAX_REFUND_QUOTIENT = 5;
+// EIP-150: a call or create forwards at most all but one 64th of the caller's remaining gas.
+export const CALL_GAS_RETAINED_DIVISOR = 64;
+// Execution gas of the opcodes the Amsterdam L1 canary runs: PUSH1 (Gverylow), and an SSTORE to a cold slot
+// whose value changes, EIP-8038's COLD_STORAGE_ACCESS plus STORAGE_WRITE.
+export const EVM_PUSH_GAS = 3;
+export const GLAMSTERDAM_COLD_STORAGE_ACCESS_GAS = 2_100;
+export const GLAMSTERDAM_STORAGE_WRITE_GAS = 10_000;
+// JS tracer returning a transaction's final refund counter: receipts only report gas after the refund.
+export const REFUND_COUNTER_TRACER =
+  "{r:0, step: function(l){ this.r = l.getRefund(); }, fault: function(){}, result: function(){ return this.r; }}";
+// Runtime size of the contract the Amsterdam L1 canary deploys: its code-deposit state gas dwarfs the
+// rest of the estimate.
+export const GLAMSTERDAM_CANARY_RUNTIME_BYTES = 1000;
+// Zero calldata bytes the Amsterdam L1 canary sends to an account: enough for EIP-7976's floor to bind.
+export const GLAMSTERDAM_CANARY_CALLDATA_BYTES = 1000;
+// The CTM deployment builds the release's complete L2 bytecode inventory in script memory.
+// Foundry's default execution-memory cap is too small for that deterministic artifact pass.
+export const CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
 export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
 
@@ -108,6 +145,10 @@ export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111
 
 // L2 bootloader address (used for failed deposit logs)
 export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
+
+// EIP-1967 proxy slots: keccak256("eip1967.proxy.admin") - 1 and keccak256("eip1967.proxy.implementation") - 1.
+export const EIP1967_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+export const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 // NTV (L2NativeTokenVault) storage slot numbers.
 // Obtained via: forge inspect L2NativeTokenVault storageLayout
