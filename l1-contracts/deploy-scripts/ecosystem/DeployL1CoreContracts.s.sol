@@ -13,16 +13,22 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
+import {CoreExecutorDeployment, UpgradeExecutorsRecord} from "../utils/UpgradeExecutorsRecord.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1CoreContracts {
     using stdToml for string;
+
+    /// @notice The ecosystem domain's upgrade executor this run deployed (see {deployUpgradeExecutor}).
+    CoreExecutorDeployment internal upgradeExecutor;
 
     function run() public virtual {
         console.log("Deploying L1 core contracts");
@@ -64,6 +70,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         return config;
     }
 
+    /// @notice The core executor this run deployed, with its construction.
+    function getUpgradeExecutor() public view returns (CoreExecutorDeployment memory) {
+        return upgradeExecutor;
+    }
+
     function runInner(string memory inputPath, string memory outputPath) public {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
@@ -73,10 +84,8 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
         (coreAddresses.shared.governance) = deploySimpleContract("Governance");
         (coreAddresses.shared.bridgehubAdmin) = deploySimpleContract("ChainAdminOwnable");
-        coreAddresses.shared.transparentProxyAdmin = deployWithCreate2AndOwner(
-            "ProxyAdmin",
-            coreAddresses.shared.governance
-        );
+        // Owned by the deployer only until {deployUpgradeExecutor} hands it to the core executor.
+        coreAddresses.shared.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", getDeployerAddress());
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
@@ -132,8 +141,41 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         setBridgehubParams();
 
         updateOwners();
+        deployUpgradeExecutor();
 
         saveOutput(outputPath);
+    }
+
+    /// @notice Deploys the ecosystem domain's upgrade executor over the ecosystem `ProxyAdmin`, hands
+    ///         it that `ProxyAdmin` and nominates governance on it: the ecosystem half of what the v35
+    ///         bootstrap ends with (the CTM executor comes with each CTM). Constructed for the
+    ///         deployer, which makes the handover and the nomination; governance accepts afterwards.
+    /// @dev Rides the CREATE2 factory like every deployment of this script.
+    function deployUpgradeExecutor() internal {
+        address deployer = getDeployerAddress();
+        ProxyAdmin proxyAdmin = ProxyAdmin(coreAddresses.shared.transparentProxyAdmin);
+        require(address(proxyAdmin) != address(0), "ecosystem ProxyAdmin not deployed");
+        CoreUpgradeExecutor coreExecutor = CoreUpgradeExecutor(
+            payable(
+                deployViaCreate2AndNotify(
+                    type(CoreUpgradeExecutor).creationCode,
+                    abi.encode(deployer, proxyAdmin),
+                    "CoreUpgradeExecutor"
+                )
+            )
+        );
+        upgradeExecutor = CoreExecutorDeployment({
+            coreExecutor: address(coreExecutor),
+            create2Salt: _create2FactorySalt,
+            initialOwner: deployer,
+            proxyAdmin: address(proxyAdmin)
+        });
+
+        vm.startBroadcast(deployer);
+        proxyAdmin.transferOwnership(address(coreExecutor));
+        coreExecutor.transferOwnership(coreAddresses.shared.governance);
+        vm.stopBroadcast();
+        console.log("Core upgrade executor deployed");
     }
 
     function setBridgehubParams() internal {
@@ -303,6 +345,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
+        vm.serializeString("root", "upgrade_executors", UpgradeExecutorsRecord.serializeCore(upgradeExecutor));
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);

@@ -264,7 +264,7 @@ jobs:
       # in the filtered report, since lcov defaults to removing branch info.
       - name: Filter Foundry coverage directories
         run: |
-          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc branch_coverage=1
+          lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' 'dev/*' --output-file lcov.info --rc branch_coverage=1
 
       - name: Post Foundry coverage report
         run: |
@@ -444,7 +444,7 @@ jobs:
 
       - name: Filter Anvil rebased coverage
         run: |
-          lcov --ignore-errors unused --remove coverage/anvil-rebased-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/anvil-rebased-lcov.info --rc branch_coverage=1
+          lcov --ignore-errors unused --remove coverage/anvil-rebased-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' 'dev/*' --output-file coverage/anvil-rebased-lcov.info --rc branch_coverage=1
 
       - name: Post Anvil interop coverage report
         run: |
@@ -461,7 +461,7 @@ jobs:
 
       - name: Filter merged coverage
         run: |
-          lcov --ignore-errors unused --remove coverage/merged-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/merged-lcov.info --rc branch_coverage=1
+          lcov --ignore-errors unused --remove coverage/merged-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' 'dev/*' --output-file coverage/merged-lcov.info --rc branch_coverage=1
 
       - name: Post merged coverage report
         run: |

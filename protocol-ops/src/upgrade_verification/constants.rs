@@ -1,10 +1,161 @@
-use alloy::primitives::{address, Address};
+use alloy::primitives::{address, b256, Address, B256};
 
-pub const EIP1967_PROXY_ADMIN_SLOT: &str =
-    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-/// `bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)`.
-pub const EIP1967_IMPLEMENTATION_SLOT: &str =
-    "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+/// EIP-1967 admin slot: `keccak256("eip1967.proxy.admin") - 1`. Read with `eth_getStorageAt`,
+/// because a transparent proxy answers `admin()` only to its own admin.
+pub const EIP1967_PROXY_ADMIN_SLOT: B256 =
+    b256!("0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103");
+
+/// EIP-1967 implementation slot: `keccak256("eip1967.proxy.implementation") - 1`.
+pub const EIP1967_IMPLEMENTATION_SLOT: B256 =
+    b256!("0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc");
+
+/// `AddressAliasHelper.offset`: an L1 contract's `msg.sender` as an L2 sees it is its address plus
+/// this, modulo 2^160.
+pub const L1_TO_L2_ALIAS_OFFSET: Address = address!("0x1111000000000000000000000000000000001111");
+
+/// The `L2EcosystemContract` members whose release-table row a genesis force-deployments blob
+/// repeats (`DeployCTM._buildForceDeploymentsData`), with their slots. The source-sync test below
+/// fails the build if the append-only enum moves one.
+pub const FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS: [(&str, usize); 9] = [
+    ("L2Bridgehub", 0),
+    ("L2AssetRouter", 1),
+    ("L2NativeTokenVault", 2),
+    ("L2MessageRoot", 3),
+    ("BaseTokenHolder", 5),
+    ("L2ChainAssetHandler", 6),
+    ("InteropCenter", 7),
+    ("L2InteropHandler", 9),
+    ("L2AssetTracker", 10),
+];
+
+/// `L2InventoryLib.fixedAddress`: every `L2EcosystemContract` member that has a fixed L2 address,
+/// with its slot. The source-sync test below holds it against the library and the enum.
+pub const L2_ECOSYSTEM_FIXED_ADDRESSES: [(&str, usize, Address); 21] = [
+    ("L2Bridgehub", 0, L2_BRIDGEHUB_ADDR),
+    ("L2AssetRouter", 1, L2_ASSET_ROUTER_ADDR),
+    ("L2NativeTokenVault", 2, L2_NATIVE_TOKEN_VAULT_ADDR),
+    ("L2MessageRoot", 3, L2_MESSAGE_ROOT_ADDR),
+    ("UpgradeableBeaconDeployer", 4, L2_NTV_BEACON_DEPLOYER_ADDR),
+    ("BaseTokenHolder", 5, L2_BASE_TOKEN_HOLDER_ADDR),
+    ("L2ChainAssetHandler", 6, L2_CHAIN_ASSET_HANDLER_ADDR),
+    ("InteropCenter", 7, L2_INTEROP_CENTER_ADDR),
+    (
+        "InteropAttributeParser",
+        8,
+        L2_INTEROP_ATTRIBUTE_PARSER_ADDR,
+    ),
+    ("L2InteropHandler", 9, L2_INTEROP_HANDLER_ADDR),
+    ("L2AssetTracker", 10, L2_ASSET_TRACKER_ADDR),
+    ("L2WrappedBaseToken", 11, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR),
+    ("L2MessageVerification", 12, L2_MESSAGE_VERIFICATION_ADDR),
+    ("L2InteropRootStorage", 13, L2_INTEROP_ROOT_STORAGE_ADDR),
+    (
+        "L2InteropCommitmentTree",
+        20,
+        L2_INTEROP_COMMITMENT_TREE_ADDR,
+    ),
+    ("AtomicFlowManager", 21, L2_ATOMIC_FLOW_MANAGER_ADDR),
+    ("L2BaseToken", 22, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR),
+    ("L1Messenger", 23, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
+    ("SystemContext", 24, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR),
+    (
+        "RemovedGWAssetTracker",
+        25,
+        L2_REMOVED_GW_ASSET_TRACKER_ADDR,
+    ),
+    ("L2ComplexUpgrader", 26, L2_COMPLEX_UPGRADER_ADDR),
+];
+
+/// `CTMContract.ServerNotifier` — the slot of the CTM-domain inventory (`ProxyUpgradeRow[]`
+/// indexed by `CTMContract`) holding the ServerNotifier row, mandatory in a bootstrap manifest.
+/// The source-sync test below fails the build if the append-only enum moves it.
+pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 19;
+
+/// The committed pins of the snarkJS Plonk backend `ZiskVerifier` delegates to, relative to the
+/// repository root (see `registry::external_backends`).
+pub const ZISK_PLONK_BACKEND_PIN_PATH: &str = "tools/verifier-gen/data/ZiSK_plonk_backend.toml";
+
+/// `ProxyUpgradeDomain.Core` — the domain tag of a `ProxyUpgradeTransition` whose inventory is
+/// indexed by `L1EcosystemContract` and applied by the `CoreUpgradeExecutor`. The source-sync test
+/// below fails the build if the append-only enum moves it.
+pub const PROXY_UPGRADE_DOMAIN_CORE: u8 = 0;
+
+/// `ProxyUpgradeDomain.CTM` — the domain tag of a `ProxyUpgradeTransition` whose inventory is
+/// indexed by `CTMContract` and applied by a `CTMUpgradeExecutor`.
+pub const PROXY_UPGRADE_DOMAIN_CTM: u8 = 1;
+
+/// `enum L1EcosystemContract`, in declaration order: the slot names of a core transition's
+/// ecosystem inventory. The source-sync test below fails the build if the enum changes.
+pub const L1_ECOSYSTEM_CONTRACTS: [&str; 9] = [
+    "L1Bridgehub",
+    "L1ChainAssetHandler",
+    "L1MessageRoot",
+    "L1Nullifier",
+    "L1AssetRouter",
+    "L1NativeTokenVault",
+    "L1InteropHandler",
+    "CTMDeploymentTracker",
+    "ChainRegistrationSender",
+];
+
+/// `enum CTMContract`, in declaration order: the slot names of a CTM-domain inventory (a
+/// CTM-domain `ProxyUpgradeTransition`'s rows, a bootstrap's `ctmProxyUpgrades`). The source-sync
+/// test below fails the build if the enum changes.
+pub const CTM_CONTRACTS: [&str; 21] = [
+    "AdminFacet",
+    "MailboxFacet",
+    "ExecutorFacet",
+    "MigratorFacet",
+    "CommitterFacet",
+    "DiamondInit",
+    "ValidatorTimelock",
+    "ChainTypeManager",
+    "VerifierPlonk",
+    "DualVerifier",
+    "TestnetVerifier",
+    "GatewayCTMDeployerCTM",
+    "GatewayCTMDeployerVerifiers",
+    "BlobsL1DAValidatorZKsyncOS",
+    "GettersFacet",
+    "DefaultUpgrade",
+    "L1GenesisUpgrade",
+    "BytecodesSupplier",
+    "PermissionlessValidator",
+    "ServerNotifier",
+    "L1InteropFeeManager",
+];
+
+/// `enum L2EcosystemContract`, in declaration order: the slot names of a release's L2 bytecode
+/// table. The source-sync test below fails the build if the enum changes.
+pub const L2_ECOSYSTEM_CONTRACTS: [&str; 27] = [
+    "L2Bridgehub",
+    "L2AssetRouter",
+    "L2NativeTokenVault",
+    "L2MessageRoot",
+    "UpgradeableBeaconDeployer",
+    "BaseTokenHolder",
+    "L2ChainAssetHandler",
+    "InteropCenter",
+    "InteropAttributeParser",
+    "L2InteropHandler",
+    "L2AssetTracker",
+    "L2WrappedBaseToken",
+    "L2MessageVerification",
+    "L2InteropRootStorage",
+    "BeaconProxy",
+    "L2DefaultUpgrade",
+    "BridgedStandardERC20",
+    "DiamondProxy",
+    "ProxyAdmin",
+    "TransparentUpgradeableProxy",
+    "L2InteropCommitmentTree",
+    "AtomicFlowManager",
+    "L2BaseToken",
+    "L1Messenger",
+    "SystemContext",
+    "RemovedGWAssetTracker",
+    "L2ComplexUpgrader",
+];
 
 /// Builds an L2 built-in address from a 16-bit offset into the
 /// `BUILT_IN_CONTRACTS_OFFSET` range (`0x10000..=0x1ffff`).
@@ -72,6 +223,7 @@ pub const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR: Address = l2_addr(0x07);
 pub const L2_INTEROP_ROOT_STORAGE_ADDR: Address = l2_addr(0x08);
 pub const L2_MESSAGE_VERIFICATION_ADDR: Address = l2_addr(0x09);
 pub const L2_CHAIN_ASSET_HANDLER_ADDR: Address = l2_addr(0x0a);
+pub const L2_NTV_BEACON_DEPLOYER_ADDR: Address = l2_addr(0x0b);
 pub const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR: Address = l2_addr(0x0c);
 pub const L2_INTEROP_CENTER_ADDR: Address = l2_addr(0x0d);
 pub const L2_INTEROP_HANDLER_ADDR: Address = l2_addr(0x0e);
@@ -112,10 +264,10 @@ pub const ECADD_SYSTEM_CONTRACT: Address = literal_addr(0x06);
 pub const ECMUL_SYSTEM_CONTRACT: Address = literal_addr(0x07);
 pub const ECPAIRING_SYSTEM_CONTRACT: Address = literal_addr(0x08);
 
-/// v31 L2 protocol upgrade transaction parameters.
+/// L2 protocol upgrade transaction parameters.
 /// ZKsync OS upgrade txs use txType 126 (Era VM's 254 is gone with the Era
-/// CTM); gas + pubdata limits are fixed by v31 deploy scripts and travel
-/// with the artifact.
+/// CTM); gas + pubdata limits are fixed by the upgrade deploy scripts and
+/// travel with the artifact.
 pub const ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE: u64 = 126;
 pub const L2_UPGRADE_GAS_LIMIT: u64 = 72_000_000;
 pub const L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT: u64 = 800;
@@ -237,6 +389,7 @@ mod tests {
             ("L2_INTEROP_ROOT_STORAGE_ADDR", L2_INTEROP_ROOT_STORAGE_ADDR),
             ("L2_MESSAGE_VERIFICATION_ADDR", L2_MESSAGE_VERIFICATION_ADDR),
             ("L2_CHAIN_ASSET_HANDLER_ADDR", L2_CHAIN_ASSET_HANDLER_ADDR),
+            ("L2_NTV_BEACON_DEPLOYER_ADDR", L2_NTV_BEACON_DEPLOYER_ADDR),
             (
                 "L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR",
                 L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
@@ -276,5 +429,170 @@ mod tests {
                 .unwrap_or_else(|| panic!("{sol_name} not found in Solidity source"));
             assert_eq!(expected, actual, "{sol_name} drift vs Solidity source");
         }
+    }
+
+    /// The slot is the member's position in `enum CTMContract`, read from the Solidity source.
+    const CONTRACT_IDENTIFIERS: &str = include_str!(
+        "../../../l1-contracts/contracts/upgrades/registry/libraries/ContractIdentifiers.sol"
+    );
+
+    /// The members of `enum <name>` in ContractIdentifiers.sol, in declaration order.
+    fn enum_members(name: &str) -> Vec<&'static str> {
+        enum_members_in(CONTRACT_IDENTIFIERS, "ContractIdentifiers.sol", name)
+    }
+
+    /// The members of `enum <name>` in `source`, in declaration order. Comments are dropped before
+    /// looking for the closing brace: they cite docs as `{path}`.
+    fn enum_members_in(source: &'static str, file: &str, name: &str) -> Vec<&'static str> {
+        let body = source
+            .split_once(&format!("enum {name} {{"))
+            .unwrap_or_else(|| panic!("{file} must declare `enum {name}`"))
+            .1;
+        let mut members = Vec::new();
+        for line in body.lines() {
+            let code = line.split("//").next().unwrap_or_default();
+            let (code, closed) = code
+                .split_once('}')
+                .map_or((code, false), |(code, _)| (code, true));
+            members.extend(
+                code.split(',')
+                    .map(str::trim)
+                    .filter(|member| !member.is_empty()),
+            );
+            if closed {
+                return members;
+            }
+        }
+        panic!("enum {name} must be closed");
+    }
+
+    /// The domain tags are the positions of `enum ProxyUpgradeDomain` in RegistryTypes.sol: a
+    /// verifier holding an object to the wrong tag would accept the other domain's inventory.
+    #[test]
+    fn the_proxy_upgrade_domains_are_the_solidity_enum() {
+        const REGISTRY_TYPES: &str =
+            include_str!("../../../l1-contracts/contracts/upgrades/registry/RegistryTypes.sol");
+        let members = enum_members_in(REGISTRY_TYPES, "RegistryTypes.sol", "ProxyUpgradeDomain");
+        assert_eq!(members, vec!["Core", "CTM"]);
+        assert_eq!(
+            members.iter().position(|m| *m == "Core"),
+            Some(usize::from(PROXY_UPGRADE_DOMAIN_CORE))
+        );
+        assert_eq!(
+            members.iter().position(|m| *m == "CTM"),
+            Some(usize::from(PROXY_UPGRADE_DOMAIN_CTM))
+        );
+    }
+
+    #[test]
+    fn the_server_notifier_slot_is_its_ctm_contract_position() {
+        assert_eq!(
+            enum_members("CTMContract")
+                .iter()
+                .position(|m| *m == "ServerNotifier"),
+            Some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
+            "CTMContract.ServerNotifier moved; update CTM_CONTRACT_SERVER_NOTIFIER_SLOT"
+        );
+    }
+
+    /// The inventory slot names are the Solidity enums, member for member: a slot check that
+    /// named the wrong member would hold a row against another contract's proxy.
+    #[test]
+    fn the_inventory_slot_names_are_the_solidity_enums() {
+        assert_eq!(
+            enum_members("L1EcosystemContract"),
+            L1_ECOSYSTEM_CONTRACTS.to_vec()
+        );
+        assert_eq!(enum_members("CTMContract"), CTM_CONTRACTS.to_vec());
+        assert_eq!(
+            enum_members("L2EcosystemContract"),
+            L2_ECOSYSTEM_CONTRACTS.to_vec()
+        );
+    }
+
+    #[test]
+    fn the_force_deployed_slots_are_their_l2_ecosystem_contract_positions() {
+        let members = enum_members("L2EcosystemContract");
+        for (member, slot) in FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS {
+            assert_eq!(
+                members.iter().position(|m| *m == member),
+                Some(slot),
+                "L2EcosystemContract.{member} moved; update FORCE_DEPLOYED_L2_ECOSYSTEM_SLOTS"
+            );
+        }
+    }
+
+    /// Every `if (_member == L2EcosystemContract.<member>) { return <constant>; }` arm of
+    /// `L2InventoryLib.fixedAddress` is a row of the table, at the member's enum position and the
+    /// constant's address, and the table has no other row.
+    #[test]
+    fn the_fixed_addresses_are_l2_inventory_libs() {
+        const L2_INVENTORY_LIB: &str = include_str!(
+            "../../../l1-contracts/contracts/upgrades/registry/libraries/L2InventoryLib.sol"
+        );
+        const L2_CONTRACT_ADDRESSES: &str = include_str!(
+            "../../../l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol"
+        );
+        let addresses = parse_solidity_addresses(L2_CONTRACT_ADDRESSES);
+        let members = enum_members("L2EcosystemContract");
+        let arms: Vec<(&str, &str)> = L2_INVENTORY_LIB
+            .split("if (_member == L2EcosystemContract.")
+            .skip(1)
+            .map(|arm| {
+                let (member, rest) = arm.split_once(')').expect("the arm's condition closes");
+                let constant = rest
+                    .split_once("return ")
+                    .and_then(|(_, after)| after.split_once(';'))
+                    .expect("the arm returns a constant")
+                    .0;
+                (member, constant)
+            })
+            .collect();
+        assert_eq!(
+            arms.len(),
+            L2_ECOSYSTEM_FIXED_ADDRESSES.len(),
+            "L2InventoryLib.fixedAddress gained or lost a member; update L2_ECOSYSTEM_FIXED_ADDRESSES"
+        );
+        for (member, constant) in arms {
+            let address = addresses
+                .get(constant)
+                .copied()
+                .unwrap_or_else(|| panic!("{constant} not found in L2ContractAddresses.sol"));
+            let slot = members
+                .iter()
+                .position(|m| *m == member)
+                .unwrap_or_else(|| panic!("{member} is not an L2EcosystemContract member"));
+            assert!(
+                L2_ECOSYSTEM_FIXED_ADDRESSES.contains(&(member, slot, address)),
+                "L2_ECOSYSTEM_FIXED_ADDRESSES must hold ({member}, {slot}, {address})"
+            );
+        }
+    }
+
+    /// The offset is `AddressAliasHelper`'s.
+    #[test]
+    fn the_alias_offset_is_the_helpers() {
+        const ALIAS_HELPER: &str =
+            include_str!("../../../l1-contracts/contracts/vendor/AddressAliasHelper.sol");
+        assert!(ALIAS_HELPER.contains(&format!(
+            "uint160 private constant offset = uint160({});",
+            alloy::hex::encode_prefixed(L1_TO_L2_ALIAS_OFFSET)
+        )));
+    }
+
+    #[test]
+    fn the_eip1967_implementation_slot_is_the_standard_preimage() {
+        let slot = alloy::primitives::U256::from_be_bytes(
+            alloy::primitives::keccak256(b"eip1967.proxy.implementation").0,
+        ) - alloy::primitives::U256::from(1);
+        assert_eq!(B256::from(slot), EIP1967_IMPLEMENTATION_SLOT);
+    }
+
+    #[test]
+    fn the_eip1967_admin_slot_is_the_standard_preimage() {
+        let slot = alloy::primitives::U256::from_be_bytes(
+            alloy::primitives::keccak256(b"eip1967.proxy.admin").0,
+        ) - alloy::primitives::U256::from(1);
+        assert_eq!(B256::from(slot), EIP1967_PROXY_ADMIN_SLOT);
     }
 }

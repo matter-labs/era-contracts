@@ -4,7 +4,7 @@
 //! Runs `DeployPUHAndGuardians.s.sol` from the sibling `zk-governance`
 //! checkout (default `../../zk-governance`, foundry root with `foundry.toml`
 //! at the top level) on the same anvil fork as the core/CTM prepares,
-//! and returns the four PUH proposal calls that wire the new contracts into
+//! and returns the PUH proposal call that wires the new contracts into
 //! the existing PUH proxy:
 //!
 //!   1. `ProxyAdmin.upgradeAndCall(puhProxy, newPuhImpl,
@@ -21,8 +21,8 @@
 //! `updateSecurityCouncil` / `updateGuardians` / `updateEmergencyUpgradeBoard` calls set, so
 //! those are no longer emitted.
 //!
-//! These land in **stage 0** so the new PUH governance set is wired before the
-//! v31 ecosystem proxy upgrades execute.
+//! The merge puts this call FIRST in the governance bundle, so the new PUH governance
+//! set is wired before the ecosystem proxy upgrades execute.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -52,15 +52,11 @@ const EIP1967_ADMIN_SLOT: B256 = B256::new([
 /// `OpenZeppelin.ProxyAdmin.upgradeAndCall(ITransparentUpgradeableProxy,address,bytes)`
 /// selector (OZ v5). Stage's PUH ProxyAdmin only exposes the v5 form — the
 /// v4 `upgrade(address,address)` selector (0x99a88ec4) is absent and reverts
-/// on dispatch. We pass empty bytes for the post-upgrade call (no init-style
-/// hook needed for the impl swap).
+/// on dispatch. The post-upgrade call carries the PUH initializer.
 const PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR: [u8; 4] = [0x96, 0x23, 0x60, 0x9d];
 /// `ProtocolUpgradeHandler.initialize(address,address,address)` selector — the proxy
 /// initializer, guarded by `reinitializer(2)`, run as the `upgradeAndCall` hook.
-/// `initialize(address,address,address)` on the PUH implementation — the hook the
-/// stage-0 impl swap carries. `stage0::the_verifier_and_generator_agree_on_the_puh_hook`
-/// pins this to the verifier's `initializeCall` selector.
-pub(crate) const PUH_INITIALIZE_SELECTOR: [u8; 4] = [0xc0, 0xc5, 0x3b, 0x8b];
+const PUH_INITIALIZE_SELECTOR: [u8; 4] = [0xc0, 0xc5, 0x3b, 0x8b];
 /// `bridgehub.chainAssetHandler()` selector.
 const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87];
 
@@ -72,7 +68,7 @@ const DEFAULT_SCRIPT_PATH: &str = "scripts/DeployPUHAndGuardians.s.sol:DeployPUH
 /// governance set (PUH impl, Guardians, SecurityCouncil, EmergencyUpgradeBoard).
 /// Each contract has distinct init code, so one salt is collision-free and
 /// rotates the set as a group. Override via `gov_salt_override`.
-pub(crate) const GOV_SALT_SEED: &[u8] = b"v31:gov";
+pub(crate) const GOV_SALT_SEED: &[u8] = b"v35:gov";
 /// Default sibling checkout path for zk-governance.
 pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
 /// Optional path override used by CI and other non-sibling checkouts.
@@ -121,11 +117,11 @@ impl<'a> ZkGovernanceInputs<'a> {
     }
 }
 
-/// Outcome of the redeploy: the two governance calls to add to stage 0, plus
-/// addresses surfaced for diagnostics / output payloads.
+/// Outcome of the redeploy: the wiring calls the merge prepends to the governance
+/// bundle, plus addresses surfaced for diagnostics / output payloads.
 #[derive(Debug)]
 pub struct ZkGovernanceOutcome {
-    pub stage0_calls: Vec<GovernanceCall>,
+    pub wiring_calls: Vec<GovernanceCall>,
     pub puh_proxy: Address,
     pub proxy_admin: Address,
     pub new_puh_impl: Address,
@@ -135,7 +131,7 @@ pub struct ZkGovernanceOutcome {
 }
 
 /// Run `DeployPUHAndGuardians.s.sol` against the supplied runner (same anvil
-/// fork as the surrounding prepare phase) and return the stage-0 governance
+/// fork as the surrounding prepare phase) and return the governance wiring
 /// calls. Reuses `deployer` for the broadcast.
 pub async fn deploy_puh_guardians(
     runner: &mut ForgeRunner,
@@ -283,7 +279,7 @@ pub async fn deploy_puh_guardians(
         "New EmergencyBoard:   {new_emergency_upgrade_board:#x}"
     ));
 
-    // Stage-0 wiring, executed as the PUH via governance: ONE call. The impl
+    // The wiring, executed as the PUH via governance: ONE call. The impl
     // swap carries the new implementation's `initialize` as its `upgradeAndCall`
     // hook, so the proxy is pointed at the freshly deployed SecurityCouncil,
     // Guardians and EmergencyUpgradeBoard in the same transaction. The board
@@ -292,7 +288,7 @@ pub async fn deploy_puh_guardians(
     // `onlySelf` setters — the shape this replaced — leaves the proxy on
     // `_initialized == 1` in between, where any caller can run `initialize`
     // first and install their own governance set.
-    let stage0_calls = vec![GovernanceCall {
+    let wiring_calls = vec![GovernanceCall {
         target: proxy_admin,
         value: U256::ZERO,
         data: encode_proxy_admin_upgrade(
@@ -307,7 +303,7 @@ pub async fn deploy_puh_guardians(
     }];
 
     Ok(ZkGovernanceOutcome {
-        stage0_calls,
+        wiring_calls,
         puh_proxy,
         proxy_admin,
         new_puh_impl,

@@ -1,15 +1,199 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+// solhint-disable no-console, gas-custom-errors
 
-/// @notice Prepares the v35 upgrade: the default upgrade, plus the `L1InteropFeeManager` proxy the new CTM is
-/// constructed with. See {protocol-docs/interop-fee.md#the-switch}.
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+import {Call} from "contracts/governance/Common.sol";
+
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
+import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {BootstrapAction} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
+import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
+import {AuthoredL2Plan, BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract,
+    L2EcosystemContract
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+
+import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
+import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
+import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
+import {Utils} from "../../utils/Utils.sol";
+import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
+
+/// @notice The v35 CTM upgrade: the ONE-TIME edge into the registry-driven model (see the
+///         Bootstrap section of {docs/registry-driven-upgrades.md}). Chains crossing this edge
+///         run pre-v35 facets and take the committed cut by hand, but the cut itself already
+///         has the registry shape: NO facet cuts, just the `BootstrapUpgrade` init,
+///         which derives the facet reinstall on-chain from the pinned genesis release. The CTM
+///         call soup is GONE too: everything the CTM must do (its own implementation swap, the
+///         version commit, the authority handover) is pinned in a write-once
+///         `RegistryBootstrapMigration` deployed at prepare time, and executed by its single
+///         `migrate()` call inside the one governance bundle `RegistryBootstrapSequence` derives;
+///         every later upgrade is applied through the bound domain executors. Before any of it, the
+///         ChainAdmin hands the ServerNotifier to the CTM domain ({serverNotifierHandoverCalls});
+///         the edge refuses to run until it has.
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v35 is DefaultCTMUpgrade {
+    /// @notice The bound executor the whole CTM domain lands under. Deployed by this prepare
+    ///         run; its address rides the bootstrap manifest (pinned + binding-checked there).
+    CTMUpgradeExecutor public ctmUpgradeExecutor;
+
+    /// @notice The write-once edge object. Its manifest pins everything the governance calls used
+    ///         to spell out.
+    RegistryBootstrapMigration public bootstrapMigration;
+
+    /// @notice The object the edge's governance bundle is READ from. Deployed over the migration
+    ///         and the core prepare's inventory; nothing about the bundle is authored here.
+    RegistryBootstrapSequence public bootstrapSequence;
+
+    /// @notice The delegate-calldata composer the bootstrap manifest pins: the CODE that
+    ///         defines what `L2DefaultUpgrade` is called with.
+    address public l2DelegateComposer;
+
+    /// @dev How {deployRegistryBootstrap} constructed the CTM executor, for the output record.
+    CTMExecutorDeployment internal ctmExecutorDeployment;
+
+    /// @notice The bootstrap edge deploys no transition: after the engine every edge pins, its
+    ///         objects are the bound executor and the write-once migration. The committed cut is
+    ///         READ from the migration — the object composes it on-chain from its pinned inputs, so
+    ///         the prepare has nothing to compose and nothing to keep in step.
+    function deployUpgradeObjects() public virtual override {
+        upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
+        deployRegistryBootstrap();
+        _declareBootstrapActions();
+    }
+
+    /// @notice The cut chains crossing this edge take by hand, exactly as the migration commits it.
+    ///         Written to the output for tooling; the bytes come from the object.
+    function getChainUpgradeDiamondCutData() public view override returns (bytes memory) {
+        require(address(bootstrapMigration) != address(0), "bootstrap migration not deployed");
+        return abi.encode(bootstrapMigration.upgradeCut());
+    }
+
+    /// @notice The bootstrap edge authors a COMPLETE release for a pre-registry ecosystem, so
+    ///         every member is expected to be new — the live ones belong to the departing,
+    ///         pre-v35 deployment. That includes the genesis engine: the live one only has the
+    ///         pre-v35 `genesisUpgrade` entrypoint, not the one the v35 Admin facet calls.
+    function changedReleaseMembers() internal view virtual override returns (string[] memory members) {
+        members = new string[](9);
+        members[0] = "ExecutorFacet";
+        members[1] = "AdminFacet";
+        members[2] = "MailboxFacet";
+        members[3] = "GettersFacet";
+        members[4] = "MigratorFacet";
+        members[5] = "CommitterFacet";
+        members[6] = "DiamondInit";
+        members[7] = "EIP7702Checker";
+        members[8] = "L1GenesisUpgrade";
+    }
+
     /// @inheritdoc DefaultCTMUpgrade
-    /// @dev A CTM already on v35 (a patch upgrade, or `UpgradeTest_Local`'s fixture) keeps its manager.
-    function deployNewCTMContracts() public override {
+    /// @dev This edge deploys no transition, so the migration is the object that pins its engine.
+    function committedUpgradeEngine() public view override returns (address) {
+        if (address(bootstrapMigration) != address(0)) {
+            return bootstrapMigration.getManifest().upgradeEngine;
+        }
+        require(upgradeAddresses.upgradeEngine != address(0), "bootstrap engine not deployed");
+        return upgradeAddresses.upgradeEngine;
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    function bootstrapMigrationAddress() public view virtual override returns (address) {
+        return address(bootstrapMigration);
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    /// @dev Rendered from live state, so a half already done is not repeated: the notifier proxy
+    ///      moves from its own ProxyAdmin to the CTM-domain one, then its current owner nominates the
+    ///      bound executor, whose acceptance is the first call of the bootstrap bundle.
+    function serverNotifierHandoverCalls() public view override returns (Call[] memory calls) {
+        address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
+        address ctmProxyAdmin = Utils.getProxyAdminAddress(ctmAddresses.stateTransition.proxies.chainTypeManager);
+        address executor = boundCTMUpgradeExecutor();
+        address notifierProxyAdmin = Utils.getProxyAdminAddress(notifier);
+        bool moveAdmin = notifierProxyAdmin != ctmProxyAdmin;
+        bool nominate = Ownable2Step(notifier).owner() != executor && Ownable2Step(notifier).pendingOwner() != executor;
+        calls = new Call[]((moveAdmin ? 1 : 0) + (nominate ? 1 : 0));
+        uint256 next = 0;
+        if (moveAdmin) {
+            calls[next] = Call({
+                target: notifierProxyAdmin,
+                value: 0,
+                data: abi.encodeCall(
+                    ProxyAdmin.changeProxyAdmin,
+                    (ITransparentUpgradeableProxy(payable(notifier)), ctmProxyAdmin)
+                )
+            });
+            ++next;
+        }
+        if (nominate) {
+            calls[next] = Call({
+                target: notifier,
+                value: 0,
+                data: abi.encodeCall(Ownable2Step.transferOwnership, (executor))
+            });
+        }
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    function upgradeExecutorsRecord() internal override returns (bool recorded, string memory json) {
+        require(ctmExecutorDeployment.ctmExecutor != address(0), "CTM executor not deployed");
+        return (true, UpgradeExecutorsRecord.serializeCTM(ctmExecutorDeployment));
+    }
+
+    /// @notice The executor this run deploys — the CTM's owner only once `migrate()` has run.
+    function boundCTMUpgradeExecutor() public view virtual override returns (address) {
+        require(address(ctmUpgradeExecutor) != address(0), "CTM executor not deployed");
+        return address(ctmUpgradeExecutor);
+    }
+
+    /// @notice Before the bootstrap edge, governance owns the CTM directly.
+    function ctmGovernance() internal view virtual override returns (address) {
+        return ctmAddresses.admin.governance;
+    }
+
+    /// @dev The repo is ZKsync-OS-only: every CTM this prepare runs against is a ZKsync OS CTM.
+    function deployUsedUpgradeContract() internal virtual override returns (address) {
+        // The bootstrap engine: derives the facet reinstall on-chain from the genesis release the
+        // migration it is handed names, then runs the storage/L2 part of `DefaultUpgrade`.
+        return deploySimpleContract("BootstrapUpgrade");
+    }
+
+    /// @notice The L2 side of the bootstrap edge: the delegate's (`L2DefaultUpgrade`) bytecode info —
+    ///         the migration force-deploys it Unsafe at its bytecode-derived address, so it never
+    ///         overwrites live code — the pinned composer that defines its arguments, and every
+    ///         bytecode the composed transaction needs published — the built-ins the genesis
+    ///         release's table installs, the ZKsync OS baselines, and the delegate itself, so the
+    ///         sequencer holds each preimage when the deployments run. The table-derived
+    ///         deployments come from the genesis release the manifest names, on-chain.
+    /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge: the real side
+    ///      reads the `L2DefaultUpgrade` artifact and every built-in's.
+    function authorL2Side() internal virtual override returns (AuthoredL2Side memory side) {
+        require(l2DelegateComposer != address(0), "L2 delegate composer not deployed");
+        side.plan = AuthoredL2Plan({
+            delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade"),
+            extraBytecodeInfos: new bytes[](0),
+            delegateComposer: l2DelegateComposer
+        });
+        L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
+        delegateArtifact[0] = L2EcosystemContract.L2DefaultUpgrade;
+        side.factoryDependencies = CoreOnGatewayHelper.getFullListOfFactoryDependencies(delegateArtifact);
+    }
+
+    function deployNewCTMContracts() public virtual override {
+        // The new CTM implementation is constructed with the `L1InteropFeeManager` proxy, so it is
+        // deployed first; see {protocol-docs/interop-fee.md#the-switch}.
         if (ctmAddresses.stateTransition.proxies.interopFeeManager == address(0)) {
             (
                 ctmAddresses.stateTransition.implementations.interopFeeManager,
@@ -17,5 +201,191 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             ) = deployTuppWithContract("L1InteropFeeManager");
         }
         super.deployNewCTMContracts();
+
+        // The composer the L2 side names (see `authorL2Side`), deployed before that side is prepared.
+        l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");
+
+        // The new ChainTypeManager implementation (per VM), the bootstrap manifest's CTM row.
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
+        ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName);
+
+        // The bootstrap manifest's mandatory notifier row: `migrate()` swaps it through the
+        // CTM-domain ProxyAdmin once the handover ({serverNotifierHandoverCalls}) has moved it there.
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier");
+
+        // The validator timelock row: the live timelock forwards only the cut-taking upgrade call,
+        // which the v35 Admin facet no longer serves.
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract("MultisigCommitter");
+    }
+
+    /// @notice Deploys the bound executor and the write-once migration pinned to this prepare
+    ///         run's outputs.
+    function deployRegistryBootstrap() public virtual {
+        address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        require(ctmProxy != address(0), "CTM proxy is zero");
+        // The admin that ACTUALLY owns the CTM proxy (and the per-CTM proxies), read from the
+        // live EIP-1967 slot rather than any address book — the migration validates every row
+        // against it, so a stale book entry would fail loudly at the wrong time.
+        ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(ctmProxy));
+        require(address(ctmProxyAdmin) != address(0), "CTM proxy has no admin");
+        // The two-executor model hands the CTM domain's admin to the CTM executor and the
+        // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
+        // the collision would only surface as a bundle revert. ZKsyncOS CTMs (the only ones
+        // this release upgrades) are deployed with their own admin; Era CTMs on old ecosystems
+        // share the ecosystem's and would need an admin split first.
+        require(
+            address(ctmProxyAdmin) != coreAddresses.shared.transparentProxyAdmin,
+            "CTM domain shares the ecosystem ProxyAdmin; split the admin before the bootstrap"
+        );
+
+        // Both go through the CREATE2 factory like every other prepare deployment: the Safe
+        // bundle replays only factory transactions, so a plain CREATE here would leave the
+        // bundle's `migrate()` call pointing at a codeless address on the real chain (a call to a
+        // code-less address is a silent success).
+        (, bytes32 salt) = getCreate2FactoryParams();
+        ctmExecutorDeployment = CTMExecutorDeployment({
+            ctmExecutor: address(0),
+            create2Salt: salt,
+            initialOwner: getOwnerAddress(),
+            chainTypeManager: ctmProxy,
+            ctmProxyAdmin: address(ctmProxyAdmin)
+        });
+        ctmUpgradeExecutor = CTMUpgradeExecutor(
+            payable(
+                deployViaCreate2AndNotify(
+                    type(CTMUpgradeExecutor).creationCode,
+                    abi.encode(ctmExecutorDeployment.initialOwner, IChainTypeManager(ctmProxy), ctmProxyAdmin),
+                    "CTMUpgradeExecutor"
+                )
+            )
+        );
+        ctmExecutorDeployment.ctmExecutor = address(ctmUpgradeExecutor);
+
+        bootstrapMigration = RegistryBootstrapMigration(
+            deployViaCreate2AndNotify(
+                type(RegistryBootstrapMigration).creationCode,
+                abi.encode(_bootstrapManifest(ctmProxy, ctmProxyAdmin)),
+                "RegistryBootstrapMigration"
+            )
+        );
+
+        address coreTransition = upgradeAddresses.coreTransition;
+        require(coreTransition != address(0), "coreTransition not set (core prepare output)");
+        bootstrapSequence = RegistryBootstrapSequence(
+            deployViaCreate2AndNotify(
+                type(RegistryBootstrapSequence).creationCode,
+                abi.encode(bootstrapMigration, IProxyUpgradeTransition(coreTransition)),
+                "RegistryBootstrapSequence"
+            )
+        );
+    }
+
+    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "L2DefaultDelegateCalldataComposer")) {
+            return abi.encode();
+        }
+        return super.getCreationCalldata(contractName);
+    }
+
+    function _bootstrapManifest(
+        address _ctmProxy,
+        ProxyAdmin _ctmProxyAdmin
+    ) internal returns (BootstrapManifest memory manifest) {
+        address implNew = ctmAddresses.stateTransition.implementations.chainTypeManager;
+        require(implNew != address(0), "new CTM implementation not deployed");
+        address release = ctmAddresses.stateTransition.currentRelease;
+        require(release != address(0), "current release not deployed");
+
+        // The participating slots of the enum-indexed CTM-domain inventory: the CTM's own
+        // implementation swap, the ServerNotifier and the ValidatorTimelock. Every other slot stays
+        // inert (explicitly not upgraded).
+        ProxyUpgradeRow[] memory proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
+        proxyUpgrades[uint256(CTMContract.ChainTypeManager)] = ProxyUpgradeRow({
+            proxy: _ctmProxy,
+            expectedOldImpl: Utils.getImplementation(_ctmProxy),
+            implNew: implNew,
+            callInitializeUpgrade: false
+        });
+        // The mandatory notifier row, applied by `migrate()` through `ctmProxyAdmin` like the
+        // CTM's own: the ChainAdmin's handover moves the proxy under that admin before the bundle.
+        address notifierProxy = ctmAddresses.stateTransition.proxies.serverNotifier;
+        address notifierImplNew = ctmAddresses.stateTransition.implementations.serverNotifier;
+        require(notifierImplNew != address(0), "new ServerNotifier implementation not deployed");
+        proxyUpgrades[uint256(CTMContract.ServerNotifier)] = ProxyUpgradeRow({
+            proxy: notifierProxy,
+            expectedOldImpl: Utils.getImplementation(notifierProxy),
+            implNew: notifierImplNew,
+            callInitializeUpgrade: false
+        });
+        address timelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
+        address timelockImplNew = ctmAddresses.stateTransition.implementations.validatorTimelock;
+        require(timelockImplNew != address(0), "new ValidatorTimelock implementation not deployed");
+        // `migrate()` reads and swaps every row through `ctmProxyAdmin`.
+        require(
+            Utils.getProxyAdminAddress(timelockProxy) == address(_ctmProxyAdmin),
+            "ValidatorTimelock is not behind the CTM-domain ProxyAdmin"
+        );
+        proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
+            proxy: timelockProxy,
+            expectedOldImpl: Utils.getImplementation(timelockProxy),
+            implNew: timelockImplNew,
+            callInitializeUpgrade: false
+        });
+
+        address engine = committedUpgradeEngine();
+
+        manifest = BootstrapManifest({
+            ctm: _ctmProxy,
+            expectedProtocolVersion: getOldProtocolVersion(),
+            ctmProxyAdmin: _ctmProxyAdmin,
+            ctmProxyUpgrades: proxyUpgrades,
+            currentRelease: release,
+            oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
+            upgradeEngine: engine,
+            l2Plan: authoredL2Plan(),
+            upgradeTimestamp: 0,
+            ctmExecutor: address(ctmUpgradeExecutor),
+            coreExecutor: address(coreUpgradeExecutor()),
+            // The executors' ownership is storage, so the edge names the expected owner here and
+            // refuses to hand either domain over if it moved after the prepares deployed them.
+            governance: getOwnerAddress()
+        });
+    }
+
+    /// @notice Declares every governance call of the bootstrap edge — BOTH domains, ending in the
+    ///         completion check — by reading them off the sequence object this prepare deployed.
+    ///         Nothing here is authored: the order, target and calldata all come from the object,
+    ///         and the label and authority ride along with each call.
+    /// @dev The whole edge is declared from the CTM prepare rather than split across the two
+    ///      prepares, because the object derives both legs and only exists once the migration
+    ///      does — which is after the core prepare has run. The merge concatenates the core
+    ///      prepare's calls ahead of this one's, and the core prepare of this edge contributes none.
+    function _declareBootstrapActions() internal virtual {
+        require(address(bootstrapSequence) != address(0), "bootstrap sequence not deployed");
+        BootstrapAction[] memory actions = bootstrapSequence.actions();
+        uint256 length = actions.length;
+        for (uint256 i = 0; i < length; ++i) {
+            declareExternalAction(
+                ExternalActionsLib.PHASE_GOVERNANCE,
+                actions[i].label,
+                actions[i].authority,
+                actions[i].call
+            );
+        }
+    }
+
+    /// @notice The `CoreUpgradeExecutor` the core prepare of this upgrade deployed — an input of this
+    ///         prepare (`CTMUpgradeParams.ecosystemUpgradeExecutor`, read by protocol-ops from the core
+    ///         output TOML). Checked to exist and to be bound to the ecosystem `ProxyAdmin` so a stale
+    ///         or missing input fails here instead of at the bootstrap's authority check.
+    function coreUpgradeExecutor() public view returns (CoreUpgradeExecutor) {
+        address executor = upgradeAddresses.coreUpgradeExecutor;
+        require(executor != address(0), "core executor not set (core prepare output)");
+        require(executor.code.length != 0, "core executor has no code");
+        require(
+            address(CoreUpgradeExecutor(payable(executor)).PROXY_ADMIN()) == coreAddresses.shared.transparentProxyAdmin,
+            "core executor is not bound to the ecosystem ProxyAdmin"
+        );
+        return CoreUpgradeExecutor(payable(executor));
     }
 }

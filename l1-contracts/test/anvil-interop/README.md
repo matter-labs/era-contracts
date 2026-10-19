@@ -37,7 +37,7 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/v0.35.0/` by default (the current snapshot version, configured as `stateVersion` in `config/anvil-config.json`). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, `v0.35.0`, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
 The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
@@ -63,6 +63,71 @@ cold identity build adds compilation time; reruns reuse that separate cache. A f
 (`ANVIL_INTEROP_FRESH_DEPLOY=1`, `run-coverage.ts --fresh-deploy`, or no snapshots for the state
 version) installs the predeploys from `out/`, whatever profile built it, so the spec compares
 against those artifacts and skips the reference build.
+
+## Upgrade Tests
+
+```bash
+cd l1-contracts/test/anvil-interop
+yarn test:upgrade             # the v35 bootstrap via protocol-ops on the frozen v0.34.0 states, then two registry-driven hops
+yarn test:upgrade-recurring   # the recurring registry-driven hop on the current-genesis states
+```
+
+`yarn test:upgrade` reviews each package the way governance would before replaying it:
+`protocol-ops ecosystem verify-package` against the live anvil L1, with `--env local`, the
+fixture's Bridgehub as `--expected-bridgehub` (`local` names another ecosystem's), the fixture's
+governance as `--expected-governance-owner` and, for the hops, the bootstrap package as
+`--executor-record`. It holds the deployments against the hashes of the build it deployed from
+(`scripts/calculate-hashes.ts --output`, passed as `--contract-hashes`), because the committed
+`AllContractsHashes.json` is regenerated last. Beyond a report without errors, the harness requires
+every construction record the package carries to be consulted (each deployment of these prepares is
+a member the package installs) and, for the bootstrap, the freeze-authority check. Every prepare
+deploys under a salt of its own, as production rotates its salt per release, so the recurring hop's
+`L1MessageRoot` row really applies.
+
+The pipeline caps each replayed L1 prepare/governance transaction at EIP-7825's 16,777,216 gas
+limit and logs its phase, bundle, index, target, hash and gas usage. Per-chain L1 upgrade calls
+are checked and logged too. These calls impersonate the bundle signer: the measurements exclude
+the outer Safe/governance envelope.
+
+`L1_GAS_RULES=amsterdam` runs the same test under Glamsterdam's gas schedule, as CI's
+`upgrade-test-glamsterdam` job does. It needs `ANVIL_AMSTERDAM_BIN`, the anvil pinned in
+`.github/amsterdam-anvil.env`:
+
+```bash
+ANVIL_AMSTERDAM_BIN="$(scripts/install-amsterdam-anvil.sh "$HOME/.cache/anvil-amsterdam")" \
+  ANVIL_BIN="$HOME/.foundry/versions/v1.5.1/anvil" L1_GAS_RULES=amsterdam yarn test:upgrade
+```
+
+The L1 then runs `--hardfork amsterdam` at mainnet's 60M block gas limit, loaded from a copy of the
+fixture without its block history, which that build cannot parse. The L2s keep `ANVIL_BIN`;
+protocol-ops' forks use the `anvil` on `PATH` (v1.5.1 in CI). A canary first fails the run unless
+the binary's estimates for a few probe transactions match EIP-2780, EIP-7976, EIP-8037 and EIP-8038.
+EIP-8037 state gas lets a deploy's `tx.gas` exceed 2^24, so each L1 transaction declares its estimate.
+
+Anvil runs one gas pool where Glamsterdam splits execution gas from a state gas reservoir, so every
+recorded transaction is read back from the node (prestate diff, refund counter, call tree) and
+logged with its state, execution, intrinsic and floor gas and its call depth. The run fails when the
+larger of intrinsic and floor gas exceeds 2^24, or when the execution gas does not fit what
+Glamsterdam guarantees the transaction's deepest frame: 2^24 less the intrinsic gas, less a 64th per
+call level, as if all of it ran there. When `floorBinding` is set, the receipt reports the calldata
+floor, so the logged execution gas is only an upper bound.
+
+A fresh deployment is born into the registry-driven model: `DeployL1CoreContracts` gives the
+ecosystem ProxyAdmin to the `CoreUpgradeExecutor`, and `DeployCTM` gives the CTM, its own ProxyAdmin and
+the ServerNotifier to the `CTMUpgradeExecutor`. Governance is only nominated on the two executors, and
+the deployment never accepts, so they stay owned by the deployer; anything needing the CTM,
+ServerNotifier or a ProxyAdmin owner must go through that executor's `forward`.
+`run-recurring-upgrade-test.ts` finds each executor through the custody it holds (the CTM's owner, the
+ecosystem ProxyAdmin's owner), has governance accept both nominations, and drives the hop, with no
+bootstrap, as one `Governance` bundle of the ordered legs `applyL1Upgrade` -> `applyCTMUpgrade`
+(`applyInfrastructureUpgrade` between them when a CTM-domain proxy changes); a bundle whose last leg
+fails must first roll back completely. (`yarn test:upgrade`'s hops hold the merged package to the same
+contiguous leg run and assert that one transaction emitted every leg's domain event, in order.)
+The recurring runner builds its objects from the committed manifest `scripts/registry-manifests/v35-local.json`
+and fails on any drift; `yarn regen:registry-manifest` (`REGEN_REGISTRIES=1`) rewrites it from the live deployment.
+`ANVIL_INTEROP_FRESH_DEPLOY=1` runs it against a fresh deployment instead of the chain states. The
+committed manifest describes the chain states, which are built with the `anvil-interop` profile, so a
+fresh deployment from the default build only matches in emit mode — restore the manifest afterwards.
 
 ## Running Tests Without Redeployment
 
@@ -249,8 +314,9 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 ```
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
+├── run-upgrade-test.ts            # Default upgrade (the v35 bootstrap) + the patch and v36 hops, via protocol-ops
+├── run-recurring-upgrade-test.ts  # Registry-driven v35 -> v36 hop through the executors the deployment created
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
-├── run-upgrade-test.ts            # Latest default upgrade test
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
 │   ├── anvil-config.json          # Chain IDs, ports, gateway designation
@@ -259,7 +325,8 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
-│   └── v0.35.0/                   # Pregenerated Anvil state snapshots (current, regenerated)
+│   ├── v0.34.0/                   # FROZEN previous-release snapshots (`upgradeSourceStateVersion`)
+│   └── v0.35.0/                   # Current-source Anvil state snapshots (`stateVersion`, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
 │       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
@@ -348,9 +415,9 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **Upgrade harness**: `run-upgrade-test.ts` still applies two direct `anvil_setStorageAt` patches. Before governance it clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
+- **Upgrade harness storage patches**: the upgrade runners apply two direct `anvil_setStorageAt` patches on L1. Before governance, `clearGenesisUpgradeTxHash` clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
-- **Default upgrade inputs**: the upgrade harness passes no script or input overrides to `upgrade-prepare-all`; it uses protocol-ops' default upgrade input and writes its outputs under `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/`.
+- **Temporary upgrade inputs**: the upgrade harness copies the scenario's config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
 ## Adding New Tests
 
