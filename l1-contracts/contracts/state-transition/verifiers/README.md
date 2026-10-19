@@ -38,16 +38,24 @@ and regenerate the contract.
 `verificationKeyHash()` is `keccak256` over the three pins in that order, so
 a rotation of any pin rotates the hash.
 
-The current `rootCVadcopFinal` and the committed Plonk verification key match
-ZiSK [v1.3.0-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.0-alpha)
-(`zisk-contracts/` at the tag). The program VK pins are the 1.3.0-alpha
-`cargo-zisk setup` values of the zksync-os-zisk guests, derived in
-[rotation runs 35695453171](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35695453171) (aggregator) and [35702731860](https://github.com/matter-labs/zksync-os-zisk/actions/runs/35702731860) (inner, after the guest moved its state commitment to the blake2sf precompile).
-The real-proof fixtures use the same 1.3.0-alpha setup and program VKs, from
-[GPU run 36396740141](https://github.com/matter-labs/zksync-os-zisk/actions/runs/36396740141).
-The run reproduces both guest ELFs, compares all four proved batch commitments
-with native execution, and checks the aggregated binding digest before the
-fixtures are verified against the real Plonk backend in Foundry.
+The pins come from [zksync-os-zisk release 0.0.9](https://github.com/matter-labs/zksync-os-zisk/releases/tag/0.0.9),
+the ZKsync OS 0.6.0 guest on zksync-os-revm v0.4.0, using ZiSK
+[v1.3.2-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.2-alpha).
+The release commit records both reproducible ELF hashes, both program VKs and
+the vadcop-final root. The combined verification-key hash is
+`0x482778c1f7c2f1153a627d52a592d6d44d8dda440ddae77dc101e31251f49197`.
+
+The final PLONK circuit key is unchanged from ZiSK 1.3.0-alpha: every field of
+the committed key (domain, SRS point, omega, coset constants and circuit
+commitments) matches the upstream v1.3.2-alpha `zisk-contracts/PlonkVerifier.sol`.
+Existing backends for that circuit can be reused.
+
+The real-proof fixtures are still the 1.3.0-alpha ones from
+[GPU run 36396740141](https://github.com/matter-labs/zksync-os-zisk/actions/runs/36396740141)
+and do not match these pins. They must come from a fixture-session run on
+release 0.0.9 before this rotation merges. `MultiProofRangeVectorTest` already
+pins the 0.0.9 binding digest, `keccak256(innerProgramVK || rootCVadcopFinal ||
+chainedPI)`.
 
 ## Preparing the backend
 
