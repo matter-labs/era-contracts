@@ -172,6 +172,14 @@ async function enableInterop(
       ntv.connect(signer).setChainBalanceBackfill(_chain.chainId, [assetId], [backfills[i]])
     );
   }
+  // Setting the amounts is not enough: `enableInterop` refuses the chain until it is marked backfilled.
+  const bridgehubOwner = await l1Bridgehub.owner();
+  await expectRevert(
+    () => messageRoot.callStatic.enableInterop(_chain.chainId, false, { from: bridgehubOwner }),
+    `enable interop for chain ${_chain.chainId} before it is marked backfilled`,
+    customError("L1MessageRoot", "ChainBalanceBackfillPending(uint256)", [_chain.chainId]),
+    l1Provider
+  );
   await asOwnerOf(_context, ntv, (signer) => ntv.connect(signer).markBackfilled(_chain.chainId));
   if (await ntv.chainBalanceBackfillPending(_chain.chainId)) {
     throw new Error(`Chain ${_chain.chainId} is still pending its backfill`);

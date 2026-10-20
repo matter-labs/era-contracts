@@ -14,7 +14,8 @@ interface IL1MessageRoot {
     function v31UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
 
     /// @notice Enables interop for a chain. One-way: there is no way to disable it. Callable by the
-    /// Bridgehub owner. See {protocol-docs/interop-gating.md#enabling-interop}.
+    /// Bridgehub owner, once the chain is no longer pending its balance backfill.
+    /// See {protocol-docs/interop-gating.md#enabling-interop}.
     /// @param _chainId The chain to enable interop for.
     /// @param _requireSecondProofSystem Whether the chain must permanently require its second proof system and be
     /// in multi-proof mode.
