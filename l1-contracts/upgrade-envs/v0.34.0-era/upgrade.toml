@@ -11,7 +11,7 @@ args = [
 # On the fork the bundle was replayed on: CREATE2 provenance, the ServerNotifier upgrade, governance
 # stages, chain 499's timestamp, drain and upgrade, a test chain, L1 assertions.
 verify_fork = ["bash", "upgrade-envs/v0.34.0-era/rehearse-stage.sh"]
-# Read-only against the real chain: every factory dep is published.
+# Read-only against the real chain: every factory dep is published and every deployed contract has code.
 verify_chain = ["bash", "upgrade-envs/v0.34.0-era/rehearse-stage.sh", "--published-only"]
 
 # How whoever executes sends the governance stages: one emergency proposal through the env's

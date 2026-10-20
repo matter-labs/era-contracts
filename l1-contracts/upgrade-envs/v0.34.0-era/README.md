@@ -1,7 +1,7 @@
 # v0.34.0 — Era dual proofs (stage)
 
 v34 moves stage's Era CTM from v0.33.0 to v0.34.0. From then on every Era batch needs a Boojum and an
-Airbender proof. It also ships an operator force-fail bit for L1→L2 transactions (new bootloader), a 15M
+Airbender proof, except that stage's testnet verifier, like v0.33.0's, accepts an empty proof. It also ships an operator force-fail bit for L1→L2 transactions (new bootloader), a 15M
 gas cap on user L1→L2 transactions and an EVM emulator fix.
 
 **Status:** generated and checked on a fork, not executed. `output/stage/` comes from generate run
@@ -74,8 +74,8 @@ Script: `deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol`.
 `rehearse-stage.sh` decodes and encodes with `cast` and derives every expected value itself, from stage's
 facts, `AllContractsHashes.json`, the v34 genesis and v33's committed output (for the 31 force deployments).
 It needs Foundry and python3 (for TOML and JSON), but no contract build (the first-batch test builds its
-own). Apart from the read-only `--published-only` check, it runs only against an Anvil fork of Sepolia. It
-checks:
+own). Apart from the read-only `--published-only` check (every factory dep published, every deployed
+contract has code; for the deploy workflow), it runs only against an Anvil fork of Sepolia. It checks:
 
 - every deployer transaction: each CREATE2 deployment uses the env's salt, its init code is a reviewed
   bytecode (`evmBytecodeHash`) plus the expected constructor arguments, and its address is the one in
@@ -88,8 +88,11 @@ checks:
   verifier and its VKs, cut hash, creation hashes, batch zero, migrations unpaused, no pending owner);
   chain 499's timestamp (the `UpgradeTimestampUpdated` event); its upgrade reverting with
   `NotAllBatchesExecuted`; the drain, by a `REVERTER_ROLE` holder through the ValidatorTimelock; the
-  upgrade (version, hashes, verifier, facets, selectors, freezable flags, the L2 tx hash, both proofs
-  required, the 15M cap); every factory dep published; and a test chain created with the new parameters;
+  upgrade (version, hashes, verifier, facets, selectors, freezable flags, the L2 tx hash, neither
+  proof system disabled, the 15M cap); every factory dep published; and a test chain created with the new
+  parameters;
+- the new MailboxFacet's address immutables (the ChainAssetHandler and the EIP-7702 checker, which has no
+  getter) equal the live facet's, read from both facets' code;
 - the 15M cap on user L1→L2 transactions, through the bridgehub. It bounds the body, `l2GasLimit` minus a
   10,000 overhead, so 15,010,001 is accepted before the upgrade and reverts with `TooMuchGas` after it,
   while 15,010,000 is accepted and sent;
@@ -126,7 +129,7 @@ factory-dep check against the genesis hashes fails on it.
   ```
 
   Without protocol_ops, `L1_FORK_URL=<rpc> ./rehearse-stage.sh` prepares and checks on its own Anvil fork.
-  Against a real chain, only `--published-only` applies.
+  Against a real chain, only `L1_RPC_URL=<rpc> ./rehearse-stage.sh --published-only` applies.
 
 - **First-batch test:** on by default with `L1_FORK_URL`; through protocol_ops only with
   `FIRST_BATCH_TEST=1` in its environment (CI doesn't set it; skipped, the run ends

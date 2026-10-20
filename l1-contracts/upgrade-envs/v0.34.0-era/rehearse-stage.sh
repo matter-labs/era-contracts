@@ -26,12 +26,15 @@
 #       (`protocol_ops ecosystem rehearse-upgrade` / `replay-bundle`): no anvil is started and step 1 is
 #       skipped. The deployer transactions are read from prepare/ next to ECOSYSTEM_TOML. The first-batch
 #       test runs only with FIRST_BATCH_TEST=1.
-#   ... --published-only — read-only: only step 2, then stop. Safe against a real chain.
+#   L1_RPC_URL=<chain> [ECOSYSTEM_TOML=<toml>] ./rehearse-stage.sh --published-only — read-only, safe against
+#       a real chain: every factory dep is published and every deployed contract has code, then stop. It
+#       never starts anvil, prepares or funds; without ECOSYSTEM_TOML it reads the committed output.
 # Steps 3–5 refuse any RPC that is not an Anvil fork of Sepolia.
 set -uo pipefail
 
 PUBLISHED_ONLY=0
 [ "${1:-}" = "--published-only" ] && PUBLISHED_ONLY=1
+[ "$PUBLISHED_ONLY" = "0" ] || [ -n "${L1_RPC_URL:-}" ] || { echo "PUBLICATION CHECK FAILED: --published-only needs L1_RPC_URL"; exit 1; }
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WT=$(cd "$HERE/../.." && pwd)
 S=$(mktemp -d)
@@ -88,11 +91,18 @@ else
   FIRST_BATCH_TEST=${FIRST_BATCH_TEST:-1}
   : "${L1_FORK_URL:?set L1_FORK_URL to a Sepolia RPC}"
   RPC=http://127.0.0.1:$PORT
+  # Never fund or send to another session's anvil.
+  cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && { echo "REHEARSAL FAILED: port $PORT is in use; set PORT"; exit 1; }
   anvil --fork-url "$L1_FORK_URL" ${FORK_BLOCK:+--fork-block-number "$FORK_BLOCK"} --port "$PORT" \
     --auto-impersonate --disable-block-gas-limit --silent > "$S/anvil_v34.log" 2>&1 &
   ANVIL_PID=$!
   trap 'kill $ANVIL_PID 2>/dev/null' EXIT
-  for _ in $(seq 1 60); do cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 1; done
+  for _ in $(seq 1 60); do
+    kill -0 "$ANVIL_PID" 2>/dev/null || break
+    cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && break
+    sleep 1
+  done
+  kill -0 "$ANVIL_PID" 2>/dev/null || { echo "REHEARSAL FAILED: anvil exited (log: $S/anvil_v34.log)"; exit 1; }
   echo "fork block: $(cast block-number --rpc-url "$RPC")"
 fi
 # The first-batch test searches the chain's history up to here.
@@ -100,7 +110,7 @@ START_BLOCK=$(cast block-number --rpc-url "$RPC")
 export RPC
 
 # ---------------------------------------------------------------- 1. prepare
-if [ -n "${ECOSYSTEM_TOML:-}" ]; then
+if [ -n "${ECOSYSTEM_TOML:-}" ] || [ "$PUBLISHED_ONLY" = "1" ]; then
   echo "using the prepared output at $OUT"
   [ -f "$OUT" ] || { echo "REHEARSAL FAILED: $OUT not found"; exit 1; }
 else
@@ -143,11 +153,24 @@ while read -r h; do
   esac
 done < "$S/v34_factory_deps.txt"
 echo "L2 upgrade tx factory deps: $N, unpublished: $UNPUB (supplier $BS)"
+# Each is the CREATE2 address of a reviewed init code (step 4 checks that on the fork), so code there can
+# only be that contract.
+DEPLOYED_KEYS=(admin_facet_addr getters_facet_addr mailbox_facet_addr executor_facet_addr migrator_facet_addr
+  committer_facet_addr airbender_verifier_addr verifier_addr default_upgrade_addr
+  chain_type_manager_implementation_addr server_notifier_implementation_addr)
+NOCODE=0
+for k in "${DEPLOYED_KEYS[@]}"; do
+  a=$(toml_get "state_transition.$k") || a=
+  c=$([ -n "$a" ] && cast code "$a" --rpc-url "$RPC")
+  case "$c" in '' | 0x) NOCODE=$((NOCODE + 1)); echo "  no code or unreadable: $k ${a:-(missing)}" ;; esac
+done
+echo "deployed contracts: ${#DEPLOYED_KEYS[@]}, without code: $NOCODE"
 if [ "$PUBLISHED_ONLY" = "1" ]; then
-  [ "$N" -gt 0 ] && [ "$UNPUB" = "0" ] && { echo "PUBLICATION CHECK PASSED"; exit 0; }
+  [ "$N" -gt 0 ] && [ "$UNPUB" = "0" ] && [ "$NOCODE" = "0" ] && { echo "PUBLICATION CHECK PASSED"; exit 0; }
   echo "PUBLICATION CHECK FAILED"; exit 1
 fi
 [ "$N" -gt 0 ] && [ "$UNPUB" = "0" ] || { echo "REHEARSAL FAILED: factory deps not published"; exit 1; }
+[ "$NOCODE" = "0" ] || { echo "REHEARSAL FAILED: deployed contracts without code"; exit 1; }
 chk "bytecodes_supplier = the CTM's" "$BS" "$SUPPLIER"
 
 # The rest funds accounts and sends as the real owners: Anvil forks of Sepolia only.
@@ -632,7 +655,7 @@ chain_state() {
   chk "$1 default account = unchanged" "$(call "$2" 'getL2DefaultAccountBytecodeHash()(bytes32)')" "$AA"
   chk "$1 EVM emulator = new" "$(call "$2" 'getL2EvmEmulatorBytecodeHash()(bytes32)')" "$EVM"
   chk "$1 verifier = new multi-proof verifier" "$(call "$2" 'getVerifier()(address)')" "$VERIFIER"
-  chk "$1 disabledProofSystems = none (both proofs required)" "$(call "$2" 'disabledProofSystems()((bool,bool))')" "(false, false)"
+  chk "$1 disabledProofSystems = (false, false): neither proof system disabled" "$(call "$2" 'disabledProofSystems()((bool,bool))')" "(false, false)"
   chk "$1 getUserPriorityTxMaxGasLimit" "$(call "$2" 'getUserPriorityTxMaxGasLimit()(uint256)' | first)" "15000000"
   CHAIN_ADDR=$2 python3 - <<'PYFACETS' && echo "  OK   $1 facets, selectors and freezable flags = the cut's Adds" || fail "$1 facets, selectors or freezable flags"
 import json, os, subprocess
@@ -651,6 +674,29 @@ for a, frozen, sels in adds:
 raise SystemExit(0 if ok else 1)
 PYFACETS
 }
+
+echo "== The new MailboxFacet's address immutables equal chain 499's live MailboxFacet's"
+# stage.toml's eip7702_checker was read from the live facet's code, which has no getter for it. Solc embeds
+# immutables as PUSH32 words: compare the address-shaped ones (the ChainAssetHandler and the checker).
+LIVE_MAILBOX=$(call "$DIAMOND" 'facetAddress(bytes4)(address)' "$(cast sig 'l2TransactionBaseCost(uint256,uint256,uint256)')")
+python3 - "$LIVE_MAILBOX" "$(toml_get state_transition.mailbox_facet_addr)" <<'PYIMMUTABLES' && echo "  OK   both embed {ChainAssetHandler, EIP-7702 checker}" || fail "MailboxFacet address immutables differ from the live facet's"
+import os, subprocess, sys
+
+def address_words(address):
+    code = bytes.fromhex(subprocess.run(["cast", "code", address, "--rpc-url", os.environ["RPC"]],
+                                        capture_output=True, text=True, check=True).stdout.strip()[2:])
+    words, i = set(), 0
+    while i < len(code):
+        op = code[i]
+        if op == 0x7F and code[i + 1:i + 13] == bytes(12) and int.from_bytes(code[i + 1:i + 33], "big") >= 2**64:
+            words.add("0x" + code[i + 13:i + 33].hex())
+        i += 1 + (op - 0x5F if 0x60 <= op <= 0x7F else 0)
+    return words
+
+live, new = address_words(sys.argv[1]), address_words(sys.argv[2])
+print(f"     live {sys.argv[1]}: {sorted(live)}; new: {sorted(new)}")
+sys.exit(0 if live == new == {os.environ["CAH"].lower(), os.environ["EIP7702_CHECKER"].lower()} else 1)
+PYIMMUTABLES
 
 echo "== Chain 499's cap on user L1->L2 transactions, before the upgrade (a depositor's eth_call)"
 # A fresh address with no code: well-known dev-key addresses can carry EIP-7702 code on Sepolia.
