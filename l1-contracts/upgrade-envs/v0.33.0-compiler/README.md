@@ -1,4 +1,4 @@
-# v0.33.0 — compiler-only upgrade (stage)
+# v0.33.0 — compiler-only upgrade (stage, testnet3)
 
 v33 ships the EraVM bytecode rebuilt with zksolc 1.5.17 and the DSE-safe bootloader (root-frame
 hooks preserved, #2522). Nothing else changes: no L1 contract is deployed, no facet is cut, and the
@@ -39,11 +39,13 @@ a plain force deployment would reset.
   `[test_upgrade_calls]` table is for the transaction simulator, not for execution.
   `test_create_chain_era` creates chain 555 from the new creation parameters as the bridgehub admin.
   `test_upgrade_chain_era` is chain 499's upgrade call, sent by its ChainAdmin contract.
-- `rehearse-stage.sh` runs the whole flow on a Sepolia fork, creates the test chain, and asserts the
+- `rehearse.sh` runs the whole flow for one env (`UPGRADE_ENV`, default `stage`) on a Sepolia fork,
+  creates the test chain, and asserts the
   L1 end state. With `L1_RPC_URL` and `ECOSYSTEM_TOML` it checks a fork the bundle was already
   replayed on; with `--published-only` it only checks publication, read-only.
 - `upgrade.toml` tells the shared generate and deploy workflows how to prepare and check this upgrade.
-  Its `[execution]` table names the script that writes `output/<env>/emergency-upgrade-board.json`;
+  Its `[execution]` table names the script that writes `output/<env>/governance-execution.json`
+  (stage's was written as `emergency-upgrade-board.json`, before the script handled legacy Governance);
   the generate workflow replays those transactions on its fork and renders `output/<env>/EXECUTE.md`.
 - `output/stage/EXECUTE.md` is the execution runbook: the emergency proposal's transactions, one
   copy-into-MetaMask row each, with the calldata decoded. `output/stage/chain-upgrades/499/` holds
@@ -62,10 +64,10 @@ and the script's factory-dep check against the genesis hashes will fail on it.
    - **Ecosystem Upgrade Calldata** with `upgrade = v0.33.0-compiler`, `environment = stage`. It runs
      `CTMUpgrade_v33.prepare` as a dry run on a Sepolia fork, packs the deployer's publishing
      transactions into a deploy bundle, replays the bundle on a fresh fork and runs
-     `rehearse-stage.sh` against it.
+     `rehearse.sh` against it.
    - **Ecosystem Upgrade: Deploy + Verify** with `generate_run_id` set to that run and
      `run_verify = false` (nothing is deployed, so there is nothing for Etherscan). It broadcasts
-     the bundle with the Sepolia deployer, then runs `rehearse-stage.sh --published-only`, a
+     the bundle with the Sepolia deployer, then runs `rehearse.sh --published-only`, a
      read-only check that every factory dep is published.
 
    Publishing is permissionless and idempotent. It costs about 43M gas. Locally, the same steps are
@@ -81,7 +83,7 @@ and the script's factory-dep check against the genesis hashes will fail on it.
    send by hand. The script derives the board, the approving member Safes and their owner on-chain
    from the env's bridgehub, so it works for any env governed by a ProtocolUpgradeHandler; write the
    list read-only with
-   `forge script deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata --sig 'emergencyUpgradeAllStages(string,string,string)' /upgrade-envs/permanent-values/<env>.toml /upgrade-envs/v0.33.0-compiler/output/<env>/ecosystem.toml <out.json> --rpc-url "$SEPOLIA_RPC"`
+   `forge script deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata --sig 'governanceAllStages(string,string,string)' /upgrade-envs/permanent-values/<env>.toml /upgrade-envs/v0.33.0-compiler/output/<env>/ecosystem.toml <out.json> --rpc-url "$SEPOLIA_RPC"`
    and render the runbook with
    `protocol_ops dev execution-runbook --input <out.json> --env <env> --check-fork-url "$SEPOLIA_RPC"`.
    `--sig 'printEmergencyBoard(string)' /upgrade-envs/permanent-values/<env>.toml` only prints who
@@ -120,3 +122,32 @@ The node must run v33 as the v32 VM with the new bootloader:
   line, with its keys registered under 0.33.0.
 
 The chain's first post-upgrade batch has to execute the L2 upgrade transaction on that server.
+
+## testnet3
+
+testnet3 is the EraVM testnet ecosystem on Sepolia: bridgehub `0xF49C6907…`, Era CTM `0x4d058d13…`,
+chain 312 (the Era testnet that replaced chain 301). It gets the same upgrade as stage, with the same
+bootloader, default account, EVM emulator and L2 upgrade transaction. It differs from stage in four
+inputs:
+
+| Input                                         | testnet3                                                                                                                      |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `old_protocol_version`                        | v0.31.1: the ecosystem was deployed at that version and never upgraded. `BaseZkSyncUpgrade` accepts the two-minor step.       |
+| `default_upgrade`                             | `0x23Cc64B9…`, deployed with the CTM (block 11759177), so it is compiled against the live diamond layout.                     |
+| `stored_force_deployments_layout`             | `current`: the CTM was deployed after #2239.                                                                                  |
+| governance (`permanent-values/testnet3.toml`) | legacy `Governance.sol` `0xD7b2fEB2…` with `minDelay` 0, owned by EOA `0xeC6A5c56…` (which also owns chain 312's ChainAdmin). |
+
+Chain 300300 is also on the CTM at v0.31.1 but has never committed a batch: its genesis L2 upgrade
+transaction is still pending, so `BaseZkSyncUpgrade` refuses a new minor until it executes. Once it
+has, `protocol_ops chain upgrade --env testnet3 --chain-id 300300` builds its call from the CTM.
+
+Steps, all from `0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b` except publishing:
+
+1. Publish the 51 factory deps into testnet3's BytecodesSupplier `0x9F04fAfb…` with the generate and
+   deploy workflows (`upgrade = v0.33.0-compiler`, `environment = testnet3`).
+2. Governance: the two transactions in `output/testnet3/EXECUTE.md` (`scheduleTransparent(op, 0)`, then
+   `execute(op)` on the Governance), from `output/testnet3/governance-execution.json`.
+3. Once testnet3's node runs a v33-aware server (the one stage runs): `output/testnet3/chain-upgrades/312/`
+   holds the upgrade timestamp and the ChainAdmin upgrade for chain 312, with their `EXECUTE.md`. They were
+   generated on a fork after step 2's transactions; the upgrade call equals
+   `chain_upgrades.312.chain_admin_calldata` in `output/testnet3/ecosystem.toml`.

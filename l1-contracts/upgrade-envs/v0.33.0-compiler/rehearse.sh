@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# Rehearse the v33 compiler-only stage upgrade on a Sepolia fork and assert the resulting L1 state:
-#   1. CTMUpgrade_v33.prepare  — publishes the factory deps (fork only), writes output/stage/ecosystem.toml
-#   2. governance stages 0/1/2 — sent as the CTM owner (stage's ProtocolUpgradeHandler), impersonated
-#   3. chain 499's ChainAdmin multicall — sent as the ChainAdmin's owner, impersonated
+# Rehearse the v33 compiler-only upgrade of one env (UPGRADE_ENV, default stage) on a Sepolia fork and
+# assert the resulting L1 state:
+#   1. CTMUpgrade_v33.prepare  — publishes the factory deps (fork only), writes output/<env>/ecosystem.toml
+#   2. governance stages 0/1/2 — sent as the CTM owner (the env's governance contract), impersonated
+#   3. every listed chain's ChainAdmin multicall — sent as the ChainAdmin's owner, impersonated
 #   4. assertions: versions, base-system hashes, verifier and facets unchanged, L2 upgrade tx scheduled,
 #      chain-creation cut replaced, migrations unpaused again
 #
 # Needs: foundry (forge/cast/anvil), python3, and the Linux CI build artifacts in
 # {system,l1,l2}-contracts/zkout (a macOS zksolc build produces different hashes).
-# Usage: L1_FORK_URL=<sepolia archive rpc> ./rehearse-stage.sh      (PORT defaults to 8633)
+# Usage: [UPGRADE_ENV=<env>] [FORK_BLOCK=<n>] L1_FORK_URL=<sepolia archive rpc> ./rehearse.sh
+# (PORT defaults to 8633; FORK_BLOCK pins the fork, e.g. to before an env executed the upgrade)
 # Only the anvil it starts is stopped (by PID).
 #
 # The generate / deploy pipeline (upgrade.toml in this directory) reuses it:
@@ -24,10 +26,16 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WT=$(cd "$HERE/../.." && pwd)
 S=$(mktemp -d)
 PORT=${PORT:-8633}
-OUT_REL=/upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml
+ENV_NAME=${UPGRADE_ENV:-stage}
+INPUT_REL=/upgrade-envs/v0.33.0-compiler/$ENV_NAME.toml
+OUT_REL=/upgrade-envs/v0.33.0-compiler/output/$ENV_NAME/ecosystem.toml
 OUT=${ECOSYSTEM_TOML:-$WT$OUT_REL}
 DEPLOYER=${DEPLOYER:-0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7}
-CTM=0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b
+input_get() { python3 -c "import tomllib,sys; print(tomllib.load(open('$WT$INPUT_REL','rb'))[sys.argv[1]])" "$1"; }
+CTM=$(input_get ctm)
+CHAIN_IDS=$(python3 -c "import tomllib; print(' '.join(str(c) for c in tomllib.load(open('$WT$INPUT_REL','rb'))['chain_ids']))")
+FIRST_CHAIN_ID=${CHAIN_IDS%% *}
+echo "env $ENV_NAME: CTM $CTM, chains $CHAIN_IDS"
 fail() { echo "FAIL: $*"; FAILED=1; }
 FAILED=0
 
@@ -37,7 +45,8 @@ if [ -n "${L1_RPC_URL:-}" ]; then
 else
   : "${L1_FORK_URL:?set L1_FORK_URL to a Sepolia RPC}"
   RPC=http://127.0.0.1:$PORT
-  anvil --fork-url "$L1_FORK_URL" --port "$PORT" --auto-impersonate --silent > "$S/anvil_v33.log" 2>&1 &
+  anvil --fork-url "$L1_FORK_URL" ${FORK_BLOCK:+--fork-block-number "$FORK_BLOCK"} --port "$PORT" \
+    --auto-impersonate --silent > "$S/anvil_v33.log" 2>&1 &
   ANVIL_PID=$!
   trap 'kill $ANVIL_PID 2>/dev/null' EXIT
   for _ in $(seq 1 60); do cast block-number --rpc-url "$RPC" >/dev/null 2>&1 && break; sleep 1; done
@@ -55,7 +64,7 @@ mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"
 cd "$WT"
 forge script deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol:CTMUpgrade_v33 \
-  --sig 'prepare(string,string)' /upgrade-envs/v0.33.0-compiler/stage.toml "$OUT_REL" \
+  --sig 'prepare(string,string)' "$INPUT_REL" "$OUT_REL" \
   --rpc-url "$RPC" --broadcast --unlocked --sender "$DEPLOYER" --legacy --slow \
   > "$S/v33_prepare.log" 2>&1
 PREPARE_EXIT=$?
@@ -91,7 +100,7 @@ fi
 # ---------------------------------------------------------------- 2. governance stage 1
 OWNER=$(cast call "$CTM" 'owner()(address)' --rpc-url "$RPC")
 cast rpc anvil_setBalance "$OWNER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
-CHAIN=$(toml_get chain_upgrades.499.chain)
+CHAIN=$(toml_get chain_upgrades.$FIRST_CHAIN_ID.chain)
 FACETS_BEFORE=$(cast call "$CHAIN" 'facetAddresses()(address[])' --rpc-url "$RPC")
 for STAGE in 0 1 2; do
   CALLS=$(toml_get governance_calls.stage${STAGE}_calls)
@@ -108,18 +117,23 @@ for target, value, data in json.load(sys.stdin)[0]:
 done
 [ "$(cast call "$(cast call "$(cast call "$CTM" 'BRIDGE_HUB()(address)' --rpc-url "$RPC")" 'chainAssetHandler()(address)' --rpc-url "$RPC")" 'migrationPaused()(bool)' --rpc-url "$RPC")" = "false" ] && echo "  OK   migrations unpaused again" || fail "migrations still paused"
 
-# ---------------------------------------------------------------- 3. chain upgrade
-ADMIN=$(toml_get chain_upgrades.499.chain_admin)
-ADMIN_CALLDATA=$(toml_get chain_upgrades.499.chain_admin_calldata)
-ADMIN_OWNER=$(cast call "$ADMIN" 'owner()(address)' --rpc-url "$RPC" 2>/dev/null || true)
-if [ -n "$ADMIN_OWNER" ]; then
-  cast rpc anvil_setBalance "$ADMIN_OWNER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
-  st=$(cast send --unlocked --from "$ADMIN_OWNER" "$ADMIN" "$ADMIN_CALLDATA" --rpc-url "$RPC" --json 2>&1 | python3 -c "import json,sys; L=[l for l in sys.stdin.read().splitlines() if l.startswith('{')]; print(json.loads(L[-1])['status'] if L else 'no-receipt')")
-  echo "chain 499 upgrade via ChainAdmin $ADMIN (owner $ADMIN_OWNER): status $st"
-  [ "$st" = "0x1" ] || fail "chain upgrade failed"
-else
-  fail "ChainAdmin $ADMIN has no owner()"
-fi
+# ---------------------------------------------------------------- 3. chain upgrades
+for CHAIN_ID in $CHAIN_IDS; do
+  ADMIN=$(toml_get chain_upgrades.$CHAIN_ID.chain_admin)
+  ADMIN_CALLDATA=$(toml_get chain_upgrades.$CHAIN_ID.chain_admin_calldata)
+  ADMIN_OWNER=$(cast call "$ADMIN" 'owner()(address)' --rpc-url "$RPC" 2>/dev/null || true)
+  if [ -n "$ADMIN_OWNER" ]; then
+    cast rpc anvil_setBalance "$ADMIN_OWNER" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
+    st=$(cast send --unlocked --from "$ADMIN_OWNER" "$ADMIN" "$ADMIN_CALLDATA" --rpc-url "$RPC" --json 2>&1 | python3 -c "import json,sys; L=[l for l in sys.stdin.read().splitlines() if l.startswith('{')]; print(json.loads(L[-1])['status'] if L else 'no-receipt')")
+    echo "chain $CHAIN_ID upgrade via ChainAdmin $ADMIN (owner $ADMIN_OWNER): status $st"
+    [ "$st" = "0x1" ] || fail "chain $CHAIN_ID upgrade failed"
+  else
+    fail "ChainAdmin $ADMIN has no owner()"
+  fi
+done
+# The assertions below use the first chain, whose ChainAdmin call the test call must equal.
+ADMIN=$(toml_get chain_upgrades.$FIRST_CHAIN_ID.chain_admin)
+ADMIN_CALLDATA=$(toml_get chain_upgrades.$FIRST_CHAIN_ID.chain_admin_calldata)
 
 # ---------------------------------------------------------------- 3b. test calls
 # [test_upgrade_calls] is what the transaction simulator runs. The chain-upgrade test call must be the
@@ -167,9 +181,10 @@ chk "facets unchanged" "$(cast call "$CHAIN" 'facetAddresses()(address[])' --rpc
 TXH=$(cast call "$CHAIN" 'getL2SystemContractsUpgradeTxHash()(bytes32)' --rpc-url "$RPC")
 [ "$TXH" != "0x0000000000000000000000000000000000000000000000000000000000000000" ] && echo "  OK   L2 upgrade tx scheduled ($TXH)" || fail "no L2 upgrade tx scheduled"
 # New-chain force-deployment data: must decode in this branch's FixedForceDeploymentsData layout,
-# carry stage's values, and name this branch's compiled L2 built-ins (a v33 genesis knows no other).
-python3 - "$(toml_get contracts_config.new_chain_creation_params)" "$WT/../AllContractsHashes.json" <<'PYCHECK' && echo "  OK   new-chain force-deployment data (current layout, stage values, branch bytecode)" || fail "new-chain force-deployment data"
-import json, subprocess, sys
+# carry the values of the blob the CTM stored before (from the input's event data), and name this
+# branch's compiled L2 built-ins (a v33 genesis knows no other).
+python3 - "$(toml_get contracts_config.new_chain_creation_params)" "$WT/../AllContractsHashes.json" "$WT$INPUT_REL" <<'PYCHECK' && echo "  OK   new-chain force-deployment data (current layout, carried values, branch bytecode)" || fail "new-chain force-deployment data"
+import json, subprocess, sys, tomllib
 params = json.loads(subprocess.check_output(["cast", "abi-decode", "--json", "--input",
     "f((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))", sys.argv[1]]))[0]
 blob = params[5]
@@ -184,13 +199,20 @@ def check(name, cond):
     if not cond:
         ok = False
         print("    mismatch:", name)
-check("l1ChainId", I(d[0]) == 11155111)
-check("eraChainId", I(d[1]) == 270)
-check("l1AssetRouter", d[2].lower() == "0xfd3130ea0e8b7dd61ac3663328a66d97eb02f84b")
-check("aliasedL1Governance", d[4].lower() == "0xa019627524aed610192132a425d6b9c32a173900")
-check("maxNumberOfZKChains", I(d[5]) == 100)
-check("aliasedChainRegistrationSender", d[18].lower() == "0xffb49e812de9264b53cbd21cea04ed69fbe08319")
-check("zkTokenAssetId", d[20].lower() == "0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823")
+inp = tomllib.load(open(sys.argv[3], "rb"))
+event = json.loads(subprocess.check_output(["cast", "abi-decode", "--json", "--input",
+    "f(address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes32,bytes,bytes32)",
+    inp["current_chain_creation_params_event_data"]]))
+legacy = inp["stored_force_deployments_layout"] == "legacy"
+stored_layout = layout.replace("f((uint256,uint256,", "f((uint256,uint256,uint256,") if legacy else layout
+s = json.loads(subprocess.check_output(["cast", "abi-decode", "--json", "--input", stored_layout, event[6]]))[0]
+if legacy:
+    s = s[:1] + s[2:]  # drop gatewayChainId: the remaining fields line up with the current layout
+for name, i in [("l1ChainId", 0), ("eraChainId", 1), ("maxNumberOfZKChains", 5)]:
+    check(name, I(d[i]) == I(s[i]))
+for name, i in [("l1AssetRouter", 2), ("aliasedL1Governance", 4), ("aliasedChainRegistrationSender", 18),
+                ("zkTokenAssetId", 20)]:
+    check(name, d[i].lower() == s[i].lower())
 check("l2TokenProxyBytecodeHash in branch hashes", d[3].lower() in known)
 for i in range(6, 16):
     check(f"bytecode info #{i} in branch hashes", ("0x" + d[i][2:66]).lower() in known)
