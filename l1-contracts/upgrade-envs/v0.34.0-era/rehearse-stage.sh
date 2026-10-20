@@ -449,7 +449,14 @@ ok("contracts.create2_factory_addr, create2_factory_salt = the env's", [eco["con
 # ECOSYSTEM_TOML. A prepare/ an earlier run left next to the committed output doesn't count.
 txs, prepare = [], os.path.join(os.path.dirname(E["OUT"]), "prepare")
 if E.get("BROADCAST_LOG"):
-    for t in json.load(open(E["BROADCAST_LOG"]))["transactions"]:
+    log = json.load(open(E["BROADCAST_LOG"]))
+    # Forge CREATE2-deploys the script's linked deploy-scripts/ libraries; protocol_ops drops those deploys
+    # from the deploy bundle (common/forge/cast_transactions.rs), so they never reach the real chain.
+    script_libs = {lib.rsplit(":", 1)[1].lower() for lib in log.get("libraries", []) if lib.startswith("deploy-scripts/")}
+    for t in log["transactions"]:
+        if t.get("transactionType") == "CREATE2" and (t.get("contractAddress") or "").lower() in script_libs:
+            print(f"     skipped: forge's deploy of script library {t.get('contractName')} at {t['contractAddress']} (not in the deploy bundle)")
+            continue
         t = t["transaction"]
         txs.append(((t.get("to") or "").lower(), (t.get("input") or t.get("data") or "0x").lower(), int(str(t.get("value") or "0x0"), 16)))
     source = E["BROADCAST_LOG"]
