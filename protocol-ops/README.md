@@ -292,7 +292,7 @@ inventory, which the objects' constructors refuse too: a row with a zero proxy o
 self-edge (`expectedOldImpl == implNew`, which applies as a no-op), two rows naming one proxy, and a
 `ProxyUpgradeTransition` with no participating row at all (omit the leg instead).
 
-A new `ChainTypeManager` implementation's constructor immutables — `BRIDGE_HUB`, `INTEROP_CENTER`,
+A new `ChainTypeManager` implementation's constructor immutables — `BRIDGE_HUB`,
 `L1_BYTECODES_SUPPLIER`, `PERMISSIONLESS_VALIDATOR`, `L1_INTEROP_FEE_MANAGER` — are masked by the
 code comparison, so they are read off the implementation and held against the live CTM's own
 getter (unchanged across the swap), else the inventory row of the slot they name, else the proxy
@@ -300,9 +300,8 @@ the package reports for that slot (`[ctms.*.state_transition]`) once it is shown
 reviewed `TransparentUpgradeableProxy`, with the CTM-domain ProxyAdmin in its EIP-1967 admin slot
 and an implementation in its EIP-1967 implementation slot that runs the slot's reviewed contract —
 a singleton the upgrade introduces, like the v35 bootstrap's `L1InteropFeeManager`. Such a proxy's
-`initialize` calldata is not reviewed. `INTEROP_CENTER` falls back to the L2 built-in
-`L2_INTEROP_CENTER_ADDR`; `BRIDGE_HUB` has no fallback. A zero value, or one nothing establishes,
-fails the run; `PERMISSIONLESS_VALIDATOR` is written into every new chain once. The
+`initialize` calldata is not reviewed. `BRIDGE_HUB` has no fallback. A zero value, or one nothing
+establishes, fails the run; `PERMISSIONLESS_VALIDATOR` is written into every new chain once. The
 implementation's construction record is held against the same values (its `_bridgehub` against the
 reviewed Bridgehub), as an independent second check, and so is the record of the implementation
 behind a reported proxy.

@@ -59,9 +59,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
 
-    /// @notice Address of the interop center
-    address public immutable INTEROP_CENTER;
-
     /// @notice Address of the L1 bytecodes supplier used for upgrades
     address public immutable L1_BYTECODES_SUPPLIER;
 
@@ -178,7 +175,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// initialized.
     constructor(
         address _bridgehub,
-        address _interopCenter,
         address _l1BytecodesSupplier,
         address _permissionlessValidator,
         address _l1InteropFeeManager
@@ -189,7 +185,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             revert ZeroAddress();
         }
         BRIDGE_HUB = _bridgehub;
-        INTEROP_CENTER = _interopCenter;
         L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
         PERMISSIONLESS_VALIDATOR = _permissionlessValidator;
         L1_INTEROP_FEE_MANAGER = _l1InteropFeeManager;

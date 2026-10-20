@@ -679,7 +679,10 @@ On the chain, `DefaultUpgrade.upgradeFromTransition` first requires the chain's 
 exactly the departing release's (`LiveRoutingDiverged`): the derived cuts remove that release's
 routing, not the live one, so a chain a CTM-owner `executeUpgrade` recovery left elsewhere would keep
 the recovery's routing under the new release, or fail mid-cut. Such a recovery ends by restoring the
-release's routing. It then applies `transition.facetCuts()` verbatim, then
+release's routing. The same check is what binds a transition to its CTM: a transition names no CTM,
+and a CTM commits whatever cut its owner hands it (the cut-taking `setNewVersionUpgrade`), so a cut
+naming the transition can be committed on another CTM, whose chains do not run `fromRelease`'s
+routing. The engine then applies `transition.facetCuts()` verbatim, then
 runs the shared storage part (`BaseZkSyncUpgrade._upgrade`) with inputs read straight from the same
 object: the version edge and schedule from the transition, the verifier of its TARGET release (never
 the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction composed from its L2
@@ -886,9 +889,12 @@ Two properties that look like omissions but are not:
 - The committed cut carries **no facet cuts and no authored calldata**. The facet delta cannot be
   derived at construction (the departing version predates releases), so the cut's init target is
   the bootstrap engine (`BootstrapUpgrade`), which removes each chain's live routing read from its
-  own diamond storage and installs the facet set of the genesis release the migration names. The
-  init names the migration and nothing else (`upgradeFromBootstrap(migration)`); at execution the
-  engine reads the version edge, the schedule, the target release and the L2 plan from it and
+  own diamond storage and installs the facet set of the genesis release the migration names.
+  Because that removal takes whatever routing the chain has, the engine first requires the chain's
+  CTM to be the migration's (`CHAIN_TYPE_MANAGER()`): a transition is bound by its `fromRelease`
+  routing, this edge only by its CTM. The init names the migration and nothing else
+  (`upgradeFromBootstrap(migration)`); at execution the engine reads the version edge, the
+  schedule, the target release and the L2 plan from it and
   composes the L2 transaction with the same `CTMUpgradeComposer` transitions use. The engine
   itself is version-independent and holds no release: a chain that crosses the edge after the CTM
   has moved on still lands on the release its own committed migration names. Chains crossing

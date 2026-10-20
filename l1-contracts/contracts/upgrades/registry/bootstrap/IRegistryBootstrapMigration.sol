@@ -18,6 +18,10 @@ interface IRegistryBootstrapMigration is ICommittedUpgrade, IManifestHash {
     /// @notice The whole manifest, exactly as it was pinned.
     function getManifest() external view returns (BootstrapManifest memory);
 
+    /// @notice The ChainTypeManager this edge bootstraps — the manifest's `ctm`, kept apart so the
+    ///         engine binds each chain to it without decoding the manifest.
+    function CHAIN_TYPE_MANAGER() external view returns (address);
+
     /// @notice The version the edge moves the CTM to: its genesis release's own, read at
     ///         construction.
     function newProtocolVersion() external view returns (uint256);

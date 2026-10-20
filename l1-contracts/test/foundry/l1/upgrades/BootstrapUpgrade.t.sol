@@ -12,6 +12,7 @@ import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {TimeNotReached, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {BootstrapCTMMismatch} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -23,8 +24,9 @@ contract DummyBootstrapUpgrade is BootstrapUpgrade, BaseUpgradeUtils {}
 ///         `RegistryBootstrapMigration`: the engine is handed nothing but the migration address and
 ///         must read everything off it — the release whose routing and verifier it reinstalls, the
 ///         version edge, the schedule and the L2 plan. The engine under test plays the chain
-///         diamond (called directly, so its own diamond storage is the chain's); the migration's
-///         CTM-side authorities are stand-ins the engine never touches.
+///         diamond (called directly, so its own diamond storage is the chain's), a chain of the
+///         migration's CTM; the migration's CTM-side authorities are stand-ins the engine never
+///         touches.
 contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     DummyBootstrapUpgrade internal engine;
     CTMRelease internal genesisRelease;
@@ -49,6 +51,7 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         engine.setBridgehub(mockBridgehub);
         engine.setChainId(ETH_CHAIN_ID);
         engine.setZKsyncOS(true);
+        engine.setChainTypeManager(ctmStub);
 
         // The departing, pre-registry chain: routing no release knows, straight in diamond storage,
         // and a verifier the release does not pin.
@@ -158,6 +161,29 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(engine.getProtocolVersion(), 0, "the version is unchanged");
         assertEq(engine.getVerifier(), legacyVerifier, "the legacy verifier is unchanged");
         assertEq(engine.facetAddress(SEL_DEPARTING), facetDeparting, "the legacy routing is unchanged");
+    }
+
+    /// @dev A chain of another CTM (one whose owner committed a cut naming this migration) is
+    ///      refused before anything is cut: {docs/registry-driven-upgrades.md#bootstrap}.
+    function test_revertWhen_upgradeFromBootstrap_theChainBelongsToAnotherCTM() public {
+        RegistryBootstrapMigration migration = _migration(genesisRelease, 0, address(engine), true);
+        address foreignCTM = makeAddr("foreignCTM");
+        engine.setChainTypeManager(foreignCTM);
+
+        vm.expectRevert(abi.encodeWithSelector(BootstrapCTMMismatch.selector, ctmStub, foreignCTM));
+        engine.upgradeFromBootstrap(address(migration));
+
+        assertEq(engine.getProtocolVersion(), 0, "the version is unchanged");
+        assertEq(engine.getVerifier(), legacyVerifier, "the legacy verifier is unchanged");
+        assertEq(engine.getL2SystemContractsUpgradeTxHash(), bytes32(0), "no L2 transaction is committed");
+        assertEq(engine.facetAddress(SEL_DEPARTING), facetDeparting, "the legacy routing is unchanged");
+        assertEq(engine.facetAddress(SEL_ARRIVING), address(0), "the release's routing is not installed");
+
+        // The same migration, on a chain of its own CTM, crosses.
+        engine.setChainTypeManager(ctmStub);
+        engine.upgradeFromBootstrap(address(migration));
+        assertEq(engine.getProtocolVersion(), protocolVersion);
+        assertEq(engine.facetAddress(SEL_ARRIVING), facetArriving);
     }
 
     function test_revertWhen_upgradeFromBootstrap_beforeTheSchedule() public {

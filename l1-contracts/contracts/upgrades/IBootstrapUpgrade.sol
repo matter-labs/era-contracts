@@ -8,7 +8,7 @@ interface IBootstrapUpgrade {
     /// @notice Crosses the bootstrap edge on the diamond this contract is delegatecalled into: the
     ///         full facet reinstall derived on-chain, then the version edge, schedule and L2 plan
     ///         read from the pinned migration object, with the verifier of the genesis release the
-    ///         engine pins.
+    ///         engine pins. Only a chain of the migration's own CTM crosses it.
     /// @param _migration The `RegistryBootstrapMigration` whose committed cut names this engine.
     /// @return The diamond-init success value.
     function upgradeFromBootstrap(address _migration) external returns (bytes32);

@@ -9,7 +9,7 @@ import {ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTyp
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 import {ChainTypeManager} from "../../ChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {Facets} from "contracts/common/StateTransitionTypes.sol";
 import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
@@ -76,7 +76,6 @@ contract GatewayCTMDeployerCTM {
         _result.chainTypeManagerImplementation = address(
             new ChainTypeManager{salt: _salt}({
                 _bridgehub: L2_BRIDGEHUB_ADDR,
-                _interopCenter: L2_INTEROP_CENTER_ADDR,
                 _l1BytecodesSupplier: address(0),
                 _permissionlessValidator: address(0),
                 _l1InteropFeeManager: address(0)

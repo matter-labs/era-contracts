@@ -8,11 +8,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {
-    L2_BRIDGEHUB_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -660,7 +656,7 @@ library GatewayCTMDeployerHelper {
         result.chainTypeManagerImplementation = _deployInternalWithParams(
             ctmName,
             ctmFile,
-            abi.encode(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, address(0), address(0), address(0)),
+            abi.encode(L2_BRIDGEHUB_ADDR, address(0), address(0), address(0)),
             innerConfig
         );
 
@@ -761,7 +757,6 @@ library GatewayCTMDeployerHelper {
                 testnetVerifier: _config.testnetVerifier,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: L2_BRIDGEHUB_ADDR,
-                interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: _deployedContracts.daContracts.rollupDAManager,
                 chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
                 l1BytecodesSupplier: address(0),
