@@ -47,8 +47,9 @@ out of the chain admin's hands.
 ## Enabling interop
 
 `L1MessageRoot.enableInterop(chainId, requireSecondProofSystem)` is callable only by the Bridgehub owner. It
-requires the chain to be registered. It is one-way: there is no way to disable interop again
-(`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads the result.
+requires the chain to be registered and no longer pending its [backfill](#backfill) (`ChainBalanceBackfillPending`).
+It is one-way: there is no way to disable interop again (`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads
+the result.
 
 With `requireSecondProofSystem`, the chain must also permanently require its second proof system
 (`SecondProofSystemNotRequired`) and be in multi-proof mode right now, so not during an emergency ZiSK-off
@@ -119,7 +120,8 @@ capped from creation. The vault owner (governance) supplies a pending chain's pr
 - `markBackfilled(chainId)` ends the chain's pending state (`ChainBalanceBackfillNotPending` otherwise), which caps
   it in every asset from then on.
 
-While a chain is pending, it is not capped ([cap](#per-chain-balance-cap)), and its balances can't move to the pool.
+While a chain is pending, it is not capped ([cap](#per-chain-balance-cap)), it can't be
+[enabled](#enabling-interop), and its balances can't move to the pool.
 A backfill set on a chain that is not pending raises its cap at once, so governance can still add an asset it missed.
 If the asset was already moved to the pool, the pool's deposits grow instead, by what the move would have added with
 the backfill set: the chain's own counters no longer change once it is enabled.
@@ -231,7 +233,7 @@ Before `enableInterop(X)`:
 - check X's whole history:
   - the proof modes since the upgrade (no single-proven batches is recommended);
   - the interop X finalized or refunded while it was disabled;
-- set X's backfill for every asset X holds, then mark X backfilled.
+- set X's backfill for every asset X holds, then mark X backfilled (`enableInterop` refuses X until then).
 
 ### Order per chain
 

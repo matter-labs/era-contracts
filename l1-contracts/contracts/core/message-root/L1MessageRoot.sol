@@ -18,6 +18,9 @@ import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE} from "../../common/Config.sol";
 import {NotMultiProofMode, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
+import {ChainBalanceBackfillPending} from "../../bridge/L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -71,6 +74,10 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         address zkChain = IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
         require(!interopEnabled[_chainId], InteropAlreadyEnabled(_chainId));
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(
+            address(IL1AssetRouter(address(IBridgehubBase(BRIDGE_HUB).assetRouter())).nativeTokenVault())
+        );
+        require(!nativeTokenVault.chainBalanceBackfillPending(_chainId), ChainBalanceBackfillPending(_chainId));
         if (_requireSecondProofSystem) {
             require(IGetters(zkChain).isSecondProofSystemRequired(), SecondProofSystemNotRequired(_chainId));
             uint256 proofMode = IGetters(zkChain).getProofMode();
