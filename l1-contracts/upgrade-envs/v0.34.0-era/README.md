@@ -5,9 +5,8 @@ Airbender proof, except that stage's testnet verifier, like v0.33.0's, accepts a
 gas cap on user L1→L2 transactions and an EVM emulator fix.
 
 **Status:** generated and checked on a fork, not executed. `output/stage/` comes from generate run
-[38932514728](https://github.com/matter-labs/era-contracts/actions/runs/38932514728) (commit `778bb3bb4`,
-Sepolia fork block 11928533); a local run at block 11926900 reproduced it byte for byte. It will be
-regenerated with the final inputs before execution, so its addresses and hashes will change.
+[39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988) (commit `fa8deea33`,
+Sepolia fork block 11955011), built on the Airbender v31.5.0 verifier and genesis.
 
 ## What the upgrade does
 
