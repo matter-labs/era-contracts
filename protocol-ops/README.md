@@ -272,7 +272,7 @@ re-read independently — never against anything the package supplies:
 | the Mailbox's EIP-7702 checker                                                  | a deployed reviewed `EIP7702Checker`                                                                                                   |
 | a verifier's sub-verifier                                                       | the address the verifier-tree walk read through its getter                                                                             |
 | a new `ChainTypeManager` implementation's `_bridgehub`                          | the reviewed Bridgehub, as above                                                                                                       |
-| its other four                                                                  | the values its getter check (below) establishes                                                                                        |
+| its other three                                                                 | the values its getter check (below) establishes                                                                                        |
 
 A member without a record, a record that does not re-derive, an argument whose source disagrees and
 one nothing establishes each fail the run. The record is untrusted input, so it can only fail: a

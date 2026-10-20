@@ -21,11 +21,11 @@ import {ZeroAddress} from "../common/L1ContractErrors.sol";
 ///         {docs/registry-driven-upgrades.md}.
 contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     /// @inheritdoc IDefaultUpgrade
-    /// @dev CTM binding is the routing check below, not the commitment:
-    ///      {docs/registry-driven-upgrades.md#flow-upgrading}. No `validate()` here either: the
-    ///      committed cut's init calldata names THIS transition address, so the object is the
-    ///      committed one by construction, and its `validate()` ran when it was committed; code
-    ///      present then is present now.
+    /// @dev No CTM check: `requireReleaseRouting` below binds the transition to its departing
+    ///      release's routing, not to a CTM ({docs/registry-driven-upgrades.md#flow-upgrading}).
+    ///      No `validate()` either: the committed cut's init calldata names THIS transition
+    ///      address, so the object is the committed one by construction, and its `validate()` ran
+    ///      when it was committed; code present then is present now.
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         _requireAllBatchesExecuted();
         ICTMTransition transition = ICTMTransition(_transition);

@@ -1052,7 +1052,7 @@ mod tests {
         assert_eq!(result.errors, 1);
     }
 
-    /// The `(implementation, live CTM)` answers of the five CTM immutables, in read order, each
+    /// The `(implementation, live CTM)` answers of the four CTM immutables, in read order, each
     /// kept unchanged across the swap.
     fn kept_immutables() -> Vec<Bytes> {
         vec![addr(Address::repeat_byte(0x42)); 2 * CtmImmutable::ALL.len()]
@@ -1063,7 +1063,7 @@ mod tests {
     const VALIDATOR: Address = Address::repeat_byte(0x7A);
 
     /// Drives the CTM row of a CTM-domain inventory whose PermissionlessValidator slot is
-    /// `validator_row` (inert when `None`), with the five immutables answering per `answer`. The
+    /// `validator_row` (inert when `None`), with the four immutables answering per `answer`. The
     /// implementation's getters are mocked as their raw answers, so a reverting one is queued as
     /// a failure.
     async fn run_ctm_row(

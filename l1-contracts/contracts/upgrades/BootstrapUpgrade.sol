@@ -9,7 +9,6 @@ import {IRegistryBootstrapMigration} from "./registry/bootstrap/IRegistryBootstr
 import {LiveRoutingReader} from "./registry/libraries/LiveRoutingReader.sol";
 import {ReleaseFacetReader} from "./registry/libraries/ReleaseFacetReader.sol";
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
-import {BootstrapCTMMismatch} from "./ZkSyncUpgradeErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -30,11 +29,6 @@ contract BootstrapUpgrade is DefaultUpgrade, IBootstrapUpgrade {
     function upgradeFromBootstrap(address _migration) external returns (bytes32) {
         _requireAllBatchesExecuted();
         IRegistryBootstrapMigration migration = IRegistryBootstrapMigration(_migration);
-        // CTM binding, before anything is cut: {docs/registry-driven-upgrades.md#bootstrap}.
-        address ctm = migration.CHAIN_TYPE_MANAGER();
-        if (s.chainTypeManager != ctm) {
-            revert BootstrapCTMMismatch(ctm, s.chainTypeManager);
-        }
         // The release the reinstall installs is the one the COMMITTED migration names, not the
         // CTM's live `currentRelease()`: a chain crossing this edge after the CTM has moved on
         // still lands on the release its own cut was committed with.

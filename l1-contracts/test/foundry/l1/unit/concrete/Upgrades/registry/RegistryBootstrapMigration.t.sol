@@ -559,8 +559,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         // The inputs the engine reads at execution.
         BootstrapManifest memory served = composed.getManifest();
-        assertEq(composed.CHAIN_TYPE_MANAGER(), address(chainContractAddress), "the CTM each chain is bound to");
-        assertEq(composed.CHAIN_TYPE_MANAGER(), served.ctm, "the manifest's own CTM");
         assertEq(served.currentRelease, address(tableRelease), "the release whose verifier the engine installs");
         assertEq(composed.newProtocolVersion(), newVersion, "the edge lands on its genesis release's version");
         assertEq(composed.newProtocolVersion(), tableRelease.protocolVersion());
