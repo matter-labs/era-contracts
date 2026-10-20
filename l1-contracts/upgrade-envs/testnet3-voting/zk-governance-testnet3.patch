@@ -1,0 +1,356 @@
+diff --git a/l1-contracts/scripts/Testnet3Config.sol b/l1-contracts/scripts/Testnet3Config.sol
+new file mode 100644
+index 0000000..f94176b
+--- /dev/null
++++ b/l1-contracts/scripts/Testnet3Config.sol
+@@ -0,0 +1,31 @@
++// SPDX-License-Identifier: MIT
++pragma solidity 0.8.24;
++
++library Testnet3Config {
++    uint256 internal constant SEPOLIA_CHAIN_ID = 11155111;
++    uint256 internal constant MEMBER_COUNT = 8;
++    uint256 internal constant SAFE_THRESHOLD = 1;
++
++    address internal constant CURRENT_CONTROL_EOA = 0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b;
++    address internal constant CREATE3_FACTORY = 0x9fBB3DF7C40Da2e5A0dE984fFE2CCB7C47cd0ABf;
++    address internal constant SAFE_PROXY_FACTORY = 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC;
++    address internal constant SAFE_SINGLETON = 0xfb1bffC9d739B8D520DaF37dF666da4C687191EA;
++    address internal constant SAFE_FALLBACK_HANDLER = 0x017062a1dE2FE6b99BE3d9d37841FeD19F573804;
++
++    address internal constant ZKSYNC_ERA = 0xbB94d8F4080d5CD34d6215399f26771990f38A1d;
++    address internal constant CHAIN_TYPE_MANAGER = 0x4d058d138F477c4b97B3D762f923811b20220078;
++    address internal constant BRIDGE_HUB = 0xF49C690785b9fE5261d786237348A66896e2F477;
++    address internal constant L1_NULLIFIER = 0xD1eAE5E399F88751Ec2F903785D62cf5A8Dc4b9b;
++    address internal constant L1_ASSET_ROUTER = 0x2B64aa3d5AEcA9AC4BbF04a48d671da7d6909C03;
++    address internal constant L1_NATIVE_TOKEN_VAULT = 0x54eDd93d08f703B788587C78b62b64663AF14AF7;
++    address internal constant CHAIN_ASSET_HANDLER = 0xcBB88E836507464a4574DBeE25BCAc91582466FE;
++
++    bytes32 internal constant HANDLER_IMPL_SALT = keccak256("testnet3-voting-handler-impl-v1");
++    bytes32 internal constant HANDLER_PROXY_SALT = keccak256("testnet3-voting-handler-proxy-v1");
++    bytes32 internal constant GUARDIANS_SALT = keccak256("testnet3-voting-guardians-v1");
++    bytes32 internal constant SECURITY_COUNCIL_SALT = keccak256("testnet3-voting-security-council-v1");
++    bytes32 internal constant EMERGENCY_BOARD_SALT = keccak256("testnet3-voting-emergency-board-v1");
++    bytes32 internal constant GUARDIAN_SAFE_NONCE_DOMAIN = keccak256("testnet3-voting-guardian-safe-v1");
++    bytes32 internal constant COUNCIL_SAFE_NONCE_DOMAIN = keccak256("testnet3-voting-council-safe-v1");
++    bytes32 internal constant FOUNDATION_SAFE_NONCE_DOMAIN = keccak256("testnet3-voting-foundation-safe-v1");
++}
+diff --git a/l1-contracts/scripts/Testnet3Deploy.s.sol b/l1-contracts/scripts/Testnet3Deploy.s.sol
+new file mode 100644
+index 0000000..7d42c03
+--- /dev/null
++++ b/l1-contracts/scripts/Testnet3Deploy.s.sol
+@@ -0,0 +1,156 @@
++// SPDX-License-Identifier: MIT
++pragma solidity 0.8.24;
++
++import {Script, console2} from "forge-std/Script.sol";
++import {TransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
++
++import {Testnet3Config as C} from "./Testnet3Config.sol";
++import {Utils} from "./Utils.sol";
++import {ICREATE3Factory} from "./ICREATE3Factory.sol";
++import {IGnosisSafeProxyFactory} from "./IGnosisSafeProxyFactory.sol";
++import {ISafeSetup} from "./ISafeSetup.sol";
++import {TestnetProtocolUpgradeHandler} from "../src/TestnetProtocolUpgradeHandler.sol";
++import {ProtocolUpgradeHandler} from "../src/ProtocolUpgradeHandler.sol";
++import {Guardians} from "../src/Guardians.sol";
++import {SecurityCouncil} from "../src/SecurityCouncil.sol";
++import {EmergencyUpgradeBoard} from "../src/EmergencyUpgradeBoard.sol";
++import {IZKsyncEra} from "../src/interfaces/IZKsyncEra.sol";
++import {IChainTypeManager} from "../src/interfaces/IChainTypeManager.sol";
++import {IBridgeHub} from "../src/interfaces/IBridgeHub.sol";
++import {IPausable} from "../src/interfaces/IPausable.sol";
++import {IChainAssetHandler} from "../src/interfaces/IChainAssetHandler.sol";
++import {IProtocolUpgradeHandler} from "../src/interfaces/IProtocolUpgradeHandler.sol";
++
++interface ISafeInspection {
++    function getOwners() external view returns (address[] memory);
++    function getThreshold() external view returns (uint256);
++}
++
++/// @notice Deploys the Stage-equivalent Testnet 3 voting authorities on Sepolia.
++/// @dev This script deploys contracts only; ownership transfer is a separate voted operation.
++contract Testnet3Deploy is Script {
++    ICREATE3Factory internal constant CREATE3 = ICREATE3Factory(C.CREATE3_FACTORY);
++    IGnosisSafeProxyFactory internal constant SAFE_FACTORY = IGnosisSafeProxyFactory(C.SAFE_PROXY_FACTORY);
++
++    struct Addresses {
++        address handlerImplementation;
++        address handlerProxy;
++        address guardians;
++        address securityCouncil;
++        address emergencyBoard;
++    }
++
++    function run() external {
++        require(block.chainid == C.SEPOLIA_CHAIN_ID, "Wrong L1 chain");
++        require(C.CREATE3_FACTORY.code.length != 0, "CREATE3 factory missing");
++        require(C.SAFE_PROXY_FACTORY.code.length != 0, "Safe factory missing");
++        require(C.SAFE_SINGLETON.code.length != 0, "Safe singleton missing");
++        require(C.SAFE_FALLBACK_HANDLER.code.length != 0, "Safe fallback handler missing");
++
++        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
++        address deployer = vm.addr(deployerKey);
++        address safeOwner = vm.envAddress("TESTNET3_SAFE_OWNER");
++        address l2Governor = vm.envAddress("L2_PROTOCOL_GOVERNOR");
++        require(safeOwner == C.CURRENT_CONTROL_EOA, "Unexpected Testnet 3 Safe owner");
++        require(l2Governor != address(0), "L2 governor missing");
++
++        Addresses memory deployed = predictAddresses(deployer);
++        require(deployed.handlerProxy.code.length == 0, "Handler already deployed");
++        require(deployed.handlerImplementation.code.length == 0, "Implementation already deployed");
++        require(deployed.guardians.code.length == 0, "Guardians already deployed");
++        require(deployed.securityCouncil.code.length == 0, "Council already deployed");
++        require(deployed.emergencyBoard.code.length == 0, "Board already deployed");
++
++        vm.startBroadcast(deployerKey);
++
++        address[] memory guardianSafes = new address[](C.MEMBER_COUNT);
++        address[] memory councilSafes = new address[](C.MEMBER_COUNT);
++        for (uint256 i = 0; i < C.MEMBER_COUNT; ++i) {
++            guardianSafes[i] = _deploySafe(safeOwner, uint256(keccak256(abi.encode(C.GUARDIAN_SAFE_NONCE_DOMAIN, i))));
++            councilSafes[i] = _deploySafe(safeOwner, uint256(keccak256(abi.encode(C.COUNCIL_SAFE_NONCE_DOMAIN, i))));
++            console2.log("Guardian Safe", i, guardianSafes[i]);
++            console2.log("Council Safe", i, councilSafes[i]);
++        }
++        address foundationSafe = _deploySafe(safeOwner, uint256(C.FOUNDATION_SAFE_NONCE_DOMAIN));
++        console2.log("Foundation Safe", foundationSafe);
++
++        guardianSafes = Utils.sortAddresses(guardianSafes);
++        councilSafes = Utils.sortAddresses(councilSafes);
++
++        bytes memory implementationCode = abi.encodePacked(
++            type(TestnetProtocolUpgradeHandler).creationCode,
++            abi.encode(
++                l2Governor,
++                IZKsyncEra(C.ZKSYNC_ERA),
++                IChainTypeManager(C.CHAIN_TYPE_MANAGER),
++                IBridgeHub(C.BRIDGE_HUB),
++                IPausable(C.L1_NULLIFIER),
++                IPausable(C.L1_ASSET_ROUTER),
++                IPausable(C.L1_NATIVE_TOKEN_VAULT),
++                IChainAssetHandler(C.CHAIN_ASSET_HANDLER)
++            )
++        );
++        require(CREATE3.deploy(C.HANDLER_IMPL_SALT, implementationCode) == deployed.handlerImplementation, "Wrong implementation");
++
++        bytes memory initData = abi.encodeCall(
++            ProtocolUpgradeHandler.initialize, (deployed.securityCouncil, deployed.guardians, deployed.emergencyBoard)
++        );
++        bytes memory proxyCode = abi.encodePacked(
++            type(TransparentUpgradeableProxy).creationCode,
++            abi.encode(deployed.handlerImplementation, deployed.handlerProxy, initData)
++        );
++        require(CREATE3.deploy(C.HANDLER_PROXY_SALT, proxyCode) == deployed.handlerProxy, "Wrong handler proxy");
++
++        bytes memory guardiansCode = abi.encodePacked(
++            type(Guardians).creationCode,
++            abi.encode(IProtocolUpgradeHandler(deployed.handlerProxy), IZKsyncEra(C.ZKSYNC_ERA), guardianSafes)
++        );
++        require(CREATE3.deploy(C.GUARDIANS_SALT, guardiansCode) == deployed.guardians, "Wrong Guardians");
++
++        bytes memory councilCode = abi.encodePacked(
++            type(SecurityCouncil).creationCode,
++            abi.encode(IProtocolUpgradeHandler(deployed.handlerProxy), councilSafes)
++        );
++        require(CREATE3.deploy(C.SECURITY_COUNCIL_SALT, councilCode) == deployed.securityCouncil, "Wrong Council");
++
++        bytes memory boardCode = abi.encodePacked(
++            type(EmergencyUpgradeBoard).creationCode,
++            abi.encode(IProtocolUpgradeHandler(deployed.handlerProxy), deployed.securityCouncil, deployed.guardians, foundationSafe)
++        );
++        require(CREATE3.deploy(C.EMERGENCY_BOARD_SALT, boardCode) == deployed.emergencyBoard, "Wrong Board");
++
++        vm.stopBroadcast();
++
++        ProtocolUpgradeHandler handler = ProtocolUpgradeHandler(payable(deployed.handlerProxy));
++        require(handler.securityCouncil() == deployed.securityCouncil, "Council not initialized");
++        require(handler.guardians() == deployed.guardians, "Guardians not initialized");
++        require(handler.emergencyUpgradeBoard() == deployed.emergencyBoard, "Board not initialized");
++        console2.log("Handler implementation", deployed.handlerImplementation);
++        console2.log("Handler proxy", deployed.handlerProxy);
++        console2.log("Guardians", deployed.guardians);
++        console2.log("Security Council", deployed.securityCouncil);
++        console2.log("Emergency board", deployed.emergencyBoard);
++    }
++
++    function predictAddresses(address _deployer) public view returns (Addresses memory predicted) {
++        predicted.handlerImplementation = CREATE3.getDeployed(_deployer, C.HANDLER_IMPL_SALT);
++        predicted.handlerProxy = CREATE3.getDeployed(_deployer, C.HANDLER_PROXY_SALT);
++        predicted.guardians = CREATE3.getDeployed(_deployer, C.GUARDIANS_SALT);
++        predicted.securityCouncil = CREATE3.getDeployed(_deployer, C.SECURITY_COUNCIL_SALT);
++        predicted.emergencyBoard = CREATE3.getDeployed(_deployer, C.EMERGENCY_BOARD_SALT);
++    }
++
++    function _deploySafe(address _owner, uint256 _nonce) internal returns (address safe) {
++        address[] memory owners = new address[](C.SAFE_THRESHOLD);
++        owners[0] = _owner;
++        bytes memory initializer = abi.encodeCall(
++            ISafeSetup.setup,
++            (owners, C.SAFE_THRESHOLD, address(0), "", C.SAFE_FALLBACK_HANDLER, address(0), 0, payable(address(0)))
++        );
++        safe = SAFE_FACTORY.createProxyWithNonce(C.SAFE_SINGLETON, initializer, _nonce);
++        require(safe.code.length != 0, "Safe not deployed");
++        require(ISafeInspection(safe).getThreshold() == C.SAFE_THRESHOLD, "Wrong Safe threshold");
++        address[] memory actualOwners = ISafeInspection(safe).getOwners();
++        require(actualOwners.length == C.SAFE_THRESHOLD && actualOwners[0] == _owner, "Wrong Safe owner");
++    }
++}
+diff --git a/l2-contracts/hardhat.config.ts b/l2-contracts/hardhat.config.ts
+index 1552e2c..8e6fd4c 100644
+--- a/l2-contracts/hardhat.config.ts
++++ b/l2-contracts/hardhat.config.ts
+@@ -30,6 +30,15 @@ const config: HardhatUserConfig = {
+       zksync: false,
+       url: "http://localhost:8545",
+     },
++    sepolia: {
++      zksync: false,
++      url: process.env.TESTNET3_L1_RPC_URL || "https://ethereum-sepolia-rpc.publicnode.com",
++    },
++    zkSyncTestnet3: {
++      zksync: true,
++      ethNetwork: "sepolia",
++      url: process.env.TESTNET3_L2_RPC_URL || "https://rpc.zksync-era-testnet.zksync.dev",
++    },
+     zkSyncLocal: {
+       zksync: true,
+       ethNetwork: "ethNetwork",
+diff --git a/l2-contracts/script/Testnet3DeployVoting.ts b/l2-contracts/script/Testnet3DeployVoting.ts
+new file mode 100644
+index 0000000..8f7268a
+--- /dev/null
++++ b/l2-contracts/script/Testnet3DeployVoting.ts
+@@ -0,0 +1,120 @@
++import { config as dotEnvConfig } from "dotenv";
++import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
++import { Wallet } from "zksync-ethers";
++import * as hre from "hardhat";
++import {
++  TESTNET3_CHAIN_ID,
++  TIMELOCK_MIN_DELAY,
++  MAX_GOVERNOR_QUORUM,
++  TOKEN_IMPL_SALT,
++  TOKEN_PROXY_SALT,
++} from "./Testnet3VotingConfig";
++
++function requiredAddress(name: string): string {
++  const value = process.env[name];
++  if (!value) throw new Error(`Set ${name}`);
++  return hre.ethers.getAddress(value);
++}
++
++function requiredBigInt(name: string): bigint {
++  const value = process.env[name];
++  if (!value) throw new Error(`Set ${name}`);
++  const parsed = BigInt(value);
++  if (parsed <= 0n) throw new Error(`${name} must be positive`);
++  return parsed;
++}
++
++function boundedNumber(name: string, maximum: number): number {
++  const value = requiredBigInt(name);
++  if (value > BigInt(maximum)) throw new Error(`${name} exceeds ${maximum}`);
++  return Number(value);
++}
++
++async function main() {
++  dotEnvConfig();
++  if (hre.network.name !== "zkSyncTestnet3") throw new Error("Use --network zkSyncTestnet3");
++  const chainId = Number(await hre.network.provider.send("eth_chainId"));
++  if (chainId !== TESTNET3_CHAIN_ID) throw new Error(`Wrong L2 chain: ${chainId}`);
++
++  const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
++  if (!deployerPrivateKey) throw new Error("Set DEPLOYER_PRIVATE_KEY");
++  const tokenAdmin = requiredAddress("TESTNET3_TOKEN_ADMIN");
++  const mintRecipient = requiredAddress("TESTNET3_MINT_RECIPIENT");
++  const initialMint = requiredBigInt("TESTNET3_INITIAL_MINT_AMOUNT");
++  const votingDelay = boundedNumber("TESTNET3_VOTING_DELAY", Number.MAX_SAFE_INTEGER);
++  const votingPeriod = boundedNumber("TESTNET3_VOTING_PERIOD", 0xffffffff);
++  const proposalThreshold = requiredBigInt("TESTNET3_PROPOSAL_THRESHOLD");
++  const initialQuorum = requiredBigInt("TESTNET3_INITIAL_QUORUM");
++  const lateQuorumExtension = boundedNumber("TESTNET3_LATE_QUORUM_EXTENSION", Number.MAX_SAFE_INTEGER);
++  if (proposalThreshold > initialMint || initialQuorum > initialMint) {
++    throw new Error("Proposal threshold and quorum must not exceed initial supply");
++  }
++  if (initialQuorum > MAX_GOVERNOR_QUORUM) throw new Error("Initial quorum exceeds uint224");
++
++  const wallet = new Wallet(deployerPrivateKey);
++  const deployer = new Deployer(hre, wallet, "create2");
++  const tokenArtifact = await deployer.loadArtifact("ZkTokenV1");
++  const token = await hre.zkUpgrades.deployProxy(
++    deployer.zkWallet,
++    tokenArtifact,
++    [tokenAdmin, mintRecipient, initialMint],
++    {
++      initializer: "initialize",
++      saltImpl: TOKEN_IMPL_SALT,
++      deploymentTypeImpl: "create2",
++      saltProxy: TOKEN_PROXY_SALT,
++      deploymentTypeProxy: "create2",
++    },
++  );
++  await token.waitForDeployment();
++  const tokenAddress = await token.getAddress();
++  if ((await token.totalSupply()) !== initialMint) throw new Error("Wrong token supply");
++  if ((await token.balanceOf(mintRecipient)) !== initialMint) throw new Error("Wrong mint recipient balance");
++  console.log("ZkTokenV1", tokenAddress);
++
++  const adminAddress = await deployer.zkWallet.getAddress();
++  const timelockArtifact = await deployer.loadArtifact("TimelockController");
++  const timelock = await deployer.deploy(timelockArtifact, [TIMELOCK_MIN_DELAY, [], [], adminAddress]);
++  await timelock.waitForDeployment();
++  const timelockAddress = await timelock.getAddress();
++  console.log("TimelockController", timelockAddress);
++
++  const governorArtifact = await deployer.loadArtifact("ZkProtocolGovernor");
++  const governor = await deployer.deploy(governorArtifact, [
++    "ZkProtocolGovernor",
++    tokenAddress,
++    timelockAddress,
++    votingDelay,
++    votingPeriod,
++    proposalThreshold,
++    initialQuorum,
++    lateQuorumExtension,
++  ]);
++  await governor.waitForDeployment();
++  const governorAddress = await governor.getAddress();
++  if ((await governor.token()).toLowerCase() !== tokenAddress.toLowerCase()) {
++    throw new Error("Governor points to wrong token");
++  }
++  console.log("ZkProtocolGovernor", governorAddress);
++
++  for (const role of [
++    await timelock.PROPOSER_ROLE(),
++    await timelock.CANCELLER_ROLE(),
++    await timelock.EXECUTOR_ROLE(),
++  ]) {
++    const receipt = await (await timelock.grantRole(role, governorAddress)).wait();
++    if (!receipt || receipt.status !== 1) throw new Error(`Grant failed for ${role}`);
++    if (!(await timelock.hasRole(role, governorAddress))) throw new Error(`Role missing: ${role}`);
++  }
++
++  const adminRole = await timelock.TIMELOCK_ADMIN_ROLE();
++  const renounceReceipt = await (await timelock.renounceRole(adminRole, adminAddress)).wait();
++  if (!renounceReceipt || renounceReceipt.status !== 1) throw new Error("Admin renounce failed");
++  if (await timelock.hasRole(adminRole, adminAddress)) throw new Error("Deployer remains timelock admin");
++  console.log("Voting stack deployed; mint recipient must delegate before voting", mintRecipient);
++}
++
++main().catch((error) => {
++  console.error(error);
++  process.exitCode = 1;
++});
+diff --git a/l2-contracts/script/Testnet3VotingConfig.ts b/l2-contracts/script/Testnet3VotingConfig.ts
+new file mode 100644
+index 0000000..c51b819
+--- /dev/null
++++ b/l2-contracts/script/Testnet3VotingConfig.ts
+@@ -0,0 +1,5 @@
++export const TESTNET3_CHAIN_ID = 312;
++export const TIMELOCK_MIN_DELAY = 0;
++export const MAX_GOVERNOR_QUORUM = (1n << 224n) - 1n;
++export const TOKEN_IMPL_SALT = "0xc4d76f4f1a4c38c83488c67c1396ce3a4263677c37a42dfd0ad55a39fc48f573";
++export const TOKEN_PROXY_SALT = "0x0470c03a124ee5102518ee784882d8c8d4a8691a64ba324436757f5069077cdd";
