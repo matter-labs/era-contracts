@@ -445,17 +445,18 @@ evm = {e["contractName"]: e["evmBytecodeHash"].lower() for e in json.load(open(E
 st, salt = eco["state_transition"], env["create2_factory_salt"].lower()
 ok("contracts.create2_factory_addr, create2_factory_salt = the env's", [eco["contracts"]["create2_factory_addr"].lower(), eco["contracts"]["create2_factory_salt"].lower()] == [E["FACTORY"].lower(), salt])
 
-# Deployer transactions: the bundle's Safe files, or this run's forge broadcast log.
+# Deployer transactions: this run's forge broadcast log if it prepared, else the bundle's Safe files next to
+# ECOSYSTEM_TOML. A prepare/ an earlier run left next to the committed output doesn't count.
 txs, prepare = [], os.path.join(os.path.dirname(E["OUT"]), "prepare")
-if os.path.isfile(prepare + "/manifest.json"):
-    for b in sorted(json.load(open(prepare + "/manifest.json"))["bundles"], key=lambda b: b["index"]):
-        txs += [(t["to"].lower(), t["data"].lower(), int(str(t.get("value") or "0"), 0)) for t in json.load(open(f"{prepare}/{b['file']}"))["transactions"]]
-    source = prepare
-elif E.get("BROADCAST_LOG"):
+if E.get("BROADCAST_LOG"):
     for t in json.load(open(E["BROADCAST_LOG"]))["transactions"]:
         t = t["transaction"]
         txs.append(((t.get("to") or "").lower(), (t.get("input") or t.get("data") or "0x").lower(), int(str(t.get("value") or "0x0"), 16)))
     source = E["BROADCAST_LOG"]
+elif os.path.isfile(prepare + "/manifest.json"):
+    for b in sorted(json.load(open(prepare + "/manifest.json"))["bundles"], key=lambda b: b["index"]):
+        txs += [(t["to"].lower(), t["data"].lower(), int(str(t.get("value") or "0"), 0)) for t in json.load(open(f"{prepare}/{b['file']}"))["transactions"]]
+    source = prepare
 else:
     raise SystemExit("  FAIL no deployer transactions: no prepare/manifest.json next to ECOSYSTEM_TOML and no broadcast log")
 print(f"     {len(txs)} deployer transactions from {source}")
