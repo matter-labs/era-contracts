@@ -46,11 +46,12 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 /// New chains: `setChainCreationParams` re-issues the CTM's current creation parameters (same
 /// genesis upgrade, facets and diamond init) with the genesis batch values and the three
 /// base-system hashes replaced, so a chain created at v33 starts from the v33 genesis. The
-/// force-deployment data is rebuilt: the blob stage stores predates the removal of
-/// `gatewayChainId` from `FixedForceDeploymentsData` (#2239), so the v33 genesis's
-/// `L2GenesisUpgrade` could not decode it, and it names the old compile's L2 built-ins, which a v33
-/// genesis does not know. The rebuilt blob uses this branch's layout and bytecode, and carries
-/// every non-bytecode value over from the stored blob after checking it against the bridgehub.
+/// force-deployment data is rebuilt: it names the old compile's L2 built-ins, which a v33 genesis
+/// does not know, and on stage it also predates the removal of `gatewayChainId` from
+/// `FixedForceDeploymentsData` (#2239), which the v33 genesis's `L2GenesisUpgrade` could not decode.
+/// The input says which layout the CTM stores. The rebuilt blob uses this branch's layout and
+/// bytecode, and carries every non-bytecode value over from the stored blob after checking it
+/// against the bridgehub.
 /// The input carries the current parameters as the data of the CTM's last `NewChainCreationParams`
 /// event; the script checks them against the CTM's stored hashes before using them.
 ///
@@ -59,7 +60,7 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 ///    Gateway migrations are live (`MigrationsNotPaused`);
 ///  - stage 1: `setNewVersionUpgrade`, then `setChainCreationParams`;
 ///  - stage 2: `ChainAssetHandler.unpauseMigration()`.
-/// Stages can run in one emergency upgrade, as stage's v0.32.x upgrades did.
+/// There is no timer between the stages, so they can run as one governance operation.
 ///
 /// Entry point: `prepare(inputPath, outputPath)`. Publishing the factory dependencies is the only
 /// broadcast (permissionless, from the broadcaster); everything else is emitted as governance calls
@@ -77,6 +78,8 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         uint256 oldProtocolVersion;
         uint256 newProtocolVersion;
         bytes currentChainCreationParamsEvent;
+        /// @dev Whether the CTM stores its force-deployment data in the layout from before #2239.
+        bool legacyForceDeploymentsLayout;
         uint256[] chainIds;
     }
 
@@ -113,6 +116,12 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
         v33Input.oldProtocolVersion = toml.readUint("$.old_protocol_version");
         v33Input.newProtocolVersion = toml.readUint("$.new_protocol_version");
         v33Input.currentChainCreationParamsEvent = toml.readBytes("$.current_chain_creation_params_event_data");
+        string memory layout = toml.readString("$.stored_force_deployments_layout");
+        require(
+            keccak256(bytes(layout)) == keccak256("legacy") || keccak256(bytes(layout)) == keccak256("current"),
+            "v33: stored_force_deployments_layout must be legacy or current"
+        );
+        v33Input.legacyForceDeploymentsLayout = keccak256(bytes(layout)) == keccak256("legacy");
         v33Input.chainIds = toml.readUintArray("$.chain_ids");
     }
 
@@ -120,10 +129,12 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     function _checkLiveState() internal {
         IChainTypeManager ctm = IChainTypeManager(v33Input.ctm);
         require(ctm.protocolVersion() == v33Input.oldProtocolVersion, "v33: CTM not on old version");
+        // BaseZkSyncUpgrade accepts any minor increase (up to MAX_ALLOWED_MINOR_VERSION_DELTA) and only
+        // requires the L2 upgrade tx nonce to equal the new minor, which getProposedUpgrade sets.
         require(
-            UpgradeHelperLib.getProtocolUpgradeNonce(v33Input.newProtocolVersion) ==
-                UpgradeHelperLib.getProtocolUpgradeNonce(v33Input.oldProtocolVersion) + 1,
-            "v33: new version not next minor"
+            UpgradeHelperLib.getProtocolUpgradeNonce(v33Input.newProtocolVersion) >
+                UpgradeHelperLib.getProtocolUpgradeNonce(v33Input.oldProtocolVersion),
+            "v33: new version not a higher minor"
         );
         require(!UpgradeHelperLib.isPatchUpgrade(v33Input.newProtocolVersion), "v33: must be a minor upgrade");
         require(v33Input.defaultUpgrade.code.length > 0, "v33: default_upgrade no code");
@@ -239,7 +250,7 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
     ///      branch's L2 bytecode, carrying the non-bytecode values over from the CTM's stored blob.
     ///      Each carried value is checked against the live bridgehub / CTM first.
     function _rebuildForceDeploymentsData(bytes memory _stored) internal returns (bytes memory) {
-        LegacyFixedForceDeploymentsData memory stored = abi.decode(_stored, (LegacyFixedForceDeploymentsData));
+        FixedForceDeploymentsData memory stored = _decodeStoredForceDeploymentsData(_stored);
         IChainTypeManager ctm = IChainTypeManager(v33Input.ctm);
         IBridgehubBase bridgehub = IBridgehubBase(ctm.BRIDGE_HUB());
 
@@ -482,6 +493,27 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
             );
     }
 
+    /// @dev The CTM's stored force-deployment data in this branch's layout. Only the bytecode infos are
+    ///      replaced afterwards, so the legacy layout's `gatewayChainId` is the one field dropped.
+    function _decodeStoredForceDeploymentsData(
+        bytes memory _stored
+    ) internal view returns (FixedForceDeploymentsData memory stored) {
+        if (!v33Input.legacyForceDeploymentsLayout) {
+            return abi.decode(_stored, (FixedForceDeploymentsData));
+        }
+        LegacyFixedForceDeploymentsData memory legacy = abi.decode(_stored, (LegacyFixedForceDeploymentsData));
+        stored.l1ChainId = legacy.l1ChainId;
+        stored.eraChainId = legacy.eraChainId;
+        stored.l1AssetRouter = legacy.l1AssetRouter;
+        stored.aliasedL1Governance = legacy.aliasedL1Governance;
+        stored.maxNumberOfZKChains = legacy.maxNumberOfZKChains;
+        stored.l2SharedBridgeLegacyImpl = legacy.l2SharedBridgeLegacyImpl;
+        stored.l2BridgedStandardERC20Impl = legacy.l2BridgedStandardERC20Impl;
+        stored.aliasedChainRegistrationSender = legacy.aliasedChainRegistrationSender;
+        stored.dangerousTestOnlyForcedBeacon = legacy.dangerousTestOnlyForcedBeacon;
+        stored.zkTokenAssetId = legacy.zkTokenAssetId;
+    }
+
     function _stripSelector(bytes memory _calldata) internal pure returns (bytes memory body) {
         require(_calldata.length >= 4, "v33: calldata too short");
         body = new bytes(_calldata.length - 4);
@@ -493,7 +525,7 @@ contract CTMUpgrade_v33 is Script, DefaultCTMUpgrade {
 }
 
 /// @dev `FixedForceDeploymentsData` as it was before #2239 removed `gatewayChainId`; the layout of the
-///      force-deployment data stage's Era CTM currently stores.
+///      force-deployment data stage's Era CTM stores.
 // solhint-disable-next-line gas-struct-packing
 struct LegacyFixedForceDeploymentsData {
     uint256 l1ChainId;
