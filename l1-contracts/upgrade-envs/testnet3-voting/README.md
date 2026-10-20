@@ -36,7 +36,7 @@ The adjacent [zk-governance-testnet3.patch](./zk-governance-testnet3.patch) adds
 
 The L2 script requires `DEPLOYER_PRIVATE_KEY`, `TESTNET3_TOKEN_ADMIN`, `TESTNET3_MINT_RECIPIENT`, `TESTNET3_INITIAL_MINT_AMOUNT` (raw token units), `TESTNET3_VOTING_DELAY`, `TESTNET3_VOTING_PERIOD`, `TESTNET3_PROPOSAL_THRESHOLD`, `TESTNET3_INITIAL_QUORUM`, and `TESTNET3_LATE_QUORUM_EXTENSION`. Run it from `zk-governance/l2-contracts` with `npx hardhat run script/Testnet3DeployVoting.ts --network zkSyncTestnet3` after the chain 312 RPC is healthy. It checks the chain ID, minted supply, governor token, timelock roles, and completed receipts. The mint recipient must delegate voting power before a proposal can pass.
 
-The L1 script compiled with Solc 0.8.24 on 20 October 2026. The L2 script was type-checked within the project's TypeScript configuration; the complete TypeScript check still needs generated `artifacts-zk` and `typechain-types`. Read-only Sepolia RPC checks found deployed bytecode at the CREATE3 factory, Safe proxy factory, Safe singleton, and fallback handler addresses. An end-to-end fork simulation still needs the L2 governor address and a funded deployer.
+The L1 script compiled with Solc 0.8.24 on 20 October 2026. `hardhat compile` built 90 L2 Solidity files, generated typings, and the complete `tsc --noEmit` check passed. Read-only Sepolia RPC checks found deployed bytecode at the CREATE3 factory, Safe proxy factory, Safe singleton, and fallback handler addresses. An end-to-end fork simulation still needs the L2 governor address and a funded deployer.
 
 ## Deployment sequence
 
