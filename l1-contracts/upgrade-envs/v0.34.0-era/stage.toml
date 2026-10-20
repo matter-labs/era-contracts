@@ -32,7 +32,7 @@ new_protocol_version = 146028888064  # v0.34.0
 upgrade_timestamp = 1
 
 # CREATE2 salt for every deployment. Fresh for this generation; rotate it on every regeneration.
-create2_factory_salt = "0x762f07366d4f97defb3edc46fe9018e1bb6ccacb8de053b1e6bd45f2e80524b3"
+create2_factory_salt = "0x5f01fff68158c8e2bf5f299d6e52511793a2bf1270db6727fe8327d3eaf50e3c"
 
 # Chains upgraded by this output. The CTM's other chains are on older versions.
 chain_ids = [499]
