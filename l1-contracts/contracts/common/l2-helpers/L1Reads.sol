@@ -11,16 +11,6 @@ import {L1SloadFailed, L1SloadInvalidKeyCount} from "../L1ContractErrors.sol";
 /// @notice Reads L1 storage at the chain's L1SLOAD anchor through the ZKsync OS precompile.
 /// See {protocol-docs/l1sload.md#reading-l1-state}.
 library L1Reads {
-    /// @notice Reads one storage slot of an L1 contract at the anchored L1 block.
-    /// @param _l1Contract The L1 contract.
-    /// @param _key The storage slot.
-    /// @return The slot's value.
-    function l1sload(address _l1Contract, bytes32 _key) internal view returns (bytes32) {
-        bytes32[] memory keys = new bytes32[](1);
-        keys[0] = _key;
-        return l1sload(_l1Contract, keys)[0];
-    }
-
     /// @notice Reads up to `L1SLOAD_MAX_KEYS` storage slots of an L1 contract at the anchored L1 block.
     /// @param _l1Contract The L1 contract.
     /// @param _keys The storage slots.

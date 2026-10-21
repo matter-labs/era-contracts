@@ -69,7 +69,7 @@ contract L2AnchorImportHandler is Test {
 }
 
 /// @notice The L1SLOAD anchor only moves forward, carries the L1 time of its block, is never a message root, and gating
-/// reads fail exactly once it is past the lag in L2 block time. See {protocol-docs/l1sload.md#anchors} and
+/// reads fail exactly without one or once it is past the lag in L2 block time. See {protocol-docs/l1sload.md#anchors} and
 /// {protocol-docs/l1sload.md#freshness}.
 contract L2InteropRootStorageL1AnchorInvariantTest is Test {
     L2InteropRootStorage internal constant ROOT_STORAGE = L2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
@@ -111,7 +111,7 @@ contract L2InteropRootStorageL1AnchorInvariantTest is Test {
 
     function invariant_readsFailExactlyPastTheLag() public {
         uint256 anchorTimestamp = ROOT_STORAGE.l1AnchorTimestamp();
-        if (block.timestamp > anchorTimestamp + L1_ANCHOR_MAX_LAG) {
+        if (anchorTimestamp == 0 || block.timestamp > anchorTimestamp + L1_ANCHOR_MAX_LAG) {
             vm.expectRevert(abi.encodeWithSelector(L1AnchorStale.selector, anchorTimestamp, block.timestamp));
         }
         probe.requireFreshAnchor();

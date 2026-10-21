@@ -61,8 +61,6 @@ contract EnableInteropTest is InteropGatingDeployer {
         assertTrue(messageRoot.isInteropEnabled(chainId));
     }
 
-    /// @dev A diamond whose facets predate L1SLOAD has no `isZKsyncOSL1SloadEnabled`, so the proxy reverts with "F" and
-    /// such a chain can't be enabled until it upgrades. The getter is mocked to revert that way.
     /// @dev The CTM cuts the L1SLOAD getter out of the chain's diamond, leaving it routed as a v35 diamond is.
     /// See {protocol-docs/l1sload.md#upgrade-window}.
     function test_enableInterop_revertWhen_diamondPredatesL1Sload() public {

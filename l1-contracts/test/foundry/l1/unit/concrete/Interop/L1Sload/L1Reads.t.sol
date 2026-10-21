@@ -11,10 +11,6 @@ import {L1SloadSharedTest} from "./_L1Sload_Shared.t.sol";
 
 /// @dev Exposes the internal library functions.
 contract L1ReadsHarness {
-    function l1sload(address _l1Contract, bytes32 _key) external view returns (bytes32) {
-        return L1Reads.l1sload(_l1Contract, _key);
-    }
-
     function l1sloadMany(address _l1Contract, bytes32[] memory _keys) external view returns (bytes32[] memory) {
         return L1Reads.l1sload(_l1Contract, _keys);
     }
@@ -38,6 +34,11 @@ contract L1ReadsTest is L1SloadSharedTest {
     L1ReadsHarness internal harness;
     address internal crs;
 
+    function _oneKey(bytes32 _key) internal pure returns (bytes32[] memory keys) {
+        keys = new bytes32[](1);
+        keys[0] = _key;
+    }
+
     function setUp() public override {
         super.setUp();
         harness = new L1ReadsHarness();
@@ -56,15 +57,15 @@ contract L1ReadsTest is L1SloadSharedTest {
 
     function test_revertWhen_noAnchor() public {
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
-        harness.l1sload(crs, L1View.interopSuspendedSlot(CHAIN_ID));
+        harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
     }
 
     function test_readsOneSlot() public {
         _importL1Anchor(1, keccak256("anchor"), 1);
-        assertEq(harness.l1sload(crs, L1View.interopSuspendedSlot(CHAIN_ID)), bytes32(0));
+        assertEq(harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)))[0], bytes32(0));
 
         _suspendInterop(CHAIN_ID);
-        assertEq(harness.l1sload(crs, L1View.interopSuspendedSlot(CHAIN_ID)), bytes32(uint256(1)));
+        assertEq(harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)))[0], bytes32(uint256(1)));
     }
 
     /// @dev Values come back in the order of the keys.
@@ -108,7 +109,7 @@ contract L1ReadsTest is L1SloadSharedTest {
         // STOP: succeeds with empty output.
         vm.etch(L1SLOAD_PRECOMPILE_ADDRESS, hex"00");
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
-        harness.l1sload(crs, L1View.interopSuspendedSlot(CHAIN_ID));
+        harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
     }
 
     /*//////////////////////////////////////////////////////////////

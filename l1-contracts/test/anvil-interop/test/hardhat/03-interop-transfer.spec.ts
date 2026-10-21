@@ -6,6 +6,7 @@ import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import { getChainIdByRole, getInteropChainIds, getL2RpcUrl, createProvider } from "../../src/core/utils";
 import {
   customError,
+  customErrorWithLeadingArgs,
   expectRevert,
   captureBalance,
   expectBalanceDelta,
@@ -75,8 +76,8 @@ describe("03 - Interop Transfer", function () {
   });
 
   // Only a peer some interop admin allowed has a base token snapshot on L1, so these destinations are not registered.
-  // A source without interop has L1SLOAD off and reads nothing from L1 at all
-  // ({protocol-docs/l1sload.md#chain-config-flag}).
+  // A source without interop never imports an anchor, so it reads nothing from L1 at all and fails closed with
+  // `L1AnchorStale(0, <block time>)` ({protocol-docs/l1sload.md#freshness}).
   for (const { title, sourceRole, targetRole, amount } of [
     {
       title: "rejects transfers from the GW-settled chain to the gateway chain, neither of which has interop",
@@ -116,7 +117,7 @@ describe("03 - Interop Transfer", function () {
         "unregistered destination route",
         sourceRole === "interop"
           ? customError("InteropCenter", "DestinationChainNotRegistered(uint256)", [targetChainId])
-          : customError("L2Bridgehub", "L1SloadFailed(address)", [state.l1Addresses!.chainRegistrationSender]),
+          : customErrorWithLeadingArgs("L2Bridgehub", "L1AnchorStale(uint256,uint256)", [0]),
         sourceProvider
       );
       const sourceAfter = await captureBalance(sourceProvider, sourceToken);

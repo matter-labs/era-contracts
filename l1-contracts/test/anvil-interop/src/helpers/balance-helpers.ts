@@ -191,7 +191,14 @@ export interface CustomErrorExpectation {
   args: readonly unknown[];
 }
 
-type ExpectedRevert = string | CustomErrorExpectation;
+/** A custom error of which only the leading arguments are known, e.g. one that also carries a block timestamp. */
+export interface CustomErrorPrefixExpectation {
+  contract: ContractName;
+  signature: string;
+  leadingArgs: readonly unknown[];
+}
+
+type ExpectedRevert = string | CustomErrorExpectation | CustomErrorPrefixExpectation;
 
 /** Expect `contract`'s custom error `signature` with `args`: the whole ABI-encoded error must match, not only its selector. */
 export function customError(
@@ -202,18 +209,56 @@ export function customError(
   return { contract, signature, args };
 }
 
-function resolveExpectedReason(expectedReason: ExpectedRevert): { expectedData: string; description: string } {
+/** Expect `contract`'s custom error `signature` whose first arguments are `leadingArgs`; the rest may be anything. */
+export function customErrorWithLeadingArgs(
+  contract: ContractName,
+  signature: string,
+  leadingArgs: readonly unknown[]
+): CustomErrorPrefixExpectation {
+  return { contract, signature, leadingArgs };
+}
+
+function sameArg(actual: unknown, expected: unknown): boolean {
+  if (ethers.BigNumber.isBigNumber(actual)) {
+    return actual.eq(ethers.BigNumber.from(expected));
+  }
+  return String(actual).toLowerCase() === String(expected).toLowerCase();
+}
+
+function resolveExpectedReason(expectedReason: ExpectedRevert): {
+  matches: (errorData: string) => boolean;
+  description: string;
+} {
   if (typeof expectedReason === "string") {
     const encodedReason =
       ethers.utils.id("Error(string)").slice(0, 10) +
       ethers.utils.defaultAbiCoder.encode(["string"], [expectedReason]).slice(2);
-    return { expectedData: encodedReason, description: expectedReason };
+    return {
+      matches: (errorData) => errorData.toLowerCase() === encodedReason.toLowerCase(),
+      description: expectedReason,
+    };
+  }
+
+  const iface = new ethers.utils.Interface(getAbi(expectedReason.contract));
+  if ("leadingArgs" in expectedReason) {
+    const { contract, signature, leadingArgs } = expectedReason;
+    const selector = iface.getSighash(iface.getError(signature));
+    return {
+      matches: (errorData) => {
+        if (errorData.slice(0, 10).toLowerCase() !== selector.toLowerCase()) {
+          return false;
+        }
+        const decoded = iface.decodeErrorResult(signature, errorData);
+        return leadingArgs.every((arg, i) => sameArg(decoded[i], arg));
+      },
+      description: `${contract}.${signature} starting with (${leadingArgs.join(", ")})`,
+    };
   }
 
   const { contract, signature, args } = expectedReason;
-  const iface = new ethers.utils.Interface(getAbi(contract));
+  const expectedData = iface.encodeErrorResult(signature, args);
   return {
-    expectedData: iface.encodeErrorResult(signature, args),
+    matches: (errorData) => errorData.toLowerCase() === expectedData.toLowerCase(),
     description: `${contract}.${signature} with (${args.join(", ")})`,
   };
 }
@@ -293,14 +338,14 @@ export async function expectRevert(
   try {
     await fn();
   } catch (err: unknown) {
-    const { expectedData, description } = resolveExpectedReason(expectedReason);
+    const { matches, description } = resolveExpectedReason(expectedReason);
     const msg = err instanceof Error ? err.message : String(err);
     let errorData = extractRevertData(err);
     if ((errorData === "" || errorData === "0x") && provider && typeof err === "object" && err !== null) {
       errorData = await replayRevertData(provider, err as EthersLikeError);
     }
     expect(
-      errorData.toLowerCase() === expectedData.toLowerCase(),
+      matches(errorData),
       `${label}: revert reason mismatch — expected ${description} in revert data.\nMessage: ${msg.slice(0, 200)}\nData: ${errorData}`
     ).to.be.true;
     return; // reverted as expected

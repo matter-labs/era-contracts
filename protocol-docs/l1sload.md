@@ -69,7 +69,7 @@ L1 time the anchor was recorded at; the import writes it and execution checks it
 ([anchors](#anchors)).
 
 - The bound holds for every read, however the operator composes batches.
-- A chain that never imported an anchor has `anchorTimestamp = 0` and reads nothing.
+- A chain that never imported an anchor has `anchorTimestamp = 0` and reads nothing, whatever the clock.
 - In Priority Mode, whose batches can't contain the service transaction that imports anchors, reads fail once the
   last anchor is past the lag instead of seeing stale state.
 
@@ -219,8 +219,12 @@ Suspension doesn't touch X's whitelist or the pool, so `resumeInterop(X)` restor
   Bounding the first block's age for L1SLOAD chains is a follow-up.
 - **Delay.** Every gating change (allowing, deregistering, suspending) reaches a chain only when it imports a newer
   anchor ([bounds](#suspending-a-chain)).
-- **Priority Mode.** A chain in Priority Mode imports no anchors, so once its last anchor is stale it neither sends
-  nor accepts interop until it imports one again.
+- **Priority Mode.** A chain in Priority Mode imports no anchors. Once its last anchor is older than
+  `L1_ANCHOR_MAX_LAG`, every gating read on it reverts, so it neither sends nor accepts interop, and the atomic-flow
+  refunds and finality on it (`AtomicFlowManager.authorizeRefund` and `requireFlowFinalized`, which read the
+  [receive filter](./interop-gating.md#receive-filter)) wait until it leaves Priority Mode and imports an anchor again,
+  even when sent as L1 transactions. This is deliberate: the alternative reads stale gating state, and a Priority Mode
+  chain can't import the post-deadline roots that a timeout proof needs anyway.
 - **No anchor, no interop.** A chain that never imported an anchor, or has the flag off, can neither send nor accept
   interop; its reads revert with `L1AnchorStale` or `L1SloadFailed`.
 - **Storage layout is an ABI.** Moving `ChainRegistrationSender`'s gating mappings breaks every L2 reader.

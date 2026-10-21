@@ -16,7 +16,7 @@ import {
     DestinationChainNotRegistered,
     InteropPreviewHash
 } from "contracts/interop/InteropErrors.sol";
-import {L1SloadFailed} from "contracts/common/L1ContractErrors.sol";
+import {L1AnchorStale} from "contracts/common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {
     L2_BRIDGEHUB_ADDR,
@@ -72,14 +72,16 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
         assertNotEq(l2Bridgehub.chainRegistrationSender(), address(chainRegistrationSender));
     }
 
-    /// @dev Without an anchor the precompile reverts, and every read fails closed.
-    function test_revertWhen_noAnchor() public {
+    /// @dev Without an anchor every read fails closed before the precompile is called, whatever the clock.
+    function testFuzz_revertWhen_noAnchor(uint64 _timestamp) public {
         _onL2();
-        vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, address(chainRegistrationSender)));
+        vm.warp(_timestamp);
+        bytes memory noAnchor = abi.encodeWithSelector(L1AnchorStale.selector, 0, uint256(_timestamp));
+        vm.expectRevert(noAnchor);
         l2Bridgehub.isPeerAllowed(PEER_CHAIN_ID);
-        vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, address(chainRegistrationSender)));
+        vm.expectRevert(noAnchor);
         l2Bridgehub.interopSendTarget(PEER_CHAIN_ID);
-        vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, address(chainRegistrationSender)));
+        vm.expectRevert(noAnchor);
         l2Bridgehub.interopBaseTokenAssetId(PEER_CHAIN_ID);
     }
 
