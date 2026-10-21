@@ -111,7 +111,7 @@ gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> -f environment=<env
 # 3. governance sends the EXECUTE.md transactions
 # 4. per chain, once the CTM is on the new version
 gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> -f environment=<env> -f chain_id=<id> \
-  -f protocol_ops_tag=<tag> -f l1_rpc_url=<l1 rpc> -f upgrade=v0.33.2-verifier -f upgrade_timestamp=1 \
+  -f protocol_ops_tag=<tag> -f upgrade=v0.33.2-verifier -f upgrade_timestamp=1 \
   [-f commit_outputs=true]
 ```
 

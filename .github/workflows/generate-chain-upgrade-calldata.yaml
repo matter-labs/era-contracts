@@ -13,9 +13,10 @@ on:
         required: true
         type: string
       l1_rpc_url:
-        description: "L1 RPC URL"
-        required: true
+        description: "L1 RPC URL, an archive node (the scripts read old event logs). BLANK = the L1_RPC_URL_SEPOLIA / L1_RPC_URL_MAINNET secret for the env's L1. A typed value is visible in the run summary."
+        required: false
         type: string
+        default: ""
       chain_id:
         description: "Numeric chain id of the ZK chain (protocol_ops --chain-id)"
         required: true
@@ -81,13 +82,36 @@ jobs:
             echo "::error::commit_outputs needs the upgrade input"; exit 1
           fi
 
+      # The env's L1 picks the secret, as in generate-ecosystem-upgrade-calldata.yaml.
+      - name: Select L1 RPC
+        env:
+          INPUT_RPC: ${{ inputs.l1_rpc_url }}
+          RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+          RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+        run: |
+          set -euo pipefail
+          PV="l1-contracts/upgrade-envs/permanent-values/$ENVIRONMENT.toml"
+          L1_CHAIN_ID="$(sed -nE 's/^[[:space:]]*l1_chain_id[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PV" | head -1)"
+          case "$L1_CHAIN_ID" in
+            1) rpc="$RPC_MAINNET" ;;
+            11155111) rpc="$RPC_SEPOLIA" ;;
+            *) rpc="" ;;
+          esac
+          [ -z "${INPUT_RPC:-}" ] || rpc="$INPUT_RPC"
+          if [ -z "$rpc" ]; then
+            echo "::error::No L1 RPC for l1_chain_id=$L1_CHAIN_ID: pass the l1_rpc_url input or set the matching L1_RPC_URL_* secret"
+            exit 1
+          fi
+          echo "::add-mask::$rpc"
+          echo "L1_RPC_URL=$rpc" >> "$GITHUB_ENV"
+
       - name: Run set-upgrade-timestamp
         if: ${{ inputs.upgrade_timestamp != '' }}
         run: |
           mkdir -p "$WORK_DIR"
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
             chain set-upgrade-timestamp \
-            --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
+            --l1-rpc-url                 "$L1_RPC_URL" \
             --env                        "${{ inputs.environment }}" \
             --chain-id                   "${{ inputs.chain_id }}" \
             --upgrade-timestamp          "${{ inputs.upgrade_timestamp }}" \
@@ -103,7 +127,7 @@ jobs:
           [ "$ACKNOWLEDGE_UNRECOMMENDED_NODA" != "true" ] || extra+=(--acknowledge-unrecommended-noda)
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
             chain upgrade \
-            --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
+            --l1-rpc-url                 "$L1_RPC_URL" \
             --env                        "${{ inputs.environment }}" \
             --chain-id                   "${{ inputs.chain_id }}" \
             --access-control-restriction "${{ inputs.access_control_restriction }}" \
@@ -134,8 +158,6 @@ jobs:
       # reverts `NotAllBatchesExecuted()` on a fork of a live chain with batches in flight, so
       # the simulator is told to settle this chain's diamond first (a real rollout waits instead).
       - name: Emit the chain's simulator scenario
-        env:
-          L1_RPC_URL: ${{ inputs.l1_rpc_url }}
         run: |
           set -euo pipefail
           PV="l1-contracts/upgrade-envs/permanent-values/$ENVIRONMENT.toml"
