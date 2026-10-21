@@ -216,6 +216,25 @@
   },
   {
     "type": "event",
+    "name": "NewZKsyncOSL1Sload",
+    "inputs": [
+      {
+        "name": "oldEnabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "newEnabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "UpgradeComplete",
     "inputs": [
       {
