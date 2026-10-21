@@ -58,7 +58,8 @@ struct DaPair {
 /// anvil (auto-impersonation), emits a Gnosis Safe Transaction Builder JSON
 /// bundle via `--out`, and never broadcasts. Replay the bundle via
 /// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor) to apply
-/// it.
+/// it. The fork counts every committed batch as executed, so a chain with
+/// batches in flight still gets its bundle; on L1 the cut waits for them.
 ///
 /// The bundle is a single `ChainAdmin.multicall`: the diamond cut, and — with
 /// `--da-mode` — the DA validator pair and the pubdata content that mode implies. Keeping them in one transaction matters for a validium going to v33:
@@ -198,6 +199,9 @@ async fn run_one(
     let da_move = resolve_da_move(&runner.rpc_url, bridgehub, chain_id, chain_address, args)
         .await
         .context("resolving the DA setup for the upgrade")?;
+    crate::common::anvil::emulate_all_batches_executed(&runner.rpc_url, chain_address)
+        .await
+        .context("settling the chain's batches on the fork")?;
 
     // The Solidity helper executes through ChainAdmin, but broadcasts from
     // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
