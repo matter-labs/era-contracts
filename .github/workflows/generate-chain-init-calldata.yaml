@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment = basename of upgrade-envs/permanent-values/<env>.toml (its bridgehub is the one the chain registers with)"
+        description: "Target environment = basename of upgrade-envs/permanent-values/<env>.toml (read by protocol_ops --env)"
         required: true
         type: choice
         options: [stage, testnet, mainnet, adi]
@@ -69,7 +69,6 @@ jobs:
     timeout-minutes: 60
     env:
       WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
-      # See generate-chain-upgrade-calldata.yaml: the work dir is mounted so
       # `--out` inside the container lands where upload-artifact reads it.
       EXTRA_MOUNTS: ${{ github.workspace }}/protocol-ops-workdir:/contracts/work
       PROTOCOL_OPS_REQUIRE_RELEASE: "1"
@@ -77,23 +76,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # `chain init` takes the bridgehub itself rather than `--env`; read it
-      # from the same preset the other chain workflows load.
-      - name: Resolve bridgehub from the environment preset
-        id: eco
-        env:
-          PRESET: l1-contracts/upgrade-envs/permanent-values/${{ inputs.environment }}.toml
-        run: |
-          bh=$(python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["core_contracts"]["bridgehub_proxy_addr"])' "$PRESET")
-          echo "bridgehub=$bh" >> "$GITHUB_OUTPUT"
-
       - name: Run chain init
         run: |
           mkdir -p "$WORK_DIR"
           bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
             chain init \
             --l1-rpc-url          "${{ inputs.l1_rpc_url }}" \
-            --bridgehub           "${{ steps.eco.outputs.bridgehub }}" \
+            --env                 "${{ inputs.environment }}" \
             --chain-id            "${{ inputs.chain_id }}" \
             --deployer-address    "${{ inputs.deployer_address }}" \
             --owner               "${{ inputs.chain_owner }}" \

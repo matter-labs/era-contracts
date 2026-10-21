@@ -97,7 +97,7 @@ OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
   --env mainnet --out "$OUT/transaction-simulator.json"
 ```
 
-**In CI:** run the **`Ecosystem Upgrade Calldata: Regenerate + Verify (v31)`**
+**In CI:** run the **`Ecosystem Upgrade Calldata: Regenerate + Verify`**
 workflow (`generate-ecosystem-upgrade-calldata.yaml`) with `protocol_ops_tag` = the
 released image. It does 1a + 1b in that image and uploads two artifacts:
 `ecosystem-upgrade-calldata-<env>` (the review set) and
@@ -173,17 +173,16 @@ journal is the operational record of the broadcast; the verifier does not read i
 **Locally** (real signing — needs the deployer key):
 
 ```bash
-TAG=<tag>   # the image step 1 ran (or sha256:<digest> from bundle-metadata.json)
-OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
+TAG=sha256:<digest>   # the bundle's protocol_ops_image.digest, after the '@'
+BUNDLE=<unpacked-bundle-dir>
 DEPLOYER_ADDR=$(./protocol-ops.sh --tag "$TAG" cast wallet address --private-key "$DEPLOYER_KEY")
 
 # Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
-# deployment's journal. Keep it out of $OUT: the committed $OUT/transactions.txt
-# also holds earlier broadcasts.
+# deployment's journal.
 mkdir -p deploy-result
-EXTRA_MOUNTS="$PWD/deploy-result:/contracts/deploy-result" \
+EXTRA_MOUNTS="$BUNDLE:/contracts/bundle $PWD/deploy-result:/contracts/deploy-result" \
   ./protocol-ops.sh --tag "$TAG" ecosystem upgrade-broadcast \
-  --manifest "$OUT/prepare/manifest.json" \
+  --manifest /contracts/bundle/prepare/manifest.json \
   --l1-rpc-url <l1-rpc> \
   --key "${DEPLOYER_ADDR}=${DEPLOYER_KEY}" \
   --skip-unkeyed \
@@ -195,14 +194,14 @@ EXTRA_MOUNTS="$PWD/deploy-result:/contracts/deploy-result" \
 # `--constructor-args <hex>` for every contract (from the CREATE2 init code it
 # deployed), so nothing is guessed.
 export ETHERSCAN_API_KEY   # protocol-ops.sh passes it into the image
-grep 'forge verify-contract' "$OUT/extra-verification-logs.txt" |
+grep 'forge verify-contract' "$BUNDLE/extra-verification-logs.txt" |
   sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u |
   while IFS= read -r cmd; do
     eval "./protocol-ops.sh --tag $TAG $cmd --chain mainnet --watch --retries 8 --delay 20" || true
   done
 ```
 
-**In CI:** run the **`Ecosystem Upgrade: Deploy + Verify (v31)`** workflow
+**In CI:** run the **`Ecosystem Upgrade: Deploy + Verify`** workflow
 (`deploy-ecosystem-upgrade.yaml`) with `generate_run_id` = the step-1 run to pull
 the deploy bundle from. It uploads `transactions.txt` as
 `ecosystem-upgrade-deploy-result-<env>`. The selected generation run must be a
@@ -345,8 +344,8 @@ Variants:
 ceremony bundles stay for their multisig. Same broadcast path, and same
 idempotency, as step 2 above. `replay-bundle` writes its own state (`executed.json`
 and the receipts in `transactions.txt`) to
-`l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/replay/` in the checkout,
-never into the bundle directory.
+`l1-contracts/upgrade-envs/<upgrade>/output/<env>/replay/` in the checkout, never into
+the bundle directory.
 
 Both `--rpc` modes first read `eth_chainId` and require it to equal the bundle's
 recorded `l1.chain_id`, and refuse to continue otherwise. That check matters most

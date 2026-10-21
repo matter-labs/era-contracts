@@ -5,10 +5,11 @@ ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
 # Pre-baked toolchain base for the build stages (see Dockerfile.base +
-# build-docker-base.yaml; build-docker.yaml builds it from the same commit with
-# docker-bake.hcl). Must be a global ARG so it's visible in the
+# build-docker-base.yaml). Must be a global ARG so it's visible in the
 # `FROM ${BUILD_BASE_IMAGE}` lines below.
 ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
+# The zksync-association/zk-governance commit the image holds at /zk-governance.
+ARG ZK_GOVERNANCE_COMMIT=9b06a16159cd58add109f25598e79731450d1772
 
 ########################################
 # 1) Planner — prepare cargo-chef recipes
@@ -29,8 +30,7 @@ RUN mkdir -p /recipes && \
 ########################################
 # Compiles the 3 binaries in isolation. Not tools/zksync-os-genesis-gen: it
 # depends on the private zksync-os-private repo, and nothing in the image runs
-# it (CI runs it from source with the bots app token). Buildkit
-# auto-parallelizes this stage with the forge-builder stage below (no
+# it. Buildkit auto-parallelizes this stage with the forge-builder stage below (no
 # cross-deps). The only contract input Rust needs is `l1-contracts/zkstack-out/`
 # (committed JSON ABIs read by `abigen!` macros at compile time) — we COPY that
 # subset rather than the whole tree so a Solidity-only change doesn't
@@ -119,22 +119,29 @@ COPY package.json yarn.lock /contracts/
 COPY l1-contracts/package.json /contracts/l1-contracts/
 RUN yarn install --frozen-lockfile
 
+# === zk-governance ===
+# protocol-ops's PUH/Guardians redeploy step (`ecosystem upgrade-prepare-all`
+# on PUH-governed envs like stage / mainnet) shells out to a forge script
+# inside zk-governance, at `<era>/../../zk-governance` = `/zk-governance`.
+# Building it also seeds /root/.svm/ with the solc it pins (the runtime image
+# runs with FOUNDRY_OFFLINE=true) and produces the out/ artifacts the script
+# reads. Some refs wrap the foundry project in `l1-contracts/`.
+ARG ZK_GOVERNANCE_COMMIT
+RUN git init -q /zk-governance && cd /zk-governance && \
+    git fetch -q --depth 1 https://github.com/zksync-association/zk-governance "$ZK_GOVERNANCE_COMMIT" && \
+    git checkout -q FETCH_HEAD && \
+    git submodule update -q --init --recursive --depth 1 && \
+    if [ -f foundry.toml ]; then forge build; \
+    elif [ -f l1-contracts/foundry.toml ]; then cd l1-contracts && forge build; \
+    else echo "zk-governance foundry root not found" >&2 && exit 1; \
+    fi
+
 # === Copy all source code ===
 # `.dockerignore` excludes node_modules / out / zkout / cache / target /
 # broadcast, so this layer only invalidates when a real source file
 # changes. No need for the previous `forge clean` / `yarn clean` dance —
 # the container always starts from a fresh build dir.
 COPY . /contracts
-
-# === Copy zk-governance source ===
-# protocol-ops's PUH/Guardians redeploy step (`ecosystem upgrade-prepare-all`
-# on PUH-governed envs like stage / mainnet) shells out to a forge script
-# inside zk-governance. The runtime path it expects is `<era>/../../zk-governance`,
-# which inside the container resolves to `/zk-governance` (foundry root with
-# `foundry.toml` at the top level — no `l1-contracts/` wrapper). The CI
-# workflow checks out zksync-association/zk-governance at
-# $GITHUB_WORKSPACE/zk-governance/ so it lands inside the docker build context.
-COPY zk-governance /zk-governance
 
 # === Compile contracts ===
 # Bytecode drift detection (`AllContractsHashes.json` ↔ built artifacts) is
@@ -144,19 +151,6 @@ COPY zk-governance /zk-governance
 # docker build on stale hashes would force every contract-touching branch
 # through a "trigger regen → wait → re-trigger docker" loop.
 RUN yarn --cwd l1-contracts build:foundry
-
-# Pre-compile zk-governance contracts. This both seeds /root/.svm/ with solc
-# 0.8.24 (zk-governance pins it; the runtime image runs with FOUNDRY_OFFLINE=true
-# so missing solc downloads would fail) and produces out/ artifacts that
-# DeployPUHAndGuardians.s.sol reads at runtime. Some refs wrap the foundry
-# project in `l1-contracts/`; pick whichever holds `foundry.toml`.
-RUN if [ -f /zk-governance/foundry.toml ]; then \
-      cd /zk-governance && forge build; \
-    elif [ -f /zk-governance/l1-contracts/foundry.toml ]; then \
-      cd /zk-governance/l1-contracts && forge build; \
-    else \
-      echo "zk-governance foundry root not found" >&2 && exit 1; \
-    fi
 
 # Keep full node_modules — forge ffi scripts depend on packages here (e.g. blakejs).
 
@@ -176,7 +170,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.js)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates bash openssl jq curl gnupg && \
+      ca-certificates bash openssl jq curl gnupg lsof && \
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     npm i -g yarn@${YARN_VERSION} && \
@@ -206,10 +200,10 @@ COPY --from=forge-builder /contracts/AllContractsHashes.json /contracts/AllContr
 # resolves it correctly via `<era>/../../zk-governance`.
 COPY --from=forge-builder /zk-governance /zk-governance
 
-# The wrapper in local mode, for harnesses that call `./protocol-ops.sh` from
-# the contracts root (build-docker.yaml rehearses the anvil-interop upgrade
-# test inside the image). The test also hashes the image's build with
-# scripts/calculate-hashes.ts for `verify-bootstrap --contract-hashes`.
+# Repository files read at runtime: the ZiSK backend pin (the verifier), and the
+# wrapper and hash script the anvil-interop upgrade test calls (build-docker.yaml
+# runs it in the image).
+COPY --from=forge-builder /contracts/tools/verifier-gen/data/ZiSK_plonk_backend.toml /contracts/tools/verifier-gen/data/ZiSK_plonk_backend.toml
 COPY --from=forge-builder /contracts/protocol-ops.sh /contracts/protocol-ops.sh
 COPY --from=forge-builder /contracts/scripts/calculate-hashes.ts /contracts/scripts/calculate-hashes.ts
 
@@ -220,6 +214,8 @@ RUN forge --version && cast --version && anvil --version && protocol_ops --help 
 
 # Provenance recorded in deploy bundles (the image has no git). Last, so a new
 # commit only invalidates this layer.
+ARG ZK_GOVERNANCE_COMMIT
 ARG CONTRACTS_COMMIT=""
 ENV PROTOCOL_OPS_BIN=/contracts/protocol-ops/protocol_ops \
-    PROTOCOL_OPS_CONTRACTS_COMMIT=${CONTRACTS_COMMIT}
+    PROTOCOL_OPS_CONTRACTS_COMMIT=${CONTRACTS_COMMIT} \
+    PROTOCOL_OPS_ZK_GOVERNANCE_COMMIT=${ZK_GOVERNANCE_COMMIT}

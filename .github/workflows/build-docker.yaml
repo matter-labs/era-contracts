@@ -32,11 +32,6 @@ concurrency:
   group: build-docker-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  # The zk-governance commit baked into the image (PUH/Guardians redeploy).
-  # build-and-push-docker.yaml and bundle.rs's DEFAULT_ZK_GOVERNANCE_COMMIT use the same one.
-  ZK_GOVERNANCE_COMMIT: 9b06a16159cd58add109f25598e79731450d1772
-
 jobs:
   build-image:
     name: Build protocol ops Docker Image
@@ -71,15 +66,6 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Checkout zk-governance
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          repository: zksync-association/zk-governance
-          ref: ${{ env.ZK_GOVERNANCE_COMMIT }}
-          submodules: recursive
-          path: zk-governance
-          persist-credentials: false
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
@@ -96,19 +82,18 @@ jobs:
           else
             IMAGE_TAG=$(git rev-parse --short HEAD)-$(date +%s)
           fi
+          if [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "::error::'$IMAGE_TAG' is not a docker tag"; exit 1
+          fi
           echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
           echo "IMAGE=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG" >> "$GITHUB_ENV"
           echo "Computed image tag: $IMAGE_TAG"
-          # Read back by the calldata workflows: they check out the revision
-          # the image was built from, and deploy checks it against the bundle.
           {
             echo "revision=$(git rev-parse HEAD)"
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_OUTPUT"
 
-      # Loaded, not pushed: the rehearsal below runs this exact image. The base is
-      # built from this commit's Dockerfile.base (docker-bake.hcl). `mode=max`
-      # caches every layer, in one GitHub Actions cache scope per image.
+      # Loaded, not pushed: the steps below test this exact image, then push it.
       - name: Build Docker Image
         uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
         with:
@@ -129,6 +114,10 @@ jobs:
             protocol.labels.org.opencontainers.image.created=${{ steps.meta.outputs.created }}
             protocol.labels.org.opencontainers.image.version=${{ env.IMAGE_TAG }}
             protocol.labels.io.matter-labs.protocol-ops.tested-with=${{ inputs.integration_tests_run_url }}
+
+      # verify-bootstrap holds the image's contract build against its AllContractsHashes.json.
+      - name: Check the image's contract hashes
+        run: docker run --rm "$IMAGE" yarn calculate-hashes:check
 
       # The anvil-interop upgrade test (anvil-interop-ci.yaml's `upgrade-test`)
       # run entirely from the image: its protocol_ops, forge, anvil and
@@ -154,6 +143,9 @@ jobs:
       - name: Push Docker Image
         if: github.event_name == 'workflow_dispatch'
         run: |
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "::error::$IMAGE already exists: a released tag is never moved"; exit 1
+          fi
           docker push "$IMAGE"
           digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")
-          echo "Pushed \`$digest\`: pass \`protocol_ops_tag=$IMAGE_TAG\` to the calldata workflows." >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed \`$IMAGE\` as \`$digest\`: pass \`protocol_ops_tag=${digest#*@}\` to the calldata workflows." >> "$GITHUB_STEP_SUMMARY"

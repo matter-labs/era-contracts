@@ -137,9 +137,6 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                               wrong.
 # `No deploy bundle was published`            → the prepare died before the pack
 #                                               step; fix the generate job first.
-# `image has no revision label`               → the tag was not built by
-#                                               build-docker.yaml from this
-#                                               change on; release a new image.
 # deploy job: "bundle was prepared for X but    → the key in CI is not the EOA the
 # this key is Y"                                  bundle was generated for. Those two
 #                                                 must match: the deployer is in the
@@ -154,10 +151,9 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 
 # Regenerates the `upgrade` input's ecosystem calldata for one environment and
 # verifies it (`verify-bootstrap` for prepare-all, the declared checks for a
-# forge-script upgrade), inside the released protocol-ops image (`protocol_ops_tag`): its
-# compiled contracts, protocol_ops and zk-governance checkout produce the
-# calldata, so the bytecode — and therefore the CREATE2 addresses baked into
-# `ecosystem.toml` — is the image's, whoever runs it. Nothing is compiled here.
+# forge-script upgrade), inside the released protocol-ops image (`protocol_ops_tag`),
+# so the bytecode — and therefore the CREATE2 addresses baked into
+# `ecosystem.toml` — is the image's, whoever runs it.
 #
 # Flow (the canonical `protocol_ops ecosystem rehearse-upgrade` command):
 #   anvil fork of the L1 RPC
@@ -266,7 +262,7 @@ on:
         default: "v0.35.0-upgrade-system"
         type: string
       protocol_ops_tag:
-        description: "protocol-ops image released by build-docker.yaml: a tag, or sha256:<digest>. The calldata comes from its contracts, protocol_ops and zk-governance; the run checks out the commit it was built from."
+        description: "protocol-ops image released by build-docker.yaml: sha256:<digest>, or a tag"
         required: true
         type: string
       environment:
@@ -284,7 +280,7 @@ on:
         default: ""
         type: string
       deployer_address:
-        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret (stage, testnet and mainnet only; a partner's env such as adi needs its own deployer here)."
+        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
         required: false
         default: ""
         type: string
@@ -303,7 +299,6 @@ jobs:
       PROTOCOL_OPS_TAG: ${{ inputs.protocol_ops_tag }}
 
     steps:
-      # Only build-docker.yaml sets the revision label: the commit checked out below.
       - name: Pull the protocol-ops image
         id: image
         run: |
@@ -319,8 +314,7 @@ jobs:
           fi
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
-      # protocol-ops.sh mounts this checkout's upgrade-envs/ into the image:
-      # the configs the image was built with.
+      # protocol-ops.sh mounts this checkout's upgrade-envs/ over the image's.
       - name: Checkout the image's revision
         uses: actions/checkout@v4
         with:
@@ -396,7 +390,6 @@ jobs:
           if [ -n "${INPUT_DEPLOYER:-}" ]; then
             deployer="$INPUT_DEPLOYER"
           elif [ -n "${pk:-}" ]; then
-            # Our deployer only for our ecosystems: a partner's (adi) broadcasts with its own.
             case "$ENVIRONMENT" in
               stage|testnet|mainnet) ;;
               *) echo "::error::'$ENVIRONMENT' is not our ecosystem: pass its own deployer as deployer_address (docs/protocol-ops-for-partners.md)"; exit 1 ;;
@@ -617,7 +610,7 @@ jobs:
         env:
           BUNDLE_IMAGE: ${{ steps.bundle.outputs.image }}
           # Mounted at the same path in the image.
-          EXTRA_MOUNTS: ${{ runner.temp }}:${{ runner.temp }}
+          EXTRA_MOUNTS: ${{ runner.temp }}/deploy-bundle:${{ runner.temp }}/deploy-bundle
         run: |
           set -euo pipefail
           # The fork anvil runs inside the container, so nothing outlives it.

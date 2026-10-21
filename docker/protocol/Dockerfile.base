@@ -12,8 +12,7 @@
 # (see `.github/workflows/build-docker-base.yaml`). The main
 # `docker/protocol/Dockerfile` consumes this via
 # `FROM ghcr.io/matter-labs/protocol-ops-base:latest AS build` instead of
-# re-running these ~10 minutes of installs every build. `build-docker.yaml`
-# builds it from the same commit instead (`docker-bake.hcl`).
+# re-running these ~10 minutes of installs every build.
 #
 # To bump a toolchain version: edit the ARG default below (or, for the foundry
 # pins, `.github/foundry-versions.env`), push, and the base-image workflow will

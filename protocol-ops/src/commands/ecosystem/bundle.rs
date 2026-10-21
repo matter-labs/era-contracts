@@ -59,10 +59,6 @@ const OPTIONAL_BUNDLE_FILES: [&str; 2] =
 /// bundle work dir.
 const TRANSACTIONS_LOG: &str = "transactions.txt";
 
-/// The zk-governance commit the governance redeploy is built from by default (the one
-/// build-docker.yaml checks out into the image). Recorded in the bundle as provenance only.
-const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
-
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
 /// replay can run next to a rehearsal of the same env.
 const ENV_ANVIL_PORTS: [(&str, u16); 4] = [
@@ -94,9 +90,10 @@ const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
     "system-contracts/contracts",
 ];
 
-/// Set in the protocol-ops image (`docker/protocol/Dockerfile`): the commit its sources were
-/// built from.
+/// Set in the protocol-ops image (`docker/protocol/Dockerfile`): the commits its sources and its
+/// zk-governance checkout were built from.
 const IMAGE_CONTRACTS_COMMIT_ENV: &str = "PROTOCOL_OPS_CONTRACTS_COMMIT";
+const IMAGE_ZK_GOVERNANCE_COMMIT_ENV: &str = "PROTOCOL_OPS_ZK_GOVERNANCE_COMMIT";
 /// Set by `protocol-ops.sh --tag`: the image reference it ran and that image's registry digest.
 const IMAGE_REFERENCE_ENV: &str = "PROTOCOL_OPS_IMAGE";
 const IMAGE_DIGEST_ENV: &str = "PROTOCOL_OPS_IMAGE_DIGEST";
@@ -272,18 +269,23 @@ fn image_provenance() -> Option<ImageProvenance> {
     })
 }
 
-/// The commit the protocol-ops image was built from, else the checkout's HEAD.
-fn contracts_commit(repository_root: &Path) -> String {
-    env_value(IMAGE_CONTRACTS_COMMIT_ENV)
+/// `image_commit`, the commit the protocol-ops image was built from, else the checkout's HEAD.
+fn contracts_commit(repository_root: &Path, image_commit: Option<&str>) -> String {
+    image_commit
+        .map(str::to_string)
         .or_else(|| try_capture("git", &["rev-parse", "HEAD"], repository_root))
         .unwrap_or_else(|| "unknown".to_string())
 }
 
 /// The sources that decide the bundle's bytes and differ from [`contracts_commit`], one per
 /// line (empty when none do), or `None` when that cannot be told.
-fn source_changes(repository_root: &Path, upgrade: &str) -> Option<String> {
+fn source_changes(
+    repository_root: &Path,
+    upgrade: &str,
+    image_commit: Option<&str>,
+) -> Option<String> {
     // The image has no git (the generate workflow mounts a checkout of the image's commit).
-    if env_value(IMAGE_CONTRACTS_COMMIT_ENV).is_some() {
+    if image_commit.is_some() {
         return Some(String::new());
     }
     let pathspecs = contract_source_pathspecs(upgrade);
@@ -361,7 +363,8 @@ pub fn pack_deploy_bundle(
         .map(|relative| Ok((relative.clone(), sha256_file(&bundle_dir.join(relative))?)))
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
 
-    let source_status = source_changes(repository_root, upgrade);
+    let image_commit = env_value(IMAGE_CONTRACTS_COMMIT_ENV);
+    let source_status = source_changes(repository_root, upgrade, image_commit.as_deref());
     match source_status.as_deref() {
         Some("") => {}
         Some(dirty) => logger::warn(format!(
@@ -374,7 +377,7 @@ pub fn pack_deploy_bundle(
         schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
         upgrade: upgrade.to_string(),
         env: env_cfg.env.clone(),
-        contracts_commit: contracts_commit(repository_root),
+        contracts_commit: contracts_commit(repository_root, image_commit.as_deref()),
         contracts_worktree_dirty: source_status
             .as_deref()
             .is_none_or(|status| !status.is_empty()),
@@ -827,9 +830,9 @@ pub struct RehearseUpgradeArgs {
     #[clap(long, hide = true)]
     pub gw_rpc_url: Option<String>,
     /// zk-governance commit the governance redeploy's sources (`ZK_GOVERNANCE_DIR`) are checked
-    /// out at; recorded in the bundle as provenance.
-    #[clap(long, default_value = DEFAULT_ZK_GOVERNANCE_COMMIT)]
-    pub zk_governance_commit: String,
+    /// out at; recorded in the bundle as provenance. Defaults to the protocol-ops image's.
+    #[clap(long)]
+    pub zk_governance_commit: Option<String>,
     /// An `[upgrade_executors]` record file for `verify-bootstrap --executor-record`, repeatable
     /// (`prepare-all` only). Needed when the package does not carry the records of the executors
     /// it drives itself, as an ordinary upgrade's package does not.
@@ -933,7 +936,10 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &BundleProvenance {
             deployer: Some(args.deployer_address),
             forked_at_block: Some(forked_at_block),
-            zk_governance_commit: Some(args.zk_governance_commit.clone()),
+            zk_governance_commit: args
+                .zk_governance_commit
+                .clone()
+                .or_else(|| env_value(IMAGE_ZK_GOVERNANCE_COMMIT_ENV)),
             foundry_zksync_version: args.foundry_zksync_version.clone(),
         },
     )?;
@@ -1261,15 +1267,12 @@ mod tests {
             repo.path(),
         )
         .is_some());
-        let status = || {
-            let pathspecs = contract_source_pathspecs(DEFAULT_UPGRADE);
-            let args: Vec<&str> = ["status", "--porcelain", "--"]
-                .into_iter()
-                .chain(pathspecs.iter().map(String::as_str))
-                .collect();
-            try_capture("git", &args, repo.path()).unwrap()
-        };
+        let status = || source_changes(repo.path(), DEFAULT_UPGRADE, None).unwrap();
         assert!(status().is_empty());
+        assert_eq!(
+            contracts_commit(repo.path(), None),
+            try_capture("git", &["rev-parse", "HEAD"], repo.path()).unwrap()
+        );
         write(&repo.path().join(output), "regenerated\n");
         assert!(
             status().is_empty(),
@@ -1284,6 +1287,14 @@ mod tests {
             write(&repo.path().join(path), "original\n");
             assert!(status().is_empty());
         }
+
+        // In the image: its own commit, and clean whatever the mounted checkout holds.
+        write(&repo.path().join(source), "changed\n");
+        assert_eq!(
+            source_changes(repo.path(), DEFAULT_UPGRADE, Some("abc")).as_deref(),
+            Some("")
+        );
+        assert_eq!(contracts_commit(repo.path(), Some("abc")), "abc");
     }
 
     const TARGET: &str = "0x0000000000000000000000000000000000000002";
