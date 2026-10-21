@@ -27,6 +27,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {Bytes} from "contracts/vendor/Bytes.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses} from "../../utils/Types.sol";
@@ -34,6 +35,7 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
+import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
 /// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0. From then on every batch needs a Boojum and an
@@ -43,9 +45,9 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 /// multi-proof verifier over the live `EraVerifierFflonk` and the new `AirbenderVerifierPlonk`,
 /// `EraSettlementLayerV34Upgrade`, and new `EraChainTypeManager` and `ServerNotifier` implementations.
 /// Everything else is reused, so the base helpers that would redeploy it (`deployStateTransitionDiamondFacets`,
-/// `deployVerifiers`, v31's `deployNewCTMContracts`) are not called. Constructor values come from the input and
-/// are checked against live state where a getter exists; `initializeWithArgs` is not used, as it introspects
-/// the old Era chain 270.
+/// `deployVerifiers`, v31's `deployNewCTMContracts`) are not called. Constructor values come from the input,
+/// checked against live state where a getter exists. `initializeWithArgs` is not used: by default, a pre-v31 first
+/// chain on the bridgehub (stage's 270) puts its introspection in v29 mode, which zeroes values this upgrade needs.
 ///
 /// Governance, one emergency proposal without a timer: stage 0 pauses migrations; stage 1 upgrades the CTM
 /// proxy (the new `ChainCreationParams` only decodes on the new implementation), then calls
@@ -88,10 +90,9 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     }
 
     V34EraInput internal v34Input;
-    /// @dev abi-encoded ChainCreationParams / Diamond.DiamondCutData (structs with nested dynamic
-    ///      arrays cannot be copied to storage by the legacy pipeline).
+    /// @dev abi-encoded ChainCreationParams (structs with nested dynamic arrays cannot be copied to storage by
+    ///      the legacy pipeline).
     bytes internal v34NewChainCreationParams;
-    bytes internal v34UpgradeCut;
     address internal v33Verifier;
 
     function prepare(string memory _inputPath, string memory _outputPath) public {
@@ -107,7 +108,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         publishBytecodes();
         console.log("v34: factory dependencies published");
 
-        v34UpgradeCut = abi.encode(_buildUpgradeCut());
+        newlyGeneratedData.upgradeCutData = abi.encode(_buildUpgradeCut());
         v34NewChainCreationParams = abi.encode(_buildNewChainCreationParams());
 
         string memory outputPath = string.concat(root, _outputPath);
@@ -223,6 +224,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         config.isZKsyncOS = false;
         config.eraChainId = v34Input.eraChainId;
         config.testnetVerifier = v34Input.testnetVerifier;
+        newConfig.oldProtocolVersion = v34Input.oldProtocolVersion;
 
         IChainTypeManager ctm = IChainTypeManager(v34Input.ctm);
         address bridgehubAddr = ctm.BRIDGE_HUB();
@@ -389,48 +391,30 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Calls ========================
 
-    function getV34Stage0Calls() public view returns (Call[] memory calls) {
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: v34Input.chainAssetHandler,
-            value: 0,
-            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
-        });
+    // The base stages add timer and stage-validator calls; this upgrade deploys neither.
+    function prepareStage0GovernanceCalls() public view override returns (Call[] memory calls) {
+        calls = preparePauseGatewayMigrationsCall();
     }
 
-    /// @dev In this order: the new CTM implementation first, since `setChainCreationParams` takes the new
-    ///      struct; `setNewVersionUpgrade` before `setChainCreationParams`, since the latter files its block
-    ///      pointer under the version currently set on the CTM.
-    function getV34Stage1Calls() public returns (Call[] memory calls) {
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(v34UpgradeCut, (Diamond.DiamondCutData));
+    function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](3);
+        allCalls[0] = prepareUpgradeCTMCalls();
+        allCalls[1] = provideSetNewVersionUpgradeCall();
+        allCalls[2] = prepareNewChainCreationParamsCall();
+        // The base recomputes the creation params; they must be the ones the output and the test chain use.
         ChainCreationParams memory newParams = abi.decode(v34NewChainCreationParams, (ChainCreationParams));
-        calls = new Call[](3);
-        calls[0] = _buildCallProxyUpgrade(v34Input.ctm, ctmAddresses.stateTransition.implementations.chainTypeManager);
-        calls[1] = Call({
-            target: v34Input.ctm,
-            value: 0,
-            data: abi.encodeCall(
-                IChainTypeManager.setNewVersionUpgrade,
-                (
-                    upgradeCut,
-                    v34Input.oldProtocolVersion,
-                    UpgradeHelperLib.getOldProtocolDeadline(),
-                    v34Input.newProtocolVersion,
-                    ctmAddresses.stateTransition.verifiers.verifier
-                )
-            )
-        });
-        calls[2] = Call({
-            target: v34Input.ctm,
-            value: 0,
-            data: abi.encodeCall(IChainTypeManager.setChainCreationParams, (newParams))
-        });
+        require(
+            keccak256(allCalls[2][0].data) ==
+                keccak256(abi.encodeCall(IChainTypeManager.setChainCreationParams, (newParams))),
+            "v34: creation params differ"
+        );
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
-    function getV34Stage2Calls() public view returns (Call[] memory calls) {
+    function prepareStage2GovernanceCalls() public view override returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
-            target: v34Input.chainAssetHandler,
+            target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
         });
@@ -439,7 +423,10 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     /// @notice The call a chain admin makes on the chain's diamond to move it from the old to the new version.
     function _v34UpgradeChainCall(uint256 _chainId) internal view returns (Call memory) {
         address chain = IChainTypeManager(v34Input.ctm).getZKChain(_chainId);
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(v34UpgradeCut, (Diamond.DiamondCutData));
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(
+            newlyGeneratedData.upgradeCutData,
+            (Diamond.DiamondCutData)
+        );
         return
             Call({
                 target: chain,
@@ -504,16 +491,19 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         vm.serializeString("root", "deployed_addresses", _serializeDeployedAddresses());
         vm.serializeString("root", "contracts", _serializeCreate2());
         vm.serializeString("root", "governance_calls", _serializeGovernanceCalls());
-        vm.serializeString("root", "ctm_admin_calls", _serializeCtmAdminCalls());
         vm.serializeString("root", "chain_upgrades", _serializeChainUpgrades());
         string memory toml = vm.serializeString("root", "test_upgrade_calls", _serializeV34TestCalls());
         vm.writeToml(toml, _outputPath);
+        // Adds [ctm_admin_calls] to the file just written.
+        upgradeConfig.outputPath = _outputPath;
+        prepareDefaultCTMAdminCalls();
     }
 
     function _serializeContractsConfig() internal returns (string memory) {
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(v34UpgradeCut, (Diamond.DiamondCutData));
+        bytes memory upgradeCutData = newlyGeneratedData.upgradeCutData;
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(upgradeCutData, (Diamond.DiamondCutData));
         ChainCreationParams memory newParams = abi.decode(v34NewChainCreationParams, (ChainCreationParams));
-        ProposedUpgrade memory proposedUpgrade = abi.decode(_stripSelector(upgradeCut.initCalldata), (ProposedUpgrade));
+        ProposedUpgrade memory proposedUpgrade = abi.decode(Bytes.slice(upgradeCut.initCalldata, 4), (ProposedUpgrade));
         address verifier = ctmAddresses.stateTransition.verifiers.verifier;
 
         vm.serializeUint("contracts_config", "old_protocol_version", v34Input.oldProtocolVersion);
@@ -549,24 +539,20 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             "l2_upgrade_tx_hash",
             keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx))
         );
-        vm.serializeBytes32("contracts_config", "l2_upgrade_tx_factory_deps", _factoryDeps(proposedUpgrade));
-        vm.serializeBytes32("contracts_config", "upgrade_cut_hash", keccak256(v34UpgradeCut));
+        vm.serializeBytes32(
+            "contracts_config",
+            "l2_upgrade_tx_factory_deps",
+            UpgradeHelperLib.factoryDepHashes(proposedUpgrade.l2ProtocolUpgradeTx)
+        );
+        vm.serializeBytes32("contracts_config", "upgrade_cut_hash", keccak256(upgradeCutData));
         vm.serializeBytes32("contracts_config", "new_initial_cut_hash", keccak256(abi.encode(newParams.diamondCut)));
         vm.serializeBytes32(
             "contracts_config",
             "new_force_deployments_hash",
             keccak256(abi.encode(newParams.forceDeploymentsData))
         );
-        vm.serializeBytes("contracts_config", "upgrade_cut_data", v34UpgradeCut);
+        vm.serializeBytes("contracts_config", "upgrade_cut_data", upgradeCutData);
         return vm.serializeBytes("contracts_config", "new_chain_creation_params", v34NewChainCreationParams);
-    }
-
-    function _factoryDeps(ProposedUpgrade memory _proposedUpgrade) internal pure returns (bytes32[] memory deps) {
-        uint256 count = _proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps.length;
-        deps = new bytes32[](count);
-        for (uint256 i = 0; i < count; ++i) {
-            deps[i] = bytes32(_proposedUpgrade.l2ProtocolUpgradeTx.factoryDeps[i]);
-        }
     }
 
     /// @dev Every state-transition address the upgrade deploys or reuses, under `DefaultCTMUpgrade.saveOutput`'s
@@ -626,19 +612,9 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     }
 
     function _serializeGovernanceCalls() internal returns (string memory) {
-        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(getV34Stage0Calls()));
-        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(getV34Stage1Calls()));
-        return vm.serializeBytes("governance_calls", "stage2_calls", abi.encode(getV34Stage2Calls()));
-    }
-
-    /// @dev The ServerNotifier upgrade, under `DefaultCTMUpgrade.prepareDefaultCTMAdminCalls`'s keys: calls the
-    ///      ChainAdmin owning the ServerNotifier's ProxyAdmin executes through `multicall`, sent by its owner.
-    function _serializeCtmAdminCalls() internal returns (string memory) {
-        Call[] memory calls = prepareUpgradeServerNotifierCall();
-        address chainAdmin = IOwnable(calls[0].target).owner();
-        vm.serializeAddress("ctm_admin_calls", "chain_admin", chainAdmin);
-        vm.serializeAddress("ctm_admin_calls", "chain_admin_owner", IOwnable(chainAdmin).owner());
-        return vm.serializeBytes("ctm_admin_calls", "server_notifier_upgrade", abi.encode(calls));
+        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(prepareStage0GovernanceCalls()));
+        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(prepareStage1GovernanceCalls()));
+        return vm.serializeBytes("governance_calls", "stage2_calls", abi.encode(prepareStage2GovernanceCalls()));
     }
 
     function _serializeChainUpgrades() internal returns (string memory chainUpgrades) {
@@ -705,15 +681,6 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
                 v34Input.currentChainCreationParamsEvent,
                 (address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32)
             );
-    }
-
-    function _stripSelector(bytes memory _calldata) internal pure returns (bytes memory body) {
-        require(_calldata.length >= 4, "v34: calldata too short");
-        body = new bytes(_calldata.length - 4);
-        uint256 bodyLength = body.length;
-        for (uint256 i = 0; i < bodyLength; ++i) {
-            body[i] = _calldata[i + 4];
-        }
     }
 }
 
