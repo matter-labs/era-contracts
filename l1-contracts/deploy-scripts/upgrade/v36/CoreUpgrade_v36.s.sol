@@ -17,7 +17,7 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 ///      anchor record), `ChainRegistrationSender` (suspension, the base token snapshot and its backfill) and
 ///      `L1AssetRouter` (its shared base). Against the v35 build at `2d08bda` the other six differ in their CBOR
 ///      metadata alone, because shared sources in their import closure (`Config.sol`, the error and interface files)
-///      changed. Recheck the list against the v35 release build before preparing.
+///      changed.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgrade_v36 is DefaultCoreUpgrade {
     /// @inheritdoc DefaultCoreUpgrade

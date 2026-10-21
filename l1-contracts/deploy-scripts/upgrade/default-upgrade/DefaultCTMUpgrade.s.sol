@@ -51,7 +51,12 @@ import {
     ProxyUpgradeTransitionManifest,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
-import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {
+    CTM_CONTRACT_COUNT,
+    CTMContract,
+    L2EcosystemContract
+} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 
 /// @notice The L2 side a version authors for its edge: the plan's authored input and the deployed
@@ -81,6 +86,10 @@ struct AuthoredL2Side {
 /// @dev Version scripts inherit and override; the v35 bootstrap edge deploys no transition and
 ///      declares every call of its one-time edge instead.
 contract DefaultCTMUpgrade is Script, DeployCTMScript {
+    /// @notice The composer of `L2DefaultUpgrade`'s arguments that {standardL2Side} pins, once
+    ///         {deployL2DelegateComposer} deployed it.
+    address public l2DelegateComposer;
+
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
 
@@ -579,6 +588,35 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function authorL2Side() internal virtual returns (AuthoredL2Side memory side) {
         // The zero value is the L1-only side: an empty plan and nothing to publish.
         return side;
+    }
+
+    /// @notice The standard L2 side, which a version opts into from {authorL2Side}: the delegate
+    ///         (`L2DefaultUpgrade`), the composer {deployL2DelegateComposer} deployed for it, and every
+    ///         bytecode the composed transaction needs published — the built-ins, the ZKsync OS
+    ///         baselines and the delegate.
+    function standardL2Side() internal returns (AuthoredL2Side memory side) {
+        require(l2DelegateComposer != address(0), "L2 delegate composer not deployed");
+        side.plan = AuthoredL2Plan({
+            delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade"),
+            extraBytecodeInfos: new bytes[](0),
+            delegateComposer: l2DelegateComposer
+        });
+        L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
+        delegateArtifact[0] = L2EcosystemContract.L2DefaultUpgrade;
+        side.factoryDependencies = CoreOnGatewayHelper.getFullListOfFactoryDependencies(delegateArtifact);
+    }
+
+    /// @notice Deploys the composer {standardL2Side} pins. A version authoring that side calls it
+    ///         before the L2 side is prepared.
+    function deployL2DelegateComposer() internal {
+        l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");
+    }
+
+    function getCreationCalldata(string memory _contractName) internal view virtual override returns (bytes memory) {
+        if (compareStrings(_contractName, "L2DefaultDelegateCalldataComposer")) {
+            return abi.encode();
+        }
+        return super.getCreationCalldata(_contractName);
     }
 
     /// @notice The authored L2 plan of this edge, factory dependencies published and pinned — what
