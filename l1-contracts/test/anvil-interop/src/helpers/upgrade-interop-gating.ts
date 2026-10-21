@@ -20,6 +20,7 @@ import { customError, expectRevert, randomBigNumber } from "./balance-helpers";
 import { encodeEvmChainAddress } from "./erc7930";
 import { getInteropProtocolFee, sendInteropMessage } from "./interop-helpers";
 import { depositETHToL2 } from "./l1-deposit-helper";
+import { installL1SloadMock, syncL1Reads } from "./l1-reads";
 
 /** An upgraded chain, with its L2. */
 export type GatedChain = { chainId: number; diamondProxy: string; provider: providers.JsonRpcProvider };
@@ -93,8 +94,8 @@ export async function depositBeforeUpgrade(_context: InteropGatingContext, _chai
 
 /**
  * After the upgrade: takes `_chain`, which registered `_peer` with {registerLegacyInteropPair}, and `_peer` through
- * {protocol-docs/interop-gating.md#order-per-chain}. The legacy pair stops sending, governance clears it, and once
- * both chains are enabled, each admin's consent opens its own direction.
+ * {protocol-docs/interop-gating.md#order-per-chain}. The chains read gating from L1 ({protocol-docs/l1sload.md}), so
+ * the legacy pair is inert, and once both chains are enabled, each admin's consent opens its own direction.
  * @param _lastPreUpgradeBlock The last L1 block before the core upgrade, up to which the backfill is computed.
  */
 export async function runInteropGatingProcedure(
@@ -103,9 +104,11 @@ export async function runInteropGatingProcedure(
   _chain: GatedChain,
   _peer: GatedChain
 ): Promise<void> {
-  await expectSendReverts(_chain, _peer, "DestinationChainNotAllowed(uint256)", "send over the legacy pair");
-  await deregisterInteropPair(_context, _chain, _peer);
-  await expectSendReverts(_chain, _peer, "DestinationChainNotRegistered(uint256)", "send over the cleared pair");
+  // The chains' state predates the mock precompile the harness serves L1 reads with (src/helpers/l1-reads.ts).
+  await installL1SloadMock(_chain.provider);
+  await installL1SloadMock(_peer.provider);
+  await syncGatedChains(_context, _chain, _peer);
+  await expectLegacyPairInert(_chain, _peer);
 
   await enableInterop(_context, _chain, _lastPreUpgradeBlock);
   await enableInterop(_context, _peer, _lastPreUpgradeBlock);
@@ -117,26 +120,32 @@ export async function runInteropGatingProcedure(
   await expectSend(_peer, _chain);
 }
 
-async function deregisterInteropPair(
-  _context: InteropGatingContext,
-  _chain: GatedChain,
-  _peer: GatedChain
-): Promise<void> {
-  const sender = new ethers.Contract(
-    _context.l1Addresses.chainRegistrationSender,
-    getAbi("ChainRegistrationSender"),
-    _context.l1Provider
-  );
-  const receipt = await asOwnerOf(_context, sender, (signer) =>
-    sender.connect(signer).deregisterInteropPairs(_chain.chainId, [_peer.chainId])
-  );
-  await relayPriorityRequestsToChain(receipt, _chain.diamondProxy, _chain.provider);
+/** Both chains import a new anchor and read L1 at it. */
+async function syncGatedChains(_context: InteropGatingContext, _chain: GatedChain, _peer: GatedChain): Promise<void> {
+  await syncL1Reads({
+    l1Provider: _context.l1Provider,
+    l1Addresses: _context.l1Addresses,
+    chainIds: [_chain.chainId, _peer.chainId],
+    l2Providers: new Map([
+      [_chain.chainId, _chain.provider],
+      [_peer.chainId, _peer.provider],
+    ]),
+  });
+}
 
+/**
+ * The legacy registration is still in `_chain`'s L2Bridgehub, but no gating reads it
+ * ({protocol-docs/interop-gating.md#legacy-registrations}): `_peer` has no snapshot on L1, so `_chain` can't send to it.
+ */
+async function expectLegacyPairInert(_chain: GatedChain, _peer: GatedChain): Promise<void> {
   const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), _chain.provider);
-  if ((await l2Bridgehub.baseTokenAssetId(_peer.chainId)) !== ethers.constants.HashZero) {
-    throw new Error(`Chain ${_peer.chainId} is still registered on the L2Bridgehub of chain ${_chain.chainId}`);
+  if ((await l2Bridgehub.baseTokenAssetId(_peer.chainId)) === ethers.constants.HashZero) {
+    throw new Error(`Chain ${_chain.chainId} lost the legacy registration of chain ${_peer.chainId}`);
   }
-  console.log(`   ✅ Chain ${_chain.chainId}: legacy pair with chain ${_peer.chainId} cleared`);
+  if ((await l2Bridgehub.interopBaseTokenAssetId(_peer.chainId)) !== ethers.constants.HashZero) {
+    throw new Error(`Chain ${_chain.chainId} reads chain ${_peer.chainId} as registered for interop`);
+  }
+  await expectSendReverts(_chain, _peer, "DestinationChainNotRegistered(uint256)", "send over the legacy pair");
 }
 
 async function enableInterop(
@@ -203,6 +212,20 @@ async function enableInterop(
       ]),
       l1Provider
     );
+  }
+  // `enableInterop` requires L1SLOAD, which the chain admin turns on ({protocol-docs/l1sload.md#chain-config-flag}).
+  const zkChain = new ethers.Contract(_chain.diamondProxy, getAbi("IZKChain"), l1Provider);
+  await expectRevert(
+    () => messageRoot.callStatic.enableInterop(_chain.chainId, false, { from: bridgehubOwner }),
+    `enable interop for chain ${_chain.chainId} before L1SLOAD is on`,
+    customError("L1MessageRoot", "L1SloadNotEnabled(uint256)", [_chain.chainId]),
+    l1Provider
+  );
+  await chainAdminMulticall(_context, _chain, _chain.diamondProxy, [
+    zkChain.interface.encodeFunctionData("setZKsyncOSL1SloadEnabled", [true]),
+  ]);
+  if (!(await zkChain.isZKsyncOSL1SloadEnabled())) {
+    throw new Error(`Chain ${_chain.chainId} did not turn L1SLOAD on`);
   }
   // The default upgrade keeps the chain's single-proof verifier, so the chain can't require a second proof system.
   // Governance enables it without the requirement, as it may for a chain it trusts for reasons checked offchain
@@ -295,10 +318,10 @@ async function allowInteropPeer(_context: InteropGatingContext, _chain: GatedCha
     getAbi("ChainRegistrationSender"),
     _context.l1Provider
   );
-  const receipt = await chainAdminMulticall(_context, _chain, sender.address, [
+  await chainAdminMulticall(_context, _chain, sender.address, [
     sender.interface.encodeFunctionData("allowInteropPeer", [_chain.chainId, _peer.chainId]),
   ]);
-  await relayPriorityRequestsToChain(receipt, _chain.diamondProxy, _chain.provider);
+  await syncGatedChains(_context, _chain, _peer);
 
   const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), _chain.provider);
   if (

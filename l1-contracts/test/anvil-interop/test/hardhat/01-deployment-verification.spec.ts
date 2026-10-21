@@ -128,11 +128,12 @@ describe("01 - Deployment Verification", function () {
     for (const chainConfig of l2ChainConfigs) {
       const interop = chainConfig.interop === true;
 
-      it(`chain ${chainConfig.chainId} (${chainConfig.role}) has ${interop ? "" : "not "}required its second proof system and enabled interop`, async () => {
+      it(`chain ${chainConfig.chainId} (${chainConfig.role}) has ${interop ? "" : "not "}required its second proof system and enabled L1SLOAD and interop`, async () => {
         const chainAddr = state.chainAddresses!.find((c) => c.chainId === chainConfig.chainId)!;
         const diamond = new Contract(chainAddr.diamondProxy, getAbi("IZKChain"), l1Provider);
         const messageRoot = new Contract(state.l1Addresses!.messageRoot, getAbi("L1MessageRoot"), l1Provider);
         expect(await diamond.isSecondProofSystemRequired()).to.equal(interop);
+        expect(await diamond.isZKsyncOSL1SloadEnabled()).to.equal(interop);
         expect(await messageRoot.isInteropEnabled(chainConfig.chainId)).to.equal(interop);
       });
 
@@ -154,18 +155,19 @@ describe("01 - Deployment Verification", function () {
             await sender.interopPeerAllowed(chainConfig.chainId, peerConfig.chainId),
             `interopPeerAllowed[${chainConfig.chainId}][${peerConfig.chainId}]`
           ).to.equal(allowed);
-          expect(
-            await l2Bridgehub.isPeerAllowed(peerConfig.chainId),
-            `isPeerAllowed(${peerConfig.chainId}) on chain ${chainConfig.chainId}`
-          ).to.equal(allowed);
-          // The L2Bridgehub of a chain without interop can know other chains for reasons unrelated to interop.
+          // A chain without interop has L1SLOAD off, so it reads nothing from L1
+          // ({protocol-docs/l1sload.md#chain-config-flag}).
           if (interop) {
+            expect(
+              await l2Bridgehub.isPeerAllowed(peerConfig.chainId),
+              `isPeerAllowed(${peerConfig.chainId}) on chain ${chainConfig.chainId}`
+            ).to.equal(allowed);
             const expectedAssetId = allowed
               ? await l1Bridgehub.baseTokenAssetId(peerConfig.chainId)
               : ethers.constants.HashZero;
             expect(
-              await l2Bridgehub.baseTokenAssetId(peerConfig.chainId),
-              `baseTokenAssetId(${peerConfig.chainId}) on chain ${chainConfig.chainId}`
+              await l2Bridgehub.interopBaseTokenAssetId(peerConfig.chainId),
+              `interopBaseTokenAssetId(${peerConfig.chainId}) on chain ${chainConfig.chainId}`
             ).to.equal(expectedAssetId);
           }
         }

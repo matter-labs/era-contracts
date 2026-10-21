@@ -621,20 +621,24 @@ export class DeploymentRunner {
   ): Promise<void> {
     console.log("\n=== Step 5: Enable Interop and Allow Peers ===\n");
 
-    const registrar = new InteropChainRegistrar(l1RpcUrl, l1Addresses);
     const interopChainIds = getInteropChainIds(chainConfigs);
     const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
+    const interopRpcUrls = new Map<number, string>();
+    for (const chainId of interopChainIds) {
+      const rpcUrl = l2RpcUrlsByChainId.get(chainId);
+      if (!rpcUrl) {
+        throw new Error(`L2 chain ${chainId} not found`);
+      }
+      interopRpcUrls.set(chainId, rpcUrl);
+    }
+    const registrar = new InteropChainRegistrar(l1RpcUrl, l1Addresses, interopRpcUrls);
     const diamondProxy = (chainId: number) => getChainDiamondProxy(chainAddresses, chainId);
 
     // Allowing a peer requires interop to be enabled on both chains, so every chain is enabled first.
     for (const chainId of interopChainIds) {
       await registrar.enableInterop(chainId, diamondProxy(chainId));
     }
-    for (const chainId of interopChainIds) {
-      const rpcUrl = l2RpcUrlsByChainId.get(chainId);
-      if (!rpcUrl) {
-        throw new Error(`L2 chain ${chainId} not found`);
-      }
+    for (const [chainId, rpcUrl] of interopRpcUrls) {
       const l2Provider = createProvider(rpcUrl);
       for (const peerChainId of interopChainIds.filter((id) => id !== chainId)) {
         await registrar.allowInteropPeer(chainId, peerChainId, diamondProxy(chainId), l2Provider);
