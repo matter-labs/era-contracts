@@ -7,7 +7,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DiamondAlreadyFrozen} from "contracts/common/L1ContractErrors.sol";
 
-contract freezeChainTest is ChainTypeManagerTest {
+contract FreezeChainTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
     }

@@ -19,11 +19,6 @@
             "internalType": "address"
           },
           {
-            "name": "isZKsyncOS",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
             "name": "rollupDAManager",
             "type": "address",
             "internalType": "address"

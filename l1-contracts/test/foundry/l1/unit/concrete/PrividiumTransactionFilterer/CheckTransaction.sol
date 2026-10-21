@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {PrividiumTransactionFiltererTest} from "./_PrividiumTransactionFilterer_Shared.t.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/PrividiumTransactionFilterer.sol";
+import {ITransactionFilterer} from "contracts/state-transition/chain-interfaces/ITransactionFilterer.sol";
 
 contract CheckTransactionTest is PrividiumTransactionFiltererTest {
     function test_DepositsAllowed() public {
@@ -26,24 +26,38 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         vm.prank(owner);
         transactionFiltererProxy.setDepositsAllowed(false);
 
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(sender, sender, 0, 1 ether, "", address(0));
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: sender,
+            contractL2: sender,
+            mintValue: 0,
+            l2Value: 1 ether,
+            l2Calldata: "",
+            refundRecipient: address(0)
+        });
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
     function test_TransactionAllowedBaseTokenDeposit() public view {
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(sender, sender, 0, 1 ether, "", address(0));
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: sender,
+            contractL2: sender,
+            mintValue: 0,
+            l2Value: 1 ether,
+            l2Calldata: "",
+            refundRecipient: address(0)
+        });
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
     function test_TransactionRejectedDepositNotToSelf() public {
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            sender,
-            makeAddr("random"),
-            0,
-            1 ether,
-            "",
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: sender,
+            contractL2: makeAddr("random"),
+            mintValue: 0,
+            l2Value: 1 ether,
+            l2Calldata: "",
+            refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
@@ -53,14 +67,14 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
             AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), depositData)
         );
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: assetRouter,
+            contractL2: L2_ASSET_ROUTER_ADDR,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalladata,
+            refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
@@ -70,27 +84,27 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
             AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), depositData)
         );
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: assetRouter,
+            contractL2: L2_ASSET_ROUTER_ADDR,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalladata,
+            refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
     function test_ArbitraryTransactionNotAllowed() public {
         bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            sender,
-            makeAddr("contract"),
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: sender,
+            contractL2: makeAddr("contract"),
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalladata,
+            refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 
@@ -98,14 +112,14 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
         bytes memory txCalladata = abi.encodeWithSelector(bytes4(0xdeadbeef), "0x12345");
         vm.prank(owner);
         transactionFiltererProxy.grantWhitelist(sender);
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            sender,
-            address(0),
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: sender,
+            contractL2: address(0),
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalladata,
+            refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertTrue(isTxAllowed, "Transaction should be allowed");
     }
 
@@ -114,14 +128,14 @@ contract CheckTransactionTest is PrividiumTransactionFiltererTest {
             AssetRouterBase.setAssetHandlerAddressThisChain,
             (bytes32("0x12345"), makeAddr("random"))
         );
-        bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
-            assetRouter,
-            L2_ASSET_ROUTER_ADDR,
-            0,
-            0,
-            txCalladata,
-            address(0)
-        ); // Other arguments do not make a difference for the test
+        bool isTxAllowed = ITransactionFilterer(address(transactionFiltererProxy)).isTransactionAllowed({
+            sender: assetRouter,
+            contractL2: L2_ASSET_ROUTER_ADDR,
+            mintValue: 0,
+            l2Value: 0,
+            l2Calldata: txCalladata,
+            refundRecipient: address(0)
+        }); // Other arguments do not make a difference for the test
         assertFalse(isTxAllowed, "Transaction should not be allowed");
     }
 }

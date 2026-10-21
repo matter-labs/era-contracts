@@ -1,16 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-// solhint-disable no-console, gas-custom-errors, reason-string
-
 import {Script, console2 as console} from "forge-std/Script.sol";
-
-import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams, MessageInclusionProof, L2Message} from "contracts/common/Messaging.sol";
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
 import {L1InteropHandler} from "contracts/interop/interop-handler/L1InteropHandler.sol";
-import {Utils} from "../utils/Utils.sol";
 import {
     AltL2ToL1Log,
     AltLog,
@@ -82,13 +77,13 @@ contract ZKSProvider is Script {
         // IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         // IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
-        ProofData memory proofData = messageRoot.getProofData(
-            params.chainId,
-            params.l2BatchNumber,
-            params.l2MessageIndex,
-            bytes32(0),
-            params.merkleProof
-        );
+        ProofData memory proofData = messageRoot.getProofData({
+            _chainId: params.chainId,
+            _batchNumber: params.l2BatchNumber,
+            _leafProofMask: params.l2MessageIndex,
+            _leaf: bytes32(0),
+            _proof: params.merkleProof
+        });
 
         // console.log("proofData");
         uint256 actualChainId = chainId;
@@ -127,7 +122,6 @@ contract ZKSProvider is Script {
         args[4] = "--json";
 
         bytes memory modifiedJsonBytes = vm.ffi(args);
-        string memory modifiedJson = vm.toString(modifiedJsonBytes);
         string memory json2 = string(modifiedJsonBytes);
         // console.log("Total batches executed", modifiedJson);
         // console.log("json2", json2);
@@ -206,7 +200,7 @@ contract ZKSProvider is Script {
         require(bytes(l2RpcUrl).length > 0, "L2 RPC URL not set");
 
         // Get withdrawal log and L2ToL1 log
-        (Log memory log, uint64 l1BatchTxId) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
+        (Log memory log, ) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
         (uint64 l2ToL1LogIndex, L2ToL1Log memory l2ToL1Log) = getWithdrawalL2ToL1Log(l2RpcUrl, withdrawalHash, index);
         if (l2ToL1Log.key == bytes32(0)) {
             return params;
@@ -256,11 +250,13 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
+        // solhint-disable quotes
         args[8] = string.concat(
             '{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["',
             vm.toString(txHash),
             '"],"id":1}'
         );
+        // solhint-enable quotes
 
         bytes memory result = vm.ffi(args);
 
@@ -281,6 +277,8 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
+        // solhint-disable quotes
+        // solhint-disable-next-line func-named-parameters
         args[8] = string.concat(
             '{"jsonrpc":"2.0","id":1,"method":"zks_getL2ToL1LogProof","params":["',
             vm.toString(txHash),
@@ -288,9 +286,11 @@ contract ZKSProvider is Script {
             vm.toString(logIndex),
             "]}"
         ); // todo later: add ,"proof_based_gw" for interop
+        // solhint-enable quotes
         // Execute RPC call
 
         bytes memory nullProofBytes = "0x7b226a736f6e727063223a22322e30222c226964223a312c22726573756c74223a6e756c6c7d";
+        // solhint-disable-next-line quotes
         string memory nullProofString2 = '{"jsonrpc":"2.0","id":1,"result":null}';
         bytes memory result = nullProofBytes;
         while (
@@ -309,7 +309,7 @@ contract ZKSProvider is Script {
         // This is a simplified implementation - you may need to enhance the parsing
         string memory responseStr = string(jsonResponse);
 
-        string memory modifiedJson = callParseAltLog(responseStr, "parse-transaction-receipt.sh");
+        callParseAltLog(responseStr, "parse-transaction-receipt.sh");
         string memory altTransactionReceiptJson = callParseAltLog(responseStr, "parse-alt-transaction-receipt.sh");
         // console.log(responseStr);
         // console.log(altTransactionReceiptJson);
@@ -415,8 +415,6 @@ contract ZKSProvider is Script {
 
         Log[] memory logs = new Log[](altLogs.length);
         for (uint256 i = 0; i < altLogs.length; i++) {
-            bool removed;
-            string memory trueString = "true";
             logs[i] = Log({
                 addr: address(uint160(altLogs[i].addr)),
                 // addr: address(0),
@@ -492,7 +490,7 @@ contract ZKSProvider is Script {
         }
     }
 
-    function getBashScriptPath(string memory scriptName) internal returns (string memory scriptPath) {
+    function getBashScriptPath(string memory scriptName) internal pure returns (string memory scriptPath) {
         scriptPath = string.concat("./deploy-scripts/provider/bash-scripts/", scriptName);
     }
 

@@ -1,6 +1,0 @@
-l2_shared_bridge_addr = "0x0000000000000000000000000000000000000000"
-l2_weth_token_proxy_addr = "0x0000000000000000000000000000000000000000"
-l2_weth_token_impl_addr = "0x0000000000000000000000000000000000000000"
-deploy_l2_bridge_counterpart_gas_limit = "10000000"
-required_l2_gas_price_per_pubdata = "800"
-gas_multiplier = "3"

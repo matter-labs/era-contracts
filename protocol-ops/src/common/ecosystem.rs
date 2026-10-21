@@ -4,9 +4,9 @@
 //!   look the bridgehub up in `upgrade-envs/permanent-values/<env>.toml`).
 //! - `--bridgehub <addr> --chain-id <u64>` for chain-targeted commands.
 //!
-//! When `--env` is passed, every other env-derived arg (CTM list, deployer,
-//! era chain id, output dir, …) is auto-filled from the env's permanent-values
-//! TOML + the release upgrade input TOML, unless an explicit CLI flag overrides.
+//! When `--env` is passed, each command fills the inputs it supports from the
+//! env's permanent-values TOML and, for version-scoped operations, the release
+//! upgrade input TOML. Explicit CLI flags override those defaults.
 
 use alloy::primitives::Address;
 use clap::Args;
@@ -28,6 +28,14 @@ pub struct EcosystemArgs {
     /// `--out`, etc.). Explicit flags still override.
     #[clap(long, help_heading = "Topology")]
     pub env: Option<String>,
+
+    /// Release upgrade-env directory (relative to `l1-contracts/`, e.g.
+    /// `upgrade-envs/v0.33.0-atomic-interop`) whose `<env>.toml` supplies the env's release values
+    /// (owner, era_chain_id, CREATE2 salts) and holds `output/<env>/`. Defaults to the current release's;
+    /// pass an older one to operate on a historical preparation.
+    #[clap(long, help_heading = "Topology", requires = "env")]
+    #[serde(default)]
+    pub upgrade_env_dir: Option<String>,
 }
 
 impl EcosystemArgs {
@@ -47,9 +55,10 @@ impl EcosystemArgs {
 
     /// Load the full env preset, if `--env` was passed.
     pub fn env_config(&self) -> anyhow::Result<Option<EnvConfig>> {
-        match self.env.as_deref() {
-            Some(env) => Ok(Some(EnvConfig::load(env)?)),
-            None => Ok(None),
+        match (self.env.as_deref(), self.upgrade_env_dir.as_deref()) {
+            (Some(env), Some(dir)) => Ok(Some(EnvConfig::load_from_upgrade_env_dir(env, dir)?)),
+            (Some(env), None) => Ok(Some(EnvConfig::load(env)?)),
+            (None, _) => Ok(None),
         }
     }
 }

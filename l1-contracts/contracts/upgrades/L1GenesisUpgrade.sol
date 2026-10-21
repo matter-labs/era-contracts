@@ -17,7 +17,7 @@ import {
     L2_FORCE_DEPLOYER_ADDR,
     L2_GENESIS_UPGRADE_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
-import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
+import {UPGRADE_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
@@ -56,13 +56,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 );
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (
-                        s.zksyncOS,
-                        _chainId,
-                        _l1CtmDeployerAddress,
-                        _fixedForceDeploymentsData,
-                        additionalForceDeploymentsData
-                    )
+                    (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -76,7 +70,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 txType: _getUpgradeTxType(),
                 from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
                 to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
-                gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+                gasLimit: UPGRADE_TX_MAX_GAS_LIMIT,
                 gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 maxFeePerGas: uint256(0),
                 maxPriorityFeePerGas: uint256(0),

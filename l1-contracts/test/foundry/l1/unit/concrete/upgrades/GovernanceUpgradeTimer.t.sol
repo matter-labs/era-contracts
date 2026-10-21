@@ -18,18 +18,18 @@ import {
 
 contract GovernanceUpgradeTimerTest is Test {
     // Instance of the contract under test
-    GovernanceUpgradeTimer timer;
+    GovernanceUpgradeTimer internal timer;
 
     // Addresses used in tests
-    address owner;
-    address newOwner;
-    address timerGovernance;
-    address nonAdmin;
-    address anotherAddress;
+    address internal owner;
+    address internal newOwner;
+    address internal timerGovernance;
+    address internal nonAdmin;
+    address internal anotherAddress;
 
     // Immutable parameters for the contract
-    uint256 initialDelay = 1000; // seconds
-    uint256 maxAdditionalDelay = 2000; // seconds
+    uint256 internal initialDelay = 1000; // seconds
+    uint256 internal maxAdditionalDelay = 2000; // seconds
 
     // Events from the GovernanceUpgradeTimer contract
     event TimerStarted(uint256 deadline, uint256 maxDeadline);
@@ -51,13 +51,13 @@ contract GovernanceUpgradeTimerTest is Test {
 
     /* ========== Deployment Tests ========== */
 
-    function testDeploymentSetsImmutableVariablesCorrectly() public {
+    function testDeploymentSetsImmutableVariablesCorrectly() public view {
         assertEq(timer.INITIAL_DELAY(), initialDelay, "INITIAL_DELAY should be set correctly");
         assertEq(timer.MAX_ADDITIONAL_DELAY(), maxAdditionalDelay, "MAX_ADDITIONAL_DELAY should be set correctly");
         assertEq(timer.TIMER_GOVERNANCE(), timerGovernance, "TIMER_GOVERNANCE should be set correctly");
     }
 
-    function testDeploymentSetsOwnerCorrectly() public {
+    function testDeploymentSetsOwnerCorrectly() public view {
         assertEq(timer.owner(), owner, "Owner should be set correctly");
     }
 

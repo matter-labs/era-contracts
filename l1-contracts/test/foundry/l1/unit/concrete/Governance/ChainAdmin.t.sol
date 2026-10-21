@@ -3,7 +3,6 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -44,19 +43,17 @@ contract ChainAdminTest is Test {
         dummyRestriction = new DummyRestriction(true);
     }
 
-    function test_getRestrictions() public {
+    function test_getRestrictions() public view {
         address[] memory restrictions = chainAdmin.getRestrictions();
         assertEq(restrictions[0], address(restriction));
     }
 
-    function test_isRestrictionActive() public {
+    function test_isRestrictionActive() public view {
         bool isActive = chainAdmin.isRestrictionActive(address(restriction));
         assertEq(isActive, true);
     }
 
     function test_addRestriction() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.expectEmit(true, false, false, true);
         emit IChainAdmin.RestrictionAdded(address(dummyRestriction));
 
@@ -81,8 +78,6 @@ contract ChainAdminTest is Test {
     }
 
     function test_addRestrictionZeroAddress() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.prank(address(chainAdmin));
         vm.expectRevert();
         chainAdmin.addRestriction(address(0));
@@ -98,8 +93,6 @@ contract ChainAdminTest is Test {
     }
 
     function test_removeRestriction() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(address(dummyRestriction));
 
@@ -111,8 +104,6 @@ contract ChainAdminTest is Test {
     }
 
     function test_removeRestrictionRevert() public {
-        address[] memory restrictions = chainAdmin.getRestrictions();
-
         vm.startPrank(address(chainAdmin));
         chainAdmin.addRestriction(address(dummyRestriction));
         chainAdmin.removeRestriction(address(dummyRestriction));
@@ -185,15 +176,15 @@ contract ChainAdminTest is Test {
     }
 
     function packSemver(
-        uint32 major,
-        uint32 minor,
-        uint32 patch,
+        uint32 _major,
+        uint32 _minor,
+        uint32 _patch,
         uint256 semverMinorVersionMultiplier
-    ) public returns (uint256) {
-        if (major != 0) {
+    ) public pure returns (uint256) {
+        if (_major != 0) {
             revert("Major version must be 0");
         }
 
-        return minor * semverMinorVersionMultiplier + patch;
+        return _minor * semverMinorVersionMultiplier + _patch;
     }
 }

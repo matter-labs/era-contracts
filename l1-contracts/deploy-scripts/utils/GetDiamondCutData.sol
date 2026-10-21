@@ -2,14 +2,13 @@
 pragma solidity ^0.8.10;
 
 import {Vm} from "forge-std/Vm.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 library GetDiamondCutData {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     error NoLogsFound(bytes32 selector);
@@ -48,7 +47,7 @@ library GetDiamondCutData {
         address ctm,
         uint256 protocolVersion
     ) external returns (Diamond.DiamondCutData memory diamondCutData) {
-        ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         uint256 blockWithData = chainTypeManager.upgradeCutDataBlock(protocolVersion);
         Vm.EthGetLogs[] memory logs = _fetchLogsFromBlock(
             blockWithData,
@@ -70,27 +69,6 @@ library GetDiamondCutData {
         diamondCutData = abi.decode(logEntry.data, (Diamond.DiamondCutData));
     }
 
-    /// @notice Fork-switch helper: select the gateway L2 fork, resolve the CTM
-    ///         registered for `ctmAssetId` on the gateway L2 bridgehub, read its
-    ///         diamond cut data via the same internal decoder used by
-    ///         `getDiamondCutAndForceDeployment`, then restore the previous fork.
-    /// @dev    Uses the `_internal` decoder (not the `external` entry point) so
-    ///         the library doesn't need to be deployed at a fixed address that
-    ///         survives the fork-switch — the internal helper is inlined into
-    ///         the calling contract's bytecode at compile time.
-    function readFromGateway(
-        string memory gatewayRpcUrl,
-        bytes32 ctmAssetId
-    ) external returns (bytes memory gatewayDiamondCutData) {
-        uint256 prevForkId = vm.activeFork();
-        vm.createSelectFork(gatewayRpcUrl);
-        address gatewayCtm = IBridgehubBase(L2_BRIDGEHUB_ADDR).ctmAssetIdToAddress(ctmAssetId);
-        require(gatewayCtm != address(0), "gateway CTM not registered for assetId on gateway L2");
-        require(gatewayCtm.code.length > 0, "gateway CTM has no code on gateway L2");
-        (gatewayDiamondCutData, ) = _getDiamondCutAndForceDeployment(gatewayCtm);
-        vm.selectFork(prevForkId);
-    }
-
     /// @notice Read chain creation params from the CTM via `eth_getLogs`.
     /// @param  ctm        Target CTM proxy.
     /// @param  skipLogs   When true, returns `("", "")` without touching
@@ -110,7 +88,7 @@ library GetDiamondCutData {
     function _getDiamondCutAndForceDeployment(
         address ctm
     ) internal returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
-        ChainTypeManagerBase chainTypeManager = ChainTypeManagerBase(ctm);
+        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
         uint256 protocolVersion = chainTypeManager.protocolVersion();
         uint256 blockWithData = chainTypeManager.newChainCreationParamsBlock(protocolVersion);
         Vm.EthGetLogs[] memory logs = _fetchLogsFromBlock(

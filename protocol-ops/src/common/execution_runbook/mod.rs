@@ -105,18 +105,13 @@ pub struct CheckFacts {
     pub replayed_after: Option<String>,
 }
 
-/// Names the env's permanent values give: the bridgehub, each CTM by flavor, and the legacy
+/// Names the env's permanent values give: the bridgehub, each CTM, and the legacy
 /// Governance and ChainAdmin contracts that own CTMs or proxy admins.
 pub fn env_names(env_cfg: &EnvConfig) -> BTreeMap<Address, String> {
     let mut names = BTreeMap::new();
     names.insert(env_cfg.bridgehub(), "Bridgehub".to_string());
     for ctm in env_cfg.ctms() {
-        let name = match ctm.is_zk_sync_os {
-            Some(true) => "ZKsync OS CTM",
-            Some(false) => "Era CTM",
-            None => "CTM",
-        };
-        names.insert(ctm.proxy, name.to_string());
+        names.insert(ctm.proxy, "ZKsync OS CTM".to_string());
     }
     for proxy in env_cfg.ownable_proxies() {
         let name = match proxy.kind {

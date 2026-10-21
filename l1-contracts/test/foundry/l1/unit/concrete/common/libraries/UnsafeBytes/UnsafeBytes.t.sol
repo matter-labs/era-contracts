@@ -19,11 +19,10 @@ contract UnsafeBytesTestTest is Test {
 
     function setUp() public {
         unsafeBytesTest = new UnsafeBytesTest();
-        // solhint-disable-next-line func-named-parameters
         bytesData = abi.encodePacked(addr0, addr1, u256, u321, u322, addr2, b32, addr3);
     }
 
-    function test() public {
+    function test() public view {
         (address a0, uint256 o0) = unsafeBytesTest.readAddress(bytesData, 0);
         assertEq(a0, addr0, "addr0 should be first address");
         assertEq(o0, 20, "offset should be 20");

@@ -1,16 +1,9 @@
 //! Ecosystem-level commands.
 //!
 //! The upgrade flow runs as Phase 1 (`UpgradePrepareAll`) → Phase 2
-//! (`UpgradeGovernance`) → Phase 3 (`Stage3`) → Phase 4 (per-chain
-//! `Admin.upgradeChainFromVersion` in [`crate::commands::chain::upgrade`]). ZKsync OS chains
-//! additionally need [`crate::commands::chain::record_priority_op_lower_bound`] to have landed
-//! before the per-chain cuts.
+//! (`UpgradeGovernance`) → Phase 3 (per-chain `Admin.upgradeChainFromVersion` in
+//! [`crate::commands::chain::upgrade`]).
 //! Each `EcosystemCommands` variant carries the per-phase doc.
-//!
-//! Pre-flight (chains migrate off legacy GW back to L1) and the new GW
-//! chain bring-up (`chain init` + `chain gateway convert`) are intentionally
-//! kept outside this module — they're per-chain operations that don't share
-//! the env-permanent shape.
 
 use clap::Subcommand;
 
@@ -19,7 +12,6 @@ use crate::{
     commands::ecosystem::bundle::{RehearseUpgradeArgs, ReplayBundleArgs, VerifyBundleArgs},
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
-    commands::ecosystem::stage3::Stage3Args,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
     commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
@@ -27,9 +19,7 @@ use crate::{
 pub mod broadcast;
 pub mod bundle;
 pub mod init;
-pub mod new_gateway_prepare;
 pub mod simulator;
-pub mod stage3;
 pub mod upgrade;
 pub mod upgrade_full;
 pub mod upgrade_inner;
@@ -44,14 +34,14 @@ pub enum EcosystemCommands {
     /// Phase 1 of the ecosystem upgrade: deploys all new ecosystem contracts
     /// (core + per-CTM impls + new zk-governance set) on
     /// a single anvil fork, emits operational admin bundles for CTM-owned
-    /// surfaces, and writes the merged `<out>/prepare/governance.toml` for
+    /// surfaces, and writes the merged `<env-out>/ecosystem.toml` for
     /// Phase 2 to replay.
     #[command(name = "upgrade-prepare-all")]
     UpgradePrepareAll(UpgradePrepareAllArgs),
     /// Phase 2 of the ecosystem upgrade: replays governance stages 0+1+2 on
     /// a single anvil fork (governance owner signs). Emits one Safe bundle
     /// containing all three governance calls. Auto-discovers
-    /// `<env>/prepare/governance.toml` when `--env` is set, or pass
+    /// `<env-out>/ecosystem.toml` when `--env` is set, or pass
     /// `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
@@ -74,10 +64,6 @@ pub enum EcosystemCommands {
     ReplayBundle(ReplayBundleArgs),
     /// Check a deploy bundle's files against the digests in its `bundle-metadata.json`.
     VerifyBundle(VerifyBundleArgs),
-    /// Phase 3 of the ecosystem upgrade: populate `L1NativeTokenVault.bridgedOut` via the core
-    /// upgrade script's `stage3(bridgehub)`. Runs after governance and *before* the per-chain
-    /// diamond cuts, so withdrawals unblock as soon as each cut lands.
-    Stage3(Stage3Args),
     /// Print a starter `--ctm-config` TOML by enumerating every CTM
     /// registered on the supplied bridgehub. Use this on stage / mainnet to
     /// discover the Atlas CTM address without having to look it up by hand.
@@ -106,7 +92,6 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::RehearseUpgrade(args) => bundle::run_rehearse_upgrade(args).await,
         EcosystemCommands::ReplayBundle(args) => bundle::run_replay_bundle(args).await,
         EcosystemCommands::VerifyBundle(args) => bundle::run_verify_bundle(args),
-        EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
     }

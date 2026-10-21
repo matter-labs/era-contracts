@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.20;
+
+// 0xf801b069
+error L1MessengerHookFailed();
+// 0x497087ab
+error NotEnoughGasSupplied();
+// 0xec7cdc0a
+error NotSelfCall();
+// 0x058f5efe
+error SetBytecodeOnAddressHookFailed();

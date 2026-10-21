@@ -7,8 +7,8 @@ import {BridgeHelperTest} from "contracts/dev-contracts/test/BridgeHelperTest.so
 import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 
 contract GetERC20GettersTest is Test {
-    BridgeHelperTest helper;
-    RevertFallback bad;
+    BridgeHelperTest internal helper;
+    RevertFallback internal bad;
 
     function setUp() public {
         helper = new BridgeHelperTest();

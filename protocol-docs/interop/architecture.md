@@ -254,3 +254,9 @@ ecosystem with that handler onto v33, check that:
 - every chain's `Bridgehub.settlementLayer` is L1 (PUVT checks this too);
 - no chain's `L2_INTEROP_HANDLER_ADDR` has emitted `BundleVerified`, `BundleExecuted`, `BundleUnbundled`
   or `CallProcessed`.
+
+Mainnet's v31 handler also leaves its L1 chain id in slot 101. Nothing reads it, but it would surface again
+if the handler's storage ever grew past slot 100, so `L2InteropHandler.updateL2`, which every non-genesis L2
+upgrade from v34 on calls, zeroes it. The v31 status mappings are not cleared: that would need their keys,
+and the checks above establish that they are empty. Stage's and testnet's v31 handler keeps its L1 chain id
+in slot 0, which stays reserved as `__DEPRECATED_L1_CHAIN_ID`.

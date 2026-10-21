@@ -39,11 +39,8 @@
 **/report
 **/broadcast
 
-# Local foundry-zksync install — the container uses the version installed
+# Local foundry install — the container uses the version installed
 # from Dockerfile.base, not the host's copy.
-foundry-zksync
-l1-contracts/foundry-zksync
-
 # Local Python venv used for tooling; never referenced from the build.
 venv
 

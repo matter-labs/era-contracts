@@ -83,11 +83,6 @@ on:
         required: false
         default: false
         type: boolean
-      zksync_foundry_version:
-        description: "foundry-zksync version (forge --zksync), used for the verify build"
-        required: false
-        default: "v0.1.5"
-        type: string
 
 permissions:
   contents: read
@@ -198,15 +193,7 @@ jobs:
           submodules: true
 
       - name: Install Foundry (cast + forge for verify)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
-
-      - name: Install foundry-zksync (for the verify build)
-        if: ${{ inputs.run_verify }}
-        uses: ./.github/actions/install-zksync-foundry
-        with:
-          version: ${{ inputs.zksync_foundry_version }}
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4

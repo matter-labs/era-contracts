@@ -361,7 +361,8 @@ export async function relayTx(
         gasLimit: 30_000_000,
         ...(value && !value.isZero() ? { value } : {}),
       });
-      const receipt = await tx.wait();
+      // Avoid ethers' replacement-detection poller, which can outlive the receipt and race RPC shutdown.
+      const receipt = await provider.waitForTransaction(tx.hash, 1);
       return { txHash: receipt.transactionHash, success: receipt.status === 1, receipt };
     });
   } catch (error) {

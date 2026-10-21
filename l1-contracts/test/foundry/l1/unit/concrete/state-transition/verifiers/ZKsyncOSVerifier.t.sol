@@ -72,9 +72,19 @@ contract ZKsyncOSVerifierTest is Test {
         new ZKsyncOSTestnetVerifier(IVerifier(address(plonkVerifier)));
     }
 
+    // ============ isTestnetVerifier Tests ============
+
+    function test_isTestnetVerifier_falseOnProductionVerifier() public view {
+        assertFalse(verifier.isTestnetVerifier());
+    }
+
+    function test_isTestnetVerifier_trueOnTestnetVerifier() public view {
+        assertTrue(testnetVerifier.isTestnetVerifier());
+    }
+
     // ============ verify Tests ============
 
-    function test_verify_routesToPlonkVerifier() public view {
+    function test_verify_routesToPlonkVerifier() public {
         uint256[] memory publicInputs = new uint256[](2);
         publicInputs[0] = 123;
         publicInputs[1] = 456;
@@ -86,8 +96,34 @@ contract ZKsyncOSVerifierTest is Test {
         proof[2] = 789;
         proof[3] = 101112;
 
+        uint256[] memory plonkInputs = new uint256[](1);
+        plonkInputs[0] = verifier.computeZKsyncOSHash(0, publicInputs);
+        uint256[] memory plonkProof = new uint256[](2);
+        plonkProof[0] = 789;
+        plonkProof[1] = 101112;
+
+        vm.expectCall(address(plonkVerifier), abi.encodeCall(IVerifier.verify, (plonkInputs, plonkProof)), 1);
         bool result = verifier.verify(publicInputs, proof);
         assertTrue(result);
+    }
+
+    /// @dev The PLONK verifier receives every word after the two metadata
+    ///      words, including none when the proof is metadata only.
+    function testFuzz_verify_forwardsProofWithoutMetadata(uint256[] memory _plonkProof) public {
+        uint256[] memory publicInputs = new uint256[](1);
+        publicInputs[0] = 123;
+
+        uint256[] memory proof = new uint256[](ZKSYNC_OS_PROOF_METADATA_LENGTH + _plonkProof.length);
+        proof[0] = ZKSYNC_OS_PLONK_VERIFICATION_TYPE;
+        for (uint256 i = 0; i < _plonkProof.length; ++i) {
+            proof[ZKSYNC_OS_PROOF_METADATA_LENGTH + i] = _plonkProof[i];
+        }
+
+        uint256[] memory plonkInputs = new uint256[](1);
+        plonkInputs[0] = verifier.computeZKsyncOSHash(0, publicInputs);
+
+        vm.expectCall(address(plonkVerifier), abi.encodeCall(IVerifier.verify, (plonkInputs, _plonkProof)), 1);
+        assertTrue(verifier.verify(publicInputs, proof));
     }
 
     function test_verify_revertsOnEmptyProof() public {

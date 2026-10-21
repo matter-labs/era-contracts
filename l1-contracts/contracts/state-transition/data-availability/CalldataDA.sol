@@ -11,7 +11,7 @@ import {
     PubdataInputTooSmall,
     PubdataLengthTooBig
 } from "../L1StateTransitionErrors.sol";
-import {BLOB_SIZE_BYTES} from "system-contracts/contracts/Constants.sol";
+import {BLOB_SIZE_BYTES} from "../../common/Config.sol";
 
 /// @dev The state diff hash, hash of pubdata + the number of blobs.
 uint256 constant BLOB_DATA_OFFSET = 65;

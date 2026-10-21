@@ -23,8 +23,6 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * See {protocol-docs/bridging.md#base-token-handling}.
  * @dev Initialized with 2^127 - 1 tokens. No balance can overflow (users only gain what the holder
  * loses); the operator must keep the base token's total supply below 2^127 to avoid underflow.
- * @dev On Era every ETH transfer routes through MsgValueSimulator (which emits Transfer events), so the
- * same implementation behaves consistently on Era and ZK OS.
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {

@@ -67,11 +67,6 @@ on:
         required: false
         type: boolean
         default: false
-      skip_priority_txs:
-        description: "Skip L2 deployments via priority transactions"
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -117,7 +112,6 @@ jobs:
             --base-token-addr     "${{ inputs.base_token_addr }}" \
             --base-token-price-ratio "${{ inputs.base_token_price_ratio }}" \
             --pause-deposits      "${{ inputs.pause_deposits }}" \
-            --skip-priority-txs   "${{ inputs.skip_priority_txs }}" \
             --out /contracts/work/session/safe
 
       - name: Upload Safe bundles

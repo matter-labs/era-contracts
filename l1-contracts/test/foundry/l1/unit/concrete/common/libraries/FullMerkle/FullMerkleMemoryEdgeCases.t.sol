@@ -8,7 +8,7 @@ import {FullMerkleTest as FullMerkleTestContract} from "contracts/dev-contracts/
 contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
 
-    /// @dev Test createTree() with zero max leaf number (should revert)
+    /// @dev Test createTree() with ZERO max leaf number (should revert)
     function test_createTreeZeroMaxLeaf() public {
         FullMerkleMemory.FullTree memory memoryTree;
 
@@ -17,7 +17,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test tree expansion when reaching power of 2 boundary (pushNewLeaf edge case)
-    function test_pushNewLeafTreeExpansion() public {
+    function test_pushNewLeafTreeExpansion() public pure {
         // Create tree with capacity for exactly 4 leaves (height 2)
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
@@ -39,11 +39,11 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
 
         // Verify we can get a valid root
         bytes32 root = memoryTree.root();
-        assertTrue(root != bytes32(0), "Root should be non-zero after expansion");
+        assertTrue(root != bytes32(0), "Root should be non-ZERO after expansion");
     }
 
     /// @dev Test node array initialization on first access (line 114)
-    function test_nodeArrayInitialization() public {
+    function test_nodeArrayInitialization() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
         // Push elements to trigger node creation at different levels
@@ -61,7 +61,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test updateLeaf() with various edge cases
-    function test_updateLeafEdgeCases() public {
+    function test_updateLeafEdgeCases() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(16);
 
         // Add several leaves
@@ -88,7 +88,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test updateAllLeaves() functionality
-    function test_updateAllLeaves() public {
+    function test_updateAllLeaves() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
         // Add initial leaves
@@ -117,7 +117,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test updateAllNodesAtHeight() edge cases
-    function test_updateAllNodesAtHeight() public {
+    function test_updateAllNodesAtHeight() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(16);
 
         // Build tree with several leaves
@@ -140,7 +140,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test tree behavior with single element
-    function test_singleElementTree() public {
+    function test_singleElementTree() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(1);
 
         bytes32 leafValue = keccak256("single");
@@ -152,23 +152,23 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
         assertEq(memoryTree._height, 0);
     }
 
-    /// @dev Test zero value handling in calculations
-    function test_zeroValueHandling() public {
+    /// @dev Test ZERO value handling in calculations
+    function test_zeroValueHandling() public pure {
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(8);
 
-        // Push some zero values
+        // Push some ZERO values
         memoryTree.pushNewLeaf(bytes32(0));
-        memoryTree.pushNewLeaf(zeroHash);
+        memoryTree.pushNewLeaf(ZERO_HASH);
         memoryTree.pushNewLeaf(bytes32(uint256(1)));
 
         // Should handle zeros properly without errors
         bytes32 root1 = memoryTree.root();
-        assertTrue(root1 != bytes32(0), "Root should be non-zero even with zero leaves");
+        assertTrue(root1 != bytes32(0), "Root should be non-ZERO even with ZERO leaves");
 
-        // Update with zero value
+        // Update with ZERO value
         memoryTree.updateLeaf(2, bytes32(0));
         bytes32 root2 = memoryTree.root();
-        assertTrue(root1 != root2, "Root should change when updating to zero");
+        assertTrue(root1 != root2, "Root should change when updating to ZERO");
     }
 
     /// @dev Test memory tree vs storage tree equivalence for edge cases
@@ -183,7 +183,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
 
         for (uint256 s = 0; s < testSizes.length; s++) {
             // Reset storage tree
-            merkleTest = new FullMerkleTestContract(zeroHash);
+            merkleTest = new FullMerkleTestContract(ZERO_HASH);
             FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(testSizes[s]);
 
             // Add same elements to both
@@ -200,7 +200,7 @@ contract FullMerkleMemoryEdgeCasesTest is FullMerkleTest {
     }
 
     /// @dev Test large tree operations for gas and correctness
-    function test_largeTreeOperations() public {
+    function test_largeTreeOperations() public pure {
         uint256 treeSize = 63; // Large non-power-of-2 number
         FullMerkleMemory.FullTree memory memoryTree = _setupMemoryTree(treeSize);
 

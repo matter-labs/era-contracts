@@ -231,7 +231,7 @@ export class GatewaySetup {
 
   /**
    * Install the test-only (migration-enabled) chain asset handlers used by the Gateway migration
-   * fixture; production v32 handlers reject bridgeBurn/bridgeMint. The production implementations
+   * fixture; production v33 handlers reject bridgeBurn/bridgeMint. The production implementations
    * stay in place through Gateway deployment and registration — only the handlers that participate
    * in Step 7 are swapped.
    */

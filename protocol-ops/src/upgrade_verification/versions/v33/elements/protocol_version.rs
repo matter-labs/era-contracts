@@ -1,7 +1,7 @@
 use alloy::primitives::U256;
 use std::{fmt, str::FromStr};
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, serde::Deserialize)]
 pub struct ProtocolVersion {
     pub major: u64,
     pub minor: u64,

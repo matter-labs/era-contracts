@@ -38,9 +38,9 @@ interface ISafeMsg {
 contract EmergencyStageUpgradeCalldata is Script {
     using stdToml for string;
 
-    IProtocolUpgradeHandler constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
-    string constant TOML = "upgrade-envs/v0.33.0-atomic-interop/output/stage/ecosystem.toml";
-    bytes32 constant SALT = bytes32(0);
+    IProtocolUpgradeHandler internal constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
+    string internal constant TOML = "upgrade-envs/v0.33.0-atomic-interop/output/stage/ecosystem.toml";
+    bytes32 internal constant SALT = bytes32(0);
 
     function runStage0() external view {
         _emit(0);
@@ -75,22 +75,22 @@ contract EmergencyStageUpgradeCalldata is Script {
         console2.log("");
         console2.log("---- STEP 1: approveHash txs (send each from the owner EOA) ----");
 
-        (address[] memory gMembers, bytes[] memory gSigs) = _approveSet(
-            owner,
-            board.GUARDIANS(),
-            dom,
-            EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
-            id,
-            "GUARDIANS"
-        );
-        (address[] memory scMembers, bytes[] memory scSigs) = _approveSet(
-            owner,
-            board.SECURITY_COUNCIL(),
-            dom,
-            EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
-            id,
-            "SECURITY_COUNCIL"
-        );
+        (address[] memory gMembers, bytes[] memory gSigs) = _approveSet({
+            _owner: owner,
+            _multisig: board.GUARDIANS(),
+            _dom: dom,
+            _typehash: EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
+            _id: id,
+            _label: "GUARDIANS"
+        });
+        (address[] memory scMembers, bytes[] memory scSigs) = _approveSet({
+            _owner: owner,
+            _multisig: board.SECURITY_COUNCIL(),
+            _dom: dom,
+            _typehash: EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
+            _id: id,
+            _label: "SECURITY_COUNCIL"
+        });
         bytes memory zkSig = _approveZk(owner, board.ZK_FOUNDATION_SAFE(), dom, id);
 
         bytes memory execData = abi.encodeCall(

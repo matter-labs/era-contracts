@@ -11,9 +11,9 @@ contract DummyInteropRecipient is IERC7786Recipient {
     receive() external payable {}
 
     function receiveMessage(
-        bytes32 receiveId, // Unique identifier
-        bytes calldata sender, // ERC-7930 address
-        bytes calldata payload
+        bytes32, // Unique identifier
+        bytes calldata, // ERC-7930 address
+        bytes calldata
     ) external payable returns (bytes4) {
         return IERC7786Recipient.receiveMessage.selector;
     }

@@ -5,8 +5,9 @@ description: >
   (the verifier) so the two can never drift apart. Expects the repository (with submodules) to
   already be checked out.
 
-  The committed snapshots must be byte-for-byte reproducible, which pins three choices: plain
-  upstream Foundry (no foundry-zksync), the anvil-interop profile (cbor_metadata=false,
+  The committed snapshots must be byte-for-byte reproducible, which pins three choices: the
+  Foundry version from .github/foundry-versions.env (never a second, local pin — that drift is
+  what silently invalidates the snapshots), the anvil-interop profile (cbor_metadata=false,
   bytecode_hash=none — path- and environment-independent bytecode), and no warm-solc-cache —
   workflows that generate or verify committed snapshots build from scratch, per the trust model
   in warm-solc-cache/action.yaml.
@@ -14,10 +15,8 @@ description: >
 runs:
   using: composite
   steps:
-    - name: Install Foundry (no foundry-zksync — deterministic bytecode)
-      uses: foundry-rs/foundry-toolchain@v1
-      with:
-        version: v1.5.1
+    - name: Install Anvil toolchain (deterministic bytecode)
+      uses: ./.github/actions/install-foundry
 
     - name: Use Node.js
       uses: actions/setup-node@v4

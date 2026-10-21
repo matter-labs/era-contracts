@@ -218,9 +218,6 @@ async fn find_representative_chain_diamond(
 
     let expected_protocol = U256::from(ctm.contracts_config.old_protocol_version);
 
-    // Era CTMs would have preferred chain `era_chain_id` as the
-    // representative here; v33 has no Era flavor, so the scan below is the
-    // only path.
     let chain_ids = match verifiers
         .network_verifier
         .try_get_all_zk_chain_ids(verifiers.bridgehub_address)

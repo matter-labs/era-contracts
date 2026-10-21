@@ -50,7 +50,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
      */
     uint256[48] private __gap;
 
-    function _bridgehub() internal view virtual returns (IBridgehubBase);
+    function _getBridgehub() internal view virtual returns (IBridgehubBase);
 
     /// @notice Sets the asset handler address for a specified asset ID on this chain.
     /// @dev The caller is encoded into the asset ID, so only the NTV or the asset's registered deployment
@@ -147,7 +147,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         bytes1 encodingVersion = _data[0];
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
-        require(_bridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
+        require(_getBridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -196,7 +196,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
     /// @notice The interop handler on this chain that is allowed to deliver interop calls to this router.
     /// @dev On L2 this is the `L2InteropHandler` system contract; on L1 the configured `L1InteropHandler`.
-    function _interopHandler() internal view virtual returns (address);
+    function _getInteropHandler() internal view virtual returns (address);
 
     /// @notice Validates that the interop message sender is the asset-router counterpart on the source chain.
     /// @dev On L2, only this same router (identical address on every ZK chain) may be the sender and the source
@@ -215,7 +215,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         bytes calldata sender,
         bytes calldata payload
     ) external payable override returns (bytes4) {
-        require(msg.sender == _interopHandler(), Unauthorized(msg.sender));
+        require(msg.sender == _getInteropHandler(), Unauthorized(msg.sender));
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
         require(_isValidInteropSender(senderChainId, senderAddress), Unauthorized(senderAddress));

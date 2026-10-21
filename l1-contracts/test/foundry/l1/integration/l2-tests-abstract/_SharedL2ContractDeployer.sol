@@ -2,25 +2,18 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
-import "forge-std/console.sol";
-
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_ROUTER,
     L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
@@ -30,7 +23,7 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, PRIORITY_TX_MAX_GAS_LIMIT, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
@@ -59,7 +52,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
@@ -73,12 +66,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     BridgedStandardERC20 internal standardErc20Impl;
 
     UpgradeableBeacon internal beacon;
-    BeaconProxy internal proxy;
 
-    IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
-    IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
-    InteropCenter l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
-    IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+    IL2AssetRouter internal l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
+    IL2Bridgehub internal l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
+    InteropCenter internal l2InteropCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+    IL2NativeTokenVault internal l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
@@ -106,10 +98,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
     IChainTypeManager internal chainTypeManager;
 
-    address UNBUNDLER_ADDRESS;
-    address EXECUTION_ADDRESS;
-    address interopTargetContract;
-    uint256 originalChainId;
+    address internal UNBUNDLER_ADDRESS;
+    address internal EXECUTION_ADDRESS;
+    address internal interopTargetContract;
+    uint256 internal originalChainId;
 
     function setUp() public virtual {
         setUpInner(false);
@@ -148,13 +140,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         // the governor, so this only affects the L2-context (which uses this test beacon).
         beacon.transferOwnership(ownerWallet);
 
-        // One of the purposes of deploying it here is to publish its bytecode
-        BeaconProxy beaconProxy = new BeaconProxy(address(beacon), new bytes(0));
-        proxy = beaconProxy;
-        bytes32 beaconProxyBytecodeHash;
-        assembly {
-            beaconProxyBytecodeHash := extcodehash(beaconProxy)
-        }
         UNBUNDLER_ADDRESS = makeAddr("unbundlerAddress");
         EXECUTION_ADDRESS = makeAddr("executionAddress");
 
@@ -165,7 +150,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
 
-        L2WrappedBaseToken weth = deployL2Weth();
+        L2WrappedBaseToken l2WethToken = deployL2Weth();
         if (_skip) {
             vm.stopBroadcast();
         }
@@ -177,12 +162,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 gatewayChainId: GATEWAY_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
                 l2TokenBeacon: address(beacon),
-                l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
                 l1CtmDeployer: l1CTMDeployer,
                 maxNumberOfZKChains: 100,
-                wethToken: address(weth)
+                wethToken: address(l2WethToken)
             })
         );
         if (!_skip) {
@@ -213,14 +197,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         l2Bridgehub.registerChainForInterop(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
         vm.stopPrank();
 
-        vm.mockCall(
-            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
-            abi.encode(bytes(""))
-        );
-
         // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls
-        // The mint mock doesn't actually give ETH, so we need to fund it manually
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);
 
         // Mock currentSettlementLayerChainId for gateway mode check in L2InteropHandler
@@ -254,7 +231,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
     }
 
-    function getExampleChainCommitment() internal returns (bytes memory) {
+    function getExampleChainCommitment() internal {
         address chainAdmin = makeAddr("chainAdmin");
 
         vm.mockCall(
@@ -305,7 +282,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 mintValue: 1 ether,
                 l2Value: 10,
                 l2Calldata: hex"",
-                l2GasLimit: 72_000_000,
+                l2GasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
                 l2GasPerPubdataByteLimit: 800,
                 factoryDeps: deps,
                 refundRecipient: address(0)
@@ -403,7 +380,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     function getInclusionProof(
         address messageSender,
         uint256 _chainId
-    ) public view returns (MessageInclusionProof memory) {
+    ) public pure returns (MessageInclusionProof memory) {
         bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);

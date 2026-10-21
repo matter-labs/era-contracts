@@ -6,15 +6,13 @@ use alloy::sol;
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 use std::collections::HashMap;
-use Bridgehub::requestL2TransactionDirectCall;
 
 use crate::common::logger;
 
 use super::bytecode_verifier::BytecodeVerifier;
-use super::{compute_create2_address_evm, compute_create2_address_zk};
+use super::compute_create2_address_evm;
 use crate::upgrade_verification::constants::{
-    EIP1967_IMPLEMENTATION_SLOT, EIP1967_PROXY_ADMIN_SLOT, L2_CREATE2_FACTORY_ADDR,
-    ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
+    EIP1967_IMPLEMENTATION_SLOT, EIP1967_PROXY_ADMIN_SLOT,
 };
 
 /// Lookups per transactions-log entry (its tx, then its receipt) before it
@@ -56,19 +54,6 @@ fn unfetched_finding(unfetched: &[(TxHash, String)], strict: bool) -> Option<(bo
 }
 
 sol! {
-    #[derive(Debug)]
-    struct L2TransactionRequestDirect {
-        uint256 chainId;
-        uint256 mintValue;
-        address l2Contract;
-        uint256 l2Value;
-        bytes l2Calldata;
-        uint256 l2GasLimit;
-        uint256 l2GasPerPubdataByteLimit;
-        bytes[] factoryDeps;
-        address refundRecipient;
-    }
-
     #[sol(rpc)]
     contract Bridgehub {
         address public sharedBridge;
@@ -84,9 +69,6 @@ sol! {
         function chainAssetHandler() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);
         function baseToken(uint256 _chainId) external view returns (address);
-        function requestL2TransactionDirect(
-            L2TransactionRequestDirect calldata _request
-        ) external payable returns (bytes32 canonicalTxHash);
     }
 
     #[sol(rpc)]
@@ -94,7 +76,6 @@ sol! {
         function legacyBridge() public view returns (address);
         function L1_WETH_TOKEN() public view returns (address);
         function L1_NULLIFIER() public view returns (address);
-        function ERA_CHAIN_ID() public view returns (uint256);
 
         function nativeTokenVault() public view returns (address);
     }
@@ -109,7 +90,6 @@ sol! {
         function getHyperchain(uint256 _chainId) public view returns (address);
         address public validatorTimelockPostV29;
         function protocolVersion() external view returns (uint256);
-        function isZKsyncOS() external view returns (bool);
         function owner() external view returns (address);
         function PERMISSIONLESS_VALIDATOR() external view returns (address);
         function serverNotifierAddress() external view returns (address);
@@ -118,11 +98,6 @@ sol! {
     #[sol(rpc)]
     contract ZKChain {
         function getProtocolVersion() external view returns (uint256);
-    }
-
-    #[sol(rpc)]
-    contract ZKChainFeeParams {
-        function getPriorityTxMaxGasLimit() external view returns (uint256);
     }
 
     /// Minimal `Ownable` view — usable against any contract that exposes a
@@ -162,7 +137,6 @@ sol! {
 
 pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
-    pub era_chain_id: u64,
     pub l1_chain_id: u64,
 
     // todo: maybe merge into one struct.
@@ -178,15 +152,15 @@ struct ParsedCreate2Deployment {
 }
 
 impl NetworkVerifier {
-    pub async fn new_v33(l1_rpc: String, era_chain_id: u64) -> anyhow::Result<Self> {
+    pub async fn new_v33(l1_rpc: String) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
         let l1_chain_id = l1_provider
             .get_chain_id()
             .await
             .context("failed to fetch L1 chain id")?;
+
         Ok(Self {
             l1_provider,
-            era_chain_id,
             l1_chain_id,
             create2_constructor_params: HashMap::new(),
             create2_known_bytecodes: HashMap::new(),
@@ -230,7 +204,6 @@ impl NetworkVerifier {
         &mut self,
         tx_hashes: &[FixedBytes<32>],
         create2_factory: &Address,
-        bridgehub_addr: &Address,
         expected_salts: &[FixedBytes<32>],
         enforce_salts: bool,
         strict_fetch: bool,
@@ -239,7 +212,6 @@ impl NetworkVerifier {
     ) {
         let mut unfetched: Vec<(TxHash, String)> = Vec::new();
         let mut reverted = 0_usize;
-        let mut parsed_gateway_deployments = 0_usize;
 
         for tx_hash in tx_hashes {
             let hash = TxHash::from(*tx_hash);
@@ -257,19 +229,12 @@ impl NetworkVerifier {
                 continue;
             };
 
-            let deployment = if to == *create2_factory {
+            if to != *create2_factory {
+                continue;
+            }
+            let Some(deployment) =
                 parse_l1_create2_deploy_from_input(to, tx.input(), bytecode_verifier)
-            } else if to == *bridgehub_addr {
-                check_gw_create2_deploy_from_input(
-                    to,
-                    tx.input(),
-                    bridgehub_addr,
-                    bytecode_verifier,
-                )
-            } else {
-                None
-            };
-            let Some(deployment) = deployment else {
+            else {
                 continue;
             };
 
@@ -287,16 +252,7 @@ impl NetworkVerifier {
                 }
             }
 
-            if to == *bridgehub_addr {
-                parsed_gateway_deployments += 1;
-                if enforce_salts && !expected_salts.contains(&deployment.salt) {
-                    result.report_error(&format!(
-                        "Gateway CREATE2 deployment of {} at {} (tx {hash:#x}) used salt {} \
-                         which is not in the env-declared salt set",
-                        deployment.name, deployment.addr, deployment.salt
-                    ));
-                }
-            } else if enforce_salts && !expected_salts.contains(&deployment.salt) {
+            if enforce_salts && !expected_salts.contains(&deployment.salt) {
                 // Salt sanity: only enforced after recognition, so non-deploy tx
                 // first-32 bytes (which aren't salts at all) don't trigger errors.
                 // Hard ERROR per offending deploy — `ensure_success` rejects the
@@ -321,11 +277,6 @@ impl NetworkVerifier {
         if reverted > 0 {
             logger::warn(format!(
                 "transactions.txt: {reverted} tx(s) reverted (status=0) — skipped"
-            ));
-        }
-        if parsed_gateway_deployments > 0 {
-            logger::info(format!(
-                "transactions.txt: loaded {parsed_gateway_deployments} Gateway L1→L2 CREATE2 deployment tx(s)"
             ));
         }
     }
@@ -497,14 +448,6 @@ impl NetworkVerifier {
             .context("failed to fetch ZK chain protocolVersion")
     }
 
-    pub async fn try_get_ctm_is_zksync_os(&self, ctm_addr: Address) -> anyhow::Result<bool> {
-        let ctm = ChainTypeManager::new(ctm_addr, self.l1_provider.clone());
-        ctm.isZKsyncOS()
-            .call()
-            .await
-            .context("failed to fetch CTM isZKsyncOS")
-    }
-
     pub async fn try_get_chain_diamond_from_bridgehub(
         &self,
         bridgehub_addr: Address,
@@ -604,62 +547,6 @@ fn parse_l1_create2_deploy_from_input(
         salt,
     })
 }
-fn check_gw_create2_deploy_from_input(
-    to: Address,
-    input: &[u8],
-    bridgehub_addr: &Address,
-    bytecode_verifier: &BytecodeVerifier,
-) -> Option<ParsedCreate2Deployment> {
-    if to != *bridgehub_addr {
-        return None;
-    }
-
-    let l2_call = requestL2TransactionDirectCall::abi_decode(input).ok()?;
-    let l2_contract = l2_call._request.l2Contract;
-    let l2_calldata = l2_call._request.l2Calldata;
-
-    if l2_contract == ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR {
-        // ZKsync OS uses the standard EVM deterministic factory whose calldata
-        // is `bytes32 salt || initCode`.
-        let raw = l2_calldata.as_ref();
-        if raw.len() < 32 {
-            return None;
-        }
-        let salt = FixedBytes::<32>::from_slice(&raw[..32]);
-        let init_code = &raw[32..];
-        let (name, params) = bytecode_verifier.try_parse_bytecode(init_code)?;
-        let addr = compute_create2_address_evm(l2_contract, salt, keccak256(init_code));
-        return Some(ParsedCreate2Deployment {
-            addr,
-            name,
-            params,
-            salt,
-        });
-    }
-
-    if l2_contract == L2_CREATE2_FACTORY_ADDR {
-        // Era gateway deployments still call the ZKsync create2 system
-        // factory: create2(salt, bytecodeHash, constructorInput).
-        let create2_call = create2Call::abi_decode(&l2_calldata).ok()?;
-        let salt = create2_call._salt;
-        let addr = compute_create2_address_zk(
-            l2_contract,
-            salt,
-            create2_call._bytecodeHash,
-            keccak256(&create2_call._input),
-        );
-        let file_name = bytecode_verifier.zk_bytecode_hash_to_file(&create2_call._bytecodeHash)?;
-        return Some(ParsedCreate2Deployment {
-            addr,
-            name: file_name.to_string(),
-            params: create2_call._input.to_vec(),
-            salt,
-        });
-    }
-
-    None
-}
-
 #[cfg(test)]
 mod create2_provenance_tests {
     use super::super::bytecode_verifier::ContractHashes;

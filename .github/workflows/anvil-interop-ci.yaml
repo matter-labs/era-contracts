@@ -7,7 +7,6 @@ on:
   pull_request:
     paths:
       - ".github/workflows/anvil-interop-ci.yaml"
-      - ".github/actions/install-zksync-foundry/**"
       - "l1-contracts/contracts/**"
       - "l1-contracts/deploy-scripts/**"
       - "l1-contracts/lib/**"
@@ -16,21 +15,12 @@ on:
       - "l1-contracts/foundry.toml"
       - "l1-contracts/hardhat.config.ts"
       - "l1-contracts/package.json"
-      - "l2-contracts/contracts/**"
-      - "l2-contracts/lib/**"
-      - "l2-contracts/src/**"
-      - "l2-contracts/test/**"
-      - "l2-contracts/foundry.toml"
-      - "l2-contracts/hardhat.config.ts"
-      - "l2-contracts/package.json"
-      - "system-contracts/bootloader/**"
-      - "system-contracts/contracts/**"
-      - "system-contracts/lib/**"
-      - "system-contracts/scripts/**"
-      - "system-contracts/test/**"
-      - "system-contracts/foundry.toml"
-      - "system-contracts/hardhat.config.ts"
-      - "system-contracts/package.json"
+      # The upgrade test runs protocol-ops' default upgrade against the genesis version, so the
+      # default scripts, the current release's upgrade input and the genesis config decide what it tests.
+      - "l1-contracts/upgrade-envs/**"
+      - "protocol-ops/**"
+      - "protocol-ops.sh"
+      - "configs/genesis/**"
       - "da-contracts/contracts/**"
       - "da-contracts/lib/**"
       - "da-contracts/test/**"
@@ -57,9 +47,7 @@ jobs:
           submodules: true
 
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -103,12 +91,10 @@ jobs:
         run: |
           bash cleanup.sh
 
-  # V31 → V33 upgrade test: loads v31 chain states, runs this release's ecosystem upgrade,
-  # executes governance calls, and verifies protocol version is updated. Replaces the former
-  # v29 → v31 and v30 → v31 jobs: this release initializes the contracts introduced in v31 on
-  # the genesis path only, and its address discovery expects the v31 ABI, so a pre-v31
-  # ecosystem can no longer be upgraded straight onto it.
-  v31-to-v33-upgrade-test:
+  # Latest upgrade test: boots the previous release's chain states (`upgradeSourceStateVersion` in
+  # config/anvil-config.json), prepares the upgrade with protocol-ops' default scripts and input, executes
+  # the governance calls and per-chain upgrades, and checks every chain reached the genesis protocol version.
+  upgrade-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -118,13 +104,16 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (for Anvil)
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: v1.5.1
+      # The committed chain states need a state-compatible Anvil, while the
+      # release bytecode is reproduced with the `build` Forge pin.
+      - name: Install Anvil toolchain (state-compatible with committed states)
+        uses: ./.github/actions/install-foundry
 
-      - name: Install foundry-zksync (for forge --zksync)
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Preserve the pinned Anvil before switching to the build toolchain
+        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-pinned"
+
+      - name: Install foundry
+        uses: ./.github/actions/install-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -144,23 +133,18 @@ jobs:
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
-      - name: Build system-contracts artifacts
-        run: yarn sc build:foundry
-
-      # No zksolc pass: the test variant of the upgrade script says it skips zkout bytecodes
-      # ("already on L2 via anvil_setCode"). zkstack-out comes from out/, so solc alone suffices.
-      - name: Build l1-contracts artifacts (solc only — zkout is unused here)
-        working-directory: l1-contracts
-        run: forge build && yarn copy-to-zkstack-out
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
-      - name: Run V31 to V33 upgrade test
+      - name: Run the latest upgrade test
         working-directory: l1-contracts/test/anvil-interop
+        env:
+          ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
         run: |
-          echo "Running V31 -> V33 upgrade test..."
           yarn ts-node run-upgrade-test.ts
 
       - name: Cleanup

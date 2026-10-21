@@ -12,7 +12,7 @@ contract UnpauseDepositsTest is MigratorTest {
     event DepositsUnpaused(uint256 chainId);
 
     // The `pausedDepositsTimestamp` sits at slot 62 of ZKChainStorage
-    bytes32 pausedDepositsTimestampSlot = bytes32(uint256(62));
+    bytes32 internal pausedDepositsTimestampSlot = bytes32(uint256(62));
 
     function setUp() public override {
         // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.

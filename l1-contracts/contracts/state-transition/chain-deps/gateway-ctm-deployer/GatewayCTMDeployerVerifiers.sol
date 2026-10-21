@@ -2,15 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {EraVerifierFflonk} from "../../verifiers/EraVerifierFflonk.sol";
-import {EraVerifierPlonk} from "../../verifiers/EraVerifierPlonk.sol";
-import {EraDualVerifier} from "../../verifiers/EraDualVerifier.sol";
-import {EraTestnetVerifier} from "../../verifiers/EraTestnetVerifier.sol";
+import {ZKsyncOSVerifierPlonk} from "../../verifiers/ZKsyncOSVerifierPlonk.sol";
+import {ZKsyncOSVerifier} from "../../verifiers/ZKsyncOSVerifier.sol";
+import {ZKsyncOSTestnetVerifier} from "../../verifiers/ZKsyncOSTestnetVerifier.sol";
 
 import {IVerifier} from "../../chain-interfaces/IVerifier.sol";
-import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
-
-import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
 
 import {Verifiers} from "contracts/common/StateTransitionTypes.sol";
 import {GatewayVerifiersDeployerConfig} from "./GatewayCTMDeployer.sol";
@@ -18,9 +14,9 @@ import {GatewayVerifiersDeployerConfig} from "./GatewayCTMDeployer.sol";
 /// @title GatewayCTMDeployerVerifiers
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Gateway CTM Era Verifiers deployer: deploys Era verifier contracts.
-/// @dev Deploys: EraVerifierFflonk, EraVerifierPlonk, and Era DualVerifier/TestnetVerifier.
-/// For ZKsyncOS verifiers, use GatewayCTMDeployerVerifiersZKsyncOS instead.
+/// @notice Gateway CTM ZKsyncOS Verifiers deployer: deploys ZKsyncOS verifier contracts.
+/// @dev Deploys ZKsyncOSVerifierPlonk and the ZKsync OS main/testnet verifier.
+/// This contract is expected to be deployed via the built-in L2 `Create2Factory`.
 contract GatewayCTMDeployerVerifiers {
     Verifiers internal deployedResult;
 
@@ -31,26 +27,18 @@ contract GatewayCTMDeployerVerifiers {
     }
 
     constructor(GatewayVerifiersDeployerConfig memory _config) {
-        if (_config.isZKsyncOS) {
-            revert WrongCTMDeployerVariant();
-        }
         bytes32 salt = _config.salt;
 
         Verifiers memory result;
 
-        // Deploy Era verifiers
-        result.verifierFflonk = address(new EraVerifierFflonk{salt: salt}());
-        result.verifierPlonk = address(new EraVerifierPlonk{salt: salt}());
+        // Deploy ZKsyncOS verifiers
+        result.verifierPlonk = address(new ZKsyncOSVerifierPlonk{salt: salt}());
 
         // Deploy main verifier
         if (_config.testnetVerifier) {
-            result.verifier = address(
-                new EraTestnetVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
-            );
+            result.verifier = address(new ZKsyncOSTestnetVerifier{salt: salt}(IVerifier(result.verifierPlonk)));
         } else {
-            result.verifier = address(
-                new EraDualVerifier{salt: salt}(IVerifierV2(result.verifierFflonk), IVerifier(result.verifierPlonk))
-            );
+            result.verifier = address(new ZKsyncOSVerifier{salt: salt}(IVerifier(result.verifierPlonk)));
         }
 
         deployedResult = result;

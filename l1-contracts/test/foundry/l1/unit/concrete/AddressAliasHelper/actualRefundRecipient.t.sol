@@ -157,7 +157,7 @@ contract ActualRefundRecipient is AddressAliasHelperSharedTest {
     // ============ Fuzz Tests ============
 
     // A codeless non-tx.origin caller (constructor case) always resolves to its finalized alias.
-    function testFuzz_zeroRecipient_constructorCallerAliasedAndFinalized(address caller) public {
+    function testFuzz_zeroRecipient_constructorCallerAliasedAndFinalized(address caller) public view {
         // solhint-disable-next-line avoid-tx-origin
         vm.assume(caller != tx.origin);
         vm.assume(caller.code.length == 0);
@@ -172,7 +172,7 @@ contract ActualRefundRecipient is AddressAliasHelperSharedTest {
     }
 
     // An explicit recipient is always passed through unresolved, regardless of the caller.
-    function testFuzz_explicitRecipient_passedThroughUnfinalized(address recipient, address caller) public {
+    function testFuzz_explicitRecipient_passedThroughUnfinalized(address recipient, address caller) public view {
         vm.assume(recipient != address(0));
 
         (address actualRecipient, bool aliasingFinalized) = addressAliasHelper.actualRefundRecipient(recipient, caller);

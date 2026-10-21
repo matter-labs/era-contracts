@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {DeployErc20Script} from "../../../../deploy-scripts/tokens/DeployErc20.s.sol";
 
 contract TokenDeployer is Test {
-    address[] tokens;
+    address[] internal tokens;
     DeployErc20Script private deployScript;
 
     function _deployTokens() internal {

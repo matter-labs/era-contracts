@@ -135,18 +135,11 @@ mod tests {
         let Ok(l1) = resolve_l1_contracts_path() else {
             return;
         };
-        let Ok(envs) = std::fs::read_dir(l1.join("upgrade-envs/v0.33.0-atomic-interop/output"))
-        else {
-            return;
-        };
-        for env in envs.flatten() {
-            let log = env.path().join("transactions.txt");
-            if !log.is_file() {
-                continue;
-            }
-            let hashes =
-                read(&log).unwrap_or_else(|e| panic!("{} must parse: {e:#}", log.display()));
-            assert!(!hashes.is_empty(), "{} should have entries", log.display());
-        }
+        let log = l1.join("upgrade-envs/v0.31.0-interopB/output/stage/transactions.txt");
+        let hashes = read(&log).expect("real stage transactions.txt must parse");
+        assert!(
+            !hashes.is_empty(),
+            "stage transactions.txt should have entries"
+        );
     }
 }

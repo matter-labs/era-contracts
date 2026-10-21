@@ -503,10 +503,8 @@ async fn fund_bundle_targets(
         .iter()
         .map(|bundle| bundle.target)
         .collect();
-    // Gateway-enabled envs burn ZK (the new gateway's base token) in a priority tx, so the
-    // mint must succeed there; elsewhere the ZK token is L1-native and the NTV cannot mint it,
-    // which is fine because nothing burns it.
-    let has_gateway = env_cfg.new_gateway().is_some();
+    // Best-effort: where the ZK token is L1-native the NTV cannot mint it, which is fine because
+    // nothing in the upgrade burns it.
     let zk_funding = U256::from(10u8).pow(U256::from(30u8));
     for target in &targets {
         set_balance(rpc_url, *target).await?;
@@ -515,11 +513,8 @@ async fn fund_bundle_targets(
             amount: zk_funding,
         }
         .abi_encode();
-        logger::info(format!(
-            "  bridgeMint({target:#x}){}",
-            if has_gateway { "" } else { " [best-effort]" }
-        ));
-        let minted = send_impersonated_tx(
+        logger::info(format!("  bridgeMint({target:#x}) [best-effort]"));
+        let _ = send_impersonated_tx(
             rpc_url,
             native_token_vault,
             zk_token,
@@ -527,9 +522,6 @@ async fn fund_bundle_targets(
             FUNDING_TX_GAS_LIMIT,
         )
         .await;
-        if has_gateway {
-            minted.context("ZK funding is required on a gateway-enabled env")?;
-        }
     }
 
     Ok(())
@@ -831,15 +823,10 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     );
     let output_dir = protocol_ops_out_dir(&args.upgrade, &env_cfg.env)?;
     logger::info(format!(
-        "Upgrade {} | env {} | bridgehub {:#x} | gateway {} | deployer {:#x} (impersonated)",
+        "Upgrade {} | env {} | bridgehub {:#x} | deployer {:#x} (impersonated)",
         args.upgrade,
         env_cfg.env,
         env_cfg.bridgehub(),
-        if env_cfg.new_gateway().is_some() {
-            "yes"
-        } else {
-            "no"
-        },
         args.deployer_address
     ));
 

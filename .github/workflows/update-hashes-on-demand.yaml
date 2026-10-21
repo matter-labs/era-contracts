@@ -20,6 +20,9 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      # Space-separated on one line: ghcommit-action reads only the first line of `file_pattern`.
+      GENERATED_PATHS: AllContractsHashes.json configs/genesis/zksync-os/latest.json l1-contracts/zkstack-out l1-contracts/selectors
 
     steps:
       - name: Checkout repo
@@ -27,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0 # We need full history to fetch PR branch
           submodules: recursive
-          token: ${{ secrets.RELEASE_TOKEN }}
+          persist-credentials: false # the commit below goes through the API with an App token
 
       - name: Get PR branch info
         id: pr
@@ -58,8 +61,12 @@ jobs:
           node-version-file: .nvmrc
           cache: yarn
 
-      - name: Install foundry-zksync
-        uses: ./.github/actions/install-zksync-foundry
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
+
+      - name: Install genesis-generator toolchain
+        working-directory: tools/zksync-os-genesis-gen
+        run: rustup toolchain install
 
       - name: Install dependencies
         run: yarn
@@ -77,33 +84,70 @@ jobs:
 
           yarn --cwd da-contracts build:foundry
           yarn --cwd l1-contracts build:foundry
-          yarn --cwd l2-contracts build:foundry
-          yarn --cwd system-contracts build:foundry
 
           yarn calculate-hashes:fix
 
           # `l1-contracts build:foundry` above already refreshed zkstack-out; selectors are
-          # derived from the same build. Regenerating all three here means one dispatch clears
-          # check-hashes, check-zkstack-out and check-selectors together, instead of leaving two
-          # of them for someone to reproduce by hand.
+          # derived from the same build.
           yarn l1 selectors --fix
 
           # zkstack-out JSON needs prettier's trailing newlines, or check-zkstack-out sees a diff.
           # Scoped to the generated files so this cannot sweep unrelated formatting into the commit.
           npx prettier --write "l1-contracts/zkstack-out/**/*.json" "AllContractsHashes.json"
 
-      - name: Commit and push changes
+      - name: Authorize private genesis dependencies
+        id: genesis-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          repositories: |
+            zksync-os-private
+            zksync-airbender-private
+          permission-contents: read
+
+      - name: Regenerate ZKsync OS genesis
+        working-directory: tools/zksync-os-genesis-gen
+        env:
+          GH_TOKEN: ${{ steps.genesis-token.outputs.token }}
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: credential.helper
+          GIT_CONFIG_VALUE_0: "!gh auth git-credential"
+        run: |
+          cargo run --locked --release --bin zksync-os-genesis-gen -- \
+            --output-file ../../configs/genesis/zksync-os/latest.json
+
+      # ghcommit-action lists changes with `git status --porcelain` without `-uall`, which collapses
+      # a wholly untracked directory into one entry -- and a new contract adds exactly that
+      # (zkstack-out/<Name>.sol/). Staging first makes git report the files individually.
+      - name: Stage generated artifacts
         run: |
           set -euo pipefail
-          git config user.name "zksync[bot]"
-          git config user.email "zksync[bot]@users.noreply.github.com"
-
-          git add AllContractsHashes.json l1-contracts/zkstack-out l1-contracts/selectors
-          # Check if there are any changes to commit
-          git diff --cached --quiet && { echo "No generated-artifact changes to commit"; exit 0; }
-
+          read -r -a paths <<<"$GENERATED_PATHS" # same split as ghcommit-action's
+          git add -A -- "${paths[@]}"
           # Report what moved, so the dispatch log says which checks this should clear.
           git --no-pager diff --cached --stat
 
-          git commit -m "chore: Updated generated artifacts from CI (hashes, zkstack-out, selectors)"
-          git push origin HEAD
+      # Minted only after the PR's own build scripts have run, so no write-capable credential exists
+      # while they execute. Scoped to this repository's contents, valid for an hour, revoked at job end.
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          permission-contents: write
+
+      # Committed through the GitHub API, so GitHub signs the commit (Verified) and the org's
+      # required-signatures rule no longer blocks the PR. The App token, unlike GITHUB_TOKEN, also
+      # triggers the PR's workflows on the new commit. Commits nothing if no artifact changed.
+      - name: Commit and push changes (signed by GitHub)
+        uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
+        with:
+          commit_message: "chore: update generated artifacts from CI"
+          repo: ${{ github.repository }}
+          branch: ${{ steps.pr.outputs.head_ref }}
+          file_pattern: ${{ env.GENERATED_PATHS }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
