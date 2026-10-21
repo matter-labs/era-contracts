@@ -203,7 +203,6 @@ pub(super) const CONSTRUCTOR_EXPECTATIONS: &[(&str, &[(&str, ArgSource)])] = &[
         "ChainTypeManager",
         &[
             ("_bridgehub", Bridgehub),
-            ("_interopCenter", CtmImmutable(CtmImmutable::InteropCenter)),
             (
                 "_l1BytecodesSupplier",
                 CtmImmutable(CtmImmutable::BytecodesSupplier),
@@ -1658,7 +1657,6 @@ mod tests {
     async fn a_ctm_implementation_is_held_to_the_established_immutables() {
         let args = (
             BRIDGEHUB,
-            OTHER,
             Address::repeat_byte(0x5B),
             Address::repeat_byte(0x7A),
             Address::repeat_byte(0xFE),
@@ -1677,7 +1675,6 @@ mod tests {
             "ChainTypeManager",
             &[
                 ("_bridgehub", "address"),
-                ("_interopCenter", "address"),
                 ("_l1BytecodesSupplier", "address"),
                 ("_permissionlessValidator", "address"),
                 ("_l1InteropFeeManager", "address"),
@@ -1689,10 +1686,9 @@ mod tests {
         let established = |validator: Option<Address>| -> CtmImmutableExpectations {
             vec![
                 (CtmImmutable::BridgeHub, Some((args.0, "a".to_string()))),
-                (CtmImmutable::InteropCenter, Some((args.1, "b".to_string()))),
                 (
                     CtmImmutable::BytecodesSupplier,
-                    Some((args.2, "c".to_string())),
+                    Some((args.1, "b".to_string())),
                 ),
                 (
                     CtmImmutable::PermissionlessValidator,
@@ -1700,12 +1696,12 @@ mod tests {
                 ),
                 (
                     CtmImmutable::InteropFeeManager,
-                    Some((args.4, "e".to_string())),
+                    Some((args.3, "d".to_string())),
                 ),
             ]
         };
         for (bridgehub, validator, errors, needle) in [
-            (Some(BRIDGEHUB), Some(args.3), 0, String::new()),
+            (Some(BRIDGEHUB), Some(args.2), 0, String::new()),
             (
                 Some(BRIDGEHUB),
                 Some(Address::repeat_byte(0x7B)),
@@ -1720,7 +1716,7 @@ mod tests {
             ),
             (
                 Some(OTHER),
-                Some(args.3),
+                Some(args.2),
                 1,
                 format!(
                     "ChainTypeManager._bridgehub is {BRIDGEHUB}, but env test's \
@@ -1729,7 +1725,7 @@ mod tests {
             ),
             (
                 None,
-                Some(args.3),
+                Some(args.2),
                 1,
                 "neither --env nor --expected-bridgehub".to_string(),
             ),

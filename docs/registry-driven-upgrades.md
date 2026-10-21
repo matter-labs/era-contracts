@@ -679,7 +679,12 @@ On the chain, `DefaultUpgrade.upgradeFromTransition` first requires the chain's 
 exactly the departing release's (`LiveRoutingDiverged`): the derived cuts remove that release's
 routing, not the live one, so a chain a CTM-owner `executeUpgrade` recovery left elsewhere would keep
 the recovery's routing under the new release, or fail mid-cut. Such a recovery ends by restoring the
-release's routing. It then applies `transition.facetCuts()` verbatim, then
+release's routing. The check binds a transition to its departing release's routing, not to a
+CTM: a transition names no CTM, and `setNewVersionUpgradeFromTransition` checks only that it departs
+the CTM's `currentRelease` and version, so another CTM on `fromRelease` would commit it and its
+chains would cross. The CTM boundary is the executor's binding
+([coordination spec](../protocol-docs/ecosystem-upgrade-coordination.md#ordering-and-atomicity)).
+The engine then applies `transition.facetCuts()` verbatim, then
 runs the shared storage part (`BaseZkSyncUpgrade._upgrade`) with inputs read straight from the same
 object: the version edge and schedule from the transition, the verifier of its TARGET release (never
 the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction composed from its L2
@@ -878,11 +883,14 @@ it now. The rows are then applied with the shared row semantics: every proxy at 
 `expectedOldImpl` (or already at `implNew`) and every `implNew` deployed code, before the first
 swap. `migrate()` runs once (`BootstrapAlreadyExecuted`).
 
-Two properties that look like omissions but are not:
+Three properties that look like omissions but are not:
 
 - `migrate()` is **permissionless**. The gate is the state, not the caller: nothing runs until
   governance has handed over both ownerships, which is the approval, and every value written
   afterwards comes from the approved manifest.
+- The engine does **not check the chain's CTM**. `migrate()` commits the cut on the manifest's CTM
+  itself, so governance never hands it to a CTM; it reaches another CTM's chains only if that CTM's
+  owner commits the same bytes there.
 - The committed cut carries **no facet cuts and no authored calldata**. The facet delta cannot be
   derived at construction (the departing version predates releases), so the cut's init target is
   the bootstrap engine (`BootstrapUpgrade`), which removes each chain's live routing read from its

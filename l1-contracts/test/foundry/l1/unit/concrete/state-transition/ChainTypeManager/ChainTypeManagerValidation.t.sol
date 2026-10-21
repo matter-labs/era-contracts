@@ -42,7 +42,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     L1ChainAssetHandler internal chainAssetHandler;
     L1MessageRoot internal messageroot;
     address internal diamondInit;
-    address internal interopCenterAddress;
     address internal governor;
     address internal admin;
     address internal baseToken;
@@ -60,7 +59,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
         vm.warp(1);
 
-        interopCenterAddress = makeAddr("interopCenter");
         governor = makeAddr("governor");
         admin = makeAddr("admin");
         baseToken = makeAddr("baseToken");
@@ -101,13 +99,7 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
         chainAssetHandler.setAddresses();
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(
-            address(bridgehub),
-            interopCenterAddress,
-            address(0),
-            permissionlessValidator,
-            address(0)
-        );
+        chainTypeManager = new ChainTypeManager(address(bridgehub), address(0), permissionlessValidator, address(0));
         diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
         vm.stopPrank();
@@ -264,7 +256,6 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     function test_constructor() public {
         ChainTypeManager ctm = new ChainTypeManager(
             address(bridgehub),
-            interopCenterAddress,
             address(0),
             permissionlessValidator,
             address(0)
@@ -278,18 +269,12 @@ contract ChainTypeManagerValidationTest is UtilsCallMockerTest {
     ///      a chain in priority mode.
     function test_RevertWhen_anL1CTMIsConstructedWithoutAPermissionlessValidator() public {
         vm.expectRevert(ZeroAddress.selector);
-        new ChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0), address(0));
+        new ChainTypeManager(address(bridgehub), address(0), address(0), address(0));
     }
 
     /// @dev Priority mode exists on L1 only, so a Gateway CTM is constructed without one.
     function test_aGatewayCTMNeedsNoPermissionlessValidator() public {
-        ChainTypeManager ctm = new ChainTypeManager(
-            L2_BRIDGEHUB_ADDR,
-            interopCenterAddress,
-            address(0),
-            address(0),
-            address(0)
-        );
+        ChainTypeManager ctm = new ChainTypeManager(L2_BRIDGEHUB_ADDR, address(0), address(0), address(0));
         assertEq(ctm.BRIDGE_HUB(), L2_BRIDGEHUB_ADDR);
         assertEq(ctm.PERMISSIONLESS_VALIDATOR(), address(0));
     }

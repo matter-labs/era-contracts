@@ -19,19 +19,10 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 contract MockPreV35ChainTypeManager is ChainTypeManager {
     constructor(
         address _bridgehub,
-        address _interopCenter,
         address _l1BytecodesSupplier,
         address _permissionlessValidator,
         address _l1InteropFeeManager
-    )
-        ChainTypeManager(
-            _bridgehub,
-            _interopCenter,
-            _l1BytecodesSupplier,
-            _permissionlessValidator,
-            _l1InteropFeeManager
-        )
-    {}
+    ) ChainTypeManager(_bridgehub, _l1BytecodesSupplier, _permissionlessValidator, _l1InteropFeeManager) {}
 
     /// @param _protocolVersion The version the verifier is recorded for.
     /// @param _verifier The verifier recorded.
@@ -66,7 +57,6 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
         deploy();
         preV35Implementation = new MockPreV35ChainTypeManager(
             address(bridgehub),
-            interopCenterAddress,
             address(bytecodesSupplier),
             address(permissionlessValidator),
             address(0)
