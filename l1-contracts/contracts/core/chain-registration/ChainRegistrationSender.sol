@@ -44,9 +44,9 @@ contract ChainRegistrationSender is
 {
     IBridgehubBase public immutable BRIDGE_HUB;
 
-    /// @dev Deprecated: written by the retired consent-free registration and read by nothing.
+    /// @dev Written by the retired consent-free registration and read by nothing.
     mapping(uint256 chainToBeRegistered => mapping(uint256 chainRegisteredOn => bool isRegistered))
-        public chainRegisteredOnChain;
+        internal __DEPRECATED_chainRegisteredOnChain;
 
     /// @inheritdoc IChainRegistrationSender
     mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
