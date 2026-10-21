@@ -12,7 +12,6 @@ struct CTMCoreDeploymentConfig {
     bool testnetVerifier;
     uint256 l1ChainId;
     address bridgehubProxy;
-    address interopCenterProxy;
     address rollupDAManager;
     address chainAssetHandler;
     address l1BytecodesSupplier;
@@ -71,7 +70,6 @@ library DeployCTML1OrGateway {
             return
                 abi.encode(
                     _config.bridgehubProxy,
-                    _config.interopCenterProxy,
                     _config.l1BytecodesSupplier,
                     _config.permissionlessValidator,
                     _config.interopFeeManager

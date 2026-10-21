@@ -14,7 +14,7 @@ contract MockChainTypeManagerWBH is ChainTypeManager {
     address internal zkChain;
     /// @notice Constructor
     /// @dev The permissionless validator is a non-zero placeholder, which an L1 CTM requires.
-    constructor(address bridgeHub) ChainTypeManager(bridgeHub, address(0), address(0), address(this), address(0)) {}
+    constructor(address bridgeHub) ChainTypeManager(bridgeHub, address(0), address(this), address(0)) {}
 
     function setZKChain(address _zkChain) external {
         zkChain = _zkChain;

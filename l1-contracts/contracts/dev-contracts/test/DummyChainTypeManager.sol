@@ -15,7 +15,7 @@ contract DummyChainTypeManager is ChainTypeManager {
 
     /// @notice Constructor
     /// @dev The permissionless validator is a non-zero placeholder, which an L1 CTM requires.
-    constructor() ChainTypeManager(address(0), address(0), address(0), address(this), address(0)) {}
+    constructor() ChainTypeManager(address(0), address(0), address(this), address(0)) {}
 
     function setZKChain(address _zkChain) external {
         zkChain = _zkChain;

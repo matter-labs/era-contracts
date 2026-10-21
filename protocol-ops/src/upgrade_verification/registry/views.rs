@@ -362,7 +362,6 @@ sol! {
         function L1_BYTECODES_SUPPLIER() external view returns (address);
         function L1_INTEROP_FEE_MANAGER() external view returns (address);
         function BRIDGE_HUB() external view returns (address);
-        function INTEROP_CENTER() external view returns (address);
         function serverNotifierAddress() external view returns (address);
         function validatorTimelockPostV29() external view returns (address);
         function PERMISSIONLESS_VALIDATOR() external view returns (address);

@@ -31,7 +31,7 @@ use alloy::providers::Provider;
 
 use crate::upgrade_verification::constants::{
     CTM_CONTRACTS, EIP1967_IMPLEMENTATION_SLOT, EIP1967_PROXY_ADMIN_SLOT, L1_ECOSYSTEM_CONTRACTS,
-    L2_INTEROP_CENTER_ADDR, PROXY_UPGRADE_DOMAIN_CORE, PROXY_UPGRADE_DOMAIN_CTM,
+    PROXY_UPGRADE_DOMAIN_CORE, PROXY_UPGRADE_DOMAIN_CTM,
 };
 use crate::upgrade_verification::report::VerificationResult;
 
@@ -447,7 +447,6 @@ pub(super) async fn verify_inventory_construction<P: Provider>(
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(super) enum CtmImmutable {
     BridgeHub,
-    InteropCenter,
     BytecodesSupplier,
     /// Written into every new chain once by `DiamondInit` and never re-read.
     PermissionlessValidator,
@@ -473,9 +472,8 @@ enum Fallback {
 }
 
 impl CtmImmutable {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 4] = [
         Self::BridgeHub,
-        Self::InteropCenter,
         Self::BytecodesSupplier,
         Self::PermissionlessValidator,
         Self::InteropFeeManager,
@@ -484,7 +482,6 @@ impl CtmImmutable {
     pub(super) fn getter(self) -> &'static str {
         match self {
             Self::BridgeHub => "BRIDGE_HUB",
-            Self::InteropCenter => "INTEROP_CENTER",
             Self::BytecodesSupplier => "L1_BYTECODES_SUPPLIER",
             Self::PermissionlessValidator => "PERMISSIONLESS_VALIDATOR",
             Self::InteropFeeManager => "L1_INTEROP_FEE_MANAGER",
@@ -512,7 +509,7 @@ impl CtmImmutable {
                 "interop_fee_manager_proxy_addr",
                 reported.interop_fee_manager,
             )),
-            Self::BridgeHub | Self::InteropCenter => None,
+            Self::BridgeHub => None,
         }
     }
 
@@ -524,25 +521,19 @@ impl CtmImmutable {
         let view = CtmView::new(ctm, provider);
         match self {
             Self::BridgeHub => view.BRIDGE_HUB().call().await,
-            Self::InteropCenter => view.INTEROP_CENTER().call().await,
             Self::BytecodesSupplier => view.L1_BYTECODES_SUPPLIER().call().await,
             Self::PermissionlessValidator => view.PERMISSIONLESS_VALIDATOR().call().await,
             Self::InteropFeeManager => view.L1_INTEROP_FEE_MANAGER().call().await,
         }
     }
 
-    /// The value the review establishes without the live CTM: `L2_INTEROP_CENTER_ADDR` for the
-    /// interop center (an L1 CTM's names the L2 built-in, as the deploy scripts set it); for a
-    /// CTM-domain singleton the participating inventory row of its slot, else the proxy the
-    /// package reports for it. None for the Bridgehub, which the implementation's construction
-    /// record is held against the reviewed one for ([`super::member_construction`]).
+    /// The value the review establishes without the live CTM: for a CTM-domain singleton the
+    /// participating inventory row of its slot, else the proxy the package reports for it. None
+    /// for the Bridgehub, which the implementation's construction record is held against the
+    /// reviewed one for ([`super::member_construction`]).
     fn fallback(self, review: &InventoryReview<'_>) -> Fallback {
         match self {
             Self::BridgeHub => Fallback::None,
-            Self::InteropCenter => Fallback::Known(
-                L2_INTEROP_CENTER_ADDR,
-                "L2_INTEROP_CENTER_ADDR, the interop center an L1 CTM is built over".to_string(),
-            ),
             _ => {
                 let Some((member, field, reported)) = self.slot(&review.reported) else {
                     return Fallback::None;
@@ -914,7 +905,6 @@ mod tests {
             "ChainTypeManager",
             &[
                 ("_bridgehub", "address"),
-                ("_interopCenter", "address"),
                 ("_l1BytecodesSupplier", "address"),
                 ("_permissionlessValidator", "address"),
                 ("_l1InteropFeeManager", "address"),
@@ -1062,7 +1052,7 @@ mod tests {
         assert_eq!(result.errors, 1);
     }
 
-    /// The `(implementation, live CTM)` answers of the five CTM immutables, in read order, each
+    /// The `(implementation, live CTM)` answers of the four CTM immutables, in read order, each
     /// kept unchanged across the swap.
     fn kept_immutables() -> Vec<Bytes> {
         vec![addr(Address::repeat_byte(0x42)); 2 * CtmImmutable::ALL.len()]
@@ -1073,7 +1063,7 @@ mod tests {
     const VALIDATOR: Address = Address::repeat_byte(0x7A);
 
     /// Drives the CTM row of a CTM-domain inventory whose PermissionlessValidator slot is
-    /// `validator_row` (inert when `None`), with the five immutables answering per `answer`. The
+    /// `validator_row` (inert when `None`), with the four immutables answering per `answer`. The
     /// implementation's getters are mocked as their raw answers, so a reverting one is queued as
     /// a failure.
     async fn run_ctm_row(
@@ -1253,15 +1243,13 @@ mod tests {
         assert!(result.has_error("PERMISSIONLESS_VALIDATOR is") && result.has_error("unverified"));
     }
 
-    /// `INTEROP_CENTER` falls back to the L2 built-in address an L1 CTM is built over;
     /// `BRIDGE_HUB` has no fallback, not even the package's `bridgehub_proxy_addr`.
     #[tokio::test]
-    async fn the_interop_center_falls_back_and_the_bridgehub_does_not() {
+    async fn the_bridgehub_does_not_fall_back() {
         const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
-        let answer = |bridgehub: (Address, Option<Address>), interop: Address| {
+        let answer = |bridgehub: (Address, Option<Address>)| {
             move |immutable: CtmImmutable| match immutable {
                 CtmImmutable::BridgeHub => (Some(bridgehub.0), bridgehub.1),
-                CtmImmutable::InteropCenter => (Some(interop), None),
                 _ => (Some(VALIDATOR), Some(VALIDATOR)),
             }
         };
@@ -1269,18 +1257,11 @@ mod tests {
             bridgehub: Some(BRIDGEHUB),
             ..Default::default()
         };
-        let live = (BRIDGEHUB, Some(BRIDGEHUB));
-        let result = run_ctm_row(None, reported, answer(live, L2_INTEROP_CENTER_ADDR)).await;
+        let result = run_ctm_row(None, reported, answer((BRIDGEHUB, Some(BRIDGEHUB)))).await;
         assert_eq!(result.errors, 0, "{:?}", result.error_messages);
 
-        let result = run_ctm_row(None, reported, answer(live, OTHER)).await;
-        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
-        assert!(result.has_error("INTEROP_CENTER is"));
-
-        let unanswered = (BRIDGEHUB, None);
         for reported in [reported, Default::default()] {
-            let result =
-                run_ctm_row(None, reported, answer(unanswered, L2_INTEROP_CENTER_ADDR)).await;
+            let result = run_ctm_row(None, reported, answer((BRIDGEHUB, None))).await;
             assert_eq!(result.errors, 1, "{:?}", result.error_messages);
             assert!(result.has_error("BRIDGE_HUB is") && result.has_error("unverified"));
         }
@@ -1754,7 +1735,7 @@ mod tests {
 
     /// The constructor arguments of a new CTM implementation, in declaration order.
     fn ctm_args(validator: Address, fee_manager: Address) -> Vec<u8> {
-        (VALIDATOR, VALIDATOR, VALIDATOR, validator, fee_manager).abi_encode_params()
+        (VALIDATOR, VALIDATOR, validator, fee_manager).abi_encode_params()
     }
 
     /// A CTM implementation built over another PermissionlessValidator than the live CTM's fails
@@ -1814,7 +1795,7 @@ mod tests {
         };
         let (implementation, mut records) = recorded(
             "ChainTypeManager",
-            (BRIDGEHUB, VALIDATOR, VALIDATOR, VALIDATOR, FEE_MANAGER).abi_encode_params(),
+            (BRIDGEHUB, VALIDATOR, VALIDATOR, FEE_MANAGER).abi_encode_params(),
         );
         let env = ReviewedEnv::for_test(None, Some(BRIDGEHUB));
         let run = |fee_manager_impl: Address, records: MemberDeployments| {
