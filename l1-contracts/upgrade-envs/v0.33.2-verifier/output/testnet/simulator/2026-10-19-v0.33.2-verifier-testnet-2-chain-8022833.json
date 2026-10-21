@@ -9,7 +9,8 @@
     "valueToMint": "1",
     "emulateAllBatchesExecuted": true,
     "emulateAllBatchesExecutedFor": "0x02b1ac1cf0a592aefd3c2246b2431388365db272",
-    "tag": "chain_upgrade_8022833_schedule"
+    "tag": "chain_upgrade_8022833",
+    "alreadyExecuted": true
   },
   {
     "description": "ChainAdmin.multicall: upgradeChainFromVersion(chain 8022833, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged.",
@@ -20,6 +21,7 @@
     "value": "0",
     "emulateAllBatchesExecuted": true,
     "emulateAllBatchesExecutedFor": "0x02b1ac1cf0a592aefd3c2246b2431388365db272",
-    "tag": "chain_upgrade_8022833_execute"
+    "tag": "chain_upgrade_8022833",
+    "alreadyExecuted": true
   }
 ]
