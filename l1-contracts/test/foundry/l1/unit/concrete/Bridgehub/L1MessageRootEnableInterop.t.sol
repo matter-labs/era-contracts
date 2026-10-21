@@ -17,6 +17,7 @@ import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE, ZKSYNC_OS_PLONK_VERIFICATION_TY
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     InteropAlreadyEnabled,
+    L1SloadNotEnabled,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -73,6 +74,18 @@ contract L1MessageRootEnableInteropTest is Test {
             abi.encodeCall(IGetters.getProofMode, ()),
             abi.encode(ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE)
         );
+        vm.mockCall(zkChain, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(true));
+    }
+
+    /// @notice Interop gating reads L1 through L1SLOAD, see {protocol-docs/l1sload.md#chain-config-flag}.
+    function testFuzz_enableInterop_revertWhen_l1SloadNotEnabled(bool _requireSecondProofSystem) public {
+        vm.mockCall(zkChain, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(false));
+
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(L1SloadNotEnabled.selector, CHAIN_ID));
+        messageRoot.enableInterop(CHAIN_ID, _requireSecondProofSystem);
+
+        assertFalse(messageRoot.isInteropEnabled(CHAIN_ID));
     }
 
     function test_enableInterop() public {

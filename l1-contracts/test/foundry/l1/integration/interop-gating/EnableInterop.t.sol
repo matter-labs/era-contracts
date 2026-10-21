@@ -6,8 +6,10 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ProofSystem, ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/Config.sol";
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {L1SloadRequiredByInterop} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
     InteropAlreadyEnabled,
+    L1SloadNotEnabled,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -28,6 +30,42 @@ contract EnableInteropTest is InteropGatingDeployer {
         chainId = zkChainIds[0];
         chain = getZKChainAddress(chainId);
         governance = addresses.bridgehubOwnerAddress;
+        _enableL1Sload(chainId);
+    }
+
+    /// @notice A chain must read L1 with L1SLOAD before it can be enabled: interop gating depends on it.
+    /// See {protocol-docs/l1sload.md#chain-config-flag}.
+    function test_enableInterop_revertWhen_l1SloadNotEnabled() public {
+        uint256 otherChainId = zkChainIds[1];
+        _permanentlyRequireSecondProofSystem(otherChainId);
+        assertFalse(IGetters(getZKChainAddress(otherChainId)).isZKsyncOSL1SloadEnabled());
+
+        _expectEnableInteropRevert(
+            governance,
+            otherChainId,
+            abi.encodeWithSelector(L1SloadNotEnabled.selector, otherChainId)
+        );
+    }
+
+    /// @notice Once interop is enabled, the chain can't turn L1SLOAD off: its gating reads would stop.
+    function test_l1SloadCantBeDisabledWhileInteropEnabled() public {
+        _enableInterop(chainId);
+
+        vm.prank(_chainAdmin(chainId));
+        vm.expectRevert(abi.encodeWithSelector(L1SloadRequiredByInterop.selector, chainId));
+        IAdmin(chain).setZKsyncOSL1SloadEnabled(false);
+
+        assertTrue(IGetters(chain).isZKsyncOSL1SloadEnabled());
+        assertTrue(messageRoot.isInteropEnabled(chainId));
+    }
+
+    /// @dev A diamond whose facets predate L1SLOAD has no `isZKsyncOSL1SloadEnabled`, so the proxy reverts with "F" and
+    /// such a chain can't be enabled until it upgrades. The getter is mocked to revert that way.
+    function test_enableInterop_revertWhen_diamondPredatesL1Sload() public {
+        _permanentlyRequireSecondProofSystem(chainId);
+        vm.mockCallRevert(chain, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), bytes("F"));
+
+        _expectEnableInteropRevert(governance, chainId, bytes("F"));
     }
 
     function test_enableInterop() public {

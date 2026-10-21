@@ -36,7 +36,7 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {L1SloadTestUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadTestUtils.sol";
+import {L1SloadMockUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
@@ -612,7 +612,7 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         // Allow the different-base destination on L1, which the real registry reads: the one peer whose base
         // token differs from this chain's.
         bytes32 differentBaseAssetId = L2_NATIVE_TOKEN_VAULT.assetId(ctx.l2Token);
-        L1SloadTestUtils.allowInteropPair(
+        L1SloadMockUtils.allowInteropPair(
             _l1ChainRegistrationSender(),
             block.chainid,
             baseTokenAssetId,

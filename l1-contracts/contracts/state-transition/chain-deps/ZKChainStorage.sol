@@ -294,6 +294,9 @@ struct ZKChainStorage {
     /// @dev See {protocol-docs/chain-config.md#large-contracts}.
     /// @dev STORAGE SLOT: 68 (packed after zksyncOSL1TxFilteringEnabled)
     bool zksyncOSLargeContractsEnabled;
+    /// @dev See {protocol-docs/chain-config.md#l1sload}.
+    /// @dev STORAGE SLOT: 68 (packed after zksyncOSLargeContractsEnabled)
+    bool zksyncOSL1SloadEnabled;
     /// @dev The interop fee units each committed batch sent, charged when it executes.
     /// See {protocol-docs/interop-fee.md}.
     /// @dev STORAGE SLOT: 69
@@ -306,9 +309,4 @@ struct ZKChainStorage {
     /// See {protocol-docs/l1sload.md#freshness}.
     /// @dev STORAGE SLOT: 71
     uint256 l1AnchorTimestamp;
-    /// @dev The last L2 block timestamp of each committed batch, read at execution for the anchor freshness rule.
-    /// @dev Proof-of-concept shortcut: production would carry it in `StoredBatchInfo.timestamp`, which ZKsync OS
-    /// commits as zero. See {protocol-docs/l1sload.md#proof-of-concept-shortcuts}.
-    /// @dev STORAGE SLOT: 72
-    mapping(uint256 batchNumber => uint256 timestamp) batchLastBlockTimestamp;
 }

@@ -157,6 +157,24 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
         assertTrue(allowed);
     }
 
+    /// @dev Reads are pinned to the anchor: an L1 change is invisible until the chain imports an anchor after it.
+    /// See {protocol-docs/l1sload.md#freshness}.
+    function test_l1ChangeTakesEffectWithTheNextAnchor() public {
+        _importAnchor();
+        _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
+
+        vm.prank(governance);
+        chainRegistrationSender.suspendInterop(PEER_CHAIN_ID);
+        assertTrue(_isPeerAllowed(PEER_CHAIN_ID), "the anchor predates the suspension");
+        (bool allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
+        assertTrue(allowed, "the anchor predates the suspension");
+
+        _importNextL1Anchor();
+        assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
+        (allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
+        assertFalse(allowed);
+    }
+
     function test_suspendingThisChainRefusesEveryPeer() public {
         _importAnchor();
         _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);

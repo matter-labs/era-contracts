@@ -9,6 +9,9 @@ import {
     PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY,
     PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY,
     PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS,
+    PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY,
+    PUBLIC_INPUT_HASH_GOLDEN_ALL_FLAGS,
+    CHAIN_CONFIG_HASH_GOLDEN,
     BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7,
     BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0
 } from "foundry-test/TestConstants.sol";
@@ -32,6 +35,14 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     function util_setZKsyncOSChainConfigFlags(bool _filteringEnabled, bool _largeContractsEnabled) external {
         s.zksyncOSL1TxFilteringEnabled = _filteringEnabled;
         s.zksyncOSLargeContractsEnabled = _largeContractsEnabled;
+    }
+
+    function util_setZKsyncOSL1SloadEnabled(bool _enabled) external {
+        s.zksyncOSL1SloadEnabled = _enabled;
+    }
+
+    function getChainConfigHash() external view returns (bytes32) {
+        return _getZKsyncOSChainConfigHash();
     }
 
     function getBatchOutputHash(
@@ -95,6 +106,24 @@ contract ZKsyncOSPublicInputTest is Test {
             committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
             uint256(PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS)
         );
+
+        committer.util_setZKsyncOSL1SloadEnabled(true);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_ALL_FLAGS)
+        );
+
+        committer.util_setZKsyncOSChainConfigFlags(false, false);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY)
+        );
+    }
+
+    /// @notice The `l1sload_enabled` word is the seventh word of the hash, after `large_contracts_enabled`.
+    /// See {protocol-docs/chain-config.md#proof-commitment}.
+    function test_chainConfigHash_matchesZKsyncOSGoldenVector() public view {
+        assertEq(committer.getChainConfigHash(), CHAIN_CONFIG_HASH_GOLDEN);
     }
 
     function test_publicInput_unsetMaxTxGasLimitFallsBackToDefault() public {

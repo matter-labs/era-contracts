@@ -25,7 +25,7 @@ import {
 } from "contracts/interop/InteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {ManagerLegSourceChainNotAllowed} from "contracts/atomic-interop/AtomicInteropErrors.sol";
-import {L1SloadTestUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadTestUtils.sol";
+import {L1SloadMockUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -296,7 +296,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
 
         uint256 sourceChainId = block.chainid;
         uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
-        L1SloadTestUtils.deregisterInteropPeer(_l1ChainRegistrationSender(), destinationChainId, sourceChainId);
+        L1SloadMockUtils.deregisterInteropPeer(_l1ChainRegistrationSender(), destinationChainId, sourceChainId);
 
         vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, sourceChainId));
         _executeOnDestination(finality);

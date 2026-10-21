@@ -50,6 +50,8 @@ error L1AnchorTooOld(uint256 anchorTimestamp, uint256 batchTimestamp);
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
+// 0xcb048150
+error L1SloadRequiredByInterop(uint256 chainId);
 // 0xd798040a
 error LegacyCutForRegistryDrivenVersion(uint256 protocolVersion);
 // 0x9b5f85eb

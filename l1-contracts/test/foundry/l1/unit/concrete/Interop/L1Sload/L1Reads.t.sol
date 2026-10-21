@@ -44,6 +44,12 @@ contract L1ReadsTest is L1SloadSharedTest {
         crs = address(chainRegistrationSender);
     }
 
+    /// @dev Slot 51 is read as is by {test_readsManySlotsInOrder}.
+    function _extraSyncedSlots() internal pure override returns (bytes32[] memory slots) {
+        slots = new bytes32[](1);
+        slots[0] = bytes32(uint256(51));
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 L1Reads
     //////////////////////////////////////////////////////////////*/

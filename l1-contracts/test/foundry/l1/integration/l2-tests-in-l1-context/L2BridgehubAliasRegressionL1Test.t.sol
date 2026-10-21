@@ -7,13 +7,13 @@ import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SharedL2ContractL1Deployer} from "./_SharedL2ContractL1Deployer.sol";
-import {L1SloadTestUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadTestUtils.sol";
+import {L1SloadMockUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 
 /// @title L2BridgehubAliasRegressionL1Test
 /// @notice L1 context test for the `chainRegistrationSender` alias regression (PR #1765), carried over to the L1 reads:
 /// the L2 Bridgehub stores the aliased L1 `ChainRegistrationSender`, and must read the L1 state at the unaliased
 /// address. See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
-/// @dev The L1 `ChainRegistrationSender` is not deployed in this context; {L1SloadTestUtils} writes its state.
+/// @dev The L1 `ChainRegistrationSender` is not deployed in this context; {L1SloadMockUtils} serves its state.
 contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
     // The L1 address of the chain registration sender
     address internal l1ChainRegistrationSender;
@@ -48,7 +48,7 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         uint256 testChainId = 12345;
         bytes32 testBaseTokenAssetId = bytes32(uint256(0xABCDEF));
 
-        L1SloadTestUtils.allowInteropPair(
+        L1SloadMockUtils.allowInteropPair(
             l1ChainRegistrationSender,
             block.chainid,
             baseTokenAssetId,
@@ -68,7 +68,7 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         uint256 testChainId = 12346;
         bytes32 testBaseTokenAssetId = bytes32(uint256(0x123456));
 
-        L1SloadTestUtils.allowInteropPair(
+        L1SloadMockUtils.allowInteropPair(
             aliasedChainRegistrationSender,
             block.chainid,
             baseTokenAssetId,
@@ -86,7 +86,7 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
     /// @notice Deregistration at the L1 address refuses the peer.
     function test_deregisteredPeerIsRefused() public {
         uint256 testChainId = 12355;
-        L1SloadTestUtils.allowInteropPair(
+        L1SloadMockUtils.allowInteropPair(
             l1ChainRegistrationSender,
             block.chainid,
             baseTokenAssetId,
@@ -94,7 +94,7 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
             bytes32(uint256(0x8642))
         );
 
-        L1SloadTestUtils.deregisterInteropPeer(l1ChainRegistrationSender, block.chainid, testChainId);
+        L1SloadMockUtils.deregisterInteropPeer(l1ChainRegistrationSender, block.chainid, testChainId);
 
         assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
         (bool allowed, ) = L2Bridgehub(L2_BRIDGEHUB_ADDR).interopSendTarget(testChainId);
@@ -118,7 +118,7 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         vm.assume(testBaseTokenAssetId != bytes32(0));
         assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
 
-        L1SloadTestUtils.allowInteropPair(
+        L1SloadMockUtils.allowInteropPair(
             l1ChainRegistrationSender,
             block.chainid,
             baseTokenAssetId,

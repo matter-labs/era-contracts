@@ -52,7 +52,7 @@ import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
-import {L1SloadTestUtils} from "foundry-test/l1/unit/concrete/Interop/L1Sload/L1SloadTestUtils.sol";
+import {L1SloadMockUtils} from "foundry-test/l1/unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
@@ -190,9 +190,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encode(bytes32(uint256(1)))
         );
         // This chain and the harness destination allowed each other on L1, which the L2 reads with L1SLOAD; every
-        // other chain id reads as unregistered (no base token snapshot).
-        L1SloadTestUtils.enableL1Reads();
-        L1SloadTestUtils.allowInteropPair(
+        // other chain id reads as unregistered (no base token snapshot). The chain imports an anchor first: without
+        // one every read fails closed.
+        L1SloadMockUtils.installMock();
+        L1SloadMockUtils.importAnchor(1, keccak256("l2 harness anchor"), 1);
+        L1SloadMockUtils.allowInteropPair(
             _l1ChainRegistrationSender(),
             block.chainid,
             baseTokenAssetId,

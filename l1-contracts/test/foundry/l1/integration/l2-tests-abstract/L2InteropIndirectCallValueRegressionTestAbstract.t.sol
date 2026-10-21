@@ -20,7 +20,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
-import {L1SloadTestUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadTestUtils.sol";
+import {L1SloadMockUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 import {IL2CrossChainSender} from "contracts/bridge/interfaces/IL2CrossChainSender.sol";
 
 /// @title L2InteropIndirectCallValueRegressionTestAbstract
@@ -378,7 +378,7 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
     /// @dev Points the destination chain at a different base token than the source chain's: its snapshot on L1.
     function _mockDifferentDestinationBaseToken() internal returns (bytes32 otherBaseTokenAssetId) {
         otherBaseTokenAssetId = bytes32(uint256(uint160(makeAddr("otherBaseToken"))));
-        L1SloadTestUtils.setInteropBaseTokenAssetId(
+        L1SloadMockUtils.setInteropBaseTokenAssetId(
             _l1ChainRegistrationSender(),
             destinationChainId,
             otherBaseTokenAssetId

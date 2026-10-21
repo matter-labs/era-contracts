@@ -42,6 +42,8 @@ error InvalidInteropPeer(uint256 chainId, uint256 peerChainId);
 error InvalidSettlementLayerForBatch(uint256 chainId, uint256 batchNumber, uint256 claimedSettlementLayer);
 // 0x47d42b1b
 error IteratedMigrationsNotSupported();
+// 0x5a2201d5
+error L1SloadNotEnabled(uint256 chainId);
 // 0xc3bd3c65
 error LocallyNoChainsAtGenesis();
 // 0x913183d8

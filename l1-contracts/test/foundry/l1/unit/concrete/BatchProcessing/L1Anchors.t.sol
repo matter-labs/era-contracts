@@ -8,7 +8,8 @@ import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfac
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {InteropRoot} from "contracts/common/Messaging.sol";
+import {InteropRoot, StoredInteropRoot} from "contracts/common/Messaging.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {L1_ANCHOR_MAX_LAG, L1_BLOCK_HASH_IMPORT_ID} from "contracts/common/Config.sol";
 import {InvalidMessageRoot} from "contracts/common/L1ContractErrors.sol";
 import {
@@ -92,11 +93,25 @@ contract L1AnchorsExecutorTest is ExecutorTest {
         uint256 batchTimestamp = anchoredAt + L1_ANCHOR_MAX_LAG + 1;
 
         IExecutor.StoredBatchInfo memory second = _commitAndProveSecond(first, batchTimestamp);
-        assertEq(utilsFacet.util_getBatchLastBlockTimestamp(2), batchTimestamp, "recorded at commit");
+        assertEq(second.timestamp, batchTimestamp, "the stored batch carries its last L2 block timestamp");
 
         vm.expectRevert(abi.encodeWithSelector(L1AnchorTooOld.selector, anchoredAt, batchTimestamp));
         _execute(second, new InteropRoot[](0));
         assertEq(getters.getTotalBatchesExecuted(), 1);
+    }
+
+    /// @dev The rule holds exactly at the lag boundary, for any distance from the anchor.
+    function testFuzz_freshness_executesIffWithinTheLag(uint256 _distance) public {
+        uint256 distance = bound(_distance, 0, 3 * L1_ANCHOR_MAX_LAG);
+        (IExecutor.StoredBatchInfo memory first, uint256 anchoredAt) = _executeFirstBatchWithAnchor();
+        uint256 batchTimestamp = anchoredAt + distance;
+        IExecutor.StoredBatchInfo memory second = _commitAndProveSecond(first, batchTimestamp);
+
+        if (distance > L1_ANCHOR_MAX_LAG) {
+            vm.expectRevert(abi.encodeWithSelector(L1AnchorTooOld.selector, anchoredAt, batchTimestamp));
+        }
+        _execute(second, new InteropRoot[](0));
+        assertEq(getters.getTotalBatchesExecuted(), distance > L1_ANCHOR_MAX_LAG ? 1 : 2);
     }
 
     /// @dev The stale batch executes once it imports a newer anchor itself.
@@ -159,6 +174,63 @@ contract L1AnchorsExecutorTest is ExecutorTest {
 
         assertEq(getters.getTotalBatchesExecuted(), 1);
         assertEq(utilsFacet.util_getL1AnchorTimestamp(), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Anchor recorded on execute
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Decision 7 of the L1SLOAD spec: operators need no separate transaction to record anchors.
+    function test_execute_recordsThePreviousL1Block() public {
+        IExecutor.StoredBatchInfo memory stored = _commitAndProveFirst(new InteropRoot[](0));
+        vm.roll(BLOCK_2 + 1);
+        vm.setBlockhash(BLOCK_2, HASH_2);
+        assertEq(messageRoot.recordedL1BlockHash(BLOCK_2).timestamp, 0);
+
+        vm.expectEmit(address(messageRoot));
+        emit IL1MessageRoot.L1BlockHashRecorded(BLOCK_2, HASH_2, block.timestamp);
+        _execute(stored, new InteropRoot[](0));
+
+        StoredInteropRoot memory recorded = messageRoot.recordedL1BlockHash(BLOCK_2);
+        assertEq(recorded.root, HASH_2);
+        assertEq(recorded.timestamp, block.timestamp);
+    }
+
+    /// @dev The anchor the first execute recorded is what a later batch imports.
+    function test_execute_recordedAnchorIsImportableByTheNextBatch() public {
+        IExecutor.StoredBatchInfo memory first = _commitAndProveFirst(new InteropRoot[](0));
+        vm.roll(BLOCK_1 + 1);
+        vm.setBlockhash(BLOCK_1, HASH_1);
+        _execute(first, new InteropRoot[](0));
+        uint256 recordedAt = block.timestamp;
+
+        vm.warp(block.timestamp + 1);
+        InteropRoot[] memory roots = _single(_anchor(BLOCK_1, HASH_1, recordedAt));
+        IExecutor.StoredBatchInfo memory second = _commitAndProve(first, _batch(2, block.timestamp, roots));
+        _mockMessageRootAppend(2);
+        _execute(second, roots);
+
+        assertEq(getters.getTotalBatchesExecuted(), 2);
+        assertEq(utilsFacet.util_getL1AnchorTimestamp(), recordedAt);
+    }
+
+    /// @dev A settlement layer other than L1 keeps no anchor record, so its executes record nothing. The message
+    /// root's `L1_CHAIN_ID` is mocked: the fixture runs on one chain.
+    function test_execute_recordsNothingOffL1() public {
+        IExecutor.StoredBatchInfo memory stored = _commitAndProveFirst(new InteropRoot[](0));
+        vm.roll(BLOCK_2 + 1);
+        vm.setBlockhash(BLOCK_2, HASH_2);
+        vm.mockCall(
+            address(messageRoot),
+            abi.encodeWithSelector(IMessageRootBase.L1_CHAIN_ID.selector),
+            abi.encode(block.chainid + 1)
+        );
+        vm.expectCall(address(messageRoot), abi.encodeCall(IL1MessageRoot.recordL1BlockHash, ()), 0);
+
+        _execute(stored, new InteropRoot[](0));
+
+        assertEq(getters.getTotalBatchesExecuted(), 1);
+        assertEq(messageRoot.recordedL1BlockHash(BLOCK_2).timestamp, 0);
     }
 
     /*//////////////////////////////////////////////////////////////

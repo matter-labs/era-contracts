@@ -8,6 +8,7 @@ import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 import {
     InteropAlreadyEnabled,
     InvalidSettlementLayerForBatch,
+    L1SloadNotEnabled,
     LocallyNoChainsAtGenesis,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
@@ -83,6 +84,8 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
             address(IL1AssetRouter(address(IBridgehubBase(BRIDGE_HUB).assetRouter())).nativeTokenVault())
         );
         require(!nativeTokenVault.chainBalanceBackfillPending(_chainId), ChainBalanceBackfillPending(_chainId));
+        // Interop gating on L2 reads L1 through L1SLOAD, see {protocol-docs/l1sload.md#chain-config-flag}.
+        require(IGetters(zkChain).isZKsyncOSL1SloadEnabled(), L1SloadNotEnabled(_chainId));
         if (_requireSecondProofSystem) {
             require(IGetters(zkChain).isSecondProofSystemRequired(), SecondProofSystemNotRequired(_chainId));
             uint256 proofMode = IGetters(zkChain).getProofMode();
@@ -102,6 +105,10 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     function recordL1BlockHash() external returns (uint256 blockNumber, bytes32 blockHash) {
         blockNumber = block.number - 1;
         blockHash = blockhash(blockNumber);
+        // Every chain's execute in an L1 block records the same block, so only the first call writes.
+        if (recordedL1BlockHashes[blockNumber].timestamp != 0) {
+            return (blockNumber, blockHash);
+        }
         recordedL1BlockHashes[blockNumber] = StoredInteropRoot({root: blockHash, timestamp: block.timestamp});
         emit L1BlockHashRecorded(blockNumber, blockHash, block.timestamp);
     }

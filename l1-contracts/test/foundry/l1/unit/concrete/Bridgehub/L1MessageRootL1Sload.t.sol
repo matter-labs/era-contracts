@@ -74,17 +74,38 @@ contract L1MessageRootL1SloadTest is Test {
         assertEq(messageRoot.recordedL1BlockHash(blockNumber).root, blockHash);
     }
 
-    /// @dev Recording twice in one block writes the same values.
+    /// @dev Every chain's execute in one L1 block records the same block: only the first call writes and emits.
     function test_recordL1BlockHash_idempotentWithinABlock() public {
         vm.roll(51);
         vm.setBlockhash(50, keccak256("l1-block-50"));
         messageRoot.recordL1BlockHash();
         StoredInteropRoot memory first = messageRoot.recordedL1BlockHash(50);
 
-        messageRoot.recordL1BlockHash();
+        vm.recordLogs();
+        (uint256 recordedNumber, bytes32 recordedHash) = messageRoot.recordL1BlockHash();
+        assertEq(vm.getRecordedLogs().length, 0, "no second event");
+        assertEq(recordedNumber, 50);
+        assertEq(recordedHash, first.root);
         StoredInteropRoot memory second = messageRoot.recordedL1BlockHash(50);
         assertEq(second.root, first.root);
         assertEq(second.timestamp, first.timestamp);
+    }
+
+    /// @dev The next L1 block records its own predecessor.
+    function test_recordL1BlockHash_nextBlockRecordsAgain() public {
+        vm.roll(51);
+        vm.setBlockhash(50, keccak256("l1-block-50"));
+        messageRoot.recordL1BlockHash();
+
+        vm.roll(52);
+        vm.warp(block.timestamp + 12);
+        vm.setBlockhash(51, keccak256("l1-block-51"));
+        vm.expectEmit(address(messageRoot));
+        emit IL1MessageRoot.L1BlockHashRecorded(51, keccak256("l1-block-51"), block.timestamp);
+        messageRoot.recordL1BlockHash();
+
+        assertEq(messageRoot.recordedL1BlockHash(51).root, keccak256("l1-block-51"));
+        assertEq(messageRoot.recordedL1BlockHash(50).root, keccak256("l1-block-50"), "the earlier record stays");
     }
 
     function test_recordedL1BlockHash_zeroForUnrecordedBlocks() public view {

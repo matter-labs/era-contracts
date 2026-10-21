@@ -344,6 +344,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         batch.batchNumber = batches[0].batchNumber;
         batch.batchHash = batches[0].newStateCommitment;
+        batch.timestamp = batches[0].lastBlockTimestamp;
         bool foundCommit;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].emitter == _chain && logs[i].topics[0] == ICommitter.BlockCommit.selector) {

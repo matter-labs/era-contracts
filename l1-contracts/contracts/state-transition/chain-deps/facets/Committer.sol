@@ -138,7 +138,6 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             );
             // Written even when zero, so a re-commit after a revert replaces the reverted batch's count.
             s.interopFeeUnits[_lastCommittedBatchData.batchNumber] = _newBatchesData[i].interopFeeUnits;
-            s.batchLastBlockTimestamp[_lastCommittedBatchData.batchNumber] = _newBatchesData[i].lastBlockTimestamp;
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,
@@ -240,8 +239,8 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
         // We are using same stored batch info structure as was used for Era VM state transition.
         // But we set some fields differently:
         // `batchHash` commitments now contains full commitment to the state and `indexRepeatedStorageChanges` not used(always set to 0)
-        // `timestamp` is not used anymore(set to 0), for Era we used it to validate that committed batch timestamp is consistent with last stored,
-        // but in ZKsync OS we are validating it within the state transition program
+        // `timestamp` is the batch's last L2 block timestamp, which the batch output hash (and so the proof) commits to.
+        // Batches committed before v36 stored 0 here. See {protocol-docs/l1sload.md#freshness}.
         storedBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
             batchHash: _newBatch.newStateCommitment,
@@ -250,7 +249,7 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             priorityOperationsHash: _newBatch.priorityOperationsHash,
             l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
             dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
-            timestamp: 0,
+            timestamp: _newBatch.lastBlockTimestamp,
             commitment: _getBatchCommitment(
                 _previousBatch.batchHash,
                 _newBatch.newStateCommitment,

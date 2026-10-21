@@ -117,14 +117,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
             );
         }
 
-        _checkL1AnchorFreshness(currentBatchNumber, newestL1AnchorTimestamp);
+        _checkL1AnchorFreshness(_storedBatch.timestamp, newestL1AnchorTimestamp);
     }
 
     /// @notice Records the newest L1SLOAD anchor the chain imported and enforces the anchor freshness rule for the
     /// batch. See {protocol-docs/l1sload.md#freshness}.
-    /// @param _batchNumber The executed batch.
+    /// @param _batchTimestamp The executed batch's last L2 block timestamp, zero for a batch committed before v36.
     /// @param _newestL1AnchorTimestamp The newest timestamp among the anchors the batch imported, or zero.
-    function _checkL1AnchorFreshness(uint256 _batchNumber, uint256 _newestL1AnchorTimestamp) internal {
+    function _checkL1AnchorFreshness(uint256 _batchTimestamp, uint256 _newestL1AnchorTimestamp) internal {
         uint256 l1AnchorTimestamp = s.l1AnchorTimestamp;
         if (_newestL1AnchorTimestamp > l1AnchorTimestamp) {
             l1AnchorTimestamp = _newestL1AnchorTimestamp;
@@ -133,10 +133,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
         if (l1AnchorTimestamp == 0 || s.priorityModeInfo.activated) {
             return;
         }
-        uint256 batchTimestamp = s.batchLastBlockTimestamp[_batchNumber];
+        // A batch committed before v36 stores a zero timestamp, which always passes.
         require(
-            l1AnchorTimestamp + L1_ANCHOR_MAX_LAG >= batchTimestamp,
-            L1AnchorTooOld(l1AnchorTimestamp, batchTimestamp)
+            l1AnchorTimestamp + L1_ANCHOR_MAX_LAG >= _batchTimestamp,
+            L1AnchorTooOld(l1AnchorTimestamp, _batchTimestamp)
         );
     }
 
@@ -247,6 +247,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
             delete s.l2SystemContractsUpgradeTxHash;
             delete s.l2SystemContractsUpgradeBatchNumber;
         }
+
+        _recordL1Anchor();
+    }
+
+    /// @notice Records an L1 block hash for chains to import as their L1SLOAD anchor, so that operators send no
+    /// separate L1 transaction for it. See {protocol-docs/l1sload.md#anchors}.
+    /// @dev Only on L1: a settlement layer's `L2MessageRoot` has no anchor record.
+    function _recordL1Anchor() internal {
+        IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
+        if (block.chainid != messageRootContract.L1_CHAIN_ID()) {
+            return;
+        }
+        // slither-disable-next-line unused-return
+        IL1MessageRoot(address(messageRootContract)).recordL1BlockHash();
     }
 
     /// @inheritdoc IExecutor

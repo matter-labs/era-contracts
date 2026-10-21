@@ -34,7 +34,7 @@ interface IExecutor is IZKChainBase {
         bytes32 priorityOperationsHash;
         bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
-        uint256 timestamp; // For ZKsync OS not used, always set to 0
+        uint256 timestamp; // ZKsync OS: the batch's last L2 block timestamp from v36, 0 before
         bytes32 commitment; // ZKsync OS: full public-input hash from v34; batch-output hash before v34.
     }
 

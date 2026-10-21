@@ -46,6 +46,11 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _enabled Whether to enable large contracts.
     function setZKsyncOSLargeContractsEnabled(bool _enabled) external;
 
+    /// @notice Enables or disables the ZKsync OS L1SLOAD precompile. It can't be disabled while interop is enabled
+    /// for the chain. See {protocol-docs/chain-config.md#l1sload}.
+    /// @param _enabled Whether to enable L1SLOAD.
+    function setZKsyncOSL1SloadEnabled(bool _enabled) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -160,6 +165,9 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice ZKsync OS large-contract support changed.
     event NewZKsyncOSLargeContracts(bool oldEnabled, bool newEnabled);
+
+    /// @notice ZKsync OS L1SLOAD support changed.
+    event NewZKsyncOSL1Sload(bool oldEnabled, bool newEnabled);
 
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);

@@ -206,7 +206,8 @@ contract ZKChainBase is ReentrancyGuard {
                     uint256(_getZKsyncOSMaxTxGasLimit()),
                     uint256(s.pubdataContent),
                     uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0),
-                    uint256(s.zksyncOSLargeContractsEnabled ? 1 : 0)
+                    uint256(s.zksyncOSLargeContractsEnabled ? 1 : 0),
+                    uint256(s.zksyncOSL1SloadEnabled ? 1 : 0)
                 )
             );
     }

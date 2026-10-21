@@ -10,7 +10,7 @@ import {DestinationChainNotAllowed, DestinationChainNotRegistered} from "contrac
 import {L2_INTEROP_CENTER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
-import {L1SloadTestUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadTestUtils.sol";
+import {L1SloadMockUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 
 /// @title L2InteropDestinationChainRegressionTestAbstract
 /// @notice Regression tests for the unregistered destination chain check (PR #1811)
@@ -50,7 +50,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
     /// @notice A chain registered for interop, i.e. allowed by some other chain's admin on L1, that this chain's
     /// admin didn't allow can't be sent to.
     function test_sendToRegisteredButNotAllowedChainReverts() public {
-        L1SloadTestUtils.setInteropBaseTokenAssetId(
+        L1SloadMockUtils.setInteropBaseTokenAssetId(
             _l1ChainRegistrationSender(),
             UNREGISTERED_CHAIN_ID,
             bytes32(uint256(0xABCDEF))
