@@ -64,9 +64,10 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         l2Bridgehub.allowInteropPeer(UNREGISTERED_CHAIN_ID, legacyBaseTokenAssetId);
         // Mock: only storage written before the upgrade holds a chain that is registered but not allowed, since
         // the retired registration is gone. The anvil upgrade test sends over such a pair end to end.
+        // `InteropCenter` consults `canSendTo`, which without L1 reads mirrors `isPeerAllowed`.
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IL2Bridgehub.isPeerAllowed, (UNREGISTERED_CHAIN_ID)),
+            abi.encodeCall(IL2Bridgehub.canSendTo, (UNREGISTERED_CHAIN_ID)),
             abi.encode(false)
         );
         assertEq(l2Bridgehub.baseTokenAssetId(UNREGISTERED_CHAIN_ID), legacyBaseTokenAssetId);

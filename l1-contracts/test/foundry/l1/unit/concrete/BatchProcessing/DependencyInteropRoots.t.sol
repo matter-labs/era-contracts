@@ -25,8 +25,10 @@ contract DependencyInteropRootsHarness is ExecutorFacet {
         s.bridgehub = _bridgehub;
     }
 
-    function verifyDependencyInteropRoots(InteropRoot[] memory _dependencyRoots) external view returns (bytes32) {
-        return _verifyDependencyInteropRoots(_dependencyRoots);
+    function verifyDependencyInteropRoots(
+        InteropRoot[] memory _dependencyRoots
+    ) external view returns (bytes32 rollingHash) {
+        (rollingHash, ) = _verifyDependencyInteropRoots(_dependencyRoots);
     }
 }
 
