@@ -93,9 +93,10 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
 
     /// @notice Records an L1 block hash for chains to import as their L1SLOAD anchor, so that operators send no
     /// separate L1 transaction for it. See {protocol-docs/l1sload.md#anchors}.
-    /// @dev Only on L1: a settlement layer's `L2MessageRoot` has no anchor record.
+    /// @dev Only for a chain with L1SLOAD on, and only on L1: a settlement layer's `L2MessageRoot` has no anchor
+    /// record.
     function _recordL1Anchor() internal {
-        if (L1_CHAIN_ID != block.chainid) {
+        if (!s.zksyncOSL1SloadEnabled || L1_CHAIN_ID != block.chainid) {
             return;
         }
         // slither-disable-next-line unused-return
@@ -253,8 +254,8 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
         // We are using same stored batch info structure as was used for Era VM state transition.
         // But we set some fields differently:
         // `batchHash` commitments now contains full commitment to the state and `indexRepeatedStorageChanges` not used(always set to 0)
-        // `timestamp` is the batch's last L2 block timestamp, which the batch output hash (and so the proof) commits to.
-        // Batches committed before v36 stored 0 here. See {protocol-docs/l1sload.md#freshness}.
+        // `timestamp` is not used anymore(set to 0), for Era we used it to validate that committed batch timestamp is consistent with last stored,
+        // but in ZKsync OS we are validating it within the state transition program
         storedBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
             batchHash: _newBatch.newStateCommitment,
@@ -263,7 +264,7 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             priorityOperationsHash: _newBatch.priorityOperationsHash,
             l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
             dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
-            timestamp: _newBatch.lastBlockTimestamp,
+            timestamp: 0,
             commitment: _getBatchCommitment(
                 _previousBatch.batchHash,
                 _newBatch.newStateCommitment,

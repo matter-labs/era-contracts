@@ -124,6 +124,11 @@ abstract contract L1SloadSharedTest is Test {
     /// @dev The chain's diamond, as the L1 contracts read it: mocked to its admin and to L1SLOAD on.
     function _installChain(uint256 _chainId, address _diamond) internal virtual {
         vm.mockCall(_diamond, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_chainAdmin(_chainId)));
+        vm.mockCall(
+            _diamond,
+            abi.encodeCall(IGetters.facetAddress, (IGetters.isZKsyncOSL1SloadEnabled.selector)),
+            abi.encode(_diamond)
+        );
         vm.mockCall(_diamond, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(true));
     }
 

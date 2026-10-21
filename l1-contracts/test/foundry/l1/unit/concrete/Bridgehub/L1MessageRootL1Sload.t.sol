@@ -74,7 +74,7 @@ contract L1MessageRootL1SloadTest is Test {
         assertEq(messageRoot.recordedL1BlockHash(blockNumber).root, blockHash);
     }
 
-    /// @dev Every chain's execute in one L1 block records the same block: only the first call writes and emits.
+    /// @dev Every chain's commit in one L1 block records the same block: only the first call writes and emits.
     function test_recordL1BlockHash_idempotentWithinABlock() public {
         vm.roll(51);
         vm.setBlockhash(50, keccak256("l1-block-50"));

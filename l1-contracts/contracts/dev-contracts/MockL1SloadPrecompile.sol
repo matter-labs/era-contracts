@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IL2InteropRootStorage} from "../interop/IL2InteropRootStorage.sol";
 import {L2_INTEROP_ROOT_STORAGE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L1SLOAD_MAX_KEYS} from "../common/Config.sol";
 
 /// @title MockL1SloadPrecompile
 /// @notice Stand-in for the ZKsync OS L1SLOAD precompile (`L1SLOAD_PRECOMPILE_ADDRESS`, RIP-7728) on EVMs that don't
@@ -12,12 +13,10 @@ import {L2_INTEROP_ROOT_STORAGE_ADDR} from "../common/l2-helpers/L2ContractAddre
 /// @dev The values are whatever the harness last set with {setL1StorageValues}, read from the L1 contract (on anvil,
 /// `eth_getStorageAt` on the L1) or chosen by the test; the precompile reads the L1 state at the anchored block.
 /// Like the precompile, it reverts while `L2InteropRootStorage` holds no anchor, and fails consuming all gas on
-/// input with no key, more than `MAX_KEYS` keys or a partial key.
+/// input with no key, more than `L1SLOAD_MAX_KEYS` keys or a partial key.
 contract MockL1SloadPrecompile {
     uint256 internal constant ADDRESS_LENGTH = 20;
     uint256 internal constant WORD_LENGTH = 32;
-    /// @dev `L1SLOAD_MAX_KEYS`; repeated so the anvil build of this file does not depend on `Config.sol`.
-    uint256 internal constant MAX_KEYS = 5;
 
     /// @notice The value served for `_key` of `_l1Contract`.
     mapping(address l1Contract => mapping(bytes32 key => bytes32 value)) public l1StorageValue;
@@ -46,7 +45,9 @@ contract MockL1SloadPrecompile {
         }
         uint256 inputLength = _input.length;
         uint256 keysLength = inputLength > ADDRESS_LENGTH ? (inputLength - ADDRESS_LENGTH) / WORD_LENGTH : 0;
-        if (keysLength == 0 || keysLength > MAX_KEYS || inputLength != ADDRESS_LENGTH + keysLength * WORD_LENGTH) {
+        if (
+            keysLength == 0 || keysLength > L1SLOAD_MAX_KEYS || inputLength != ADDRESS_LENGTH + keysLength * WORD_LENGTH
+        ) {
             assembly {
                 invalid()
             }

@@ -529,7 +529,7 @@ contract ExecutorTest is UtilsCallMockerTest {
             priorityOperationsHash: info.priorityOperationsHash,
             dependencyRootsRollingHash: info.dependencyRootsRollingHash,
             l2LogsTreeRoot: info.l2LogsTreeRoot,
-            timestamp: info.lastBlockTimestamp,
+            timestamp: 0,
             commitment: commitment
         });
     }

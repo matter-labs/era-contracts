@@ -8,7 +8,8 @@ import {InteropRoot, StoredInteropRoot} from "contracts/common/Messaging.sol";
 import {
     L1_BLOCK_HASH_IMPORT_ID,
     L1SLOAD_ANCHOR_BLOCK_HASH_SLOT,
-    L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT
+    L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT,
+    L1SLOAD_ANCHOR_TIMESTAMP_SLOT
 } from "contracts/common/Config.sol";
 import {InteropRootTimestampIsZero, L1AnchorNotNewer, SidesLengthNotOne} from "contracts/interop/InteropErrors.sol";
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -29,11 +30,13 @@ contract L2InteropRootStorageL1AnchorTest is L1SloadSharedTest {
     function test_anchorSlotsMatchTheOS() public pure {
         assertEq(L1SLOAD_ANCHOR_BLOCK_HASH_SLOT, 0x142c4a6779611c44dc597e02ef1171577327f02356cebd6f373cfaa886831283);
         assertEq(L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT, keccak256("zksync-os.l1sload.anchor.block-number"));
+        assertEq(L1SLOAD_ANCHOR_TIMESTAMP_SLOT, 0x840528b13813a4d88e7572e39ead87b5d3a2ef4d72fc74665e1c19c022e232ce);
     }
 
     function test_noAnchorBeforeTheFirstImport() public view {
         assertEq(rootStorage.l1AnchorBlockHash(), bytes32(0));
         assertEq(rootStorage.l1AnchorBlockNumber(), 0);
+        assertEq(rootStorage.l1AnchorTimestamp(), 0);
     }
 
     /// @dev The import emits exactly one side (the block hash, which the OS event hook requires) and moves the anchor
@@ -57,6 +60,8 @@ contract L2InteropRootStorageL1AnchorTest is L1SloadSharedTest {
         assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_1);
         assertEq(vm.load(L2_INTEROP_ROOT_STORAGE_ADDR, L1SLOAD_ANCHOR_BLOCK_HASH_SLOT), HASH_1, "OS-read slot");
         assertEq(uint256(vm.load(L2_INTEROP_ROOT_STORAGE_ADDR, L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT)), BLOCK_1);
+        assertEq(rootStorage.l1AnchorTimestamp(), TIMESTAMP_1, "the L1 time the reads' freshness is measured from");
+        assertEq(uint256(vm.load(L2_INTEROP_ROOT_STORAGE_ADDR, L1SLOAD_ANCHOR_TIMESTAMP_SLOT)), TIMESTAMP_1);
     }
 
     /// @dev An anchor is not a message root, so nothing that reads roots sees it.
@@ -75,6 +80,7 @@ contract L2InteropRootStorageL1AnchorTest is L1SloadSharedTest {
 
         assertEq(rootStorage.l1AnchorBlockHash(), HASH_2);
         assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_2);
+        assertEq(rootStorage.l1AnchorTimestamp(), TIMESTAMP_2);
     }
 
     /// @dev The anchor never moves back: an older import reverts.

@@ -193,7 +193,7 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
                 priorityOperationsHash: _commitInfo.priorityOperationsHash,
                 l2LogsTreeRoot: _commitInfo.l2LogsTreeRoot,
                 dependencyRootsRollingHash: _commitInfo.dependencyRootsRollingHash,
-                timestamp: _commitInfo.lastBlockTimestamp,
+                timestamp: 0,
                 commitment: keccak256(
                     abi.encodePacked(
                         _previousBatch.batchHash,

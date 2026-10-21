@@ -43,7 +43,7 @@ bytes32 constant ERC1967_ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.a
 /// Bridgehub caps chain IDs at `type(uint48).max`. See {protocol-docs/l1sload.md#anchors}.
 uint256 constant L1_BLOCK_HASH_IMPORT_ID = uint256(keccak256("zksync.l1-block-hash-import")) - 1;
 
-/// @dev Maximum age of a chain's newest L1 anchor relative to the last L2 block of a batch it executes.
+/// @dev Maximum age, in L2 block time, of the L1 anchor that L2 contracts read gating state at.
 /// See {protocol-docs/l1sload.md#freshness}.
 uint256 constant L1_ANCHOR_MAX_LAG = 1 hours;
 
@@ -52,6 +52,9 @@ bytes32 constant L1SLOAD_ANCHOR_BLOCK_HASH_SLOT = keccak256("zksync-os.l1sload.a
 
 /// @dev `L2InteropRootStorage` slot of the L1SLOAD anchor block number.
 bytes32 constant L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT = keccak256("zksync-os.l1sload.anchor.block-number");
+
+/// @dev `L2InteropRootStorage` slot of the L1 time the L1SLOAD anchor was recorded at.
+bytes32 constant L1SLOAD_ANCHOR_TIMESTAMP_SLOT = keccak256("zksync-os.l1sload.anchor.timestamp");
 
 /// @dev Maximum number of storage keys one L1SLOAD precompile call reads.
 uint256 constant L1SLOAD_MAX_KEYS = 5;

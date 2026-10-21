@@ -290,10 +290,6 @@ contract UtilsFacet is ZKChainBase {
         return s.disabledProofSystems;
     }
 
-    function util_getL1AnchorTimestamp() external view returns (uint256) {
-        return s.l1AnchorTimestamp;
-    }
-
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

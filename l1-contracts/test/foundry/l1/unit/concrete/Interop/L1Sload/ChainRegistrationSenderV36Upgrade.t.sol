@@ -41,6 +41,11 @@ contract V36ChainUpgradeHarness is DefaultUpgrade {
         return s.zksyncOSL1SloadEnabled;
     }
 
+    /// @dev The loupe `enableInterop` asks: this chain routes every getter it has.
+    function facetAddress(bytes4) external view returns (address) {
+        return address(this);
+    }
+
     function getZKsyncOSChainConfigHash() external view returns (bytes32) {
         return _getZKsyncOSChainConfigHash();
     }

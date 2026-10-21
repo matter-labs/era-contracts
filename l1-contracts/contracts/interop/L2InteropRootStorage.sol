@@ -8,7 +8,8 @@ import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddre
 import {
     L1_BLOCK_HASH_IMPORT_ID,
     L1SLOAD_ANCHOR_BLOCK_HASH_SLOT,
-    L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT
+    L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT,
+    L1SLOAD_ANCHOR_TIMESTAMP_SLOT
 } from "contracts/common/Config.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IL2InteropRootStorage} from "./IL2InteropRootStorage.sol";
@@ -55,6 +56,11 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @inheritdoc IL2InteropRootStorage
     function l1AnchorBlockNumber() public view returns (uint256) {
         return StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT).value;
+    }
+
+    /// @inheritdoc IL2InteropRootStorage
+    function l1AnchorTimestamp() external view returns (uint256) {
+        return StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_TIMESTAMP_SLOT).value;
     }
 
     /// @inheritdoc IL2InteropRootStorage
@@ -111,7 +117,7 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         // An L1 anchor is not a message root: it only moves the anchor, and the event still carries it into the
         // batch's dependency roots. See {protocol-docs/l1sload.md#anchors}.
         if (chainId == L1_BLOCK_HASH_IMPORT_ID) {
-            _setL1Anchor(blockOrBatchNumber, sides[0]);
+            _setL1Anchor(blockOrBatchNumber, sides[0], timestamp);
             emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
             return;
         }
@@ -136,12 +142,14 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @dev The slots are fixed because ZKsync OS reads the anchor hash directly from this contract's storage.
     /// @param _blockNumber The L1 block number.
     /// @param _blockHash The L1 block hash.
-    function _setL1Anchor(uint256 _blockNumber, bytes32 _blockHash) private {
+    /// @param _timestamp The L1 time the block hash was recorded at, which execution checks against the record.
+    function _setL1Anchor(uint256 _blockNumber, bytes32 _blockHash, uint256 _timestamp) private {
         uint256 anchorBlockNumber = l1AnchorBlockNumber();
         if (_blockNumber <= anchorBlockNumber) {
             revert L1AnchorNotNewer(_blockNumber, anchorBlockNumber);
         }
         StorageSlot.getBytes32Slot(L1SLOAD_ANCHOR_BLOCK_HASH_SLOT).value = _blockHash;
         StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT).value = _blockNumber;
+        StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_TIMESTAMP_SLOT).value = _timestamp;
     }
 }

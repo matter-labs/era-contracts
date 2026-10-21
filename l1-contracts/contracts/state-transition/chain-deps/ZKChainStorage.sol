@@ -305,8 +305,4 @@ struct ZKChainStorage {
     /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
     /// @dev STORAGE SLOT: 70
     bool secondProofSystemRequired;
-    /// @dev The newest timestamp among the L1SLOAD anchors this chain imported in executed batches.
-    /// See {protocol-docs/l1sload.md#freshness}.
-    /// @dev STORAGE SLOT: 71
-    uint256 l1AnchorTimestamp;
 }

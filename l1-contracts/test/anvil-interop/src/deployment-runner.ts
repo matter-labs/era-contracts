@@ -19,7 +19,16 @@ import type {
   L2ChainInfo,
   PriorityRequestData,
 } from "./core/types";
-import { getChainDiamondProxy, getChainIdsByRole, getInteropChainIds, timeIt, createProvider } from "./core/utils";
+import {
+  getChainDiamondProxy,
+  getChainIdsByRole,
+  getInteropChainIds,
+  getL1RpcUrl,
+  getL2RpcUrl,
+  timeIt,
+  createProvider,
+} from "./core/utils";
+import { syncL1Reads } from "./helpers/l1-reads";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
 import { getInteropSourceAddress, getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
@@ -763,6 +772,24 @@ export class DeploymentRunner {
     console.log("\n=== Chain States Loaded ===\n");
 
     return { chains: chainInfo, l1Addresses, ctmAddresses, chainAddresses };
+  }
+
+  /**
+   * The interop chains import a new anchor and read L1 at it, as their server would. Loaded chain states hold anchors
+   * as old as the states, which gating reads refuse once past `L1_ANCHOR_MAX_LAG` ({protocol-docs/l1sload.md#freshness}).
+   */
+  async syncInteropL1Reads(): Promise<void> {
+    const state = this.loadState();
+    if (!state.chains || !state.l1Addresses) {
+      throw new Error("Deployment state incomplete: no chains or L1 addresses to sync L1 reads for");
+    }
+    const chainIds = getInteropChainIds(state.chains.config);
+    await syncL1Reads({
+      l1Provider: createProvider(getL1RpcUrl(state)),
+      l1Addresses: state.l1Addresses,
+      chainIds,
+      l2Providers: new Map(chainIds.map((chainId) => [chainId, createProvider(getL2RpcUrl(state, chainId))])),
+    });
   }
 
   /** Resolve the chain-states directory for the current protocol version. */

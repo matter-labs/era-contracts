@@ -4,10 +4,12 @@ pragma solidity 0.8.28;
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProofSystem, ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/Config.sol";
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {L1SloadRequiredByInterop} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
+    ChainPredatesL1Sload,
     InteropAlreadyEnabled,
     L1SloadNotEnabled,
     SecondProofSystemNotRequired,
@@ -61,11 +63,25 @@ contract EnableInteropTest is InteropGatingDeployer {
 
     /// @dev A diamond whose facets predate L1SLOAD has no `isZKsyncOSL1SloadEnabled`, so the proxy reverts with "F" and
     /// such a chain can't be enabled until it upgrades. The getter is mocked to revert that way.
+    /// @dev The CTM cuts the L1SLOAD getter out of the chain's diamond, leaving it routed as a v35 diamond is.
+    /// See {protocol-docs/l1sload.md#upgrade-window}.
     function test_enableInterop_revertWhen_diamondPredatesL1Sload() public {
-        _permanentlyRequireSecondProofSystem(chainId);
-        vm.mockCallRevert(chain, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), bytes("F"));
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = IGetters.isZKsyncOSL1SloadEnabled.selector;
+        Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](1);
+        cuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: false,
+            selectors: selectors
+        });
+        vm.prank(IGetters(chain).getChainTypeManager());
+        IAdmin(chain).executeUpgrade(
+            Diamond.DiamondCutData({facetCuts: cuts, initAddress: address(0), initCalldata: ""})
+        );
+        assertEq(IGetters(chain).facetAddress(IGetters.isZKsyncOSL1SloadEnabled.selector), address(0));
 
-        _expectEnableInteropRevert(governance, chainId, bytes("F"));
+        _expectEnableInteropRevert(governance, chainId, abi.encodeWithSelector(ChainPredatesL1Sload.selector, chainId));
     }
 
     function test_enableInterop() public {

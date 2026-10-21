@@ -168,7 +168,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
                 priorityOperationsHash: _batch.priorityOperationsHash,
                 l2LogsTreeRoot: _batch.l2LogsTreeRoot,
                 dependencyRootsRollingHash: _batch.dependencyRootsRollingHash,
-                timestamp: _batch.lastBlockTimestamp,
+                timestamp: 0,
                 commitment: keccak256(
                     abi.encodePacked(
                         _previousBatch.batchHash,
