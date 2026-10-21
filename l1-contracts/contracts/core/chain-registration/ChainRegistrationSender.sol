@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
 
 import {IChainRegistrationSender} from "./IChainRegistrationSender.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
@@ -11,7 +12,9 @@ import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
+import {IProxyUpgradeInitializable} from "../../upgrades/registry/IUpgradeInit.sol";
 
+import {ERC1967_ADMIN_SLOT} from "../../common/Config.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
@@ -27,7 +30,12 @@ import {
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Holds the interop gating state that chains read from L1 with L1SLOAD: the peer whitelist the chain admins
 /// write, the peers' base tokens and the owner's suspensions. See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
-contract ChainRegistrationSender is IChainRegistrationSender, ReentrancyGuard, Ownable2StepUpgradeable {
+contract ChainRegistrationSender is
+    IChainRegistrationSender,
+    IProxyUpgradeInitializable,
+    ReentrancyGuard,
+    Ownable2StepUpgradeable
+{
     IBridgehubBase public immutable BRIDGE_HUB;
 
     /// @dev Written by the retired consent-free registration and read by nothing.
@@ -60,6 +68,28 @@ contract ChainRegistrationSender is IChainRegistrationSender, ReentrancyGuard, O
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
+    }
+
+    /// @inheritdoc IProxyUpgradeInitializable
+    /// @dev The v36 migration: snapshots the base token of every chain a v35 admin could have allowed as a peer, so
+    /// that pairs allowed before the upgrade keep working. See {protocol-docs/l1sload.md#upgrade-from-v35}.
+    /// @dev Only the proxy admin, i.e. through `upgradeToAndCall`.
+    function initializeUpgrade() external reinitializer(2) {
+        require(msg.sender == StorageSlot.getAddressSlot(ERC1967_ADMIN_SLOT).value, Unauthorized(msg.sender));
+        IMessageRootBase messageRoot = BRIDGE_HUB.messageRoot();
+        uint256[] memory chainIds = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256 chainIdsLength = chainIds.length;
+        for (uint256 i = 0; i < chainIdsLength; ++i) {
+            uint256 chainId = chainIds[i];
+            if (
+                interopBaseTokenAssetId[chainId] != bytes32(0) ||
+                !IL1MessageRoot(address(messageRoot)).isInteropEnabled(chainId) ||
+                messageRoot.chainTreeLeafCount(chainId) == 0
+            ) {
+                continue;
+            }
+            interopBaseTokenAssetId[chainId] = BRIDGE_HUB.baseTokenAssetId(chainId);
+        }
     }
 
     /// @inheritdoc IChainRegistrationSender
