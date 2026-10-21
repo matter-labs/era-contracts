@@ -10,7 +10,7 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 
 ## Gateway is softly deprecated
 
-v33 onwards deploys no Gateway, and its ceremony tooling is gone. The settlement-layer machinery in the contracts, the scripts that stand a Gateway up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04–06) remain so that a future settlement layer can use chain migration; removing them is tracked in EVM-1729. Support for the legacy Era Gateway is gone. Beyond keeping those tests passing, nothing depends on the Gateway.
+v33 onwards deploys no Gateway, and its ceremony tooling is gone. The settlement-layer machinery in the contracts, the scripts that stand a Gateway up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04 and 05) remain so that a future settlement layer can use chain migration; removing them is tracked in EVM-1729. Support for the legacy Era Gateway is gone. Beyond keeping those tests passing, nothing depends on the Gateway.
 
 Unless the user explicitly asks about the Gateway:
 

@@ -4,7 +4,7 @@ import { Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import {
   getChainIdByRole,
-  getChainIdsByRole,
+  getInteropChainIds,
   getL2Chain,
   createProvider,
   impersonateAndRun,
@@ -95,10 +95,9 @@ describe("14 - Interop fee units", function () {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
 
-    // The two chains the harness wires for L2<->L2 interop.
-    const interopChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
+    const interopChainIds = getInteropChainIds(state.chains.config);
     if (interopChainIds.length < 2) {
-      throw new Error("Need at least 2 interop-registered chains");
+      throw new Error("Need at least 2 interop chains");
     }
     sourceChainId = interopChainIds[0];
     destChainId = interopChainIds[1];

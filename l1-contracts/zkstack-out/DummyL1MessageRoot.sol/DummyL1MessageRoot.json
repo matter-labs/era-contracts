@@ -276,6 +276,24 @@
   },
   {
     "type": "function",
+    "name": "enableInterop",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_requireSecondProofSystem",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getAggregatedRoot",
     "inputs": [],
     "outputs": [
@@ -494,6 +512,25 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isInteropEnabled",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -959,6 +996,19 @@
   },
   {
     "type": "event",
+    "name": "InteropEnabled",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "NewChainRoot",
     "inputs": [
       {
@@ -1021,6 +1071,17 @@
   },
   {
     "type": "error",
+    "name": "ChainBalanceBackfillPending",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ChainBatchRootAlreadyExists",
     "inputs": [
       {
@@ -1049,6 +1110,17 @@
     "type": "error",
     "name": "HashedLogIsDefault",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InteropAlreadyEnabled",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
@@ -1112,6 +1184,17 @@
       },
       {
         "name": "batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotMultiProofMode",
+    "inputs": [
+      {
+        "name": "proofMode",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1188,6 +1271,28 @@
   },
   {
     "type": "error",
+    "name": "SecondProofSystemNotRequired",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "UnsupportedProofMetadataVersion",
     "inputs": [
       {
@@ -1196,6 +1301,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ZKChainNotRegistered",
+    "inputs": []
   },
   {
     "type": "error",

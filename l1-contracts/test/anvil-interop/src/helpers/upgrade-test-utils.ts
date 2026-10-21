@@ -83,6 +83,26 @@ export function selectUpgradeChains(
 }
 
 /**
+ * The chains among `chains` that settle on L1 in the loaded states. Roles come from the current config, whose
+ * topology can differ from that of an older release's states, so the settlement layer is read on-chain.
+ */
+export async function keepL1SettledChains(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  bridgehubAddr: string,
+  chains: Array<{ chainId: number; diamondProxy: string }>
+): Promise<Array<{ chainId: number; diamondProxy: string }>> {
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  const settledOnL1: Array<{ chainId: number; diamondProxy: string }> = [];
+  for (const chain of chains) {
+    if ((await bridgehub.settlementLayer(chain.chainId)).eq(l1ChainId)) {
+      settledOnL1.push(chain);
+    }
+  }
+  return settledOnL1;
+}
+
+/**
  * Trace a failed transaction via receipt + eth_call replay and return a human-readable summary.
  */
 export async function traceFailedTx(provider: ethers.providers.JsonRpcProvider, txHash: string): Promise<string> {

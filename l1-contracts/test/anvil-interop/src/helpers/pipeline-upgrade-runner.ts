@@ -79,6 +79,7 @@ import {
   discoverDomainExecutors,
   findLegExecution,
   readProxyAdmin,
+  keepL1SettledChains,
   readProxyImplementation,
   selectUpgradeChains,
   snapshotProxyUpgradeLegs,
@@ -99,6 +100,8 @@ import { l1GasOverrides, recordL1TransactionGas } from "./l1-transaction-gas";
 import { createProvider, impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
+import type { GatedChain } from "./upgrade-interop-gating";
+import { depositBeforeUpgrade, registerLegacyInteropPair, runInteropGatingProcedure } from "./upgrade-interop-gating";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -162,6 +165,11 @@ export type PipelineUpgradeScenario = {
    * legs, and every chain crosses through the cut-READING `upgradeChainFromVersion` (see runRecurringHop).
    */
   followUps?: RecurringUpgradeHop[];
+  /**
+   * Registers the first two target chains with each other before the upgrade and takes them through
+   * {protocol-docs/interop-gating.md#order-per-chain} after it, before any follow-up hop.
+   */
+  checkInteropGating?: boolean;
 };
 
 export type RecurringUpgradeHop = {
@@ -210,16 +218,30 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
     const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
-    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
-    if (upgradeChainAddresses.length === 0) {
-      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
-    }
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
     const l1Provider = createProvider(l1Chain.rpcUrl);
+    const upgradeChainAddresses = await keepL1SettledChains(
+      l1Provider,
+      l1Addresses.bridgehub,
+      selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles)
+    );
+    if (upgradeChainAddresses.length === 0) {
+      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
+    }
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+    const gatingContext = { l1Provider, chainAdminOwner: defaultSigner, l1Addresses };
+    const gatedChains = scenario.checkInteropGating ? selectGatedChains(anvilManager, upgradeChainAddresses) : null;
+    if (gatedChains) {
+      console.log("\n── Registering a legacy interop pair ──");
+      await registerLegacyInteropPair(gatingContext, ...gatedChains);
+      console.log("\n── Depositing to the gated chains before the upgrade ──");
+      for (const chain of gatedChains) {
+        await depositBeforeUpgrade(gatingContext, chain);
+      }
+    }
 
     const ctm = new ethers.Contract(ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
     const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
@@ -316,6 +338,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
 
     // ── Execute the governance bundle via protocol-ops ──
+    const lastPreUpgradeBlock = await l1Provider.getBlockNumber();
     console.log("\n── Replaying the governance bundle ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
@@ -376,6 +399,11 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
     await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
+    if (gatedChains) {
+      console.log("── Replacing the legacy interop pair with an allowed one ──");
+      await runInteropGatingProcedure(gatingContext, lastPreUpgradeBlock, ...gatedChains);
+      console.log("✅ Interop gating procedure verified\n");
+    }
 
     // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
     // forward the way a production env file does.
@@ -776,6 +804,23 @@ async function runRecurringHop(
 }
 
 // ── Shared tx helper ─────────────────────────────────────────────────
+
+function selectGatedChains(
+  anvilManager: AnvilManager,
+  upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>
+): [GatedChain, GatedChain] {
+  if (upgradeChainAddresses.length < 2) {
+    throw new Error(`The interop gating check needs two upgraded chains, got ${upgradeChainAddresses.length}`);
+  }
+  const [chain, peer] = upgradeChainAddresses.slice(0, 2).map(({ chainId, diamondProxy }) => {
+    const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chainId);
+    if (!l2Chain) {
+      throw new Error(`Missing running L2 chain ${chainId}`);
+    }
+    return { chainId, diamondProxy, provider: createProvider(l2Chain.rpcUrl) };
+  });
+  return [chain, peer];
+}
 
 async function sendAndCheck(
   provider: ethers.providers.JsonRpcProvider,

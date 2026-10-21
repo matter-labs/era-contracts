@@ -124,6 +124,8 @@ const DETERMINISTIC_SOURCES = [
   "contracts/state-transition/chain-deps/DiamondInit.sol",
   "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol",
   "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
+  "contracts/state-transition/verifiers/MultiProofVerifier.sol",
+  "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol",
   "contracts/core/message-root/L1MessageRoot.sol",
   "contracts/dev-contracts/MockContractDeployer.sol",
   "contracts/upgrades/registry/objects/CTMRelease.sol",
@@ -287,6 +289,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       rollupDAManager: live.rollupDAManager,
       bridgehub: l1Addresses.bridgehub,
       chainAssetHandler: live.chainAssetHandler,
+      ziskRangeVerifier: live.ziskRangeVerifier,
     });
 
     // ── 4. Regenerate (EMIT) or validate (CONSUME) the committed manifest, then deploy the
@@ -549,6 +552,8 @@ type LiveUpgradeInputs = {
   messageRootProxy: string;
   /** The proxy's live (pre-upgrade) implementation — the source side of the ecosystem edge. */
   messageRootImplOld: string;
+  /** The live multi-proof verifier's ZiSK side, which the fresh multi-proof verifier reuses. */
+  ziskRangeVerifier: string;
 };
 
 /** The probed live facet address by name (see readLiveUpgradeInputs facet probes). */
@@ -627,6 +632,19 @@ async function readLiveUpgradeInputs(
   const adminFacetView = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("AdminFacet"), l1Provider);
   const rollupDAManager: string = await adminFacetView.getRollupDAManager();
 
+  // The harness CTM deploys a multi-proof testnet verifier (`multi_proof_verifier` in its config).
+  const liveVerifier = new ethers.Contract(
+    await firstDiamond.getVerifier(),
+    getAbi("MultiProofTestnetVerifier"),
+    l1Provider
+  );
+  const liveMultiProofVerifier = new ethers.Contract(
+    await liveVerifier.INNER_VERIFIER(),
+    getAbi("MultiProofVerifier"),
+    l1Provider
+  );
+  const ziskRangeVerifier: string = await liveMultiProofVerifier.ZISK_RANGE_VERIFIER();
+
   const genesisUpgrade: string = await ctm.l1GenesisUpgrade();
 
   const bridgehubAddr: string = await ctm.BRIDGE_HUB();
@@ -657,6 +675,7 @@ async function readLiveUpgradeInputs(
     ecosystemProxyAdmin: await readAddressSlot(messageRootProxy, EIP1967_ADMIN_SLOT),
     messageRootProxy,
     messageRootImplOld: await readAddressSlot(messageRootProxy, EIP1967_IMPL_SLOT),
+    ziskRangeVerifier,
   };
 }
 
@@ -826,6 +845,7 @@ async function deployUpgradeImplementations(
     rollupDAManager: string;
     bridgehub: string;
     chainAssetHandler: string;
+    ziskRangeVerifier: string;
   }
 ): Promise<DeployedImplementations> {
   const deployFrom = async (
@@ -876,10 +896,17 @@ async function deployUpgradeImplementations(
     newCommitterFacet: await deployDeterministic("CommitterFacet", [params.l1ChainId]),
     newDefaultUpgrade: await deployDeterministic("DefaultUpgrade", []),
     newDiamondInit: await deployDeterministic("DiamondInit", []),
-    // The ZKsync OS testnet verifier over the plonk sub-verifier deployed above; no proofs are
-    // verified in this harness.
+    // A multi-proof testnet verifier like the live one: the ZKsync OS testnet verifier over the plonk
+    // sub-verifier deployed above, next to the live ZiSK side. Interop chains require the second
+    // proof system ({protocol-docs/interop-gating.md#second-proof-system-requirement}), so a
+    // single-proof verifier would not be accepted. No proofs are verified in this harness.
     newVerifierPlonk,
-    newVerifier: await deployDeterministic("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
+    newVerifier: await deployDeterministic("MultiProofTestnetVerifier", [
+      await deployDeterministic("MultiProofVerifier", [
+        await deployDeterministic("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
+        params.ziskRangeVerifier,
+      ]),
+    ]),
     // Ecosystem leg: a fresh L1MessageRoot implementation with the live immutable values.
     newMessageRootImpl: await deployDeterministic("L1MessageRoot", [params.bridgehub, params.chainAssetHandler]),
   };

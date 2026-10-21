@@ -2,7 +2,7 @@
 // probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
 // `./runtime-config` instead of importing a constant from here.
 
-import { utils } from "ethers";
+import { BigNumber, utils } from "ethers";
 
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
@@ -57,6 +57,10 @@ export const ANVIL_RECIPIENT_ADDR = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
+
+// Chain ID under which `L1NativeTokenVault` records the interop pool's totals:
+// uint256(keccak256("interop.pool")) - 1, as `INTEROP_POOL_CHAIN_ID` in Config.sol.
+export const INTEROP_POOL_CHAIN_ID = BigNumber.from(utils.id("interop.pool")).sub(1);
 
 // Default gas limits for test transactions.
 // Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
@@ -198,3 +202,12 @@ export const FAILING_INTEROP_CALL_REASON = "Intentional interop receiver failure
 // From SemVer.sol: bit offsets of the minor and major components in a packed protocol version.
 export const SEMVER_MINOR_OFFSET = 32;
 export const SEMVER_MAJOR_OFFSET = 64;
+
+// Deposit encoding version of the consent-free registration that `ChainRegistrationSender.bridgehubDeposit`
+// accepted before the interop peer whitelist, see {protocol-docs/interop-gating.md#legacy-registrations}.
+export const LEGACY_CHAIN_REGISTRATION_ENCODING_VERSION = "0x01";
+
+// Bounds, in ether, of the random deposit the upgrade test makes to each gated chain before the upgrade, which
+// governance then backfills, see {protocol-docs/interop-gating.md#backfill-amounts}.
+export const PRE_UPGRADE_DEPOSIT_MIN_ETH = "1";
+export const PRE_UPGRADE_DEPOSIT_MAX_ETH = "10";

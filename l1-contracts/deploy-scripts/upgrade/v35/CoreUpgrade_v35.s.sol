@@ -6,6 +6,8 @@ pragma solidity 0.8.28;
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {L1EcosystemContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {CoreExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
@@ -26,9 +28,10 @@ contract CoreUpgrade_v35 is DefaultCoreUpgrade {
 
     /// @inheritdoc DefaultCoreUpgrade
     /// @dev Every ecosystem implementation differs from the v0.34.0 build by runtime codehash. In
-    ///      executable code only `L1Bridgehub`, `L1MessageRoot` and `L1ChainAssetHandler` changed;
-    ///      the other six differ in their CBOR metadata alone, because sources in their import
-    ///      closure (shared error and interface files) changed.
+    ///      executable code `L1Bridgehub`, `L1MessageRoot`, `L1ChainAssetHandler`, `L1AssetRouter`,
+    ///      `L1NativeTokenVault` and `ChainRegistrationSender` changed; the other three differ in their
+    ///      CBOR metadata alone, because sources in their import closure (shared error and interface
+    ///      files) changed.
     function changedEcosystemImplementations() internal view virtual override returns (string[] memory names) {
         names = new string[](9);
         names[0] = "L1Bridgehub";
@@ -40,6 +43,14 @@ contract CoreUpgrade_v35 is DefaultCoreUpgrade {
         names[6] = "CTMDeploymentTracker";
         names[7] = "L1InteropHandler";
         names[8] = "ChainRegistrationSender";
+    }
+
+    /// @inheritdoc DefaultCoreUpgrade
+    /// @dev The vault's swap runs its `initializeUpgrade`, which opens the backfill window of the chains registered so
+    ///      far ({protocol-docs/interop-gating.md#backfill}).
+    function _coreProxyUpgradeRows() internal view virtual override returns (ProxyUpgradeRow[] memory rows) {
+        rows = super._coreProxyUpgradeRows();
+        rows[uint256(L1EcosystemContract.L1NativeTokenVault)].callInitializeUpgrade = true;
     }
 
     /// @notice The core executor this run deployed.

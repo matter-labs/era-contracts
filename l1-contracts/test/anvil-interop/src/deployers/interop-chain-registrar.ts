@@ -2,63 +2,127 @@ import type { providers } from "ethers";
 import { ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_BRIDGEHUB_ADDR } from "../core/const";
+import type { CoreDeployedAddresses } from "../core/types";
 import { relayPriorityRequestsToChain, createProvider } from "../core/utils";
 
+/**
+ * Opts chains into interop through the real L1 flow, see {protocol-docs/interop-gating.md#order-per-chain}.
+ * The default Anvil account sends the chain admin calls and the Bridgehub and vault owner calls, so it must be
+ * the chain admin and the Bridgehub and vault owner.
+ */
 export class InteropChainRegistrar {
-  private l1Provider: providers.JsonRpcProvider;
-  private l2Provider: providers.JsonRpcProvider;
-  private chainRegistrationSenderAddr: string;
-  private currentChainDiamondProxy: string;
+  private l1Wallet: ethers.Wallet;
+  private l1Addresses: CoreDeployedAddresses;
 
-  constructor(l2RpcUrl: string, l1RpcUrl: string, chainRegistrationSender: string, currentChainDiamondProxy: string) {
-    this.l1Provider = createProvider(l1RpcUrl);
-    this.l2Provider = createProvider(l2RpcUrl);
-    this.chainRegistrationSenderAddr = chainRegistrationSender;
-    this.currentChainDiamondProxy = currentChainDiamondProxy;
+  constructor(l1RpcUrl: string, l1Addresses: CoreDeployedAddresses) {
+    this.l1Wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, createProvider(l1RpcUrl));
+    this.l1Addresses = l1Addresses;
   }
 
-  async registerInteropChains(currentChainId: number, interopChainIds: number[]): Promise<void> {
-    const chainIds = Array.from(new Set(interopChainIds));
+  async enableInterop(chainId: number, diamondProxy: string): Promise<void> {
+    const zkChain = new ethers.Contract(diamondProxy, getAbi("IZKChain"), this.l1Wallet);
+    const messageRoot = new ethers.Contract(this.l1Addresses.messageRoot, getAbi("L1MessageRoot"), this.l1Wallet);
+    const l1Bridgehub = new ethers.Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), this.l1Wallet);
+    const ntv = new ethers.Contract(this.l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), this.l1Wallet);
+    // When interop is enabled, a chain holds only ETH and its base token. The chains are created on this release,
+    // so the vault's counters cover their whole history and nothing is backfilled.
+    const assetIds: string[] = [
+      ...new Set<string>([await ntv.BASE_TOKEN_ASSET_ID(), await l1Bridgehub.baseTokenAssetId(chainId)]),
+    ];
 
-    if (chainIds.length === 0) {
-      console.log("   No real interop registrations required for this chain");
-      return;
+    await this.requireChainAdmin(zkChain);
+    await (await zkChain.permanentlyRequireSecondProofSystem()).wait();
+    await (await messageRoot.enableInterop(chainId, true)).wait();
+    for (const assetId of assetIds) {
+      await (await ntv.moveChainBalanceToInteropPool(chainId, assetId)).wait();
     }
 
-    const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), this.l2Provider);
-    const l1Wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, this.l1Provider);
-    const chainRegistrationSender = new ethers.Contract(
-      this.chainRegistrationSenderAddr,
-      getAbi("ChainRegistrationSender"),
-      l1Wallet
+    if (!(await zkChain.isSecondProofSystemRequired()) || !(await messageRoot.isInteropEnabled(chainId))) {
+      throw new Error(
+        `Enabling interop for chain ${chainId} did not require the second proof system and enable interop`
+      );
+    }
+    for (const assetId of assetIds) {
+      if (!(await ntv.chainBalanceInInteropPool(chainId, assetId))) {
+        throw new Error(`Chain ${chainId} balance of asset ${assetId} was not moved to the interop pool`);
+      }
+    }
+    console.log(
+      `   ✅ Chain ${chainId}: second proof system required, interop enabled, balances moved to the interop pool`
     );
+  }
 
-    for (const chainId of chainIds) {
-      const existingAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-      if (existingAssetId !== ethers.constants.HashZero) {
-        console.log(`   ✅ Chain ${chainId} already registered on L2Bridgehub`);
-        continue;
-      }
+  async allowInteropPeer(
+    chainId: number,
+    peerChainId: number,
+    diamondProxy: string,
+    l2Provider: providers.JsonRpcProvider
+  ): Promise<void> {
+    const sender = new ethers.Contract(
+      this.l1Addresses.chainRegistrationSender,
+      getAbi("ChainRegistrationSender"),
+      this.l1Wallet
+    );
+    const l1Bridgehub = new ethers.Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), this.l1Wallet);
+    const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), l2Provider);
 
-      console.log(`   Registering chain ${chainId} on chain ${currentChainId} via L1 ChainRegistrationSender...`);
+    await this.requireChainAdmin(new ethers.Contract(diamondProxy, getAbi("IZKChain"), this.l1Wallet));
+    const l1Receipt = await (await sender.allowInteropPeer(chainId, peerChainId)).wait();
+    await relayPriorityRequestsToChain(l1Receipt, diamondProxy, l2Provider);
 
-      // ChainRegistrationSender.registerChain has no access control,
-      // so any EOA can call it directly -- no impersonation needed.
-      const tx = await chainRegistrationSender.registerChain(chainId, currentChainId, {
-        gasLimit: 5_000_000,
-      });
-      const l1Receipt = await tx.wait();
+    const expectedAssetId: string = await l1Bridgehub.baseTokenAssetId(peerChainId);
+    if (!(await sender.interopPeerAllowed(chainId, peerChainId))) {
+      throw new Error(`Chain ${chainId} did not record chain ${peerChainId} as an allowed peer`);
+    }
+    if (
+      (await l2Bridgehub.baseTokenAssetId(peerChainId)) !== expectedAssetId ||
+      !(await l2Bridgehub.isPeerAllowed(peerChainId))
+    ) {
+      throw new Error(`Chain ${peerChainId} is not allowed on the L2Bridgehub of chain ${chainId}`);
+    }
+    console.log(`   ✅ Chain ${chainId}: chain ${peerChainId} allowed as interop peer`);
+  }
 
-      await relayPriorityRequestsToChain(l1Receipt, this.currentChainDiamondProxy, this.l2Provider);
+  /**
+   * Governance removes the pair (`chainId`, `peerChainId`) from `chainId`'s side, see
+   * {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+   */
+  async deregisterInteropPair(
+    chainId: number,
+    peerChainId: number,
+    diamondProxy: string,
+    l2Provider: providers.JsonRpcProvider
+  ): Promise<void> {
+    const sender = new ethers.Contract(
+      this.l1Addresses.chainRegistrationSender,
+      getAbi("ChainRegistrationSender"),
+      this.l1Wallet
+    );
+    const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), l2Provider);
 
-      const registeredAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-      if (registeredAssetId === ethers.constants.HashZero) {
-        throw new Error(
-          `Interop registration failed for chain ${chainId} on chain ${currentChainId}: ` +
-            "baseTokenAssetId is zero (chain not registered)"
-        );
-      }
-      console.log(`   ✅ Chain ${chainId} registered on L2Bridgehub via real L1 flow`);
+    const owner: string = await sender.owner();
+    if (owner !== this.l1Wallet.address) {
+      throw new Error(`ChainRegistrationSender owner is ${owner}, not the default Anvil account`);
+    }
+    const l1Receipt = await (await sender.deregisterInteropPairs(chainId, [peerChainId])).wait();
+    await relayPriorityRequestsToChain(l1Receipt, diamondProxy, l2Provider);
+
+    if (await sender.interopPeerAllowed(chainId, peerChainId)) {
+      throw new Error(`Chain ${chainId} still records chain ${peerChainId} as an allowed peer`);
+    }
+    if (
+      (await l2Bridgehub.baseTokenAssetId(peerChainId)) !== ethers.constants.HashZero ||
+      (await l2Bridgehub.isPeerAllowed(peerChainId))
+    ) {
+      throw new Error(`Chain ${peerChainId} is still registered on the L2Bridgehub of chain ${chainId}`);
+    }
+    console.log(`   ✅ Chain ${chainId}: chain ${peerChainId} deregistered`);
+  }
+
+  private async requireChainAdmin(zkChain: ethers.Contract): Promise<void> {
+    const admin: string = await zkChain.getAdmin();
+    if (admin !== this.l1Wallet.address) {
+      throw new Error(`Chain admin of ${zkChain.address} is ${admin}, not the default Anvil account`);
     }
   }
 }

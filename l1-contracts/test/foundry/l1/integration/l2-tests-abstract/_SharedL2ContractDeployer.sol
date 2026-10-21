@@ -12,7 +12,6 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_ROUTER,
     L2_ASSET_TRACKER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -189,12 +188,10 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(uint256(1)))
         );
-        // Register this chain and the harness destination in the L2 Bridgehub's interop registry
-        // through the production entry point; every other chain id reads as unregistered (bytes32(0)).
-        vm.startPrank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.registerChainForInterop(block.chainid, L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID());
-        l2Bridgehub.registerChainForInterop(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
-        vm.stopPrank();
+        // Allow the harness destination in the L2 Bridgehub's interop registry through the production entry point;
+        // every other chain id reads as unregistered (bytes32(0)).
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.allowInteropPeer(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
 
         // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);

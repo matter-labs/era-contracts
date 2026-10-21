@@ -99,8 +99,9 @@ finality)`, which:
 
 - re-checks `flowId` and L1 settlement;
 - requires exactly one proof per leg (`ManagerProofCountMismatch`);
-- for **every** leg, checks the proof's `sourceChainId` equals the declared `legSourceChainIds[i]` and
-  runs `AtomicInteropProof.verifyInclusion` against the leg's `commitValue`, the flow `deadline`, and the
+- for **every** leg, checks the proof's `sourceChainId` equals the declared `legSourceChainIds[i]`, that this
+  chain accepts that source ({protocol-docs/interop-gating.md#receive-filter}), and runs
+  `AtomicInteropProof.verifyInclusion` against the leg's `commitValue`, the flow `deadline`, and the
   settlement layer;
 - requires the executing bundle to be one of the legs (`ManagerExecutingBundleNotInFlow`).
 

@@ -61,6 +61,10 @@ interface IGetters is IZKChainBase {
     /// @return The accepted real proof type: 2 for Airbender or 5 for multiprover.
     function getProofMode() external view returns (uint256);
 
+    /// @return Whether the chain permanently requires its second proof system.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+    function isSecondProofSystemRequired() external view returns (bool);
+
     /// @return Named disable flags for each proof system; these do not indicate verifier support.
     function disabledProofSystems() external view returns (DisabledProofSystems memory);
 

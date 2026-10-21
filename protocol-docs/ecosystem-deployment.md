@@ -25,9 +25,9 @@ contract instances under separate governance, and a chain belongs to exactly one
 private ecosystem is therefore exactly this deployment, done once, with its own owner. The public
 ZKsync ecosystem contracts are not involved.
 
-Interop between two chains exists only if both are registered on the same Bridgehub and have been
-explicitly registered for interop with each other (see "Interop registration" below); it is never a
-side effect of creating a chain.
+Interop between two chains exists only if both are registered on the same Bridgehub, governance has
+enabled interop for both and their admins have allowed each other as interop peers (see "Interop
+registration" below); it is never a side effect of creating a chain.
 
 ## Layers and the tooling
 
@@ -75,25 +75,15 @@ compiled L2 built-ins as factory dependencies.
 It then wires them: the asset router and nullifier learn the vault and the interop handler, the
 vault registers ETH, and `L1Bridgehub.setAddresses` records the asset router, CTM deployment
 tracker, message root, chain asset handler and chain registration sender. Finally it starts the
-ownership hand-off: the Bridgehub, asset router, nullifier, interop handler, CTM deployment tracker
-and chain asset handler are transferred (two-step) to `Governance`, the native token vault to the
-configured owner, and `ChainAdminOwnable` is set as the Bridgehub's pending admin.
-`ChainRegistrationSender` is initialized with the deployer as its owner and is not transferred.
+ownership hand-off: the Bridgehub, asset router, nullifier, native token vault, interop handler, CTM
+deployment tracker, chain asset handler and `ChainRegistrationSender` are transferred (two-step) to
+`Governance`, and `ChainAdminOwnable` is set as the Bridgehub's pending admin.
 
-`hub init` accepts part of the hand-off as the owner: `AdminFunctions.chainAdminAcceptAdmin`
-accepts the Bridgehub admin role and `AdminFunctions.governanceAcceptOwnerAggregated` accepts the
-pending ownership of the Bridgehub, asset router, nullifier, CTM deployment tracker and chain
-asset handler on behalf of `Governance`. It does not complete the rest, so after `hub init` the
-deployer EOA still owns three core contracts:
-
-| Contract                  | State after `hub init`                          | Deployer can still                      | Manual step to complete the hand-off                                                                                                     |
-| ------------------------- | ----------------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `L1InteropHandler`        | owner: deployer, pending owner: `Governance`    | `pause()` withdrawal finalization       | `Governance` calls `acceptOwnership()` (signed by `owner_address`: `AdminFunctions.governanceAcceptOwner(governance, l1InteropHandler)`) |
-| `L1NativeTokenVault`      | owner: deployer, pending owner: `owner_address` | `pause()` the vault                     | `owner_address` calls `acceptOwnership()` on the vault directly                                                                          |
-| `ChainRegistrationSender` | owner: deployer, no pending owner               | nothing today (no owner-gated function) | the deployer calls `transferOwnership(governance)`, then `owner_address` runs `AdminFunctions.governanceAcceptOwner(governance, sender)` |
-
-Until these are done the ownership table below does not hold. Making `hub init` perform them
-itself is an open tooling follow-up.
+`hub init` completes the hand-off as the owner: `AdminFunctions.chainAdminAcceptAdmin` accepts the
+Bridgehub admin role and `AdminFunctions.governanceAcceptOwnerAggregated` accepts every pending
+ownership above on behalf of `Governance`, so none of them stays with the deployer EOA. In particular,
+only `Governance` can call `ChainRegistrationSender.deregisterInteropPairs` for any pair (a chain's admin can for
+its own chain's pairs).
 
 Two inputs are immutable once deployed and therefore must be right the first time: the L1 WETH
 address (baked into the asset router and vault implementations; resolved from the L1 chain id when
@@ -211,18 +201,13 @@ block.
 
 ### Interop registration
 
-Creating a chain does not make it reachable for interop. `chain init --register-for-interop`
-(or `RegisterOnAllChains.s.sol` on its own) registers the new chain on every other chain of the
-ecosystem and vice versa through `ChainRegistrationSender`, which is permissionless and
-once-per-ordered-pair. It skips, without failing, every pair that is not registrable yet: a chain
-with no batch in the message root (an EraVM chain until its first settled batch, since only ZKsync
-OS chains are seeded at creation) and an existing destination whose deposits are paused. Registrations onto the new chain itself do
-not check its pause flag, so a chain created with `--pause-deposits` makes the run revert; unpause it
-first. A successful run
-therefore does not mean every pair is registered; re-run it once the skipped chains qualify. It is
-off by default on purpose: which chains of a production ecosystem may
-talk to each other is a decision, not a side effect of creating one. The guards the sender applies
-are described in [Interop registration](./chain-lifecycle.md#interop-registration-chainregistrationsender).
+Creating a chain does not make it reachable for interop, and no deployment command makes it so: which
+chains of a production ecosystem may talk to each other is a decision, not a side effect of creating
+one. A chain joins interop through the steps in
+[Order per chain](./interop-gating.md#order-per-chain): its admin permanently requires the second proof system,
+governance enables interop for it on `L1MessageRoot`, and its admin allows each peer on
+`ChainRegistrationSender`. The checks the sender applies are described in
+[Interop registration](./chain-lifecycle.md#interop-registration-chainregistrationsender).
 
 ## Inputs and where they come from
 
@@ -287,10 +272,10 @@ the start: every power in the table above flows from it.
   `yarn verify-contracts <log-file> --chain <stage|testnet|mainnet>`, where the log file holds the
   `forge verify-contract` lines the scripts print. It only targets mainnet (`mainnet`) and Sepolia (`stage`, `testnet`);
   on any other L1, run those lines with that explorer's verifier settings.
-- Check ownership once the manual steps listed under "Hub" and "CTM" have been executed:
+- Check ownership once the manual steps listed under "CTM" have been executed:
   `owner()` must be the governance contract for the Bridgehub, asset router, nullifier, interop
   handler, CTM deployment tracker, chain asset handler, `ChainRegistrationSender`,
-  `RollupDAManager` and the CTM; `owner_address` for the native token vault and
+  `RollupDAManager`, the native token vault and the CTM; `owner_address` for the
   `ValidatorTimelock`; the `ChainAdminOwnable` for `ServerNotifier`. No `pendingOwner()` may be
   left dangling, and the Bridgehub's and the CTM's `admin()` must be the `ChainAdminOwnable`.
 
@@ -298,11 +283,10 @@ the start: every power in the table above flows from it.
 
 The anvil-interop fixture (`l1-contracts/test/anvil-interop/`) deploys a complete ecosystem for
 tests: L1 core contracts and CTM, then the registration and initialization of every chain, then
-interop registration, plus a Gateway. `yarn setup-and-dump` runs it from scratch and snapshots the
-Anvil states that CI and the interop tests load. It is the quickest way to see a deployment run
-end to end, but it is not a production reference: it uses the test entry points (`runForAnvil`
-with `DummyL1MessageRoot`, `runForAnvilTest` without governance reuse, `RegisterCTM.runForTest`
-calling the Bridgehub directly as the deployer, so `Governance` never takes ownership), skips
-`FinalizeChainInit` (deposits are unpaused directly) and registers interop with direct
-`registerChain` calls instead of `RegisterOnAllChains`. For a production deployment follow
-`ecosystem init` and `chain init` as described above.
+the interop enabling and peer whitelisting, plus a Gateway. `yarn setup-and-dump` runs it from
+scratch and snapshots the Anvil states that CI and the interop tests load. It is the quickest way to
+see a deployment run end to end, but it is not a production reference: it uses the test entry
+points (`runForAnvil` with `DummyL1MessageRoot`, `runForAnvilTest` without governance reuse,
+`RegisterCTM.runForTest` calling the Bridgehub directly as the deployer, so `Governance` never takes
+ownership) and skips `FinalizeChainInit` (deposits are unpaused directly). For a production
+deployment follow `ecosystem init` and `chain init` as described above.
