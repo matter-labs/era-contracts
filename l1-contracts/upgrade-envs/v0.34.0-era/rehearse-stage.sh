@@ -35,6 +35,12 @@ set -uo pipefail
 PUBLISHED_ONLY=0
 [ "${1:-}" = "--published-only" ] && PUBLISHED_ONLY=1
 [ "$PUBLISHED_ONLY" = "0" ] || [ -n "${L1_RPC_URL:-}" ] || { echo "PUBLICATION CHECK FAILED: --published-only needs L1_RPC_URL"; exit 1; }
+# Only the script's own anvil prepares: step 1 would broadcast to L1_RPC_URL.
+[ -z "${L1_RPC_URL:-}" ] || [ -n "${ECOSYSTEM_TOML:-}" ] || [ "$PUBLISHED_ONLY" = "1" ] || {
+  echo "REHEARSAL FAILED: L1_RPC_URL (it overrides L1_FORK_URL) needs ECOSYSTEM_TOML or --published-only;"\
+    "unset it to rehearse on this script's own anvil"
+  exit 1
+}
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WT=$(cd "$HERE/../.." && pwd)
 S=$(mktemp -d)
@@ -48,39 +54,12 @@ BROADCAST_LOG=
 FAILED=0
 SKIPPED=0
 python3 -c 'import tomllib' 2>/dev/null || { echo "REHEARSAL FAILED: needs python3 >= 3.11 (tomllib)"; exit 1; }
-
-# ---------------------------------------------------------------- stage facts (Sepolia)
-export L1_CHAIN_ID=11155111 ERA_CHAIN_ID=270 CHAIN_ID=499 TEST_CHAIN_ID=555
-export OLD=141733920768 NEW=146028888064 TS=1 # v0.33.0, v0.34.0, upgrade timestamp
-export FACTORY=0x4e59b44847b379578588920cA78FbF26c0B4956C
-export BRIDGEHUB=0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE
-export PUH=0x8f08627524aeD610192132A425D6b9C32a1727EF
-export ECO_ADMIN=0xa6ED12b87D2e6Ea039d27e1FFbDC24915FFd3042
-export ECO_ADMIN_OWNER=0xd669494442609879b209CcA8eba2BdC904D2E69D
-export CTM=0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b
-export CTM_PROXY_ADMIN=0xCb7F8e556Ef02771eA32F54e767D6F9742ED31c2
-export INTEROP_CENTER=0x000000000000000000000000000000000001000d
-export SUPPLIER=0xdA709DEB3b515F0b690445bbF592757b7D517f6c
-export PERMISSIONLESS_VALIDATOR=0x59ef8ffc3e9640A55A1de415923b443D0249Bcd1
-export FFLONK=0x09D55E0f09e8f493C58331f0B827189c2EdAA838
-export SN=0xB19c325bf89547666C3c972A755b8960d6198224
-export SN_PROXY_ADMIN=0x2d61a4B81f9A04612ED146a6ecD42de6ed67b7A4
-export VT=0x7E38a259C353e72eEd3F5136c6E6534eb15C7199
-export CAH=0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d
-export L1_ASSET_ROUTER=0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b
-export CHAIN_REGISTRATION_SENDER=0xEeA39E812de9264b53cBd21CeA04ED69FBE07208
-export ZK_TOKEN_ASSET_ID=0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823
-export GENESIS_UPGRADE=0xD6C481390952092F5e89e0eBbb53ed6C1c33BC70
-export DIAMOND_INIT=0xb1AC8Ae36193aDA1Ad5cBD4bf2dde4c3925762cc
-export ROLLUP_DA_MANAGER=0x5af0d94e50b271005AF1687e363FD104771EAe9d
-export EIP7702_CHECKER=0x961821b7aa9236008ead6b39ec0b035b91e72c22
-export DIAMOND=0x35360f304599cD6479978E2734F37B57AD6F1696
-export CHAIN_ADMIN=0x3543055b186b5Fc8B214397955e850c712D831AD
-export CHAIN_ADMIN_OWNER=0x1454c35737130eB8700e5d0e7a6C44e8aE00aB10
 export OUT S HERE WT
 
 fail() { echo "  FAIL $*"; FAILED=$((FAILED + 1)); }
 chk() { [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo "  OK   $1" || fail "$1: expected $3, got $2"; }
+call() { cast call "$@" --rpc-url "$RPC"; }
+first() { awk '{print $1}'; }
 
 if [ -n "${L1_RPC_URL:-}" ]; then
   RPC="$L1_RPC_URL"
@@ -108,6 +87,103 @@ fi
 # The first-batch test searches the chain's history up to here.
 START_BLOCK=$(cast block-number --rpc-url "$RPC")
 export RPC
+
+# ---------------------------------------------------------------- stage facts
+# Inputs from stage.toml and permanent-values (not its stale bytecodes_supplier), the other addresses from the
+# chain before step 1 changes it. Each input the chain also holds is checked against it (EIP7702_CHECKER in
+# step 5, against the live MailboxFacet's code). --published-only needs none, and may run after stage 1.
+if [ "$PUBLISHED_ONLY" = "0" ]; then
+  python3 - "$HERE/$UPGRADE_ENV.toml" "$WT/upgrade-envs/permanent-values/$UPGRADE_ENV.toml" <<'PYINPUTS' \
+    > "$S/inputs.env" || { echo "REHEARSAL FAILED: cannot read the inputs"; exit 1; }
+import re, sys, tomllib
+env, permanent = (tomllib.load(open(p, "rb")) for p in sys.argv[1:])
+(chain_id,) = env["chain_ids"]  # the checks cover one chain
+ADDRESS, NUMBER = r"0x[0-9a-fA-F]{40}", r"[0-9]+"
+for name, value, pattern in [
+    ("CTM", env["ctm"], ADDRESS),
+    ("SUPPLIER", env["bytecodes_supplier"], ADDRESS),
+    ("PERMISSIONLESS_VALIDATOR", env["permissionless_validator"], ADDRESS),
+    ("CAH", env["chain_asset_handler"], ADDRESS),
+    ("ROLLUP_DA_MANAGER", env["rollup_da_manager"], ADDRESS),
+    ("EIP7702_CHECKER", env["eip7702_checker"], ADDRESS),
+    ("FFLONK", env["verifier_fflonk"], ADDRESS),
+    ("DIAMOND_INIT", env["diamond_init"], ADDRESS),
+    ("ERA_CHAIN_ID", env["era_chain_id"], NUMBER),
+    ("OLD", env["old_protocol_version"], NUMBER),
+    ("NEW", env["new_protocol_version"], NUMBER),
+    ("TS", env["upgrade_timestamp"], NUMBER),
+    ("CHAIN_ID", chain_id, NUMBER),
+    ("L1_CHAIN_ID", permanent["l1_chain_id"], NUMBER),
+    ("FACTORY", permanent["permanent_contracts"]["create2_factory_addr"], ADDRESS),
+    ("BRIDGEHUB", permanent["core_contracts"]["bridgehub_proxy_addr"], ADDRESS),
+    ("ZK_TOKEN_ASSET_ID", permanent["zk_token_asset_id"], r"0x[0-9a-fA-F]{64}"),
+]:
+    # str() keeps a bool or a float from passing as a number.
+    if not re.fullmatch(pattern, str(value)):
+        sys.exit(f"  {name}: malformed {value!r}")
+    print(f"export {name}={value}")
+event = bytes.fromhex(env["current_chain_creation_params_event_data"][2:])
+cut_at, deps_at = (int.from_bytes(event[32 * i:32 * i + 32], "big") for i in (4, 6))
+print(f"export STORED_CUT=0x{32:064x}{event[cut_at:deps_at].hex()}")
+print(f"export STORED_CUT_INIT=0x{event[cut_at + 44:cut_at + 64].hex()}")
+PYINPUTS
+  # shellcheck disable=SC1091
+  . "$S/inputs.env"
+  # Mirrors ERA_TEST_CREATE_CHAIN_ID in deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol.
+  export TEST_CHAIN_ID=555
+
+  # fact NAME CAST_ARGS… — one read, exported; a failed read, a zero or a non-address stops the run.
+  fact() {
+    local v
+    v=$(cast "${@:2}" --rpc-url "$RPC" 2> "$S/fact.err")
+    [[ $v =~ ^0x[0-9a-fA-F]{40}$ && ! $v =~ ^0x0{40}$ ]] && { export "$1=$v"; return; }
+    echo "REHEARSAL FAILED: $1 unreadable (${v:-no answer}): cast ${*:2}"
+    head -c 300 "$S/fact.err"
+    exit 1
+  }
+  fact PUH call "$CTM" 'owner()(address)'
+  fact CTM_PROXY_ADMIN admin "$CTM"
+  fact SN call "$CTM" 'serverNotifierAddress()(address)'
+  fact SN_PROXY_ADMIN admin "$SN"
+  fact ECO_ADMIN call "$BRIDGEHUB" 'admin()(address)'
+  fact ECO_ADMIN_OWNER call "$ECO_ADMIN" 'owner()(address)'
+  fact VT call "$CTM" 'validatorTimelockPostV29()(address)'
+  fact INTEROP_CENTER call "$CTM" 'INTEROP_CENTER()(address)'
+  fact L1_ASSET_ROUTER call "$BRIDGEHUB" 'assetRouter()(address)'
+  fact CHAIN_REGISTRATION_SENDER call "$BRIDGEHUB" 'chainRegistrationSender()(address)'
+  fact GENESIS_UPGRADE call "$CTM" 'l1GenesisUpgrade()(address)'
+  fact DIAMOND call "$CTM" 'getZKChain(uint256)(address)' "$CHAIN_ID"
+  fact CHAIN_ADMIN call "$CTM" 'getChainAdmin(uint256)(address)' "$CHAIN_ID"
+  fact CHAIN_ADMIN_OWNER call "$CHAIN_ADMIN" 'owner()(address)'
+  fact OLD_VERIFIER call "$CTM" 'protocolVersionVerifier(uint256)(address)' "$OLD"
+  fact LIVE_ADMIN_FACET call "$DIAMOND" 'facetAddress(bytes4)(address)' "$(cast sig 'acceptAdmin()')"
+
+  echo "== The inputs against the chain"
+  chk "l1_chain_id = the RPC's chain id" "$(cast chain-id --rpc-url "$RPC")" "$L1_CHAIN_ID"
+  chk "ctm = the bridgehub's chainTypeManager($CHAIN_ID)" \
+    "$(call "$BRIDGEHUB" 'chainTypeManager(uint256)(address)' "$CHAIN_ID")" "$CTM"
+  chk "bridgehub_proxy_addr = the CTM's BRIDGE_HUB()" "$(call "$CTM" 'BRIDGE_HUB()(address)')" "$BRIDGEHUB"
+  chk "old_protocol_version = the CTM's protocolVersion()" "$(call "$CTM" 'protocolVersion()(uint256)' | first)" "$OLD"
+  chk "bytecodes_supplier = the CTM's L1_BYTECODES_SUPPLIER()" \
+    "$(call "$CTM" 'L1_BYTECODES_SUPPLIER()(address)')" "$SUPPLIER"
+  chk "permissionless_validator = the CTM's PERMISSIONLESS_VALIDATOR()" \
+    "$(call "$CTM" 'PERMISSIONLESS_VALIDATOR()(address)')" "$PERMISSIONLESS_VALIDATOR"
+  chk "chain_asset_handler = the bridgehub's chainAssetHandler()" \
+    "$(call "$BRIDGEHUB" 'chainAssetHandler()(address)')" "$CAH"
+  chk "verifier_fflonk = FFLONK_VERIFIER() of the old version's verifier" \
+    "$(call "$OLD_VERIFIER" 'FFLONK_VERIFIER()(address)')" "$FFLONK"
+  chk "rollup_da_manager = ROLLUP_DA_MANAGER() of chain $CHAIN_ID's AdminFacet" \
+    "$(call "$LIVE_ADMIN_FACET" 'ROLLUP_DA_MANAGER()(address)')" "$ROLLUP_DA_MANAGER"
+  chk "era_chain_id = the asset router's ERA_CHAIN_ID()" \
+    "$(call "$L1_ASSET_ROUTER" 'ERA_CHAIN_ID()(uint256)' | first)" "$ERA_CHAIN_ID"
+  chk "current_chain_creation_params_event_data: its cut hashes to the CTM's initialCutHash()" \
+    "$(cast keccak "$STORED_CUT")" "$(call "$CTM" 'initialCutHash()(bytes32)')"
+  chk "diamond_init = that cut's initAddress" "$STORED_CUT_INIT" "$DIAMOND_INIT"
+  chk "PUH, the CTM's owner() = the bridgehub's owner()" "$(call "$BRIDGEHUB" 'owner()(address)')" "$PUH"
+  chk "ecosystem admin, the bridgehub's admin() = the ServerNotifier ProxyAdmin's owner()" \
+    "$(call "$SN_PROXY_ADMIN" 'owner()(address)')" "$ECO_ADMIN"
+  [ "$FAILED" = "0" ] || { echo "REHEARSAL FAILED: the inputs differ from the chain"; exit 1; }
+fi
 
 # ---------------------------------------------------------------- 1. prepare
 if [ -n "${ECOSYSTEM_TOML:-}" ] || [ "$PUBLISHED_ONLY" = "1" ]; then
@@ -282,6 +358,9 @@ check("EVM emulator hash = genesis", p[3], evm)
 check("verifier and verifierParams zero", [p[4], p[5]], [ZERO, ["0x" + "00" * 32] * 3])
 check("l1ContractsUpgradeCalldata, postUpgradeCalldata empty; upgradeTimestamp 0", [p[6], p[7], I(p[8])], ["0x", "0x", 0])
 check("newProtocolVersion = v0.34.0", I(p[9]), I(E["NEW"]))
+semver = genesis["protocol_semantic_version"]
+check("new_protocol_version = the genesis's protocol_semantic_version", I(E["NEW"]),
+      semver["major"] << 64 | semver["minor"] << 32 | semver["patch"])
 check("tx: type 254, from 0x8007, to 0x8006, gas 72M, 800 per pubdata, no fees or paymaster, nonce 34, value 0",
       [I(x) for x in tx[:10]], [254, 0x8007, 0x8006, 72_000_000, 800, 0, 0, 0, I(E["NEW"]) >> 32, 0])
 check("tx reserved, signature, paymasterInput, reservedDynamic empty", [[I(x) for x in tx[10]], tx[12], tx[14], tx[15]], [[0] * 4, "0x", "0x", "0x"])
@@ -519,7 +598,6 @@ raise SystemExit(1 if failed else 0)
 PYPROVENANCE
 
 # ---------------------------------------------------------------- 5. the fork flow
-call() { cast call "$@" --rpc-url "$RPC"; }
 # send FROM TO DATA LABEL [VALUE [GAS_PRICE]] — impersonated; cast waits for the receipt, kept in $S/receipt.json.
 send() {
   cast send --unlocked --from "$1" "$2" "$3" ${5:+--value "$5"} ${6:+--gas-price "$6"} --rpc-url "$RPC" --json 2> "$S/send.err" | grep '^{' | tail -1 > "$S/receipt.json"
@@ -561,7 +639,6 @@ sys.exit(0 if len(logs) == 1 and [int(t, 16) for t in logs[0]["topics"][1:1 + le
          and data in ("-", logs[0]["data"].lower()) else 1)
 PYEMITTED
 }
-first() { awk '{print $1}'; }
 for a in "$PUH" "$ECO_ADMIN" "$ECO_ADMIN_OWNER" "$CHAIN_ADMIN_OWNER"; do
   cast rpc anvil_setBalance "$a" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
 done

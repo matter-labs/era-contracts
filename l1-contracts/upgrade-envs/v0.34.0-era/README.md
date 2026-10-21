@@ -70,10 +70,12 @@ Script: `deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol`.
 
 ## Fork checks
 
-`rehearse-stage.sh` decodes and encodes with `cast` and derives every expected value itself, from stage's
-facts, `AllContractsHashes.json`, the v34 genesis and v33's committed output (for the 31 force deployments).
-It needs Foundry and python3 (for TOML and JSON), but no contract build (the first-batch test builds its
-own). Apart from the read-only `--published-only` check (every factory dep published, every deployed
+`rehearse-stage.sh` decodes and encodes with `cast` and derives every expected value itself, from the inputs
+(`stage.toml`, `permanent-values/stage.toml`), addresses it reads from the chain, `AllContractsHashes.json`,
+the v34 genesis and v33's committed output (for the 31 force deployments). Before anything is sent, it checks
+each input it uses against the chain where the chain holds it (the EIP-7702 checker later, against the live
+MailboxFacet), and reads the PUH and the ecosystem admin two ways. It needs Foundry and python3 (for TOML and
+JSON), but no contract build (the first-batch test builds its own). Apart from the read-only `--published-only` check (every factory dep published, every deployed
 contract has code; for the deploy workflow), it runs only against an Anvil fork of Sepolia. It checks:
 
 - every deployer transaction: each CREATE2 deployment uses the env's salt, its init code is a reviewed
