@@ -226,10 +226,10 @@
   {
     "contractName": "l1-contracts/ChainRegistrationSender",
     "evmBytecodePath": "/l1-contracts/out/ChainRegistrationSender.sol/ChainRegistrationSender.json",
-    "evmBytecodeHash": "0x1812d3ac4a79a78db193a2a7ab274cba189658c59c679cfd656c03568ebc3e08",
-    "evmDeployedBytecodeHash": "0xe068bf50b21a11535b519730b6083ec30a8816eb51e028bb376c590b88f6be84",
-    "evmDeployedBytecodeBlakeHash": "0xdd8edf524400401f1adde37ef764dada2769bc0eef8d995bfbc8655c7474b7e1",
-    "evmDeployedBytecodeLength": 7405
+    "evmBytecodeHash": "0x924d3efb04d2068ce159b54a11b774310a4ad6aefa183901d5d4eb95cfcd42dd",
+    "evmDeployedBytecodeHash": "0x9a0b73658bdbcaf0b241a245c42637064fce4dd207f11dce4a6b6973fe9c8573",
+    "evmDeployedBytecodeBlakeHash": "0x4a1b155f6008dc7faec153760c1960083100dcdc8c58c1675d655189dc6f2512",
+    "evmDeployedBytecodeLength": 7337
   },
   {
     "contractName": "l1-contracts/ChainTypeManager",
