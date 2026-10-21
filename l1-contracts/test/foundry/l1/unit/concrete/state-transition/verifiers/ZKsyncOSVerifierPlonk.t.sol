@@ -38,7 +38,7 @@ contract ZKsyncOSVerifierPlonkTest is Test {
     /// it here ties the key the contract actually loads to the one its header claims. A rotation of
     /// the committed key is expected to fail this test: update the constant as part of that change,
     /// deliberately, rather than treating the failure as flaky.
-    bytes32 internal constant EXPECTED_VK_HASH = 0xec24ed291193c0f86d53b242e45490f05e2328817d9decb8cc4188b582682bfa;
+    bytes32 internal constant EXPECTED_VK_HASH = 0x35a5dd22f7af694267e229fa5458a82d1be3a5f308b7e5a7ca6f5ead631ac282;
 
     uint256[] public publicInputs;
     uint256[] public serializedProof;
