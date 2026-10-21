@@ -63,6 +63,8 @@ error MultiCallToL1NotSupported(uint256 callCount);
 error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
+// 0x0952d72d
+error ReservedInteropRootChainId(uint256 chainId);
 // 0x5af78ecd
 error ShadowAccountNotSupported();
 // 0x2f59bd0d

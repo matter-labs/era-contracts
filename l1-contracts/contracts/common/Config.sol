@@ -39,6 +39,35 @@ uint256 constant INTEROP_POOL_CHAIN_ID = uint256(keccak256("interop.pool")) - 1;
 /// @dev ERC-1967 storage slot of a proxy's admin.
 bytes32 constant ERC1967_ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
 
+/// @dev Interop-root "chain id" under which L1 block-hash anchors are imported. No chain can have it, since the
+/// Bridgehub caps chain IDs at `type(uint48).max`. See {protocol-docs/l1sload.md#anchors}.
+uint256 constant L1_BLOCK_HASH_IMPORT_ID = uint256(keccak256("zksync.l1-block-hash-import")) - 1;
+
+/// @dev Maximum age of a chain's newest L1 anchor relative to the last L2 block of a batch it executes.
+/// See {protocol-docs/l1sload.md#freshness}.
+uint256 constant L1_ANCHOR_MAX_LAG = 1 hours;
+
+/// @dev `L2InteropRootStorage` slot that ZKsync OS reads the L1SLOAD anchor block hash from.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_HASH_SLOT = keccak256("zksync-os.l1sload.anchor.block-hash");
+
+/// @dev `L2InteropRootStorage` slot of the L1SLOAD anchor block number.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT = keccak256("zksync-os.l1sload.anchor.block-number");
+
+/// @dev Maximum number of storage keys one L1SLOAD precompile call reads.
+uint256 constant L1SLOAD_MAX_KEYS = 5;
+
+// Storage slots of the L1 variables that L2 contracts read with L1SLOAD, in the implementation layout of the L1
+// contract (`forge inspect <Contract> storageLayout`; the proxies keep no storage in sequential slots). They are an
+// L2-facing ABI: an L1 upgrade must keep them, and `L1ViewStorageLayout.t.sol` pins them.
+// See {protocol-docs/l1sload.md#reading-l1-state}.
+
+/// @dev Slot of `L1MessageRoot.interopEnabled`.
+uint256 constant L1_MESSAGE_ROOT_INTEROP_ENABLED_SLOT = 51;
+/// @dev Slot of `L1MessageRoot.interopSuspended`.
+uint256 constant L1_MESSAGE_ROOT_INTEROP_SUSPENDED_SLOT = 52;
+/// @dev Slot of `ChainRegistrationSender.interopPeerAllowed`.
+uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT = 152;
+
 /// @dev Pubdata capacity of a blob: 4096 field elements with 31 bytes of data each.
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 

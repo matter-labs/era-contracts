@@ -28,8 +28,12 @@ error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 error IncorrectSender(address prevMsgSender, address chainAdmin);
 // 0xd107dab8
 error InteropAlreadyEnabled(uint256 chainId);
+// 0x72bdd603
+error InteropAlreadySuspended(uint256 chainId);
 // 0x13b3ef48
 error InteropNotEnabled(uint256 chainId);
+// 0x6ea02b79
+error InteropNotSuspended(uint256 chainId);
 // 0x927cf466
 error InteropPeerAlreadyAllowed(uint256 chainId, uint256 peerChainId);
 // 0x2d958c8c

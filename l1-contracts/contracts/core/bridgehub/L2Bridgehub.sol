@@ -12,6 +12,7 @@ import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {L1View} from "../../common/l2-helpers/L1View.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,8 +40,16 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
+    /// @notice The chain's own side of the peer whitelist, mirrored from L1 by service transactions. Used by
+    /// {isPeerAllowed} until the L1 read addresses are set.
+    /// @dev Formerly the public `isPeerAllowed` mapping; renamed to free the selector, the slot is unchanged.
+    mapping(uint256 chainId => bool) internal mirroredPeerAllowed;
+
     /// @inheritdoc IL2Bridgehub
-    mapping(uint256 chainId => bool) public isPeerAllowed;
+    address public l1MessageRoot;
+
+    /// @inheritdoc IL2Bridgehub
+    address public l1ChainRegistrationSender;
 
     modifier onlyChainRegistrationSender() {
         if (
@@ -95,13 +104,59 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
         require(_baseTokenAssetId != bytes32(0), EmptyAssetId());
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
-        isPeerAllowed[_chainId] = true;
+        mirroredPeerAllowed[_chainId] = true;
     }
 
     /// @inheritdoc IL2Bridgehub
     function deregisterChainForInterop(uint256 _chainId) external onlyChainRegistrationSender {
         delete baseTokenAssetId[_chainId];
-        delete isPeerAllowed[_chainId];
+        delete mirroredPeerAllowed[_chainId];
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    /// @dev Proof-of-concept: production would set the addresses in the force deployments.
+    function setL1ReadAddresses(address _l1MessageRoot, address _l1ChainRegistrationSender) external onlyOwner {
+        l1MessageRoot = _l1MessageRoot;
+        l1ChainRegistrationSender = _l1ChainRegistrationSender;
+        emit L1ReadAddressesSet(_l1MessageRoot, _l1ChainRegistrationSender);
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function isPeerAllowed(uint256 _chainId) external view returns (bool) {
+        if (!_readsL1()) {
+            return mirroredPeerAllowed[_chainId];
+        }
+        return _isPeerAllowedOnL1(_chainId, false);
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    /// @dev Until the L1 read addresses are set, only the chain's own side is known, as in {isPeerAllowed}.
+    function canSendTo(uint256 _chainId) external view returns (bool) {
+        if (!_readsL1()) {
+            return mirroredPeerAllowed[_chainId];
+        }
+        return _isPeerAllowedOnL1(_chainId, true);
+    }
+
+    /// @dev Whether the peer whitelist is read from L1 instead of the mirror.
+    function _readsL1() internal view returns (bool) {
+        return l1MessageRoot != address(0) && l1ChainRegistrationSender != address(0);
+    }
+
+    /// @dev Reads the peer whitelist at the chain's L1SLOAD anchor.
+    /// See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
+    /// @param _peerChainId The peer.
+    /// @param _requirePeerConsent Whether the peer's admin must also have allowed this chain.
+    function _isPeerAllowedOnL1(uint256 _peerChainId, bool _requirePeerConsent) internal view returns (bool) {
+        if (!L1View.isInteropActive(l1MessageRoot, block.chainid, _peerChainId)) {
+            return false;
+        }
+        if (!L1View.isInteropPeerAllowed(l1ChainRegistrationSender, block.chainid, _peerChainId)) {
+            return false;
+        }
+        return
+            !_requirePeerConsent ||
+            L1View.isInteropPeerAllowed(l1ChainRegistrationSender, _peerChainId, block.chainid);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -138,6 +138,7 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             );
             // Written even when zero, so a re-commit after a revert replaces the reverted batch's count.
             s.interopFeeUnits[_lastCommittedBatchData.batchNumber] = _newBatchesData[i].interopFeeUnits;
+            s.batchLastBlockTimestamp[_lastCommittedBatchData.batchNumber] = _newBatchesData[i].lastBlockTimestamp;
             emit BlockCommit(
                 _lastCommittedBatchData.batchNumber,
                 _lastCommittedBatchData.batchHash,

@@ -302,4 +302,13 @@ struct ZKChainStorage {
     /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
     /// @dev STORAGE SLOT: 70
     bool secondProofSystemRequired;
+    /// @dev The newest timestamp among the L1SLOAD anchors this chain imported in executed batches.
+    /// See {protocol-docs/l1sload.md#freshness}.
+    /// @dev STORAGE SLOT: 71
+    uint256 l1AnchorTimestamp;
+    /// @dev The last L2 block timestamp of each committed batch, read at execution for the anchor freshness rule.
+    /// @dev Proof-of-concept shortcut: production would carry it in `StoredBatchInfo.timestamp`, which ZKsync OS
+    /// commits as zero. See {protocol-docs/l1sload.md#proof-of-concept-shortcuts}.
+    /// @dev STORAGE SLOT: 72
+    mapping(uint256 batchNumber => uint256 timestamp) batchLastBlockTimestamp;
 }

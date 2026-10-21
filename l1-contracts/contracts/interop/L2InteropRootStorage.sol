@@ -2,7 +2,14 @@
 
 pragma solidity 0.8.28;
 
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
+
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L1_BLOCK_HASH_IMPORT_ID,
+    L1SLOAD_ANCHOR_BLOCK_HASH_SLOT,
+    L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT
+} from "contracts/common/Config.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IL2InteropRootStorage} from "./IL2InteropRootStorage.sol";
 import {InteropRootAlreadyExists, InteropRootTimestampIsZero, SidesLengthNotOne} from "./InteropErrors.sol";
@@ -34,6 +41,16 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @inheritdoc IL2InteropRootStorage
     /// @dev Appended after `storedInteropRoots`, so the v31 layout note above is unaffected.
     mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
+
+    /// @inheritdoc IL2InteropRootStorage
+    function l1AnchorBlockHash() external view returns (bytes32) {
+        return StorageSlot.getBytes32Slot(L1SLOAD_ANCHOR_BLOCK_HASH_SLOT).value;
+    }
+
+    /// @inheritdoc IL2InteropRootStorage
+    function l1AnchorBlockNumber() public view returns (uint256) {
+        return StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT).value;
+    }
 
     /// @inheritdoc IL2InteropRootStorage
     function interopRoots(
@@ -99,6 +116,19 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
             latestInteropRootTimestamp[chainId] = timestamp;
         }
 
+        if (chainId == L1_BLOCK_HASH_IMPORT_ID && blockOrBatchNumber > l1AnchorBlockNumber()) {
+            _setL1Anchor(blockOrBatchNumber, sides[0]);
+        }
+
         emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
+    }
+
+    /// @notice Moves the L1SLOAD anchor to an imported L1 block. See {protocol-docs/l1sload.md#anchors}.
+    /// @dev The slots are fixed because ZKsync OS reads the anchor hash directly from this contract's storage.
+    /// @param _blockNumber The L1 block number.
+    /// @param _blockHash The L1 block hash.
+    function _setL1Anchor(uint256 _blockNumber, bytes32 _blockHash) private {
+        StorageSlot.getBytes32Slot(L1SLOAD_ANCHOR_BLOCK_HASH_SLOT).value = _blockHash;
+        StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT).value = _blockNumber;
     }
 }

@@ -6,7 +6,8 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
-import {EMPTY_STRING_KECCAK} from "../../../common/Config.sol";
+import {IL1MessageRoot} from "../../../core/message-root/IL1MessageRoot.sol";
+import {EMPTY_STRING_KECCAK, L1_ANCHOR_MAX_LAG, L1_BLOCK_HASH_IMPORT_ID} from "../../../common/Config.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
@@ -26,6 +27,7 @@ import {
     DependencyRootsRollingHashMismatch,
     InvalidBatchesDataLength,
     InvalidInteropRootTimestamp,
+    L1AnchorTooOld,
     MessageRootIsZero,
     MismatchNumberOfLayer1Txs
 } from "../../L1StateTransitionErrors.sol";
@@ -82,6 +84,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
     /// @dev 1. Processes all pending operations (Complete priority requests)
     /// @dev 2. Finalizes batch
     /// @dev 3. Charges the batch's interop fee units
+    /// @dev 4. Checks the chain's L1SLOAD anchor freshness
     /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
@@ -93,7 +96,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
             revert MismatchNumberOfLayer1Txs(_storedBatch.numberOfLayer1Txs, _priorityOpsData.itemHashes.length);
         }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
-        bytes32 dependencyRootsRollingHash = _verifyDependencyInteropRoots(_dependencyRoots);
+        (bytes32 dependencyRootsRollingHash, uint256 newestL1AnchorTimestamp) = _verifyDependencyInteropRoots(
+            _dependencyRoots
+        );
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash, dependencyRootsRollingHash);
         s.priorityTree.processBatch(_priorityOpsData);
 
@@ -111,12 +116,36 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
                 interopFeeUnits
             );
         }
+
+        _checkL1AnchorFreshness(currentBatchNumber, newestL1AnchorTimestamp);
     }
 
-    /// @notice Verifies the dependency message roots that the chain relied on.
+    /// @notice Records the newest L1SLOAD anchor the chain imported and enforces the anchor freshness rule for the
+    /// batch. See {protocol-docs/l1sload.md#freshness}.
+    /// @param _batchNumber The executed batch.
+    /// @param _newestL1AnchorTimestamp The newest timestamp among the anchors the batch imported, or zero.
+    function _checkL1AnchorFreshness(uint256 _batchNumber, uint256 _newestL1AnchorTimestamp) internal {
+        uint256 l1AnchorTimestamp = s.l1AnchorTimestamp;
+        if (_newestL1AnchorTimestamp > l1AnchorTimestamp) {
+            l1AnchorTimestamp = _newestL1AnchorTimestamp;
+            s.l1AnchorTimestamp = l1AnchorTimestamp;
+        }
+        if (l1AnchorTimestamp == 0 || s.priorityModeInfo.activated) {
+            return;
+        }
+        uint256 batchTimestamp = s.batchLastBlockTimestamp[_batchNumber];
+        require(
+            l1AnchorTimestamp + L1_ANCHOR_MAX_LAG >= batchTimestamp,
+            L1AnchorTooOld(l1AnchorTimestamp, batchTimestamp)
+        );
+    }
+
+    /// @notice Verifies the dependency message roots and L1SLOAD anchors that the chain relied on.
+    /// @return dependencyRootsRollingHash The rolling hash of the roots, as the batch committed it.
+    /// @return newestL1AnchorTimestamp The newest timestamp among the anchors, or zero if there are none.
     function _verifyDependencyInteropRoots(
         InteropRoot[] memory _dependencyRoots
-    ) internal view returns (bytes32 dependencyRootsRollingHash) {
+    ) internal view returns (bytes32 dependencyRootsRollingHash, uint256 newestL1AnchorTimestamp) {
         uint256 length = _dependencyRoots.length;
         IMessageRootBase messageRootContract = IBridgehubBase(s.bridgehub).messageRoot();
 
@@ -133,6 +162,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
                 );
                 correctRootHash = recordedRoot.root;
                 correctTimestamp = recordedRoot.timestamp;
+            } else if (interopRoot.chainId == L1_BLOCK_HASH_IMPORT_ID) {
+                // See {protocol-docs/l1sload.md#anchors}.
+                StoredInteropRoot memory recordedBlockHash = IL1MessageRoot(address(messageRootContract))
+                    .recordedL1BlockHash(interopRoot.blockOrBatchNumber);
+                correctRootHash = recordedBlockHash.root;
+                correctTimestamp = recordedBlockHash.timestamp;
+                if (correctTimestamp > newestL1AnchorTimestamp) {
+                    newestL1AnchorTimestamp = correctTimestamp;
+                }
             } else {
                 revert CommitBasedInteropNotSupported();
             }

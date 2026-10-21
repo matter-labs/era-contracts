@@ -49,6 +49,8 @@ contract ChainRegistrationSender is
         internal __DEPRECATED_chainRegisteredOnChain;
 
     /// @inheritdoc IChainRegistrationSender
+    /// @dev L2 contracts read it with L1SLOAD, so its slot must stay
+    /// `CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT`.
     mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
 
     /// @notice Checks that the message sender is the bridgehub.

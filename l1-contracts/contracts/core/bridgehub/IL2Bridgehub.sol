@@ -28,7 +28,29 @@ interface IL2Bridgehub is IBridgehubBase {
     /// @param _chainId The chain id of the chain.
     function deregisterChainForInterop(uint256 _chainId) external;
 
+    /// @notice The L1 read addresses were set, see {setL1ReadAddresses}.
+    event L1ReadAddressesSet(address l1MessageRoot, address l1ChainRegistrationSender);
+
     /// @notice Whether interop with the chain is allowed, see {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+    /// Once the L1 read addresses are set, it is read from L1, see
+    /// {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
     /// @param _chainId The chain id of the peer chain.
     function isPeerAllowed(uint256 _chainId) external view returns (bool);
+
+    /// @notice Whether this chain may send interop to the chain: {isPeerAllowed}, and, once the L1 read addresses
+    /// are set, the peer allowed this chain too. See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
+    /// @param _chainId The chain id of the peer chain.
+    function canSendTo(uint256 _chainId) external view returns (bool);
+
+    /// @notice Sets the L1 contracts whose state {isPeerAllowed} and {canSendTo} read with L1SLOAD. Zero addresses
+    /// switch back to the mirrored whitelist. Callable by the owner.
+    /// @param _l1MessageRoot The L1 `L1MessageRoot` proxy.
+    /// @param _l1ChainRegistrationSender The L1 `ChainRegistrationSender` proxy.
+    function setL1ReadAddresses(address _l1MessageRoot, address _l1ChainRegistrationSender) external;
+
+    /// @notice The L1 `L1MessageRoot` proxy read with L1SLOAD, or zero.
+    function l1MessageRoot() external view returns (address);
+
+    /// @notice The L1 `ChainRegistrationSender` proxy read with L1SLOAD, or zero.
+    function l1ChainRegistrationSender() external view returns (address);
 }
