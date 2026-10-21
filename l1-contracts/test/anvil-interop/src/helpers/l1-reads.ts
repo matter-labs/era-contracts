@@ -75,7 +75,7 @@ export async function installL1SloadMock(_l2Provider: providers.JsonRpcProvider)
   await _l2Provider.send("anvil_setCode", [L1SLOAD_PRECOMPILE_ADDR, getBytecode("MockL1SloadPrecompile")]);
 }
 
-/** Records the previous L1 block's hash on L1, as every `executeBatches` does on a real chain. */
+/** Records the previous L1 block's hash on L1, as every `commitBatches` does on a real chain. */
 export async function recordL1Anchor(
   _l1Provider: providers.JsonRpcProvider,
   _l1Addresses: CoreDeployedAddresses

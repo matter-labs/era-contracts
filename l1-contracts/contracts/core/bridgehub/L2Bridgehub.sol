@@ -95,6 +95,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
 
     /// @inheritdoc IL2Bridgehub
     function interopSendTarget(uint256 _chainId) external view returns (bool allowed, bytes32 peerBaseTokenAssetId) {
+        // slither-disable-next-line unused-return
         return L1View.sendTarget(l1ChainRegistrationSender(), block.chainid, _chainId);
     }
 

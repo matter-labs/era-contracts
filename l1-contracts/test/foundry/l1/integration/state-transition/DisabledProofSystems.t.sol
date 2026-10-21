@@ -12,6 +12,8 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ICommitter, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -282,6 +284,15 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(true)
+        );
+        // Commits record an L1SLOAD anchor in the message root, which is out of this suite's scope; `L1Anchors.t.sol`
+        // runs it against a real `L1MessageRoot`. See {protocol-docs/l1sload.md#anchors}.
+        address messageRoot = makeAddr("messageRoot");
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehubBase.messageRoot.selector), abi.encode(messageRoot));
+        vm.mockCall(
+            messageRoot,
+            abi.encodeWithSelector(IL1MessageRoot.recordL1BlockHash.selector),
+            abi.encode(uint256(0), bytes32(0))
         );
 
         Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](4);

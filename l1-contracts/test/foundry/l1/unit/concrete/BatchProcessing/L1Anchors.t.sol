@@ -4,7 +4,9 @@ pragma solidity 0.8.28;
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {TestCommitter} from "contracts/dev-contracts/test/TestCommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
@@ -18,14 +20,16 @@ import {
     MessageRootIsZero
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-/// @notice L1SLOAD anchors through a real diamond and a real `L1MessageRoot`: an imported anchor must match the
-/// L1 record at execution, and the chain's newest anchor must be fresh relative to each executed batch.
+/// @notice L1SLOAD anchors through a real diamond and a real `L1MessageRoot`: commits record anchors, an imported
+/// anchor must match the L1 record at execution, and the chain's newest anchor must be fresh relative to each
+/// executed batch.
 /// See {protocol-docs/l1sload.md}.
 contract L1AnchorsExecutorTest is ExecutorTest {
     uint256 internal constant BLOCK_1 = 1000;
     uint256 internal constant BLOCK_2 = 2000;
     bytes32 internal constant HASH_1 = keccak256("l1-block-1000");
     bytes32 internal constant HASH_2 = keccak256("l1-block-2000");
+    string internal constant V35_COMMITTER = "test/foundry/l1/integration/fixtures/v35/CommitterFacet.json";
 
     function setUp() public {}
 
@@ -177,32 +181,68 @@ contract L1AnchorsExecutorTest is ExecutorTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        Anchor recorded on execute
+                        Anchor recorded on commit
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Decision 7 of the L1SLOAD spec: operators need no separate transaction to record anchors.
-    function test_execute_recordsThePreviousL1Block() public {
-        IExecutor.StoredBatchInfo memory stored = _commitAndProveFirst(new InteropRoot[](0));
+    function test_commit_recordsThePreviousL1Block() public {
         vm.roll(BLOCK_2 + 1);
         vm.setBlockhash(BLOCK_2, HASH_2);
         assertEq(messageRoot.recordedL1BlockHash(BLOCK_2).timestamp, 0);
 
         vm.expectEmit(address(messageRoot));
         emit IL1MessageRoot.L1BlockHashRecorded(BLOCK_2, HASH_2, block.timestamp);
-        _execute(stored, new InteropRoot[](0));
+        _commitBatch(genesisStoredBatchInfo, _batch(1, block.timestamp, new InteropRoot[](0)));
 
         StoredInteropRoot memory recorded = messageRoot.recordedL1BlockHash(BLOCK_2);
         assertEq(recorded.root, HASH_2);
         assertEq(recorded.timestamp, block.timestamp);
     }
 
-    /// @dev The anchor the first execute recorded is what a later batch imports.
-    function test_execute_recordedAnchorIsImportableByTheNextBatch() public {
-        IExecutor.StoredBatchInfo memory first = _commitAndProveFirst(new InteropRoot[](0));
+    /// @dev Commits don't wait for proofs, so anchors keep being recorded while proving lags.
+    function test_commit_recordsWhileProofsLag() public {
         vm.roll(BLOCK_1 + 1);
         vm.setBlockhash(BLOCK_1, HASH_1);
-        _execute(first, new InteropRoot[](0));
+        IExecutor.StoredBatchInfo memory first = _commitBatch(
+            genesisStoredBatchInfo,
+            _batch(1, block.timestamp, new InteropRoot[](0))
+        );
+        vm.roll(BLOCK_2 + 1);
+        vm.setBlockhash(BLOCK_2, HASH_2);
+        _commitBatch(first, _batch(2, block.timestamp, new InteropRoot[](0)));
+
+        assertEq(getters.getTotalBatchesCommitted(), 2);
+        assertEq(getters.getTotalBatchesVerified(), 0);
+        assertEq(messageRoot.recordedL1BlockHash(BLOCK_1).root, HASH_1);
+        assertEq(messageRoot.recordedL1BlockHash(BLOCK_2).root, HASH_2);
+    }
+
+    /// @dev The chains committing in one L1 block, and the server's keeper, share one record: a second record in the
+    /// block writes nothing.
+    function test_commit_secondRecordInTheSameL1BlockIsANoop() public {
+        vm.roll(BLOCK_2 + 1);
+        vm.setBlockhash(BLOCK_2, HASH_2);
+        _commitBatch(genesisStoredBatchInfo, _batch(1, block.timestamp, new InteropRoot[](0)));
         uint256 recordedAt = block.timestamp;
+
+        vm.warp(block.timestamp + 1);
+        vm.recordLogs();
+        (uint256 blockNumber, ) = messageRoot.recordL1BlockHash();
+
+        assertEq(vm.getRecordedLogs().length, 0, "no event");
+        assertEq(blockNumber, BLOCK_2);
+        StoredInteropRoot memory recorded = messageRoot.recordedL1BlockHash(BLOCK_2);
+        assertEq(recorded.root, HASH_2);
+        assertEq(recorded.timestamp, recordedAt, "the first record stays");
+    }
+
+    /// @dev The anchor a commit recorded is what a later batch imports.
+    function test_commit_recordedAnchorIsImportableByTheNextBatch() public {
+        vm.roll(BLOCK_1 + 1);
+        vm.setBlockhash(BLOCK_1, HASH_1);
+        IExecutor.StoredBatchInfo memory first = _commitAndProveFirst(new InteropRoot[](0));
+        uint256 recordedAt = block.timestamp;
+        _execute(first, new InteropRoot[](0));
 
         vm.warp(block.timestamp + 1);
         InteropRoot[] memory roots = _single(_anchor(BLOCK_1, HASH_1, recordedAt));
@@ -214,23 +254,59 @@ contract L1AnchorsExecutorTest is ExecutorTest {
         assertEq(utilsFacet.util_getL1AnchorTimestamp(), recordedAt);
     }
 
-    /// @dev A settlement layer other than L1 keeps no anchor record, so its executes record nothing. The message
-    /// root's `L1_CHAIN_ID` is mocked: the fixture runs on one chain.
-    function test_execute_recordsNothingOffL1() public {
+    /// @dev Executes record nothing, so anchors don't depend on proofs.
+    function test_execute_recordsNothing() public {
         IExecutor.StoredBatchInfo memory stored = _commitAndProveFirst(new InteropRoot[](0));
         vm.roll(BLOCK_2 + 1);
         vm.setBlockhash(BLOCK_2, HASH_2);
-        vm.mockCall(
-            address(messageRoot),
-            abi.encodeWithSelector(IMessageRootBase.L1_CHAIN_ID.selector),
-            abi.encode(block.chainid + 1)
-        );
         vm.expectCall(address(messageRoot), abi.encodeCall(IL1MessageRoot.recordL1BlockHash, ()), 0);
 
         _execute(stored, new InteropRoot[](0));
 
         assertEq(getters.getTotalBatchesExecuted(), 1);
         assertEq(messageRoot.recordedL1BlockHash(BLOCK_2).timestamp, 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Batches committed before v36
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The v35 `CommitterFacet` stores `StoredBatchInfo.timestamp = 0`. Such a batch passes the freshness rule
+    /// however old the chain's anchor is. The upgrade engines execute every committed batch before a chain upgrades,
+    /// so in production it never meets an anchor; this pins the defensive skip. The real v35 facet commits it
+    /// (`fixtures/v35/CommitterFacet.json`), installed with a diamond cut as an upgrade would.
+    function test_freshness_batchCommittedByTheV35CommitterIsNotChecked() public {
+        (IExecutor.StoredBatchInfo memory first, uint256 anchoredAt) = _executeFirstBatchWithAnchor();
+        vm.warp(anchoredAt + 10 * L1_ANCHOR_MAX_LAG);
+
+        _replaceCommitter(deployCode(V35_COMMITTER, abi.encode(block.chainid)));
+        CommitBatchInfoZKsyncOS memory info = _batch(2, block.timestamp, new InteropRoot[](0));
+        // The v35 Committer checks the six-word chain config hash.
+        info.chainConfigHash = keccak256(
+            abi.encodePacked(
+                l2ChainId,
+                uint256(0),
+                uint256(getters.getZKsyncOSMaxTxGasLimit()),
+                uint256(getters.getPubdataContent()),
+                uint256(0),
+                uint256(0)
+            )
+        );
+        IExecutor.StoredBatchInfo memory second = _commitBatch(first, info);
+        second.timestamp = 0;
+        assertEq(getters.storedBatchHash(2), keccak256(abi.encode(second)), "v35 stores timestamp 0");
+        _replaceCommitter(address(new TestCommitter()));
+
+        IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
+        batches[0] = second;
+        (uint256 from, uint256 to, bytes memory data) = Utils.encodeProveBatchesData(first, batches, proofInput);
+        vm.prank(validator);
+        executor.proveBatchesSharedBridge(address(0), from, to, data);
+        _mockMessageRootAppend(2);
+        _execute(second, new InteropRoot[](0));
+
+        assertEq(getters.getTotalBatchesExecuted(), 2);
+        assertEq(utilsFacet.util_getL1AnchorTimestamp(), anchoredAt);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -254,6 +330,29 @@ contract L1AnchorsExecutorTest is ExecutorTest {
         InteropRoot[] memory roots = _single(_anchor(BLOCK_1, HASH_1, anchoredAt));
         first = _commitAndProveFirst(roots);
         _execute(first, roots);
+    }
+
+    /// @dev Commits `_batchInfo` on top of `_prev` without proving it.
+    function _commitBatch(
+        IExecutor.StoredBatchInfo memory _prev,
+        CommitBatchInfoZKsyncOS memory _batchInfo
+    ) internal returns (IExecutor.StoredBatchInfo memory) {
+        return _commitOSBatchGetStored(_prev, _batchInfo);
+    }
+
+    /// @dev Points `commitBatchesSharedBridge` at `_facet`, through the CTM's `executeUpgrade` as an upgrade does.
+    function _replaceCommitter(address _facet) internal {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = ICommitter.commitBatchesSharedBridge.selector;
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: _facet,
+            action: Diamond.Action.Replace,
+            isFreezable: true,
+            selectors: selectors
+        });
+        vm.prank(getters.getChainTypeManager());
+        admin.executeUpgrade(Diamond.DiamondCutData({facetCuts: facetCuts, initAddress: address(0), initCalldata: ""}));
     }
 
     /// @dev Commits and proves batch 1, importing `_roots`, at the current time.

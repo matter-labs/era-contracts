@@ -42,10 +42,12 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
   IDs at `type(uint48).max`.
 - **L1 record.** `L1MessageRoot.recordL1BlockHash()` stores `blockhash(block.number - 1)` with `block.timestamp`
   under `block.number - 1`, emits `L1BlockHashRecorded`, and `recordedL1BlockHash(n)` returns it. Every
-  `executeBatches` on L1 calls it, so operators send no transaction for it. It stays permissionless, and is a no-op
-  when the block is already recorded, so the chains executing in one L1 block share one record. The record is
-  permanent, so an anchor stays verifiable at execution however long ago it was taken; the EVM's `blockhash` only
-  reaches 256 blocks back.
+  `commitBatches` on L1 calls it, so operators send no transaction for it. Commits don't wait for proofs, so a
+  prover outage doesn't stop new anchors; recording at execute would have paused the L2 after `L1_ANCHOR_MAX_LAG`
+  without proofs. It stays permissionless, and is a no-op when the block is already recorded, so the chains
+  committing in one L1 block share one record. When production is paused waiting for an anchor there are no
+  commits, so the server's keeper calls it itself. The record is permanent, so an anchor stays verifiable at
+  execution however long ago it was taken; the EVM's `blockhash` only reaches 256 blocks back.
 - **Import on L2.** `L2InteropRootStorage` runs the checks of every import (one non-zero side, non-zero
   timestamp), then requires the block to be newer than the current anchor (`L1AnchorNotNewer`), so the anchor
   only moves forward and block 0 can't be anchored. It writes the anchor's hash and number to the fixed slots
@@ -71,11 +73,15 @@ execution reverts with `L1AnchorTooOld`, so an operator can't serve L1 reads fro
 executor keeps the maximum, without relying on L2 importing anchors in increasing order.
 
 `StoredBatchInfo.timestamp` is the batch's last L2 block timestamp. ZKsync OS batches stored 0 there until v36; from
-v36 the Committer stores `lastBlockTimestamp`, which the batch output hash, and so the proof, commits to. The rule
+v36 the Committer stores `lastBlockTimestamp`, which the batch output hash, and so the proof, commits to. It does so
+for every batch it commits, with no per-batch version gate. The server's `StoredBatchInfo` encoding gates on the
+batch's protocol version (≥ v36) instead, and the two agree: after a chain upgrade with an L2 upgrade transaction the
+first batch committed must be the upgrade batch (`Committer._commitBatches`, `processSystemUpgradeTx`). The rule
 doesn't apply:
 
 - to chains that never imported an anchor;
-- to batches committed before v36, whose timestamp is 0;
+- to batches committed before v36, whose timestamp is 0. The upgrade engines execute every committed batch before a
+  chain upgrades, so this is a defensive skip;
 - in Priority Mode, whose batches can't contain the service transaction that imports anchors. L1 reads there see
   the last anchor, however old.
 
@@ -165,7 +171,7 @@ changed, which the release pair derives on-chain (among them `L2Bridgehub`, `Int
   nothing until its admin turns the flag on, so its admin does that at the first configuration boundary after the
   upgrade ({protocol-docs/chain-config.md#configuration-updates}).
 - **The first anchor.** The upgrade seeds no anchor: a seeded one would be an unchecked L1 state. The first
-  `executeBatches` after the upgrade records one, and the operator imports it in a later batch. Until then the
+  `commitBatches` after the upgrade records one, and the operator imports it in a later batch. Until then the
   chain's interop reads revert, so its interop pauses for about one batch.
 - **Stale L2 state.** The L2 Bridgehub's v35 whitelist stays under `__DEPRECATED_isPeerAllowed`, and its
   `baseTokenAssetId` entries for peers stay but are not read for gating.
