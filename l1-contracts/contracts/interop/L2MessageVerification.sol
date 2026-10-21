@@ -6,8 +6,6 @@ import {MessageVerification} from "../common/MessageVerification.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../core/bridgehub/L1BridgehubErrors.sol";
-import {L1_BLOCK_HASH_IMPORT_ID} from "../common/Config.sol";
-import {ReservedInteropRootChainId} from "./InteropErrors.sol";
 
 /// @title L2MessageVerification
 /// @author Matter Labs
@@ -25,10 +23,6 @@ contract L2MessageVerification is MessageVerification {
         bytes32[] calldata _proof,
         uint256 _depth
     ) internal view override returns (bool) {
-        // L1 block-hash anchors are stored as interop roots under this id, see {protocol-docs/l1sload.md#anchors}.
-        if (_chainId == L1_BLOCK_HASH_IMPORT_ID) {
-            revert ReservedInteropRootChainId(_chainId);
-        }
         ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
             _batchNumber: _blockOrBatchNumber,

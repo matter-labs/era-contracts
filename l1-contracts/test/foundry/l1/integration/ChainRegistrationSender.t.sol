@@ -3,21 +3,19 @@ pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
 
-import {L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
-import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
+    InteropAlreadySuspended,
     InteropNotEnabled,
+    InteropNotSuspended,
     InteropPeerAlreadyAllowed,
-    InteropPeerNotAllowed,
     InvalidInteropPeer,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -25,9 +23,11 @@ import {
 import {InteropGatingDeployer} from "./_SharedInteropGatingDeployer.t.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
-/// @notice The interop peer whitelist of `ChainRegistrationSender`. See
-/// {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+/// @notice The interop gating state of `ChainRegistrationSender` with a real ecosystem: the peer whitelist, the base
+/// token snapshots and the suspensions, which chains read from L1 and which no longer reach L2 by service
+/// transactions. See {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/l1sload.md}.
 contract ChainRegistrationSenderTests is InteropGatingDeployer {
     using LogFinder for Vm.Log[];
 
@@ -47,18 +47,6 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         assertNotEq(chainAdmin, addresses.chainRegistrationSender.owner());
     }
 
-    function _registrationCalldata(uint256 _peerChainId) internal view returns (bytes memory) {
-        return
-            abi.encodeCall(
-                IL2Bridgehub.allowInteropPeer,
-                (_peerChainId, addresses.bridgehub.baseTokenAssetId(_peerChainId))
-            );
-    }
-
-    function _deregistrationCalldata(uint256 _peerChainId) internal pure returns (bytes memory) {
-        return abi.encodeCall(IL2Bridgehub.deregisterChainForInterop, (_peerChainId));
-    }
-
     function _allowInteropPeer() internal returns (Vm.Log[] memory logs) {
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
         emit IChainRegistrationSender.InteropPeerAllowed(chainId, peerChainId);
@@ -69,18 +57,43 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
     }
 
-    /// @notice Allowing a peer queues a service transaction registering it on the chain's L2 Bridgehub, and
-    /// only on that chain: the peer's own L2 Bridgehub is written only once the peer's admin consents too.
-    function test_allowInteropPeer_registersPeer() public {
+    /// @notice Allowing a peer writes the pair and snapshots the peer's base token from the Bridgehub, on L1 only:
+    /// no chain gets a priority transaction, and the peer's side waits for the peer's admin.
+    function test_allowInteropPeer_writesL1StateOnly() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
+        uint256 chainPriorityTxs = IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs();
         uint256 peerPriorityTxs = IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs();
 
         Vm.Log[] memory logs = _allowInteropPeer();
 
-        assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
+        _assertNoPriorityTx(logs);
+        assertEq(IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs(), chainPriorityTxs);
         assertEq(IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs(), peerPriorityTxs);
         assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(peerChainId, chainId));
+        assertEq(
+            addresses.chainRegistrationSender.interopBaseTokenAssetId(peerChainId),
+            addresses.bridgehub.baseTokenAssetId(peerChainId),
+            "the peer's base token snapshot"
+        );
+        assertNotEq(addresses.chainRegistrationSender.interopBaseTokenAssetId(peerChainId), bytes32(0));
+        assertEq(addresses.chainRegistrationSender.interopBaseTokenAssetId(chainId), bytes32(0));
+    }
+
+    /// @notice The peer's consent completes the pair and snapshots the chain's base token in turn.
+    function test_allowInteropPeer_bothWays() public {
+        _enableInterop(chainId);
+        _enableInterop(peerChainId);
+        _allowInteropPeer();
+
+        vm.prank(_chainAdmin(peerChainId));
+        addresses.chainRegistrationSender.allowInteropPeer(peerChainId, chainId);
+
+        assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(peerChainId, chainId));
+        assertEq(
+            addresses.chainRegistrationSender.interopBaseTokenAssetId(chainId),
+            addresses.bridgehub.baseTokenAssetId(chainId)
+        );
     }
 
     /// @notice An allowed pair stays allowed until it is deregistered, so a second call has nothing to do.
@@ -164,8 +177,9 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         addresses.chainRegistrationSender.allowInteropPeer(chainId, peerChainId);
     }
 
-    /// @notice Deregistering the legacy pairs, which L1 never recorded, of two chains registered on each other.
-    function test_deregisterInteropPairs_clearsEveryPair() public {
+    /// @notice Deregistering pairs L1 never recorded, such as the ones the retired consent-free registration wrote on
+    /// L2, emits and sends nothing to L2.
+    function test_deregisterInteropPairs_pairsNeverAllowed() public {
         address owner = addresses.chainRegistrationSender.owner();
 
         vm.recordLogs();
@@ -177,30 +191,32 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         emit IChainRegistrationSender.InteropPairDeregistered(peerChainId, chainId);
         addresses.chainRegistrationSender.deregisterInteropPairs(peerChainId, _peers(chainId));
         vm.stopPrank();
-        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
-        assertEq(_priorityTxCalldata(logs, peerChainId), _deregistrationCalldata(chainId));
+        _assertNoPriorityTx(vm.getRecordedLogs());
     }
 
-    /// @notice Governance can remove a pair the admin allowed, which the admin can then allow again.
+    /// @notice Governance can remove a pair the admin allowed, on L1 alone; the admin can then allow it again.
     function test_deregisterInteropPairs_allowedPair() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         _allowInteropPeer();
+        bytes32 snapshot = addresses.chainRegistrationSender.interopBaseTokenAssetId(peerChainId);
 
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
         emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
         vm.recordLogs();
         vm.prank(addresses.chainRegistrationSender.owner());
         addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(peerChainId));
-        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
+        _assertNoPriorityTx(vm.getRecordedLogs());
         assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
+        assertEq(
+            addresses.chainRegistrationSender.interopBaseTokenAssetId(peerChainId),
+            snapshot,
+            "the snapshot stays"
+        );
 
-        logs = _allowInteropPeer();
-        assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
+        _allowInteropPeer();
     }
 
     /// @notice The chain's admin can remove a pair it allowed, and allow it again.
@@ -214,17 +230,14 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         vm.recordLogs();
         vm.prank(chainAdmin);
         addresses.chainRegistrationSender.deregisterInteropPairs(chainId, _peers(peerChainId));
-        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(_priorityTxCalldata(logs, chainId), _deregistrationCalldata(peerChainId));
+        _assertNoPriorityTx(vm.getRecordedLogs());
         assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
 
-        logs = _allowInteropPeer();
-        assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
+        _allowInteropPeer();
     }
 
-    /// @notice The chain's admin removes two allowed peers in one call: one service transaction per peer, all on
-    /// the chain, none on the peers.
+    /// @notice The chain's admin removes two allowed peers in one call, on L1 alone.
     function test_deregisterInteropPairs_severalPeers() public {
         _deployZKChain(ETH_TOKEN_ADDRESS);
         uint256 thirdChainId = zkChainIds[2];
@@ -236,8 +249,6 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         addresses.chainRegistrationSender.allowInteropPeer(chainId, thirdChainId);
         uint256[] memory peers = new uint256[](2);
         (peers[0], peers[1]) = (peerChainId, thirdChainId);
-        uint256 peerPriorityTxs = IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs();
-        uint256 thirdPriorityTxs = IGetters(getZKChainAddress(thirdChainId)).getTotalPriorityTxs();
 
         vm.expectEmit(true, true, false, true, address(addresses.chainRegistrationSender));
         emit IChainRegistrationSender.InteropPairDeregistered(chainId, peerChainId);
@@ -246,14 +257,8 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         vm.recordLogs();
         vm.prank(chainAdmin);
         addresses.chainRegistrationSender.deregisterInteropPairs(chainId, peers);
-        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        bytes[] memory calldatas = _priorityTxCalldatas(logs, chainId);
-        assertEq(calldatas.length, 2, "one service transaction per peer");
-        assertEq(calldatas[0], _deregistrationCalldata(peerChainId));
-        assertEq(calldatas[1], _deregistrationCalldata(thirdChainId));
-        assertEq(IGetters(getZKChainAddress(peerChainId)).getTotalPriorityTxs(), peerPriorityTxs);
-        assertEq(IGetters(getZKChainAddress(thirdChainId)).getTotalPriorityTxs(), thirdPriorityTxs);
+        _assertNoPriorityTx(vm.getRecordedLogs());
         assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
         assertFalse(addresses.chainRegistrationSender.interopPeerAllowed(chainId, thirdChainId));
     }
@@ -329,39 +334,58 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         assertEq(IGetters(chain).getPriorityTreeRoot(), priorityRoot);
     }
 
-    /// @notice A resubmission re-sends the registration of an allowed peer, paid by the caller.
-    function test_resubmission_allowedPeer_registersPeer() public {
+    /*//////////////////////////////////////////////////////////////
+                    suspendInterop / resumeInterop
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The owner suspends and resumes a chain on L1 alone; the whitelist and the enabling are untouched.
+    function test_suspendAndResume() public {
         _enableInterop(chainId);
         _enableInterop(peerChainId);
         _allowInteropPeer();
+        address owner = addresses.chainRegistrationSender.owner();
 
-        Vm.Log[] memory logs = _resubmit(
-            bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(peerChainId))
-        );
+        vm.expectEmit(true, false, false, true, address(addresses.chainRegistrationSender));
+        emit IChainRegistrationSender.InteropSuspended(peerChainId);
+        vm.recordLogs();
+        vm.prank(owner);
+        addresses.chainRegistrationSender.suspendInterop(peerChainId);
+        _assertNoPriorityTx(vm.getRecordedLogs());
 
-        assertEq(_priorityTxCalldata(logs, chainId), _registrationCalldata(peerChainId));
+        assertTrue(addresses.chainRegistrationSender.isInteropSuspended(peerChainId));
+        assertFalse(addresses.chainRegistrationSender.isInteropSuspended(chainId));
+        assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId));
+        assertTrue(messageRoot.isInteropEnabled(peerChainId), "enabling is one-way and untouched");
+
+        vm.expectEmit(true, false, false, true, address(addresses.chainRegistrationSender));
+        emit IChainRegistrationSender.InteropResumed(peerChainId);
+        vm.prank(owner);
+        addresses.chainRegistrationSender.resumeInterop(peerChainId);
+        assertFalse(addresses.chainRegistrationSender.isInteropSuspended(peerChainId));
     }
 
-    function test_resubmission_revertWhen_peerNotAllowed() public {
-        _expectResubmissionRevert(
-            bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(peerChainId)),
-            abi.encodeWithSelector(InteropPeerNotAllowed.selector, chainId, peerChainId)
-        );
+    /// @notice Suspension is the owner's: the chain's admin can't suspend its own chain.
+    function test_suspendInterop_revertWhen_chainAdmin() public {
+        vm.prank(chainAdmin);
+        vm.expectRevert("Ownable: caller is not the owner");
+        addresses.chainRegistrationSender.suspendInterop(chainId);
+        assertFalse(addresses.chainRegistrationSender.isInteropSuspended(chainId));
     }
 
-    /// @notice The retired consent-free encoding is rejected.
-    function test_resubmission_revertWhen_legacyEncodingVersion() public {
-        _expectResubmissionRevert(
-            bytes.concat(bytes1(0x01), abi.encode(peerChainId)),
-            abi.encodeWithSelector(UnsupportedEncodingVersion.selector)
-        );
+    function test_suspendInterop_revertWhen_alreadySuspended() public {
+        address owner = addresses.chainRegistrationSender.owner();
+        vm.prank(owner);
+        addresses.chainRegistrationSender.suspendInterop(chainId);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(InteropAlreadySuspended.selector, chainId));
+        addresses.chainRegistrationSender.suspendInterop(chainId);
     }
 
-    function test_resubmission_revertWhen_peerIsSelf() public {
-        _expectResubmissionRevert(
-            bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(chainId)),
-            abi.encodeWithSelector(InteropPeerNotAllowed.selector, chainId, chainId)
-        );
+    function test_resumeInterop_revertWhen_notSuspended() public {
+        vm.prank(addresses.chainRegistrationSender.owner());
+        vm.expectRevert(abi.encodeWithSelector(InteropNotSuspended.selector, chainId));
+        addresses.chainRegistrationSender.resumeInterop(chainId);
     }
 
     function _peers(uint256 _peerChainId) internal pure returns (uint256[] memory peers) {
@@ -380,66 +404,8 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         assertEq(IGetters(chain).getAdmin(), admin);
     }
 
-    /// @dev Runs requestL2TransactionTwoBridges through ChainRegistrationSender; only ETH for base-token gas.
-    function _resubmissionRequest(
-        bytes memory _secondBridgeCalldata
-    ) internal returns (address user, uint256 mintValue, L2TransactionRequestTwoBridgesOuter memory request) {
-        user = makeAddr("resubmitter");
-        uint256 gasPrice = 10000000;
-        vm.txGasPrice(gasPrice);
-
-        uint256 l2GasLimit = 1000000;
-        mintValue = MailboxFacet(getZKChainAddress(chainId)).l2TransactionBaseCost(
-            gasPrice,
-            l2GasLimit,
-            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-        );
-        vm.deal(user, mintValue);
-
-        request = _createL2TransactionRequestTwoBridges({
-            _chainId: chainId,
-            _mintValue: mintValue,
-            _secondBridgeValue: 0,
-            _secondBridgeAddress: address(addresses.chainRegistrationSender),
-            _l2Value: 0,
-            _l2GasLimit: l2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _secondBridgeCalldata: _secondBridgeCalldata
-        });
-    }
-
-    function _resubmit(bytes memory _secondBridgeCalldata) internal returns (Vm.Log[] memory logs) {
-        (address user, uint256 mintValue, L2TransactionRequestTwoBridgesOuter memory request) = _resubmissionRequest(
-            _secondBridgeCalldata
-        );
-
-        bool allowed = addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId);
-
-        vm.recordLogs();
-        vm.prank(user);
-        bytes32 txHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(request);
-        logs = vm.getRecordedLogs();
-
-        assertNotEq(txHash, bytes32(0));
-        assertEq(user.balance, 0, "the caller pays the base-token gas");
-        assertEq(addresses.chainRegistrationSender.interopPeerAllowed(chainId, peerChainId), allowed);
-        Vm.Log memory baseTokenLog = logs.requireOne(
-            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
-        );
-        assertEq(uint256(baseTokenLog.topics[1]), chainId);
-    }
-
-    function _expectResubmissionRevert(bytes memory _secondBridgeCalldata, bytes memory _revertData) internal {
-        (address user, uint256 mintValue, L2TransactionRequestTwoBridgesOuter memory request) = _resubmissionRequest(
-            _secondBridgeCalldata
-        );
-        uint256 priorityTxs = IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs();
-
-        vm.prank(user);
-        vm.expectRevert(_revertData);
-        addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(request);
-
-        assertEq(IGetters(getZKChainAddress(chainId)).getTotalPriorityTxs(), priorityTxs);
+    function _assertNoPriorityTx(Vm.Log[] memory _logs) internal pure {
+        assertEq(_logs.findAll(NEW_PRIORITY_REQUEST_SIGNATURE).length, 0, "no priority transaction");
     }
 
     // add this to be excluded from coverage report

@@ -17,40 +17,27 @@ interface IL2Bridgehub is IBridgehubBase {
     //     address _chainRegistrationSender
     // ) external;
 
-    /// @notice Allows interop with a peer chain once its whitelisting on L1 arrives, see
-    /// {protocol-docs/interop-gating.md#interop-peer-whitelist}.
-    /// @param _chainId The chain id of the peer chain.
-    /// @param _baseTokenAssetId The base token asset id of the peer chain.
-    function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external;
+    /// @notice The L1 `ChainRegistrationSender` proxy, whose interop gating state the chain reads with L1SLOAD: the
+    /// unaliased `chainRegistrationSender`. See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
+    function l1ChainRegistrationSender() external view returns (address);
 
-    /// @notice Removes a chain from the chains known for interop, an allowed peer included, once its deregistration
-    /// on L1 arrives. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
-    /// @param _chainId The chain id of the chain.
-    function deregisterChainForInterop(uint256 _chainId) external;
-
-    /// @notice The L1 read addresses were set, see {setL1ReadAddresses}.
-    event L1ReadAddressesSet(address l1MessageRoot, address l1ChainRegistrationSender);
-
-    /// @notice Whether interop with the chain is allowed, see {protocol-docs/interop-gating.md#interop-peer-whitelist}.
-    /// Once the L1 read addresses are set, it is read from L1, see
-    /// {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
+    /// @notice Whether this chain accepts interop from the chain: this chain's admin allowed it on L1 and neither
+    /// chain is suspended, read from L1 at the chain's L1SLOAD anchor. The receive filter, see
+    /// {protocol-docs/interop-gating.md#receive-filter} and {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
     /// @param _chainId The chain id of the peer chain.
     function isPeerAllowed(uint256 _chainId) external view returns (bool);
 
-    /// @notice Whether this chain may send interop to the chain: {isPeerAllowed}, and, once the L1 read addresses
-    /// are set, the peer allowed this chain too. See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
+    /// @notice Whether this chain may send interop to the chain, and the chain's base token, read from L1 at the
+    /// chain's L1SLOAD anchor. Sending needs both admins' consent and neither chain suspended.
+    /// See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
     /// @param _chainId The chain id of the peer chain.
-    function canSendTo(uint256 _chainId) external view returns (bool);
+    /// @return allowed Whether this chain may send to the chain.
+    /// @return peerBaseTokenAssetId The chain's base token asset id, zero if the chain is not registered for interop.
+    function interopSendTarget(uint256 _chainId) external view returns (bool allowed, bytes32 peerBaseTokenAssetId);
 
-    /// @notice Sets the L1 contracts whose state {isPeerAllowed} and {canSendTo} read with L1SLOAD. Zero addresses
-    /// switch back to the mirrored whitelist. Callable by the owner.
-    /// @param _l1MessageRoot The L1 `L1MessageRoot` proxy.
-    /// @param _l1ChainRegistrationSender The L1 `ChainRegistrationSender` proxy.
-    function setL1ReadAddresses(address _l1MessageRoot, address _l1ChainRegistrationSender) external;
-
-    /// @notice The L1 `L1MessageRoot` proxy read with L1SLOAD, or zero.
-    function l1MessageRoot() external view returns (address);
-
-    /// @notice The L1 `ChainRegistrationSender` proxy read with L1SLOAD, or zero.
-    function l1ChainRegistrationSender() external view returns (address);
+    /// @notice Whether the chain is registered for interop, i.e. some chain admin allowed it as a peer on L1, which
+    /// required it to be in the L1 MessageRoot. Read from L1 at the chain's L1SLOAD anchor.
+    /// See {protocol-docs/l1sload.md#the-base-token-snapshot}.
+    /// @param _chainId The chain id of the chain.
+    function isInteropRegistered(uint256 _chainId) external view returns (bool);
 }

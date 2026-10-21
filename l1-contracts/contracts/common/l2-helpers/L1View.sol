@@ -4,59 +4,81 @@ pragma solidity ^0.8.21;
 
 import {L1Reads} from "./L1Reads.sol";
 import {
+    CHAIN_REGISTRATION_SENDER_INTEROP_BASE_TOKEN_ASSET_ID_SLOT,
     CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT,
-    L1_MESSAGE_ROOT_INTEROP_ENABLED_SLOT,
-    L1_MESSAGE_ROOT_INTEROP_SUSPENDED_SLOT
+    CHAIN_REGISTRATION_SENDER_INTEROP_SUSPENDED_SLOT
 } from "../Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Reads the interop gating state of the L1 contracts at the chain's L1SLOAD anchor.
-/// See {protocol-docs/l1sload.md#reading-l1-state}.
+/// @notice Reads the interop gating state of the L1 `ChainRegistrationSender` at the chain's L1SLOAD anchor, one
+/// precompile call per check. `interopEnabled` is never read, see {protocol-docs/l1sload.md#reading-l1-state}.
 library L1View {
-    /// @notice Whether interop is active, i.e. enabled and not suspended, for both chains.
-    /// @param _l1MessageRoot The L1 `L1MessageRoot` proxy.
-    /// @param _chainId The first chain.
-    /// @param _otherChainId The second chain.
-    function isInteropActive(
-        address _l1MessageRoot,
-        uint256 _chainId,
-        uint256 _otherChainId
-    ) internal view returns (bool) {
-        bytes32[] memory keys = new bytes32[](4);
-        keys[0] = interopEnabledSlot(_chainId);
-        keys[1] = interopSuspendedSlot(_chainId);
-        keys[2] = interopEnabledSlot(_otherChainId);
-        keys[3] = interopSuspendedSlot(_otherChainId);
-        bytes32[] memory values = L1Reads.l1sload(_l1MessageRoot, keys);
-        return values[0] != bytes32(0) && values[1] == bytes32(0) && values[2] != bytes32(0) && values[3] == bytes32(0);
-    }
-
-    /// @notice Whether the admin of `_chainId` allowed `_peerChainId` as an interop peer on L1.
+    /// @notice Whether `_chainId` accepts interop from `_peerChainId`: its admin allowed the peer and neither chain is
+    /// suspended.
     /// @param _chainRegistrationSender The L1 `ChainRegistrationSender` proxy.
-    /// @param _chainId The chain whose side is read.
-    /// @param _peerChainId The peer.
-    function isInteropPeerAllowed(
+    /// @param _chainId The receiving chain.
+    /// @param _peerChainId The sending peer.
+    function isReceiveAllowed(
         address _chainRegistrationSender,
         uint256 _chainId,
         uint256 _peerChainId
     ) internal view returns (bool) {
-        return L1Reads.l1sload(_chainRegistrationSender, interopPeerAllowedSlot(_chainId, _peerChainId)) != bytes32(0);
+        bytes32[] memory keys = new bytes32[](3);
+        keys[0] = interopPeerAllowedSlot(_chainId, _peerChainId);
+        keys[1] = interopSuspendedSlot(_chainId);
+        keys[2] = interopSuspendedSlot(_peerChainId);
+        bytes32[] memory values = L1Reads.l1sload(_chainRegistrationSender, keys);
+        return values[0] != bytes32(0) && values[1] == bytes32(0) && values[2] == bytes32(0);
     }
 
-    /// @notice The slot of `L1MessageRoot.interopEnabled[_chainId]`.
-    function interopEnabledSlot(uint256 _chainId) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_chainId, L1_MESSAGE_ROOT_INTEROP_ENABLED_SLOT));
+    /// @notice Whether `_chainId` may send interop to `_peerChainId`, and the peer's base token.
+    /// @param _chainRegistrationSender The L1 `ChainRegistrationSender` proxy.
+    /// @param _chainId The sending chain.
+    /// @param _peerChainId The destination peer.
+    /// @return allowed Whether both admins allowed each other and neither chain is suspended.
+    /// @return peerBaseTokenAssetId The peer's base token snapshot, zero if no chain ever allowed the peer.
+    function sendTarget(
+        address _chainRegistrationSender,
+        uint256 _chainId,
+        uint256 _peerChainId
+    ) internal view returns (bool allowed, bytes32 peerBaseTokenAssetId) {
+        bytes32[] memory keys = new bytes32[](5);
+        keys[0] = interopPeerAllowedSlot(_chainId, _peerChainId);
+        keys[1] = interopPeerAllowedSlot(_peerChainId, _chainId);
+        keys[2] = interopSuspendedSlot(_chainId);
+        keys[3] = interopSuspendedSlot(_peerChainId);
+        keys[4] = interopBaseTokenAssetIdSlot(_peerChainId);
+        bytes32[] memory values = L1Reads.l1sload(_chainRegistrationSender, keys);
+        allowed =
+            values[0] != bytes32(0) &&
+            values[1] != bytes32(0) &&
+            values[2] == bytes32(0) &&
+            values[3] == bytes32(0);
+        peerBaseTokenAssetId = values[4];
     }
 
-    /// @notice The slot of `L1MessageRoot.interopSuspended[_chainId]`.
-    function interopSuspendedSlot(uint256 _chainId) internal pure returns (bytes32) {
-        return keccak256(abi.encode(_chainId, L1_MESSAGE_ROOT_INTEROP_SUSPENDED_SLOT));
+    /// @notice Whether the chain is registered for interop, i.e. has a base token snapshot.
+    /// See {protocol-docs/l1sload.md#the-base-token-snapshot}.
+    /// @param _chainRegistrationSender The L1 `ChainRegistrationSender` proxy.
+    /// @param _chainId The chain.
+    function isRegistered(address _chainRegistrationSender, uint256 _chainId) internal view returns (bool) {
+        return L1Reads.l1sload(_chainRegistrationSender, interopBaseTokenAssetIdSlot(_chainId)) != bytes32(0);
     }
 
     /// @notice The slot of `ChainRegistrationSender.interopPeerAllowed[_chainId][_peerChainId]`.
     function interopPeerAllowedSlot(uint256 _chainId, uint256 _peerChainId) internal pure returns (bytes32) {
         bytes32 innerMappingSlot = keccak256(abi.encode(_chainId, CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT));
         return keccak256(abi.encode(_peerChainId, innerMappingSlot));
+    }
+
+    /// @notice The slot of `ChainRegistrationSender.interopSuspended[_chainId]`.
+    function interopSuspendedSlot(uint256 _chainId) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_chainId, CHAIN_REGISTRATION_SENDER_INTEROP_SUSPENDED_SLOT));
+    }
+
+    /// @notice The slot of `ChainRegistrationSender.interopBaseTokenAssetId[_chainId]`.
+    function interopBaseTokenAssetIdSlot(uint256 _chainId) internal pure returns (bytes32) {
+        return keccak256(abi.encode(_chainId, CHAIN_REGISTRATION_SENDER_INTEROP_BASE_TOKEN_ASSET_ID_SLOT));
     }
 }

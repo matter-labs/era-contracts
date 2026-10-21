@@ -55,6 +55,8 @@ error InteropToSelfNotSupported();
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0x209a6e49
+error L1AnchorNotNewer(uint256 blockNumber, uint256 anchorBlockNumber);
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x6a430157
@@ -63,8 +65,6 @@ error MultiCallToL1NotSupported(uint256 callCount);
 error NonAtomicSendUnsupported();
 // 0xd72e81d8
 error NonZeroValueToL1NotSupported(uint256 value);
-// 0x0952d72d
-error ReservedInteropRootChainId(uint256 chainId);
 // 0x5af78ecd
 error ShadowAccountNotSupported();
 // 0x2f59bd0d

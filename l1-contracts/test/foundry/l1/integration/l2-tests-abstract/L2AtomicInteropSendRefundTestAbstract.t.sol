@@ -36,7 +36,7 @@ import {
     L2_INTEROP_COMMITMENT_TREE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {L1SloadTestUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadTestUtils.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
@@ -609,11 +609,16 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         ctx.l2Token = initializeTokenByDeposit();
         IERC20(ctx.l2Token).transfer(_depositor, BRIDGED_VALUE_LEG_AMOUNT);
 
-        // Allow the different-base destination through the real registry: the one entry whose base
+        // Allow the different-base destination on L1, which the real registry reads: the one peer whose base
         // token differs from this chain's.
         bytes32 differentBaseAssetId = L2_NATIVE_TOKEN_VAULT.assetId(ctx.l2Token);
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.allowInteropPeer(DIFFERENT_BASE_DEST_CHAIN_ID, differentBaseAssetId);
+        L1SloadTestUtils.allowInteropPair(
+            _l1ChainRegistrationSender(),
+            block.chainid,
+            baseTokenAssetId,
+            DIFFERENT_BASE_DEST_CHAIN_ID,
+            differentBaseAssetId
+        );
 
         // A direct value leg built by hand: `InteropLibrary.buildSendDestinationChainBaseTokenCall` routes
         // different-base transfers indirectly (bridging THIS chain's base token as an asset); here we

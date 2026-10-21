@@ -115,7 +115,8 @@ contract L1AnchorsExecutorTest is ExecutorTest {
         assertEq(utilsFacet.util_getL1AnchorTimestamp(), newAnchoredAt);
     }
 
-    /// @dev Imports need not be in L1 order: an older anchor never lowers the tracked timestamp.
+    /// @dev `L2InteropRootStorage` refuses an anchor that isn't newer than the chain's current one, but the executor
+    /// doesn't rely on that: an older anchor never lowers the tracked timestamp.
     function test_freshness_olderAnchorKeepsTheNewest() public {
         uint256 olderAt = _recordL1BlockHash(BLOCK_1, HASH_1);
         vm.warp(block.timestamp + 100);
@@ -268,11 +269,7 @@ contract L1AnchorsExecutorTest is ExecutorTest {
     }
 
     /// @dev Executes one batch without priority operations, importing `_roots`.
-    function _execute(
-        IExecutor.StoredBatchInfo memory _stored,
-        InteropRoot[] memory _roots,
-        address _sender
-    ) internal {
+    function _execute(IExecutor.StoredBatchInfo memory _stored, InteropRoot[] memory _roots, address _sender) internal {
         IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
         batches[0] = _stored;
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](1);

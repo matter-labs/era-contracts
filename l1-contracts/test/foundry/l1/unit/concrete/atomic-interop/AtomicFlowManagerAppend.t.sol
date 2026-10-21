@@ -32,14 +32,13 @@ import {
     L2_INTEROP_ROOT_STORAGE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @dev Minimal Bridgehub stand-in exposing only the `baseTokenAssetId` registry mapping the manager
-/// consults: a real Bridgehub needs the full ecosystem bootstrap, irrelevant to `append`'s registration
-/// gate.
+/// @dev Minimal Bridgehub stand-in exposing only the `isInteropRegistered` registry the manager consults: the
+/// real one reads L1 with L1SLOAD (see {protocol-docs/l1sload.md}), irrelevant to `append`'s registration gate.
 contract MockBridgehubRegistry {
-    mapping(uint256 chainId => bytes32 assetId) public baseTokenAssetId;
+    mapping(uint256 chainId => bool registered) public isInteropRegistered;
 
-    function setBaseTokenAssetId(uint256 _chainId, bytes32 _assetId) external {
-        baseTokenAssetId[_chainId] = _assetId;
+    function setInteropRegistered(uint256 _chainId, bool _registered) external {
+        isInteropRegistered[_chainId] = _registered;
     }
 }
 
@@ -67,7 +66,7 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
 
         // The canonical remote chain used by `_twoLegPreimage` is interop-registered; tests for the
         // registration gate use other, unregistered chain ids.
-        MockBridgehubRegistry(L2_BRIDGEHUB_ADDR).setBaseTokenAssetId(OTHER_CHAIN_ID, keccak256("remote asset id"));
+        MockBridgehubRegistry(L2_BRIDGEHUB_ADDR).setInteropRegistered(OTHER_CHAIN_ID, true);
     }
 
     /// @dev A canonical two-leg preimage: `_localLeg` declared with this chain as source, `_remoteLeg`

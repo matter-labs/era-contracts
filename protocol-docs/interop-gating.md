@@ -140,6 +140,10 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 
 ## Interop peer whitelist
 
+> **L1SLOAD proof of concept.** On this branch L2s read the whitelist from L1 with L1SLOAD, and the
+> service-transaction mirror into `L2Bridgehub` (with `bridgehubDeposit` resubmission) is removed. See
+> [l1sload.md](./l1sload.md#interop-gating-through-l1-reads); the rest of this section describes the mirror.
+
 `ChainRegistrationSender` keeps `interopPeerAllowed[chainId][peerChainId]` and mirrors it into each chain's
 `L2Bridgehub` as `isPeerAllowed(peerChainId)`. The chain's `InteropCenter` sends only to allowed peers
 (`DestinationChainNotAllowed`, {protocol-docs/interop.md}).

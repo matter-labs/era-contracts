@@ -5,33 +5,40 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {
-    CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION,
-    ChainRegistrationSender
-} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
+import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
-import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
-import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
+    InteropAlreadySuspended,
     InteropNotEnabled,
+    InteropNotSuspended,
     InteropPeerAlreadyAllowed,
-    InteropPeerNotAllowed,
     InvalidInteropPeer,
-    NoEthAllowed,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
+/// @dev The entry points of the retired service-transaction push.
+interface IRetiredChainRegistrationSenderPush {
+    function bridgehubDeposit(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable;
+
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
+}
+
 /// @notice `ChainRegistrationSender` alone. The Bridgehub, the message root and the chains are mocked to
 /// isolate the sender's checks; the end-to-end flow with real contracts is in the integration test
-/// `ChainRegistrationSender.t.sol`. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+/// `ChainRegistrationSender.t.sol`, and the L2 reads of this state in `Interop/L1Sload/`.
+/// See {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/l1sload.md}.
 contract ChainRegistrationSenderUnitTest is Test {
     uint256 internal constant CHAIN_ID = 271;
     uint256 internal constant PEER_CHAIN_ID = 272;
@@ -90,18 +97,53 @@ contract ChainRegistrationSenderUnitTest is Test {
                             allowInteropPeer
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Allowing writes the pair and the peer's base token snapshot on L1, and sends nothing to L2.
     function test_allowInteropPeer() public {
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPeerAllowed(CHAIN_ID, PEER_CHAIN_ID);
-        vm.expectCall(
-            chain,
-            abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _registrationCalldata()))
-        );
+        vm.expectCall(chain, abi.encodeWithSelector(IMailbox.requestL2ServiceTransaction.selector), 0);
         vm.prank(chainAdmin);
         sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
 
         assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
         assertFalse(sender.interopPeerAllowed(PEER_CHAIN_ID, CHAIN_ID), "the peer's side needs its own admin");
+        assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), PEER_BASE_TOKEN_ASSET_ID, "the peer's snapshot");
+        assertEq(sender.interopBaseTokenAssetId(CHAIN_ID), bytes32(0), "the allowing chain gets none");
+    }
+
+    /// @notice The snapshot is the peer's, whichever chain allows it, and stays when the pair is deregistered.
+    function test_allowInteropPeer_snapshotIsPerPeer() public {
+        _mockChain(THIRD_CHAIN_ID, makeAddr("third"), keccak256("thirdBaseToken"));
+        address thirdAdmin = makeAddr("thirdAdmin");
+        vm.mockCall(makeAddr("third"), abi.encodeCall(IGetters.getAdmin, ()), abi.encode(thirdAdmin));
+
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        vm.prank(thirdAdmin);
+        sender.allowInteropPeer(THIRD_CHAIN_ID, PEER_CHAIN_ID);
+        assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), PEER_BASE_TOKEN_ASSET_ID);
+
+        vm.prank(owner);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
+        vm.prank(owner);
+        sender.deregisterInteropPairs(THIRD_CHAIN_ID, _peers(PEER_CHAIN_ID));
+        assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), PEER_BASE_TOKEN_ASSET_ID, "kept");
+    }
+
+    /// @notice A failing check writes neither the pair nor the snapshot.
+    function test_allowInteropPeer_revertWritesNothing() public {
+        vm.mockCall(
+            messageRoot,
+            abi.encodeCall(IMessageRootBase.chainTreeLeafCount, (PEER_CHAIN_ID)),
+            abi.encode(uint256(0))
+        );
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(ChainHasNoBatchesInMessageRoot.selector, PEER_CHAIN_ID));
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+
+        assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+        assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
     }
 
     function test_allowInteropPeer_revertWhen_alreadyAllowed() public {
@@ -188,37 +230,29 @@ contract ChainRegistrationSenderUnitTest is Test {
                             deregisterInteropPairs
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice A pair registered by the retired `registerChain`, which L1 never recorded.
-    function test_deregisterInteropPairs_legacyPair() public {
+    /// @notice A pair L1 never recorded, such as one the retired `registerChain` wrote on L2, deregisters as a no-op.
+    function test_deregisterInteropPairs_pairNeverAllowed() public {
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
-        vm.expectCall(
-            chain,
-            abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
-        );
         vm.prank(owner);
         sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
     }
 
+    /// @notice Governance removes a pair on L1 alone, sending nothing to L2; the admin can allow it again.
     function test_deregisterInteropPairs_allowedPair() public {
         vm.prank(chainAdmin);
         sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
 
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
-        vm.expectCall(
-            chain,
-            abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
-        );
+        vm.expectCall(chain, abi.encodeWithSelector(IMailbox.requestL2ServiceTransaction.selector), 0);
         vm.prank(owner);
         sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID), "cleared on L1");
-        vm.prank(bridgehub);
-        vm.expectRevert(abi.encodeWithSelector(InteropPeerNotAllowed.selector, CHAIN_ID, PEER_CHAIN_ID));
-        sender.bridgehubDeposit(CHAIN_ID, makeAddr("resubmitter"), 0, _resubmissionData(PEER_CHAIN_ID));
+        assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), PEER_BASE_TOKEN_ASSET_ID, "the snapshot stays");
 
         // The admin can allow the pair again.
         vm.prank(chainAdmin);
@@ -233,14 +267,25 @@ contract ChainRegistrationSenderUnitTest is Test {
 
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
-        vm.expectCall(
-            chain,
-            abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
-        );
         vm.prank(chainAdmin);
         sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
 
         assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+    }
+
+    /// @notice Deregistering one side leaves the peer's own side.
+    function test_deregisterInteropPairs_keepsThePeersSide() public {
+        address peerAdmin = makeAddr("peerAdmin");
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        vm.prank(peerAdmin);
+        sender.allowInteropPeer(PEER_CHAIN_ID, CHAIN_ID);
+
+        vm.prank(chainAdmin);
+        sender.deregisterInteropPairs(CHAIN_ID, _peers(PEER_CHAIN_ID));
+
+        assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+        assertTrue(sender.interopPeerAllowed(PEER_CHAIN_ID, CHAIN_ID));
     }
 
     /// @notice One call removes several peers of the chain, reading the chain's admin once.
@@ -257,17 +302,6 @@ contract ChainRegistrationSenderUnitTest is Test {
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, PEER_CHAIN_ID);
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.InteropPairDeregistered(CHAIN_ID, THIRD_CHAIN_ID);
-        vm.expectCall(
-            chain,
-            abi.encodeCall(IMailbox.requestL2ServiceTransaction, (L2_BRIDGEHUB_ADDR, _deregistrationCalldata()))
-        );
-        vm.expectCall(
-            chain,
-            abi.encodeCall(
-                IMailbox.requestL2ServiceTransaction,
-                (L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.deregisterChainForInterop, (THIRD_CHAIN_ID)))
-            )
-        );
         vm.expectCall(chain, abi.encodeCall(IGetters.getAdmin, ()), 1);
         vm.prank(chainAdmin);
         sender.deregisterInteropPairs(CHAIN_ID, peers);
@@ -338,64 +372,103 @@ contract ChainRegistrationSenderUnitTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        bridgehubDeposit (resubmission)
+                    suspendInterop / resumeInterop
     //////////////////////////////////////////////////////////////*/
 
-    function test_bridgehubDeposit_resubmitsAllowedPair() public {
+    /// @notice Suspension leaves the whitelist and the snapshots alone, so resuming restores the pairs as they were.
+    function test_suspendAndResume() public {
         vm.prank(chainAdmin);
         sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
 
+        vm.expectEmit(true, false, false, true, address(sender));
+        emit IChainRegistrationSender.InteropSuspended(CHAIN_ID);
+        vm.prank(owner);
+        sender.suspendInterop(CHAIN_ID);
+
+        assertTrue(sender.isInteropSuspended(CHAIN_ID));
+        assertFalse(sender.isInteropSuspended(PEER_CHAIN_ID), "other chains untouched");
+        assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID), "the whitelist is untouched");
+        assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), PEER_BASE_TOKEN_ASSET_ID);
+
+        vm.expectEmit(true, false, false, true, address(sender));
+        emit IChainRegistrationSender.InteropResumed(CHAIN_ID);
+        vm.prank(owner);
+        sender.resumeInterop(CHAIN_ID);
+
+        assertFalse(sender.isInteropSuspended(CHAIN_ID));
+        assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+    }
+
+    /// @notice A suspended chain's admin can still edit its whitelist; the suspension gates the L2 reads only.
+    function test_suspendedChainCanStillAllowPeers() public {
+        vm.prank(owner);
+        sender.suspendInterop(CHAIN_ID);
+
+        vm.prank(chainAdmin);
+        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        assertTrue(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
+        assertTrue(sender.isInteropSuspended(CHAIN_ID));
+    }
+
+    function testFuzz_suspendInterop_revertWhen_notOwner(address _caller) public {
+        // The proxy admin can only reach the proxy itself.
+        vm.assume(_caller != owner && _caller != makeAddr("proxyAdmin"));
+        vm.prank(_caller);
+        vm.expectRevert("Ownable: caller is not the owner");
+        sender.suspendInterop(CHAIN_ID);
+        assertFalse(sender.isInteropSuspended(CHAIN_ID));
+    }
+
+    /// @notice Not even the chain's admin can suspend or resume its chain.
+    function test_suspendAndResume_revertWhen_chainAdmin() public {
+        vm.prank(chainAdmin);
+        vm.expectRevert("Ownable: caller is not the owner");
+        sender.suspendInterop(CHAIN_ID);
+
+        vm.prank(owner);
+        sender.suspendInterop(CHAIN_ID);
+        vm.prank(chainAdmin);
+        vm.expectRevert("Ownable: caller is not the owner");
+        sender.resumeInterop(CHAIN_ID);
+        assertTrue(sender.isInteropSuspended(CHAIN_ID));
+    }
+
+    function test_suspendInterop_revertWhen_alreadySuspended() public {
+        vm.prank(owner);
+        sender.suspendInterop(CHAIN_ID);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(InteropAlreadySuspended.selector, CHAIN_ID));
+        sender.suspendInterop(CHAIN_ID);
+    }
+
+    function test_resumeInterop_revertWhen_notSuspended() public {
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(InteropNotSuspended.selector, CHAIN_ID));
+        sender.resumeInterop(CHAIN_ID);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        The retired service-transaction push
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The sender no longer serves as a second bridge, so the Bridgehub can't resubmit through it.
+    function test_bridgehubDepositIsGone() public {
         vm.prank(bridgehub);
-        L2TransactionRequestTwoBridgesInner memory request = sender.bridgehubDeposit(
+        vm.expectRevert();
+        IRetiredChainRegistrationSenderPush(address(sender)).bridgehubDeposit(
             CHAIN_ID,
             makeAddr("resubmitter"),
             0,
-            _resubmissionData(PEER_CHAIN_ID)
+            abi.encode(PEER_CHAIN_ID)
         );
 
-        assertEq(request.magicValue, TWO_BRIDGES_MAGIC_VALUE);
-        assertEq(request.l2Contract, L2_BRIDGEHUB_ADDR);
-        assertEq(request.l2Calldata, _registrationCalldata());
-        assertEq(request.factoryDeps.length, 0);
-        assertEq(request.txDataHash, bytes32(0));
-    }
-
-    function test_bridgehubDeposit_revertWhen_pairNotAllowed() public {
-        vm.prank(bridgehub);
-        vm.expectRevert(abi.encodeWithSelector(InteropPeerNotAllowed.selector, CHAIN_ID, PEER_CHAIN_ID));
-        sender.bridgehubDeposit(CHAIN_ID, makeAddr("resubmitter"), 0, _resubmissionData(PEER_CHAIN_ID));
-    }
-
-    function test_bridgehubDeposit_revertWhen_legacyEncodingVersion() public {
-        vm.prank(bridgehub);
-        vm.expectRevert(UnsupportedEncodingVersion.selector);
-        sender.bridgehubDeposit(
+        vm.expectRevert();
+        IRetiredChainRegistrationSenderPush(address(sender)).bridgehubConfirmL2Transaction(
             CHAIN_ID,
-            makeAddr("resubmitter"),
-            0,
-            bytes.concat(bytes1(0x01), abi.encode(PEER_CHAIN_ID))
+            bytes32(0),
+            bytes32(0)
         );
-    }
-
-    function test_bridgehubDeposit_revertWhen_value() public {
-        vm.deal(bridgehub, 1);
-        vm.prank(bridgehub);
-        vm.expectRevert(NoEthAllowed.selector);
-        sender.bridgehubDeposit{value: 1}(CHAIN_ID, makeAddr("resubmitter"), 0, _resubmissionData(PEER_CHAIN_ID));
-    }
-
-    function test_bridgehubDeposit_revertWhen_notBridgehub() public {
-        address notBridgehub = makeAddr("notBridgehub");
-        vm.prank(notBridgehub);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notBridgehub));
-        sender.bridgehubDeposit(CHAIN_ID, notBridgehub, 0, _resubmissionData(PEER_CHAIN_ID));
-    }
-
-    /// @notice Failed resubmissions need no recovery.
-    function test_bridgehubConfirmL2Transaction_noop() public {
-        vm.recordLogs();
-        sender.bridgehubConfirmL2Transaction(CHAIN_ID, bytes32(0), bytes32(0));
-        assertEq(vm.getRecordedLogs().length, 0);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -412,11 +485,6 @@ contract ChainRegistrationSenderUnitTest is Test {
         _mockSettlementLayer(_chainId, block.chainid);
         _mockInteropEnabled(_chainId, true);
         vm.mockCall(messageRoot, abi.encodeCall(IMessageRootBase.chainTreeLeafCount, (_chainId)), abi.encode(1));
-        vm.mockCall(
-            _chain,
-            abi.encodeWithSelector(IMailbox.requestL2ServiceTransaction.selector),
-            abi.encode(bytes32(0))
-        );
     }
 
     function _mockSettlementLayer(uint256 _chainId, uint256 _settlementLayer) internal {
@@ -429,18 +497,6 @@ contract ChainRegistrationSenderUnitTest is Test {
 
     function _mockInteropEnabled(uint256 _chainId, bool _enabled) internal {
         vm.mockCall(messageRoot, abi.encodeCall(IL1MessageRoot.isInteropEnabled, (_chainId)), abi.encode(_enabled));
-    }
-
-    function _registrationCalldata() internal pure returns (bytes memory) {
-        return abi.encodeCall(IL2Bridgehub.allowInteropPeer, (PEER_CHAIN_ID, PEER_BASE_TOKEN_ASSET_ID));
-    }
-
-    function _deregistrationCalldata() internal pure returns (bytes memory) {
-        return abi.encodeCall(IL2Bridgehub.deregisterChainForInterop, (PEER_CHAIN_ID));
-    }
-
-    function _resubmissionData(uint256 _peerChainId) internal pure returns (bytes memory) {
-        return bytes.concat(CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION, abi.encode(_peerChainId));
     }
 
     function _peers(uint256 _peerChainId) internal pure returns (uint256[] memory peers) {

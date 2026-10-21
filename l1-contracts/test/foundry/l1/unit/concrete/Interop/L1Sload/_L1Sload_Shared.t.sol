@@ -9,7 +9,6 @@ import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRe
 import {L2InteropRootStorage} from "contracts/interop/L2InteropRootStorage.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -26,8 +25,8 @@ import {MockL1SloadPrecompile} from "./MockL1SloadPrecompile.sol";
 /// @notice Shared fixture for the L1SLOAD tests: the real L1 `L1MessageRoot` and `ChainRegistrationSender` behind
 /// proxies, the real L2 `L2InteropRootStorage` at its built-in address, and {MockL1SloadPrecompile}, which serves
 /// L2 reads from the L1 contracts' storage. The Bridgehub, the vault and the chains' diamonds are mocked to
-/// isolate the gating state from chain creation; the L1 state the L2 reads is written through the real L1 entry
-/// points. See {protocol-docs/l1sload.md}.
+/// isolate the gating state from chain creation; the `ChainRegistrationSender` state the L2 reads is written through
+/// its real entry points. See {protocol-docs/l1sload.md}.
 abstract contract L1SloadSharedTest is Test {
     uint256 internal constant L1_CHAIN_ID = 31337;
     uint256 internal constant CHAIN_ID = 271;
@@ -101,15 +100,10 @@ abstract contract L1SloadSharedTest is Test {
         vm.mockCall(
             bridgehub,
             abi.encodeCall(IBridgehubBase.baseTokenAssetId, (_chainId)),
-            abi.encode(keccak256(abi.encode("baseToken", _chainId)))
+            abi.encode(_baseTokenAssetId(_chainId))
         );
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.settlementLayer, (_chainId)), abi.encode(L1_CHAIN_ID));
         vm.mockCall(diamond, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_chainAdmin(_chainId)));
-        vm.mockCall(
-            diamond,
-            abi.encodeWithSelector(IMailbox.requestL2ServiceTransaction.selector),
-            abi.encode(bytes32(0))
-        );
 
         vm.prank(bridgehub);
         l1MessageRoot.addNewChain(_chainId, 0);
@@ -121,6 +115,10 @@ abstract contract L1SloadSharedTest is Test {
         return makeAddr(string.concat("admin", vm.toString(_chainId)));
     }
 
+    function _baseTokenAssetId(uint256 _chainId) internal pure returns (bytes32) {
+        return keccak256(abi.encode("baseToken", _chainId));
+    }
+
     function _enableInterop(uint256 _chainId) internal {
         vm.prank(governance);
         l1MessageRoot.enableInterop(_chainId, false);
@@ -128,18 +126,37 @@ abstract contract L1SloadSharedTest is Test {
 
     function _suspendInterop(uint256 _chainId) internal {
         vm.prank(governance);
-        l1MessageRoot.suspendInterop(_chainId);
+        chainRegistrationSender.suspendInterop(_chainId);
     }
 
     function _resumeInterop(uint256 _chainId) internal {
         vm.prank(governance);
-        l1MessageRoot.resumeInterop(_chainId);
+        chainRegistrationSender.resumeInterop(_chainId);
     }
 
     /// @dev `_chainId`'s admin allows `_peerChainId` on L1 (one side of the pair).
     function _allowInteropPeer(uint256 _chainId, uint256 _peerChainId) internal {
         vm.prank(_chainAdmin(_chainId));
         chainRegistrationSender.allowInteropPeer(_chainId, _peerChainId);
+    }
+
+    /// @dev Enables both chains if needed, and each admin allows the other.
+    function _allowBothWays(uint256 _chainId, uint256 _peerChainId) internal {
+        if (!l1MessageRoot.isInteropEnabled(_chainId)) {
+            _enableInterop(_chainId);
+        }
+        if (!l1MessageRoot.isInteropEnabled(_peerChainId)) {
+            _enableInterop(_peerChainId);
+        }
+        _allowInteropPeer(_chainId, _peerChainId);
+        _allowInteropPeer(_peerChainId, _chainId);
+    }
+
+    function _deregisterInteropPeer(uint256 _chainId, uint256 _peerChainId) internal {
+        uint256[] memory peers = new uint256[](1);
+        peers[0] = _peerChainId;
+        vm.prank(_chainAdmin(_chainId));
+        chainRegistrationSender.deregisterInteropPairs(_chainId, peers);
     }
 
     function _anchorRoot(

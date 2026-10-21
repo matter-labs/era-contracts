@@ -7,8 +7,6 @@ import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 import {
     InteropAlreadyEnabled,
-    InteropAlreadySuspended,
-    InteropNotSuspended,
     InvalidSettlementLayerForBatch,
     LocallyNoChainsAtGenesis,
     SecondProofSystemNotRequired,
@@ -49,13 +47,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     mapping(uint256 chainId => uint256 batchNumber) public v31UpgradeChainBatchNumber;
 
     /// @notice Whether governance enabled interop for the chain. See {protocol-docs/interop-gating.md}.
-    /// @dev L2 contracts read it with L1SLOAD, so its slot must stay `L1_MESSAGE_ROOT_INTEROP_ENABLED_SLOT`.
     mapping(uint256 chainId => bool enabled) internal interopEnabled;
-
-    /// @notice Whether governance suspended interop for the chain.
-    /// See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
-    /// @dev L2 contracts read it with L1SLOAD, so its slot must stay `L1_MESSAGE_ROOT_INTEROP_SUSPENDED_SLOT`.
-    mapping(uint256 chainId => bool suspended) internal interopSuspended;
 
     /// @notice The L1 block hashes recorded for L1SLOAD anchors, with the time they were recorded.
     /// See {protocol-docs/l1sload.md#anchors}.
@@ -104,27 +96,6 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @inheritdoc IL1MessageRoot
     function isInteropEnabled(uint256 _chainId) external view returns (bool) {
         return interopEnabled[_chainId];
-    }
-
-    /// @inheritdoc IL1MessageRoot
-    function suspendInterop(uint256 _chainId) external {
-        require(msg.sender == IOwnable(BRIDGE_HUB).owner(), Unauthorized(msg.sender));
-        require(!interopSuspended[_chainId], InteropAlreadySuspended(_chainId));
-        interopSuspended[_chainId] = true;
-        emit InteropSuspended(_chainId);
-    }
-
-    /// @inheritdoc IL1MessageRoot
-    function resumeInterop(uint256 _chainId) external {
-        require(msg.sender == IOwnable(BRIDGE_HUB).owner(), Unauthorized(msg.sender));
-        require(interopSuspended[_chainId], InteropNotSuspended(_chainId));
-        interopSuspended[_chainId] = false;
-        emit InteropResumed(_chainId);
-    }
-
-    /// @inheritdoc IL1MessageRoot
-    function isInteropSuspended(uint256 _chainId) external view returns (bool) {
-        return interopSuspended[_chainId];
     }
 
     /// @inheritdoc IL1MessageRoot

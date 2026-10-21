@@ -36,8 +36,6 @@ error InteropNotEnabled(uint256 chainId);
 error InteropNotSuspended(uint256 chainId);
 // 0x927cf466
 error InteropPeerAlreadyAllowed(uint256 chainId, uint256 peerChainId);
-// 0x2d958c8c
-error InteropPeerNotAllowed(uint256 chainId, uint256 peerChainId);
 // 0x04bd744b
 error InvalidInteropPeer(uint256 chainId, uint256 peerChainId);
 // 0x896555dc

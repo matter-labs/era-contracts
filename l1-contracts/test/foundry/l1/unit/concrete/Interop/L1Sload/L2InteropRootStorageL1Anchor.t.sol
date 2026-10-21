@@ -10,7 +10,8 @@ import {
     L1SLOAD_ANCHOR_BLOCK_HASH_SLOT,
     L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT
 } from "contracts/common/Config.sol";
-import {InteropRootAlreadyExists} from "contracts/interop/InteropErrors.sol";
+import {InteropRootTimestampIsZero, L1AnchorNotNewer, SidesLengthNotOne} from "contracts/interop/InteropErrors.sol";
+import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_INTEROP_ROOT_STORAGE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {L1SloadSharedTest} from "./_L1Sload_Shared.t.sol";
@@ -35,8 +36,8 @@ contract L2InteropRootStorageL1AnchorTest is L1SloadSharedTest {
         assertEq(rootStorage.l1AnchorBlockNumber(), 0);
     }
 
-    /// @dev The import stores the anchor as an ordinary root, emits exactly one side (the block hash, which the
-    /// OS event hook requires), and moves the anchor slots that the OS reads.
+    /// @dev The import emits exactly one side (the block hash, which the OS event hook requires) and moves the anchor
+    /// slots that the OS reads; nothing is stored as a root.
     function test_importSetsAnchorAndEmitsOneSide() public {
         vm.recordLogs();
         _importL1Anchor(BLOCK_1, HASH_1, TIMESTAMP_1);
@@ -52,15 +53,20 @@ contract L2InteropRootStorageL1AnchorTest is L1SloadSharedTest {
         assertEq(sides.length, 1, "exactly one side");
         assertEq(sides[0], HASH_1);
 
-        StoredInteropRoot memory stored = rootStorage.interopRoots(L1_BLOCK_HASH_IMPORT_ID, BLOCK_1);
-        assertEq(stored.root, HASH_1);
-        assertEq(stored.timestamp, TIMESTAMP_1);
-        assertEq(rootStorage.latestInteropRootTimestamp(L1_BLOCK_HASH_IMPORT_ID), TIMESTAMP_1);
-
         assertEq(rootStorage.l1AnchorBlockHash(), HASH_1);
         assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_1);
         assertEq(vm.load(L2_INTEROP_ROOT_STORAGE_ADDR, L1SLOAD_ANCHOR_BLOCK_HASH_SLOT), HASH_1, "OS-read slot");
         assertEq(uint256(vm.load(L2_INTEROP_ROOT_STORAGE_ADDR, L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT)), BLOCK_1);
+    }
+
+    /// @dev An anchor is not a message root, so nothing that reads roots sees it.
+    function test_importStoresNoRoot() public {
+        _importL1Anchor(BLOCK_1, HASH_1, TIMESTAMP_1);
+
+        StoredInteropRoot memory stored = rootStorage.interopRoots(L1_BLOCK_HASH_IMPORT_ID, BLOCK_1);
+        assertEq(stored.root, bytes32(0));
+        assertEq(stored.timestamp, 0);
+        assertEq(rootStorage.latestInteropRootTimestamp(L1_BLOCK_HASH_IMPORT_ID), 0);
     }
 
     function test_newerImportMovesAnchor() public {
@@ -71,22 +77,71 @@ contract L2InteropRootStorageL1AnchorTest is L1SloadSharedTest {
         assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_2);
     }
 
-    /// @dev Imports need not arrive in block order; an older one is stored but never moves the anchor back.
-    function test_olderImportKeepsAnchor() public {
+    /// @dev The anchor never moves back: an older import reverts.
+    function test_revertWhen_olderImport() public {
         _importL1Anchor(BLOCK_2, HASH_2, TIMESTAMP_2);
-        _importL1Anchor(BLOCK_1, HASH_1, TIMESTAMP_1);
+
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(L1AnchorNotNewer.selector, BLOCK_1, BLOCK_2));
+        rootStorage.addSingleInteropRoot(_anchorRoot(BLOCK_1, HASH_1, TIMESTAMP_1));
 
         assertEq(rootStorage.l1AnchorBlockHash(), HASH_2);
         assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_2);
-        assertEq(rootStorage.interopRoots(L1_BLOCK_HASH_IMPORT_ID, BLOCK_1).root, HASH_1, "still stored");
     }
 
     function test_revertWhen_anchorImportedTwice() public {
         _importL1Anchor(BLOCK_1, HASH_1, TIMESTAMP_1);
 
         vm.prank(L2_BOOTLOADER_ADDRESS);
-        vm.expectRevert(InteropRootAlreadyExists.selector);
+        vm.expectRevert(abi.encodeWithSelector(L1AnchorNotNewer.selector, BLOCK_1, BLOCK_1));
         rootStorage.addSingleInteropRoot(_anchorRoot(BLOCK_1, HASH_2, TIMESTAMP_1));
+    }
+
+    /// @dev Block 0 can't be anchored: zero means "no anchor".
+    function test_revertWhen_blockZero() public {
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(L1AnchorNotNewer.selector, 0, 0));
+        rootStorage.addSingleInteropRoot(_anchorRoot(0, HASH_1, TIMESTAMP_1));
+    }
+
+    /// @dev Several anchors in one batch import go through in increasing order; a decrease reverts the whole call.
+    function test_batchImport() public {
+        InteropRoot[] memory roots = new InteropRoot[](2);
+        roots[0] = _anchorRoot(BLOCK_1, HASH_1, TIMESTAMP_1);
+        roots[1] = _anchorRoot(BLOCK_2, HASH_2, TIMESTAMP_2);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        rootStorage.addInteropRootsInBatch(roots);
+        assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_2);
+
+        (roots[0], roots[1]) = (
+            _anchorRoot(BLOCK_2 + 2, HASH_2, TIMESTAMP_2),
+            _anchorRoot(BLOCK_2 + 1, HASH_1, TIMESTAMP_2)
+        );
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(L1AnchorNotNewer.selector, BLOCK_2 + 1, BLOCK_2 + 2));
+        rootStorage.addInteropRootsInBatch(roots);
+        assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_2);
+    }
+
+    /// @dev The import's other checks still apply to anchors.
+    function test_revertWhen_anchorIsMalformed() public {
+        InteropRoot memory anchor = _anchorRoot(BLOCK_1, bytes32(0), TIMESTAMP_1);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        vm.expectRevert(MessageRootIsZero.selector);
+        rootStorage.addSingleInteropRoot(anchor);
+
+        anchor = _anchorRoot(BLOCK_1, HASH_1, 0);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        vm.expectRevert(InteropRootTimestampIsZero.selector);
+        rootStorage.addSingleInteropRoot(anchor);
+
+        anchor.timestamp = TIMESTAMP_1;
+        anchor.sides = new bytes32[](2);
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        vm.expectRevert(SidesLengthNotOne.selector);
+        rootStorage.addSingleInteropRoot(anchor);
+
+        assertEq(rootStorage.l1AnchorBlockNumber(), 0);
     }
 
     /// @dev A root of a real chain at a higher number than the anchor is not an anchor.
@@ -100,24 +155,27 @@ contract L2InteropRootStorageL1AnchorTest is L1SloadSharedTest {
 
         assertEq(rootStorage.l1AnchorBlockHash(), HASH_1);
         assertEq(rootStorage.l1AnchorBlockNumber(), BLOCK_1);
+        assertEq(rootStorage.interopRoots(L1_CHAIN_ID, BLOCK_2).root, HASH_2, "stored as a root");
     }
 
-    function testFuzz_anchorIsTheHighestImportedBlock(uint64[4] memory _blockNumbers) public {
+    /// @dev Each import either moves the anchor to a strictly higher block or reverts and leaves it in place.
+    function testFuzz_anchorOnlyMovesForward(uint64[4] memory _blockNumbers) public {
         uint256 highest;
         bytes32 highestHash;
         for (uint256 i = 0; i < _blockNumbers.length; ++i) {
             uint256 blockNumber = uint256(_blockNumbers[i]) + 1;
-            if (rootStorage.interopRoots(L1_BLOCK_HASH_IMPORT_ID, blockNumber).root != bytes32(0)) {
-                continue;
-            }
             bytes32 blockHash = keccak256(abi.encode(blockNumber));
-            _importL1Anchor(blockNumber, blockHash, TIMESTAMP_1 + i);
             if (blockNumber > highest) {
+                _importL1Anchor(blockNumber, blockHash, TIMESTAMP_1 + i);
                 highest = blockNumber;
                 highestHash = blockHash;
+            } else {
+                vm.prank(L2_BOOTLOADER_ADDRESS);
+                vm.expectRevert(abi.encodeWithSelector(L1AnchorNotNewer.selector, blockNumber, highest));
+                rootStorage.addSingleInteropRoot(_anchorRoot(blockNumber, blockHash, TIMESTAMP_1 + i));
             }
+            assertEq(rootStorage.l1AnchorBlockNumber(), highest);
+            assertEq(rootStorage.l1AnchorBlockHash(), highestHash);
         }
-        assertEq(rootStorage.l1AnchorBlockNumber(), highest);
-        assertEq(rootStorage.l1AnchorBlockHash(), highestHash);
     }
 }

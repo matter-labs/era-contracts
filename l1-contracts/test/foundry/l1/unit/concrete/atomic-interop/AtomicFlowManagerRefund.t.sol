@@ -27,6 +27,7 @@ import {IAtomicRecoverable} from "contracts/atomic-interop/IAtomicRecoverable.so
 import {INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
+import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -103,14 +104,10 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         manager.append(committedLeg, 0, preimage);
     }
 
-    /// @dev Stubs the send-side Bridgehub `baseTokenAssetId` registry so `append` accepts `_chainId` as
+    /// @dev Stubs the send-side Bridgehub `isInteropRegistered` registry so `append` accepts `_chainId` as
     /// a declared remote leg source. This is the only send-side stub; the absence-proof path is real.
     function _registerRemoteLegSource(uint256 _chainId) internal {
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSignature("baseTokenAssetId(uint256)", _chainId),
-            abi.encode(keccak256(abi.encode("remote base token asset id", _chainId)))
-        );
+        vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.isInteropRegistered, (_chainId)), abi.encode(true));
     }
 
     /// @dev A minimal well-formed bundle for the committed leg. Its call content is irrelevant here:

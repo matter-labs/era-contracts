@@ -61,12 +61,12 @@ uint256 constant L1SLOAD_MAX_KEYS = 5;
 // L2-facing ABI: an L1 upgrade must keep them, and `L1ViewStorageLayout.t.sol` pins them.
 // See {protocol-docs/l1sload.md#reading-l1-state}.
 
-/// @dev Slot of `L1MessageRoot.interopEnabled`.
-uint256 constant L1_MESSAGE_ROOT_INTEROP_ENABLED_SLOT = 51;
-/// @dev Slot of `L1MessageRoot.interopSuspended`.
-uint256 constant L1_MESSAGE_ROOT_INTEROP_SUSPENDED_SLOT = 52;
 /// @dev Slot of `ChainRegistrationSender.interopPeerAllowed`.
 uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT = 152;
+/// @dev Slot of `ChainRegistrationSender.interopSuspended`.
+uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_SUSPENDED_SLOT = 153;
+/// @dev Slot of `ChainRegistrationSender.interopBaseTokenAssetId`.
+uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_BASE_TOKEN_ASSET_ID_SLOT = 154;
 
 /// @dev Pubdata capacity of a blob: 4096 field elements with 31 bytes of data each.
 uint256 constant BLOB_SIZE_BYTES = 126_976;

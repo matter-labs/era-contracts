@@ -692,14 +692,11 @@ contract InteropCenter is
     }
 
     /// @notice Returns the base token asset ID for the destination chain, which this chain must be allowed to send
-    /// to (`L2Bridgehub.canSendTo`). Override for pre-v31 chains.
+    /// to (`L2Bridgehub.interopSendTarget`). Override for pre-v31 chains.
     function _getDestinationBaseTokenAssetId(uint256 _destinationChainId) internal view virtual returns (bytes32) {
-        bytes32 assetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
+        (bool allowed, bytes32 assetId) = IL2Bridgehub(address(L2_BRIDGEHUB)).interopSendTarget(_destinationChainId);
         require(assetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
-        require(
-            IL2Bridgehub(address(L2_BRIDGEHUB)).canSendTo(_destinationChainId),
-            DestinationChainNotAllowed(_destinationChainId)
-        );
+        require(allowed, DestinationChainNotAllowed(_destinationChainId));
         return assetId;
     }
 
