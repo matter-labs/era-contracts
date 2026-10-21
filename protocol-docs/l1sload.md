@@ -76,7 +76,7 @@ asset id is non-zero (`ZKChainNotRegistered`) and the peer has a batch in L1's m
   allowed it as a peer. The leaf-count check is what makes a snapshot imply MessageRoot presence, which
   `AtomicFlowManager.append` relies on for every co-leg's source chain
   ({protocol-docs/atomicity/security.md#timeout-protocol-preconditions}); it reads it with
-  `L2Bridgehub.isInteropRegistered`.
+  `L2Bridgehub.interopBaseTokenAssetId`.
 
 ## Interop gating through L1 reads
 
@@ -108,7 +108,4 @@ The L2 Bridgehub reads the L1 `ChainRegistrationSender` at `l1ChainRegistrationS
 - Every gating change (allowing, deregistering, suspending) takes effect on L2 once a newer anchor is imported, up
   to `L1_ANCHOR_MAX_LAG` later, and never in Priority Mode.
 - Every gating read needs an anchor: a chain that never imported one can neither send nor accept interop.
-- `L2AssetRouter.initiateIndirectCall` still checks the bridged asset against the L2 Bridgehub's
-  `baseTokenAssetId(destination)` (`AssetIdNotSupported`), which no longer holds peers, so on L2 that check no
-  longer rejects bridging the destination's base token as an ordinary asset.
 - The anvil-interop harness has no `L1SLOAD`, so its interop specs need a shim before they can run on this branch.

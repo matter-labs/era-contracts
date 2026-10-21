@@ -32,13 +32,13 @@ import {
     L2_INTEROP_ROOT_STORAGE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @dev Minimal Bridgehub stand-in exposing only the `isInteropRegistered` registry the manager consults: the
+/// @dev Minimal Bridgehub stand-in exposing only the `interopBaseTokenAssetId` registry the manager consults: the
 /// real one reads L1 with L1SLOAD (see {protocol-docs/l1sload.md}), irrelevant to `append`'s registration gate.
 contract MockBridgehubRegistry {
-    mapping(uint256 chainId => bool registered) public isInteropRegistered;
+    mapping(uint256 chainId => bytes32 baseTokenAssetId) public interopBaseTokenAssetId;
 
     function setInteropRegistered(uint256 _chainId, bool _registered) external {
-        isInteropRegistered[_chainId] = _registered;
+        interopBaseTokenAssetId[_chainId] = _registered ? keccak256(abi.encode(_chainId)) : bytes32(0);
     }
 }
 

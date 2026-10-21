@@ -35,9 +35,9 @@ interface IL2Bridgehub is IBridgehubBase {
     /// @return peerBaseTokenAssetId The chain's base token asset id, zero if the chain is not registered for interop.
     function interopSendTarget(uint256 _chainId) external view returns (bool allowed, bytes32 peerBaseTokenAssetId);
 
-    /// @notice Whether the chain is registered for interop, i.e. some chain admin allowed it as a peer on L1, which
-    /// required it to be in the L1 MessageRoot. Read from L1 at the chain's L1SLOAD anchor.
-    /// See {protocol-docs/l1sload.md#the-base-token-snapshot}.
+    /// @notice The chain's base token asset id as snapshotted on L1 when a chain admin first allowed it as a peer,
+    /// which required it to be in the L1 MessageRoot; zero if it is not registered for interop. Read from L1 at the
+    /// chain's L1SLOAD anchor. See {protocol-docs/l1sload.md#the-base-token-snapshot}.
     /// @param _chainId The chain id of the chain.
-    function isInteropRegistered(uint256 _chainId) external view returns (bool);
+    function interopBaseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 }

@@ -99,8 +99,8 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     }
 
     /// @inheritdoc IL2Bridgehub
-    function isInteropRegistered(uint256 _chainId) external view returns (bool) {
-        return L1View.isRegistered(l1ChainRegistrationSender(), _chainId);
+    function interopBaseTokenAssetId(uint256 _chainId) external view returns (bytes32) {
+        return L1View.baseTokenAssetId(l1ChainRegistrationSender(), _chainId);
     }
 
     /*//////////////////////////////////////////////////////////////

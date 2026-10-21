@@ -153,14 +153,9 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyServiceTransaction() {
-        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
-        if (
-            /// For registering chains in the L2Bridgehub. This is used for interop initiation.
-            msg.sender != bridgehub.chainRegistrationSender() &&
-            /// For sending the deposit-pause request to the settlement layer's L2ChainAssetHandler
-            /// when a chain migrates away from it.
-            msg.sender != address(bridgehub.chainAssetHandler())
-        ) {
+        // Only for sending the deposit-pause request to the settlement layer's L2ChainAssetHandler when a chain
+        // migrates away from it. L2s read interop registration from L1, see {protocol-docs/l1sload.md}.
+        if (msg.sender != address(IBridgehubBase(s.bridgehub).chainAssetHandler())) {
             revert Unauthorized(msg.sender);
         }
         _;

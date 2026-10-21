@@ -80,7 +80,7 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, address(chainRegistrationSender)));
         l2Bridgehub.interopSendTarget(PEER_CHAIN_ID);
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, address(chainRegistrationSender)));
-        l2Bridgehub.isInteropRegistered(PEER_CHAIN_ID);
+        l2Bridgehub.interopBaseTokenAssetId(PEER_CHAIN_ID);
     }
 
     /// @dev The service-transaction entry points are gone: nothing on L2 writes the whitelist.
@@ -168,7 +168,7 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    interopSendTarget / isInteropRegistered
+                    interopSendTarget / interopBaseTokenAssetId
     //////////////////////////////////////////////////////////////*/
 
     /// @dev K1: sending needs both admins' consent, receiving only this chain's.
@@ -198,16 +198,20 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
         assertEq(l2Bridgehub.baseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
     }
 
-    function test_isInteropRegistered() public {
+    function test_interopBaseTokenAssetId() public {
         _importAnchor();
         _enableInterop(PEER_CHAIN_ID);
         _enableInterop(THIRD_CHAIN_ID);
-        assertFalse(_isInteropRegistered(PEER_CHAIN_ID));
+        assertEq(_interopBaseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
 
         // Any chain's admin registers the peer, not only this chain's.
         _allowInteropPeer(THIRD_CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(_isInteropRegistered(PEER_CHAIN_ID));
-        assertFalse(_isInteropRegistered(THIRD_CHAIN_ID));
+        assertEq(
+            _interopBaseTokenAssetId(PEER_CHAIN_ID),
+            chainRegistrationSender.interopBaseTokenAssetId(PEER_CHAIN_ID)
+        );
+        assertNotEq(_interopBaseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
+        assertEq(_interopBaseTokenAssetId(THIRD_CHAIN_ID), bytes32(0));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -293,9 +297,9 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
         _onL1();
     }
 
-    function _isInteropRegistered(uint256 _chainId) internal returns (bool registered) {
+    function _interopBaseTokenAssetId(uint256 _chainId) internal returns (bytes32 assetId) {
         _onL2();
-        registered = l2Bridgehub.isInteropRegistered(_chainId);
+        assetId = l2Bridgehub.interopBaseTokenAssetId(_chainId);
         _onL1();
     }
 

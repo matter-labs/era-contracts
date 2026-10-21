@@ -104,10 +104,14 @@ contract AtomicFlowManagerRefundTest is AtomicInteropProofBuilder {
         manager.append(committedLeg, 0, preimage);
     }
 
-    /// @dev Stubs the send-side Bridgehub `isInteropRegistered` registry so `append` accepts `_chainId` as
+    /// @dev Stubs the send-side Bridgehub `interopBaseTokenAssetId` registry so `append` accepts `_chainId` as
     /// a declared remote leg source. This is the only send-side stub; the absence-proof path is real.
     function _registerRemoteLegSource(uint256 _chainId) internal {
-        vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.isInteropRegistered, (_chainId)), abi.encode(true));
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IL2Bridgehub.interopBaseTokenAssetId, (_chainId)),
+            abi.encode(keccak256(abi.encode(_chainId)))
+        );
     }
 
     /// @dev A minimal well-formed bundle for the committed leg. Its call content is irrelevant here:

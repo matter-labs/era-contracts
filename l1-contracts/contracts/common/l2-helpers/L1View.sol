@@ -58,12 +58,12 @@ library L1View {
         peerBaseTokenAssetId = values[4];
     }
 
-    /// @notice Whether the chain is registered for interop, i.e. has a base token snapshot.
+    /// @notice The chain's base token snapshot, zero if no chain admin ever allowed it as a peer.
     /// See {protocol-docs/l1sload.md#the-base-token-snapshot}.
     /// @param _chainRegistrationSender The L1 `ChainRegistrationSender` proxy.
     /// @param _chainId The chain.
-    function isRegistered(address _chainRegistrationSender, uint256 _chainId) internal view returns (bool) {
-        return L1Reads.l1sload(_chainRegistrationSender, interopBaseTokenAssetIdSlot(_chainId)) != bytes32(0);
+    function baseTokenAssetId(address _chainRegistrationSender, uint256 _chainId) internal view returns (bytes32) {
+        return L1Reads.l1sload(_chainRegistrationSender, interopBaseTokenAssetIdSlot(_chainId));
     }
 
     /// @notice The slot of `ChainRegistrationSender.interopPeerAllowed[_chainId][_peerChainId]`.

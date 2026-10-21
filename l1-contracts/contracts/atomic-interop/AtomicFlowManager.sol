@@ -156,7 +156,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
             if (legSourceChainId == block.chainid) {
                 continue;
             }
-            if (!IL2Bridgehub(address(L2_BRIDGEHUB)).isInteropRegistered(legSourceChainId)) {
+            if (IL2Bridgehub(address(L2_BRIDGEHUB)).interopBaseTokenAssetId(legSourceChainId) == bytes32(0)) {
                 revert ManagerLegSourceChainNotRegistered(legSourceChainId);
             }
         }

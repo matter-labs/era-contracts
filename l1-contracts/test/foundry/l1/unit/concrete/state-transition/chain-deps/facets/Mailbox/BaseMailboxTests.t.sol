@@ -111,7 +111,7 @@ contract MailboxBaseTests is MailboxTest {
 
     function test_serviceTransactionUsesProtocolGasCeiling() public {
         // Isolate mailbox admission from Bridgehub's service-sender configuration.
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.chainRegistrationSender, ()), abi.encode(address(this)));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.chainAssetHandler, ()), abi.encode(address(this)));
         address target = makeAddr("serviceTarget");
         bytes memory data = hex"12345678";
 

@@ -27,8 +27,8 @@ contract L1ReadsHarness {
         return L1View.sendTarget(_crs, _chainId, _peerChainId);
     }
 
-    function isRegistered(address _crs, uint256 _chainId) external view returns (bool) {
-        return L1View.isRegistered(_crs, _chainId);
+    function baseTokenAssetId(address _crs, uint256 _chainId) external view returns (bytes32) {
+        return L1View.baseTokenAssetId(_crs, _chainId);
     }
 }
 
@@ -122,10 +122,10 @@ contract L1ReadsTest is L1SloadSharedTest {
         harness.sendTarget(crs, CHAIN_ID, PEER_CHAIN_ID);
     }
 
-    function test_isRegistered_isOneRead() public {
+    function test_baseTokenAssetId_isOneRead() public {
         _importL1Anchor(1, keccak256("anchor"), 1);
         vm.expectCall(L1SLOAD_PRECOMPILE_ADDRESS, "", 1);
-        harness.isRegistered(crs, PEER_CHAIN_ID);
+        harness.baseTokenAssetId(crs, PEER_CHAIN_ID);
     }
 
     /// @dev Receiving needs only this chain's allowance; a suspension of either chain refuses it.
@@ -179,18 +179,20 @@ contract L1ReadsTest is L1SloadSharedTest {
         assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID), "a suspension keeps the snapshot");
     }
 
-    /// @dev A chain is registered once any chain's admin allowed it, and stays so after the pair is deregistered.
-    function test_isRegistered() public {
+    /// @dev A chain has a snapshot once any chain's admin allowed it, and keeps it after the pair is deregistered.
+    function test_baseTokenAssetId() public {
         _importL1Anchor(1, keccak256("anchor"), 1);
         _enableInterop(CHAIN_ID);
         _enableInterop(PEER_CHAIN_ID);
-        assertFalse(harness.isRegistered(crs, PEER_CHAIN_ID));
+        assertEq(harness.baseTokenAssetId(crs, PEER_CHAIN_ID), bytes32(0));
 
         _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(harness.isRegistered(crs, PEER_CHAIN_ID));
-        assertFalse(harness.isRegistered(crs, CHAIN_ID), "the allowing chain is not registered by it");
+        bytes32 snapshot = chainRegistrationSender.interopBaseTokenAssetId(PEER_CHAIN_ID);
+        assertNotEq(snapshot, bytes32(0));
+        assertEq(harness.baseTokenAssetId(crs, PEER_CHAIN_ID), snapshot);
+        assertEq(harness.baseTokenAssetId(crs, CHAIN_ID), bytes32(0), "the allowing chain gets no snapshot");
 
         _deregisterInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(harness.isRegistered(crs, PEER_CHAIN_ID));
+        assertEq(harness.baseTokenAssetId(crs, PEER_CHAIN_ID), snapshot);
     }
 }

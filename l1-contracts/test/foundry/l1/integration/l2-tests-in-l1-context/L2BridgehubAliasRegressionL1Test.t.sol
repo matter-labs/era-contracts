@@ -60,7 +60,7 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         (bool allowed, bytes32 peerBaseTokenAssetId) = L2Bridgehub(L2_BRIDGEHUB_ADDR).interopSendTarget(testChainId);
         assertTrue(allowed);
         assertEq(peerBaseTokenAssetId, testBaseTokenAssetId);
-        assertTrue(L2Bridgehub(L2_BRIDGEHUB_ADDR).isInteropRegistered(testChainId));
+        assertNotEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).interopBaseTokenAssetId(testChainId), bytes32(0));
     }
 
     /// @notice State at the aliased address, which is no L1 contract, is never read.
@@ -80,7 +80,7 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         (bool allowed, bytes32 peerBaseTokenAssetId) = L2Bridgehub(L2_BRIDGEHUB_ADDR).interopSendTarget(testChainId);
         assertFalse(allowed);
         assertEq(peerBaseTokenAssetId, bytes32(0));
-        assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isInteropRegistered(testChainId));
+        assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).interopBaseTokenAssetId(testChainId), bytes32(0));
     }
 
     /// @notice Deregistration at the L1 address refuses the peer.
@@ -99,7 +99,11 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         assertFalse(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
         (bool allowed, ) = L2Bridgehub(L2_BRIDGEHUB_ADDR).interopSendTarget(testChainId);
         assertFalse(allowed);
-        assertTrue(L2Bridgehub(L2_BRIDGEHUB_ADDR).isInteropRegistered(testChainId), "the snapshot stays");
+        assertNotEq(
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).interopBaseTokenAssetId(testChainId),
+            bytes32(0),
+            "the snapshot stays"
+        );
     }
 
     /// @notice Fuzz test with various chain IDs and asset IDs

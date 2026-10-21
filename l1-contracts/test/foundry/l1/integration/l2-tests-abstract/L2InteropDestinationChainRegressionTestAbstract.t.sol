@@ -55,7 +55,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
             UNREGISTERED_CHAIN_ID,
             bytes32(uint256(0xABCDEF))
         );
-        assertTrue(l2Bridgehub.isInteropRegistered(UNREGISTERED_CHAIN_ID));
+        assertNotEq(l2Bridgehub.interopBaseTokenAssetId(UNREGISTERED_CHAIN_ID), bytes32(0));
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = InteropCallStarter({
