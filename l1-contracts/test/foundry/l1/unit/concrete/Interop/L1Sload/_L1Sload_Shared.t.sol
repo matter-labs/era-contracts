@@ -59,7 +59,7 @@ abstract contract L1SloadSharedTest is Test {
         l1MessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgehub, chainAssetHandler)),
+                    _l1MessageRootImplementation(chainAssetHandler),
                     makeAddr("proxyAdmin"),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -93,6 +93,11 @@ abstract contract L1SloadSharedTest is Test {
         L1SloadMockUtils.installMock();
     }
 
+    /// @dev The implementation the `L1MessageRoot` proxy starts with.
+    function _l1MessageRootImplementation(address _chainAssetHandler) internal virtual returns (address) {
+        return address(new L1MessageRoot(bridgehub, _chainAssetHandler));
+    }
+
     /// @dev The implementation the `ChainRegistrationSender` proxy starts with.
     function _chainRegistrationSenderImplementation() internal virtual returns (address) {
         return address(new ChainRegistrationSender(IBridgehubBase(bridgehub)));
@@ -108,13 +113,18 @@ abstract contract L1SloadSharedTest is Test {
             abi.encode(_baseTokenAssetId(_chainId))
         );
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.settlementLayer, (_chainId)), abi.encode(L1_CHAIN_ID));
-        vm.mockCall(diamond, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_chainAdmin(_chainId)));
-        vm.mockCall(diamond, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(true));
+        _installChain(_chainId, diamond);
 
         vm.prank(bridgehub);
         l1MessageRoot.addNewChain(_chainId, 0);
         vm.prank(diamond);
         l1MessageRoot.addChainBatchRootV32(_chainId, 1, keccak256(abi.encode("batchRoot", _chainId)));
+    }
+
+    /// @dev The chain's diamond, as the L1 contracts read it: mocked to its admin and to L1SLOAD on.
+    function _installChain(uint256 _chainId, address _diamond) internal virtual {
+        vm.mockCall(_diamond, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_chainAdmin(_chainId)));
+        vm.mockCall(_diamond, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(true));
     }
 
     function _chainAdmin(uint256 _chainId) internal returns (address) {

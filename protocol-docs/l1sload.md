@@ -167,9 +167,12 @@ changed, which the release pair derives on-chain (among them `L2Bridgehub`, `Int
   only peers that were registered, enabled and had a batch in the message root, so this covers every peer a v35
   admin allowed; a snapshot of an enabled chain nobody allowed only marks it registered, which the leaf check makes
   true. Mappings can't be enumerated, and this rule needs no list authored off-chain.
-- **The flag.** Every chain starts with `l1sload_enabled` off. A chain whose interop was enabled under v35 reads
-  nothing until its admin turns the flag on, so its admin does that at the first configuration boundary after the
-  upgrade ({protocol-docs/chain-config.md#configuration-updates}).
+- **The flag.** A chain whose interop was enabled under v35 would cross with interop on and `l1sload_enabled` off,
+  which v36 forbids. So the chain's upgrade turns the flag on: `DefaultUpgrade.upgradeFromTransition` sets it, with
+  the setter's `NewZKsyncOSL1Sload(false, true)`, for a chain on L1 whose interop is enabled. Every committed batch has
+  executed by then, so the change lands at a configuration boundary. The first batch after the upgrade commits the
+  seven-word chain config hash with the flag on, so the server reads the flag from L1 for it. Chains without interop
+  keep it off. Every later transition repeats the step, and finds nothing to do once the flag is on.
 - **The first anchor.** The upgrade seeds no anchor: a seeded one would be an unchecked L1 state. The first
   `commitBatches` after the upgrade records one, and the operator imports it in a later batch. Until then the
   chain's interop reads revert, so its interop pauses for about one batch.

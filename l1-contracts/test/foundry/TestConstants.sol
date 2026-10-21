@@ -16,6 +16,9 @@ bytes32 constant BATCH_OUTPUT_HASH_GOLDEN = 0x3fa2b6bcbfde24e4aa05b9d48bb04bd3f1
 // The chain config hash of the golden chain with every flag off, and the public inputs below, have seven words
 // since v36 (`l1sload_enabled` is the seventh).
 bytes32 constant CHAIN_CONFIG_HASH_GOLDEN = 0x08156c4dbaecb599a90c9dd8f97e8547b74ef780e9450a0353318135bf9f4948;
+// The same chain with L1SLOAD only, and with filtering, large contracts and L1SLOAD all on (ZKsync OS `public_input.rs`).
+bytes32 constant CHAIN_CONFIG_HASH_GOLDEN_L1SLOAD_ONLY = 0xcd8f68091d831ef30097c2c439b44a7ad3af3c5aaec22c00e06597c7d284d158;
+bytes32 constant CHAIN_CONFIG_HASH_GOLDEN_ALL_FLAGS = 0x529c14e825020584de12a976db579292eaf63abb451994ba4316eb49078eb855;
 bytes32 constant PUBLIC_INPUT_HASH_GOLDEN = 0x19c9f44479b3849265ebc58630ad42452ce077aa081af2c5a6ca9e2bb288288c;
 bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY = 0x8bfa5df0c8871c96fff5322b35d14553bcf4917b8cfef1e4d02e41ba3e6e508d;
 bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY = 0xeec156b2928698ac0946c50216c8c745c5b4a2cb24b992688336d491a3024fbd;

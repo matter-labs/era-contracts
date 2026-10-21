@@ -24,6 +24,8 @@ import {PreviousUpgradeNotFinalized} from "contracts/upgrades/ZkSyncUpgradeError
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {NotMultiProofMode, TimeNotReached, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 
@@ -31,7 +33,15 @@ import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 import {RegistryObjectsFixture} from "./_SharedRegistryObjects.t.sol";
 
-contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeUtils {}
+contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeUtils {
+    function isZKsyncOSL1SloadEnabled() external view returns (bool) {
+        return s.zksyncOSL1SloadEnabled;
+    }
+
+    function getZKsyncOSChainConfigHash() external view returns (bytes32) {
+        return _getZKsyncOSChainConfigHash();
+    }
+}
 
 /// @notice `DefaultUpgrade.upgradeFromTransition` against REAL write-once objects: the engine is
 ///         handed nothing but the transition address and must read the derived facet cuts, the
@@ -104,6 +114,31 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(engine.facetAddress(SEL_DEPARTING), address(0), "the departing facet is removed");
         assertEq(engine.facetAddress(SEL_ARRIVING), facetArriving, "the arriving facet is installed");
         assertEq(engine.facetAddress(SEL_SHARED_A), facetShared, "the shared facet is untouched");
+    }
+
+    /// @dev A chain whose interop was enabled before v36 crosses with L1SLOAD off, and the engine turns it on
+    ///      ({protocol-docs/l1sload.md#upgrade-from-v35}); the chain config hash its next batch commits carries it. The
+    ///      message root is mocked: `ChainRegistrationSenderV36Upgrade.t.sol` runs the step against the real v35 one.
+    function test_upgradeFromTransition_turnsL1SloadOnForAnInteropChain() public {
+        bytes32 configHashBefore = engine.getZKsyncOSChainConfigHash();
+        vm.mockCall(mockMessageRoot, abi.encodeCall(IL1MessageRoot.isInteropEnabled, (ETH_CHAIN_ID)), abi.encode(true));
+
+        vm.expectEmit(address(engine));
+        emit IAdmin.NewZKsyncOSL1Sload(false, true);
+        engine.upgradeFromTransition(address(_defaultTransition(0)));
+
+        assertTrue(engine.isZKsyncOSL1SloadEnabled());
+        assertTrue(engine.getZKsyncOSChainConfigHash() != configHashBefore, "the flag is committed");
+    }
+
+    /// @dev A chain without interop keeps L1SLOAD off.
+    function test_upgradeFromTransition_leavesL1SloadOffWithoutInterop() public {
+        bytes32 configHashBefore = engine.getZKsyncOSChainConfigHash();
+
+        engine.upgradeFromTransition(address(_defaultTransition(0)));
+
+        assertFalse(engine.isZKsyncOSL1SloadEnabled());
+        assertEq(engine.getZKsyncOSChainConfigHash(), configHashBefore);
     }
 
     /// @dev A lagging chain: its CTM has already moved on to a later release, but the chain

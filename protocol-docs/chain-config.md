@@ -135,7 +135,8 @@ Interop gating reads L1 through the precompile, so the flag is tied to interop
 
 - `L1MessageRoot.enableInterop` requires it (`L1SloadNotEnabled`);
 - it can't be turned off while the chain's interop is enabled (`L1SloadRequiredByInterop`). Enabling interop is
-  one-way, so for an enabled chain the flag is permanent.
+  one-way, so for an enabled chain the flag is permanent;
+- a chain whose interop was enabled before v36 gets it from its upgrade ({protocol-docs/l1sload.md#upgrade-from-v35}).
 
 ## Configuration updates
 

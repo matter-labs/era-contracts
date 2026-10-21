@@ -5,26 +5,62 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L1SloadNotEnabled} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {IProxyUpgradeInitializable} from "contracts/upgrades/registry/IUpgradeInit.sol";
 import {L1View} from "contracts/common/l2-helpers/L1View.sol";
+import {PubdataContent, ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
+import {Utils} from "../../Utils/Utils.sol";
 import {L1ReadsHarness} from "./L1Reads.t.sol";
 import {L1SloadSharedTest} from "./_L1Sload_Shared.t.sol";
 
-/// @notice The v35 -> v36 swap of the `ChainRegistrationSender` implementation, starting from the real v35 build
-/// (`fixtures/v35/ChainRegistrationSender.json`): pairs that v35 admins allowed keep working once the L2 reads L1,
-/// because the swap's `initializeUpgrade` backfills the base token snapshots v35 never wrote.
+/// @dev A chain's diamond in these tests: the v36 engine's L1SLOAD step (`DefaultUpgrade._enableL1SloadForInterop`)
+/// running in the chain's own storage, and the getters the L1 contracts read from the chain. The full engine path,
+/// `upgradeFromTransition`, is covered by `DefaultUpgrade.t.sol`.
+contract V36ChainUpgradeHarness is DefaultUpgrade {
+    function initChain(address _bridgehub, uint256 _chainId, address _admin) external {
+        s.bridgehub = _bridgehub;
+        s.chainId = _chainId;
+        s.admin = _admin;
+    }
+
+    function enableL1SloadForInterop() external {
+        _enableL1SloadForInterop();
+    }
+
+    function getAdmin() external view returns (address) {
+        return s.admin;
+    }
+
+    function isZKsyncOSL1SloadEnabled() external view returns (bool) {
+        return s.zksyncOSL1SloadEnabled;
+    }
+
+    function getZKsyncOSChainConfigHash() external view returns (bytes32) {
+        return _getZKsyncOSChainConfigHash();
+    }
+}
+
+/// @notice The v35 -> v36 upgrade of interop chains, starting from the real v35 `L1MessageRoot` and
+/// `ChainRegistrationSender` builds (`fixtures/v35/`): interop was enabled with L1SLOAD off, and the pairs v35 admins
+/// allowed have no base token snapshot. The ecosystem leg swaps both implementations, and the
+/// `ChainRegistrationSender`'s `initializeUpgrade` backfills the snapshots; each chain's own upgrade then turns L1SLOAD
+/// on if its interop is enabled. Once the L2 imports an anchor, the v35 pairs keep working.
 /// See {protocol-docs/l1sload.md#upgrade-from-v35}.
-/// @dev The proxy admin is an EOA here; in an upgrade the Core-domain `ProxyUpgradeTransition` row calls
-/// `upgradeAndCall` with `initializeUpgrade` (`CoreUpgrade_v36._coreProxyUpgradeRows`). v35 also pushed each
-/// allowance to the chain's L2 Bridgehub as a service transaction; the diamonds are mocked to accept it, since the
-/// push is what v36 retires.
+/// @dev The proxy admin is an EOA here; in an upgrade the Core-domain `ProxyUpgradeTransition` rows swap the
+/// implementations (`CoreUpgrade_v36._coreProxyUpgradeRows`). v35 also pushed each allowance to the chain's L2 Bridgehub
+/// as a service transaction; the diamonds are mocked to accept it, since the push is what v36 retires. Foundry has no
+/// L1SLOAD precompile, so the mock one serves the L2 reads whatever the chain's flag ({L1SloadMockUtils}).
 contract ChainRegistrationSenderV36UpgradeTest is L1SloadSharedTest {
     string internal constant V35_IMPLEMENTATION =
         "test/foundry/l1/integration/fixtures/v35/ChainRegistrationSender.json";
-    /// @dev An interop-enabled chain nobody allowed: the migration snapshots it too.
+    string internal constant V35_MESSAGE_ROOT = "test/foundry/l1/integration/fixtures/v35/L1MessageRoot.json";
+    /// @dev A chain without interop: the upgrade gives it neither a snapshot nor L1SLOAD.
     uint256 internal constant NOT_ENABLED_CHAIN_ID = 274;
 
     address internal proxyAdmin;
@@ -32,6 +68,15 @@ contract ChainRegistrationSenderV36UpgradeTest is L1SloadSharedTest {
 
     function _chainRegistrationSenderImplementation() internal override returns (address) {
         return deployCode(V35_IMPLEMENTATION, abi.encode(IBridgehubBase(bridgehub)));
+    }
+
+    function _l1MessageRootImplementation(address _chainAssetHandler) internal override returns (address) {
+        return deployCode(V35_MESSAGE_ROOT, abi.encode(bridgehub, _chainAssetHandler));
+    }
+
+    function _installChain(uint256 _chainId, address _diamond) internal override {
+        vm.etch(_diamond, address(new V36ChainUpgradeHarness()).code);
+        V36ChainUpgradeHarness(_diamond).initChain(bridgehub, _chainId, _chainAdmin(_chainId));
     }
 
     function setUp() public override {
@@ -60,6 +105,52 @@ contract ChainRegistrationSenderV36UpgradeTest is L1SloadSharedTest {
         _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
         _allowInteropPeer(PEER_CHAIN_ID, CHAIN_ID);
         _allowInteropPeer(CHAIN_ID, THIRD_CHAIN_ID);
+    }
+
+    /// @dev The state the chain upgrade repairs: v35 enabled interop without L1SLOAD.
+    function test_v35StateHasInteropOnAndL1SloadOff() public {
+        assertTrue(l1MessageRoot.isInteropEnabled(CHAIN_ID));
+        assertFalse(_chain(CHAIN_ID).isZKsyncOSL1SloadEnabled());
+        assertEq(_chain(CHAIN_ID).getZKsyncOSChainConfigHash(), _chainConfigHash(CHAIN_ID, false));
+    }
+
+    /// @dev Each chain's upgrade turns L1SLOAD on when its interop is enabled, with the Admin setter's event, and the
+    /// chain config hash its next batch commits carries it. A chain without interop keeps it off, and from v36 it can't
+    /// get interop without it.
+    function test_chainUpgradeTurnsL1SloadOnForInteropChains() public {
+        _upgradeEcosystemToV36();
+        assertTrue(l1MessageRoot.isInteropEnabled(CHAIN_ID), "the v35 state survives the swap");
+
+        uint256[3] memory interopChains = [CHAIN_ID, PEER_CHAIN_ID, THIRD_CHAIN_ID];
+        for (uint256 i = 0; i < interopChains.length; ++i) {
+            V36ChainUpgradeHarness chain = _chain(interopChains[i]);
+            vm.expectEmit(address(chain));
+            emit IAdmin.NewZKsyncOSL1Sload(false, true);
+            chain.enableL1SloadForInterop();
+            assertTrue(chain.isZKsyncOSL1SloadEnabled());
+            assertEq(chain.getZKsyncOSChainConfigHash(), _chainConfigHash(interopChains[i], true));
+        }
+
+        V36ChainUpgradeHarness other = _chain(NOT_ENABLED_CHAIN_ID);
+        vm.recordLogs();
+        other.enableL1SloadForInterop();
+        assertEq(vm.getRecordedLogs().length, 0, "no event");
+        assertFalse(other.isZKsyncOSL1SloadEnabled());
+        assertEq(other.getZKsyncOSChainConfigHash(), _chainConfigHash(NOT_ENABLED_CHAIN_ID, false));
+
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(L1SloadNotEnabled.selector, NOT_ENABLED_CHAIN_ID));
+        l1MessageRoot.enableInterop(NOT_ENABLED_CHAIN_ID, false);
+    }
+
+    /// @dev Every later transition finds the flag on and does nothing.
+    function test_chainUpgradeIsANoopOnceL1SloadIsOn() public {
+        _upgradeToV36();
+
+        vm.recordLogs();
+        _chain(CHAIN_ID).enableL1SloadForInterop();
+        assertEq(vm.getRecordedLogs().length, 0, "no event");
+        assertTrue(_chain(CHAIN_ID).isZKsyncOSL1SloadEnabled());
     }
 
     /// @dev v35 kept no snapshot: an L2 reading v35 state finds no base token for its peers, so its sends would fail.
@@ -92,6 +183,8 @@ contract ChainRegistrationSenderV36UpgradeTest is L1SloadSharedTest {
     /// @dev What the L2 reads at its first anchor after the upgrade: the pairs allowed under v35 keep working.
     function test_pairsAllowedUnderV35KeepWorkingOnL2() public {
         _upgradeToV36();
+        assertTrue(_chain(CHAIN_ID).isZKsyncOSL1SloadEnabled());
+        assertTrue(_chain(PEER_CHAIN_ID).isZKsyncOSL1SloadEnabled());
         _importL1Anchor(1, keccak256("first anchor after the upgrade"), block.timestamp);
 
         (bool allowed, bytes32 peerBaseTokenAssetId) = reads.sendTarget(
@@ -149,13 +242,43 @@ contract ChainRegistrationSenderV36UpgradeTest is L1SloadSharedTest {
         assertEq(chainRegistrationSender.interopBaseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
     }
 
+    /// @dev The ecosystem leg, then every chain's own upgrade.
     function _upgradeToV36() internal {
+        _upgradeEcosystemToV36();
+        uint256[4] memory chainIds = [CHAIN_ID, PEER_CHAIN_ID, THIRD_CHAIN_ID, NOT_ENABLED_CHAIN_ID];
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            _chain(chainIds[i]).enableL1SloadForInterop();
+        }
+    }
+
+    /// @dev The two implementation swaps, the `ChainRegistrationSender` one with its backfill.
+    function _upgradeEcosystemToV36() internal {
+        address messageRootImplementation = address(new L1MessageRoot(bridgehub, makeAddr("chainAssetHandler")));
         address implementation = _v36Implementation();
-        vm.prank(proxyAdmin);
+        vm.startPrank(proxyAdmin);
+        ITransparentUpgradeableProxy(address(l1MessageRoot)).upgradeTo(messageRootImplementation);
         ITransparentUpgradeableProxy(address(chainRegistrationSender)).upgradeToAndCall(
             implementation,
             abi.encodeCall(IProxyUpgradeInitializable.initializeUpgrade, ())
         );
+        vm.stopPrank();
+    }
+
+    function _chain(uint256 _chainId) internal returns (V36ChainUpgradeHarness) {
+        return V36ChainUpgradeHarness(makeAddr(string.concat("diamond", vm.toString(_chainId))));
+    }
+
+    /// @dev The chain config hash of a fixture chain: default gas limit, full pubdata, only L1SLOAD may be on.
+    function _chainConfigHash(uint256 _chainId, bool _l1SloadEnabled) internal pure returns (bytes32) {
+        return
+            Utils.chainConfigHash({
+                _chainId: _chainId,
+                _maxTxGasLimit: ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
+                _pubdataContent: PubdataContent.FULL_PUBDATA,
+                _filteringEnabled: false,
+                _largeContractsEnabled: false,
+                _l1SloadEnabled: _l1SloadEnabled
+            });
     }
 
     function _v36Implementation() internal returns (address) {

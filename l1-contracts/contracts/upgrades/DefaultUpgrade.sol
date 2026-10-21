@@ -12,6 +12,10 @@ import {CTMUpgradeComposer} from "./registry/libraries/CTMUpgradeComposer.sol";
 import {LiveRoutingReader} from "./registry/libraries/LiveRoutingReader.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {ZeroAddress} from "../common/L1ContractErrors.sol";
+import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
+import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
+import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
+import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,6 +43,7 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
         // against the new routing; applying the derived cut first is what keeps that order.
         _applyDerivedFacetCuts(transition.facetCuts());
         _upgradeFromCommittedObject(transition);
+        _enableL1SloadForInterop();
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
@@ -49,6 +54,27 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
         uint256 _chainId
     ) external view returns (L2CanonicalTransaction memory) {
         return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(_transition), _bridgehub, _chainId);
+    }
+
+    /// @notice Turns L1SLOAD on for a chain whose interop is enabled, as the Admin setter would, since interop gating
+    ///         reads L1 through it. A chain enabled before v36 crosses its first transition with interop on and the
+    ///         flag off; once the flag is on, `enableInterop` and the setter keep it on, so every later transition
+    ///         is a no-op. See {protocol-docs/l1sload.md#upgrade-from-v35}.
+    /// @dev Only on L1, the only layer whose message root enables interop. The engine runs after every committed
+    ///      batch has executed, so the flag changes at a configuration boundary.
+    function _enableL1SloadForInterop() internal {
+        if (s.zksyncOSL1SloadEnabled) {
+            return;
+        }
+        IMessageRootBase messageRoot = IBridgehubBase(s.bridgehub).messageRoot();
+        if (block.chainid != messageRoot.L1_CHAIN_ID()) {
+            return;
+        }
+        if (!IL1MessageRoot(address(messageRoot)).isInteropEnabled(s.chainId)) {
+            return;
+        }
+        s.zksyncOSL1SloadEnabled = true;
+        emit IAdmin.NewZKsyncOSL1Sload(false, true);
     }
 
     /// @notice Applies the storage/L2 part of a registry-driven edge from the object the committed
