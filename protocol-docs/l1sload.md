@@ -199,5 +199,6 @@ Suspension doesn't touch X's whitelist or the pool, so `resumeInterop(X)` restor
   to L1's clock at execution. Tightening that bound for interop chains is a follow-up.
 - **Delay.** Every gating change (allowing, deregistering, suspending) reaches a chain only when it imports a newer
   anchor, and never in Priority Mode.
-- **No anchor, no interop.** A chain that never imported an anchor can neither send nor accept interop.
+- **No anchor, no interop.** A chain that never imported an anchor, or has the flag off, can neither send nor accept
+  interop; its reads revert with `L1SloadFailed`.
 - **Storage layout is an ABI.** Moving `ChainRegistrationSender`'s gating mappings breaks every L2 reader.

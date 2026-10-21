@@ -152,10 +152,10 @@ while neither chain is [suspended](./l1sload.md#suspending-a-chain).
     ({protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}).
   - An allowed peer stays allowed (`InteropPeerAlreadyAllowed` on a second call) until `deregisterInteropPairs`
     removes it.
-- **Consent is per side.** Each admin writes only its own chain's side, and a chain sends interop to and accepts
-  it from only the peers on its own side ([receive filter](#receive-filter)). Two-way interop needs both admins,
-  and a one-sided whitelist can strand flows ([K1](#k1-stuck-flows)). SDKs should check both sides on L1 before
-  sending.
+- **Consent is per side.** Each admin writes only its own chain's side. A chain accepts interop only from the peers
+  on its own side ([receive filter](#receive-filter)), and sends only to peers that allowed it back, since sending
+  reads both sides ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}). So a one-sided whitelist starts no
+  flow, but removing one side holds the flows already in flight ([K1](#k1-stuck-flows)).
 - **Effect on L2.** A change reaches a chain once it imports an L1 anchor taken after it
   ({protocol-docs/l1sload.md#anchors}). Nothing is sent to L2, and `ChainRegistrationSender` is no longer a second
   bridge: it has no `bridgehubDeposit`, so a two-bridges request naming it reverts.
