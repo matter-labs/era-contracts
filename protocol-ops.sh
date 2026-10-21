@@ -26,13 +26,13 @@
 #   EXTRA_MOUNTS     — Docker mode: space-separated host:container mount pairs,
 #                      e.g. "/tmp/cfg:/contracts/cfg". Use this to point output
 #                      somewhere other than the in-tree default (the host's
-#                      l1-contracts/upgrade-envs/ — which is mounted by default
-#                      so `--env <env>` writes land in
+#                      l1-contracts/upgrade-envs/, mounted when it is the
+#                      image's own, so `--env <env>` writes land in
 #                      upgrade-envs/<v>/output/<env>/ on the host).
 #   PROTOCOL_OPS_REQUIRE_RELEASE=1
-#                    — Docker mode: run an image as build-docker.yaml released
-#                      it: refuse one without its org.opencontainers.image.revision
-#                      label, and don't mount the host's upgrade-envs/ over its own.
+#                    — Docker mode: refuse an image without the
+#                      org.opencontainers.image.revision label, i.e. one not
+#                      released by build-docker.yaml (the calldata workflows).
 #   PROTOCOL_OPS_BIN — Local mode only: path to a pre-built protocol_ops
 #                      binary. If unset, the wrapper runs `cargo build
 #                      --release` inside protocol-ops/ and uses the resulting
@@ -145,19 +145,30 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 IMAGE_DIGEST="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE" \
   | grep -m1 "^${IMAGE_REPO}@" || true)"
-if [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" == "1" ]] && [[ -z "$(docker image inspect \
-  --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$IMAGE")" ]]; then
+IMAGE_REVISION="$(docker image inspect \
+  --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$IMAGE")"
+
+if [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" == "1" && -z "$IMAGE_REVISION" ]]; then
   echo "Error: ${IMAGE} has no revision label (org.opencontainers.image.revision): release an image with build-docker.yaml" >&2
   exit 1
 fi
 
-# Mount the host's `l1-contracts/upgrade-envs/` over the container's so
-# `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml) land
-# directly in the in-tree path (upgrade-envs/<v>/output/<env>/) the operator
-# already commits. The host's checkout shadows the image's baked-in copy —
-# both are the same git source, so the override is invisible at read time
-# and only matters at write time.
+# The image reads its own `l1-contracts/upgrade-envs/`. The host's is mounted
+# over it, so `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml)
+# land in the in-tree path (upgrade-envs/<v>/output/<env>/) the operator
+# commits, only when the two are the same: a local build (no revision), or this
+# checkout at the image's revision with no edits outside the outputs.
 HOST_UPGRADE_ENVS="${ERA_PATH}/l1-contracts/upgrade-envs"
+mount_upgrade_envs=""
+if [[ -z "$IMAGE_REVISION" ]]; then
+  mount_upgrade_envs=1
+elif [[ "$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" == "$IMAGE_REVISION" ]] &&
+  edits="$(git -C "$ERA_PATH" status --porcelain -- l1-contracts/upgrade-envs \
+    ':(exclude,glob)l1-contracts/upgrade-envs/*/output/**')" && [[ -z "$edits" ]]; then
+  mount_upgrade_envs=1
+else
+  echo "Note: running with the image's upgrade-envs/: this checkout is not its revision ${IMAGE_REVISION}, or has edits there. Its outputs stay in the container unless EXTRA_MOUNTS takes them." >&2
+fi
 HOST_SCRIPT_OUT="${ERA_PATH}/l1-contracts/script-out"
 mkdir -p "${HOST_SCRIPT_OUT}"
 
@@ -180,7 +191,7 @@ docker_args=(
   -e PROTOCOL_OPS_IMAGE_DIGEST="${IMAGE_DIGEST}"
   -v "${HOST_SCRIPT_OUT}:/contracts/l1-contracts/script-out"
 )
-if [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" != "1" ]]; then
+if [[ -n "$mount_upgrade_envs" ]]; then
   docker_args+=(-v "${HOST_UPGRADE_ENVS}:/contracts/l1-contracts/upgrade-envs")
 fi
 

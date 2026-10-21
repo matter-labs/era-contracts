@@ -55,10 +55,9 @@ against the on-chain result before governance signs (step 3).
 ## Running the image
 
 The local commands below run the image too. `./protocol-ops.sh --tag <tag>` (or
-`--tag sha256:<digest>`) pulls it and mounts the checkout's `l1-contracts/upgrade-envs/`, so
-outputs land in the checkout; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
-Run them from a checkout of the image's commit: a bundle packed in the image records that commit as
-clean, whatever `upgrade-envs/` is mounted.
+`--tag sha256:<digest>`) pulls it; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
+Run them from a checkout of the image's commit: only then does the wrapper mount the checkout's
+`l1-contracts/upgrade-envs/` (the image's configs, unedited), so outputs land in the checkout.
 
 ---
 
@@ -89,7 +88,7 @@ TAG=<tag>   # the released protocol-ops image
   --fork-url <l1-rpc> --deployer-address <deployer-eoa>
 
 # 1b) emit the sim-inputs + transaction-simulator.json
-OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
+OUT=l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/mainnet   # rehearse-upgrade's default upgrade
 ./protocol-ops.sh --tag "$TAG" ecosystem governance-toml-to-simulator \
   --env mainnet --include-manifest "$OUT/prepare/manifest.json" \
   --camp-a-signers <deployer-eoa> --emit-sim-inputs "$OUT/sim-inputs"
@@ -174,7 +173,7 @@ journal is the operational record of the broadcast; the verifier does not read i
 
 ```bash
 TAG=sha256:<digest>   # the bundle's protocol_ops_image.digest, after the '@'
-BUNDLE=<unpacked-bundle-dir>
+BUNDLE="$PWD/<unpacked-bundle-dir>"
 DEPLOYER_ADDR=$(./protocol-ops.sh --tag "$TAG" cast wallet address --private-key "$DEPLOYER_KEY")
 
 # Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
@@ -258,7 +257,7 @@ names: it re-derives every object from the reviewed creation code in the image's
 
 ```bash
 TAG=sha256:<digest>   # protocol_ops_image.digest, after the '@'
-export EXTRA_MOUNTS="<unpacked-bundle-dir>:/contracts/bundle"
+export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle"
 ./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
   --bundle /contracts/bundle --rpc <l1-rpc> --verify-only
 ```
@@ -319,7 +318,7 @@ file's hash with the bundle's and exits on a mismatch. The image is
 
 ```bash
 TAG=sha256:<digest>   # protocol_ops_image.digest, after the '@'
-export EXTRA_MOUNTS="<unpacked-bundle-dir>:/contracts/bundle"
+export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle"
 ./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
   --bundle /contracts/bundle --fork-url <l1-rpc>
 ```
@@ -328,14 +327,10 @@ That forks L1 at the bundle's recorded height, funds every bundle signer, replay
 all the manifest's bundles under impersonation and runs `ecosystem verify-bootstrap`
 against the result.
 
-Variants:
+To broadcast the deployer bundles for real, then verify (`--verify-only` in place of `--key` verifies a
+chain the bundle was already broadcast to, as in step 3):
 
 ```bash
-# verify a chain the bundle was already broadcast to (no replay)
-./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
-  --bundle /contracts/bundle --rpc <l1-rpc> --verify-only
-
-# broadcast the deployer bundles for real, then verify
 ./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
   --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 ```

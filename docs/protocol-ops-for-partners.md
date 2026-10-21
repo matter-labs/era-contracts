@@ -100,7 +100,7 @@ image's, and the outputs land there.
    and sends only the deployer's bundles.
 
    ```bash
-   EXTRA_MOUNTS="<unpacked-bundle-dir>:/contracts/bundle" \
+   EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle" \
      ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
      --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
    ```
@@ -121,5 +121,4 @@ How to rehearse the broadcast on a fork first and verify it afterwards:
 ## Changing a config
 
 The configs are part of the image. Tell us what to change: we merge it and release a new image, with a
-new digest. Don't mount an edited `upgrade-envs/` over the image's: the output would no longer be what
-the released image produces.
+new digest. `protocol-ops.sh` doesn't mount an edited `upgrade-envs/` over the image's.

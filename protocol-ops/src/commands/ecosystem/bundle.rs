@@ -138,7 +138,8 @@ pub struct DeployBundleMetadata {
     pub env: String,
     pub contracts_commit: String,
     /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in the
-    /// protocol-ops image, which records its own commit and does not check the mounted `upgrade-envs/`.
+    /// protocol-ops image: it runs its own commit's sources and configs (`protocol-ops.sh` mounts a
+    /// checkout's `upgrade-envs/` over them only when the checkout is that commit, unedited).
     pub contracts_worktree_dirty: bool,
     pub all_contracts_hashes_sha256: String,
     pub l1: L1Provenance,
@@ -284,7 +285,7 @@ fn source_changes(
     upgrade: &str,
     image_commit: Option<&str>,
 ) -> Option<String> {
-    // The image has no git (the generate workflow mounts a checkout of the image's commit).
+    // The image has no git; see `DeployBundleMetadata::contracts_worktree_dirty`.
     if image_commit.is_some() {
         return Some(String::new());
     }
@@ -1288,8 +1289,7 @@ mod tests {
             assert!(status().is_empty());
         }
 
-        // In the image: its own commit, and clean whatever the mounted checkout holds.
-        write(&repo.path().join(source), "changed\n");
+        // In the image, which has no git: its own commit, clean.
         assert_eq!(
             source_changes(repo.path(), DEFAULT_UPGRADE, Some("abc")).as_deref(),
             Some("")

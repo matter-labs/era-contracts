@@ -242,13 +242,6 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                   (either may be omitted if you always pass
 #                                    the `l1_rpc_url` input instead)
 # Optional:
-#   DEPLOYER_PRIVATE_KEY_SEPOLIA  — deployer EOA key for stage + testnet
-#   DEPLOYER_PRIVATE_KEY_MAINNET  — deployer EOA key for mainnet
-#                                   (ONLY used to derive the deployer address;
-#                                    prefer the `deployer_address` input so no
-#                                    key is needed — this is a fork rehearsal
-#                                    that impersonates the deployer and signs
-#                                    nothing)
 #   GW_RPC_URL                    — Gateway RPC, passed as `--gw-rpc-url`
 #                                   when set (the release's checks read L1
 #                                   only and ignore it).
@@ -280,9 +273,8 @@ on:
         default: ""
         type: string
       deployer_address:
-        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are. BLANK = derive it from the DEPLOYER_PRIVATE_KEY_* secret."
-        required: false
-        default: ""
+        description: "Deployer EOA address (public). Only the address is needed — this is a fork rehearsal, the deployer is impersonated and nothing is signed. It is NOT a free parameter though: it goes into the init code of a few deployments (initialize(deployer) on two proxies, and the verifier's constructor), so their CREATE2 addresses depend on it and whoever broadcasts MUST be this same EOA. The bundle records which deployments those are."
+        required: true
         type: string
 
 permissions:
@@ -309,7 +301,7 @@ jobs:
           esac
           docker pull --quiet --platform=linux/amd64 "$image"
           revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")"
-          if [ -z "$revision" ]; then
+          if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::$image has no revision label: release it with build-docker.yaml"; exit 1
           fi
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
@@ -326,9 +318,7 @@ jobs:
       #
       # This is a fork rehearsal: the deployer is IMPERSONATED (anvil
       # --auto-impersonate) and nothing is signed, so only the deployer ADDRESS
-      # is needed — never a private key. Provide it via the `deployer_address`
-      # input (recommended, esp. for mainnet: no real key ever touches CI), or
-      # let it be derived from the optional DEPLOYER_PRIVATE_KEY_* secret.
+      # is needed — never a private key: the `deployer_address` input.
       - name: Select L1 RPC + resolve deployer address
         env:
           ENVIRONMENT: ${{ inputs.environment }}
@@ -338,8 +328,6 @@ jobs:
           INPUT_DEPLOYER: ${{ inputs.deployer_address }}
           RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
           RPC_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
-          PK_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
-          PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
           GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
@@ -369,8 +357,8 @@ jobs:
             echo "::error::$PV has no top-level 'l1_chain_id ='"; exit 1
           fi
           case "$L1_CHAIN_ID" in
-            1)        rpc="$RPC_MAINNET"; pk="${PK_MAINNET:-}"; net=mainnet ;;
-            11155111) rpc="$RPC_SEPOLIA"; pk="${PK_SEPOLIA:-}"; net=sepolia ;;
+            1)        rpc="$RPC_MAINNET"; net=mainnet ;;
+            11155111) rpc="$RPC_SEPOLIA"; net=sepolia ;;
             *) echo "::error::l1_chain_id=$L1_CHAIN_ID has no RPC secret wired (only 1 / 11155111)"; exit 1 ;;
           esac
           echo "env=$ENVIRONMENT l1_chain_id=$L1_CHAIN_ID -> forking $net"
@@ -385,21 +373,10 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$rpc"
-          # Resolve the deployer address: explicit input wins; otherwise derive
-          # it from the deployer key (the address is public, the key stays masked).
-          if [ -n "${INPUT_DEPLOYER:-}" ]; then
-            deployer="$INPUT_DEPLOYER"
-          elif [ -n "${pk:-}" ]; then
-            case "$ENVIRONMENT" in
-              stage|testnet|mainnet) ;;
-              *) echo "::error::'$ENVIRONMENT' is not our ecosystem: pass its own deployer as deployer_address (docs/protocol-ops-for-partners.md)"; exit 1 ;;
-            esac
-            echo "::add-mask::$pk"
-            deployer="$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast wallet address --private-key "$pk")"
-          else
-            echo "::error::No deployer: pass the deployer_address input or set DEPLOYER_PRIVATE_KEY_SEPOLIA / DEPLOYER_PRIVATE_KEY_MAINNET"
-            exit 1
+          if [[ ! "$INPUT_DEPLOYER" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::deployer_address must be an address, got '$INPUT_DEPLOYER'"; exit 1
           fi
+          deployer="$INPUT_DEPLOYER"
           echo "Deployer (impersonated on the fork): $deployer"
           # Job-scoped. L1_FORK_URL stays masked; DEPLOYER_ADDR is public. Both are
           # passed to `rehearse-upgrade` as flags below; the deployer is impersonated on
@@ -552,8 +529,8 @@ jobs:
             echo '::error::No deploy bundle was published, so there is nothing to verify. The bundle is packed straight after `upgrade-prepare-all`, so the generate job failed at or before the prepare — fix that first.'
             exit 1
           fi
-          image="$(jq -er '.protocol_ops_image.digest // error("the bundle names no protocol-ops image") | sub(".*@"; "")' "$meta")"
-          commit="$(jq -er .contracts_commit "$meta")"
+          image="$(jq -er '.protocol_ops_image.digest // "" | capture("^ghcr\\.io/matter-labs/protocol-ops@(?<d>sha256:[0-9a-f]{64})$").d // error("the bundle names no protocol-ops image")' "$meta")"
+          commit="$(jq -er '.contracts_commit | select(test("^[0-9a-f]{40}$")) // error("the bundle names no commit")' "$meta")"
           {
             echo "image=$image"
             echo "commit=$commit"

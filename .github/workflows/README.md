@@ -12,22 +12,24 @@ Nothing is compiled per run: the image is what gets released and tested.
 2. Test that commit with zksync-os-integration-tests: in a PR there, point `protocol_ops` and
    `zksync_os_genesis_gen` in its `Cargo.toml` at the commit (`rev = "<commit>"`). That PR's CI run is
    the one the release cites.
-3. Release the image: dispatch `build-docker` on that commit with `tested_with_integration_tests=true`
-   and `integration_tests_run_url=<that run>`; it refuses to push without them. Before pushing, it
-   checks the image's contract build against its `AllContractsHashes.json` and runs the anvil-interop
-   upgrade test (`run-upgrade-test.ts`: the previous release's chain states, upgraded with this image's
-   `protocol_ops`) inside the image. The run summary gives the digest.
+3. Release the image:
+   `gh workflow run build-docker.yaml --ref <release branch> -f ref=<commit> -f tested_with_integration_tests=true -f integration_tests_run_url=<that run>`.
+   `--ref` picks the copy of the workflow that runs, so use the release branch's. It refuses to push
+   without the two inputs. Before pushing, it checks the image's contract build against its
+   `AllContractsHashes.json` and runs the anvil-interop upgrade test (`run-upgrade-test.ts`: the
+   previous release's chain states, upgraded with this image's `protocol_ops`) inside the image. The
+   run summary gives the digest.
 4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata` and the chain
    workflows; `deploy-ecosystem-upgrade` runs the image its bundle names. Partners (ADI) get the same
    digest and run it with their own keys:
    [docs/protocol-ops-for-partners.md](../../docs/protocol-ops-for-partners.md).
 
 The calldata workflows refuse an image without the `org.opencontainers.image.revision` label
-`build-docker` sets (such as those `build-and-push-docker` pushes for zksync-os-integration-tests), and
-run it with the configs it was built with: the ecosystem workflow checks out its commit, and the chain
-workflows don't mount the checkout's `upgrade-envs/` (`PROTOCOL_OPS_REQUIRE_RELEASE`). A change to
-`upgrade-envs/` (salts, owners, presets) therefore needs a new image. Our deployer keys serve only
-`stage`, `testnet` and `mainnet`.
+`build-docker` sets (such as those `build-and-push-docker` pushes), and run it with the configs it was
+built with: `protocol-ops.sh` mounts the checkout's `upgrade-envs/` only when the checkout is the
+image's commit, unedited (the ecosystem workflow checks that commit out). A change to `upgrade-envs/`
+(salts, owners, presets) therefore needs a new image. Our deployer keys serve only `stage`, `testnet`
+and `mainnet`.
 
 ## Mapping
 
@@ -59,7 +61,7 @@ transfers between machines.
 
 ## Conventions
 
-- **All workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`
+- **Calldata workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`
 - **`environment`** is a preset: `l1-contracts/upgrade-envs/permanent-values/<env>.toml` (`stage`,
   `testnet`, `mainnet`, `adi`), passed as `--env <env>`; it gives the bridgehub and the L1 chain id.
   Chain workflows take the chain as `chain_id` (`--chain-id`).
