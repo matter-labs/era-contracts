@@ -47,7 +47,9 @@ out of the chain admin's hands.
 ## Enabling interop
 
 `L1MessageRoot.enableInterop(chainId, requireSecondProofSystem)` is callable only by the Bridgehub owner. It
-requires the chain to be registered and no longer pending its [backfill](#backfill) (`ChainBalanceBackfillPending`).
+requires the chain to be registered, no longer pending its [backfill](#backfill) (`ChainBalanceBackfillPending`), and
+to have L1SLOAD on ({protocol-docs/l1sload.md#chain-config-flag}: `L1SloadNotEnabled`, or `ChainPredatesL1Sload` for
+a chain still on pre-v36 facets).
 It is one-way: there is no way to disable interop again (`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads
 the result.
 

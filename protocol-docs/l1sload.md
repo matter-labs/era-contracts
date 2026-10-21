@@ -27,10 +27,10 @@ A batch whose L1 reads don't come from L1 can't be executed:
 - **The values are that block's state.** ZKsync OS checks the block header against the anchor hash and each value's
   account and storage proofs against the header's state root, inside the proven state transition. A missing or
   invalid witness fails the transaction or the block; it never yields a value.
-- **The anchor is recent.** The [freshness rule](#freshness) bounds how far behind L1 the anchor can be at a batch,
-  outside Priority Mode.
-- **Failures close.** With no anchor or with the [flag](#chain-config-flag) off, every read reverts
-  (`L1SloadFailed`): the chain can neither send interop nor accept it.
+- **The anchor is recent.** Every gating read refuses an anchor older than `L1_ANCHOR_MAX_LAG` in L2 block time
+  ([freshness](#freshness)), Priority Mode included.
+- **Failures close.** With no anchor, a stale anchor or the [flag](#chain-config-flag) off, every gating read
+  reverts (`L1AnchorStale`, `L1SloadFailed`): the chain can neither send interop nor accept it.
 
 The storage slots of the gating mappings are an L2-facing ABI ([reading L1 state](#reading-l1-state)).
 
@@ -42,17 +42,17 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
   IDs at `type(uint48).max`.
 - **L1 record.** `L1MessageRoot.recordL1BlockHash()` stores `blockhash(block.number - 1)` with `block.timestamp`
   under `block.number - 1`, emits `L1BlockHashRecorded`, and `recordedL1BlockHash(n)` returns it. Every
-  `commitBatches` on L1 calls it, so operators send no transaction for it. Commits don't wait for proofs, so a
-  prover outage doesn't stop new anchors; recording at execute would have paused the L2 after `L1_ANCHOR_MAX_LAG`
-  without proofs. It stays permissionless, and is a no-op when the block is already recorded, so the chains
-  committing in one L1 block share one record. When production is paused waiting for an anchor there are no
-  commits, so the server's keeper calls it itself. The record is permanent, so an anchor stays verifiable at
+  `commitBatches` on L1 of a chain with L1SLOAD on calls it, so operators send no transaction for it; chains with
+  the flag off don't pay for it. Commits don't wait for proofs, so a prover outage doesn't stop new anchors. It stays
+  permissionless, and is a no-op when the block is already recorded, so the chains committing in one L1 block share
+  one record. When nothing commits, for example on an idle ecosystem, the server's keeper calls it itself. The record is permanent, so an anchor stays verifiable at
   execution however long ago it was taken; the EVM's `blockhash` only reaches 256 blocks back.
 - **Import on L2.** `L2InteropRootStorage` runs the checks of every import (one non-zero side, non-zero
   timestamp), then requires the block to be newer than the current anchor (`L1AnchorNotNewer`), so the anchor
-  only moves forward and block 0 can't be anchored. It writes the anchor's hash and number to the fixed slots
-  `keccak256("zksync-os.l1sload.anchor.block-hash")` and `keccak256("zksync-os.l1sload.anchor.block-number")`,
-  where ZKsync OS reads it, and emits `InteropRootAdded` with exactly one side, the block hash, so the ZKsync OS
+  only moves forward and block 0 can't be anchored. It writes the anchor's hash, number and L1 time to the fixed
+  slots `keccak256("zksync-os.l1sload.anchor.block-hash")`, `keccak256("zksync-os.l1sload.anchor.block-number")`
+  and `keccak256("zksync-os.l1sload.anchor.timestamp")` (ZKsync OS reads the hash, [freshness](#freshness) the
+  time), and emits `InteropRootAdded` with exactly one side, the block hash, so the ZKsync OS
   event hook folds it into the batch's dependency-roots rolling hash. The anchor is stored only there: neither
   `interopRoots` nor `latestInteropRootTimestamp` record it. `L1SLOAD` reverts while no anchor is set.
 - **Check on L1.** `Executor._verifyDependencyInteropRoots` takes the expected root and timestamp of an anchor from
@@ -63,27 +63,24 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
 
 ## Freshness
 
-Each chain tracks the newest anchor timestamp it imported (`l1AnchorTimestamp`, monotonic). Once a chain has
-imported an anchor, every batch it executes must satisfy
+Every gating read checks the anchor's age first: `L1View` reverts with `L1AnchorStale` when `block.timestamp >
+anchorTimestamp + L1_ANCHOR_MAX_LAG` (1 hour), so gating fails closed on a stale view of L1. `anchorTimestamp` is the
+L1 time the anchor was recorded at; the import writes it and execution checks it against the L1 record
+([anchors](#anchors)).
 
-`l1AnchorTimestamp + L1_ANCHOR_MAX_LAG >= StoredBatchInfo.timestamp`,
+- The bound holds for every read, however the operator composes batches.
+- A chain that never imported an anchor has `anchorTimestamp = 0` and reads nothing.
+- In Priority Mode, whose batches can't contain the service transaction that imports anchors, reads fail once the
+  last anchor is past the lag instead of seeing stale state.
 
-where `l1AnchorTimestamp` includes the anchors the batch itself imports and `L1_ANCHOR_MAX_LAG` is 1 hour. Otherwise
-execution reverts with `L1AnchorTooOld`, so an operator can't serve L1 reads from an arbitrarily old L1 state. The
-executor keeps the maximum, without relying on L2 importing anchors in increasing order.
+`L1View` is the gating reader. Other contracts that call `0x101` directly pick their own rule from
+`IL2InteropRootStorage.l1AnchorTimestamp()`. The Executor checks no freshness, and `StoredBatchInfo.timestamp` stays
+0 for ZKsync OS batches.
 
-`StoredBatchInfo.timestamp` is the batch's last L2 block timestamp. ZKsync OS batches stored 0 there until v36; from
-v36 the Committer stores `lastBlockTimestamp`, which the batch output hash, and so the proof, commits to. It does so
-for every batch it commits, with no per-batch version gate. The server's `StoredBatchInfo` encoding gates on the
-batch's protocol version (≥ v36) instead, and the two agree: after a chain upgrade with an L2 upgrade transaction the
-first batch committed must be the upgrade batch (`Committer._commitBatches`, `processSystemUpgradeTx`). The rule
-doesn't apply:
+## Settlement layer
 
-- to chains that never imported an anchor;
-- to batches committed before v36, whose timestamp is 0. The upgrade engines execute every committed batch before a
-  chain upgrades, so this is a defensive skip;
-- in Priority Mode, whose batches can't contain the service transaction that imports anchors. L1 reads there see
-  the last anchor, however old.
+Anchors are checked against `L1MessageRoot.recordedL1BlockHash`, the L1 record, which a settlement layer's message
+root doesn't have. A chain with L1SLOAD on must therefore settle on L1. The contracts don't extend the Gateway for it.
 
 ## Reading L1 state
 
@@ -173,13 +170,26 @@ changed, which the release pair derives on-chain (among them `L2Bridgehub`, `Int
   executed by then, so the change lands at a configuration boundary. The first batch after the upgrade commits the
   seven-word chain config hash with the flag on, so the server reads the flag from L1 for it. Chains without interop
   keep it off. Every later transition repeats the step, and finds nothing to do once the flag is on.
-- **The first anchor.** The upgrade seeds no anchor: a seeded one would be an unchecked L1 state. The first
-  `commitBatches` after the upgrade records one, and the operator imports it in a later batch. Until then the
-  chain's interop reads revert, so its interop pauses for about one batch.
+- **The first anchor.** The upgrade seeds no anchor: a seeded one would be an unchecked L1 state. The first record
+  comes from the chain's first commit with the flag on (its upgrade batch, for a chain the upgrade turned it on for)
+  or from the server's keeper. The server imports it once it is final on L1 (about 13 minutes), in a later block.
+  Until then the chain's gating reads revert and its interop pauses.
 - **Stale L2 state.** The L2 Bridgehub's v35 whitelist stays under `__DEPRECATED_isPeerAllowed`, and its
   `baseTokenAssetId` entries for peers stay but are not read for gating.
-- **Batch timestamps.** Batches committed before the upgrade keep `StoredBatchInfo.timestamp = 0`, and the
-  [freshness rule](#freshness) skips them. The server encodes the new value for batches committed from v36.
+- **Enabling interop.** `enableInterop` reverts with `ChainPredatesL1Sload` for a chain still on pre-v36 facets, which
+  route no `isZKsyncOSL1SloadEnabled`.
+
+### Upgrade window
+
+Between the ecosystem upgrade and a chain's own upgrade, the new `ChainRegistrationSender` no longer pushes, and the
+chain's v35 L2 still gates on its pushed mapping. So in that window:
+
+- `allowInteropPeer`, `deregisterInteropPairs`, `suspendInterop` and `resumeInterop` change only L1, and don't
+  reach chains not yet upgraded;
+- a chain not yet upgraded still accepts the legs of a peer suspended meanwhile.
+
+Governance therefore upgrades every interop chain in the same window as the ecosystem upgrade, and doesn't rely on
+deregistration or suspension for a chain until it and its peers have upgraded.
 
 ## Governance procedure
 
@@ -189,19 +199,28 @@ To stop interop to and from chain X, for example after a prover incident:
 
 1. The `ChainRegistrationSender` owner calls `suspendInterop(X)` on L1.
 2. Each chain stops sending to and accepting from X once it imports an anchor taken at or after that L1 block.
-   Outside Priority Mode the freshness rule makes that happen within `L1_ANCHOR_MAX_LAG` of its batches' timestamps.
+   - With an honest server, that is L1 finality (about 13 minutes) plus the server's import interval.
+   - In any case, at most `L1_ANCHOR_MAX_LAG` of L2 block time after the last anchor the chain's operator imported
+     before the suspension: an operator may still import a recorded anchor taken just before it, but reads stop once
+     that one is stale.
+   - L2 block time can trail L1 ([known issues](#known-issues)).
+   - A chain in Priority Mode imports nothing, so its reads fail closed once its last anchor is stale.
 3. Flows already in flight toward or from X stay unreceived ([K1](./interop-gating.md#k1-stuck-flows)) and complete
    after `resumeInterop(X)`.
 
-Suspension doesn't touch X's whitelist or the pool, so `resumeInterop(X)` restores the previous state.
+Suspension doesn't touch X's whitelist or the pool, so `resumeInterop(X)` restores the previous state. During the
+[upgrade window](#upgrade-window), chains not yet upgraded don't see it.
 
 ## Known issues
 
-- **Batch-relative freshness.** The L2 batch timestamp is chosen by the operator within the commit bounds (up to
-  `COMMIT_TIMESTAMP_NOT_OLDER` in the past), so the freshness rule bounds the anchor's age relative to the batch, not
-  to L1's clock at execution. Tightening that bound for interop chains is a follow-up.
+- **L2 clock.** Freshness is measured in L2 block time, which the operator chooses within the commit bounds: a batch's
+  first block may trail L1 by up to `COMMIT_TIMESTAMP_NOT_OLDER` (3 days on mainnet, 30 days on testnets). A hostile
+  operator can therefore serve gating reads from an anchor up to that much plus `L1_ANCHOR_MAX_LAG` old in L1 time.
+  Bounding the first block's age for L1SLOAD chains is a follow-up.
 - **Delay.** Every gating change (allowing, deregistering, suspending) reaches a chain only when it imports a newer
-  anchor, and never in Priority Mode.
+  anchor ([bounds](#suspending-a-chain)).
+- **Priority Mode.** A chain in Priority Mode imports no anchors, so once its last anchor is stale it neither sends
+  nor accepts interop until it imports one again.
 - **No anchor, no interop.** A chain that never imported an anchor, or has the flag off, can neither send nor accept
-  interop; its reads revert with `L1SloadFailed`.
+  interop; its reads revert with `L1AnchorStale` or `L1SloadFailed`.
 - **Storage layout is an ABI.** Moving `ChainRegistrationSender`'s gating mappings breaks every L2 reader.

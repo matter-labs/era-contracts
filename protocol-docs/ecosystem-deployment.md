@@ -204,8 +204,8 @@ block.
 Creating a chain does not make it reachable for interop, and no deployment command makes it so: which
 chains of a production ecosystem may talk to each other is a decision, not a side effect of creating
 one. A chain joins interop through the steps in
-[Order per chain](./interop-gating.md#order-per-chain): its admin permanently requires the second proof system,
-governance enables interop for it on `L1MessageRoot`, and its admin allows each peer on
+[Order per chain](./interop-gating.md#order-per-chain): its admin permanently requires the second proof system and
+turns L1SLOAD on, governance enables interop for it on `L1MessageRoot`, and its admin allows each peer on
 `ChainRegistrationSender`. The checks the sender applies are described in
 [Interop registration](./chain-lifecycle.md#interop-registration-chainregistrationsender).
 
