@@ -1165,6 +1165,22 @@
   },
   {
     "type": "error",
+    "name": "L1AnchorStale",
+    "inputs": [
+      {
+        "name": "anchorTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "blockTimestamp",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "L1SloadFailed",
     "inputs": [
       {

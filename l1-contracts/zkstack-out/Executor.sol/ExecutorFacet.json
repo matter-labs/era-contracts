@@ -301,22 +301,6 @@
   },
   {
     "type": "error",
-    "name": "L1AnchorTooOld",
-    "inputs": [
-      {
-        "name": "anchorTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "batchTimestamp",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "MerkleIndexOrHeightMismatch",
     "inputs": []
   },
