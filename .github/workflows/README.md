@@ -9,30 +9,25 @@ Nothing is compiled per run: the image is what gets released and tested.
 
 1. Merge the PRs that change the upgrade's scripts and inputs (`l1-contracts/upgrade-envs/<upgrade>/`,
    `AllContractsHashes.json`, the chain states).
-2. Run zksync-os-integration-tests against that commit.
+2. Test that commit with zksync-os-integration-tests: in a PR there, point `protocol_ops` and
+   `zksync_os_genesis_gen` in its `Cargo.toml` at the commit (`rev = "<commit>"`). That PR's CI run is
+   the one the release cites.
 3. Release the image: dispatch `build-docker` on that commit with `tested_with_integration_tests=true`
-   and `integration_tests_run_url=<that run>`; it refuses to push without them. Before pushing, it runs
-   the anvil-interop upgrade test (`run-upgrade-test.ts`: the previous release's chain states, upgraded
-   with this image's `protocol_ops`) inside the image. The run summary gives the tag and digest.
-4. Pass that tag as `protocol_ops_tag` to `generate-ecosystem-upgrade-calldata` and the chain
-   workflows; `deploy-ecosystem-upgrade` runs the image its bundle names.
+   and `integration_tests_run_url=<that run>`; it refuses to push without them. Before pushing, it
+   checks the image's contract build against its `AllContractsHashes.json` and runs the anvil-interop
+   upgrade test (`run-upgrade-test.ts`: the previous release's chain states, upgraded with this image's
+   `protocol_ops`) inside the image. The run summary gives the digest.
+4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata` and the chain
+   workflows; `deploy-ecosystem-upgrade` runs the image its bundle names. Partners (ADI) get the same
+   digest and run it with their own keys:
+   [docs/protocol-ops-for-partners.md](../../docs/protocol-ops-for-partners.md).
 
-`protocol_ops_tag` is an image tag or `sha256:<digest>`. Images without the
-`org.opencontainers.image.revision` label `build-docker` sets (such as those `build-and-push-docker`
-pushes for zksync-os-integration-tests) are refused. The ecosystem workflow checks out the commit the
-image was built from, so its configs are the image's: a change to `upgrade-envs/<upgrade>/<env>.toml`
-(salts, owners) needs a new image. Its deploy bundle records the image digest, which
-`verify-bundle-handoff` and `deploy-ecosystem-upgrade` run. The chain workflows run on the dispatched
-branch, whose `upgrade-envs/` is mounted into the image.
-
-### For partners
-
-Share the digest from the run summary. A partner (ADI) runs chain operations with `docker run` and no
-checkout, and signs and broadcasts with its own keys:
-[docs/protocol-ops-for-partners.md](../../docs/protocol-ops-for-partners.md). Our deployer keys serve
-only `stage`, `testnet` and `mainnet`: `execute-deployer-safe-bundles` offers no other, the
-`deploy-ecosystem-upgrade` broadcast refuses any other, and generate takes a blank `deployer_address`
-(our deployer) for no other.
+The calldata workflows refuse an image without the `org.opencontainers.image.revision` label
+`build-docker` sets (such as those `build-and-push-docker` pushes for zksync-os-integration-tests), and
+run it with the configs it was built with: the ecosystem workflow checks out its commit, and the chain
+workflows don't mount the checkout's `upgrade-envs/` (`PROTOCOL_OPS_REQUIRE_RELEASE`). A change to
+`upgrade-envs/` (salts, owners, presets) therefore needs a new image. Our deployer keys serve only
+`stage`, `testnet` and `mainnet`.
 
 ## Mapping
 
@@ -46,9 +41,9 @@ only `stage`, `testnet` and `mainnet`: `execute-deployer-safe-bundles` offers no
 
 ## Execute workflows
 
-| Workflow                        | Purpose                                                                                                                                                                                                                                                                                              |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (e.g. the chain-init workflow's). Our ecosystems only (`stage`, `testnet`, `mainnet`): signs with the deployer secret of the preset's L1, `DEPLOYER_PRIVATE_KEY_SEPOLIA` or `_MAINNET`, and refuses bundles that target another EOA. |
+| Workflow                        | Purpose                                                                                                                                                                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (the chain-init workflow's, when the deployer also owns the chain). Signs with the deployer secret of the environment's L1, `DEPLOYER_PRIVATE_KEY_SEPOLIA` or `_MAINNET`. |
 
 ## Ecosystem-upgrade workflows
 
@@ -67,8 +62,7 @@ transfers between machines.
 - **All workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`
 - **`environment`** is a preset: `l1-contracts/upgrade-envs/permanent-values/<env>.toml` (`stage`,
   `testnet`, `mainnet`, `adi`), passed as `--env <env>`; it gives the bridgehub and the L1 chain id.
-  Chain workflows take the chain as `chain_id` (`--chain-id`). What uses our deployer keys takes only
-  ours (see [For partners](#for-partners)).
+  Chain workflows take the chain as `chain_id` (`--chain-id`).
 - **Integration-test-only** env vars (e.g. `L1_DIAMOND_CUT_DATA`) are NOT workflow inputs
 - **v30-only** overrides are marked `[v30 only]` in descriptions and `TODO(v30-removal)` in code
 - **Artifact names**: per-chain workflows upload `safe-bundles-{operation}-{chain_id}-{environment}`

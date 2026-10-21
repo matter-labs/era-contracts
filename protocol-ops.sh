@@ -30,9 +30,9 @@
 #                      so `--env <env>` writes land in
 #                      upgrade-envs/<v>/output/<env>/ on the host).
 #   PROTOCOL_OPS_REQUIRE_RELEASE=1
-#                    — Docker mode: refuse an image without the
-#                      org.opencontainers.image.revision label, i.e. one not
-#                      released by build-docker.yaml (the calldata workflows).
+#                    — Docker mode: run an image as build-docker.yaml released
+#                      it: refuse one without its org.opencontainers.image.revision
+#                      label, and don't mount the host's upgrade-envs/ over its own.
 #   PROTOCOL_OPS_BIN — Local mode only: path to a pre-built protocol_ops
 #                      binary. If unset, the wrapper runs `cargo build
 #                      --release` inside protocol-ops/ and uses the resulting
@@ -178,9 +178,11 @@ docker_args=(
   -e FOUNDRY_DISABLE_NIGHTLY_WARNING=1
   -e PROTOCOL_OPS_IMAGE="${IMAGE}"
   -e PROTOCOL_OPS_IMAGE_DIGEST="${IMAGE_DIGEST}"
-  -v "${HOST_UPGRADE_ENVS}:/contracts/l1-contracts/upgrade-envs"
   -v "${HOST_SCRIPT_OUT}:/contracts/l1-contracts/script-out"
 )
+if [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" != "1" ]]; then
+  docker_args+=(-v "${HOST_UPGRADE_ENVS}:/contracts/l1-contracts/upgrade-envs")
+fi
 
 run_args=("$TOOL" "$@")
 

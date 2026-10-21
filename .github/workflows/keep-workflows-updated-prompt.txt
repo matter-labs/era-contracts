@@ -10,8 +10,7 @@ l1-contracts/upgrade-envs/permanent-values/) and the chain as
 When modifying a workflow:
 
 1. Check that every required `protocol-ops` flag has a matching workflow input
-   (or is sourced from the environment preset — e.g. the chain-init workflow
-   reads the bridgehub from permanent-values/<env>.toml).
+   (or is sourced from the environment preset through `--env`).
 2. Integration-test-only overrides (e.g. `--l1-diamond-cut-data`) must NOT be
    exposed as workflow inputs — CI operators target real chains where those
    values auto-resolve from L1.

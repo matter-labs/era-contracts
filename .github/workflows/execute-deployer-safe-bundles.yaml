@@ -2,8 +2,8 @@ name: "Execute Deployer Safe Bundles"
 
 # Apply Safe Transaction Builder bundles whose `target` is the ecosystem
 # deployer EOA (i.e. bundles emitted by the chain-init workflow). The
-# deployer's private key is pulled from the preset L1's secret and used to
-# sign every tx in the bundle via `protocol-ops dev execute-safe`. Ecosystem
+# deployer's private key is pulled from the secret of the environment's L1 and
+# used to sign every tx in the bundle via `protocol-ops dev execute-safe`. Ecosystem
 # upgrade bundles go through `deploy-ecosystem-upgrade.yaml` instead.
 #
 # The workflow downloads bundles produced by a prior "generate" workflow
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment = upgrade-envs/permanent-values/<env>.toml preset; its l1_chain_id selects the DEPLOYER_PRIVATE_KEY_{SEPOLIA,MAINNET} secret. Our ecosystems only: partners (adi) sign with their own keys, see docs/protocol-ops-for-partners.md"
+        description: "Target environment; its L1 selects the DEPLOYER_PRIVATE_KEY_{SEPOLIA,MAINNET} secret"
         required: true
         type: choice
         options: [stage, testnet, mainnet]
@@ -48,6 +48,8 @@ jobs:
       # `dev execute-safe` reads the bundles inside the container.
       EXTRA_MOUNTS: ${{ github.workspace }}/bundles:/contracts/bundles
       PROTOCOL_OPS_REQUIRE_RELEASE: "1"
+      PROTOCOL_OPS_TAG: ${{ inputs.protocol_ops_tag }}
+      L1_RPC_URL: ${{ inputs.l1_rpc_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -63,21 +65,18 @@ jobs:
       - name: Select deployer private key + resolve its address
         id: deployer
         env:
-          PRESET: l1-contracts/upgrade-envs/permanent-values/${{ inputs.environment }}.toml
-          L1_RPC_URL: ${{ inputs.l1_rpc_url }}
+          ENVIRONMENT: ${{ inputs.environment }}
           KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
           KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
           # Deployer secrets are per L1, as in deploy-ecosystem-upgrade.yaml.
-          l1=$(python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["l1_chain_id"])' "$PRESET")
-          case "$l1" in
-            1)        secret=MAINNET key="$KEY_MAINNET" ;;
-            11155111) secret=SEPOLIA key="$KEY_SEPOLIA" ;;
-            *)        echo "no deployer secret for L1 chain $l1" >&2; exit 1 ;;
+          case "$ENVIRONMENT" in
+            mainnet)       l1=1        secret=MAINNET key="$KEY_MAINNET" ;;
+            stage|testnet) l1=11155111 secret=SEPOLIA key="$KEY_SEPOLIA" ;;
           esac
-          rpc_chain=$(bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" cast chain-id --rpc-url "$L1_RPC_URL")
+          rpc_chain=$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast chain-id --rpc-url "$L1_RPC_URL")
           if [[ "$rpc_chain" != "$l1" ]]; then
-            echo "error: l1_rpc_url is chain $rpc_chain, but the $PRESET preset is on L1 $l1" >&2
+            echo "error: l1_rpc_url is chain $rpc_chain, but $ENVIRONMENT is on L1 $l1" >&2
             exit 1
           fi
           if [[ -z "$key" ]]; then
@@ -85,7 +84,7 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$key"
-          addr=$(bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" cast wallet address --private-key "$key")
+          addr=$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast wallet address --private-key "$key")
           echo "addr=$addr" >> "$GITHUB_OUTPUT"
           echo "Deployer (from DEPLOYER_PRIVATE_KEY_$secret): $addr"
           # Don't echo the key into $GITHUB_OUTPUT (GH redacts, but keep it
@@ -130,9 +129,9 @@ jobs:
           manifest="$BUNDLE_DIR/manifest.json"
           jq -r '.bundles[].file' "$manifest" | while read -r file; do
             echo ">>> dev execute-safe $file"
-            bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" \
               dev execute-safe \
               --safe-file "/contracts/bundles/$file" \
-              --l1-rpc-url "${{ inputs.l1_rpc_url }}" \
+              --l1-rpc-url "$L1_RPC_URL" \
               --private-key "$DEPLOYER_KEY"
           done

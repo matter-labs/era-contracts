@@ -38,8 +38,7 @@ container: nothing is signed and nothing is sent. You sign and send the result f
 - ecosystem upgrade deployments: `replay-bundle --key`, with your deployer's key, on your machine;
 - ecosystem upgrade governance calls: from your Governance's owner.
 
-We never need your keys and you never need ours. Our CI signs with our deployer keys only for our own
-ecosystems (`stage`, `testnet`, `mainnet`) and refuses any other.
+We never need your keys and you never need ours.
 
 ## Chain operations
 
@@ -101,7 +100,8 @@ image's, and the outputs land there.
    and sends only the deployer's bundles.
 
    ```bash
-   ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
+   EXTRA_MOUNTS="<unpacked-bundle-dir>:/contracts/bundle" \
+     ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
      --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
    ```
 
@@ -115,8 +115,7 @@ image's, and the outputs land there.
    `ecosystem upgrade-governance` writes the calls as a Safe bundle that schedules with no delay,
    which a Governance with a `minDelay` refuses (`InvalidDelay`), on a fork too.
 
-How to mount the bundle (`/contracts/bundle` above), rehearse the broadcast on a fork first and
-verify it afterwards:
+How to rehearse the broadcast on a fork first and verify it afterwards:
 [Deploying + verifying from a deploy bundle](ecosystem-upgrade-deploy.md#deploying--verifying-from-a-deploy-bundle).
 
 ## Changing a config

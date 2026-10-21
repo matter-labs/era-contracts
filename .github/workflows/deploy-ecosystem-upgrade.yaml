@@ -10,11 +10,10 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # any transactions, dispatch with verify_only=true and run_verify=true using
 # the SAME generate_run_id that supplied the deployed bundle.
 #
-# Every command runs in the protocol-ops image the bundle was generated with
-# (`bundle-metadata.json` `protocol_ops_image.digest`, pulled by digest), from a
-# checkout of the commit that image was built from. Nothing is compiled here,
-# and these are the same `./protocol-ops.sh --tag sha256:<digest>` commands you'd
-# run locally (see `docs/ecosystem-upgrade-deploy.md`).
+# It runs the SAME commands you'd run locally (see
+# `docs/ecosystem-upgrade-deploy.md`), in the protocol-ops image the bundle names,
+# so a local deploy and a CI deploy are the same tool — CI is just a convenience
+# wrapper.
 #
 # What gets broadcast: ONLY the deployer's (Camp-A) bundles — the ones whose
 # `manifest.bundles[].target` is the deployer EOA. The legacy-Governance /
@@ -56,7 +55,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment = the same config-pair basename you generated with. Broadcasts only ours (stage, testnet, mainnet): a partner's (adi) is broadcast by its own deployer; verify_only takes any. Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
+        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
         required: true
         type: string
       generate_run_id:
@@ -198,7 +197,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: ${{ runner.temp }}/deploy-inputs
+          path: ${{ runner.temp }}/deploy/inputs
           run-id: ${{ inputs.generate_run_id }}
           github-token: ${{ github.token }}
 
@@ -207,7 +206,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
-          path: ${{ runner.temp }}/previous-deploy-result
+          path: ${{ runner.temp }}/deploy/previous-result
           run-id: ${{ inputs.resume_deploy_run_id }}
           github-token: ${{ github.token }}
 
@@ -217,7 +216,7 @@ jobs:
       - name: Pull the bundle's protocol-ops image
         run: |
           set -euo pipefail
-          bundle="$RUNNER_TEMP/deploy-inputs"
+          bundle="$RUNNER_TEMP/deploy/inputs"
           digest="$(jq -r '.protocol_ops_image.digest // empty' "$bundle/bundle-metadata.json")"
           commit="$(jq -r '.contracts_commit' "$bundle/bundle-metadata.json")"
           if [ -z "$digest" ]; then
@@ -233,7 +232,7 @@ jobs:
             echo "BUNDLE_IMAGE=${digest#*@}"
             echo "BUNDLE_COMMIT=$commit"
             # Mounted at the same path, so the commands below take host paths.
-            echo "EXTRA_MOUNTS=$RUNNER_TEMP:$RUNNER_TEMP"
+            echo "EXTRA_MOUNTS=$RUNNER_TEMP/deploy:$RUNNER_TEMP/deploy"
           } >> "$GITHUB_ENV"
 
       - name: Checkout the bundle's commit
@@ -298,12 +297,12 @@ jobs:
           RESUME_FROM_OTHER_BUNDLE: ${{ inputs.resume_from_other_bundle }}
         run: |
           set -euo pipefail
-          OUTDIR="$RUNNER_TEMP/deploy-result"
+          OUTDIR="$RUNNER_TEMP/deploy/result"
           mkdir -p "$OUTDIR"
           bundle_metadata_sha256="$(sha256sum "$DEPLOY_BUNDLE_DIR/bundle-metadata.json" | awk '{print $1}')"
 
           if [ -n "$RESUME_DEPLOY_RUN_ID" ]; then
-            previous_meta="$(find "$RUNNER_TEMP/previous-deploy-result" -name resume-metadata.json -print -quit)"
+            previous_meta="$(find "$RUNNER_TEMP/deploy/previous-result" -name resume-metadata.json -print -quit)"
             if [ -z "$previous_meta" ]; then
               echo "::error::resume artifact has no resume-metadata.json"; exit 1
             fi
@@ -376,8 +375,6 @@ jobs:
           PK_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
           set -euo pipefail
-          # Our deployer keys broadcast our ecosystems only (the bundle's env was matched
-          # to this input above); a partner (adi) broadcasts with its own key.
           case "$ENVIRONMENT" in
             stage|testnet|mainnet) ;;
             *) echo "::error::'$ENVIRONMENT' is not our ecosystem: its own deployer broadcasts it (docs/protocol-ops-for-partners.md)"; exit 1 ;;
@@ -473,7 +470,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-result-${{ inputs.environment }}
-          path: ${{ runner.temp }}/deploy-result
+          path: ${{ runner.temp }}/deploy/result
           if-no-files-found: warn
           retention-days: 90
 
