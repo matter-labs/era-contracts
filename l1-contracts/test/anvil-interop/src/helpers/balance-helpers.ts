@@ -248,7 +248,13 @@ function resolveExpectedReason(expectedReason: ExpectedRevert): {
         if (errorData.slice(0, 10).toLowerCase() !== selector.toLowerCase()) {
           return false;
         }
-        const decoded = iface.decodeErrorResult(signature, errorData);
+        // Data with the right selector can still be truncated; that is a mismatch, reported with the label.
+        let decoded: ethers.utils.Result;
+        try {
+          decoded = iface.decodeErrorResult(signature, errorData);
+        } catch {
+          return false;
+        }
         return leadingArgs.every((arg, i) => sameArg(decoded[i], arg));
       },
       description: `${contract}.${signature} starting with (${leadingArgs.join(", ")})`,

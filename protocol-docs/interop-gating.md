@@ -189,8 +189,8 @@ chain's batches are as provable as any other. The filter has to cover refunds to
 broken prover could forge "present" toward one chain and "absent" toward another, so that one chain finalizes the
 flow while another refunds it, and a leg is paid twice.
 
-The filter reads L1, so it fails closed without a fresh anchor: on a chain in Priority Mode, finality and refunds
-wait once its last anchor is stale ({protocol-docs/l1sload.md#known-issues}).
+The filter reads L1, so it fails closed without a fresh anchor: on a chain in Priority Mode, finality and refunds for
+legs from other chains wait once its last anchor is stale ({protocol-docs/l1sload.md#known-issues}).
 
 ## Governance procedure
 

@@ -220,11 +220,11 @@ Suspension doesn't touch X's whitelist or the pool, so `resumeInterop(X)` restor
 - **Delay.** Every gating change (allowing, deregistering, suspending) reaches a chain only when it imports a newer
   anchor ([bounds](#suspending-a-chain)).
 - **Priority Mode.** A chain in Priority Mode imports no anchors. Once its last anchor is older than
-  `L1_ANCHOR_MAX_LAG`, every gating read on it reverts, so it neither sends nor accepts interop, and the atomic-flow
-  refunds and finality on it (`AtomicFlowManager.authorizeRefund` and `requireFlowFinalized`, which read the
-  [receive filter](./interop-gating.md#receive-filter)) wait until it leaves Priority Mode and imports an anchor again,
-  even when sent as L1 transactions. This is deliberate: the alternative reads stale gating state, and a Priority Mode
-  chain can't import the post-deadline roots that a timeout proof needs anyway.
+  `L1_ANCHOR_MAX_LAG`, every gating read on it reverts, so it neither sends nor accepts interop. The atomic-flow
+  refunds and finality on it for legs from other chains (`AtomicFlowManager.authorizeRefund` and
+  `requireFlowFinalized`, which read the [receive filter](./interop-gating.md#receive-filter)) wait until it leaves
+  Priority Mode and imports an anchor again, even when sent as L1 transactions; legs from the chain itself need no L1
+  read. This is deliberate: the alternative reads stale gating state.
 - **No anchor, no interop.** A chain that never imported an anchor, or has the flag off, can neither send nor accept
   interop; its reads revert with `L1AnchorStale` or `L1SloadFailed`.
 - **Storage layout is an ABI.** Moving `ChainRegistrationSender`'s gating mappings breaks every L2 reader.
