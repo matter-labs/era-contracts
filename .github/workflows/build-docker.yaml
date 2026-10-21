@@ -28,8 +28,9 @@ on:
         type: string
         required: true
 
+# Releases run one at a time, so checking that a tag is free and pushing it can't race.
 concurrency:
-  group: build-docker-${{ github.event_name }}-${{ github.ref }}
+  group: build-docker-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && 'release' || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -116,7 +117,9 @@ jobs:
             protocol.labels.io.matter-labs.protocol-ops.tested-with=${{ inputs.integration_tests_run_url }}
 
       # verify-bootstrap holds the image's contract build against its AllContractsHashes.json.
+      # Not on PRs, whose hashes are regenerated last (docker/protocol/Dockerfile).
       - name: Check the image's contract hashes
+        if: github.event_name == 'workflow_dispatch'
         run: docker run --rm "$IMAGE" yarn calculate-hashes:check
 
       # The anvil-interop upgrade test (anvil-interop-ci.yaml's `upgrade-test`)
@@ -130,7 +133,7 @@ jobs:
             -e ANVIL_BIN=/usr/local/bin/anvil \
             -w /contracts/l1-contracts/test/anvil-interop \
             "$IMAGE" \
-            bash -c 'yarn install --frozen-lockfile && yarn ts-node run-upgrade-test.ts'
+            bash -c 'yarn install --frozen-lockfile && yarn test:upgrade'
 
       - name: Login to GitHub Container Registry
         if: github.event_name == 'workflow_dispatch'
@@ -143,8 +146,9 @@ jobs:
       - name: Push Docker Image
         if: github.event_name == 'workflow_dispatch'
         run: |
-          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
-            echo "::error::$IMAGE already exists: a released tag is never moved"; exit 1
+          # A released tag is never moved: only "manifest unknown" means it is free.
+          if out="$(docker manifest inspect "$IMAGE" 2>&1)" || [[ "$out" != *"manifest unknown"* ]]; then
+            echo "::error::$IMAGE exists, or the registry didn't say it doesn't"; exit 1
           fi
           docker push "$IMAGE"
           digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")

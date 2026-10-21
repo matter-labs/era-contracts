@@ -85,11 +85,11 @@ jobs:
           fi
           echo "::add-mask::$key"
           addr=$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast wallet address --private-key "$key")
-          echo "addr=$addr" >> "$GITHUB_OUTPUT"
+          {
+            echo "addr=$addr"
+            echo "secret=$secret"
+          } >> "$GITHUB_OUTPUT"
           echo "Deployer (from DEPLOYER_PRIVATE_KEY_$secret): $addr"
-          # Don't echo the key into $GITHUB_OUTPUT (GH redacts, but keep it
-          # in $GITHUB_ENV which is scoped to this job only).
-          echo "DEPLOYER_KEY=$key" >> "$GITHUB_ENV"
 
       - name: Verify every bundle targets the deployer
         env:
@@ -120,7 +120,13 @@ jobs:
           echo "All bundles target the deployer EOA."
 
       - name: Execute bundles in manifest order
+        env:
+          SECRET: ${{ steps.deployer.outputs.secret }}
+          KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
+          # The key selected above, read again rather than kept in $GITHUB_ENV.
+          if [[ "$SECRET" == MAINNET ]]; then key="$KEY_MAINNET"; else key="$KEY_SEPOLIA"; fi
           # Iterate manifest.json in declared order; `dev execute-safe` is
           # idempotent per-bundle (each call is a discrete tx batch under
           # the deployer key), so a failure mid-way can be resumed by
@@ -133,5 +139,5 @@ jobs:
               dev execute-safe \
               --safe-file "/contracts/bundles/$file" \
               --l1-rpc-url "$L1_RPC_URL" \
-              --private-key "$DEPLOYER_KEY"
+              --private-key "$key"
           done

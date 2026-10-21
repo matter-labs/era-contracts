@@ -219,12 +219,12 @@ jobs:
           bundle="$RUNNER_TEMP/deploy/inputs"
           digest="$(jq -r '.protocol_ops_image.digest // empty' "$bundle/bundle-metadata.json")"
           commit="$(jq -r '.contracts_commit' "$bundle/bundle-metadata.json")"
-          if [ -z "$digest" ]; then
+          if [[ ! "$digest" =~ ^ghcr\.io/matter-labs/protocol-ops@sha256:[0-9a-f]{64}$ ]]; then
             echo "::error::the bundle names no protocol-ops image: generate it with a released one"; exit 1
           fi
           docker pull --quiet --platform=linux/amd64 "$digest"
           revision="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$digest")"
-          if [ -z "$revision" ] || [ "$revision" != "$commit" ]; then
+          if [[ ! "$commit" =~ ^[0-9a-f]{40}$ || "$revision" != "$commit" ]]; then
             echo "::error::$digest was built from '$revision', the bundle from '$commit'"; exit 1
           fi
           {
