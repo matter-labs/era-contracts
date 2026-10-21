@@ -83,26 +83,24 @@ interop-registration time instead (next section).
 
 ## Interop registration (`ChainRegistrationSender`)
 
-`ChainRegistrationSender` registers a chain on another chain's `L2Bridgehub`
-(`allowInteropPeer`) for the pairs the chain admins whitelisted. Who may whitelist which pair, and
-how a registration is re-sent, is in
-{protocol-docs/interop-gating.md#interop-peer-whitelist}. Chains settling on L1 participate in interop
-without a gateway: L1 itself builds interop roots (`MessageRootBase.addChainBatchRootV32`) and serves
-the corresponding inclusion proofs.
+`ChainRegistrationSender` holds the interop gating state chains read from L1 with L1SLOAD: the pairs the chain
+admins whitelisted and the base token snapshot that registers a peer for interop
+({protocol-docs/l1sload.md#the-base-token-snapshot}). Who may whitelist which pair is in
+{protocol-docs/interop-gating.md#interop-peer-whitelist}. Chains settling on L1 participate in interop without a
+gateway: L1 itself builds interop roots (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding
+inclusion proofs.
 
-Checks performed before sending a registration (every path that sends one builds it with
-`_getL2RegistrationCalldata`):
+Checks performed before `allowInteropPeer` writes a peer's snapshot:
 
-- The chain to be registered is known to the Bridgehub (its `baseTokenAssetId` is non-zero).
-- The chain to be registered has at least one batch leaf in this layer's message root
-  (`messageRoot.chainTreeLeafCount(chainId) > 0`), else it reverts with
-  `ChainHasNoBatchesInMessageRoot`. This is the second enforcement point of the atomic-interop
-  timeout precondition: interop towards a chain is only enabled once the chain both has its
-  `sharedTree` leaf and has a batch in its chain tree.
+- The peer is known to the Bridgehub (its `baseTokenAssetId` is non-zero).
+- The peer has at least one batch leaf in L1's message root (`messageRoot.chainTreeLeafCount(chainId) > 0`), else it
+  reverts with `ChainHasNoBatchesInMessageRoot`. This is the second enforcement point of the atomic-interop timeout
+  precondition: a chain is only registered for interop once it both has its `sharedTree` leaf and has a batch in its
+  chain tree.
 
-The pairs the removed consent-free `registerChain` registered passed the same checks, so no chain is
-registered for interop with an empty tree. Governance clears them
-({protocol-docs/interop-gating.md#legacy-registrations}).
+The v36 backfill of the snapshots applies the same leaf check ({protocol-docs/l1sload.md#upgrade-from-v35}), and the
+pairs the removed consent-free `registerChain` registered passed it too, so no chain is registered for interop with
+an empty tree.
 
 ## Settlement-layer migration (`ChainAssetHandler`)
 
@@ -164,7 +162,7 @@ A chain registered on a settlement layer during `bridgeMint` (non-zero batch num
 genesis batch leaf** in that layer's message root — its chain tree stays empty until its first
 settlement there. This is fine under the current assumption that **only the L1 message root is
 used to anchor atomic-interop timeout proofs**: fresh chains are seeded on L1 at creation, and
-`ChainRegistrationSender` refuses to enable interop towards a chain with an empty tree. If a
+`ChainRegistrationSender` refuses to register a chain with an empty tree for interop. If a
 non-L1 message root is ever used as the timeout-proof anchor, migrated chains need an equivalent
 guarantee (e.g. carrying the chain's current IMT root in the migration data and seeding a leaf
 from it).
