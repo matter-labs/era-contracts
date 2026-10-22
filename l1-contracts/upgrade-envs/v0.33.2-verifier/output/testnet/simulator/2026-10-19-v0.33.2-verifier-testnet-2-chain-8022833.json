@@ -1,6 +1,6 @@
 [
   {
-    "description": "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(8022833, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario.",
+    "description": "Chain 8022833, schedule: chain 8022833's ChainAdmin.multicall: set chain 8022833's upgrade timestamp to 1, i.e. without waiting (ServerNotifier.setUpgradeTimestamp)",
     "network": "sepolia",
     "from": "0xd64e136566a9e04eb05b30184ff577f52682d182",
     "to": "0x3b7a24e583867ab85694cf55941734653bdfab9c",
@@ -9,11 +9,11 @@
     "valueToMint": "1",
     "emulateAllBatchesExecuted": true,
     "emulateAllBatchesExecutedFor": "0x02b1ac1cf0a592aefd3c2246b2431388365db272",
-    "tag": "chain_upgrade_8022833",
+    "tag": "chain_upgrade_8022833_schedule",
     "alreadyExecuted": true
   },
   {
-    "description": "ChainAdmin.multicall: upgradeChainFromVersion(chain 8022833, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged.",
+    "description": "Chain 8022833, execute: chain 8022833's ChainAdmin.multicall: upgrade chain 8022833 from v0.33.0 with the CTM's stored cut (ZK chain.upgradeChainFromVersion)",
     "network": "sepolia",
     "from": "0xd64e136566a9e04eb05b30184ff577f52682d182",
     "to": "0x3b7a24e583867ab85694cf55941734653bdfab9c",
@@ -21,7 +21,7 @@
     "value": "0",
     "emulateAllBatchesExecuted": true,
     "emulateAllBatchesExecutedFor": "0x02b1ac1cf0a592aefd3c2246b2431388365db272",
-    "tag": "chain_upgrade_8022833",
+    "tag": "chain_upgrade_8022833_execute",
     "alreadyExecuted": true
   }
 ]

@@ -1,6 +1,6 @@
 [
   {
-    "description": "Stage 0: pause chain migrations (ChainAssetHandler.pauseMigration) — the CTM refuses a new version otherwise",
+    "description": "Stage 0: pause chain migrations, which the CTM requires to take a new version (ChainAssetHandler.pauseMigration)",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0xdfa2193b161d7bd45fc81b4e80225eebdc3cf96c",
@@ -21,18 +21,17 @@
     "alreadyExecuted": true
   },
   {
-    "description": "Stage 1: pause chain migrations (ChainAssetHandler.pauseMigration) — the CTM refuses a new version otherwise",
+    "description": "Stage 1: pause chain migrations again: ProtocolUpgradeHandler.executeEmergencyUpgrade unpauses them before a proposal's calls (ChainAssetHandler.pauseMigration)",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0xdfa2193b161d7bd45fc81b4e80225eebdc3cf96c",
     "data": "0xac700e63",
     "value": "0",
-    "valueToMint": "1",
     "tag": "stage1",
     "alreadyExecuted": true
   },
   {
-    "description": "Stage 1: check the upgrade timer deadline has passed (GovernanceUpgradeTimer.checkDeadline)",
+    "description": "Stage 1: check the governance upgrade timer's deadline has passed (GovernanceUpgradeTimer.checkDeadline)",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x8041c49aefba4c0f96af9db80ca76139e69c925e",
@@ -53,7 +52,7 @@
     "alreadyExecuted": true
   },
   {
-    "description": "Stage 1: register v0.33.2 as an upgrade of v0.33.0 with the new ZKsyncOSTestnetVerifier (CTM.createNewVerifierOnlyUpgrade)",
+    "description": "Stage 1: register v0.33.2 as an upgrade of v0.33.0 with the new Verifier (ChainTypeManager.createNewVerifierOnlyUpgrade)",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x54d55e74de9c6003e7a68a1fe70e633f05761eb5",
@@ -63,7 +62,7 @@
     "alreadyExecuted": true
   },
   {
-    "description": "Stage 2: check v0.33.2 is registered on the CTM (UpgradeStageValidator.checkProtocolUpgradePresence)",
+    "description": "Stage 2: check the new protocol version is registered on the CTM (UpgradeStageValidator.checkProtocolUpgradePresence)",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0xc04fc5ed2ffd03b27e953afe4020fac1e2f0f885",
@@ -94,7 +93,7 @@
     "alreadyExecuted": true
   },
   {
-    "description": "test: create chain 556 on v0.33.2 from the unchanged chain creation params (Bridgehub.createNewChain)",
+    "description": "Test: create chain 556 on ZKsync OS CTM (Bridgehub.createNewChain)",
     "network": "sepolia",
     "from": "0x7cbdda00285de05a1353803db38770043e359b6d",
     "to": "0xc4fd2580c3487bba18d63f50301020132342fdbd",
@@ -104,7 +103,7 @@
     "tag": "test_create_chain_zkos"
   },
   {
-    "description": "Placeholder: test_upgrade_chain_zkos is absent from this artifact. The per-chain upgrades are the separate per-chain scenarios (tag chain_upgrade_<chainId>).",
+    "description": "Placeholder: test_upgrade_chain_zkos is absent from this artifact. The per-chain upgrades are the separate per-chain scenarios (tags chain_upgrade_<chainId>_schedule and chain_upgrade_<chainId>_execute).",
     "network": "sepolia",
     "from": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",
     "to": "0x803e5e7af1fdd504f8844e28a249203cfa7c471d",

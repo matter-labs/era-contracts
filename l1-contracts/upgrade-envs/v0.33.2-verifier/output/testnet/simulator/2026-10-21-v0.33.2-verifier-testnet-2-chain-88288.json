@@ -1,6 +1,6 @@
 [
   {
-    "description": "ChainAdmin.multicall: ServerNotifier.setUpgradeTimestamp(88288, 1) — 1 means no waiting, and 0 is rejected as the unset sentinel. Requires stage 1 to have registered the v0.33.2 cut, which is why this file must run after the ecosystem scenario.",
+    "description": "Chain 88288, schedule: chain 88288's ChainAdmin.multicall: set chain 88288's upgrade timestamp to 1, i.e. without waiting (ServerNotifier.setUpgradeTimestamp)",
     "network": "sepolia",
     "from": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
     "to": "0xf3b67c6e88bb7ab3721d0cfa47c024f08f0f2476",
@@ -12,7 +12,7 @@
     "tag": "chain_upgrade_88288_schedule"
   },
   {
-    "description": "ChainAdmin.multicall: upgradeChainFromVersion(chain 88288, 0x2100000000 -> 0x2100000002) — the per-chain diamond cut: no facets, new verifier, DA unchanged.",
+    "description": "Chain 88288, execute: chain 88288's ChainAdmin.multicall: upgrade chain 88288 from v0.33.0 with the CTM's stored cut (ZK chain.upgradeChainFromVersion)",
     "network": "sepolia",
     "from": "0x5555555590930f501c88b73ea43b3eeb5a71643c",
     "to": "0xf3b67c6e88bb7ab3721d0cfa47c024f08f0f2476",
