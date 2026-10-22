@@ -306,7 +306,7 @@ jobs:
           fi
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
-      # protocol-ops.sh mounts this checkout's upgrade-envs/ over the image's.
+      # So that protocol-ops.sh mounts its upgrade-envs/, where the outputs land.
       - name: Checkout the image's revision
         uses: actions/checkout@v4
         with:
@@ -536,7 +536,7 @@ jobs:
             echo "commit=$commit"
           } >> "$GITHUB_OUTPUT"
 
-      # protocol-ops.sh and the configs it mounts into the image.
+      # protocol-ops.sh, and its upgrade-envs/ for the replay's outputs.
       - name: Checkout the bundle's commit
         uses: actions/checkout@v4
         with:

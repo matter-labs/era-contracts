@@ -55,7 +55,7 @@ jobs:
             echo "::error::An image is released only for a ref that passed zksync-os-integration-tests: set tested_with_integration_tests."
             exit 1
           fi
-          if [[ ! "$RUN_URL" =~ ^https://github\.com/matter-labs/zksync-os-integration-tests/actions/runs/[0-9]+(/[^[:space:]]*)?$ ]]; then
+          if [[ ! "$RUN_URL" =~ ^https://github\.com/matter-labs/zksync-os-integration-tests/actions/runs/[0-9]+(/(job|attempts)/[0-9]+)?$ ]]; then
             echo "::error::integration_tests_run_url must be a run of matter-labs/zksync-os-integration-tests, got '$RUN_URL'."
             exit 1
           fi
@@ -146,8 +146,9 @@ jobs:
       - name: Push Docker Image
         if: github.event_name == 'workflow_dispatch'
         run: |
-          # A released tag is never moved: only "manifest unknown" means it is free.
-          if out="$(docker manifest inspect "$IMAGE" 2>&1)" || [[ "$out" != *"manifest unknown"* ]]; then
+          # A released tag is never moved: only a missing manifest means it is free.
+          if out="$(docker manifest inspect "$IMAGE" 2>&1)" ||
+            [[ "$out" != *"manifest unknown"* && "$out" != *"no such manifest"* ]]; then
             echo "::error::$IMAGE exists, or the registry didn't say it doesn't"; exit 1
           fi
           docker push "$IMAGE"

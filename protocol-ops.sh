@@ -167,7 +167,7 @@ elif [[ "$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" == "$IMAGE_REVISION" 
     ':(exclude,glob)l1-contracts/upgrade-envs/*/output/**')" && [[ -z "$edits" ]]; then
   mount_upgrade_envs=1
 else
-  echo "Note: running with the image's upgrade-envs/: this checkout is not its revision ${IMAGE_REVISION}, or has edits there. Its outputs stay in the container unless EXTRA_MOUNTS takes them." >&2
+  echo "Note: running with the image's own upgrade-envs/, since this checkout is not its revision ${IMAGE_REVISION} or has edits there; check that revision out to get the outputs in the checkout." >&2
 fi
 HOST_SCRIPT_OUT="${ERA_PATH}/l1-contracts/script-out"
 mkdir -p "${HOST_SCRIPT_OUT}"

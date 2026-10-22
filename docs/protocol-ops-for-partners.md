@@ -84,8 +84,7 @@ An upgrade of your ecosystem needs your release inputs in the image,
 release an image. The current release, `v0.35.0-upgrade-system`, has no `adi.toml` yet.
 
 These steps write a bundle you keep, so run them with `./protocol-ops.sh --tag sha256:<digest>` from a
-checkout of the image's `revision`: the wrapper mounts the checkout's `upgrade-envs/`, the same as the
-image's, and the outputs land there.
+checkout of the image's `revision`, so the outputs land in it.
 
 1. Generate with your deployer's address, or have us run `generate-ecosystem-upgrade-calldata` with it
    as `deployer_address` and send you the deploy bundle. The address is baked into the init code of
