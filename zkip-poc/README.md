@@ -6,6 +6,8 @@ An experimental proof of concept for ZKIP, an asset-accounting proof that each c
 - a batch that sends interop legs can execute only once its debit is proven;
 - a chain can count a received leg only once both legs of the flow are final on L1.
 
+Statements reach L1 one by one, or several at once in one aggregated proof.
+
 **Status: research code.**
 
 - It is not wired into the Executor or the native token vault: `contracts/src/mocks/` stands in for them.
@@ -41,13 +43,21 @@ An experimental proof of concept for ZKIP, an asset-accounting proof that each c
   - **On L1:** bb's generated, optimized Solidity verifiers (`contracts/src/verifiers/`).
   - **Size classes:** debits of up to 1 or 4 legs (`debit_1`, `debit_4`), claims of up to 1 or 2 credits (`claim_1`,
     `claim_2`).
+- **Aggregation.** Each chain hands a zero-knowledge proof (bb's `noir-recursive` target) to an untrusted aggregator.
+  - **The aggregator** verifies each proof natively and drops the ones that fail. It then proves `agg_4`, which
+    recursively verifies up to four of them and exposes each one's public inputs plus a commitment to its VK.
+  - **`submitAggregated`** verifies that one proof. It applies each slot whose VK commitment is an approved circuit of
+    its kind and whose public inputs are what L1 would hand that circuit now. Any other slot is skipped with
+    `SlotSkipped(reason)`, so a stale slot doesn't block the rest of the window.
+  - **Privacy:** the inner proofs are zero-knowledge, so the aggregator learns only what L1 sees.
+  - **Fallback:** a chain the aggregator leaves out can still submit directly.
 
 ## Layout
 
 | Path | What |
 | --- | --- |
-| `circuits/` | Noir workspace: the `zkip_lite` library and the `debit_1`, `debit_4`, `claim_1`, `claim_2` circuits (each pair differs only in `N`) |
-| `prover/prove.py` | Prover bridge for the tests (vm.ffi): builds the private witness, runs nargo and bb, writes VKs and verifiers (`setup`) |
+| `circuits/` | Noir workspace: the `zkip_lite` library, the `debit_1`, `debit_4`, `claim_1`, `claim_2` circuits (each pair differs only in `N`) and the `agg_4` aggregation circuit |
+| `prover/prove.py` | Prover bridge for the tests (vm.ffi): builds the private witness, runs nargo and bb, writes VKs and verifiers (`setup`), and plays the aggregator (`aggregate`) |
 | `contracts/src/` | `ZKIPLiteRegistry` (submissions, execute gate), `ImtInsertion`, errors, mocks, generated verifiers |
 | `contracts/test/` | End-to-end tests on real proofs |
 | `work/` | Generated VKs, proofs and timings (ignored) |
@@ -73,8 +83,8 @@ cd zkip-poc/contracts && forge test --threads 1 -vv
 ```
 
 `setup` compiles the circuits, writes the VKs to `work/vk/`, and regenerates the verifiers, which must come out
-identical to the committed ones. The tests prove every statement for real, so the 11 tests take ~2 minutes on an
-Apple M4 Max. `foundry.toml` uses Prague gas pricing. Add `--evm-version osaka` for today's mainnet pricing.
+identical to the committed ones. The tests prove every statement for real: the 11 direct-path tests take ~2 minutes on
+an Apple M4 Max, and the 4 aggregation tests ~5. `foundry.toml` uses Prague gas pricing. Add `--evm-version osaka` for today's mainnet pricing.
 
 ## Tests
 
@@ -90,6 +100,10 @@ Apple M4 Max. `foundry.toml` uses Prague gas pricing. Add `--evm-version osaka` 
 | `test_lateLegCannotBeCredited` | A counter-leg settled after the deadline doesn't make the flow final |
 | `test_nonZkipLegSourceCannotBeCredited` | A leg from a chain that isn't a ZKIP chain can't be credited |
 | `test_unknownAnchorRejected` | Anchors must be existing L1 message roots |
+| `test_aggSwapEndToEnd` | The same swap with one aggregated proof per window: both debits in one, both claims in the next. A tampered public input fails verification. |
+| `test_aggFourSlotsFromTwoChains` | One proof carries 4 debits from 2 chains, 2 batches each. Slots apply in order, so a chain's second batch builds on its first. |
+| `test_aggDropsInvalidProofAndChecksCircuits` | The aggregator drops a corrupted proof and aggregates the rest. A revoked circuit's slot is skipped, and the dropped chain proves directly. |
+| `test_aggStaleSlotIsSkipped` | A slot made stale by a direct submission is skipped; the other slot applies, and nothing applies twice |
 
 ## Measurements
 
@@ -106,6 +120,15 @@ pricing.
 - **Verifier:** ~0.76–0.82M execution plus ~0.16M of calldata per proof. The rest is L1 bookkeeping, the largest part
   being ~19k gas per leg for the IMT insertion checks.
 - **Execute gate:** ~16k gas for the first batch of an execute transaction, ~7.7k for each further one.
+- **Aggregation** (`agg_4`):
+  - 3,015,574 gates (2^22 rows); 20.7 s at 4 threads and 11–13 s at 14 threads, in 5.2 GB. The cost is the same
+    however many slots are filled.
+  - **L1, one aggregated proof at Prague pricing** (Osaka adds ~8k):
+    - ~1.15M with 1 statement;
+    - ~1.21–1.23M with 2;
+    - ~1.36M with 4, i.e. ~0.34M per statement.
+
+    That's ~1.08M fixed plus ~0.07M per statement. A lone statement is cheaper submitted directly.
 - **Where the gates go:**
   - keccak-f1600 costs 17,380 gates and Poseidon2 73.
   - A leg's 1,600-byte bundle hash is ~0.22M gates.
@@ -120,4 +143,5 @@ pricing.
   - a consumed-leg tree of depth 24 and 8 asset slots;
   - one bundle layout: ERC20 legs through the asset router.
 - **Refunds** of expired flows aren't covered.
-- **L1 cost.** Each proof costs ~1M gas on L1. Aggregation across chains is a follow-up.
+- **L1 cost.** A direct proof costs ~1M gas on L1, and a full aggregated window ~0.34M per statement.
+- **Aggregation depth.** More than 4 statements per L1 proof needs another recursion level, which isn't built.
