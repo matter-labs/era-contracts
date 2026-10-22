@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IL2InteropRootStorage} from "../interop/IL2InteropRootStorage.sol";
 import {L2_INTEROP_ROOT_STORAGE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {L1SLOAD_MAX_KEYS} from "../common/Config.sol";
+import {L1_ANCHOR_MAX_LAG, L1SLOAD_MAX_KEYS} from "../common/Config.sol";
 
 /// @title MockL1SloadPrecompile
 /// @notice Stand-in for the ZKsync OS L1SLOAD precompile (`L1SLOAD_PRECOMPILE_ADDRESS`, RIP-7728) on EVMs that don't
@@ -12,8 +12,9 @@ import {L1SLOAD_MAX_KEYS} from "../common/Config.sol";
 /// See {protocol-docs/l1sload.md#reading-l1-state}.
 /// @dev The values are whatever the harness last set with {setL1StorageValues}, read from the L1 contract (on anvil,
 /// `eth_getStorageAt` on the L1) or chosen by the test; the precompile reads the L1 state at the anchored block.
-/// Like the precompile, it reverts while `L2InteropRootStorage` holds no anchor, and fails consuming all gas on
-/// input with no key, more than `L1SLOAD_MAX_KEYS` keys or a partial key.
+/// Like the precompile, it reverts while `L2InteropRootStorage` holds no anchor, and fails consuming all gas when the
+/// anchor is stale ({protocol-docs/l1sload.md#freshness}) or on input with no key, more than `L1SLOAD_MAX_KEYS` keys
+/// or a partial key.
 contract MockL1SloadPrecompile {
     uint256 internal constant ADDRESS_LENGTH = 20;
     uint256 internal constant WORD_LENGTH = 32;
@@ -38,9 +39,15 @@ contract MockL1SloadPrecompile {
     }
 
     fallback(bytes calldata _input) external returns (bytes memory output) {
-        if (IL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR).l1AnchorBlockHash() == bytes32(0)) {
+        IL2InteropRootStorage rootStorage = IL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
+        if (rootStorage.l1AnchorBlockHash() == bytes32(0)) {
             assembly {
                 revert(0, 0)
+            }
+        }
+        if (block.timestamp > rootStorage.l1AnchorTimestamp() + L1_ANCHOR_MAX_LAG) {
+            assembly {
+                invalid()
             }
         }
         uint256 inputLength = _input.length;

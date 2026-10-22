@@ -43,9 +43,10 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
 - **L1 record.** `L1MessageRoot.recordL1BlockHash()` stores `blockhash(block.number - 1)` with `block.timestamp`
   under `block.number - 1`, emits `L1BlockHashRecorded`, and `recordedL1BlockHash(n)` returns it. Every
   `commitBatches` on L1 of a chain with L1SLOAD on calls it, so operators send no transaction for it; chains with
-  the flag off don't pay for it. Commits don't wait for proofs, so a prover outage doesn't stop new anchors. It stays
-  permissionless, and is a no-op when the block is already recorded, so the chains committing in one L1 block share
-  one record. When nothing commits, for example on an idle ecosystem, the server's keeper calls it itself. The record is permanent, so an anchor stays verifiable at
+  the flag off don't pay for it. It stays permissionless, and is a no-op when the block is already recorded, so the
+  chains committing in one L1 block share one record. The stock server commits only proven batches, so commits
+  alone stop during a prover outage, and nothing commits on an idle ecosystem: there the server's keeper calls it
+  itself, which is what keeps anchors coming. The record is permanent, so an anchor stays verifiable at
   execution however long ago it was taken; the EVM's `blockhash` only reaches 256 blocks back.
 - **Import on L2.** `L2InteropRootStorage` runs the checks of every import (one non-zero side, non-zero
   timestamp), then requires the block to be newer than the current anchor (`L1AnchorNotNewer`), so the anchor
@@ -63,8 +64,8 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
 
 ## Freshness
 
-Every gating read checks the anchor's age first: `L1View` reverts with `L1AnchorStale` when `block.timestamp >
-anchorTimestamp + L1_ANCHOR_MAX_LAG` (1 hour), so gating fails closed on a stale view of L1. `anchorTimestamp` is the
+Every read at the anchor is bounded in age: a read is stale when `block.timestamp > anchorTimestamp +
+L1_ANCHOR_MAX_LAG` (1 hour), and fails closed. `anchorTimestamp` is the
 L1 time the anchor was recorded at; the import writes it and execution checks it against the L1 record
 ([anchors](#anchors)).
 
@@ -73,9 +74,14 @@ L1 time the anchor was recorded at; the import writes it and execution checks it
 - In Priority Mode, whose batches can't contain the service transaction that imports anchors, reads fail once the
   last anchor is past the lag instead of seeing stale state.
 
-`L1View` is the gating reader. Other contracts that call `0x101` directly pick their own rule from
-`IL2InteropRootStorage.l1AnchorTimestamp()`. The Executor checks no freshness, and `StoredBatchInfo.timestamp` stays
-0 for ZKsync OS batches.
+The rule is enforced twice, identically:
+
+- **The precompile** fails a call at a stale anchor, consuming all gas passed to it, without asking for a witness.
+  This is the protocol rule, and it binds every caller of `0x101`, `L1Reads` included.
+- **`L1View`** checks the same rule before calling and reverts with the typed `L1AnchorStale`, so gating reads fail
+  cheaply and with a clear error.
+
+The Executor checks no freshness, and `StoredBatchInfo.timestamp` stays 0 for ZKsync OS batches.
 
 ## Settlement layer
 
@@ -170,10 +176,10 @@ changed, which the release pair derives on-chain (among them `L2Bridgehub`, `Int
   executed by then, so the change lands at a configuration boundary. The first batch after the upgrade commits the
   seven-word chain config hash with the flag on, so the server reads the flag from L1 for it. Chains without interop
   keep it off. Every later transition repeats the step, and finds nothing to do once the flag is on.
-- **The first anchor.** The upgrade seeds no anchor: a seeded one would be an unchecked L1 state. The first record
-  comes from the chain's first commit with the flag on (its upgrade batch, for a chain the upgrade turned it on for)
-  or from the server's keeper. The server imports it once it is final on L1 (about 13 minutes), in a later block.
-  Until then the chain's gating reads revert and its interop pauses.
+- **The first anchor.** The upgrade seeds no anchor: a seeded one would be an unchecked L1 state. Any recent L1
+  record serves as the first anchor: one from the commit of any chain with the flag on, or from the server's keeper,
+  which records at once when there is none. The server imports it once it is final on L1 (about 13 minutes). Until
+  then the chain's gating reads revert and its interop pauses.
 - **Stale L2 state.** The L2 Bridgehub's v35 whitelist stays under `__DEPRECATED_isPeerAllowed`, and its
   `baseTokenAssetId` entries for peers stay but are not read for gating.
 - **Enabling interop.** `enableInterop` reverts with `ChainPredatesL1Sload` for a chain still on pre-v36 facets, which
@@ -199,10 +205,12 @@ To stop interop to and from chain X, for example after a prover incident:
 
 1. The `ChainRegistrationSender` owner calls `suspendInterop(X)` on L1.
 2. Each chain stops sending to and accepting from X once it imports an anchor taken at or after that L1 block.
-   - With an honest server, that is L1 finality (about 13 minutes) plus the server's import interval.
-   - In any case, at most `L1_ANCHOR_MAX_LAG` of L2 block time after the last anchor the chain's operator imported
-     before the suspension: an operator may still import a recorded anchor taken just before it, but reads stop once
-     that one is stale.
+   - With an honest server: the next L1 record after the suspension (the next commit of a chain with L1SLOAD on, or
+     the keeper once the newest record passes its threshold, about 35 minutes on an idle ecosystem), then L1
+     finality (about 13 minutes), then the import interval. That is about 54 minutes at worst on an idle ecosystem,
+     and far less when batches commit often.
+   - Against any operator: an operator may still import an anchor recorded before the suspension, but reads at it
+     stop once L2 block time passes the suspension block's L1 timestamp plus `L1_ANCHOR_MAX_LAG`.
    - L2 block time can trail L1 ([known issues](#known-issues)).
    - A chain in Priority Mode imports nothing, so its reads fail closed once its last anchor is stale.
 3. Flows already in flight toward or from X stay unreceived ([K1](./interop-gating.md#k1-stuck-flows)) and complete

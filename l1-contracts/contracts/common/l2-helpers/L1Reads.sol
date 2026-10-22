@@ -22,7 +22,8 @@ library L1Reads {
         }
 
         // The precompile has no ABI (input `address || key_1 || ... || key_k`, output `k` raw words), so it can
-        // only be reached with a low-level call. A failure, e.g. no anchor yet, is surfaced, never handled.
+        // only be reached with a low-level call. A failure, e.g. no anchor yet or a stale one, is surfaced, never
+        // handled.
         // slither-disable-next-line low-level-calls
         (bool success, bytes memory returnData) = L1SLOAD_PRECOMPILE_ADDRESS.staticcall(
             abi.encodePacked(_l1Contract, _keys)

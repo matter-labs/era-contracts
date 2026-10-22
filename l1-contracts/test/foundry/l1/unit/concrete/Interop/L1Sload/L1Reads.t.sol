@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {L1Reads} from "contracts/common/l2-helpers/L1Reads.sol";
 import {L1View} from "contracts/common/l2-helpers/L1View.sol";
 import {L1SloadFailed, L1SloadInvalidKeyCount} from "contracts/common/L1ContractErrors.sol";
-import {L1SLOAD_MAX_KEYS} from "contracts/common/Config.sol";
+import {L1_ANCHOR_MAX_LAG, L1SLOAD_MAX_KEYS} from "contracts/common/Config.sol";
 import {L1SLOAD_PRECOMPILE_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {L1SloadSharedTest} from "./_L1Sload_Shared.t.sol";
@@ -58,6 +58,24 @@ contract L1ReadsTest is L1SloadSharedTest {
     function test_revertWhen_noAnchor() public {
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
         harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
+    }
+
+    /// @dev The precompile enforces freshness itself, so a direct read through a stale anchor fails too, consuming the
+    /// gas passed to it; the mock mirrors that. See {protocol-docs/l1sload.md#freshness}.
+    function test_revertWhen_anchorIsStale() public {
+        _importL1Anchor(1, keccak256("anchor"), 1);
+        vm.warp(1 + L1_ANCHOR_MAX_LAG + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
+        harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
+    }
+
+    function test_readsUpToTheLag() public {
+        _importL1Anchor(1, keccak256("anchor"), 1);
+        _suspendInterop(CHAIN_ID);
+        vm.warp(1 + L1_ANCHOR_MAX_LAG);
+
+        assertEq(harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)))[0], bytes32(uint256(1)));
     }
 
     function test_readsOneSlot() public {
