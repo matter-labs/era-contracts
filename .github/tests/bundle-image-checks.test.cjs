@@ -11,53 +11,60 @@ const YAML = require("yaml");
 // digest, so build-docker's release flow can't reach these checks; they run here against a stub
 // `docker` and crafted bundle metadata.
 const workflows = join(__dirname, "../workflows");
-const deployPull = YAML.parse(
-  readFileSync(join(workflows, "deploy-ecosystem-upgrade.yaml"), "utf8")
-).jobs.deploy.steps.find((step) => step.name === "Pull the bundle's protocol-ops image").run;
-const handoffBundle = YAML.parse(
-  readFileSync(join(workflows, "generate-ecosystem-upgrade-calldata.yaml"), "utf8")
-).jobs["verify-bundle-handoff"].steps.find((step) => step.name === "Require a bundle to hand off").run;
+const deployJob = YAML.parse(readFileSync(join(workflows, "deploy-ecosystem-upgrade.yaml"), "utf8")).jobs.deploy;
+const handoffJob = YAML.parse(readFileSync(join(workflows, "generate-ecosystem-upgrade-calldata.yaml"), "utf8")).jobs[
+  "verify-bundle-handoff"
+];
+const deployPull = deployJob.steps.find((step) => step.name === "Pull the bundle's protocol-ops image");
+const handoffBundle = handoffJob.steps.find((step) => step.name === "Require a bundle to hand off");
 
 const DIGEST = `ghcr.io/matter-labs/protocol-ops@sha256:${"a".repeat(64)}`;
 const COMMIT = "b".repeat(40);
+
+// Logs each call's subcommand and image; answers the revision-label inspect with STUB_LABEL.
+const STUB_DOCKER = `printf '%s %s\\n' "$1" "\${!#}" >> "$STUB_CALLS"
+[[ "$1" == pull ]] && exit 0
+[[ "$*" == *revision* ]] && printf '%s\\n' "$STUB_LABEL"
+`;
 
 function run(script, bundleDir, metadata, label = COMMIT) {
   const temp = mkdtempSync(join(tmpdir(), "bundle-image-checks-"));
   try {
     mkdirSync(join(temp, "bin"));
-    writeFileSync(
-      join(temp, "bin/docker"),
-      `[[ "$1" == pull ]] && exit 0\n[[ "$*" == *revision* ]] && printf '%s\\n' "$STUB_LABEL"\n`,
-      { mode: 0o755 }
-    );
+    writeFileSync(join(temp, "bin/docker"), STUB_DOCKER, { mode: 0o755 });
     mkdirSync(join(temp, bundleDir), { recursive: true });
     writeFileSync(join(temp, bundleDir, "bundle-metadata.json"), JSON.stringify(metadata));
-    writeFileSync(join(temp, "out"), "");
+    const files = { env: join(temp, "env"), output: join(temp, "output"), calls: join(temp, "calls") };
+    Object.values(files).forEach((file) => writeFileSync(file, ""));
     const result = spawnSync("bash", ["-e", "-c", script], {
       encoding: "utf8",
       env: {
         PATH: `${join(temp, "bin")}:${process.env.PATH}`,
         RUNNER_TEMP: temp,
-        GITHUB_ENV: join(temp, "out"),
-        GITHUB_OUTPUT: join(temp, "out"),
+        GITHUB_ENV: files.env,
+        GITHUB_OUTPUT: files.output,
+        STUB_CALLS: files.calls,
         STUB_LABEL: label,
       },
     });
-    return { ...result, out: readFileSync(join(temp, "out"), "utf8").replaceAll(temp, "$RUNNER_TEMP") };
+    const read = (file) => readFileSync(file, "utf8").replaceAll(temp, "$RUNNER_TEMP");
+    return { ...result, env: read(files.env), output: read(files.output), calls: read(files.calls) };
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }
 }
 
-const deploy = (metadata, label) => run(deployPull, "deploy/inputs", metadata, label);
-const handoff = (metadata) => run(handoffBundle, "deploy-bundle", metadata);
+const deploy = (metadata, label) => run(deployPull.run, "deploy/inputs", metadata, label);
+const handoff = (metadata) => run(handoffBundle.run, "deploy-bundle", metadata);
 
 test("deploy pulls the bundle's image and checks it was built from the bundle's commit", () => {
   const result = deploy({ protocol_ops_image: { digest: DIGEST }, contracts_commit: COMMIT });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.out, new RegExp(`^BUNDLE_IMAGE=sha256:${"a".repeat(64)}$`, "m"));
-  assert.match(result.out, new RegExp(`^BUNDLE_COMMIT=${COMMIT}$`, "m"));
-  assert.match(result.out, /^EXTRA_MOUNTS=\$RUNNER_TEMP\/deploy\/inputs:\$RUNNER_TEMP\/deploy\/inputs:ro /m);
+  assert.equal(result.calls, `pull ${DIGEST}\nimage ${DIGEST}\n`);
+  assert.match(result.env, new RegExp(`^BUNDLE_IMAGE=sha256:${"a".repeat(64)}$`, "m"));
+  assert.match(result.env, new RegExp(`^BUNDLE_COMMIT=${COMMIT}$`, "m"));
+  assert.match(result.env, /^EXTRA_MOUNTS=\$RUNNER_TEMP\/deploy\/inputs:\$RUNNER_TEMP\/deploy\/inputs:ro /m);
+  assert.equal(result.output, "");
 });
 
 test("deploy refuses a bundle without a released image, or an image built from another commit", () => {
@@ -77,14 +84,15 @@ test("deploy refuses a bundle without a released image, or an image built from a
   ]) {
     const result = deploy(metadata, imageLabel);
     assert.equal(result.status, 1, label);
-    assert.equal(result.out, "", label);
+    assert.equal(result.env, "", label);
   }
 });
 
 test("the handoff takes the image digest and commit, nothing else", () => {
   const result = handoff({ protocol_ops_image: { digest: DIGEST }, contracts_commit: COMMIT });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.out, `image=sha256:${"a".repeat(64)}\ncommit=${COMMIT}\n`);
+  assert.equal(result.output, `image=sha256:${"a".repeat(64)}\ncommit=${COMMIT}\n`);
+  assert.equal(result.env, "");
   for (const [label, metadata] of [
     ["no image", { contracts_commit: COMMIT }],
     [
@@ -96,6 +104,29 @@ test("the handoff takes the image digest and commit, nothing else", () => {
   ]) {
     const refused = handoff(metadata);
     assert.notEqual(refused.status, 0, label);
-    assert.equal(refused.out, "", label);
+    assert.equal(refused.output, "", label);
+  }
+});
+
+// An unset step output is an empty string: the checkout would take the triggering ref.
+test("deploy and the handoff run the bundle's image from a checkout of the bundle's commit", () => {
+  assert.equal(handoffBundle.id, "bundle");
+  for (const [job, ref, image] of [
+    [deployJob, "${{ env.BUNDLE_COMMIT }}", undefined],
+    [handoffJob, "${{ steps.bundle.outputs.commit }}", "${{ steps.bundle.outputs.image }}"],
+  ]) {
+    const checkouts = job.steps.filter((step) => step.uses?.startsWith("actions/checkout@"));
+    assert.deepEqual(
+      checkouts.map((step) => step.with.ref),
+      [ref]
+    );
+    const runs = job.steps.filter((step) => step.run?.includes("protocol-ops.sh"));
+    assert.ok(runs.length > 0);
+    for (const step of runs) {
+      for (const [, args] of step.run.matchAll(/protocol-ops\.sh"? (.*)/g)) {
+        assert.match(args, /^--tag "\$BUNDLE_IMAGE" /, step.name);
+      }
+      assert.equal(step.env?.BUNDLE_IMAGE, image, step.name);
+    }
   }
 });
