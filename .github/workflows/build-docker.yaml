@@ -138,7 +138,8 @@ jobs:
             "$IMAGE" \
             bash -c 'yarn install --frozen-lockfile && yarn test:upgrade'
 
-      # The ecosystem-upgrade workflows' commands, through protocol-ops.sh in this image. Not on
+      # The ecosystem-upgrade workflows' commands, through protocol-ops.sh in this image, then a
+      # partner's chain commands, by `docker run` (docs/protocol-ops-for-partners.md). Not on
       # drafts: it verifies the build against AllContractsHashes.json, which a PR regenerates last
       # (docs/ai-review/docs/ci-green.md, "CI tiers").
       - name: Install Foundry (the release flow's L1)

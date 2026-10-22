@@ -11,8 +11,8 @@ holds the contracts at the release commit, their compiled artifacts, `protocol_o
 anvil, and the configs under `l1-contracts/upgrade-envs/`, your ecosystem's preset
 (`permanent-values/<env>.toml`, `adi` for ADI) included.
 
-We send the digest, from the run summary of the `build-docker` run that released it. Use the digest,
-not a tag: a tag can be moved.
+We send the digest, from the run summary of the `build-docker` run that released it, once we have run
+that image on our own `stage` ecosystem. Use the digest, not a tag: a tag can be moved.
 
 ```bash
 IMAGE=ghcr.io/matter-labs/protocol-ops@sha256:<digest>
@@ -27,6 +27,10 @@ docker inspect --format '{{json .Config.Labels}}' "$IMAGE"
 | `org.opencontainers.image.version`        | the tag it was released under                                                                                                 |
 
 An image without a `revision` label was not released by `build-docker`: don't use it.
+
+This applies to images released from v0.35.0 on. The release lines up to v0.34.0 build their images
+without these labels and without the release gate, so the rule above rejects them: for an upgrade to
+one of those versions, ask us which image to use.
 
 ## Keys
 

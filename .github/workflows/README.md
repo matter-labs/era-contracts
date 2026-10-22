@@ -19,10 +19,13 @@ Nothing is compiled per run: the image is what gets released and tested.
    `AllContractsHashes.json`, runs the anvil-interop upgrade test (`run-upgrade-test.ts`: the
    previous release's chain states, upgraded with this image's `protocol_ops`) inside the image, and
    runs the generate, handoff and deploy commands through `protocol-ops.sh --tag` against the same
-   fixture (`.github/tests/release-flow.sh`). The run summary gives the digest.
+   fixture, then the governance calls and a partner's chain commands (`set-upgrade-timestamp`,
+   `add-validator`) with `docker run`, as the partner guide does (`.github/tests/release-flow.sh`).
+   The run summary gives the digest.
 4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata`, the chain
    workflows and `execute-deployer-safe-bundles`; `deploy-ecosystem-upgrade` runs the image its
-   bundle names. Partners (ADI) get the same digest and run it with their own keys:
+   bundle names. Run it on `stage` first, then `testnet` and `mainnet`. Partners (ADI) get the same
+   digest only once our chain workflows have run it on `stage`, and run it with their own keys:
    [docs/protocol-ops-for-partners.md](../../docs/protocol-ops-for-partners.md).
 5. Before each ecosystem's governance vote, mainnet's included, run
    [phase 3](../../protocol-docs/ecosystem-upgrade.md#3-verify) against its L1: `verify-bootstrap` on

@@ -4,7 +4,12 @@
 #   generate  `rehearse-upgrade` and the simulator export (generate-ecosystem-upgrade-calldata.yaml);
 #   handoff   `replay-bundle --fork-url` (its verify-bundle-handoff job);
 #   deploy    `verify-bundle`, `upgrade-broadcast` with the deployer key (deploy-ecosystem-upgrade.yaml),
-#             then `replay-bundle --verify-only` on the result.
+#             then `replay-bundle --verify-only` on the result;
+#   govern    the simulator export's governance calls, as the vote executes them;
+#   chain     a partner's chain operations, `set-upgrade-timestamp` and `add-validator`, run the way
+#             docs/protocol-ops-for-partners.md runs them, with their bundles sent and their effect
+#             checked on L1. Not `chain upgrade`: the fixture's chains still have the previous
+#             upgrade's L2 transaction pending, which an L1-only fixture can't finalize.
 # The commands only: every phase runs this checkout in one unpushed image, so the bundle names no
 # registry digest; the workflows' digest and commit checks are bundle-image-checks.test.cjs. The bundle
 # is still copied out and mounted read-only, as their downloaded artifact is.
@@ -21,6 +26,10 @@ readonly L1=http://127.0.0.1:19545
 readonly DEPLOYER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 readonly DEPLOYER_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 readonly EIP1967_ADMIN_SLOT=0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103
+# The chain the chain phase operates, and what it sets.
+readonly CHAIN_ID=10
+readonly UPGRADE_TIMESTAMP=1900000000
+readonly VALIDATOR=0x1111111111111111111111111111111111111111
 
 po() {
   if [[ -n "${PROTOCOL_OPS_TAG:-}" ]]; then
@@ -28,6 +37,27 @@ po() {
   else
     ./protocol-ops.sh "$@"
   fi
+}
+
+# `protocol_ops chain $2… --out $1` on CHAIN_ID as a partner runs it: `docker run` on the image, with
+# its own configs and an empty `out/` mounted (docs/protocol-ops-for-partners.md). From this checkout
+# without an image.
+chain_op() {
+  local out=$1 image
+  shift
+  mkdir "$out"
+  set -- "$@" --env "$ENV" --chain-id "$CHAIN_ID" --l1-rpc-url "$L1"
+  if [[ -z "${PROTOCOL_OPS_TAG:-}" ]]; then
+    ./protocol-ops.sh chain "$@" --out "$out"
+    return
+  fi
+  if [[ "$PROTOCOL_OPS_TAG" == sha256:* ]]; then
+    image="ghcr.io/matter-labs/protocol-ops@$PROTOCOL_OPS_TAG"
+  else
+    image="ghcr.io/matter-labs/protocol-ops:$PROTOCOL_OPS_TAG"
+  fi
+  docker run --rm --platform linux/amd64 --network=host -v "$out:/out" "$image" \
+    protocol_ops chain "$@" --out /out
 }
 
 # Sends as `$1`, impersonated and funded.
@@ -38,9 +68,20 @@ send_as() {
   cast send --from "$from" --unlocked --rpc-url "$L1" "$@" >/dev/null
 }
 
+# Sends the bundles in `$1/manifest.json`, in order, each from the account it names (EXECUTE.md's way).
+send_bundles() {
+  local target file to value data
+  while read -r target file; do
+    while read -r to value data; do
+      send_as "$target" "$to" "$data" --value "$value"
+    done < <(jq -r '.transactions[] | "\(.to) \(.value) \(.data)"' "$1/$file")
+  done < <(jq -r '.bundles[] | "\(.target) \(.file)"' "$1/manifest.json")
+}
+
 fixture="l1-contracts/test/anvil-interop/chain-states/$(jq -r .upgradeSourceStateVersion \
   l1-contracts/test/anvil-interop/config/anvil-config.json)"
 addresses="$fixture/addresses.json"
+bridgehub="$(jq -r .l1Addresses.bridgehub "$addresses")"
 governance="$(jq -r .l1Addresses.governance "$addresses")"
 ctm="$(jq -r .ctmAddresses.chainTypeManager "$addresses")"
 preset="l1-contracts/upgrade-envs/permanent-values/$ENV.toml"
@@ -52,7 +93,7 @@ require_named() {
     exit 1
   fi
 }
-require_named "$preset" "$(jq -r .l1Addresses.bridgehub "$addresses")"
+require_named "$preset" "$bridgehub"
 require_named "$preset" "$ctm"
 require_named "$preset" "$(jq -r .zkToken.assetId "$addresses")"
 require_named "$input" "$governance"
@@ -133,4 +174,45 @@ if [[ ! -s "$result/transactions.txt" ]]; then
   exit 1
 fi
 po ecosystem replay-bundle --bundle "$bundle" --rpc "$L1" --verify-only
+
+echo "== govern"
+while read -r from to data value; do
+  send_as "$from" "$to" "$data" --value "$value"
+done < <(jq -r '.[] | select(.tag == "governance") | "\(.from) \(.to) \(.data) \(.value)"' \
+  "$out/transaction-simulator.json")
+
+echo "== chain $CHAIN_ID"
+# The fixture's chains have an EOA admin; the commands need a ChainAdmin, as `RegisterZKChain`
+# deploys one (Ownable, owned by that EOA). The fixture's own ChainAdminOwnable takes the chain.
+chain_admin="$(jq -r .ctmAddresses.chainAdmin "$addresses")"
+diamond="$(cast call "$bridgehub" 'getZKChain(uint256)(address)' "$CHAIN_ID" --rpc-url "$L1")"
+admin="$(cast call "$diamond" 'getAdmin()(address)' --rpc-url "$L1")"
+if [[ "$admin" != "$chain_admin" ]]; then
+  send_as "$admin" "$diamond" 'setPendingAdmin(address)' "$chain_admin"
+  send_as "$(cast call "$chain_admin" 'owner()(address)' --rpc-url "$L1")" "$chain_admin" \
+    'multicall((address,uint256,bytes)[],bool)' "[($diamond,0,$(cast calldata 'acceptAdmin()'))]" true
+fi
+
+# INC-38's call: the timestamp must land on the version the chain upgrades from.
+chain_op "$work/set-upgrade-timestamp" set-upgrade-timestamp --upgrade-timestamp "$UPGRADE_TIMESTAMP"
+send_bundles "$work/set-upgrade-timestamp"
+version="$(cast call "$ctm" 'getProtocolVersion(uint256)(uint256)' "$CHAIN_ID" --rpc-url "$L1" | cut -d' ' -f1)"
+server_notifier="$(cast call "$ctm" 'serverNotifierAddress()(address)' --rpc-url "$L1")"
+scheduled="$(cast call "$server_notifier" 'protocolVersionToUpgradeTimestamp(uint256,uint256)(uint256)' \
+  "$CHAIN_ID" "$version" --rpc-url "$L1" | cut -d' ' -f1)"
+if [[ "$scheduled" != "$UPGRADE_TIMESTAMP" ]]; then
+  echo "error: chain $CHAIN_ID's upgrade timestamp for its version $version is $scheduled, not $UPGRADE_TIMESTAMP" >&2
+  exit 1
+fi
+
+chain_op "$work/add-validator" add-validator --validator-address "$VALIDATOR"
+send_bundles "$work/add-validator"
+timelock="$(cast call "$ctm" 'validatorTimelockPostV29()(address)' --rpc-url "$L1")"
+for role in COMMITTER_ROLE PROVER_ROLE EXECUTOR_ROLE; do
+  if [[ "$(cast call "$timelock" 'hasRoleForChainId(uint256,bytes32,address)(bool)' "$CHAIN_ID" \
+    "$(cast keccak "$role")" "$VALIDATOR" --rpc-url "$L1")" != true ]]; then
+    echo "error: $VALIDATOR has no $role for chain $CHAIN_ID" >&2
+    exit 1
+  fi
+done
 echo "Release flow passed"
