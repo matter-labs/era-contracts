@@ -21,9 +21,13 @@ Nothing is compiled per run: the image is what gets released and tested.
    run summary gives the digest.
 4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata`, the chain
    workflows and `execute-deployer-safe-bundles`; `deploy-ecosystem-upgrade` runs the image its
-   bundle names. Partners (ADI) get the same
-   digest and run it with their own keys:
+   bundle names. Partners (ADI) get the same digest and run it with their own keys:
    [docs/protocol-ops-for-partners.md](../../docs/protocol-ops-for-partners.md).
+5. Before each ecosystem's governance vote, mainnet's included, run
+   [phase 3](../../protocol-docs/ecosystem-upgrade.md#3-verify) against its L1 in the same image:
+   `verify-bootstrap` on the deployment, and the transaction simulator on a fork of that L1 (generate's
+   `transaction-simulator.json`: the governance call and the post-upgrade smoke tests). That is the
+   rehearsal in the target's own state.
 
 The calldata workflows refuse an image without the `org.opencontainers.image.revision` label
 `build-docker` sets (such as those `build-and-push-docker` pushes), and run it with the configs it was
