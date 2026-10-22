@@ -167,12 +167,14 @@ HOST_UPGRADE_ENVS="${ERA_PATH}/l1-contracts/upgrade-envs"
 mount_upgrade_envs=""
 if [[ -z "$IMAGE_REVISION" ]]; then
   mount_upgrade_envs=1
-elif [[ "$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" == "$IMAGE_REVISION" ]] &&
+elif head="$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" && [[ "$head" == "$IMAGE_REVISION" ]] &&
   edits="$(git -C "$ERA_PATH" status --porcelain --untracked-files=all -- l1-contracts/upgrade-envs \
     ':(exclude,glob)l1-contracts/upgrade-envs/*/output/**')" && [[ -z "$edits" ]]; then
   mount_upgrade_envs=1
 elif [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" != "1" ]]; then
-  echo "Error: this checkout is not ${IMAGE}'s revision ${IMAGE_REVISION}, or has edits in l1-contracts/upgrade-envs/: check that revision out, or set PROTOCOL_OPS_REQUIRE_RELEASE=1 to run with the image's own and take outputs through EXTRA_MOUNTS" >&2
+  echo "Error: ${IMAGE} is revision ${IMAGE_REVISION}; this checkout is ${head:-not a git checkout}${edits:+, with edits in upgrade-envs/:
+${edits}}
+Check that revision out, or set PROTOCOL_OPS_REQUIRE_RELEASE=1 to run with the image's own upgrade-envs/ and take outputs through EXTRA_MOUNTS" >&2
   exit 1
 else
   echo "Note: l1-contracts/upgrade-envs/ is the image's own; whatever the command writes there stays in the container" >&2
