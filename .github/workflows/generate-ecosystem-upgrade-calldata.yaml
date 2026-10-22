@@ -286,7 +286,7 @@ jobs:
     timeout-minutes: 60
     env:
       UPGRADE: ${{ inputs.upgrade }}
-      # Every protocol_ops / cast call below runs in this image (protocol-ops.sh
+      # Every protocol_ops call below runs in this image (protocol-ops.sh
       # docker mode). Pulled once here, so a tag moved mid-run changes nothing.
       PROTOCOL_OPS_TAG: ${{ inputs.protocol_ops_tag }}
 
@@ -319,7 +319,7 @@ jobs:
       # This is a fork rehearsal: the deployer is IMPERSONATED (anvil
       # --auto-impersonate) and nothing is signed, so only the deployer ADDRESS
       # is needed — never a private key: the `deployer_address` input.
-      - name: Select L1 RPC + resolve deployer address
+      - name: Select L1 RPC + check deployer address
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           # Referenced as shell vars (not `${{ }}`-interpolated into the script

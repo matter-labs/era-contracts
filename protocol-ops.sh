@@ -34,7 +34,8 @@
 #                      org.opencontainers.image.revision label, i.e. one not
 #                      released by build-docker.yaml, and run it with its own
 #                      upgrade-envs/ from any checkout (outputs only through
-#                      EXTRA_MOUNTS). The calldata workflows set it.
+#                      EXTRA_MOUNTS). The chain workflows and
+#                      execute-deployer-safe-bundles set it.
 #   PROTOCOL_OPS_BIN — Local mode only: path to a pre-built protocol_ops
 #                      binary. If unset, the wrapper runs `cargo build
 #                      --release` inside protocol-ops/ and uses the resulting
@@ -76,7 +77,7 @@ EOF
 TAG=""
 if [[ "${1:-}" == "--tag" ]]; then
   shift
-  [[ $# -lt 1 ]] && usage
+  [[ $# -lt 1 || -z "$1" ]] && usage
   TAG="$1"; shift
 fi
 
@@ -158,20 +159,21 @@ fi
 # The image reads its own `l1-contracts/upgrade-envs/`. The host's is mounted
 # over it, so `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml)
 # land in the in-tree path (upgrade-envs/<v>/output/<env>/) the operator
-# commits, only when the two are the same: a local build (no revision), or this
-# checkout at the image's revision with no edits outside the outputs. Otherwise
+# commits, only when the two are the same: a local build (never pushed, so no
+# revision), or this checkout at the image's revision with no edits outside the
+# outputs. Otherwise
 # those writes would be lost with the container, so that takes
 # PROTOCOL_OPS_REQUIRE_RELEASE=1.
 HOST_UPGRADE_ENVS="${ERA_PATH}/l1-contracts/upgrade-envs"
 mount_upgrade_envs=""
-if [[ -z "$IMAGE_REVISION" ]]; then
+if [[ -z "$IMAGE_REVISION" && -z "$IMAGE_DIGEST" ]]; then
   mount_upgrade_envs=1
-elif [[ "$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" == "$IMAGE_REVISION" ]] &&
+elif [[ -n "$IMAGE_REVISION" && "$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" == "$IMAGE_REVISION" ]] &&
   edits="$(git -C "$ERA_PATH" status --porcelain --untracked-files=all -- l1-contracts/upgrade-envs \
     ':(exclude,glob)l1-contracts/upgrade-envs/*/output/**')" && [[ -z "$edits" ]]; then
   mount_upgrade_envs=1
 elif [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" != "1" ]]; then
-  echo "Error: this checkout is not ${IMAGE}'s revision ${IMAGE_REVISION}, or has edits in l1-contracts/upgrade-envs/: check that revision out, or set PROTOCOL_OPS_REQUIRE_RELEASE=1 to run with the image's own and take outputs through EXTRA_MOUNTS" >&2
+  echo "Error: this checkout is not ${IMAGE}'s revision (${IMAGE_REVISION:-none: not a release}), or has edits in l1-contracts/upgrade-envs/: check that revision out, or set PROTOCOL_OPS_REQUIRE_RELEASE=1 to run a release with its own and take outputs through EXTRA_MOUNTS" >&2
   exit 1
 elif [[ -z "${EXTRA_MOUNTS:-}" ]]; then
   echo "Note: l1-contracts/upgrade-envs/ is the image's own; whatever the command writes there stays in the container" >&2
@@ -212,8 +214,8 @@ else
   docker_args+=(--add-host=host.docker.internal:host-gateway)
   rewritten=("$TOOL")
   for arg in "$@"; do
-    arg="${arg//:\/\/localhost:/:\/\/host.docker.internal:}"
-    arg="${arg//:\/\/127.0.0.1:/:\/\/host.docker.internal:}"
+    arg="${arg//:\/\/localhost:/://host.docker.internal:}"
+    arg="${arg//:\/\/127.0.0.1:/://host.docker.internal:}"
     rewritten+=("$arg")
   done
   run_args=("${rewritten[@]}")
