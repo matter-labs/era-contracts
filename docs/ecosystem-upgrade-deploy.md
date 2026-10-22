@@ -214,8 +214,8 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 > A single deployer bundle can revert mid-way (e.g. RPC 429). The broadcast is
 > idempotent, so retry it with the same journal — already-deployed /
-> already-transferred txs are skipped and it resumes. Locally, reuse the same
-> `--out` path. In CI, dispatch a new deploy run with `resume_deploy_run_id` set
+> already-transferred txs are skipped and it resumes. Locally, re-run the same
+> `replay-bundle --key` from the same checkout (its journal is `output/<env>/replay/`). In CI, dispatch a new deploy run with `resume_deploy_run_id` set
 > to the failed deploy run; the workflow validates and restores that run's
 > partial result artifact before broadcasting. Do not use GitHub's plain
 > “re-run failed jobs” button, which cannot add the resume input.
