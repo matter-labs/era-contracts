@@ -38,7 +38,7 @@ on:
         type: string
         default: ""
       upgrade:
-        description: "Upgrade directory under l1-contracts/upgrade-envs/ the bundles belong to, e.g. v0.33.2-verifier. Names the simulator scenario, picks its sim-descriptions, and is where commit_outputs writes. BLANK = artifacts only."
+        description: "Upgrade directory under l1-contracts/upgrade-envs/ the bundles belong to, e.g. v0.33.2-verifier. Names the simulator scenario and is where commit_outputs writes. BLANK = artifacts only."
         required: false
         type: string
         default: ""
@@ -172,20 +172,9 @@ jobs:
           NAME="${UPGRADE:-chain-upgrade}"
           SCENARIO="$WORK_DIR/simulator/$(date -u +%Y-%m-%d)-$NAME-$ENVIRONMENT-2-chain-$CHAIN_ID.json"
           mkdir -p "$WORK_DIR/simulator"
-          args=(--manifest "$WORK_DIR/safe/manifest.json" --network "$network" --tag "chain_upgrade_$CHAIN_ID"
-                --emulate-all-batches-executed-for "$DIAMOND" --out "$SCENARIO")
-          DESCRIPTIONS=""
-          for d in "l1-contracts/upgrade-envs/$UPGRADE/sim-descriptions-$ENVIRONMENT.toml" \
-                   "l1-contracts/upgrade-envs/$UPGRADE/sim-descriptions.toml"; do
-            if [ -n "$UPGRADE" ] && [ -f "$d" ]; then DESCRIPTIONS="$d"; break; fi
-          done
-          BIN=./protocol-ops/target/release/protocol_ops
-          # With descriptions the converter refuses any call they do not name; a chain missing
-          # from them still gets a scenario, unlabelled, rather than none.
-          if [ -z "$DESCRIPTIONS" ] || ! "$BIN" ecosystem manifest-to-simulator "${args[@]}" --descriptions "$DESCRIPTIONS"; then
-            [ -z "$DESCRIPTIONS" ] || echo "::warning::$DESCRIPTIONS does not name every call of chain $CHAIN_ID; the scenario is unlabelled"
-            "$BIN" ecosystem manifest-to-simulator "${args[@]}"
-          fi
+          ./protocol-ops/target/release/protocol_ops ecosystem manifest-to-simulator \
+            --manifest "$WORK_DIR/safe/manifest.json" --network "$network" --tag "chain_upgrade_$CHAIN_ID" \
+            --emulate-all-batches-executed-for "$DIAMOND" --out "$SCENARIO"
           echo "scenario: $SCENARIO"
 
       - uses: actions/upload-artifact@v4

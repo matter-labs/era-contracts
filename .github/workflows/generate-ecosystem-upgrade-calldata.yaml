@@ -585,10 +585,8 @@ jobs:
           BLOCK=()
           [ -z "$FORK_BLOCK" ] || BLOCK=(--block "$FORK_BLOCK")
           FROM="$(cast call "$CTM" 'owner()(address)' "${BLOCK[@]}" --rpc-url "$L1_FORK_URL")"
-          args=(--governance-toml "$OUT/ecosystem.toml" --from "$FROM" --network "$L1_NETWORK")
-          for d in "$DIR/sim-descriptions-$ENVIRONMENT.toml" "$DIR/sim-descriptions.toml"; do
-            if [ -f "$d" ]; then args+=(--descriptions "$d"); break; fi
-          done
+          # --env names the env's contracts and governance in the scenario's descriptions.
+          args=(--env "$ENVIRONMENT" --governance-toml "$OUT/ecosystem.toml" --from "$FROM" --network "$L1_NETWORK")
           # The per-chain upgrade is its own scenario: acknowledge a checked tag the artifact
           # does not carry, so the simulator's provenance check finds it.
           [ -n "$(toml_get test_upgrade_calls.test_upgrade_chain_zkos "$OUT/ecosystem.toml")" ] \
