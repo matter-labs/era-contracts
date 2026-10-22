@@ -70,9 +70,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                         deployer calls + provenance
 #
 # With `commit_outputs`, a third job commits that env dir to the dispatched branch
-# once both jobs pass (RELEASE_TOKEN; branches of this repository only). The
-# per-chain bundles and their scenarios come from generate-chain-upgrade-calldata.yaml,
-# which can commit them the same way.
+# once both jobs pass (RELEASE_TOKEN; branches of this repository only). For a
+# verifier-only upgrade the rehearsal also generates the bundles of the input's chains
+# that have none yet, and this workflow their scenarios; generate-chain-upgrade-calldata.yaml
+# makes or remakes them for chosen chains and can commit them the same way.
 #
 # The `verify-bundle-handoff` job then re-deploys and re-verifies that bundle from
 # scratch with no contract build. If it is green, the bundle is provably enough to
@@ -603,6 +604,21 @@ jobs:
           ./protocol-ops/target/release/protocol_ops ecosystem sync-already-executed \
             --scenario "$SCENARIO" --l1-rpc-url "$L1_FORK_URL"
           echo "scenario: $SCENARIO"
+          # A scenario for every chain whose bundles have none yet: the rehearsal generates the bundles
+          # of the input's chains that had none, after the governance stages.
+          for manifest in "$OUT"/chain-upgrades/*/manifest.json; do
+            [ -f "$manifest" ] || continue
+            id="$(basename "$(dirname "$manifest")")"
+            if ls "$OUT"/simulator/*-"$UPGRADE-$ENVIRONMENT"-2-chain-"$id".json > /dev/null 2>&1; then continue; fi
+            DIAMOND="$(jq -r '.metadata[] | select(.command == "chain.upgrade") | .output.chain_address' "$manifest")"
+            CHAIN_SCENARIO="$OUT/simulator/$(date -u +%Y-%m-%d)-$UPGRADE-$ENVIRONMENT-2-chain-$id.json"
+            ./protocol-ops/target/release/protocol_ops ecosystem manifest-to-simulator \
+              --manifest "$manifest" --network "$L1_NETWORK" --tag "chain_upgrade_$id" \
+              --emulate-all-batches-executed-for "$DIAMOND" --out "$CHAIN_SCENARIO"
+            ./protocol-ops/target/release/protocol_ops ecosystem sync-already-executed \
+              --scenario "$CHAIN_SCENARIO" --l1-rpc-url "$L1_FORK_URL"
+            echo "scenario: $CHAIN_SCENARIO"
+          done
 
       # Upload only the calldata deliverables; the verification logs travel in the
       # deploy bundle below.

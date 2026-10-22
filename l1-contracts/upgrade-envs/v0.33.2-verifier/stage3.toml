@@ -36,5 +36,6 @@ create2_factory_salt = "0x2a089f887e5f31c7d3d527b3599e417eb20fd4b5f0c7f8140c6dc5
 chain_ids = [2727, 2728, 2729, 27271, 27272, 27273]
 
 # 2729 and 27272 are validium-priced chains that already commit FullPubdata with the EmptyNoDA scheme, which
-# is not the recommended DA state. This upgrade keeps their DA as it is: run the per-chain workflow for them
-# with `acknowledge_unrecommended_noda`, so protocol-ops prepares the cut without a DA move.
+# is not the recommended DA state. This upgrade keeps their DA as it is: their bundles are prepared with
+# --acknowledge-unrecommended-noda (run the per-chain workflow for them with `acknowledge_unrecommended_noda`).
+acknowledge_unrecommended_noda_chain_ids = [2729, 27272]

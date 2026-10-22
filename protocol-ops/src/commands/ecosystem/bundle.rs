@@ -759,6 +759,7 @@ async fn check_upgrade(
                         protocol_ops_out_dir(upgrade_name, &env_cfg.env)?.join("chain-upgrades");
                     verifier_only_check::check_fork(
                         rpc_url,
+                        &env_cfg.env,
                         &paths.ecosystem_toml,
                         &input,
                         &chain_bundles,
