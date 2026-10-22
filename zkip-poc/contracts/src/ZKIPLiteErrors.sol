@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+// 0x1a95b93c
+error BadAggregate();
 // 0x948ad06f
 error BatchOpen();
 // 0xd4213672
@@ -39,8 +41,12 @@ error OnlyOwner();
 error OnlyRegistry();
 // 0x07a554d9
 error RegistryAlreadySet();
+// 0x51489bf3
+error SlotInputsMismatch();
 // 0xb73ef67b
 error TooManyChains();
+// 0xa9316b9b
+error UnapprovedCircuit(bytes32 vkCommitment);
 // 0x0847ff06
 error UnknownAnchor(uint256 blockNumber);
 // 0x51cf29eb

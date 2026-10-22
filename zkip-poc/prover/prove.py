@@ -2,13 +2,20 @@
 
   python3 -I prove.py setup                                   # compile circuits, write VKs and Solidity verifiers
   python3 -I prove.py init-root                               # state root of an empty ZKIP state
-  python3 -I prove.py debit <size> <witness.json> <state_in> <state_out> <out_dir>
-  python3 -I prove.py claim <size> <witness.json> <state_in> <state_out> <out_dir>
+  python3 -I prove.py vk-commits                              # VK commitments of the aggregatable circuits
+  python3 -I prove.py debit <size> <witness.json> <state_in> <state_out> <out_dir> [evm|rec]
+  python3 -I prove.py claim <size> <witness.json> <state_in> <state_out> <out_dir> [evm|rec]
+  python3 -I prove.py aggregate <manifest.json> <out_dir>     # the aggregator: one agg_4 proof for L1
 
 The forge test supplies the public L1/L2 data (bundles, flow preimages, IMT and message-root paths) as a flat
 witness JSON. This script adds the chain's private ZKIP state (balances and the consumed set), writes the
 Prover.toml, runs nargo and bb, and prints the new state root as 0x-hex on stdout (the only stdout output, so
 vm.ffi can decode it). An `<state_in>` of "-" means the empty state.
+
+Target `evm` (default) makes a proof for the chain's own L1 verifier; `rec` makes a zero-knowledge proof for the
+noir-recursive target, which the chain hands to the aggregator instead. The aggregator checks every proof it
+received natively, drops the ones that fail, fills the four agg_4 slots (repeating the first proof in unused
+slots), and proves agg_4 for L1. It prints one byte per manifest slot: 01 if included, 00 if dropped.
 
 Tools come from the environment: NARGO and BB (default: on PATH), BB_CRS (bb's CRS directory, default ~/.bb-crs),
 ZKIP_PROVER_THREADS (default 14) and ZKIP_CMD_WRAPPER (an optional command that every nargo and bb call runs under,
@@ -32,6 +39,7 @@ from keccak import keccak256  # noqa: E402
 POC = HERE.parent
 CIRCUITS = POC / "circuits"
 VK_DIR = POC / "work" / "vk"
+VK_REC_DIR = POC / "work" / "vk_rec"
 VERIFIERS = POC / "contracts" / "src" / "verifiers"
 NARGO = os.environ.get("NARGO", "nargo")
 BB = os.environ.get("BB", "bb")
@@ -45,6 +53,8 @@ MAX_ASSETS, NULL_DEPTH = 8, 24
 D_IMT, D_CHAIN, D_SHARED = 16, 18, 7
 TAG = bytes.fromhex("3445134c")
 CIRCUIT_NAMES = ["debit_1", "debit_4", "claim_1", "claim_2"]
+AGG_INNER = ["debit_4", "claim_1", "claim_2"]  # 16 public inputs each, so they fit an agg_4 slot
+AGG_SLOTS = 4
 
 
 def log(*a):
@@ -205,16 +215,17 @@ def open_leg(bundle, pre, leg):
     }
 
 
-def commit_state(state, out_state, toml, kind, size, out_dir, w):
+def commit_state(state, out_state, toml, kind, size, out_dir, w, target="evm"):
     name = "%s_%d" % (kind, size)
     prover = "Prover_" + Path(out_dir).name
     (CIRCUITS / name / (prover + ".toml")).write_text("\n".join(toml) + "\n")
     run([NARGO, "execute", "--prover-name", prover, Path(out_dir).name], cwd=CIRCUITS / name)
     witness = CIRCUITS / "target" / (Path(out_dir).name + ".gz")
     Path(out_dir).mkdir(parents=True, exist_ok=True)
-    _, wall, rss = run([BB, "prove", "-b", CIRCUITS / "target" / (name + ".json"), "-w", witness, "-k",
-                        VK_DIR / name / "vk", "-o", out_dir, "-t", "evm", "-c", CRS], timed=True)
-    record({"circuit": name, "prove_s": round(wall, 2),
+    vk, bb_target = (VK_DIR / name / "vk", "evm") if target == "evm" else (VK_REC_DIR / name / "vk", "noir-recursive")
+    _, wall, rss = run([BB, "prove", "-b", CIRCUITS / "target" / (name + ".json"), "-w", witness, "-k", vk,
+                        "-o", out_dir, "-t", bb_target, "-c", CRS], timed=True)
+    record({"circuit": name, "target": target, "prove_s": round(wall, 2),
             "peak_rss_mb": round(rss / 2 ** 20) if rss else None,
             "proof_bytes": (Path(out_dir) / "proof").stat().st_size, **w})
     state.save(out_state)
@@ -224,6 +235,53 @@ def commit_state(state, out_state, toml, kind, size, out_dir, w):
 def record(entry):
     with open(METRICS, "a") as f:
         f.write(json.dumps({"threads": THREADS, **entry}) + "\n")
+
+
+# ----------------------------------------------------------------------------------- aggregation
+
+def fields(path):
+    """bb's binary proofs, public inputs and VKs are sequences of 32-byte big-endian field elements."""
+    b = Path(path).read_bytes()
+    return [int.from_bytes(b[i: i + 32], "big") for i in range(0, len(b), 32)]
+
+
+def vk_commit(name):
+    """Mirrors agg_4: a Poseidon2 commitment to the noir-recursive VK, which L1 matches to approved circuits."""
+    return p2.hash_many(fields(VK_REC_DIR / name / "vk"))
+
+
+def aggregate(manifest, out_dir):
+    slots = json.loads(Path(manifest).read_text())["slots"]
+    assert 0 < len(slots) <= AGG_SLOTS, "agg_4 takes 1 to 4 proofs"
+    included = []
+    for s in slots:
+        d, vk = Path(s["dir"]), VK_REC_DIR / s["circuit"] / "vk"
+        verify = [str(BB), "verify", "-k", str(vk), "-p", str(d / "proof"), "-i", str(d / "public_inputs"),
+                  "-t", "noir-recursive", "-c", str(CRS)]
+        ok = s["circuit"] in AGG_INNER and subprocess.run(
+            ([WRAPPER] if WRAPPER else []) + verify, capture_output=True).returncode == 0
+        included.append(ok)
+        if not ok:
+            log("aggregator: dropped", s["dir"], "(native verification failed)")
+    use = [s for s, ok in zip(slots, included) if ok]
+    if not use:
+        raise SystemExit("aggregator: no valid proof to aggregate")
+    use += [use[0]] * (AGG_SLOTS - len(use))
+    tag = Path(out_dir).name
+    toml = ["vks = " + arr([arr([q(x) for x in fields(VK_REC_DIR / s["circuit"] / "vk")]) for s in use]),
+            "key_hashes = " + arr([q(fields(VK_REC_DIR / s["circuit"] / "vk_hash")[0]) for s in use]),
+            "proofs = " + arr([arr([q(x) for x in fields(Path(s["dir"]) / "proof")]) for s in use]),
+            "slot_pis = " + arr([arr([q(x) for x in fields(Path(s["dir"]) / "public_inputs")]) for s in use])]
+    (CIRCUITS / "agg_4" / ("Prover_" + tag + ".toml")).write_text("\n".join(toml) + "\n")
+    _, ex_wall, _ = run([NARGO, "execute", "--prover-name", "Prover_" + tag, tag], cwd=CIRCUITS / "agg_4")
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    _, wall, rss = run([BB, "prove", "-b", CIRCUITS / "target" / "agg_4.json", "-w", CIRCUITS / "target" / (tag + ".gz"),
+                        "-k", VK_DIR / "agg_4" / "vk", "-o", out_dir, "-t", "evm", "-c", CRS], timed=True)
+    record({"circuit": "agg_4", "target": "evm", "kind": "aggregate", "real_slots": sum(included),
+            "execute_s": round(ex_wall, 2), "prove_s": round(wall, 2),
+            "peak_rss_mb": round(rss / 2 ** 20) if rss else None,
+            "proof_bytes": (Path(out_dir) / "proof").stat().st_size})
+    print("0x" + "".join("01" if ok else "00" for ok in included))
 
 
 def debit(size, w, state, out_state, out_dir):
@@ -304,13 +362,18 @@ def claim(size, w, state, out_state, out_dir):
 def setup():
     run([NARGO, "compile", "--workspace"], cwd=CIRCUITS)
     VERIFIERS.mkdir(parents=True, exist_ok=True)
-    for name in CIRCUIT_NAMES:
+    for name in CIRCUIT_NAMES + ["agg_4"]:
         out = VK_DIR / name
         out.mkdir(parents=True, exist_ok=True)
         run([BB, "write_vk", "-b", CIRCUITS / "target" / (name + ".json"), "-o", out, "-t", "evm", "-c", CRS])
         sol = VERIFIERS / (name.title().replace("_", "") + "Verifier.sol")
         run([BB, "write_solidity_verifier", "-k", out / "vk", "-o", sol, "-t", "evm", "--optimized", "-c", CRS])
         log("wrote", sol)
+    for name in AGG_INNER:
+        out = VK_REC_DIR / name
+        out.mkdir(parents=True, exist_ok=True)
+        run([BB, "write_vk", "-b", CIRCUITS / "target" / (name + ".json"), "-o", out, "-t", "noir-recursive", "-c", CRS])
+        log("noir-recursive VK", name, "commitment 0x%064x" % vk_commit(name))
 
 
 def main():
@@ -320,12 +383,18 @@ def main():
     if cmd == "init-root":
         print("0x%064x" % State().root())
         return
+    if cmd == "vk-commits":
+        print("0x" + "".join("%064x" % vk_commit(n) for n in AGG_INNER))
+        return
+    if cmd == "aggregate":
+        return aggregate(sys.argv[2], sys.argv[3])
     size, w = int(sys.argv[2]), json.loads(Path(sys.argv[3]).read_text())
     state_in, state_out, out_dir = sys.argv[4], sys.argv[5], sys.argv[6]
+    target = sys.argv[7] if len(sys.argv) > 7 else "evm"
     state = State.load(state_in)
     state.toml_prev = state.toml()
     toml = (debit if cmd == "debit" else claim)(size, w, state, state_out, out_dir)
-    commit_state(state, state_out, toml, cmd, size, out_dir, {"kind": cmd})
+    commit_state(state, state_out, toml, cmd, size, out_dir, {"kind": cmd}, target)
 
 
 if __name__ == "__main__":

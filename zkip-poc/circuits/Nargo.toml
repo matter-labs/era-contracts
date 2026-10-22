@@ -1,2 +1,2 @@
 [workspace]
-members = ["zkip_lite", "debit_1", "debit_4", "claim_1", "claim_2"]
+members = ["zkip_lite", "debit_1", "debit_4", "claim_1", "claim_2", "agg_4"]
