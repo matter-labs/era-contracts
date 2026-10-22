@@ -96,15 +96,30 @@ words). The precompile has no ABI, so this is a low-level `staticcall`, and its 
 `L1SloadFailed`, never handled. Any contract may call `0x101`; the precompile's per-call caps and its gas
 (`2000 + 2000·k`) and native charges bound the work.
 
-The precompile also caps a transaction at 64 keys across all its calls, frames that later revert included. The call
-that would pass the cap fails, consuming the gas passed to it, so the gating read reverts with `L1SloadFailed`. That
-is 21 receive checks or 12 send checks.
+The precompile also caps a transaction at 64 distinct `(anchor, address, key)` reads across all its calls, frames
+that later revert included. A slot the transaction already read doesn't count again, and the anchor doesn't change
+within a transaction. The call whose new keys would pass the cap fails, consuming the gas passed to it and counting
+nothing, so the gating read reverts with `L1SloadFailed`.
 
-- **A bundle's fixed checks fit.** Finality reads at most 24 keys (`isReceiveAllowed` for each of up to 8 legs), and
-  `append` at most 7.
-- **Reads that grow with the transaction may not.** A send reads 5 keys, plus one per asset-router call in the bundle
-  and, for an atomic bundle, one per leg from another chain. A transaction that sends or executes several bundles
-  adds their reads up. Such a transaction has to be split.
+On the protocol's paths, chain C reads only `ChainRegistrationSender` (table below), and every slot it reads is
+`interopSuspended[C]` or one of four slots of another chain X: `interopPeerAllowed[C][X]`,
+`interopPeerAllowed[X][C]`, `interopSuspended[X]` and `interopBaseTokenAssetId[X]`. The roles X plays in the
+transaction decide which of them it reads:
+
+| X is                                                                        | Slots of X read                                   |
+| --------------------------------------------------------------------------- | ------------------------------------------------- |
+| a destination of a send (`interopSendTarget`, and the asset router's check) | all four                                          |
+| the source of a leg the chain accepts (finality, refund)                    | `interopPeerAllowed[C][X]`, `interopSuspended[X]` |
+| the source of another leg of a flow the chain appends to                    | `interopBaseTokenAssetId[X]`                      |
+
+The asset router's base-token check reads `interopBaseTokenAssetId[X]` of the bundle's destination, which the send
+already read. So a transaction that deals with k other chains reads at most `1 + 4k` distinct slots, however many
+calls, bundles or asset-router calls it makes:
+
+- **Up to 15 other chains always fit.** One send reads at most 12 slots (5 for the destination and this chain, plus
+  one per other leg source of an atomic bundle, at most 7), and one bundle's finality at most 17 (8 leg sources).
+- **The cap fails a transaction only past 64 distinct slots.** For example, one that sends to 16 distinct chains
+  (65 slots), or accepts legs from 32 distinct source chains (65). Such a transaction has to be split.
 - **The test mock doesn't model the cap.** `L1Reads` calls `MockL1SloadPrecompile` with `staticcall`, where EVM code
   can't keep a count.
 
