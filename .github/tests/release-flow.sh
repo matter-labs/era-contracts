@@ -97,10 +97,8 @@ if [[ "$(cast code "$owner" --rpc-url "$L1")" != 0x ]]; then
 fi
 
 echo "== generate"
-rm -rf l1-contracts/upgrade-envs/*/output/"$ENV"
 po ecosystem rehearse-upgrade --env "$ENV" --fork-url "$L1" --deployer-address "$DEPLOYER"
-outputs=(l1-contracts/upgrade-envs/*/output/"$ENV")
-out="${outputs[0]}"
+out="${input%/*}/output/$ENV"
 po ecosystem governance-toml-to-simulator --env "$ENV" --include-manifest "$out/prepare/manifest.json" \
   --camp-a-signers "$DEPLOYER" --emit-sim-inputs "$out/sim-inputs"
 po ecosystem governance-toml-to-simulator --env "$ENV" --out "$out/transaction-simulator.json"
