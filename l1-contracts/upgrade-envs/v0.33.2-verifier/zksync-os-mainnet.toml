@@ -31,9 +31,5 @@ governance_upgrade_timer_initial_delay = 0
 #   python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
 create2_factory_salt = "0xc2c225faf4a143458c3c674b68845dc67af3c95966b64113124759498fa427aa"
 
-# Sender of the CREATE2 deployments: the address of the DEPLOYER_PRIVATE_KEY_MAINNET secret, which the deploy
-# workflow broadcasts from.
-deployer = "0x0000000000000000000000000000000000000000"
-
 # Every chain registered on the CTM, all on v0.33.0. 20250714 has never committed a batch.
 chain_ids = [5790, 51703, 61703, 20250714, 886229927]

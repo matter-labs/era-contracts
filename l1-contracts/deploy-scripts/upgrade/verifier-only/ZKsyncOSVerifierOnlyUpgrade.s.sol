@@ -47,7 +47,6 @@ contract ZKsyncOSVerifierOnlyUpgrade is Script, DefaultCTMUpgrade {
     struct VerifierOnlyInput {
         uint256 expectedOldProtocolVersion;
         bool ownerIsGovernance;
-        address deployer;
         uint256[] chainIds;
     }
 
@@ -62,7 +61,6 @@ contract ZKsyncOSVerifierOnlyUpgrade is Script, DefaultCTMUpgrade {
         address ctm = toml.readAddress("$.ctm");
         verifierOnlyInput.expectedOldProtocolVersion = toml.readUint("$.old_protocol_version");
         verifierOnlyInput.ownerIsGovernance = toml.readBool("$.owner_is_governance");
-        verifierOnlyInput.deployer = toml.readAddress("$.deployer");
         verifierOnlyInput.chainIds = toml.readUintArray("$.chain_ids");
         require(IChainTypeManager(ctm).isZKsyncOS(), "vk-only: not a ZKsync OS CTM");
 
@@ -296,7 +294,8 @@ contract ZKsyncOSVerifierOnlyUpgrade is Script, DefaultCTMUpgrade {
                 data: Utils.getDeterministicCreate2FactoryCalldata(salt, initCode)
             });
         }
-        vm.serializeAddress("deploy_calls", "deployer", verifierOnlyInput.deployer);
+        // protocol-ops runs the prepare with the deployer as sender.
+        vm.serializeAddress("deploy_calls", "deployer", tx.origin);
         vm.serializeString("deploy_calls", "contracts", names);
         return vm.serializeBytes("deploy_calls", "calls", abi.encode(calls));
     }
