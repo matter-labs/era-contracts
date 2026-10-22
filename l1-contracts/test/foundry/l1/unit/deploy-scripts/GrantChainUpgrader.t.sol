@@ -119,6 +119,17 @@ contract GrantChainUpgraderTest is Test {
         _prepare();
     }
 
+    function test_RunRejectsSuccessfulCallWithoutGrant() public {
+        GrantChainUpgrader.Transaction memory transaction = _prepare();
+        // Isolate the postcondition from execution: a successful response from
+        // the ChainAdmin must not allow writing a request whose grant was a no-op.
+        vm.mockCall(address(admin), transaction.data, bytes(""));
+        vm.expectRevert(GrantChainUpgrader.GrantNotApplied.selector);
+        script.run(block.chainid, address(bridgehub), chainId, address(timelock), operator, "script-out/no-grant.json");
+        assertFalse(timelock.hasRole(chain, transaction.role, operator));
+        assertFalse(vm.exists("script-out/no-grant.json"));
+    }
+
     function test_RejectsZeroAccount() public {
         vm.expectRevert(GrantChainUpgrader.InvalidAccount.selector);
         script.prepare(block.chainid, address(bridgehub), chainId, address(timelock), address(0));
