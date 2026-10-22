@@ -26,11 +26,21 @@ use alloy::providers::Provider;
 use alloy::rpc::types::TransactionRequest;
 use alloy::sol_types::SolCall;
 use anyhow::Context;
+use clap::Parser;
 
+use crate::commands::chain::set_upgrade_timestamp;
+use crate::commands::chain::upgrade as chain_upgrade;
 use crate::common::anvil::set_balance;
 use crate::common::ethereum::get_provider;
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
 use crate::common::logger;
+
+/// A chain's bundle set: `manifest.json` beside its `.safe.json` files.
+const MANIFEST_FILE: &str = "manifest.json";
+
+/// `setUpgradeTimestamp`'s value in generated bundles: 1, so the chain takes the cut without waiting
+/// (0 is the unset sentinel).
+const GENERATED_UPGRADE_TIMESTAMP: &str = "1";
 
 alloy::sol! {
     #[sol(rpc)]
@@ -231,6 +241,7 @@ pub async fn check_chain(
 /// transactions, so it leaves the fork upgraded.
 pub async fn check_fork(
     rpc_url: &str,
+    env: &str,
     ecosystem_toml: &Path,
     upgrade_input: &Path,
     chain_bundles: &Path,
@@ -334,7 +345,9 @@ pub async fn check_fork(
         false,
     );
 
-    // ── 3. the committed per-chain bundles
+    // ── 3. the per-chain bundles: the input's chains without committed ones get them generated
+    //       here, now that the CTM holds the cut, then every chain's bundles are exercised
+    generate_missing_chain_bundles(rpc_url, env, upgrade_input, chain_bundles, &mut report).await?;
     check_chain_bundles(rpc_url, &expected, chain_bundles, &mut report).await?;
 
     // ── 4. a chain created after the upgrade
@@ -546,6 +559,84 @@ async fn check_chain_bundles(
                 zk_chain.getProtocolVersion().call().await?,
                 expected.old_version,
             );
+        }
+    }
+    Ok(())
+}
+
+/// Generate the set-upgrade-timestamp and upgrade bundles of every chain of the input's
+/// `chain_ids` that has none under `chain_bundles`, on the fork the governance stages ran on. The
+/// chains of `acknowledge_unrecommended_noda_chain_ids` get `--acknowledge-unrecommended-noda`.
+async fn generate_missing_chain_bundles(
+    rpc_url: &str,
+    env: &str,
+    upgrade_input: &Path,
+    chain_bundles: &Path,
+    report: &mut Report,
+) -> anyhow::Result<()> {
+    let input = read_toml(upgrade_input)?;
+    let ids = |key: &str| -> anyhow::Result<Vec<i64>> {
+        let Some(value) = input.get(key) else {
+            return Ok(Vec::new());
+        };
+        value
+            .as_array()
+            .with_context(|| format!("{}: {key} is not an array", upgrade_input.display()))?
+            .iter()
+            .map(|id| {
+                id.as_integer()
+                    .with_context(|| format!("{}: {key} holds {id}", upgrade_input.display()))
+            })
+            .collect()
+    };
+    let chain_ids = ids("chain_ids")?;
+    let unrecommended_noda = ids("acknowledge_unrecommended_noda_chain_ids")?;
+    for chain_id in chain_ids {
+        let dir = chain_bundles.join(chain_id.to_string());
+        if dir.join(MANIFEST_FILE).is_file() {
+            continue;
+        }
+        logger::info(format!("  chain {chain_id}: generating its bundles"));
+        let id = chain_id.to_string();
+        let out = dir.to_string_lossy().to_string();
+        let common = [
+            "--env",
+            env,
+            "--chain-id",
+            &id,
+            "--l1-rpc-url",
+            rpc_url,
+            "--out",
+            &out,
+        ];
+        let schedule = set_upgrade_timestamp::ChainSetUpgradeTimestampArgs::try_parse_from(
+            [
+                "set-upgrade-timestamp",
+                "--upgrade-timestamp",
+                GENERATED_UPGRADE_TIMESTAMP,
+            ]
+            .iter()
+            .chain(common.iter()),
+        )?;
+        let noda: &[&str] = if unrecommended_noda.contains(&chain_id) {
+            &["--acknowledge-unrecommended-noda"]
+        } else {
+            &[]
+        };
+        let cut = chain_upgrade::ChainUpgradeArgs::try_parse_from(
+            std::iter::once(&"upgrade")
+                .chain(common.iter())
+                .chain(noda.iter()),
+        )?;
+        let generated = async {
+            set_upgrade_timestamp::run(schedule).await?;
+            chain_upgrade::run(cut).await
+        }
+        .await;
+        if let Err(error) = generated {
+            report.fail(format!(
+                "chain {chain_id}: generating its bundles: {error:#}"
+            ));
         }
     }
     Ok(())

@@ -86,7 +86,8 @@ is a copy of `upgrade.toml` and the `<env>.toml` inputs in a new directory, with
     - `simulator/…-<env>-1-ecosystem.json`: the ecosystem transaction-simulator scenario;
     - not committed: `deploy-bundle/` (the deployer's calls, what the deploy workflow broadcasts), `prepare/`,
       `fork-rehearsal/`;
-  - written by the chain workflow (`generate-chain-upgrade-calldata.yaml`), once the ecosystem is upgraded:
+  - written by the generate workflow's rehearsal for the input's chains that have none yet (on the fork, after
+    the governance stages), or by the chain workflow (`generate-chain-upgrade-calldata.yaml`):
     - `chain-upgrades/<id>/`: the per-chain bundles from `protocol_ops chain set-upgrade-timestamp` and
       `chain upgrade`: `01_chain.set-upgrade-timestamp_*.safe.json`, `02_chain.upgrade_*.safe.json` and
       `manifest.json`;
