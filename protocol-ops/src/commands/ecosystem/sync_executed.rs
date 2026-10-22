@@ -5,11 +5,14 @@
 //!   proposal or operation that carries exactly its calls says so: `ProtocolUpgradeHandler.upgradeStatus`
 //!   for an emergency proposal or a handler proposal, `Governance.isOperationDone` for a legacy
 //!   Governance operation. The proposals and operations are read from the env's `execution.json`.
+//!   When that record is not done, the stages count as executed if the CTM is on the version they
+//!   register and chain migrations are unpaused again: a regenerated artifact can carry the
+//!   executed calls under another salt.
 //! - A per-chain upgrade (`chain_upgrade_<id>_execute`) is executed when the chain's protocol
 //!   version is past the version the cut upgrades from; its schedule (`chain_upgrade_<id>_schedule`)
 //!   when the ServerNotifier holds an upgrade timestamp for that version.
 //!
-//! Every other transaction keeps its flag. A stage with no record in `execution.json` is left as it is.
+//! Every other transaction keeps its flag.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -22,7 +25,7 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::common::calldata::{self, InnerCall};
-use crate::common::ethereum::get_provider;
+use crate::common::ethereum::{get_provider, AlloyProvider};
 use crate::common::logger;
 
 use super::simulator::SimulatorTransaction;
@@ -79,6 +82,16 @@ alloy::sol! {
     }
 
     #[sol(rpc)]
+    interface ISyncCtm {
+        function protocolVersion() external view returns (uint256);
+    }
+
+    #[sol(rpc)]
+    interface ISyncChainAssetHandler {
+        function migrationPaused() external view returns (bool);
+    }
+
+    #[sol(rpc)]
     interface ISyncZkChain {
         function getProtocolVersion() external view returns (uint256);
     }
@@ -121,6 +134,27 @@ struct Execution {
     #[serde(default)]
     protocol_upgrade_handler: Option<Address>,
     transactions: Vec<ExecutionTx>,
+}
+
+/// `execution.json` as either kind of upgrade writes it: an object with the handler and the
+/// transactions under a ProtocolUpgradeHandler, the bare transaction list under a legacy Governance.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ExecutionFile {
+    Runbook(Execution),
+    Transactions(Vec<ExecutionTx>),
+}
+
+impl From<ExecutionFile> for Execution {
+    fn from(file: ExecutionFile) -> Self {
+        match file {
+            ExecutionFile::Runbook(execution) => execution,
+            ExecutionFile::Transactions(transactions) => Execution {
+                protocol_upgrade_handler: None,
+                transactions,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -172,8 +206,10 @@ pub async fn run(args: SyncAlreadyExecutedArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Whether each governance stage of the scenario has executed, for the stages `execution.json`
-/// holds a proposal or operation of.
+/// Whether each governance stage of the scenario has executed: by the governance record of the
+/// proposal or operation in `execution.json` that carries exactly its calls, or, when that record
+/// is not done, by the state the ceremony leaves (see [`ceremony_completed`]). An artifact
+/// regenerated after execution can carry the same calls under another salt, so another id.
 async fn stage_status(
     args: &SyncAlreadyExecutedArgs,
     transactions: &[SimulatorTransaction],
@@ -182,58 +218,124 @@ async fn stage_status(
     if stages.is_empty() {
         return Ok(Vec::new());
     }
-    let execution_path = match &args.execution {
-        Some(path) => path.clone(),
-        None => default_execution_path(&args.scenario)?,
-    };
-    if !execution_path.is_file() {
-        logger::warn(format!(
-            "No {} for the governance stages; their flags are left as they are",
-            execution_path.display()
-        ));
-        return Ok(Vec::new());
-    }
-    let execution: Execution = serde_json::from_str(
-        &fs::read_to_string(&execution_path)
-            .with_context(|| format!("failed to read {}", execution_path.display()))?,
-    )
-    .with_context(|| format!("failed to parse {}", execution_path.display()))?;
-    let records = governance_records(&execution)?;
-
     let provider = get_provider(&args.l1_rpc_url)?;
+    let records = match &args.execution {
+        Some(path) => Some(path.clone()),
+        None => default_execution_path(&args.scenario).ok(),
+    }
+    .filter(|path| path.is_file())
+    .map(|path| -> anyhow::Result<_> {
+        let execution: Execution = serde_json::from_str::<ExecutionFile>(
+            &fs::read_to_string(&path)
+                .with_context(|| format!("failed to read {}", path.display()))?,
+        )
+        .with_context(|| format!("failed to parse {}", path.display()))?
+        .into();
+        governance_records(&execution)
+    })
+    .transpose()?
+    .unwrap_or_default();
+    let completed = ceremony_completed(&provider, &stages).await?;
+
     let mut out = Vec::new();
-    for (stage, calls) in stages {
-        let Some((_, record)) = records
+    for (stage, calls) in &stages {
+        let recorded = match records
             .iter()
-            .find(|(record_calls, _)| *record_calls == calls)
-        else {
-            logger::warn(format!(
-                "stage {stage}: no proposal or operation in {} carries exactly its calls; its flags \
-                 are left as they are",
-                execution_path.display()
-            ));
-            continue;
+            .find(|(record_calls, _)| record_calls == calls)
+        {
+            Some((_, record)) => Some(record_done(&provider, record).await?),
+            None => None,
         };
-        let done = match record {
-            GovernanceRecord::Handler { handler, id } => {
-                IProtocolUpgradeHandler::new(*handler, provider.clone())
-                    .upgradeStatus(*id)
-                    .call()
-                    .await
-                    .with_context(|| format!("upgradeStatus({id}) on {handler}"))?
-                    .executed
+        let done = match (recorded, completed) {
+            (Some(true), _) => true,
+            (_, Some(true)) => {
+                if recorded == Some(false) {
+                    logger::warn(format!(
+                        "stage {stage}: its governance record is not done, but the L1 state shows \
+                         the ceremony completed: the calls ran under another proposal or operation id"
+                    ));
+                }
+                true
             }
-            GovernanceRecord::Governance { governance, id } => {
-                ILegacyGovernance::new(*governance, provider.clone())
-                    .isOperationDone(*id)
-                    .call()
-                    .await
-                    .with_context(|| format!("isOperationDone({id}) on {governance}"))?
+            (Some(false), _) | (None, Some(false)) => false,
+            (None, None) => {
+                logger::warn(format!(
+                    "stage {stage}: no governance record carries exactly its calls and the ceremony \
+                     state cannot be read from them; its flags are left as they are"
+                ));
+                continue;
             }
         };
-        out.push((stage, done));
+        out.push((*stage, done));
     }
     Ok(out)
+}
+
+async fn record_done(provider: &AlloyProvider, record: &GovernanceRecord) -> anyhow::Result<bool> {
+    Ok(match record {
+        GovernanceRecord::Handler { handler, id } => {
+            IProtocolUpgradeHandler::new(*handler, provider.clone())
+                .upgradeStatus(*id)
+                .call()
+                .await
+                .with_context(|| format!("upgradeStatus({id}) on {handler}"))?
+                .executed
+        }
+        GovernanceRecord::Governance { governance, id } => {
+            ILegacyGovernance::new(*governance, provider.clone())
+                .isOperationDone(*id)
+                .call()
+                .await
+                .with_context(|| format!("isOperationDone({id}) on {governance}"))?
+        }
+    })
+}
+
+/// Whether the whole ceremony has run on L1: the CTM is on the version the stages register and
+/// chain migrations are unpaused again, which the last stage does. `None` when the stages carry no
+/// version registration or no `unpauseMigration` to read those from.
+async fn ceremony_completed(
+    provider: &AlloyProvider,
+    stages: &BTreeMap<u32, Vec<InnerCall>>,
+) -> anyhow::Result<Option<bool>> {
+    let mut registration = None;
+    let mut chain_asset_handler = None;
+    for call in stages.values().flatten() {
+        let Some((known, args)) = calldata::decode(&call.data) else {
+            continue;
+        };
+        match known.function.name.as_str() {
+            "createNewVerifierOnlyUpgrade" => {
+                registration = args
+                    .get(2)
+                    .and_then(calldata::as_uint)
+                    .map(|v| (call.target, v));
+            }
+            "setNewVersionUpgrade" => {
+                registration = args
+                    .get(3)
+                    .and_then(calldata::as_uint)
+                    .map(|v| (call.target, v));
+            }
+            "unpauseMigration" => chain_asset_handler = Some(call.target),
+            _ => {}
+        }
+    }
+    let (Some((ctm, new_version)), Some(chain_asset_handler)) = (registration, chain_asset_handler)
+    else {
+        return Ok(None);
+    };
+    let version = ISyncCtm::new(ctm, provider.clone())
+        .protocolVersion()
+        .call()
+        .await
+        .with_context(|| format!("protocolVersion on {ctm}"))?;
+    let paused = ISyncChainAssetHandler::new(chain_asset_handler, provider.clone())
+        .migrationPaused()
+        .call()
+        .await
+        .with_context(|| format!("migrationPaused on {chain_asset_handler}"))?;
+    Ok(Some(version >= new_version && !paused))
 }
 
 /// `<env out>/execution.json` for a scenario at `<env out>/simulator/<file>`.
@@ -452,14 +554,59 @@ mod tests {
         assert_eq!(chain_tag("stage1"), None);
     }
 
+    /// A legacy Governance env's execution.json is the bare list of its scheduleTransparent /
+    /// execute transactions: each execute is one operation record.
+    #[test]
+    fn a_legacy_governance_execution_list_yields_its_operations() {
+        let governance = Address::repeat_byte(1);
+        let operation = Operation {
+            calls: vec![Call {
+                target: Address::repeat_byte(2),
+                value: U256::ZERO,
+                data: Bytes::from_static(&[0xac, 0x70, 0x0e, 0x63]),
+            }],
+            predecessor: B256::ZERO,
+            salt: B256::repeat_byte(3),
+        };
+        let execute = ILegacyGovernance::executeCall {
+            _operation: operation.clone(),
+        }
+        .abi_encode();
+        let file = serde_json::json!([
+            { "description": "execute", "to": format!("{governance:#x}"), "data": format!("0x{}", alloy::hex::encode(&execute)) }
+        ]);
+        let execution: Execution = serde_json::from_value::<ExecutionFile>(file)
+            .unwrap()
+            .into();
+        let records = governance_records(&execution).unwrap();
+        assert_eq!(records.len(), 1);
+        let (calls, record) = &records[0];
+        assert_eq!(calls.len(), 1);
+        match record {
+            GovernanceRecord::Governance {
+                governance: target,
+                id,
+            } => {
+                assert_eq!(*target, governance);
+                assert_eq!(*id, keccak256(operation.abi_encode()));
+            }
+            GovernanceRecord::Handler { .. } => {
+                panic!("a Governance operation read as a handler proposal")
+            }
+        }
+    }
+
     /// The testnet v0.33.2 emergency proposals executed on Sepolia at blocks 11947773, 11947835
     /// and 11947839: each stage of the committed scenario matches exactly one of them.
     #[test]
     fn every_testnet_stage_has_its_emergency_proposal() {
         let out = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../l1-contracts/upgrade-envs/v0.33.2-verifier/output/testnet");
-        let execution: Execution =
-            serde_json::from_str(&fs::read_to_string(out.join(EXECUTION_FILE)).unwrap()).unwrap();
+        let execution: Execution = serde_json::from_str::<ExecutionFile>(
+            &fs::read_to_string(out.join(EXECUTION_FILE)).unwrap(),
+        )
+        .unwrap()
+        .into();
         let records = governance_records(&execution).unwrap();
         assert_eq!(records.len(), 3);
         assert!(records
