@@ -78,7 +78,7 @@ test("a verification failure fails the step without skipping remaining contracts
   assert.equal(result.calls.filter((call) => call.includes("good")).length, 1);
 });
 
-test("DA contracts verify from l1-contracts without changing recorded constructor arguments", () => {
+test("DA contracts verify without changing recorded constructor arguments", () => {
   const result = runVerification(
     "forge verify-contract first EIP7702Checker\n" +
       "forge verify-contract second RollupL1DAValidator --constructor-args 0x1234\n" +

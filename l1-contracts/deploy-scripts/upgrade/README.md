@@ -13,8 +13,10 @@ The Forge scripts in this directory are not run with `forge script` directly in 
 `protocol_ops` (see [protocol-ops/README.md](../../../protocol-ops/README.md)) invokes their entry
 points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `chain upgrade` and
 `chain set-upgrade-timestamp` go through `AdminFunctions.s.sol`. In a rollout `protocol_ops` runs in
-the released image, from a checkout of its commit (`./protocol-ops.sh --tag sha256:<digest>`, as below;
-[release flow](../../../.github/workflows/README.md#release-flow)).
+the released image, from the root of a checkout of its commit (`./protocol-ops.sh --tag sha256:<digest>`,
+as below; [release flow](../../../.github/workflows/README.md#release-flow)). File arguments are then
+paths in the image: under `l1-contracts/upgrade-envs/` or `l1-contracts/script-out/`, which the wrapper
+mounts, or mounted with `EXTRA_MOUNTS`.
 
 ## Layout
 

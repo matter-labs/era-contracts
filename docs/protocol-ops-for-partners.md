@@ -20,11 +20,11 @@ docker pull --platform linux/amd64 "$IMAGE"
 docker inspect --format '{{json .Config.Labels}}' "$IMAGE"
 ```
 
-| Label                                     | Meaning                                                                   |
-| ----------------------------------------- | ------------------------------------------------------------------------- |
-| `org.opencontainers.image.revision`       | the era-contracts commit the image was built from                         |
-| `io.matter-labs.protocol-ops.tested-with` | the zksync-os-integration-tests run the releaser recorded for that commit |
-| `org.opencontainers.image.version`        | the tag it was released under                                             |
+| Label                                     | Meaning                                                                                                                       |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `org.opencontainers.image.revision`       | the era-contracts commit the image was built from                                                                             |
+| `io.matter-labs.protocol-ops.tested-with` | the zksync-os-integration-tests run the releaser cited as testing that commit (an attestation; the run itself is not checked) |
+| `org.opencontainers.image.version`        | the tag it was released under                                                                                                 |
 
 An image without a `revision` label was not released by `build-docker`: don't use it.
 
