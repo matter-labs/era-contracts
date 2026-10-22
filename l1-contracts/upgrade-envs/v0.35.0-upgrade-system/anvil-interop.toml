@@ -1,0 +1,14 @@
+# Upgrade input for the anvil-interop environment on the v35 release. See protocol-ops/README.md "Environment inputs".
+
+era_chain_id = 10
+
+# `bridgehub.owner()`, the signer of the governance bundle.
+owner_address = "0xa60F07cAaFA0aE451296c0ca5C261578A390105e"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0xe4197b19d462c783bad42ea22e50e94b9d4fbbf1515b313ad42397644abb5e42"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy.
+[create2_factory_salts]
+"0xB317d4066bbd717Ce907ddCB5742f3D7EAc31175" = "0xbe3c346f5f438470d0e48e32c23f6bc16b5d6966af26c23f8c36ac0f91d3c80e"

@@ -16,9 +16,10 @@ Nothing is compiled per run: the image is what gets released and tested.
    `gh workflow run build-docker.yaml --ref <release branch> -f ref=<commit> -f tested_with_integration_tests=true -f integration_tests_run_url=<that run>`.
    `--ref` picks the copy of the workflow that runs, so use the release branch's. It refuses to push
    without the two inputs. Before pushing, it checks the image's contract build against its
-   `AllContractsHashes.json` and runs the anvil-interop upgrade test (`run-upgrade-test.ts`: the
-   previous release's chain states, upgraded with this image's `protocol_ops`) inside the image. The
-   run summary gives the digest.
+   `AllContractsHashes.json`, runs the anvil-interop upgrade test (`run-upgrade-test.ts`: the
+   previous release's chain states, upgraded with this image's `protocol_ops`) inside the image, and
+   runs the generate, handoff and deploy commands through `protocol-ops.sh --tag` against the same
+   fixture (`.github/tests/release-flow.sh`). The run summary gives the digest.
 4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata`, the chain
    workflows and `execute-deployer-safe-bundles`; `deploy-ecosystem-upgrade` runs the image its
    bundle names. Partners (ADI) get the same digest and run it with their own keys:

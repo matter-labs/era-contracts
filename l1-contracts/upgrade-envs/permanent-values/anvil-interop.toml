@@ -1,0 +1,20 @@
+# Permanent values of the anvil-interop fixture the current release upgrades from
+# (`l1-contracts/test/anvil-interop/chain-states/<upgradeSourceStateVersion>/addresses.json`), for
+# .github/tests/release-flow.sh. When `yarn new-release` moves the fixture, copy the new one's
+# addresses here.
+l1_chain_id = 31337
+
+# protocol-ops' localhost ZK token asset ID (`LOCAL_ZK_TOKEN_ASSET_ID`), as in `local.toml`.
+zk_token_asset_id = "0x50c8daa176d24869d010ad74c2d374427601375ca2264e94f73784e299d572d4"
+
+# Anvil fixtures run `ZKsyncOSTestnetVerifier`.
+testnet_verifier = true
+
+[core_contracts]
+bridgehub_proxy_addr = "0x3BFDCfcc2Ac1d41071F3D8c52991f00C9Ac4D1B0"
+
+[[ctm_contracts.ctms]]
+proxy = "0xB317d4066bbd717Ce907ddCB5742f3D7EAc31175"
+
+[permanent_contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
