@@ -138,8 +138,7 @@ pub struct DeployBundleMetadata {
     pub env: String,
     pub contracts_commit: String,
     /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in the
-    /// protocol-ops image: it runs its own commit's sources and configs (`protocol-ops.sh` mounts a
-    /// checkout's `upgrade-envs/` over them only when the checkout is that commit, unedited).
+    /// protocol-ops image, which runs its own commit's sources and configs (see `protocol-ops.sh`).
     pub contracts_worktree_dirty: bool,
     pub all_contracts_hashes_sha256: String,
     pub l1: L1Provenance,

@@ -32,7 +32,7 @@ Mapping (workflow -> protocol-ops command):
   deploy-ecosystem-upgrade                       <-> ecosystem verify-bundle + upgrade-broadcast
 
 Conventions:
-- All workflows share: environment, protocol_ops_tag, l1_rpc_url
+- Calldata workflows share: environment, protocol_ops_tag, l1_rpc_url
 - environment choices are the permanent-values presets (stage, testnet,
   mainnet, adi); workflows that sign or broadcast with our deployer keys take
   only ours (stage, testnet, mainnet)

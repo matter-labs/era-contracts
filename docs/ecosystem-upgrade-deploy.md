@@ -112,7 +112,8 @@ the standing proof that the artifact is self-sufficient.
 plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env's
 `l1_chain_id` (`1` → mainnet, `11155111` → Sepolia). Adding an ecosystem therefore
 needs no workflow edit: commit the config pair, add its anvil port to
-`ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork. The
+`ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork, and
+release an image with them. The
 verifier takes its reviewer inputs from the env config (the upgrade input's `owner_address` and
 CREATE2 salts, the permanent values' `zk_token_asset_id`), so the env must declare them.
 Committed today: `stage`, `testnet`, `mainnet`, `adi`. The check must pass for both the
@@ -312,7 +313,7 @@ identifies deployed code against the same file; in any other image the deploymen
 are not recognised and the verdict is meaningless. `replay-bundle` compares the
 file's hash with the bundle's and exits on a mismatch. The image is
 `protocol_ops_image.digest` (`--tag sha256:<digest>`); the checkout of
-`contracts_commit` supplies `protocol-ops.sh` and the configs it mounts.
+`contracts_commit` supplies `protocol-ops.sh`.
 
 **Rehearse the deploy and verify it — no regeneration:**
 
