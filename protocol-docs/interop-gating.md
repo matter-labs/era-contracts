@@ -47,7 +47,9 @@ out of the chain admin's hands.
 ## Enabling interop
 
 `L1MessageRoot.enableInterop(chainId, requireSecondProofSystem)` is callable only by the Bridgehub owner. It
-requires the chain to be registered and no longer pending its [backfill](#backfill) (`ChainBalanceBackfillPending`).
+requires the chain to be registered, no longer pending its [backfill](#backfill) (`ChainBalanceBackfillPending`), and
+to have L1SLOAD on ({protocol-docs/l1sload.md#chain-config-flag}: `L1SloadNotEnabled`, or `ChainPredatesL1Sload` for
+a chain still on pre-v36 facets).
 It is one-way: there is no way to disable interop again (`InteropAlreadyEnabled`). `isInteropEnabled(chainId)` reads
 the result.
 
@@ -140,45 +142,36 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 
 ## Interop peer whitelist
 
-`ChainRegistrationSender` keeps `interopPeerAllowed[chainId][peerChainId]` and mirrors it into each chain's
-`L2Bridgehub` as `isPeerAllowed(peerChainId)`. The chain's `InteropCenter` sends only to allowed peers
-(`DestinationChainNotAllowed`, {protocol-docs/interop.md}).
+`ChainRegistrationSender` keeps `interopPeerAllowed[chainId][peerChainId]` on L1, and chains read it there with
+L1SLOAD ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}). The chain's `InteropCenter` sends only to
+peers that allowed it back and that it allowed (`DestinationChainNotAllowed`, {protocol-docs/interop.md}), and only
+while neither chain is [suspended](./l1sload.md#suspending-a-chain).
 
-- **`allowInteropPeer(chainId, peerChainId)`** is callable only by `chainId`'s admin. It sets the flag and sends an
-  L2 service transaction to `chainId`'s `L2Bridgehub.allowInteropPeer`, which sets `isPeerAllowed` and the peer's
-  `baseTokenAssetId`.
+- **`allowInteropPeer(chainId, peerChainId)`** is callable only by `chainId`'s admin. It sets the flag and the peer's
+  [base token snapshot](./l1sload.md#the-base-token-snapshot).
   - Both chains must be registered and enabled (`InteropNotEnabled`). The peer can be neither the
     chain itself nor L1 (`InvalidInteropPeer`), and must have a batch in L1's message root
     ({protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}).
   - An allowed peer stays allowed (`InteropPeerAlreadyAllowed` on a second call) until `deregisterInteropPairs`
     removes it.
-- **Consent is per side.** Each admin writes only its own chain's side, and a chain sends interop to and accepts
-  it from only the peers on its own side ([receive filter](#receive-filter)). Two-way interop needs both admins,
-  and a one-sided whitelist can strand flows ([K1](#k1-stuck-flows)). SDKs should check both sides on L1 before
-  sending.
-- **`bridgehubDeposit`** (Bridgehub two-bridges path, encoding version `0x02`, data `abi.encode(peerChainId)`)
-  re-sends the registration of an allowed pair, and reverts with `InteropPeerNotAllowed` for any other pair. Anyone
-  can call it, and the caller pays the L1->L2 transaction in the base token.
-- **`registerChain`**, the retired consent-free registration, is removed. Its paid counterpart, deposit encoding
-  version `0x01`, reverts with `UnsupportedEncodingVersion`.
-- **`deregisterInteropPairs(chainRegisteredOn, chainsToDeregister)`** removes peers from one chain's L2 Bridgehub.
-  It is callable by the owner and by that chain's admin (`Unauthorized` otherwise). For each peer, it clears
-  `interopPeerAllowed` and sends a service transaction to `L2Bridgehub.deregisterChainForInterop`, which clears
-  `baseTokenAssetId` and `isPeerAllowed`. The chain's L2 must already be upgraded, or that transaction fails. It
-  refuses a peer that settles on the chain (`InvalidInteropPeer`), whose entry the chain needs as a settlement layer.
-  - Its main use is the cleanup of the pairs `registerChain` registered ([Legacy registrations](#legacy-registrations)).
-    Nothing depends on that cleanup: `registerChain` set only `baseTokenAssetId`, never `isPeerAllowed`, so neither
-    `InteropCenter` nor the [receive filter](#receive-filter) accept a legacy pair.
-  - It also removes allowed pairs, which can strand the pair's unfinalized flows ([K1](#k1-stuck-flows)). Whoever
-    removes a pair is responsible for them: an admin removing its chain's pair, for its users. The admin can allow
-    the pair again.
-- **`L2Bridgehub.registerChainForInterop`**, the target of the retired registration, is removed too. A legacy
-  registration still in the priority queue when the chain's L2 is upgraded fails there and registers nothing.
-  `L2Bridgehub.allowInteropPeer` requires a non-zero `baseTokenAssetId` (`EmptyAssetId`).
+- **Consent is per side.** Each admin writes only its own chain's side. A chain accepts interop only from the peers
+  on its own side ([receive filter](#receive-filter)), and sends only to peers that allowed it back, since sending
+  reads both sides ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}). So a one-sided whitelist starts no
+  flow, but removing one side holds the flows already in flight ([K1](#k1-stuck-flows)).
+- **Effect on L2.** A change reaches a chain once it imports an L1 anchor taken after it
+  ({protocol-docs/l1sload.md#anchors}). Nothing is sent to L2, and `ChainRegistrationSender` is no longer a second
+  bridge: it has no `bridgehubDeposit`, so a two-bridges request naming it reverts.
+- **`registerChain`**, the retired consent-free registration, is removed.
+- **`deregisterInteropPairs(chainRegisteredOn, chainsToDeregister)`** clears `interopPeerAllowed` for one chain's
+  peers. It is callable by the owner and by that chain's admin (`Unauthorized` otherwise), and refuses a peer that
+  settles on the chain (`InvalidInteropPeer`). Removing an allowed pair can strand the pair's unfinalized flows
+  ([K1](#k1-stuck-flows)). Whoever removes a pair is responsible for them: an admin removing its chain's pair, for its
+  users. The admin can allow the pair again.
 
 ## Receive filter
 
-A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. C's
+A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds: C allowed S
+on L1 and neither chain is suspended, at C's anchor ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}). C's
 `AtomicFlowManager` reverts with `ManagerLegSourceChainNotAllowed` otherwise:
 
 - **Finality** (`requireFlowFinalized`, {protocol-docs/atomicity/flow.md#3-finalize--requireflowfinalized}) needs
@@ -187,8 +180,8 @@ A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.
   missing leg's source to be allowed.
 
 The filter reads the whitelist when the bundle is verified, or executed if it wasn't verified first, not when it was
-sent. A bundle from a peer that is removed stays unreceived, and executes once the admin allows the peer again; one
-verified before the removal still executes. `append` doesn't apply the filter: it only needs the other legs' sources
+sent. A bundle from a peer that is removed or suspended stays unreceived, and executes once the admin allows the peer
+again or governance resumes it; one verified before the removal still executes. `append` doesn't apply the filter: it only needs the other legs' sources
 to be registered ({protocol-docs/atomicity/security.md#timeout-protocol-preconditions}).
 
 The message root can't tell enabled chains apart: L1 aggregates every L1-settled chain's batch roots, so a disabled
@@ -196,17 +189,16 @@ chain's batches are as provable as any other. The filter has to cover refunds to
 broken prover could forge "present" toward one chain and "absent" toward another, so that one chain finalizes the
 flow while another refunds it, and a leg is paid twice.
 
+The filter reads L1, so it fails closed without a fresh anchor: on a chain in Priority Mode, finality and refunds for
+legs from other chains wait once its last anchor is stale ({protocol-docs/l1sload.md#known-issues}).
+
 ## Governance procedure
 
 ### Legacy registrations
 
-The removed `registerChain` registered pairs without consent. Once a chain's L2 is upgraded, its `InteropCenter`
-no longer sends to them ([whitelist](#interop-peer-whitelist)), so they are cleanup, not a safety issue: clear them
-with `deregisterInteropPairs` in the first governance transaction after the chain's upgrade. Governance enables a chain
-only once every legacy pair involving it is cleared; this order is enforced offchain. To find them:
-
-1. list the L1 priority transactions that call the retired `registerChainForInterop(uint256,bytes32)` selector;
-2. cross-check each pair against `baseTokenAssetId` on the target chain's `L2Bridgehub`.
+The removed `registerChain` registered pairs without consent by writing `baseTokenAssetId` on the target chain's
+`L2Bridgehub`. Since v36 no gating reads that entry ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}), so
+the legacy pairs are inert and need no cleanup.
 
 ### Backfill amounts
 
@@ -228,7 +220,7 @@ unbacked.
 
 Before `enableInterop(X)`:
 
-- confirm on L2 that every [legacy pair](#legacy-registrations) involving X is cleared;
+- X's admin has turned L1SLOAD on (`enableInterop` refuses X until then, {protocol-docs/chain-config.md#l1sload});
 - wait for X's second proof system requirement, unless governance waives it;
 - check X's whole history:
   - the proof modes since the upgrade (no single-proven batches is recommended);
@@ -238,9 +230,9 @@ Before `enableInterop(X)`:
 ### Order per chain
 
 1. Chain upgrade.
-2. Governance deregisters the chain's legacy pairs.
-3. Governance sets the chain's backfill and marks it backfilled.
-4. The admin turns ZiSK on and calls `permanentlyRequireSecondProofSystem`.
+2. Governance sets the chain's backfill and marks it backfilled.
+3. The admin turns ZiSK on and calls `permanentlyRequireSecondProofSystem`.
+4. The admin turns L1SLOAD on (`setZKsyncOSL1SloadEnabled`).
 5. Governance calls `enableInterop`.
 6. Anyone calls `moveChainBalanceToInteropPool` for each asset the chain holds.
 7. The admin calls `allowInteropPeer` for each peer.
@@ -253,7 +245,7 @@ A flow gets stuck when a chain's [receive filter](#receive-filter) refuses one o
 present, that chain can't finalize the flow; with a leg missing, a committed leg on that chain can't be refunded.
 Causes:
 
-- a one-sided whitelist, or a removed pair;
+- a one-sided whitelist, a removed pair, or a suspended chain;
 - a leg from a chain that the destination doesn't whitelist;
 - legacy flows that involve a chain that stays disabled.
 

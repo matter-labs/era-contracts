@@ -26,6 +26,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
     L1DAValidatorAddressIsZero,
+    L1SloadRequiredByInterop,
     NotL1,
     PriorityModeAlreadyAllowed,
     SecondProofSystemAlreadyRequired,
@@ -66,6 +67,8 @@ import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 import {IOwnable} from "../../../common/interfaces/IOwnable.sol";
 import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
+import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
+import {IL1MessageRoot} from "../../../core/message-root/IL1MessageRoot.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -205,6 +208,19 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
         bool oldEnabled = s.zksyncOSLargeContractsEnabled;
         s.zksyncOSLargeContractsEnabled = _enabled;
         emit NewZKsyncOSLargeContracts(oldEnabled, _enabled);
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSL1SloadEnabled(bool _enabled) external onlyAdmin onlySettlementLayer onlyL1 {
+        uint256 chainId = s.chainId;
+        if (!_enabled && IL1MessageRoot(address(IBridgehubBase(s.bridgehub).messageRoot())).isInteropEnabled(chainId)) {
+            revert L1SloadRequiredByInterop(chainId);
+        }
+        _enforceNoUnverifiedBatchesForChainConfigUpdate();
+
+        bool oldEnabled = s.zksyncOSL1SloadEnabled;
+        s.zksyncOSL1SloadEnabled = _enabled;
+        emit NewZKsyncOSL1Sload(oldEnabled, _enabled);
     }
 
     /// @notice Enforces the configuration-update boundary described in {protocol-docs/chain-config.md}.
@@ -644,7 +660,7 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     ///      (see `Utils.getAllSelectors`), in ascending selector order. Guarded against drift by
     ///      FacetSelfDescription.t.sol and `yarn l1 facet-selectors --check`.
     function selectors() public pure returns (bytes4[] memory result) {
-        uint32[27] memory list = [
+        uint32[28] memory list = [
             // upgradeChainFromVersion(address,uint256)
             uint32(0x03129ad9),
             // acceptAdmin()
@@ -685,6 +701,8 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
             uint32(0xb4fcb577),
             // setPriorityTxMaxGasLimit(uint256)
             uint32(0xbe6f11cf),
+            // setZKsyncOSL1SloadEnabled(bool)
+            uint32(0xc4505cb9),
             // setPriorityModeTransactionFilterer(address)
             uint32(0xc5f1f1f5),
             // genesisUpgrade()

@@ -25,4 +25,15 @@ interface IL2InteropRootStorage {
     /// imported, the returned value is `>= T` forever, so it is an authenticated lower bound on the
     /// referenced chain's clock as observed by this chain.
     function latestInteropRootTimestamp(uint256 chainId) external view returns (uint256);
+
+    /// @notice Returns the hash of the L1 block that L1SLOAD reads at (zero before the first anchor import).
+    /// See {protocol-docs/l1sload.md#anchors}.
+    function l1AnchorBlockHash() external view returns (bytes32);
+
+    /// @notice Returns the number of the L1 block that L1SLOAD reads at (zero before the first anchor import).
+    function l1AnchorBlockNumber() external view returns (uint256);
+
+    /// @notice Returns the L1 time the anchor was recorded at (zero before the first anchor import).
+    /// See {protocol-docs/l1sload.md#freshness}.
+    function l1AnchorTimestamp() external view returns (uint256);
 }

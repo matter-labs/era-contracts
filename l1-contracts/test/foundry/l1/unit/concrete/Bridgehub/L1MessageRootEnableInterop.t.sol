@@ -16,7 +16,9 @@ import {ChainBalanceBackfillPending} from "contracts/bridge/L1BridgeContractErro
 import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE, ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/Config.sol";
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
+    ChainPredatesL1Sload,
     InteropAlreadyEnabled,
+    L1SloadNotEnabled,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -73,6 +75,38 @@ contract L1MessageRootEnableInteropTest is Test {
             abi.encodeCall(IGetters.getProofMode, ()),
             abi.encode(ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE)
         );
+        vm.mockCall(
+            zkChain,
+            abi.encodeCall(IGetters.facetAddress, (IGetters.isZKsyncOSL1SloadEnabled.selector)),
+            abi.encode(makeAddr("gettersFacet"))
+        );
+        vm.mockCall(zkChain, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(true));
+    }
+
+    /// @dev A chain still on pre-v36 facets routes no L1SLOAD getter, see {protocol-docs/l1sload.md#upgrade-window}.
+    function testFuzz_enableInterop_revertWhen_chainPredatesL1Sload(bool _requireSecondProofSystem) public {
+        vm.mockCall(
+            zkChain,
+            abi.encodeCall(IGetters.facetAddress, (IGetters.isZKsyncOSL1SloadEnabled.selector)),
+            abi.encode(address(0))
+        );
+
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(ChainPredatesL1Sload.selector, CHAIN_ID));
+        messageRoot.enableInterop(CHAIN_ID, _requireSecondProofSystem);
+
+        assertFalse(messageRoot.isInteropEnabled(CHAIN_ID));
+    }
+
+    /// @notice Interop gating reads L1 through L1SLOAD, see {protocol-docs/l1sload.md#chain-config-flag}.
+    function testFuzz_enableInterop_revertWhen_l1SloadNotEnabled(bool _requireSecondProofSystem) public {
+        vm.mockCall(zkChain, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(false));
+
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(L1SloadNotEnabled.selector, CHAIN_ID));
+        messageRoot.enableInterop(CHAIN_ID, _requireSecondProofSystem);
+
+        assertFalse(messageRoot.isInteropEnabled(CHAIN_ID));
     }
 
     function test_enableInterop() public {

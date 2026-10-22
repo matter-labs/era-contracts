@@ -95,7 +95,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](18);
+        bytes4[] memory selectors = new bytes4[](19);
         uint256 i = 0;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
@@ -103,6 +103,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = admin.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = admin.setZKsyncOSL1TxFiltering.selector;
         selectors[i++] = admin.setZKsyncOSLargeContractsEnabled.selector;
+        selectors[i++] = admin.setZKsyncOSL1SloadEnabled.selector;
         selectors[i++] = admin.setZKsyncOSMaxTxGasLimit.selector;
         selectors[i++] = admin.setPubdataContent.selector;
         selectors[i++] = admin.changeFeeParams.selector;
@@ -138,7 +139,7 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](38);
+        bytes4[] memory selectors = new bytes4[](39);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getZKsyncOSChainConfigHash.selector;
@@ -164,6 +165,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = getters.getPriorityTxMaxGasLimit.selector;
         selectors[i++] = getters.isZKsyncOSL1TxFilteringEnabled.selector;
         selectors[i++] = getters.isZKsyncOSLargeContractsEnabled.selector;
+        selectors[i++] = getters.isZKsyncOSL1SloadEnabled.selector;
         selectors[i++] = getters.isEthWithdrawalFinalized.selector;
         selectors[i++] = getters.facets.selector;
         selectors[i++] = getters.facetFunctionSelectors.selector;

@@ -6,7 +6,8 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
-import {EMPTY_STRING_KECCAK} from "../../../common/Config.sol";
+import {IL1MessageRoot} from "../../../core/message-root/IL1MessageRoot.sol";
+import {EMPTY_STRING_KECCAK, L1_BLOCK_HASH_IMPORT_ID} from "../../../common/Config.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
@@ -113,7 +114,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
         }
     }
 
-    /// @notice Verifies the dependency message roots that the chain relied on.
+    /// @notice Verifies the dependency message roots and L1SLOAD anchors that the chain relied on.
     function _verifyDependencyInteropRoots(
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
@@ -133,6 +134,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor, ISelfDescribingFacet {
                 );
                 correctRootHash = recordedRoot.root;
                 correctTimestamp = recordedRoot.timestamp;
+            } else if (interopRoot.chainId == L1_BLOCK_HASH_IMPORT_ID) {
+                // See {protocol-docs/l1sload.md#anchors}.
+                StoredInteropRoot memory recordedBlockHash = IL1MessageRoot(address(messageRootContract))
+                    .recordedL1BlockHash(interopRoot.blockOrBatchNumber);
+                correctRootHash = recordedBlockHash.root;
+                correctTimestamp = recordedBlockHash.timestamp;
             } else {
                 revert CommitBasedInteropNotSupported();
             }

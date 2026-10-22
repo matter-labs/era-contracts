@@ -80,10 +80,10 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
     function test_onlyL1Modifier_RevertsOnGateway() public {
         // Any function with onlyL1 modifier should revert when called on Gateway
         // requestL2ServiceTransaction uses onlyL1 modifier
-        // Mock the chainRegistrationSender call to return the test caller
+        // Mock the chainAssetHandler call to return the test caller
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.chainRegistrationSender.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(address(this))
         );
 

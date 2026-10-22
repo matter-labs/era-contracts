@@ -17,18 +17,24 @@ interface IL2Bridgehub is IBridgehubBase {
     //     address _chainRegistrationSender
     // ) external;
 
-    /// @notice Allows interop with a peer chain once its whitelisting on L1 arrives, see
-    /// {protocol-docs/interop-gating.md#interop-peer-whitelist}.
-    /// @param _chainId The chain id of the peer chain.
-    /// @param _baseTokenAssetId The base token asset id of the peer chain.
-    function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external;
+    /// @notice The L1 `ChainRegistrationSender` proxy that interop gating is read from: the unaliased
+    /// `chainRegistrationSender`. See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
+    function l1ChainRegistrationSender() external view returns (address);
 
-    /// @notice Removes a chain from the chains known for interop, an allowed peer included, once its deregistration
-    /// on L1 arrives. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
-    /// @param _chainId The chain id of the chain.
-    function deregisterChainForInterop(uint256 _chainId) external;
-
-    /// @notice Whether interop with the chain is allowed, see {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+    /// @notice Whether this chain accepts interop from the chain (the receive filter), read from L1.
+    /// See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
     /// @param _chainId The chain id of the peer chain.
     function isPeerAllowed(uint256 _chainId) external view returns (bool);
+
+    /// @notice Whether this chain may send interop to the chain, and the chain's base token, read from L1.
+    /// See {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
+    /// @param _chainId The chain id of the peer chain.
+    /// @return allowed Whether this chain may send to the chain.
+    /// @return peerBaseTokenAssetId The chain's base token asset id, zero if the chain is not registered for interop.
+    function interopSendTarget(uint256 _chainId) external view returns (bool allowed, bytes32 peerBaseTokenAssetId);
+
+    /// @notice The chain's base token snapshot on L1, zero if it is not registered for interop.
+    /// See {protocol-docs/l1sload.md#the-base-token-snapshot}.
+    /// @param _chainId The chain id of the chain.
+    function interopBaseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 }

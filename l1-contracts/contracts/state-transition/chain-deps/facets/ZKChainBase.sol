@@ -153,14 +153,9 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyServiceTransaction() {
-        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
-        if (
-            /// For registering chains in the L2Bridgehub. This is used for interop initiation.
-            msg.sender != bridgehub.chainRegistrationSender() &&
-            /// For sending the deposit-pause request to the settlement layer's L2ChainAssetHandler
-            /// when a chain migrates away from it.
-            msg.sender != address(bridgehub.chainAssetHandler())
-        ) {
+        // For sending the deposit-pause request to the settlement layer's L2ChainAssetHandler when a chain
+        // migrates away from it.
+        if (msg.sender != address(IBridgehubBase(s.bridgehub).chainAssetHandler())) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -211,7 +206,8 @@ contract ZKChainBase is ReentrancyGuard {
                     uint256(_getZKsyncOSMaxTxGasLimit()),
                     uint256(s.pubdataContent),
                     uint256(s.zksyncOSL1TxFilteringEnabled ? 1 : 0),
-                    uint256(s.zksyncOSLargeContractsEnabled ? 1 : 0)
+                    uint256(s.zksyncOSLargeContractsEnabled ? 1 : 0),
+                    uint256(s.zksyncOSL1SloadEnabled ? 1 : 0)
                 )
             );
     }

@@ -22,7 +22,8 @@ abstract contract ChainConfigTest is ExecutorTest {
                 _maxTxGasLimit: getters.getZKsyncOSMaxTxGasLimit(),
                 _pubdataContent: getters.getPubdataContent(),
                 _filteringEnabled: getters.isZKsyncOSL1TxFilteringEnabled(),
-                _largeContractsEnabled: getters.isZKsyncOSLargeContractsEnabled()
+                _largeContractsEnabled: getters.isZKsyncOSLargeContractsEnabled(),
+                _l1SloadEnabled: getters.isZKsyncOSL1SloadEnabled()
             });
     }
 

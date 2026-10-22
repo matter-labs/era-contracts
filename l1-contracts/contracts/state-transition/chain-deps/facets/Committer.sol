@@ -16,6 +16,8 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
+import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
+import {IL1MessageRoot} from "../../../core/message-root/IL1MessageRoot.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
@@ -86,6 +88,18 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             revert InvalidProtocolVersion();
         }
         _commitBatchesSharedBridge(_processFrom, _processTo, _commitData);
+        _recordL1Anchor();
+    }
+
+    /// @notice Records an L1 block hash for chains to import as their L1SLOAD anchor, see
+    /// {protocol-docs/l1sload.md#anchors}.
+    /// @dev Only on L1: a settlement layer's `L2MessageRoot` has no anchor record.
+    function _recordL1Anchor() internal {
+        if (!s.zksyncOSL1SloadEnabled || L1_CHAIN_ID != block.chainid) {
+            return;
+        }
+        // slither-disable-next-line unused-return
+        IL1MessageRoot(address(IBridgehubBase(s.bridgehub).messageRoot())).recordL1BlockHash();
     }
 
     function _commitBatchesSharedBridge(uint256 _processFrom, uint256 _processTo, bytes calldata _commitData) internal {

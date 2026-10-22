@@ -9,6 +9,7 @@ import {
     PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY,
     PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY,
     PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS,
+    PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY,
     BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7,
     BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0
 } from "foundry-test/TestConstants.sol";
@@ -32,6 +33,10 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     function util_setZKsyncOSChainConfigFlags(bool _filteringEnabled, bool _largeContractsEnabled) external {
         s.zksyncOSL1TxFilteringEnabled = _filteringEnabled;
         s.zksyncOSLargeContractsEnabled = _largeContractsEnabled;
+    }
+
+    function util_setZKsyncOSL1SloadEnabled(bool _enabled) external {
+        s.zksyncOSL1SloadEnabled = _enabled;
     }
 
     function getBatchOutputHash(
@@ -94,6 +99,13 @@ contract ZKsyncOSPublicInputTest is Test {
         assertEq(
             committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
             uint256(PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS)
+        );
+
+        committer.util_setZKsyncOSChainConfigFlags(false, false);
+        committer.util_setZKsyncOSL1SloadEnabled(true);
+        assertEq(
+            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
+            uint256(PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY)
         );
     }
 

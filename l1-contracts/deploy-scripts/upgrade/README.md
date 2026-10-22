@@ -27,8 +27,9 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
   (`ExternalActionsLib`) and is listed in the output's `external_actions`.
   `DefaultChainUpgrade` is the legacy handed-cut per-chain leg the Foundry integration tests use.
 - `v36/` — the v35 -> v36 edge, the first registry-driven release and the template for the next
-  one: `CoreUpgrade_v36` replaces one ecosystem implementation (`L1MessageRoot`); `CTMUpgrade_v36`
-  overrides nothing.
+  one: `CoreUpgrade_v36` declares the changed ecosystem implementations and reinitializes the
+  `ChainRegistrationSender` row; `CTMUpgrade_v36` declares the changed release members and opts into
+  `DefaultCTMUpgrade.standardL2Side` for its L2 leg ({protocol-docs/l1sload.md#upgrade-from-v35}).
 - `v35/` — the v34 -> v35 bootstrap edge: `CoreUpgrade_v35` also deploys the
   `CoreUpgradeExecutor`; `CTMUpgrade_v35` deploys the `CTMUpgradeExecutor`, the
   `RegistryBootstrapMigration` (naming both executors) and the `RegistryBootstrapSequence` over the

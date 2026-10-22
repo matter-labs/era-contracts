@@ -147,6 +147,10 @@ interface IGetters is IZKChainBase {
     /// @return Whether large contracts are enabled.
     function isZKsyncOSLargeContractsEnabled() external view returns (bool);
 
+    /// @notice Returns whether the ZKsync OS L1SLOAD precompile is enabled, see {protocol-docs/chain-config.md#l1sload}.
+    /// @return Whether L1SLOAD is enabled.
+    function isZKsyncOSL1SloadEnabled() external view returns (bool);
+
     /// @return Whether a withdrawal has been finalized.
     /// @param _l2BatchNumber The L2 batch number within which the withdrawal happened.
     /// @param _l2MessageIndex The index of the L2->L1 message denoting the withdrawal.

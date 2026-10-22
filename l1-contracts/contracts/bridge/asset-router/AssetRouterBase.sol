@@ -52,6 +52,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
 
     function _getBridgehub() internal view virtual returns (IBridgehubBase);
 
+    /// @notice The base token of the destination chain, which can only be bridged through the base token path.
+    /// @param _chainId The destination chain.
+    function _destinationBaseTokenAssetId(uint256 _chainId) internal view virtual returns (bytes32) {
+        return _getBridgehub().baseTokenAssetId(_chainId);
+    }
+
     /// @notice Sets the asset handler address for a specified asset ID on this chain.
     /// @dev The caller is encoded into the asset ID, so only the NTV or the asset's registered deployment
     /// tracker may call it. See {protocol-docs/bridging.md#asset-ids-asset-handlers-deployment-trackers}.
@@ -147,7 +153,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, IERC7786Recipient, Ownabl
         bytes1 encodingVersion = _data[0];
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _data);
-        require(_getBridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
+        require(_destinationBaseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,

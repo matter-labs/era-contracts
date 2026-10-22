@@ -865,6 +865,55 @@
   },
   {
     "type": "function",
+    "name": "recordL1BlockHash",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "blockNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "blockHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "recordedL1BlockHash",
+    "inputs": [
+      {
+        "name": "_blockNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct StoredInteropRoot",
+        "components": [
+          {
+            "name": "root",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "timestamp",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "seedGenesisRoot",
     "inputs": [
       {
@@ -1009,6 +1058,31 @@
   },
   {
     "type": "event",
+    "name": "L1BlockHashRecorded",
+    "inputs": [
+      {
+        "name": "blockNumber",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "blockHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "timestamp",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "NewChainRoot",
     "inputs": [
       {
@@ -1108,6 +1182,17 @@
   },
   {
     "type": "error",
+    "name": "ChainPredatesL1Sload",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "HashedLogIsDefault",
     "inputs": []
   },
@@ -1126,6 +1211,17 @@
     "type": "error",
     "name": "InvalidProofLengthForFinalNode",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "L1SloadNotEnabled",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

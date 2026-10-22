@@ -20,6 +20,7 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
   L2_NTV_BEACON_DEPLOYER_ADDR,
   L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+  L1SLOAD_PRECOMPILE_ADDR,
   L2_TO_L1_MESSENGER_ADDR,
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
   MINT_BASE_TOKEN_HOOK_ADDR,
@@ -38,6 +39,8 @@ export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
   { address: L2_TO_L1_MESSENGER_ADDR, contractName: "L1Messenger" },
   { address: L2_BASE_TOKEN_ADDR, contractName: "L2BaseToken" },
   { address: L2_MESSAGE_VERIFICATION_ADDR, contractName: "MockL2MessageVerification" },
+  // Anvil has no L1SLOAD precompile; src/helpers/l1-reads.ts feeds the mock from the L1 at each anchor.
+  { address: L1SLOAD_PRECOMPILE_ADDR, contractName: "MockL1SloadPrecompile" },
   { address: L1_MESSENGER_HOOK_ADDR, contractName: "MockL1MessengerHook" },
   { address: MINT_BASE_TOKEN_HOOK_ADDR, contractName: "MockMintBaseTokenHook" },
   { address: L2_CONTRACT_DEPLOYER_ADDR, contractName: "MockContractDeployer" },
