@@ -95,7 +95,7 @@ export async function depositBeforeUpgrade(_context: InteropGatingContext, _chai
 /**
  * After the upgrade: takes `_chain`, which registered `_peer` with {registerLegacyInteropPair}, and `_peer` through
  * {protocol-docs/interop-gating.md#order-per-chain}. The chains read gating from L1 ({protocol-docs/l1sload.md}), so
- * the legacy pair is inert, and once both chains are enabled, each admin's consent opens its own direction.
+ * the legacy pair is inert, and once both chains are enabled, sending needs both admins' consent.
  * @param _lastPreUpgradeBlock The last L1 block before the core upgrade, up to which the backfill is computed.
  */
 export async function runInteropGatingProcedure(
@@ -114,9 +114,10 @@ export async function runInteropGatingProcedure(
   await enableInterop(_context, _peer, _lastPreUpgradeBlock);
 
   await allowInteropPeer(_context, _chain, _peer);
-  await expectSend(_chain, _peer);
+  await expectSendReverts(_chain, _peer, "DestinationChainNotAllowed(uint256)", "send before the peer allows back");
   await expectSendReverts(_peer, _chain, "DestinationChainNotRegistered(uint256)", "send before the peer allows back");
   await allowInteropPeer(_context, _peer, _chain);
+  await expectSend(_chain, _peer);
   await expectSend(_peer, _chain);
 }
 

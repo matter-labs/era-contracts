@@ -70,6 +70,24 @@ export async function installL1SloadMock(_l2Provider: providers.JsonRpcProvider)
   await _l2Provider.send("anvil_setCode", [L1SLOAD_PRECOMPILE_ADDR, getBytecode("MockL1SloadPrecompile")]);
 }
 
+/**
+ * Moves the L1 clock up to the L2s' if it is behind: freshness compares the anchor's L1 time with L2 block time, and an
+ * L1 loaded from a dump without its blocks (the Amsterdam L1) restarts its clock near zero.
+ */
+async function alignL1Clock(
+  _l1Provider: providers.JsonRpcProvider,
+  _l2Providers: providers.JsonRpcProvider[]
+): Promise<void> {
+  const l1Time = (await _l1Provider.getBlock("latest")).timestamp;
+  const l2Times = await Promise.all(
+    _l2Providers.map(async (provider) => (await provider.getBlock("latest")).timestamp)
+  );
+  const l2Time = Math.max(...l2Times);
+  if (l1Time < l2Time) {
+    await _l1Provider.send("evm_setNextBlockTimestamp", [l2Time]);
+  }
+}
+
 /** Records the previous L1 block's hash on L1, as every `commitBatches` does on a real chain. */
 export async function recordL1Anchor(
   _l1Provider: providers.JsonRpcProvider,
@@ -109,6 +127,7 @@ export async function importL1Anchor(_l2Provider: providers.JsonRpcProvider, _an
  */
 export async function syncL1Reads(_context: L1ReadsContext): Promise<L1Anchor> {
   const { l1Provider, l1Addresses, chainIds, l2Providers } = _context;
+  await alignL1Clock(l1Provider, [...l2Providers.values()]);
   const anchor = await recordL1Anchor(l1Provider, l1Addresses);
   const sender = l1Addresses.chainRegistrationSender;
   const keys = gatingSlots(chainIds);
