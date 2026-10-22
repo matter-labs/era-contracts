@@ -1,0 +1,8 @@
+[package]
+name = "claim_1"
+type = "bin"
+authors = [""]
+compiler_version = ">=1.0.0"
+
+[dependencies]
+zkip_lite = { path = "../zkip_lite" }
