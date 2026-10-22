@@ -39,7 +39,7 @@ abstract contract ZKIPBase is Test {
     struct DebitWitness {
         uint256 chainId;
         bytes[] bundles;
-        bytes[] pres;
+        bytes[] preimages;
         uint256[] legs;
         bytes32 lockAsset;
         uint256 lockAmount;
@@ -200,14 +200,14 @@ abstract contract ZKIPBase is Test {
         ChainSim _sim,
         uint256 _batch,
         bytes[] memory _bundles,
-        bytes[] memory _pres,
+        bytes[] memory _preimages,
         uint256[] memory _legs,
         bytes32 _lockAsset,
         uint256 _lockAmount,
         string memory _tag
     ) internal {
         uint256 chainId = _sim.chainId();
-        (bool ok, bytes32 newRoot, bytes memory proof) = _proveDebit(chainId, _bundles, _pres, _legs, _lockAsset, _lockAmount, _tag);
+        (bool ok, bytes32 newRoot, bytes memory proof) = _proveDebit(chainId, _bundles, _preimages, _legs, _lockAsset, _lockAmount, _tag);
         assertTrue(ok, string.concat("prover failed: ", _tag));
         ZKIPLiteRegistry.DebitSubmission memory sub = _submission(_sim, _batch, _lockAsset, _lockAmount, newRoot, proof);
         uint256 g = gasleft();
@@ -232,13 +232,13 @@ abstract contract ZKIPBase is Test {
     function _proveDebit(
         uint256 _chainId,
         bytes[] memory _bundles,
-        bytes[] memory _pres,
+        bytes[] memory _preimages,
         uint256[] memory _legs,
         bytes32 _lockAsset,
         uint256 _lockAmount,
         string memory _tag
     ) internal returns (bool, bytes32, bytes memory) {
-        DebitWitness memory w = DebitWitness(_chainId, _bundles, _pres, _legs, _lockAsset, _lockAmount);
+        DebitWitness memory w = DebitWitness(_chainId, _bundles, _preimages, _legs, _lockAsset, _lockAmount);
         return _proveDebitWith(w, _tag, _bundles.length <= 1 ? 1 : 4);
     }
 
@@ -250,7 +250,7 @@ abstract contract ZKIPBase is Test {
         vm.serializeUint(_tag, "l1_chain_id", block.chainid);
         vm.serializeUint(_tag, "num_legs", _w.bundles.length);
         vm.serializeBytes(_tag, "bundles", _w.bundles);
-        vm.serializeBytes(_tag, "preimages", _w.pres);
+        vm.serializeBytes(_tag, "preimages", _w.preimages);
         vm.serializeUint(_tag, "leg_index", _w.legs);
         vm.serializeBytes32(_tag, "lock_asset", _w.lockAsset);
         string memory json = vm.serializeUint(_tag, "lock_amount", _w.lockAmount);

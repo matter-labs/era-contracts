@@ -229,16 +229,16 @@ def record(entry):
 def debit(size, w, state, out_state, out_dir):
     chain_id, n = int(w["chain_id"]), int(w["num_legs"])
     bundles = [b32(x) for x in w["bundles"]]
-    pres = [b32(x) for x in w["preimages"]]
+    preimages = [b32(x) for x in w["preimages"]]
     legs = [int(x) for x in w["leg_index"]]
     while len(bundles) < size:  # unused slots carry a copy of leg 0 (their checks are switched off)
-        bundles.append(bundles[0]), pres.append(pres[0]), legs.append(legs[0])
+        bundles.append(bundles[0]), preimages.append(preimages[0]), legs.append(legs[0])
     prev = state.root()
     lock_asset, lock_amount = b32(w["lock_asset"]), int(w["lock_amount"])
     lock_slot = state.apply(field(lock_asset), lock_amount, True) if lock_amount else 0
     cv_hi, cv_lo, slots = [], [], []
     for k in range(size):
-        o = open_leg(bundles[k], pres[k], legs[k])
+        o = open_leg(bundles[k], preimages[k], legs[k])
         if k < n:
             h, l = hi_lo(o["own_cv"])
             cv_hi.append(h), cv_lo.append(l)
@@ -251,7 +251,7 @@ def debit(size, w, state, out_state, out_dir):
             "cv_hi = " + arr([q(x) for x in cv_hi]), "cv_lo = " + arr([q(x) for x in cv_lo]),
             "lock_asset_hi = " + q(lh), "lock_asset_lo = " + q(ll), "lock_amount = " + q(lock_amount)]
     toml += state.toml_prev
-    toml += ["bundles = " + arr([toml_bytes(b) for b in bundles]), "preimages = " + arr([toml_bytes(b) for b in pres]),
+    toml += ["bundles = " + arr([toml_bytes(b) for b in bundles]), "preimages = " + arr([toml_bytes(b) for b in preimages]),
              "leg_index = " + arr(["true" if x else "false" for x in legs]), "slots = " + arr([str(s) for s in slots]),
              "lock_slot = %d" % lock_slot]
     return toml
