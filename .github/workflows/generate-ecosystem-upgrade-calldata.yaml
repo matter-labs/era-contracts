@@ -88,7 +88,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # Broadcast ONLY the deployer's bundles; the governance-signed ones are the
 # ceremony (step 4). Both paths are idempotent — re-run after a partial deploy.
 # Do NOT re-generate to "refresh" a bundle: bytecode is specific to the build that
-# produced it, so a re-run yields different addresses and different calldata.
+# produced it, so a re-run in another image yields different addresses and calldata.
 #
 # ── 3. Verify what landed (verify-bootstrap), yourself ─────────────────────
 # From the bundle, in its image, from a checkout of the commit it names:
@@ -171,10 +171,10 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # Solidity output is not byte-stable across build environments (the default
 # foundry profile embeds path-dependent CBOR metadata), so the bytecode — and
 # with it every CREATE2 address and all the governance calldata — belongs to the
-# machine that compiled it. Nobody can "reproduce" this run elsewhere and get the
-# same addresses. What they CAN do is broadcast the exact deployer calls this run
-# computed: the `prepare/*.safe.json` transactions carry the CREATE2 init code
-# verbatim.
+# build that compiled it, the released image's. Nobody can "reproduce" this run
+# from another build and get the same addresses. What they CAN do is broadcast the
+# exact deployer calls this run computed: the `prepare/*.safe.json` transactions
+# carry the CREATE2 init code verbatim.
 # So this workflow publishes a self-contained DEPLOY BUNDLE
 # (`ecosystem-upgrade-deploy-inputs-<env>`): the deployer calls, `ecosystem.toml`,
 # the Etherscan verify commands, and a `bundle-metadata.json` pinning the image,

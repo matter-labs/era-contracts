@@ -1,9 +1,9 @@
 # Ecosystem upgrade: generate → deploy
 
-> **Scope.** Written for the v31 rollout from the `draft-v31` line. On the v35 line the same two steps run the release's upgrade: the
-> generate workflow defaults to `upgrade = v0.35.0-upgrade-system` (only that directory may use
-> `prepare = "prepare-all"`) and outputs land under `upgrade-envs/v0.35.0-upgrade-system/output/<env>/`.
-> The v31 line's verifier (PUVT, `ecosystem verify-upgrade`) does not exist on this line; the check
+> **Scope.** First written for the v31 rollout from the `draft-v31` line; the `adi` notes come from
+> it. On the v35 line the generate workflow defaults to `upgrade = v0.35.0-upgrade-system` (only
+> that directory may use `prepare = "prepare-all"`) and outputs land under
+> `upgrade-envs/v0.35.0-upgrade-system/output/<env>/`. The v31 line's verifier (PUVT, `ecosystem verify-upgrade`) does not exist on this line; the check
 > here is `ecosystem verify-bootstrap`, the registry verifier, as step 3 describes.
 
 An ecosystem upgrade is produced and shipped in **two steps**, each runnable
@@ -22,9 +22,9 @@ alike — CI is only a wrapper around the commands below.
 **Step 1 output is a handoff, not a recipe.** Solidity output is not byte-stable
 across build environments (the default foundry profile embeds path-dependent CBOR
 metadata), so the bytecode — and therefore every CREATE2 address and all the
-governance calldata — belongs to the machine that compiled it. Re-running step 1
-somewhere else does not "reproduce" the addresses; it produces a different,
-equally valid upgrade. What travels is the **deploy bundle**: the deployer
+governance calldata — belongs to the build that compiled it, the released image's.
+Re-running step 1 with another build does not "reproduce" the addresses; it
+produces a different, equally valid upgrade. What travels is the **deploy bundle**: the deployer
 transactions carry the CREATE2 init code verbatim, so whoever broadcasts them
 deploys that exact bytecode at the addresses the reviewed `ecosystem.toml` names,
 without compiling anything. See
@@ -56,7 +56,8 @@ against the on-chain result before governance signs (step 3).
 The local commands below run the image too. `./protocol-ops.sh --tag <tag>` (or
 `--tag sha256:<digest>`) pulls it; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
 Run them from a checkout of the image's commit, unedited: the wrapper mounts its
-`l1-contracts/upgrade-envs/` so outputs land in it, and refuses another checkout.
+`l1-contracts/upgrade-envs/` so outputs land in it, and refuses another checkout for a released
+image.
 
 ---
 
