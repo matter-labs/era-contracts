@@ -73,7 +73,6 @@ is a copy of `upgrade.toml` and the `<env>.toml` inputs in a new directory, with
   - against Sepolia after the deploy workflow's broadcast: the deployments and their wiring, read-only.
 - `<env>.toml` is the input: bridgehub, CTM, the expected current version, the governance kind, the verifier
   flavour, the timer delay, the CREATE2 salt and the chain list. The script checks it against the live state.
-- `sim-descriptions-<env>.toml`: the scenarios' human-readable descriptions.
 - `output/<env>/` holds everything for one environment. A run rewrites what it produces and leaves the rest alone:
   - written by the generate workflow (`rehearse-upgrade`):
     - `ecosystem.toml`, the artifact. On top of the standard `DefaultCTMUpgrade` output (`[state_transition]`,

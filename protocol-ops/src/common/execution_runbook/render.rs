@@ -5,9 +5,9 @@ use std::collections::BTreeSet;
 
 use alloy::primitives::{keccak256, Address, U256};
 
-use super::decode::{self, InnerCall, WrapperKind, INLINE_CALLDATA_MAX_BYTES};
 use super::load::network_name;
 use super::{Runbook, RunbookTx, SourceKind};
+use crate::common::calldata::{self as decode, InnerCall, WrapperKind, INLINE_CALLDATA_MAX_BYTES};
 
 /// Wrapped calls listed inline in a sentence; more become a numbered list.
 const MAX_INLINE_CALLS: usize = 4;

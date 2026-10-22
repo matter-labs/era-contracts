@@ -2,6 +2,8 @@ pub mod abi;
 pub mod addresses;
 pub mod anvil;
 pub mod args;
+pub mod call_description;
+pub mod calldata;
 pub mod cmd;
 pub mod config;
 pub mod ecosystem;

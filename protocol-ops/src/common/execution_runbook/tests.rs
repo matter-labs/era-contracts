@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use alloy::primitives::{address, keccak256, Address, Bytes, FixedBytes, U256};
 use alloy::sol_types::SolCall;
 
-use super::decode::{self, protocol_version};
 use super::load::relative_link;
 use super::*;
+use crate::common::calldata::{self as decode, protocol_version};
 use crate::common::env_config::EnvConfig;
 
 alloy::sol! {

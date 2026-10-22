@@ -9,8 +9,8 @@ use anyhow::Context;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::decode::known_function;
 use super::{Runbook, RunbookTx, SourceKind};
+use crate::common::calldata::known_function;
 
 /// Chain ids the runbook names; any other id is shown as `chain <id>`.
 const NETWORKS: [(u64, &str, &str); 2] = [

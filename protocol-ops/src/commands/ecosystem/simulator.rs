@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use alloy::dyn_abi::{DynSolType, DynSolValue};
 use alloy::hex;
 use alloy::primitives::{Address, U256};
 use alloy::sol_types::SolCall;
@@ -10,6 +9,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
+use crate::common::call_description::{tagged, Describer, Names};
 use crate::common::execution_runbook;
 use crate::common::governance_calls::decode_calls;
 use crate::common::logger;
@@ -23,353 +23,6 @@ alloy::sol! {
 
     interface ChainAdminAbi {
         function multicall(ChainAdminCall[] _calls, bool _requireSuccess) external payable;
-    }
-}
-
-/// Optional human-description registry. Loaded from a TOML at
-/// `<env>/sim-descriptions.toml` (auto-discovered from `--env`) or via an
-/// explicit `--descriptions` flag. Each `[[entries]]` matches a sim tx by
-/// `(target, selector)` plus an optional discriminator — first matching
-/// entry wins; non-matching txs keep their auto-generated description.
-///
-/// Discriminators:
-/// - `arg0_address`: the first 32-byte word after the selector, decoded as
-///   an address. Disambiguates same-`(target, selector)` calls with
-///   different first args (e.g. `TPA.upgrade(<proxy>, <impl>)` across
-///   multiple proxies in stage 1).
-/// - `tag`: only the governance-toml transactions of that tag (`stage0`, `stage1`, …), e.g. when one
-///   call (`ChainAssetHandler.pauseMigration`) recurs in two stages.
-/// - `inner_target` + `inner_selector`: for *wrapper* selectors
-///   (`ChainAdmin.multicall`, legacy `Governance.scheduleTransparent` /
-///   `executeInstant`), match against the FIRST inner call's target and/or
-///   selector. Used for the bundle-1 legacy-Gov ceremony pairs and the
-///   ChainAdmin multicalls in bundles 3/4.
-///
-/// Raw on-disk shape — address-typed fields accept either a `0x…` literal
-/// or a label from `[labels]`. Resolved to the canonical [`SimDescriptionRegistry`]
-/// at load time via [`build_registry`].
-#[derive(Debug, Default, Deserialize)]
-struct RawSimDescriptionRegistry {
-    /// `name → address` map. Lets entry targets and address-typed
-    /// discriminators refer to deployments by name so a salt rotation only
-    /// requires updating this section (not every entry that referenced the
-    /// rotated address).
-    #[serde(default)]
-    labels: std::collections::HashMap<String, Address>,
-    #[serde(default)]
-    entries: Vec<RawSimDescriptionEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct RawSimDescriptionEntry {
-    target: String,
-    selector: String,
-    #[serde(default)]
-    arg0_address: Option<String>,
-    #[serde(default)]
-    l2_contract: Option<String>,
-    #[serde(default)]
-    second_bridge_address: Option<String>,
-    #[serde(default)]
-    inner_target: Option<String>,
-    #[serde(default)]
-    inner_selector: Option<String>,
-    #[serde(default)]
-    tag: Option<String>,
-    desc: String,
-}
-
-#[derive(Debug, Default)]
-struct SimDescriptionRegistry {
-    entries: Vec<SimDescriptionEntry>,
-    /// `[labels]` inverted: the names this file gives addresses (several joined by ` / `).
-    labels: BTreeMap<Address, String>,
-}
-
-#[derive(Debug)]
-struct SimDescriptionEntry {
-    target: Address,
-    selector: String,
-    /// First 32-byte word after the selector, interpreted as `address`.
-    /// Used for plain `f(address, ...)` calls (e.g. `TPA.upgrade(proxy, impl)`).
-    arg0_address: Option<Address>,
-    /// `Bridgehub.requestL2TransactionDirect(L2TransactionRequestDirect)` —
-    /// `l2Contract` is word 3 of the tuple (after offset/chainId/mintValue).
-    /// Only meaningful when `selector = 0xd52471c1`.
-    l2_contract: Option<Address>,
-    /// `Bridgehub.requestL2TransactionTwoBridges(L2TransactionRequestTwoBridgesOuter)` —
-    /// `secondBridgeAddress` is word 7 of the tuple.
-    /// Only meaningful when `selector = 0x24fd57fb`.
-    second_bridge_address: Option<Address>,
-    /// For wrapper selectors (`multicall`, `scheduleTransparent`,
-    /// `executeInstant`) — match the first inner call's target.
-    inner_target: Option<Address>,
-    /// For wrapper selectors — match the first inner call's 4-byte selector.
-    inner_selector: Option<String>,
-    /// Only transactions emitted under this tag.
-    tag: Option<String>,
-    desc: String,
-}
-
-/// Resolve a target string (either a `0x…` address literal or a label
-/// defined in `[labels]`) to its canonical [`Address`].
-fn resolve_address(
-    value: &str,
-    labels: &std::collections::HashMap<String, Address>,
-) -> anyhow::Result<Address> {
-    if value.starts_with("0x") || value.starts_with("0X") {
-        value
-            .parse::<Address>()
-            .map_err(|err| anyhow::anyhow!("invalid address literal {value}: {err}"))
-    } else {
-        labels.get(value).copied().ok_or_else(|| {
-            anyhow::anyhow!("unknown label `{value}` — add it to [labels] in sim-descriptions.toml")
-        })
-    }
-}
-
-/// Resolve all label references in a [`RawSimDescriptionRegistry`] into
-/// canonical addresses. Returns an error on the first unknown label /
-/// malformed literal, with a context string that points at the offending
-/// entry index + field name so the developer can find it instantly.
-fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescriptionRegistry> {
-    use anyhow::Context;
-    let labels = &raw.labels;
-    let mut names: BTreeMap<Address, Vec<&str>> = BTreeMap::new();
-    for (name, address) in labels {
-        names.entry(*address).or_default().push(name);
-    }
-    let labels_by_address = names
-        .into_iter()
-        .map(|(address, mut names)| {
-            names.sort_unstable();
-            (address, names.join(" / "))
-        })
-        .collect();
-    let mut entries = Vec::with_capacity(raw.entries.len());
-    for (i, e) in raw.entries.into_iter().enumerate() {
-        let target = resolve_address(&e.target, labels)
-            .with_context(|| format!("entries[{i}].target = `{}`", e.target))?;
-        let resolve_opt = |field: &str, v: Option<String>| -> anyhow::Result<Option<Address>> {
-            v.map(|s| {
-                resolve_address(&s, labels).with_context(|| format!("entries[{i}].{field} = `{s}`"))
-            })
-            .transpose()
-        };
-        entries.push(SimDescriptionEntry {
-            target,
-            selector: e.selector,
-            arg0_address: resolve_opt("arg0_address", e.arg0_address)?,
-            l2_contract: resolve_opt("l2_contract", e.l2_contract)?,
-            second_bridge_address: resolve_opt("second_bridge_address", e.second_bridge_address)?,
-            inner_target: resolve_opt("inner_target", e.inner_target)?,
-            inner_selector: e.inner_selector,
-            tag: e.tag,
-            desc: e.desc,
-        });
-    }
-    Ok(SimDescriptionRegistry {
-        entries,
-        labels: labels_by_address,
-    })
-}
-
-impl SimDescriptionRegistry {
-    fn lookup(&self, target: Address, data_hex: &str) -> Option<String> {
-        self.lookup_tagged(target, data_hex, None)
-    }
-
-    /// [`Self::lookup`] for a transaction emitted under `tag`: entries naming another tag are skipped.
-    fn lookup_tagged(&self, target: Address, data_hex: &str, tag: Option<&str>) -> Option<String> {
-        let selector = data_hex.get(..10)?;
-        let inner = parse_first_inner_call(data_hex);
-        for entry in &self.entries {
-            if entry.target != target {
-                continue;
-            }
-            if entry.tag.is_some() && entry.tag.as_deref() != tag {
-                continue;
-            }
-            if !entry.selector.eq_ignore_ascii_case(selector) {
-                continue;
-            }
-            if let Some(want) = entry.arg0_address {
-                let arg0_hex = data_hex.get(10..74)?;
-                let parsed: Address = format!("0x{}", &arg0_hex[24..]).parse().ok()?;
-                if parsed != want {
-                    continue;
-                }
-            }
-            // requestL2TransactionDirect: l2Contract at word 3 after the selector.
-            if let Some(want) = entry.l2_contract {
-                let word_start = 10 + 3 * 64;
-                let word_hex = data_hex.get(word_start..word_start + 64)?;
-                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
-                if parsed != want {
-                    continue;
-                }
-            }
-            // requestL2TransactionTwoBridges: secondBridgeAddress at word 7.
-            if let Some(want) = entry.second_bridge_address {
-                let word_start = 10 + 7 * 64;
-                let word_hex = data_hex.get(word_start..word_start + 64)?;
-                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
-                if parsed != want {
-                    continue;
-                }
-            }
-            if entry.inner_target.is_some() || entry.inner_selector.is_some() {
-                let (inner_target, inner_selector) = inner.as_ref()?;
-                if let Some(want) = entry.inner_target {
-                    if *inner_target != want {
-                        continue;
-                    }
-                }
-                if let Some(ref want_sel) = entry.inner_selector {
-                    if !want_sel.eq_ignore_ascii_case(inner_selector) {
-                        continue;
-                    }
-                }
-            }
-            return Some(entry.desc.clone());
-        }
-        None
-    }
-}
-
-/// For wrapper calls — `ChainAdmin.multicall`, `Governance.scheduleTransparent`,
-/// `Governance.executeInstant` / `Governance.execute` — return the first inner `Call`'s target and
-/// 4-byte selector. Returns `None` for unrecognised wrappers (the registry
-/// then falls back to plain `(target, selector)` matching).
-fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
-    let bytes = hex::decode(data_hex.trim_start_matches("0x")).ok()?;
-    if bytes.len() < 4 {
-        return None;
-    }
-    let selector = u32::from_be_bytes(bytes[..4].try_into().ok()?);
-    let body = &bytes[4..];
-
-    let call_type = DynSolType::Tuple(vec![
-        DynSolType::Address,
-        DynSolType::Uint(256),
-        DynSolType::Bytes,
-    ]);
-    let operation_type = DynSolType::Tuple(vec![
-        DynSolType::Array(Box::new(call_type.clone())),
-        DynSolType::FixedBytes(32),
-        DynSolType::FixedBytes(32),
-    ]);
-
-    let first_param = match selector {
-        // multicall((address,uint256,bytes)[], bool)
-        0x69340beb => {
-            let params = DynSolType::Tuple(vec![
-                DynSolType::Array(Box::new(call_type)),
-                DynSolType::Bool,
-            ])
-            .abi_decode_params(body)
-            .ok()?;
-            into_tuple(params)?.into_iter().next()?
-        }
-        // scheduleTransparent((Call[], bytes32, bytes32), uint256)
-        0x2c431917 => {
-            let params = DynSolType::Tuple(vec![operation_type, DynSolType::Uint(256)])
-                .abi_decode_params(body)
-                .ok()?;
-            // First param is the Operation tuple; its first field is `Call[]`.
-            into_tuple(into_tuple(params)?.into_iter().next()?)?
-                .into_iter()
-                .next()?
-        }
-        // executeInstant((Call[], bytes32, bytes32)) / execute((Call[], bytes32, bytes32))
-        // Same ABI (a single `Operation` tuple param) — only the selector differs
-        // (executeInstant = onlySecurityCouncil, execute = onlyOwnerOrSecurityCouncil).
-        0x95218ecd | 0x74da756b => {
-            let params = DynSolType::Tuple(vec![operation_type])
-                .abi_decode_params(body)
-                .ok()?;
-            into_tuple(into_tuple(params)?.into_iter().next()?)?
-                .into_iter()
-                .next()?
-        }
-        _ => return None,
-    };
-    let calls_array = match first_param {
-        DynSolValue::Array(calls) => calls,
-        _ => return None,
-    };
-
-    let first = into_tuple(calls_array.into_iter().next()?)?;
-    let mut it = first.into_iter();
-    let target = match it.next()? {
-        DynSolValue::Address(addr) => addr,
-        _ => return None,
-    };
-    let _value = it.next()?;
-    let inner_data = match it.next()? {
-        DynSolValue::Bytes(b) => b,
-        _ => return None,
-    };
-    if inner_data.len() < 4 {
-        return None;
-    }
-    Some((target, format!("0x{}", hex::encode(&inner_data[..4]))))
-}
-
-/// Consume a `DynSolValue::Tuple`, returning its fields (or `None` for any
-/// other variant).
-fn into_tuple(value: DynSolValue) -> Option<Vec<DynSolValue>> {
-    match value {
-        DynSolValue::Tuple(items) => Some(items),
-        _ => None,
-    }
-}
-
-fn load_descriptions(path: Option<&Path>) -> SimDescriptionRegistry {
-    let path = match path {
-        Some(p) => p,
-        None => return SimDescriptionRegistry::default(),
-    };
-    if !path.exists() {
-        return SimDescriptionRegistry::default();
-    }
-    let raw = match fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(err) => {
-            logger::info(format!(
-                "Couldn't read {} ({err}); using auto-generated descriptions",
-                path.display()
-            ));
-            return SimDescriptionRegistry::default();
-        }
-    };
-    let parsed: RawSimDescriptionRegistry = match toml::from_str(&raw) {
-        Ok(r) => r,
-        Err(err) => {
-            logger::info(format!(
-                "Couldn't parse {} ({err}); using auto-generated descriptions",
-                path.display()
-            ));
-            return SimDescriptionRegistry::default();
-        }
-    };
-    let label_count = parsed.labels.len();
-    let entry_count = parsed.entries.len();
-    match build_registry(parsed) {
-        Ok(reg) => {
-            logger::info(format!(
-                "Loaded {entry_count} sim description override(s) and {label_count} label(s) from {}",
-                path.display()
-            ));
-            reg
-        }
-        Err(err) => {
-            logger::info(format!(
-                "Failed to resolve labels in {} ({err:#}); using auto-generated descriptions",
-                path.display()
-            ));
-            SimDescriptionRegistry::default()
-        }
     }
 }
 
@@ -441,14 +94,6 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// Repeatable: `--ack test_upgrade_chain_zkos`.
     #[clap(long = "ack", num_args = 1..)]
     pub acks: Vec<String>,
-
-    /// Optional path to a `sim-descriptions.toml` that overrides each
-    /// emitted tx's `description` field with a human-readable string keyed by
-    /// `(target, selector)` (+ optional discriminators). Auto-discovered at
-    /// `upgrade-envs/v0.33.0-atomic-interop/<env>/sim-descriptions.toml` when
-    /// `--env` is set and the file exists.
-    #[clap(long)]
-    pub descriptions: Option<PathBuf>,
 
     /// When set, write a curated, machine-independent **sim-inputs** set to this
     /// directory instead of emitting the sim JSON: a normalized `manifest.json`
@@ -693,39 +338,34 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     // BUT when *producing* sim-inputs (`--emit-sim-inputs`), source from `prepare/`
     // first — reading from `sim-inputs/` while `write_sim_inputs` truncates those same
     // files would self-overwrite the source to 0 bytes.
+    // Both sit next to the governance TOML, in the output directory of the upgrade it belongs to.
     let manifest_path = match args.include_manifest {
         Some(path) => Some(path),
-        None => env_cfg.as_ref().and_then(|cfg| {
-            crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
-                .ok()
-                .and_then(|base| {
-                    let sim_inputs = base.join("sim-inputs").join("manifest.json");
-                    let prepare = base.join("prepare").join("manifest.json");
-                    let candidates = if args.emit_sim_inputs.is_some() {
-                        [prepare, sim_inputs]
-                    } else {
-                        [sim_inputs, prepare]
-                    };
-                    candidates.into_iter().find(|p| p.is_file())
-                })
+        None => governance_toml.parent().and_then(|base| {
+            let sim_inputs = base.join("sim-inputs").join("manifest.json");
+            let prepare = base.join("prepare").join("manifest.json");
+            let candidates = if args.emit_sim_inputs.is_some() {
+                [prepare, sim_inputs]
+            } else {
+                [sim_inputs, prepare]
+            };
+            candidates.into_iter().find(|p| p.is_file())
         }),
     };
 
-    // Resolve descriptions registry: explicit `--descriptions` wins; otherwise
-    // auto-discover the file alongside the env config TOML (one level up from
-    // `<env-out>/`). For the v31 stage env that's
-    // `upgrade-envs/v0.33.0-atomic-interop/sim-descriptions.toml`.
-    let descriptions_path = args.descriptions.or_else(|| {
-        env_cfg.as_ref().and_then(|cfg| {
-            crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
-                .ok()
-                .and_then(|out| out.parent().map(|p| p.to_path_buf()))
-                .and_then(|out_parent| out_parent.parent().map(|p| p.to_path_buf()))
-                .map(|root| root.join("sim-descriptions.toml"))
-                .filter(|p| p.is_file())
-        })
-    });
-    let descriptions = load_descriptions(descriptions_path.as_deref());
+    let ecosystem: toml::Table = toml::from_str(
+        &fs::read_to_string(&governance_toml)
+            .with_context(|| format!("failed to read {}", governance_toml.display()))?,
+    )
+    .with_context(|| format!("failed to parse {}", governance_toml.display()))?;
+    let mut names = env_cfg.as_ref().map(Names::from_env).unwrap_or_default();
+    names.add_ecosystem_toml(&ecosystem);
+    let mut describer = Describer::new(
+        names,
+        env_cfg
+            .as_ref()
+            .map(|cfg| cfg.permanent.core_contracts.governance_kind),
+    );
 
     // `--emit-sim-inputs`: write the curated, git-portable sim-inputs set and
     // stop. This is the VPS regen's handoff step — it has the prepare manifest
@@ -737,7 +377,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             )
         })?;
         write_sim_inputs(manifest, &args.camp_a_signers, sim_inputs_dir)?;
-        write_sim_inputs_runbook(sim_inputs_dir, env_cfg.as_ref(), &descriptions)?;
+        write_sim_inputs_runbook(sim_inputs_dir, env_cfg.as_ref(), &mut describer)?;
         return Ok(());
     }
 
@@ -765,14 +405,14 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             manifest,
             &network,
             &args.camp_a_signers,
-            &descriptions,
+            &mut describer,
             &ctm_admin_calls_tags,
         )
         .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
     let governance =
-        governance_toml_to_simulator_transactions(&governance_toml, &network, from, &descriptions)
+        governance_toml_to_simulator_transactions(&governance_toml, &network, from, &mut describer)
             .with_context(|| {
                 format!(
                     "failed to convert governance TOML {}",
@@ -780,6 +420,9 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
                 )
             })?;
     transactions.extend(governance);
+    for tx in &mut transactions {
+        tx.description = tagged(&tx.tag, &tx.description);
+    }
 
     // Acknowledgement placeholders, appended last: an inert `alreadyExecuted` entry carrying the
     // checked tag itself, which the simulator records without sending. Empty calldata keeps it
@@ -807,8 +450,6 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             already_executed: Some(true),
         });
     }
-
-    reject_unlabelled(&transactions, descriptions_path.as_deref())?;
 
     let body = serde_json::to_string_pretty(&transactions)?;
 
@@ -952,12 +593,6 @@ pub struct ManifestToSimulatorArgs {
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
 
-    /// Path to a `sim-descriptions.toml` giving each emitted transaction a human-readable
-    /// description. Without it every entry reads `[unlabelled] …`, which is exactly what a
-    /// reviewer cannot act on.
-    #[clap(long)]
-    pub descriptions: Option<PathBuf>,
-
     /// DiamondProxy whose batch counters the simulator should override before each emitted
     /// transaction.
     ///
@@ -972,47 +607,6 @@ pub struct ManifestToSimulatorArgs {
     /// Output JSON path. Printed to stdout when omitted.
     #[clap(long)]
     pub out: Option<PathBuf>,
-}
-
-/// Marker the emitters use when no `sim-descriptions.toml` entry matched a call.
-const UNLABELLED: &str = "[unlabelled]";
-
-/// Refuses to emit a scenario in which any call is still `[unlabelled]`.
-///
-/// Passing `--descriptions` is a statement that every call should be named, so a leftover
-/// `[unlabelled]` is a gap in that file, not an acceptable default. It is also silent: the usual
-/// cause is a label whose address rotated with the CREATE2 salts, which still parses and still
-/// matches nothing, so the scenario emits fine and the missing description is only noticed by
-/// someone reading the JSON. Failing here turns that into an error at generation time, with the
-/// target and selector needed to write the entry.
-fn reject_unlabelled(
-    transactions: &[SimulatorTransaction],
-    descriptions: Option<&Path>,
-) -> anyhow::Result<()> {
-    let Some(descriptions) = descriptions else {
-        return Ok(());
-    };
-    let gaps: Vec<&SimulatorTransaction> = transactions
-        .iter()
-        .filter(|t| t.description.contains(UNLABELLED))
-        .collect();
-    if gaps.is_empty() {
-        return Ok(());
-    }
-    let mut msg = format!(
-        "{} call(s) matched no entry in {} — add one per line below, or drop --descriptions to \
-         accept auto-generated text:",
-        gaps.len(),
-        descriptions.display()
-    );
-    for t in gaps {
-        let selector = t.data.get(..10).unwrap_or("0x");
-        msg.push_str(&format!(
-            "\n  target = \"{}\"  selector = \"{selector}\"   (tag {})",
-            t.to, t.tag
-        ));
-    }
-    anyhow::bail!(msg)
 }
 
 /// `1e18`, as the divisor between wei and whole ETH.
@@ -1060,7 +654,18 @@ fn safe_bundle_value_to_eth_decimal(raw: Option<&str>) -> anyhow::Result<String>
 /// provenance check (there is no TOML to re-derive it from); the ecosystem scenario acknowledges
 /// the gap with an `ack_` marker and the reviewer checks this file on its own terms.
 pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow::Result<()> {
-    let descriptions = load_descriptions(args.descriptions.as_deref());
+    let mut names = Names::default();
+    for manifest in &args.manifest {
+        let raw: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(manifest)
+                .with_context(|| format!("failed to read {}", manifest.display()))?,
+        )
+        .with_context(|| format!("failed to parse {}", manifest.display()))?;
+        if let Some(metadata) = raw["metadata"].as_array() {
+            names.add_chain_manifest_metadata(metadata);
+        }
+    }
+    let mut describer = Describer::new(names, None);
     let mut transactions = Vec::new();
     for manifest in &args.manifest {
         let phases = bundle_phases(manifest)?;
@@ -1068,7 +673,7 @@ pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow:
             manifest,
             &args.network,
             &args.camp_a_signers,
-            &descriptions,
+            &mut describer,
             // A per-chain manifest carries no `ctm_admin_calls` entry to tag.
             &CtmAdminCallsTags::new(),
         )?;
@@ -1099,12 +704,12 @@ pub async fn run_manifest_to_simulator(args: ManifestToSimulatorArgs) -> anyhow:
         transactions.append(&mut batch);
     }
     for tx in &mut transactions {
+        tx.description = tagged(&tx.tag, &tx.description);
         if let Some(diamond) = args.emulate_all_batches_executed_for {
             tx.emulate_all_batches_executed = Some(true);
             tx.emulate_all_batches_executed_for = Some(format!("{diamond:#x}"));
         }
     }
-    reject_unlabelled(&transactions, args.descriptions.as_deref())?;
 
     let body = serde_json::to_string_pretty(&transactions)?;
     match args.out {
@@ -1152,13 +757,12 @@ fn bundle_phases(
 }
 
 /// Write `EXECUTE.md` next to the sim-inputs directory: the copy-into-MetaMask runbook of the
-/// Camp-B bundles, which their signers send by hand. Txs are labelled with their
-/// `sim-descriptions.toml` description and addresses named with its `[labels]` and the env's
-/// permanent values. Nothing is written when no Camp-B bundle is left.
+/// Camp-B bundles, which their signers send by hand, each labelled with what it does. Nothing is
+/// written when no Camp-B bundle is left.
 fn write_sim_inputs_runbook(
     sim_inputs_dir: &Path,
     env_cfg: Option<&crate::common::env_config::EnvConfig>,
-    descriptions: &SimDescriptionRegistry,
+    describer: &mut Describer,
 ) -> anyhow::Result<()> {
     let manifest_path = sim_inputs_dir.join("manifest.json");
     let manifest: PrepareManifest = serde_json::from_str(
@@ -1171,21 +775,15 @@ fn write_sim_inputs_runbook(
         return Ok(());
     }
     let path = execution_runbook::default_runbook_path(sim_inputs_dir)?;
-    let mut names = env_cfg
-        .map(execution_runbook::env_names)
-        .unwrap_or_default();
-    names.extend(descriptions.labels.clone());
     let options = execution_runbook::LoadOptions {
         chain_id: env_cfg.and_then(|cfg| cfg.l1_chain_id()),
         env: env_cfg.map(|cfg| cfg.env.clone()),
-        names,
+        names: describer.names().as_map().clone(),
         ..Default::default()
     };
     let mut runbook = execution_runbook::load(sim_inputs_dir, &path, &options)?;
     for tx in &mut runbook.txs {
-        if let Some(description) = descriptions.lookup(tx.to, &format!("{:#x}", tx.data)) {
-            tx.label = description;
-        }
+        tx.label = describer.describe_call(tx.to, &tx.data)?;
     }
     execution_runbook::write(&runbook, &path)?;
     logger::info(format!("Wrote execution runbook {}", path.display()));
@@ -1207,7 +805,7 @@ fn manifest_to_simulator_transactions(
     manifest_path: &Path,
     network: &str,
     explicit_camp_a: &[Address],
-    descriptions: &SimDescriptionRegistry,
+    describer: &mut Describer,
     ctm_admin_calls_tags: &CtmAdminCallsTags,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let manifest_dir = manifest_path.parent().ok_or_else(|| {
@@ -1300,7 +898,7 @@ fn manifest_to_simulator_transactions(
             })
             .collect();
         let mut ordered_ctm_admin_txs = ordered_ctm_admin_txs.into_iter();
-        for (idx, tx) in kept.into_iter().enumerate() {
+        for tx in kept {
             let tx = if ctm_admin_calls_tag(ctm_admin_calls_tags, tx).is_some() {
                 ordered_ctm_admin_txs.next().unwrap_or(tx)
             } else {
@@ -1312,15 +910,9 @@ fn manifest_to_simulator_transactions(
                 None
             };
             let _ = (label.as_str(), kept_total); // kept for `tag` parity; not used in description
-            let description = descriptions.lookup(tx.to, &tx.data).unwrap_or_else(|| {
-                let selector = tx.data.get(..10).unwrap_or("0x");
-                format!(
-                    "[unlabelled] to={:#x} sel={selector} (bundle {} tx {})",
-                    tx.to,
-                    bundle.index,
-                    idx + 1
-                )
-            });
+            let data = alloy::hex::decode(tx.data.trim_start_matches("0x"))
+                .with_context(|| format!("bundle {} tx data is not hex", bundle.index))?;
+            let description = describer.describe_call(tx.to, &data)?;
             out.push(SimulatorTransaction {
                 description,
                 network: network.to_string(),
@@ -1346,7 +938,7 @@ fn governance_toml_to_simulator_transactions(
     path: &PathBuf,
     network: &str,
     from: Address,
-    descriptions: &SimDescriptionRegistry,
+    describer: &mut Describer,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
@@ -1367,7 +959,7 @@ fn governance_toml_to_simulator_transactions(
     for (stage, encoded_calls) in stages {
         let calls = decode_calls(encoded_calls)
             .with_context(|| format!("failed to decode stage{stage}_calls"))?;
-        for (idx, call) in calls.into_iter().enumerate() {
+        for call in calls {
             let data_hex = format!("0x{}", hex::encode(&call.data));
             // Mint logic:
             //   - First stage-2 call → top up PUH with `STAGE2_PUH_FUND_ETH`
@@ -1394,16 +986,7 @@ fn governance_toml_to_simulator_transactions(
             } else {
                 None
             };
-            let description = descriptions
-                .lookup_tagged(call.target, &data_hex, Some(&format!("stage{stage}")))
-                .unwrap_or_else(|| {
-                    let selector = data_hex.get(..10).unwrap_or("0x");
-                    format!(
-                        "[unlabelled] stage{stage} call {} to={:#x} sel={selector}",
-                        idx + 1,
-                        call.target
-                    )
-                });
+            let description = describer.describe_call(call.target, &call.data)?;
             out.push(SimulatorTransaction {
                 description,
                 network: network.to_string(),
@@ -1421,7 +1004,7 @@ fn governance_toml_to_simulator_transactions(
         }
     }
 
-    append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
+    append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, describer)?;
 
     Ok(out)
 }
@@ -1430,7 +1013,7 @@ fn append_test_upgrade_calls(
     out: &mut Vec<SimulatorTransaction>,
     test_upgrade_calls: &BTreeMap<String, String>,
     network: &str,
-    descriptions: &SimDescriptionRegistry,
+    describer: &mut Describer,
 ) -> anyhow::Result<()> {
     for (tag, encoded_calls) in test_upgrade_calls {
         if !tag.starts_with("test_") || tag.ends_with("_caller") {
@@ -1447,18 +1030,9 @@ fn append_test_upgrade_calls(
             .with_context(|| format!("failed to decode [test_upgrade_calls].{tag}"))?;
         let emulate_all_batches_executed = tag.starts_with("test_upgrade_").then_some(true);
 
-        for (idx, call) in calls.into_iter().enumerate() {
+        for call in calls {
             let data_hex = format!("0x{}", hex::encode(&call.data));
-            let description = descriptions
-                .lookup_tagged(call.target, &data_hex, Some(tag))
-                .unwrap_or_else(|| {
-                    let selector = data_hex.get(..10).unwrap_or("0x");
-                    format!(
-                        "[unlabelled] {tag} call {} to={:#x} sel={selector}",
-                        idx + 1,
-                        call.target
-                    )
-                });
+            let description = describer.describe_call(call.target, &call.data)?;
             out.push(SimulatorTransaction {
                 description,
                 network: network.to_string(),
@@ -1563,62 +1137,6 @@ mod value_conversion_tests {
 }
 
 #[cfg(test)]
-mod description_tag_tests {
-    use super::*;
-
-    /// One call in two stages: each stage gets its own tagged entry, and an untagged entry
-    /// still matches every tag.
-    #[test]
-    fn a_tagged_entry_matches_only_its_tag() {
-        let raw: RawSimDescriptionRegistry = toml::from_str(
-            r#"
-[labels]
-cah = "0x0000000000000000000000000000000000000001"
-
-[[entries]]
-target = "cah"
-selector = "0xac700e63"
-tag = "stage0"
-desc = "stage 0 pause"
-
-[[entries]]
-target = "cah"
-selector = "0xac700e63"
-tag = "stage1"
-desc = "stage 1 pause"
-
-[[entries]]
-target = "cah"
-selector = "0xf7c7eb92"
-desc = "unpause"
-"#,
-        )
-        .unwrap();
-        let registry = build_registry(raw).unwrap();
-        let cah = Address::with_last_byte(1);
-        let lookup = |data: &str, tag| registry.lookup_tagged(cah, data, tag);
-        assert_eq!(
-            lookup("0xac700e63", Some("stage0")).as_deref(),
-            Some("stage 0 pause")
-        );
-        assert_eq!(
-            lookup("0xac700e63", Some("stage1")).as_deref(),
-            Some("stage 1 pause")
-        );
-        assert_eq!(lookup("0xac700e63", Some("stage2")), None);
-        assert_eq!(lookup("0xac700e63", None), None);
-        assert_eq!(
-            lookup("0xf7c7eb92", Some("stage2")).as_deref(),
-            Some("unpause")
-        );
-        assert_eq!(
-            registry.lookup(cah, "0xf7c7eb92").as_deref(),
-            Some("unpause")
-        );
-    }
-}
-
-#[cfg(test)]
 mod chain_phase_tests {
     use super::*;
 
@@ -1636,7 +1154,6 @@ mod chain_phase_tests {
             network: "sepolia".to_string(),
             tag: "chain_upgrade_42111".to_string(),
             camp_a_signers: vec![],
-            descriptions: None,
             emulate_all_batches_executed_for: None,
             out: Some(out.clone()),
         };

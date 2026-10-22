@@ -11,7 +11,6 @@ upgrade-envs/
   permanent-values/<env>.toml           # per-environment facts, independent of the release
   <release>/<env>.toml                  # per-release inputs for that environment
   <release>/output/<env>/               # the committed artifacts of that rollout
-  <release>/sim-descriptions.toml       # labels for the transaction-simulator scenarios
 ```
 
 `<release>` is the full release name (`v0.33.0-atomic-interop`); `<env>` is `stage`, `testnet`,
