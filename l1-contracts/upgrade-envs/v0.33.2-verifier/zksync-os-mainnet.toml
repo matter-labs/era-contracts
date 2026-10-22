@@ -1,0 +1,39 @@
+# v0.33.2 verifier-only upgrade of the ZKsync OS mainnet ecosystem — input for
+# deploy-scripts/upgrade/verifier-only/ZKsyncOSVerifierOnlyUpgrade.s.sol (see that script's doc).
+#
+# The ZKsync OS ecosystem on Ethereum mainnet (`upgrade-envs/permanent-values/zksync-os-mainnet.toml`). The CTM
+# and the ChainAssetHandler are owned by a `Governance` contract (0x3d678383…, minDelay 0), itself owned by the
+# 4-of-7 Safe 0x4e494334….
+#
+# The target version (0.33.2) and its VK hash come from configs/genesis/zksync-os/latest.json;
+# the script refuses to run if the deployed verifier's VK differs from it.
+
+bridgehub = "0xEe293Fd09348e22Cde4CFc7c1ddE82953fc33027"
+# ZKsync OS ChainTypeManager proxy (`isZKsyncOS() == true`).
+ctm = "0xF9Fc08eaA6dAD8DDE886F3B174a019c9ac56B2Ef"
+
+# v0.33.0. The CTM never took v0.33.1, and a verifier-only upgrade may skip patch versions.
+old_protocol_version = 0x2100000000
+
+# The CTM owner is a `Governance` contract: the output also carries the scheduleTransparent /
+# execute calldata its owner sends per stage.
+owner_is_governance = true
+
+# Mainnet runs the real verifier (proofs required), like the verifier it replaces.
+testnet_verifier = false
+
+# The GovernanceUpgradeTimer's INITIAL_DELAY. Nothing on L2 changes, so stage 1 may follow stage 0
+# immediately.
+governance_upgrade_timer_initial_delay = 0
+
+# Deterministic CREATE2 factory. The salt is fresh for this upgrade: a repeated (salt, initcode)
+# pair resolves to an already deployed contract. Rotate it before any regen that must deploy anew:
+#   python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
+create2_factory_salt = "0xc2c225faf4a143458c3c674b68845dc67af3c95966b64113124759498fa427aa"
+
+# Sender of the CREATE2 deployments: the address of the DEPLOYER_PRIVATE_KEY_MAINNET secret, which the deploy
+# workflow broadcasts from.
+deployer = "0x0000000000000000000000000000000000000000"
+
+# Every chain registered on the CTM, all on v0.33.0. 20250714 has never committed a batch.
+chain_ids = [5790, 51703, 61703, 20250714, 886229927]
