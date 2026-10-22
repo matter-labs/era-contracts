@@ -24,9 +24,8 @@ pin the shared default and flag-combination vectors from ZKsync OS's
 [`public_input.rs`](https://github.com/matter-labs/zksync-os-private/blob/ca730149b70ceb296dd2c4158823e152c90ae92b/basic_bootloader/src/bootloader/block_flow/zk/post_tx_op/public_input.rs).
 The batch output now ends with the interop fee units word ([interop-fee.md](./interop-fee.md)),
 so the pinned values differ from that revision; they match the paired ZKsync OS change.
-The v36 vectors (`CHAIN_CONFIG_HASH_GOLDEN`, `PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY`,
-`PUBLIC_INPUT_HASH_GOLDEN_ALL_FLAGS` and the updated ones) match the paired ZKsync OS change that adds
-`l1sload_enabled`. The vectors with exactly one flag enabled detect swaps of the boolean words.
+The v36 vectors match the paired ZKsync OS change that adds `l1sload_enabled`. The vectors with exactly one
+flag enabled detect swaps of the boolean words.
 Batch-proving tests explicitly cover all four combinations.
 
 The stored batch commitment is the full, untruncated public-input hash:
@@ -124,19 +123,9 @@ subsequent deployments; already deployed large contracts remain callable.
 
 ## L1SLOAD
 
-The ZKsync OS `L1SLOAD` precompile at `0x101` lets L2 contracts read L1 storage at the chain's anchored L1 block
-({protocol-docs/l1sload.md}). It is disabled by default, including for existing chains. The chain admin opts in with
-`setZKsyncOSL1SloadEnabled`, on L1 only (`NotL1`); the current value is exposed by `isZKsyncOSL1SloadEnabled`, and
-`AdminFunctions.setZKsyncOSL1SloadEnabled` prepares or sends the admin call. With the flag off the runtime doesn't
-register the precompile, so `0x101` behaves like an empty account and every L1 read reverts (`L1SloadFailed`).
-
-Interop gating reads L1 through the precompile, so the flag is tied to interop
-({protocol-docs/l1sload.md#chain-config-flag}):
-
-- `L1MessageRoot.enableInterop` requires it (`L1SloadNotEnabled`);
-- it can't be turned off while the chain's interop is enabled (`L1SloadRequiredByInterop`). Enabling interop is
-  one-way, so for an enabled chain the flag is permanent;
-- a chain whose interop was enabled before v36 gets it from its upgrade ({protocol-docs/l1sload.md#upgrade-from-v35}).
+The `L1SLOAD` precompile ({protocol-docs/l1sload.md}) is disabled by default, including for existing chains. The chain
+admin turns it on with `setZKsyncOSL1SloadEnabled`, on L1 only (`NotL1`). It is tied to interop
+({protocol-docs/l1sload.md#chain-config-flag}).
 
 ## Configuration updates
 

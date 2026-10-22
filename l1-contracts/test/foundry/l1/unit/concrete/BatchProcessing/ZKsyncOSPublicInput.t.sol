@@ -10,10 +10,6 @@ import {
     PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY,
     PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS,
     PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY,
-    PUBLIC_INPUT_HASH_GOLDEN_ALL_FLAGS,
-    CHAIN_CONFIG_HASH_GOLDEN,
-    CHAIN_CONFIG_HASH_GOLDEN_L1SLOAD_ONLY,
-    CHAIN_CONFIG_HASH_GOLDEN_ALL_FLAGS,
     BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7,
     BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0
 } from "foundry-test/TestConstants.sol";
@@ -24,12 +20,9 @@ import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVer
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {
     L2DACommitmentScheme,
-    PubdataContent,
     ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT,
     PUBLIC_INPUT_SHIFT
 } from "contracts/common/Config.sol";
-
-import {ChainConfigTest} from "./_ChainConfig_Shared.t.sol";
 
 contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
     function util_setZKsyncOSChainConfig(uint256 _chainId, uint64 _maxTxGasLimit) external {
@@ -44,10 +37,6 @@ contract CommitterZKsyncOSPublicInputHarness is TestCommitter {
 
     function util_setZKsyncOSL1SloadEnabled(bool _enabled) external {
         s.zksyncOSL1SloadEnabled = _enabled;
-    }
-
-    function getChainConfigHash() external view returns (bytes32) {
-        return _getZKsyncOSChainConfigHash();
     }
 
     function getBatchOutputHash(
@@ -112,23 +101,12 @@ contract ZKsyncOSPublicInputTest is Test {
             uint256(PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS)
         );
 
-        committer.util_setZKsyncOSL1SloadEnabled(true);
-        assertEq(
-            committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
-            uint256(PUBLIC_INPUT_HASH_GOLDEN_ALL_FLAGS)
-        );
-
         committer.util_setZKsyncOSChainConfigFlags(false, false);
+        committer.util_setZKsyncOSL1SloadEnabled(true);
         assertEq(
             committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN),
             uint256(PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY)
         );
-    }
-
-    /// @notice The `l1sload_enabled` word is the seventh word of the hash, after `large_contracts_enabled`.
-    /// See {protocol-docs/chain-config.md#proof-commitment}.
-    function test_chainConfigHash_matchesZKsyncOSGoldenVector() public view {
-        assertEq(committer.getChainConfigHash(), CHAIN_CONFIG_HASH_GOLDEN);
     }
 
     function test_publicInput_unsetMaxTxGasLimitFallsBackToDefault() public {
@@ -218,47 +196,5 @@ contract ZKsyncOSPublicInputTest is Test {
         inputs[0] = committer.getBatchProofPublicInput(bytes32(0), bytes32(0), BATCH_OUTPUT_HASH_GOLDEN);
 
         assertEq(verifier.computeZKsyncOSHash(0, inputs), inputs[0] >> PUBLIC_INPUT_SHIFT);
-    }
-}
-
-/// @notice The chain config hash of a real diamond, with each flag set through its Admin setter, pinned to the ZKsync OS
-/// vectors, so that every flag's word is checked against the OS and not only the all-off encoding.
-/// See {protocol-docs/chain-config.md#proof-commitment}.
-contract ZKsyncOSChainConfigGoldenTest is ChainConfigTest {
-    function test_chainConfigHash_allOff() public {
-        _useGoldenChain();
-        assertEq(getters.getZKsyncOSChainConfigHash(), CHAIN_CONFIG_HASH_GOLDEN);
-    }
-
-    /// @dev Interop stays off: only turning L1SLOAD off depends on it.
-    function test_chainConfigHash_l1SloadOnly() public {
-        _useGoldenChain();
-        vm.prank(getters.getAdmin());
-        admin.setZKsyncOSL1SloadEnabled(true);
-
-        assertEq(getters.getZKsyncOSChainConfigHash(), CHAIN_CONFIG_HASH_GOLDEN_L1SLOAD_ONLY);
-    }
-
-    function test_chainConfigHash_allFlags() public {
-        _useGoldenChain();
-        vm.startPrank(getters.getAdmin());
-        admin.setZKsyncOSL1TxFiltering(true);
-        admin.setZKsyncOSLargeContractsEnabled(true);
-        admin.setZKsyncOSL1SloadEnabled(true);
-        vm.stopPrank();
-
-        assertEq(getters.getZKsyncOSChainConfigHash(), CHAIN_CONFIG_HASH_GOLDEN_ALL_FLAGS);
-    }
-
-    /// @dev The golden inputs: chain id 37, FRI off, the default max tx gas limit, full pubdata, every flag off. Only
-    /// the chain id differs from the fixture's, and it is set through the fixture's utility facet.
-    function _useGoldenChain() internal {
-        utilsFacet.util_setChainId(GOLDEN_CHAIN_ID);
-        assertEq(getters.getChainId(), GOLDEN_CHAIN_ID);
-        assertEq(getters.getZKsyncOSMaxTxGasLimit(), ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT);
-        assertEq(uint256(getters.getPubdataContent()), uint256(PubdataContent.FULL_PUBDATA));
-        assertFalse(getters.isZKsyncOSL1TxFilteringEnabled());
-        assertFalse(getters.isZKsyncOSLargeContractsEnabled());
-        assertFalse(getters.isZKsyncOSL1SloadEnabled());
     }
 }

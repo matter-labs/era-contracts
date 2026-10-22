@@ -46,8 +46,7 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _enabled Whether to enable large contracts.
     function setZKsyncOSLargeContractsEnabled(bool _enabled) external;
 
-    /// @notice Enables or disables the ZKsync OS L1SLOAD precompile. It can't be disabled while interop is enabled
-    /// for the chain. See {protocol-docs/chain-config.md#l1sload}.
+    /// @notice Enables or disables the ZKsync OS L1SLOAD precompile. See {protocol-docs/chain-config.md#l1sload}.
     /// @param _enabled Whether to enable L1SLOAD.
     function setZKsyncOSL1SloadEnabled(bool _enabled) external;
 

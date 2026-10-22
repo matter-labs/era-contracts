@@ -9,10 +9,7 @@ import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUp
 ///         `CTMUpgradeExecutor.applyCTMUpgrade(transition)` the merge derives. Its L2 leg installs
 ///         the built-ins whose code changed, derived on-chain from the release pair, and runs
 ///         `L2DefaultUpgrade` after them.
-/// @dev L1SLOAD ({protocol-docs/l1sload.md#upgrade-from-v35}) changes the executable code of the Admin, Getters,
-///      Mailbox, Executor and Committer facets, and of L2 built-ins among which the L2 Bridgehub, InteropCenter,
-///      AtomicFlowManager, L2AssetRouter and L2InteropRootStorage. Against the v35 build at `2d08bda` the Migrator
-///      facet, `DiamondInit` and `L1GenesisUpgrade` differ in their CBOR metadata alone.
+/// @dev The Migrator facet, `DiamondInit` and `L1GenesisUpgrade` differ from v35 in their metadata only.
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade

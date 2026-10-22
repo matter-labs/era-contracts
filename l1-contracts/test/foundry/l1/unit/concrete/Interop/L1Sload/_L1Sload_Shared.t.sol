@@ -12,21 +12,15 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {InteropRoot} from "contracts/common/Messaging.sol";
 import {L1View} from "contracts/common/l2-helpers/L1View.sol";
 import {L2_INTEROP_ROOT_STORAGE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {L1SloadMockUtils} from "./L1SloadMockUtils.sol";
 
-/// @notice Shared fixture for the L1SLOAD tests: the real L1 `L1MessageRoot` and `ChainRegistrationSender` behind
-/// proxies, the real L2 `L2InteropRootStorage` at its built-in address, and the mock L1SLOAD precompile
-/// ({L1SloadMockUtils}). The Bridgehub, the vault and the chains' diamonds are mocked to isolate the gating state
-/// from chain creation; the `ChainRegistrationSender` state is written through its real entry points.
-/// @dev Reads are pinned to the anchor, as on a chain: each anchor import serves the gating slots of the fixture's
-/// chains as L1 holds them at that moment ({_importL1Anchor}), and once an anchor exists every L1 helper below
-/// imports the next one, standing for the anchor the chain imports after the L1 change. A test that changes L1
-/// through the contracts directly sees the change on L2 only after it imports a newer anchor.
-/// See {protocol-docs/l1sload.md}.
+/// @notice The real L1 `L1MessageRoot` and `ChainRegistrationSender` behind proxies, the real `L2InteropRootStorage`
+/// and the mock L1SLOAD precompile, with the Bridgehub and the chains mocked.
+/// @dev Each anchor import serves the gating slots as L1 holds them at that moment, so an L1 change is visible on L2
+/// only after the next import. Once an anchor exists, the L1 helpers below import the next one.
 abstract contract L1SloadSharedTest is Test {
     uint256 internal constant L1_CHAIN_ID = 31337;
     uint256 internal constant CHAIN_ID = 271;
@@ -59,7 +53,7 @@ abstract contract L1SloadSharedTest is Test {
         l1MessageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    _l1MessageRootImplementation(chainAssetHandler),
+                    address(new L1MessageRoot(bridgehub, chainAssetHandler)),
                     makeAddr("proxyAdmin"),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -68,7 +62,7 @@ abstract contract L1SloadSharedTest is Test {
         chainRegistrationSender = ChainRegistrationSender(
             address(
                 new TransparentUpgradeableProxy(
-                    _chainRegistrationSenderImplementation(),
+                    address(new ChainRegistrationSender(IBridgehubBase(bridgehub))),
                     makeAddr("proxyAdmin"),
                     abi.encodeCall(ChainRegistrationSender.initialize, (governance))
                 )
@@ -93,17 +87,7 @@ abstract contract L1SloadSharedTest is Test {
         L1SloadMockUtils.installMock();
     }
 
-    /// @dev The implementation the `L1MessageRoot` proxy starts with.
-    function _l1MessageRootImplementation(address _chainAssetHandler) internal virtual returns (address) {
-        return address(new L1MessageRoot(bridgehub, _chainAssetHandler));
-    }
-
-    /// @dev The implementation the `ChainRegistrationSender` proxy starts with.
-    function _chainRegistrationSenderImplementation() internal virtual returns (address) {
-        return address(new ChainRegistrationSender(IBridgehubBase(bridgehub)));
-    }
-
-    /// @dev A chain registered on L1 with a settled batch in the message root, as `allowInteropPeer` requires.
+    /// @dev A chain with L1SLOAD on and a settled batch in the message root, as `allowInteropPeer` requires.
     function _registerChain(uint256 _chainId) internal {
         address diamond = makeAddr(string.concat("diamond", vm.toString(_chainId)));
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.getZKChain, (_chainId)), abi.encode(diamond));
@@ -113,23 +97,18 @@ abstract contract L1SloadSharedTest is Test {
             abi.encode(_baseTokenAssetId(_chainId))
         );
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.settlementLayer, (_chainId)), abi.encode(L1_CHAIN_ID));
-        _installChain(_chainId, diamond);
+        vm.mockCall(diamond, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_chainAdmin(_chainId)));
+        vm.mockCall(
+            diamond,
+            abi.encodeCall(IGetters.facetAddress, (IGetters.isZKsyncOSL1SloadEnabled.selector)),
+            abi.encode(diamond)
+        );
+        vm.mockCall(diamond, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(true));
 
         vm.prank(bridgehub);
         l1MessageRoot.addNewChain(_chainId, 0);
         vm.prank(diamond);
         l1MessageRoot.addChainBatchRootV32(_chainId, 1, keccak256(abi.encode("batchRoot", _chainId)));
-    }
-
-    /// @dev The chain's diamond, as the L1 contracts read it: mocked to its admin and to L1SLOAD on.
-    function _installChain(uint256 _chainId, address _diamond) internal virtual {
-        vm.mockCall(_diamond, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(_chainAdmin(_chainId)));
-        vm.mockCall(
-            _diamond,
-            abi.encodeCall(IGetters.facetAddress, (IGetters.isZKsyncOSL1SloadEnabled.selector)),
-            abi.encode(_diamond)
-        );
-        vm.mockCall(_diamond, abi.encodeCall(IGetters.isZKsyncOSL1SloadEnabled, ()), abi.encode(true));
     }
 
     function _chainAdmin(uint256 _chainId) internal returns (address) {
@@ -157,7 +136,6 @@ abstract contract L1SloadSharedTest is Test {
         _followL1();
     }
 
-    /// @dev `_chainId`'s admin allows `_peerChainId` on L1 (one side of the pair).
     function _allowInteropPeer(uint256 _chainId, uint256 _peerChainId) internal {
         vm.prank(_chainAdmin(_chainId));
         chainRegistrationSender.allowInteropPeer(_chainId, _peerChainId);
@@ -184,39 +162,27 @@ abstract contract L1SloadSharedTest is Test {
         _followL1();
     }
 
-    function _anchorRoot(
-        uint256 _blockNumber,
-        bytes32 _blockHash,
-        uint256 _timestamp
-    ) internal pure returns (InteropRoot memory) {
-        return L1SloadMockUtils.anchorRoot(_blockNumber, _blockHash, _timestamp);
-    }
-
-    /// @dev Imports an L1 block-hash anchor the way the bootloader does, and serves the fixture's gating slots as L1
-    /// holds them now.
+    /// @dev Imports an anchor the way the bootloader does, serving the gating slots as L1 holds them now.
     function _importL1Anchor(uint256 _blockNumber, bytes32 _blockHash, uint256 _timestamp) internal {
         L1SloadMockUtils.importAnchor(_blockNumber, _blockHash, _timestamp);
         L1SloadMockUtils.syncFromL1(address(chainRegistrationSender), _gatingSlots());
     }
 
-    /// @dev Imports the anchor after the current one.
     function _importNextL1Anchor() internal {
         uint256 blockNumber = rootStorage.l1AnchorBlockNumber() + 1;
         _importL1Anchor(blockNumber, keccak256(abi.encode("l1 block", blockNumber)), block.timestamp);
     }
 
-    /// @dev A chain that already reads L1 imports a newer anchor after an L1 change.
     function _followL1() internal {
         if (rootStorage.l1AnchorBlockHash() != bytes32(0)) {
             _importNextL1Anchor();
         }
     }
 
-    /// @dev Every `ChainRegistrationSender` slot the L2 reads for the fixture's chains, plus {_extraSyncedSlots}.
-    function _gatingSlots() internal view returns (bytes32[] memory slots) {
+    /// @dev Every `ChainRegistrationSender` slot the L2 reads for the fixture's chains.
+    function _gatingSlots() internal pure returns (bytes32[] memory slots) {
         uint256[3] memory chains = [CHAIN_ID, PEER_CHAIN_ID, THIRD_CHAIN_ID];
-        bytes32[] memory extra = _extraSyncedSlots();
-        slots = new bytes32[](12 + extra.length);
+        slots = new bytes32[](12);
         uint256 n = 0;
         for (uint256 i = 0; i < chains.length; ++i) {
             slots[n++] = L1View.interopSuspendedSlot(chains[i]);
@@ -227,18 +193,9 @@ abstract contract L1SloadSharedTest is Test {
                 }
             }
         }
-        for (uint256 i = 0; i < extra.length; ++i) {
-            slots[n++] = extra[i];
-        }
     }
 
-    /// @dev Further `ChainRegistrationSender` slots a suite reads.
-    function _extraSyncedSlots() internal view virtual returns (bytes32[] memory) {
-        return new bytes32[](0);
-    }
-
-    /// @dev L2 contracts read their own chain id from `block.chainid`; the L1 contracts in this fixture run on
-    /// `L1_CHAIN_ID`.
+    /// @dev L2 contracts read their own chain id from `block.chainid`.
     function _onL2() internal {
         vm.chainId(CHAIN_ID);
     }

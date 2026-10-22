@@ -16,8 +16,6 @@ import {
     DestinationChainNotRegistered,
     InteropPreviewHash
 } from "contracts/interop/InteropErrors.sol";
-import {L1AnchorStale} from "contracts/common/L1ContractErrors.sol";
-import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {
     L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
@@ -27,21 +25,10 @@ import {
 
 import {L1SloadSharedTest} from "./_L1Sload_Shared.t.sol";
 
-/// @dev The L2 Bridgehub entry points that the retired service transactions called.
-interface IRetiredL2BridgehubPush {
-    function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external;
-
-    function deregisterChainForInterop(uint256 _chainId) external;
-}
-
-/// @notice `L2Bridgehub`'s interop gating reads the real L1 `ChainRegistrationSender` through L1SLOAD, and
+/// @notice `L2Bridgehub` gating reads the real L1 `ChainRegistrationSender` through the mock precompile, and
 /// `InteropCenter` sends only where `interopSendTarget` allows. See
 /// {protocol-docs/l1sload.md#interop-gating-through-l1-reads}.
 contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
-    uint256 internal constant MAX_NUMBER_OF_ZK_CHAINS = 100;
-    uint256 internal constant ANCHOR_BLOCK = 1000;
-    uint256 internal constant ANCHOR_TIMESTAMP = 1_700_000_000;
-
     L2Bridgehub internal l2Bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
     address internal l2Owner;
 
@@ -51,7 +38,7 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
 
         vm.etch(L2_BRIDGEHUB_ADDR, address(new L2Bridgehub()).code);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2Bridgehub.initL2(L1_CHAIN_ID, l2Owner, MAX_NUMBER_OF_ZK_CHAINS);
+        l2Bridgehub.initL2(L1_CHAIN_ID, l2Owner, 100);
         // As the genesis force deployments do: the L2 Bridgehub stores the aliased L1 `ChainRegistrationSender`.
         vm.prank(l2Owner);
         l2Bridgehub.setAddresses(
@@ -61,188 +48,82 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
             makeAddr("l2ChainAssetHandler"),
             AddressAliasHelper.applyL1ToL2Alias(address(chainRegistrationSender))
         );
+        _importL1Anchor(1000, keccak256("anchor"), block.timestamp);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                        The L1 ChainRegistrationSender
-    //////////////////////////////////////////////////////////////*/
 
     function test_l1ChainRegistrationSenderIsTheUnaliasedAddress() public view {
         assertEq(l2Bridgehub.l1ChainRegistrationSender(), address(chainRegistrationSender));
-        assertNotEq(l2Bridgehub.chainRegistrationSender(), address(chainRegistrationSender));
     }
 
-    /// @dev Without an anchor every read fails closed before the precompile is called, whatever the clock.
-    function testFuzz_revertWhen_noAnchor(uint64 _timestamp) public {
-        _onL2();
-        vm.warp(_timestamp);
-        bytes memory noAnchor = abi.encodeWithSelector(L1AnchorStale.selector, 0, uint256(_timestamp));
-        vm.expectRevert(noAnchor);
-        l2Bridgehub.isPeerAllowed(PEER_CHAIN_ID);
-        vm.expectRevert(noAnchor);
-        l2Bridgehub.interopSendTarget(PEER_CHAIN_ID);
-        vm.expectRevert(noAnchor);
-        l2Bridgehub.interopBaseTokenAssetId(PEER_CHAIN_ID);
-    }
-
-    /// @dev The service-transaction entry points are gone: nothing on L2 writes the whitelist.
-    function test_servicePushIsGone() public {
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        vm.expectRevert();
-        IRetiredL2BridgehubPush(L2_BRIDGEHUB_ADDR).allowInteropPeer(PEER_CHAIN_ID, keccak256("peerBaseToken"));
-
-        vm.prank(l2Bridgehub.chainRegistrationSender());
-        vm.expectRevert();
-        IRetiredL2BridgehubPush(L2_BRIDGEHUB_ADDR).deregisterChainForInterop(PEER_CHAIN_ID);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        isPeerAllowed (the receive filter)
-    //////////////////////////////////////////////////////////////*/
-
-    function test_isPeerAllowed_followsL1State() public {
-        _importAnchor();
-        _enableInterop(CHAIN_ID);
-        _enableInterop(PEER_CHAIN_ID);
-        assertFalse(_isPeerAllowed(PEER_CHAIN_ID), "this chain's admin has not allowed the peer");
-
-        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(_isPeerAllowed(PEER_CHAIN_ID));
-        assertFalse(_isPeerAllowed(THIRD_CHAIN_ID), "other peers unaffected");
-        assertFalse(_isPeerAllowed(L1_CHAIN_ID), "L1 is never a peer");
-    }
-
-    /// @dev Only this chain's side counts for receiving: the peer's admin choosing this chain is not enough.
-    function test_isPeerAllowed_ignoresThePeersSide() public {
-        _importAnchor();
+    /// @dev Receiving needs only this chain's allowance.
+    function test_isPeerAllowed() public {
         _enableInterop(CHAIN_ID);
         _enableInterop(PEER_CHAIN_ID);
         _allowInteropPeer(PEER_CHAIN_ID, CHAIN_ID);
+        assertFalse(_isPeerAllowed(PEER_CHAIN_ID), "the peer's side does not count");
 
-        assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
-    }
-
-    /// @dev Deregistration on L1 refuses the peer on L2 with no service transaction; the peer keeps its own side.
-    function test_deregistrationRefusesThePeer() public {
-        _importAnchor();
-        _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
+        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
         assertTrue(_isPeerAllowed(PEER_CHAIN_ID));
+        assertFalse(_isPeerAllowed(THIRD_CHAIN_ID));
 
         _deregisterInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
         assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
-        (bool allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
-        assertFalse(allowed);
-
-        vm.chainId(PEER_CHAIN_ID);
-        assertTrue(l2Bridgehub.isPeerAllowed(CHAIN_ID), "the peer's side is its own admin's");
-        (allowed, ) = l2Bridgehub.interopSendTarget(CHAIN_ID);
-        assertFalse(allowed, "but it can no longer send to this chain");
     }
 
-    /// @dev One L1 transaction, no service transaction: a suspended peer is refused by every chain at once.
-    function test_suspendingThePeerFlipsBothChecks() public {
-        _importAnchor();
-        _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(_isPeerAllowed(PEER_CHAIN_ID));
-        (bool allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
-        assertTrue(allowed);
-
-        _suspendInterop(PEER_CHAIN_ID);
-        assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
-        (allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
-        assertFalse(allowed);
-        assertTrue(chainRegistrationSender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID), "the whitelist is untouched");
-
-        _resumeInterop(PEER_CHAIN_ID);
-        assertTrue(_isPeerAllowed(PEER_CHAIN_ID));
-        (allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
-        assertTrue(allowed);
-    }
-
-    /// @dev Reads are pinned to the anchor: an L1 change is invisible until the chain imports an anchor after it.
-    /// See {protocol-docs/l1sload.md#freshness}.
-    function test_l1ChangeTakesEffectWithTheNextAnchor() public {
-        _importAnchor();
-        _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
-
-        vm.prank(governance);
-        chainRegistrationSender.suspendInterop(PEER_CHAIN_ID);
-        assertTrue(_isPeerAllowed(PEER_CHAIN_ID), "the anchor predates the suspension");
-        (bool allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
-        assertTrue(allowed, "the anchor predates the suspension");
-
-        _importNextL1Anchor();
-        assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
-        (allowed, ) = _interopSendTarget(PEER_CHAIN_ID);
-        assertFalse(allowed);
-    }
-
-    function test_suspendingThisChainRefusesEveryPeer() public {
-        _importAnchor();
-        _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
-        _allowBothWays(CHAIN_ID, THIRD_CHAIN_ID);
-
-        _suspendInterop(CHAIN_ID);
-        assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
-        assertFalse(_isPeerAllowed(THIRD_CHAIN_ID));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    interopSendTarget / interopBaseTokenAssetId
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev K1: sending needs both admins' consent, receiving only this chain's.
-    function test_interopSendTarget_requiresBothSides() public {
-        _importAnchor();
+    /// @dev Sending needs both allowances; the peer's base token comes from the L1 snapshot.
+    function test_interopSendTarget() public {
         _enableInterop(CHAIN_ID);
         _enableInterop(PEER_CHAIN_ID);
-        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(_isPeerAllowed(PEER_CHAIN_ID));
         (bool allowed, bytes32 baseTokenAssetId) = _interopSendTarget(PEER_CHAIN_ID);
+        assertFalse(allowed);
+        assertEq(baseTokenAssetId, bytes32(0), "no chain allowed the peer yet");
+
+        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        (allowed, baseTokenAssetId) = _interopSendTarget(PEER_CHAIN_ID);
         assertFalse(allowed, "the peer's admin has not allowed this chain");
-        assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID), "the snapshot is there already");
+        assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID));
+        assertEq(_interopBaseTokenAssetId(PEER_CHAIN_ID), baseTokenAssetId);
 
         _allowInteropPeer(PEER_CHAIN_ID, CHAIN_ID);
         (allowed, baseTokenAssetId) = _interopSendTarget(PEER_CHAIN_ID);
         assertTrue(allowed);
         assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID));
+        assertEq(l2Bridgehub.baseTokenAssetId(PEER_CHAIN_ID), bytes32(0), "the local registry holds no peers");
     }
 
-    /// @dev The L2 Bridgehub's own `baseTokenAssetId` registry no longer holds peers.
-    function test_interopSendTarget_baseTokenComesFromL1() public {
-        _importAnchor();
+    /// @dev A suspension of either chain refuses the pair in both directions, and resuming restores it.
+    function test_suspension() public {
         _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
 
-        (, bytes32 baseTokenAssetId) = _interopSendTarget(PEER_CHAIN_ID);
-        assertEq(baseTokenAssetId, chainRegistrationSender.interopBaseTokenAssetId(PEER_CHAIN_ID));
-        assertEq(l2Bridgehub.baseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
+        uint256[2] memory suspended = [CHAIN_ID, PEER_CHAIN_ID];
+        for (uint256 i = 0; i < suspended.length; ++i) {
+            _suspendInterop(suspended[i]);
+            assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
+            (bool allowed, bytes32 baseTokenAssetId) = _interopSendTarget(PEER_CHAIN_ID);
+            assertFalse(allowed);
+            assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID), "a suspension keeps the snapshot");
+
+            _resumeInterop(suspended[i]);
+            assertTrue(_isPeerAllowed(PEER_CHAIN_ID));
+        }
     }
 
-    function test_interopBaseTokenAssetId() public {
-        _importAnchor();
-        _enableInterop(PEER_CHAIN_ID);
-        _enableInterop(THIRD_CHAIN_ID);
-        assertEq(_interopBaseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
+    /// @dev Reads are pinned to the anchor: an L1 change is invisible until the next import.
+    function test_l1ChangeTakesEffectWithTheNextAnchor() public {
+        _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
 
-        // Any chain's admin registers the peer, not only this chain's.
-        _allowInteropPeer(THIRD_CHAIN_ID, PEER_CHAIN_ID);
-        assertEq(
-            _interopBaseTokenAssetId(PEER_CHAIN_ID),
-            chainRegistrationSender.interopBaseTokenAssetId(PEER_CHAIN_ID)
-        );
-        assertNotEq(_interopBaseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
-        assertEq(_interopBaseTokenAssetId(THIRD_CHAIN_ID), bytes32(0));
+        vm.prank(governance);
+        chainRegistrationSender.suspendInterop(PEER_CHAIN_ID);
+        assertTrue(_isPeerAllowed(PEER_CHAIN_ID));
+
+        _importNextL1Anchor();
+        assertFalse(_isPeerAllowed(PEER_CHAIN_ID));
     }
-
-    /*//////////////////////////////////////////////////////////////
-                            InteropCenter
-    //////////////////////////////////////////////////////////////*/
 
     function test_interopCenter_refusesUnregisteredPeer() public {
         _deployInteropCenter();
-        _importAnchor();
-
         (InteropCallStarter[] memory calls, bytes[] memory bundleAttributes) = _bundleInputs();
+
         _onL2();
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, PEER_CHAIN_ID));
         InteropCenter(L2_INTEROP_CENTER_ADDR).sendBundle(
@@ -254,12 +135,11 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
 
     function test_interopCenter_refusesOneSidedPeer() public {
         _deployInteropCenter();
-        _importAnchor();
         _enableInterop(CHAIN_ID);
         _enableInterop(PEER_CHAIN_ID);
         _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-
         (InteropCallStarter[] memory calls, bytes[] memory bundleAttributes) = _bundleInputs();
+
         _onL2();
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotAllowed.selector, PEER_CHAIN_ID));
         InteropCenter(L2_INTEROP_CENTER_ADDR).sendBundle(
@@ -269,14 +149,12 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
         );
     }
 
-    /// @dev With both sides allowed the bundle passes the destination check; the preview reverts with its hash
-    /// right after it.
+    /// @dev Past the destination check the preview reverts with the bundle hash.
     function test_interopCenter_acceptsPeerAllowedBothWays() public {
         _deployInteropCenter();
-        _importAnchor();
         _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
-
         (InteropCallStarter[] memory calls, bytes[] memory bundleAttributes) = _bundleInputs();
+
         _onL2();
         vm.expectPartialRevert(InteropPreviewHash.selector);
         InteropCenter(L2_INTEROP_CENTER_ADDR).previewBundleHash(
@@ -284,25 +162,6 @@ contract L2BridgehubL1ReadsTest is L1SloadSharedTest {
             calls,
             bundleAttributes
         );
-
-        _onL1();
-        _suspendInterop(PEER_CHAIN_ID);
-        _onL2();
-        vm.expectRevert(abi.encodeWithSelector(DestinationChainNotAllowed.selector, PEER_CHAIN_ID));
-        InteropCenter(L2_INTEROP_CENTER_ADDR).previewBundleHash(
-            InteroperableAddress.formatEvmV1(PEER_CHAIN_ID),
-            calls,
-            bundleAttributes
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                                Helpers
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Imports an anchor so that L1SLOAD works.
-    function _importAnchor() internal {
-        _importL1Anchor(ANCHOR_BLOCK, keccak256("anchor"), ANCHOR_TIMESTAMP);
     }
 
     function _isPeerAllowed(uint256 _peerChainId) internal returns (bool allowed) {

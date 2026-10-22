@@ -1,12 +1,7 @@
 /**
- * Harness-only stand-in for the L1SLOAD witness a ZKsync OS sequencer serves, see {protocol-docs/l1sload.md}.
- *
- * Anvil L2s have no L1SLOAD precompile, so they run `MockL1SloadPrecompile` at its address
- * (src/core/predeploys.ts). The mock answers whatever its setter last stored. {syncL1Reads} plays the sequencer for
- * one anchor: it records an L1 block hash with the real `L1MessageRoot.recordL1BlockHash`, imports it on each L2
- * through the real bootloader entry point of `L2InteropRootStorage`, and serves the `ChainRegistrationSender` slots
- * the L2 contracts read, as they are at that L1 block (`eth_getStorageAt`), through the mock's setter. No storage is
- * overridden.
+ * Harness-only stand-in for the L1SLOAD witness a ZKsync OS sequencer serves. Anvil L2s run `MockL1SloadPrecompile`
+ * at the precompile address; {syncL1Reads} records an L1 anchor, imports it on each L2 through the real bootloader
+ * entry point, and feeds the mock the `ChainRegistrationSender` slots as they are at that L1 block.
  */
 
 import type { providers, BigNumber } from "ethers";

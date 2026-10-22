@@ -117,8 +117,7 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     }
 
     /// @dev A chain whose interop was enabled before v36 crosses with L1SLOAD off, and the engine turns it on
-    ///      ({protocol-docs/l1sload.md#upgrade-from-v35}); the chain config hash its next batch commits carries it. The
-    ///      message root is mocked: `ChainRegistrationSenderV36Upgrade.t.sol` runs the step against the real v35 one.
+    ///      ({protocol-docs/l1sload.md#upgrade-from-v35}). The message root is mocked to isolate the engine.
     function test_upgradeFromTransition_turnsL1SloadOnForAnInteropChain() public {
         bytes32 configHashBefore = engine.getZKsyncOSChainConfigHash();
         vm.mockCall(mockMessageRoot, abi.encodeCall(IL1MessageRoot.isInteropEnabled, (ETH_CHAIN_ID)), abi.encode(true));

@@ -16,8 +16,7 @@ import {L1AnchorStale} from "../L1ContractErrors.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Reads the interop gating state of the L1 `ChainRegistrationSender` at the chain's L1SLOAD anchor, one
-/// precompile call per check, and only while the anchor is fresh. `interopEnabled` is never read, see
-/// {protocol-docs/l1sload.md#reading-l1-state}.
+/// precompile call per check. See {protocol-docs/l1sload.md#reading-l1-state}.
 library L1View {
     /// @notice Whether `_chainId` accepts interop from `_peerChainId`: its admin allowed the peer and neither chain is
     /// suspended.
@@ -73,10 +72,8 @@ library L1View {
         return _read(_chainRegistrationSender, keys)[0];
     }
 
-    /// @notice Reverts unless the chain has an L1SLOAD anchor at most `L1_ANCHOR_MAX_LAG` old in L2 block time, so that
-    /// gating fails closed without an anchor or on stale L1 state. See {protocol-docs/l1sload.md#freshness}.
-    /// @dev Staleness is `block.timestamp > anchorTimestamp + L1_ANCHOR_MAX_LAG` computed without overflow, the
-    /// precompile's saturating rule.
+    /// @notice Reverts unless the chain has an L1SLOAD anchor at most `L1_ANCHOR_MAX_LAG` old in L2 block time.
+    /// See {protocol-docs/l1sload.md#freshness}.
     function requireFreshAnchor() internal view {
         uint256 anchorTimestamp = IL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR).l1AnchorTimestamp();
         if (

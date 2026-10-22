@@ -91,10 +91,9 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
         _recordL1Anchor();
     }
 
-    /// @notice Records an L1 block hash for chains to import as their L1SLOAD anchor, so that operators send no
-    /// separate L1 transaction for it. See {protocol-docs/l1sload.md#anchors}.
-    /// @dev Only for a chain with L1SLOAD on, and only on L1: a settlement layer's `L2MessageRoot` has no anchor
-    /// record.
+    /// @notice Records an L1 block hash for chains to import as their L1SLOAD anchor, see
+    /// {protocol-docs/l1sload.md#anchors}.
+    /// @dev Only on L1: a settlement layer's `L2MessageRoot` has no anchor record.
     function _recordL1Anchor() internal {
         if (!s.zksyncOSL1SloadEnabled || L1_CHAIN_ID != block.chainid) {
             return;

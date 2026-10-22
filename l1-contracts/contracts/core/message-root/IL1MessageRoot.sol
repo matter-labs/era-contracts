@@ -32,8 +32,7 @@ interface IL1MessageRoot {
     function isInteropEnabled(uint256 _chainId) external view returns (bool);
 
     /// @notice Records the previous L1 block's hash so that chains can import it as an L1SLOAD anchor. Permissionless,
-    /// and a no-op when the block is already recorded. Every `commitBatches` on L1 calls it.
-    /// See {protocol-docs/l1sload.md#anchors}.
+    /// and a no-op when the block is already recorded. See {protocol-docs/l1sload.md#anchors}.
     /// @return blockNumber The recorded block, `block.number - 1`.
     /// @return blockHash Its hash.
     function recordL1BlockHash() external returns (uint256 blockNumber, bytes32 blockHash);

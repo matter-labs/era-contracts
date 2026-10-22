@@ -114,8 +114,8 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
             revert InteropRootTimestampIsZero();
         }
 
-        // An L1 anchor is not a message root: it only moves the anchor, and the event still carries it into the
-        // batch's dependency roots. See {protocol-docs/l1sload.md#anchors}.
+        // An L1 anchor is not a message root; the event still carries it into the batch's dependency roots.
+        // See {protocol-docs/l1sload.md#anchors}.
         if (chainId == L1_BLOCK_HASH_IMPORT_ID) {
             _setL1Anchor(blockOrBatchNumber, sides[0], timestamp);
             emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
@@ -139,7 +139,7 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     }
 
     /// @notice Moves the L1SLOAD anchor forward to an imported L1 block. See {protocol-docs/l1sload.md#anchors}.
-    /// @dev The slots are fixed because ZKsync OS reads the anchor hash directly from this contract's storage.
+    /// @dev The slots are fixed because ZKsync OS reads them directly.
     /// @param _blockNumber The L1 block number.
     /// @param _blockHash The L1 block hash.
     /// @param _timestamp The L1 time the block hash was recorded at, which execution checks against the record.

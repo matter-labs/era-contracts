@@ -43,17 +43,15 @@ contract ChainRegistrationSender is
         internal __DEPRECATED_chainRegisteredOnChain;
 
     /// @inheritdoc IChainRegistrationSender
-    /// @dev L2 contracts read it with L1SLOAD, so its slot must stay
-    /// `CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT`.
+    /// @dev Read from L2 with L1SLOAD: its slot must stay `CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT`.
     mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
 
-    /// @notice Whether the owner suspended interop for the chain, see {isInteropSuspended}.
-    /// @dev L2 contracts read it with L1SLOAD, so its slot must stay `CHAIN_REGISTRATION_SENDER_INTEROP_SUSPENDED_SLOT`.
+    /// @notice Whether the owner suspended interop for the chain.
+    /// @dev Read from L2 with L1SLOAD: its slot must stay `CHAIN_REGISTRATION_SENDER_INTEROP_SUSPENDED_SLOT`.
     mapping(uint256 chainId => bool suspended) internal interopSuspended;
 
     /// @inheritdoc IChainRegistrationSender
-    /// @dev L2 contracts read it with L1SLOAD, so its slot must stay
-    /// `CHAIN_REGISTRATION_SENDER_INTEROP_BASE_TOKEN_ASSET_ID_SLOT`.
+    /// @dev Read from L2 with L1SLOAD: its slot must stay `CHAIN_REGISTRATION_SENDER_INTEROP_BASE_TOKEN_ASSET_ID_SLOT`.
     mapping(uint256 chainId => bytes32 baseTokenAssetId) public interopBaseTokenAssetId;
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
@@ -71,9 +69,8 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IProxyUpgradeInitializable
-    /// @dev The v36 migration: snapshots the base token of every chain a v35 admin could have allowed as a peer, so
-    /// that pairs allowed before the upgrade keep working. See {protocol-docs/l1sload.md#upgrade-from-v35}.
-    /// @dev Only the proxy admin, i.e. through `upgradeToAndCall`.
+    /// @dev The v36 snapshot backfill, see {protocol-docs/l1sload.md#upgrade-from-v35}. Only the proxy admin, i.e.
+    /// through `upgradeToAndCall`.
     function initializeUpgrade() external reinitializer(2) {
         require(msg.sender == StorageSlot.getAddressSlot(ERC1967_ADMIN_SLOT).value, Unauthorized(msg.sender));
         IMessageRootBase messageRoot = BRIDGE_HUB.messageRoot();
@@ -103,8 +100,7 @@ contract ChainRegistrationSender is
         IMessageRootBase messageRoot = BRIDGE_HUB.messageRoot();
         require(IL1MessageRoot(address(messageRoot)).isInteropEnabled(_chainId), InteropNotEnabled(_chainId));
         require(IL1MessageRoot(address(messageRoot)).isInteropEnabled(_peerChainId), InteropNotEnabled(_peerChainId));
-        // The snapshot can't drift, and having one implies MessageRoot presence, see
-        // {protocol-docs/l1sload.md#the-base-token-snapshot}.
+        // See {protocol-docs/l1sload.md#the-base-token-snapshot}.
         bytes32 peerBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_peerChainId);
         require(peerBaseTokenAssetId != bytes32(0), ZKChainNotRegistered());
         require(messageRoot.chainTreeLeafCount(_peerChainId) != 0, ChainHasNoBatchesInMessageRoot(_peerChainId));

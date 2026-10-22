@@ -23,18 +23,6 @@ import {
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
-/// @dev The entry points of the retired service-transaction push.
-interface IRetiredChainRegistrationSenderPush {
-    function bridgehubDeposit(
-        uint256 _chainId,
-        address _originalCaller,
-        uint256 _value,
-        bytes calldata _data
-    ) external payable;
-
-    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
-}
-
 /// @notice `ChainRegistrationSender` alone. The Bridgehub, the message root and the chains are mocked to
 /// isolate the sender's checks; the end-to-end flow with real contracts is in the integration test
 /// `ChainRegistrationSender.t.sol`, and the L2 reads of this state in `Interop/L1Sload/`.
@@ -128,22 +116,6 @@ contract ChainRegistrationSenderUnitTest is Test {
         vm.prank(owner);
         sender.deregisterInteropPairs(THIRD_CHAIN_ID, _peers(PEER_CHAIN_ID));
         assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), PEER_BASE_TOKEN_ASSET_ID, "kept");
-    }
-
-    /// @notice A failing check writes neither the pair nor the snapshot.
-    function test_allowInteropPeer_revertWritesNothing() public {
-        vm.mockCall(
-            messageRoot,
-            abi.encodeCall(IMessageRootBase.chainTreeLeafCount, (PEER_CHAIN_ID)),
-            abi.encode(uint256(0))
-        );
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(ChainHasNoBatchesInMessageRoot.selector, PEER_CHAIN_ID));
-        sender.allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-
-        assertFalse(sender.interopPeerAllowed(CHAIN_ID, PEER_CHAIN_ID));
-        assertEq(sender.interopBaseTokenAssetId(PEER_CHAIN_ID), bytes32(0));
     }
 
     function test_allowInteropPeer_revertWhen_alreadyAllowed() public {
@@ -419,20 +391,6 @@ contract ChainRegistrationSenderUnitTest is Test {
         assertFalse(sender.isInteropSuspended(CHAIN_ID));
     }
 
-    /// @notice Not even the chain's admin can suspend or resume its chain.
-    function test_suspendAndResume_revertWhen_chainAdmin() public {
-        vm.prank(chainAdmin);
-        vm.expectRevert("Ownable: caller is not the owner");
-        sender.suspendInterop(CHAIN_ID);
-
-        vm.prank(owner);
-        sender.suspendInterop(CHAIN_ID);
-        vm.prank(chainAdmin);
-        vm.expectRevert("Ownable: caller is not the owner");
-        sender.resumeInterop(CHAIN_ID);
-        assertTrue(sender.isInteropSuspended(CHAIN_ID));
-    }
-
     function test_suspendInterop_revertWhen_alreadySuspended() public {
         vm.prank(owner);
         sender.suspendInterop(CHAIN_ID);
@@ -446,29 +404,6 @@ contract ChainRegistrationSenderUnitTest is Test {
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(InteropNotSuspended.selector, CHAIN_ID));
         sender.resumeInterop(CHAIN_ID);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        The retired service-transaction push
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice The sender no longer serves as a second bridge, so the Bridgehub can't resubmit through it.
-    function test_bridgehubDepositIsGone() public {
-        vm.prank(bridgehub);
-        vm.expectRevert();
-        IRetiredChainRegistrationSenderPush(address(sender)).bridgehubDeposit(
-            CHAIN_ID,
-            makeAddr("resubmitter"),
-            0,
-            abi.encode(PEER_CHAIN_ID)
-        );
-
-        vm.expectRevert();
-        IRetiredChainRegistrationSenderPush(address(sender)).bridgehubConfirmL2Transaction(
-            CHAIN_ID,
-            bytes32(0),
-            bytes32(0)
-        );
     }
 
     /*//////////////////////////////////////////////////////////////

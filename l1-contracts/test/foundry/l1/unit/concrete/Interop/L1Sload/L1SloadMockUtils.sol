@@ -14,11 +14,8 @@ import {
     L2_INTEROP_ROOT_STORAGE_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Test plumbing for L2 contracts that read L1 with L1SLOAD, in suites that run in one Foundry EVM.
-/// @dev Foundry has no L1SLOAD precompile, so {installMock} etches {MockL1SloadPrecompile} at its address. This
-/// isolates the L2 contracts from the ZKsync OS precompile and its witness, which the zksync-os suites cover. The mock
-/// answers what these helpers set through its own setter, and the anchor it requires is imported through the real
-/// `L2InteropRootStorage` bootloader entry point. See {protocol-docs/l1sload.md}.
+/// @notice Helpers for L2 contracts that read L1 with L1SLOAD in a single Foundry EVM, which has no such precompile:
+/// {installMock} etches {MockL1SloadPrecompile} at its address, and the helpers set what it serves.
 library L1SloadMockUtils {
     Vm internal constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
 
@@ -28,12 +25,11 @@ library L1SloadMockUtils {
         return MockL1SloadPrecompile(L1SLOAD_PRECOMPILE_ADDRESS);
     }
 
-    /// @dev Etches the mock precompile; its served values start empty.
     function installMock() internal {
         VM.etch(L1SLOAD_PRECOMPILE_ADDRESS, address(new MockL1SloadPrecompile()).code);
     }
 
-    /// @dev The L1 block-hash anchor entry the server imports, see {protocol-docs/l1sload.md#anchors}.
+    /// @dev The L1 block-hash anchor entry the server imports.
     function anchorRoot(
         uint256 _blockNumber,
         bytes32 _blockHash,
@@ -54,7 +50,6 @@ library L1SloadMockUtils {
         );
     }
 
-    /// @dev Serves `_values` for `_keys` of `_l1Contract`.
     function setL1Storage(address _l1Contract, bytes32[] memory _keys, bytes32[] memory _values) internal {
         mock().setL1StorageValues(_l1Contract, _keys, _values);
     }
@@ -67,8 +62,7 @@ library L1SloadMockUtils {
         setL1Storage(_l1Contract, keys, values);
     }
 
-    /// @dev Serves the given slots of a real L1 contract running in the same EVM with their current values, as the
-    /// sequencer's witness source would at an anchor taken now.
+    /// @dev Serves the given slots of an L1 contract in the same EVM with their current values.
     function syncFromL1(address _l1Contract, bytes32[] memory _keys) internal {
         bytes32[] memory values = new bytes32[](_keys.length);
         for (uint256 i = 0; i < _keys.length; ++i) {
@@ -77,8 +71,7 @@ library L1SloadMockUtils {
         setL1Storage(_l1Contract, _keys, values);
     }
 
-    /// @dev What `ChainRegistrationSender.allowInteropPeer(_chainId, _peerChainId)` leaves on L1: the allowance and
-    /// the peer's base token snapshot.
+    /// @dev What `ChainRegistrationSender.allowInteropPeer(_chainId, _peerChainId)` leaves on L1.
     function allowInteropPeer(
         address _chainRegistrationSender,
         uint256 _chainId,

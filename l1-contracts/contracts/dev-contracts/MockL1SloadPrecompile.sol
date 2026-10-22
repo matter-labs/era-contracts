@@ -6,16 +6,10 @@ import {L2_INTEROP_ROOT_STORAGE_ADDR} from "../common/l2-helpers/L2ContractAddre
 import {L1_ANCHOR_MAX_LAG, L1SLOAD_MAX_KEYS} from "../common/Config.sol";
 
 /// @title MockL1SloadPrecompile
-/// @notice Stand-in for the ZKsync OS L1SLOAD precompile (`L1SLOAD_PRECOMPILE_ADDRESS`, RIP-7728) on EVMs that don't
-/// have it: the Foundry suites that run L2 contracts in one EVM, and the anvil-interop L2s. It parses the RIP-7728
-/// input `address (20 bytes) || key_1 || ... || key_k (32 bytes each)` and answers `value_1 || ... || value_k`.
-/// See {protocol-docs/l1sload.md#reading-l1-state}.
-/// @dev The values are whatever the harness last set with {setL1StorageValues}, read from the L1 contract (on anvil,
-/// `eth_getStorageAt` on the L1) or chosen by the test; the precompile reads the L1 state at the anchored block.
-/// Like the precompile, it fails consuming all gas with no anchor in `L2InteropRootStorage`, at a stale anchor (by the
-/// same saturating rule, {protocol-docs/l1sload.md#freshness}), or on input with no key, more than `L1SLOAD_MAX_KEYS`
-/// keys or a partial key. It doesn't model the precompile's cap of 64 keys per transaction: `L1Reads` calls it with
-/// `staticcall`, where EVM code can't write state, transient storage included, so it can't count across calls.
+/// @notice Stand-in for the ZKsync OS L1SLOAD precompile on EVMs that don't have it (Foundry and the anvil-interop
+/// L2s). It serves the values last set with {setL1StorageValues} and fails like the precompile on a missing or stale
+/// anchor and on malformed input.
+/// @dev It doesn't model the per-transaction cap of 64 reads: it is called with `staticcall`, so it can't count.
 contract MockL1SloadPrecompile {
     uint256 internal constant ADDRESS_LENGTH = 20;
     uint256 internal constant WORD_LENGTH = 32;

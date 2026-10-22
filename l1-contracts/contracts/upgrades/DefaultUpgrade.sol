@@ -56,8 +56,8 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
         return CTMUpgradeComposer.buildL2UpgradeTx(ICTMTransition(_transition), _bridgehub, _chainId);
     }
 
-    /// @notice Turns L1SLOAD on for a chain whose interop is enabled, see {protocol-docs/l1sload.md#upgrade-from-v35}.
-    /// @dev Only on L1, the only layer whose message root enables interop.
+    /// @notice Turns L1SLOAD on for a chain on L1 whose interop is enabled, see
+    /// {protocol-docs/l1sload.md#upgrade-from-v35}.
     function _enableL1SloadForInterop() internal {
         if (s.zksyncOSL1SloadEnabled) {
             return;

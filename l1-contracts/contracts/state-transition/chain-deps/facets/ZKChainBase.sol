@@ -153,8 +153,8 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyServiceTransaction() {
-        // Only for sending the deposit-pause request to the settlement layer's L2ChainAssetHandler when a chain
-        // migrates away from it. L2s read interop registration from L1, see {protocol-docs/l1sload.md}.
+        // For sending the deposit-pause request to the settlement layer's L2ChainAssetHandler when a chain
+        // migrates away from it.
         if (msg.sender != address(IBridgehubBase(s.bridgehub).chainAssetHandler())) {
             revert Unauthorized(msg.sender);
         }

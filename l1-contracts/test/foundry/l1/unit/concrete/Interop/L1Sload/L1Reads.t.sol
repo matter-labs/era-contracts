@@ -3,258 +3,112 @@ pragma solidity 0.8.28;
 
 import {L1Reads} from "contracts/common/l2-helpers/L1Reads.sol";
 import {L1View} from "contracts/common/l2-helpers/L1View.sol";
-import {L1SloadFailed, L1SloadInvalidKeyCount} from "contracts/common/L1ContractErrors.sol";
+import {L1AnchorStale, L1SloadFailed, L1SloadInvalidKeyCount} from "contracts/common/L1ContractErrors.sol";
 import {L1_ANCHOR_MAX_LAG, L1SLOAD_MAX_KEYS} from "contracts/common/Config.sol";
 import {L1SLOAD_PRECOMPILE_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {L1SloadSharedTest} from "./_L1Sload_Shared.t.sol";
 
-/// @dev Exposes the internal library functions.
 contract L1ReadsHarness {
-    function l1sloadMany(address _l1Contract, bytes32[] memory _keys) external view returns (bytes32[] memory) {
+    function l1sload(address _l1Contract, bytes32[] memory _keys) external view returns (bytes32[] memory) {
         return L1Reads.l1sload(_l1Contract, _keys);
     }
 
     function isReceiveAllowed(address _crs, uint256 _chainId, uint256 _peerChainId) external view returns (bool) {
         return L1View.isReceiveAllowed(_crs, _chainId, _peerChainId);
     }
-
-    function sendTarget(address _crs, uint256 _chainId, uint256 _peerChainId) external view returns (bool, bytes32) {
-        return L1View.sendTarget(_crs, _chainId, _peerChainId);
-    }
-
-    function baseTokenAssetId(address _crs, uint256 _chainId) external view returns (bytes32) {
-        return L1View.baseTokenAssetId(_crs, _chainId);
-    }
 }
 
-/// @notice `L1Reads` and `L1View` against the real L1 `ChainRegistrationSender`.
-/// See {protocol-docs/l1sload.md#reading-l1-state}.
+/// @notice `L1Reads` and the `L1View` freshness rule, see {protocol-docs/l1sload.md#freshness}. The gating
+/// semantics of `L1View` are covered through `L2Bridgehub` in `L2BridgehubL1Reads.t.sol`.
 contract L1ReadsTest is L1SloadSharedTest {
+    uint256 internal constant ANCHORED_AT = 1_700_000_000;
+
     L1ReadsHarness internal harness;
     address internal crs;
-
-    /// @dev The gas a test passes to a precompile call that must fail consuming all of it.
-    uint256 internal constant GAS_PASSED = 1_000_000;
-
-    function _oneKey(bytes32 _key) internal pure returns (bytes32[] memory keys) {
-        keys = new bytes32[](1);
-        keys[0] = _key;
-    }
-
-    /// @dev Calls the precompile directly and checks that the call fails consuming all the gas passed to it, as
-    /// ZKsync OS's does, rather than reverting and returning the rest.
-    function _assertReadConsumesAllGas(bytes32 _key) internal {
-        uint256 gasBefore = gasleft();
-        (bool success, ) = L1SLOAD_PRECOMPILE_ADDRESS.call{gas: GAS_PASSED}(abi.encodePacked(crs, _key));
-        uint256 gasUsed = gasBefore - gasleft();
-        assertFalse(success);
-        assertGe(gasUsed, GAS_PASSED);
-    }
 
     function setUp() public override {
         super.setUp();
         harness = new L1ReadsHarness();
         crs = address(chainRegistrationSender);
+        vm.warp(ANCHORED_AT);
     }
 
-    /// @dev Slot 51 is read as is by {test_readsManySlotsInOrder}.
-    function _extraSyncedSlots() internal pure override returns (bytes32[] memory slots) {
-        slots = new bytes32[](1);
-        slots[0] = bytes32(uint256(51));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                                L1Reads
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev With no anchor the precompile fails consuming the gas passed to it; the mock mirrors that.
     function test_revertWhen_noAnchor() public {
-        vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
-        harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
-
-        _assertReadConsumesAllGas(L1View.interopSuspendedSlot(CHAIN_ID));
-    }
-
-    /// @dev The precompile enforces freshness itself, so a direct read through a stale anchor fails too, consuming the
-    /// gas passed to it; the mock mirrors that. See {protocol-docs/l1sload.md#freshness}.
-    function test_revertWhen_anchorIsStale() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        vm.warp(1 + L1_ANCHOR_MAX_LAG + 1);
+        vm.expectRevert(abi.encodeWithSelector(L1AnchorStale.selector, 0, ANCHORED_AT));
+        harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID);
 
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
-        harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
-
-        _assertReadConsumesAllGas(L1View.interopSuspendedSlot(CHAIN_ID));
+        harness.l1sload(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
     }
 
-    /// @dev Staleness is computed without overflow, as ZKsync OS saturates `anchorTimestamp + L1_ANCHOR_MAX_LAG`: an
-    /// anchor timestamp whose sum would overflow reads as fresh, through `L1View` and directly. Only a forged import
-    /// could set one, and its batch can't execute on L1. See {protocol-docs/l1sload.md#freshness}.
-    function test_anchorNearTheTopOfUint256ReadsAsFresh() public {
-        _enableInterop(CHAIN_ID);
-        _enableInterop(PEER_CHAIN_ID);
-        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        bytes32[] memory keys = _oneKey(L1View.interopPeerAllowedSlot(CHAIN_ID, PEER_CHAIN_ID));
+    /// @dev Both `L1View` and the precompile refuse reads exactly past the lag.
+    function testFuzz_readsFailPastTheLag(uint256 _age) public {
+        _importL1Anchor(1, keccak256("anchor"), ANCHORED_AT);
+        uint256 age = bound(_age, 0, 10 * L1_ANCHOR_MAX_LAG);
+        vm.warp(ANCHORED_AT + age);
 
-        // The smallest timestamp whose sum overflows.
-        _importL1Anchor(1, keccak256("anchor 1"), type(uint256).max - L1_ANCHOR_MAX_LAG + 1);
-        assertEq(harness.l1sloadMany(crs, keys)[0], bytes32(uint256(1)));
-        assertTrue(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
-
-        _importL1Anchor(2, keccak256("anchor 2"), type(uint256).max);
-        assertEq(harness.l1sloadMany(crs, keys)[0], bytes32(uint256(1)));
-        assertTrue(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
+        if (age > L1_ANCHOR_MAX_LAG) {
+            vm.expectRevert(abi.encodeWithSelector(L1AnchorStale.selector, ANCHORED_AT, ANCHORED_AT + age));
+            harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID);
+            vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
+            harness.l1sload(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
+        } else {
+            harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID);
+            harness.l1sload(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
+        }
     }
 
-    function test_readsUpToTheLag() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        _suspendInterop(CHAIN_ID);
-        vm.warp(1 + L1_ANCHOR_MAX_LAG);
+    /// @dev ZKsync OS saturates `anchorTimestamp + L1_ANCHOR_MAX_LAG`, so an anchor whose sum would overflow reads as
+    /// fresh on both paths.
+    function test_freshnessSaturates() public {
+        _importL1Anchor(1, keccak256("anchor"), type(uint256).max - L1_ANCHOR_MAX_LAG + 1);
 
-        assertEq(harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)))[0], bytes32(uint256(1)));
+        assertFalse(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
+        assertEq(harness.l1sload(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)))[0], bytes32(0));
     }
 
-    function test_readsOneSlot() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        assertEq(harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)))[0], bytes32(0));
-
-        _suspendInterop(CHAIN_ID);
-        assertEq(harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)))[0], bytes32(uint256(1)));
-    }
-
-    /// @dev Values come back in the order of the keys.
     function test_readsManySlotsInOrder() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        _enableInterop(CHAIN_ID);
-        _enableInterop(PEER_CHAIN_ID);
-        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        _allowBothWays(CHAIN_ID, PEER_CHAIN_ID);
         _suspendInterop(PEER_CHAIN_ID);
+        _importL1Anchor(1, keccak256("anchor"), ANCHORED_AT);
 
         bytes32[] memory keys = new bytes32[](L1SLOAD_MAX_KEYS);
         keys[0] = L1View.interopPeerAllowedSlot(CHAIN_ID, PEER_CHAIN_ID);
         keys[1] = L1View.interopSuspendedSlot(CHAIN_ID);
         keys[2] = L1View.interopSuspendedSlot(PEER_CHAIN_ID);
         keys[3] = L1View.interopBaseTokenAssetIdSlot(PEER_CHAIN_ID);
-        keys[4] = bytes32(uint256(51));
-        bytes32[] memory values = harness.l1sloadMany(crs, keys);
+        keys[4] = L1View.interopBaseTokenAssetIdSlot(CHAIN_ID);
+        bytes32[] memory values = harness.l1sload(crs, keys);
 
         assertEq(values.length, keys.length);
         assertEq(values[0], bytes32(uint256(1)));
         assertEq(values[1], bytes32(0));
         assertEq(values[2], bytes32(uint256(1)));
         assertEq(values[3], _baseTokenAssetId(PEER_CHAIN_ID));
-        assertEq(values[4], bytes32(uint256(uint160(governance))), "slot 51, the owner, is read as is");
+        assertEq(values[4], _baseTokenAssetId(CHAIN_ID));
     }
 
-    function test_revertWhen_noKeys() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
+    function test_revertWhen_invalidKeyCount() public {
+        _importL1Anchor(1, keccak256("anchor"), ANCHORED_AT);
+
         vm.expectRevert(abi.encodeWithSelector(L1SloadInvalidKeyCount.selector, 0));
-        harness.l1sloadMany(crs, new bytes32[](0));
-    }
+        harness.l1sload(crs, new bytes32[](0));
 
-    function test_revertWhen_tooManyKeys() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
         vm.expectRevert(abi.encodeWithSelector(L1SloadInvalidKeyCount.selector, L1SLOAD_MAX_KEYS + 1));
-        harness.l1sloadMany(crs, new bytes32[](L1SLOAD_MAX_KEYS + 1));
+        harness.l1sload(crs, new bytes32[](L1SLOAD_MAX_KEYS + 1));
     }
 
-    /// @dev A precompile that answers with the wrong length is a failed read, not a short answer.
+    /// @dev A precompile answering with the wrong length is a failed read, not a short answer.
     function test_revertWhen_outputLengthIsWrong() public {
         // STOP: succeeds with empty output.
         vm.etch(L1SLOAD_PRECOMPILE_ADDRESS, hex"00");
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
-        harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
+        harness.l1sload(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
     }
 
-    /*//////////////////////////////////////////////////////////////
-                                L1View
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Each `L1View` check is one precompile call.
-    function test_isReceiveAllowed_isOneRead() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        vm.expectCall(L1SLOAD_PRECOMPILE_ADDRESS, "", 1);
-        harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID);
-    }
-
-    function test_sendTarget_isOneRead() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        vm.expectCall(L1SLOAD_PRECOMPILE_ADDRESS, "", 1);
-        harness.sendTarget(crs, CHAIN_ID, PEER_CHAIN_ID);
-    }
-
-    function test_baseTokenAssetId_isOneRead() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        vm.expectCall(L1SLOAD_PRECOMPILE_ADDRESS, "", 1);
-        harness.baseTokenAssetId(crs, PEER_CHAIN_ID);
-    }
-
-    /// @dev Receiving needs only this chain's allowance; a suspension of either chain refuses it.
-    function test_isReceiveAllowed() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        _enableInterop(CHAIN_ID);
-        _enableInterop(PEER_CHAIN_ID);
-        assertFalse(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
-
-        _allowInteropPeer(PEER_CHAIN_ID, CHAIN_ID);
-        assertFalse(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID), "the peer's side does not count");
-
-        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
-
-        _suspendInterop(CHAIN_ID);
-        assertFalse(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID), "this chain suspended");
-        _resumeInterop(CHAIN_ID);
-        _suspendInterop(PEER_CHAIN_ID);
-        assertFalse(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID), "the peer suspended");
-        _resumeInterop(PEER_CHAIN_ID);
-        assertTrue(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
-    }
-
-    /// @dev Sending needs both allowances and no suspension; the peer's base token comes back regardless.
-    function test_sendTarget() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        _enableInterop(CHAIN_ID);
-        _enableInterop(PEER_CHAIN_ID);
-        (bool allowed, bytes32 baseTokenAssetId) = harness.sendTarget(crs, CHAIN_ID, PEER_CHAIN_ID);
-        assertFalse(allowed);
-        assertEq(baseTokenAssetId, bytes32(0), "no chain allowed the peer yet");
-
-        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        (allowed, baseTokenAssetId) = harness.sendTarget(crs, CHAIN_ID, PEER_CHAIN_ID);
-        assertFalse(allowed, "the peer's admin has not allowed this chain");
-        assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID));
-
-        _allowInteropPeer(PEER_CHAIN_ID, CHAIN_ID);
-        (allowed, baseTokenAssetId) = harness.sendTarget(crs, CHAIN_ID, PEER_CHAIN_ID);
-        assertTrue(allowed);
-        assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID));
-
-        _suspendInterop(CHAIN_ID);
-        (allowed, ) = harness.sendTarget(crs, CHAIN_ID, PEER_CHAIN_ID);
-        assertFalse(allowed, "this chain suspended");
-        _resumeInterop(CHAIN_ID);
-        _suspendInterop(PEER_CHAIN_ID);
-        (allowed, baseTokenAssetId) = harness.sendTarget(crs, CHAIN_ID, PEER_CHAIN_ID);
-        assertFalse(allowed, "the peer suspended");
-        assertEq(baseTokenAssetId, _baseTokenAssetId(PEER_CHAIN_ID), "a suspension keeps the snapshot");
-    }
-
-    /// @dev A chain has a snapshot once any chain's admin allowed it, and keeps it after the pair is deregistered.
-    function test_baseTokenAssetId() public {
-        _importL1Anchor(1, keccak256("anchor"), 1);
-        _enableInterop(CHAIN_ID);
-        _enableInterop(PEER_CHAIN_ID);
-        assertEq(harness.baseTokenAssetId(crs, PEER_CHAIN_ID), bytes32(0));
-
-        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        bytes32 snapshot = chainRegistrationSender.interopBaseTokenAssetId(PEER_CHAIN_ID);
-        assertNotEq(snapshot, bytes32(0));
-        assertEq(harness.baseTokenAssetId(crs, PEER_CHAIN_ID), snapshot);
-        assertEq(harness.baseTokenAssetId(crs, CHAIN_ID), bytes32(0), "the allowing chain gets no snapshot");
-
-        _deregisterInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
-        assertEq(harness.baseTokenAssetId(crs, PEER_CHAIN_ID), snapshot);
+    function _oneKey(bytes32 _key) internal pure returns (bytes32[] memory keys) {
+        keys = new bytes32[](1);
+        keys[0] = _key;
     }
 }

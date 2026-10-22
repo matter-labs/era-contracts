@@ -40,8 +40,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
-    /// @dev Formerly the public `isPeerAllowed` mapping, the chain's side of the peer whitelist mirrored from L1 by
-    /// service transactions. Unused since the whitelist is read from L1 ({isPeerAllowed}); kept for the storage layout.
+    /// @dev Formerly the `isPeerAllowed` whitelist pushed from L1. Unused; kept for the storage layout.
     mapping(uint256 chainId => bool) private __DEPRECATED_isPeerAllowed;
 
     /// @notice Initializes the contract.

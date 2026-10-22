@@ -39,8 +39,7 @@ uint256 constant INTEROP_POOL_CHAIN_ID = uint256(keccak256("interop.pool")) - 1;
 /// @dev ERC-1967 storage slot of a proxy's admin.
 bytes32 constant ERC1967_ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
 
-/// @dev Interop-root "chain id" under which L1 block-hash anchors are imported. No chain can have it, since the
-/// Bridgehub caps chain IDs at `type(uint48).max`. See {protocol-docs/l1sload.md#anchors}.
+/// @dev Interop-root "chain id" under which L1 block-hash anchors are imported. See {protocol-docs/l1sload.md#anchors}.
 uint256 constant L1_BLOCK_HASH_IMPORT_ID = uint256(keccak256("zksync.l1-block-hash-import")) - 1;
 
 /// @dev Maximum age, in L2 block time, of the L1 anchor that L2 contracts read gating state at.
@@ -59,10 +58,8 @@ bytes32 constant L1SLOAD_ANCHOR_TIMESTAMP_SLOT = keccak256("zksync-os.l1sload.an
 /// @dev Maximum number of storage keys one L1SLOAD precompile call reads.
 uint256 constant L1SLOAD_MAX_KEYS = 5;
 
-// Storage slots of the L1 variables that L2 contracts read with L1SLOAD, in the implementation layout of the L1
-// contract (`forge inspect <Contract> storageLayout`; the proxies keep no storage in sequential slots). They are an
-// L2-facing ABI: an L1 upgrade must keep them, and `L1ViewStorageLayout.t.sol` pins them.
-// See {protocol-docs/l1sload.md#reading-l1-state}.
+// Storage slots of the L1 variables that L2 contracts read with L1SLOAD. They are an L2-facing ABI that an L1 upgrade
+// must keep, see {protocol-docs/l1sload.md#reading-l1-state}.
 
 /// @dev Slot of `ChainRegistrationSender.interopPeerAllowed`.
 uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT = 152;

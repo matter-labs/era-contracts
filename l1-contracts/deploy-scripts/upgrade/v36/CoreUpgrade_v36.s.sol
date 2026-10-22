@@ -13,11 +13,8 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 ///         their code differs from the live one) and pins them in a Core-domain
 ///         `ProxyUpgradeTransition`, which the merged bundle applies through
 ///         `CoreUpgradeExecutor.applyL1Upgrade`. This prepare emits no governance call of its own.
-/// @dev L1SLOAD ({protocol-docs/l1sload.md#upgrade-from-v35}) changes the executable code of `L1MessageRoot` (the
-///      anchor record), `ChainRegistrationSender` (suspension, the base token snapshot and its backfill) and
-///      `L1AssetRouter` (its shared base). Against the v35 build at `2d08bda` the other six differ in their CBOR
-///      metadata alone, because shared sources in their import closure (`Config.sol`, the error and interface files)
-///      changed.
+/// @dev `L1MessageRoot`, `ChainRegistrationSender` and `L1AssetRouter` change code; the others differ from v35 in
+///      their metadata only, because shared sources they import changed.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgrade_v36 is DefaultCoreUpgrade {
     /// @inheritdoc DefaultCoreUpgrade
@@ -35,9 +32,8 @@ contract CoreUpgrade_v36 is DefaultCoreUpgrade {
     }
 
     /// @inheritdoc DefaultCoreUpgrade
-    /// @dev The `ChainRegistrationSender` swap runs its `initializeUpgrade`, the base token backfill of the pairs
-    ///      allowed under v35 ({protocol-docs/l1sload.md#upgrade-from-v35}). A run that reuses the live
-    ///      implementation has no row to reinitialize.
+    /// @dev The `ChainRegistrationSender` swap runs its `initializeUpgrade` ({protocol-docs/l1sload.md#upgrade-from-v35}).
+    ///      A run that reuses the live implementation has no row to reinitialize.
     function _coreProxyUpgradeRows() internal view virtual override returns (ProxyUpgradeRow[] memory rows) {
         rows = super._coreProxyUpgradeRows();
         uint256 chainRegistrationSenderRow = uint256(L1EcosystemContract.ChainRegistrationSender);

@@ -85,8 +85,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
             address(IL1AssetRouter(address(IBridgehubBase(BRIDGE_HUB).assetRouter())).nativeTokenVault())
         );
         require(!nativeTokenVault.chainBalanceBackfillPending(_chainId), ChainBalanceBackfillPending(_chainId));
-        // Interop gating on L2 reads L1 through L1SLOAD, see {protocol-docs/l1sload.md#chain-config-flag}. A chain still
-        // on pre-v36 facets has no flag to read ({protocol-docs/l1sload.md#upgrade-window}).
+        // See {protocol-docs/l1sload.md#chain-config-flag}. A chain on pre-v36 facets routes no flag getter.
         require(
             IGetters(zkChain).facetAddress(IGetters.isZKsyncOSL1SloadEnabled.selector) != address(0),
             ChainPredatesL1Sload(_chainId)
@@ -111,7 +110,6 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     function recordL1BlockHash() external returns (uint256 blockNumber, bytes32 blockHash) {
         blockNumber = block.number - 1;
         blockHash = blockhash(blockNumber);
-        // Every chain's commit in an L1 block records the same block, so only the first call writes.
         if (recordedL1BlockHashes[blockNumber].timestamp != 0) {
             return (blockNumber, blockHash);
         }

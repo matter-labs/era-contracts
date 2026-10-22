@@ -211,8 +211,6 @@ contract AdminFacet is ZKChainBase, IAdmin, ISelfDescribingFacet {
     }
 
     /// @inheritdoc IAdmin
-    /// @dev L1 only: interop gating reads the L1 `ChainRegistrationSender`, and `isInteropEnabled` lives in the L1
-    /// MessageRoot.
     function setZKsyncOSL1SloadEnabled(bool _enabled) external onlyAdmin onlySettlementLayer onlyL1 {
         uint256 chainId = s.chainId;
         if (!_enabled && IL1MessageRoot(address(IBridgehubBase(s.bridgehub).messageRoot())).isInteropEnabled(chainId)) {

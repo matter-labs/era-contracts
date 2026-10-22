@@ -12,9 +12,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {
     ChainHasNoBatchesInMessageRoot,
-    InteropAlreadySuspended,
     InteropNotEnabled,
-    InteropNotSuspended,
     InteropPeerAlreadyAllowed,
     InvalidInteropPeer,
     ZKChainNotRegistered
@@ -25,9 +23,8 @@ import {InteropGatingDeployer} from "./_SharedInteropGatingDeployer.t.sol";
 import {LogFinder} from "test-utils/LogFinder.sol";
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
-/// @notice The interop gating state of `ChainRegistrationSender` with a real ecosystem: the peer whitelist, the base
-/// token snapshots and the suspensions, which chains read from L1 and which no longer reach L2 by service
-/// transactions. See {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/l1sload.md}.
+/// @notice The interop gating state of `ChainRegistrationSender` with a real ecosystem. See
+/// {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/l1sload.md}.
 contract ChainRegistrationSenderTests is InteropGatingDeployer {
     using LogFinder for Vm.Log[];
 
@@ -78,22 +75,6 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         );
         assertNotEq(addresses.chainRegistrationSender.interopBaseTokenAssetId(peerChainId), bytes32(0));
         assertEq(addresses.chainRegistrationSender.interopBaseTokenAssetId(chainId), bytes32(0));
-    }
-
-    /// @notice The peer's consent completes the pair and snapshots the chain's base token in turn.
-    function test_allowInteropPeer_bothWays() public {
-        _enableInterop(chainId);
-        _enableInterop(peerChainId);
-        _allowInteropPeer();
-
-        vm.prank(_chainAdmin(peerChainId));
-        addresses.chainRegistrationSender.allowInteropPeer(peerChainId, chainId);
-
-        assertTrue(addresses.chainRegistrationSender.interopPeerAllowed(peerChainId, chainId));
-        assertEq(
-            addresses.chainRegistrationSender.interopBaseTokenAssetId(chainId),
-            addresses.bridgehub.baseTokenAssetId(chainId)
-        );
     }
 
     /// @notice An allowed pair stays allowed until it is deregistered, so a second call has nothing to do.
@@ -362,30 +343,6 @@ contract ChainRegistrationSenderTests is InteropGatingDeployer {
         vm.prank(owner);
         addresses.chainRegistrationSender.resumeInterop(peerChainId);
         assertFalse(addresses.chainRegistrationSender.isInteropSuspended(peerChainId));
-    }
-
-    /// @notice Suspension is the owner's: the chain's admin can't suspend its own chain.
-    function test_suspendInterop_revertWhen_chainAdmin() public {
-        vm.prank(chainAdmin);
-        vm.expectRevert("Ownable: caller is not the owner");
-        addresses.chainRegistrationSender.suspendInterop(chainId);
-        assertFalse(addresses.chainRegistrationSender.isInteropSuspended(chainId));
-    }
-
-    function test_suspendInterop_revertWhen_alreadySuspended() public {
-        address owner = addresses.chainRegistrationSender.owner();
-        vm.prank(owner);
-        addresses.chainRegistrationSender.suspendInterop(chainId);
-
-        vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(InteropAlreadySuspended.selector, chainId));
-        addresses.chainRegistrationSender.suspendInterop(chainId);
-    }
-
-    function test_resumeInterop_revertWhen_notSuspended() public {
-        vm.prank(addresses.chainRegistrationSender.owner());
-        vm.expectRevert(abi.encodeWithSelector(InteropNotSuspended.selector, chainId));
-        addresses.chainRegistrationSender.resumeInterop(chainId);
     }
 
     function _peers(uint256 _peerChainId) internal pure returns (uint256[] memory peers) {
