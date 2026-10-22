@@ -1,0 +1,34 @@
+l1_chain_id = 1
+# zksync-os-mainnet: the ZKsync OS ecosystem on Ethereum mainnet, separate from `mainnet.toml` (the Era
+# ecosystem, bridgehub 0x303a465B…).
+#
+# Read from mainnet on 2026-10-22. Its only CTM is ZKsync OS, on v0.33.0; chains 5790, 51703, 61703,
+# 20250714, 886229927.
+testnet_verifier = false
+
+[permanent_contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+
+[core_contracts]
+bridgehub_proxy_addr = "0xEe293Fd09348e22Cde4CFc7c1ddE82953fc33027"
+# `bridgehub.owner()`, the CTM's and the ChainAssetHandler's `owner()` are the legacy `Governance`
+# below, itself owned by the 4-of-7 Safe 0x4e4943346848c4867F81dFb37c4cA9C5715A7828 (`minDelay() == 0`).
+governance_kind = "legacy"
+
+[ctm_contracts]
+ctm_proxy_addr = "0xF9Fc08eaA6dAD8DDE886F3B174a019c9ac56B2Ef"
+
+[[ctm_contracts.ctms]]
+proxy = "0xF9Fc08eaA6dAD8DDE886F3B174a019c9ac56B2Ef"
+is_zk_sync_os = true
+
+[[ownable_proxies]]
+# Legacy `Governance.sol`: owns the bridgehub, the CTM and the ChainAssetHandler. Its owner sends
+# `scheduleTransparent(op, 0)` then `execute(op)`.
+addr = "0x3d67838307eedEF76026b84170737254A5FaA438"
+kind = "legacy_governance"
+
+[[ownable_proxies]]
+# `ChainAdminOwnable`, the bridgehub's and the CTM's `admin()`; owned by the same Safe.
+addr = "0x1Cf8e760e2A85373b8d63d7bff6EbC6A56E4148f"
+kind = "oz_chain_admin"

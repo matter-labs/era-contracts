@@ -672,7 +672,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     let network = args.network.unwrap_or_else(|| {
         env_cfg
             .as_ref()
-            .filter(|cfg| cfg.env == "mainnet")
+            .filter(|cfg| cfg.is_mainnet())
             .map(|_| "mainnet".to_string())
             .unwrap_or_else(|| "sepolia".to_string())
     });

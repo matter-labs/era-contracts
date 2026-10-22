@@ -360,11 +360,11 @@ impl EnvConfig {
         self.upgrade_input.era_chain_id
     }
 
-    /// Whether this is the mainnet ecosystem. Drives testnet-vs-real contract
-    /// selection (e.g. the per-CTM verifier and the PUH redeploy: every
-    /// non-mainnet env gets the zeroed-delay `TestnetProtocolUpgradeHandler`).
+    /// Whether this is one of our mainnet ecosystems (Era or ZKsync OS). Drives testnet-vs-real
+    /// contract selection (e.g. the per-CTM verifier and the PUH redeploy: every non-mainnet env
+    /// gets the zeroed-delay `TestnetProtocolUpgradeHandler`).
     pub fn is_mainnet(&self) -> bool {
-        self.env == "mainnet"
+        matches!(self.env.as_str(), "mainnet" | "zksync-os-mainnet")
     }
 
     pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
