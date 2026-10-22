@@ -54,19 +54,19 @@ contract ZKIPLiteE2ETest is ZKIPBase {
         uint256[] memory cvsB = new uint256[](3);
         bytes[] memory bundlesA = new bytes[](3);
         bytes[] memory bundlesB = new bytes[](3);
-        bytes[] memory pres = new bytes[](3);
+        bytes[] memory preimages = new bytes[](3);
         uint256[] memory legsA = new uint256[](3);
         uint256[] memory legsB = new uint256[](3);
         for (uint256 i = 0; i < 3; ++i) {
             s[i] = _swap(A, B, (i + 1) * 10e6, (i + 1) * 5e6, deadline, keccak256(abi.encode("multi", i)));
-            (cvsA[i], cvsB[i], bundlesA[i], bundlesB[i], pres[i]) = (s[i].cvA, s[i].cvB, s[i].bundleA, s[i].bundleB, s[i].pre);
+            (cvsA[i], cvsB[i], bundlesA[i], bundlesB[i], preimages[i]) = (s[i].cvA, s[i].cvB, s[i].bundleA, s[i].bundleB, s[i].pre);
             (legsA[i], legsB[i]) = (s[i].legOfA, 1 - s[i].legOfA);
         }
         _commitLegs(simA, cvsA);
-        _debitAndSubmit(simA, 1, bundlesA, pres, legsA, usdcId, 60e6, "multi_A_debit");
+        _debitAndSubmit(simA, 1, bundlesA, preimages, legsA, usdcId, 60e6, "multi_A_debit");
         _execute(simA, 1);
         _commitLegs(simB, cvsB);
-        _debitAndSubmit(simB, 1, bundlesB, pres, legsB, eurcId, 30e6, "multi_B_debit");
+        _debitAndSubmit(simB, 1, bundlesB, preimages, legsB, eurcId, 30e6, "multi_B_debit");
         _execute(simB, 1);
 
         Credit[] memory two = new Credit[](2);
