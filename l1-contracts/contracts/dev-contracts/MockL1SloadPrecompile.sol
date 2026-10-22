@@ -14,7 +14,8 @@ import {L1_ANCHOR_MAX_LAG, L1SLOAD_MAX_KEYS} from "../common/Config.sol";
 /// `eth_getStorageAt` on the L1) or chosen by the test; the precompile reads the L1 state at the anchored block.
 /// Like the precompile, it fails consuming all gas with no anchor in `L2InteropRootStorage`, at a stale anchor (by the
 /// same saturating rule, {protocol-docs/l1sload.md#freshness}), or on input with no key, more than `L1SLOAD_MAX_KEYS`
-/// keys or a partial key.
+/// keys or a partial key. It doesn't model the precompile's cap of 64 keys per transaction: `L1Reads` calls it with
+/// `staticcall`, where EVM code can't write state, transient storage included, so it can't count across calls.
 contract MockL1SloadPrecompile {
     uint256 internal constant ADDRESS_LENGTH = 20;
     uint256 internal constant WORD_LENGTH = 32;

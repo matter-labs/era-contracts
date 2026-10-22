@@ -66,8 +66,9 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
 
 Every read at the anchor is bounded in age: a read is stale when `block.timestamp > anchorTimestamp +
 L1_ANCHOR_MAX_LAG` (1 hour), and fails closed. The sum saturates instead of overflowing, so an anchor timestamp
-ahead of the L2 clock is never stale. `anchorTimestamp` is the L1 time the anchor was recorded at; the import writes
-it and execution checks it against the L1 record ([anchors](#anchors)).
+within `L1_ANCHOR_MAX_LAG` of 2^256 reads as fresh rather than failing on the overflow. `anchorTimestamp` is the L1
+time the anchor was recorded at; the import writes it and execution checks it against the L1 record
+([anchors](#anchors)).
 
 - The bound holds for every read, however the operator composes batches.
 - A chain that never imported an anchor has `anchorTimestamp = 0` and reads nothing, whatever the clock.
@@ -94,6 +95,18 @@ root doesn't have. A chain with L1SLOAD on must therefore settle on L1. The cont
 words). The precompile has no ABI, so this is a low-level `staticcall`, and its failure is surfaced as
 `L1SloadFailed`, never handled. Any contract may call `0x101`; the precompile's per-call caps and its gas
 (`2000 + 2000·k`) and native charges bound the work.
+
+The precompile also caps a transaction at 64 keys across all its calls, frames that later revert included. The call
+that would pass the cap fails, consuming the gas passed to it, so the gating read reverts with `L1SloadFailed`. That
+is 21 receive checks or 12 send checks.
+
+- **A bundle's fixed checks fit.** Finality reads at most 24 keys (`isReceiveAllowed` for each of up to 8 legs), and
+  `append` at most 7.
+- **Reads that grow with the transaction may not.** A send reads 5 keys, plus one per asset-router call in the bundle
+  and, for an atomic bundle, one per leg from another chain. A transaction that sends or executes several bundles
+  adds their reads up. Such a transaction has to be split.
+- **The test mock doesn't model the cap.** `L1Reads` calls `MockL1SloadPrecompile` with `staticcall`, where EVM code
+  can't keep a count.
 
 `L1View` reads only `ChainRegistrationSender`, with one precompile call per check:
 
