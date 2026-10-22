@@ -108,23 +108,24 @@ test("the handoff takes the image digest and commit, nothing else", () => {
   }
 });
 
-// An unset step output is an empty string: the checkout would take the triggering ref.
+// An unset step output or env is an empty string: the checkout would take the triggering ref.
 test("deploy and the handoff run the bundle's image from a checkout of the bundle's commit", () => {
   assert.equal(handoffBundle.id, "bundle");
-  for (const [job, ref, image] of [
-    [deployJob, "${{ env.BUNDLE_COMMIT }}", undefined],
-    [handoffJob, "${{ steps.bundle.outputs.commit }}", "${{ steps.bundle.outputs.image }}"],
+  for (const [job, source, ref, image] of [
+    [deployJob, deployPull, "${{ env.BUNDLE_COMMIT }}", undefined],
+    [handoffJob, handoffBundle, "${{ steps.bundle.outputs.commit }}", "${{ steps.bundle.outputs.image }}"],
   ]) {
     const checkouts = job.steps.filter((step) => step.uses?.startsWith("actions/checkout@"));
     assert.deepEqual(
       checkouts.map((step) => step.with.ref),
       [ref]
     );
+    assert.ok(job.steps.indexOf(checkouts[0]) > job.steps.indexOf(source), "checkout before the bundle is read");
     const runs = job.steps.filter((step) => step.run?.includes("protocol-ops.sh"));
     assert.ok(runs.length > 0);
     for (const step of runs) {
-      for (const [, args] of step.run.matchAll(/protocol-ops\.sh"? (.*)/g)) {
-        assert.match(args, /^--tag "\$BUNDLE_IMAGE" /, step.name);
+      for (const [call, pinned] of step.run.matchAll(/protocol-ops\.sh("? --tag "\$BUNDLE_IMAGE" )?/g)) {
+        assert.ok(pinned, `${step.name}: ${call} without the bundle's image`);
       }
       assert.equal(step.env?.BUNDLE_IMAGE, image, step.name);
     }
