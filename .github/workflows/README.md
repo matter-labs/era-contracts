@@ -19,8 +19,9 @@ Nothing is compiled per run: the image is what gets released and tested.
    `AllContractsHashes.json` and runs the anvil-interop upgrade test (`run-upgrade-test.ts`: the
    previous release's chain states, upgraded with this image's `protocol_ops`) inside the image. The
    run summary gives the digest.
-4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata` and the chain
-   workflows; `deploy-ecosystem-upgrade` runs the image its bundle names. Partners (ADI) get the same
+4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata`, the chain
+   workflows and `execute-deployer-safe-bundles`; `deploy-ecosystem-upgrade` runs the image its
+   bundle names. Partners (ADI) get the same
    digest and run it with their own keys:
    [docs/protocol-ops-for-partners.md](../../docs/protocol-ops-for-partners.md).
 
@@ -29,9 +30,8 @@ The calldata workflows refuse an image without the `org.opencontainers.image.rev
 built with: `protocol-ops.sh` mounts the checkout's `upgrade-envs/` only when the checkout is the
 image's commit, unedited (the ecosystem workflows check that commit out), and otherwise runs only with
 `PROTOCOL_OPS_REQUIRE_RELEASE=1` (the chain workflows, whose outputs go through `EXTRA_MOUNTS`). A
-change to `upgrade-envs/`
-(salts, owners, presets) therefore needs a new image. Our deployer keys serve only `stage`, `testnet`
-and `mainnet`.
+change to `upgrade-envs/` (salts, owners, presets) therefore needs a new image. Our deployer keys
+serve only `stage`, `testnet` and `mainnet`.
 
 ## Mapping
 
