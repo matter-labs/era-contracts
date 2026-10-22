@@ -32,7 +32,9 @@
 #   PROTOCOL_OPS_REQUIRE_RELEASE=1
 #                    — Docker mode: refuse an image without the
 #                      org.opencontainers.image.revision label, i.e. one not
-#                      released by build-docker.yaml (the calldata workflows).
+#                      released by build-docker.yaml, and run it with its own
+#                      upgrade-envs/ from any checkout (outputs only through
+#                      EXTRA_MOUNTS). The calldata workflows set it.
 #   PROTOCOL_OPS_BIN — Local mode only: path to a pre-built protocol_ops
 #                      binary. If unset, the wrapper runs `cargo build
 #                      --release` inside protocol-ops/ and uses the resulting
@@ -157,17 +159,20 @@ fi
 # over it, so `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml)
 # land in the in-tree path (upgrade-envs/<v>/output/<env>/) the operator
 # commits, only when the two are the same: a local build (no revision), or this
-# checkout at the image's revision with no edits outside the outputs.
+# checkout at the image's revision with no edits outside the outputs. Otherwise
+# those writes would be lost with the container, so that takes
+# PROTOCOL_OPS_REQUIRE_RELEASE=1.
 HOST_UPGRADE_ENVS="${ERA_PATH}/l1-contracts/upgrade-envs"
 mount_upgrade_envs=""
 if [[ -z "$IMAGE_REVISION" ]]; then
   mount_upgrade_envs=1
 elif [[ "$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" == "$IMAGE_REVISION" ]] &&
-  edits="$(git -C "$ERA_PATH" status --porcelain -- l1-contracts/upgrade-envs \
+  edits="$(git -C "$ERA_PATH" status --porcelain --untracked-files=all -- l1-contracts/upgrade-envs \
     ':(exclude,glob)l1-contracts/upgrade-envs/*/output/**')" && [[ -z "$edits" ]]; then
   mount_upgrade_envs=1
-else
-  echo "Note: running with the image's own upgrade-envs/, since this checkout is not its revision ${IMAGE_REVISION} or has edits there; check that revision out to get the outputs in the checkout." >&2
+elif [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" != "1" ]]; then
+  echo "Error: this checkout is not ${IMAGE}'s revision ${IMAGE_REVISION}, or has edits in l1-contracts/upgrade-envs/: check that revision out, or set PROTOCOL_OPS_REQUIRE_RELEASE=1 to run with the image's own and take outputs through EXTRA_MOUNTS" >&2
+  exit 1
 fi
 HOST_SCRIPT_OUT="${ERA_PATH}/l1-contracts/script-out"
 mkdir -p "${HOST_SCRIPT_OUT}"
