@@ -197,13 +197,13 @@ struct GovernanceCalls {
     stage2_calls: String,
 }
 
-#[derive(Debug, Serialize)]
-struct SimulatorTransaction {
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct SimulatorTransaction {
     description: String,
     network: String,
     from: String,
-    to: String,
-    data: String,
+    pub(crate) to: String,
+    pub(crate) data: String,
     value: String,
     #[serde(rename = "valueToMint", skip_serializing_if = "Option::is_none")]
     value_to_mint: Option<String>,
@@ -235,11 +235,12 @@ struct SimulatorTransaction {
         skip_serializing_if = "Option::is_none"
     )]
     emulate_all_batches_executed_for: Option<String>,
-    tag: String,
+    pub(crate) tag: String,
     /// Recorded but not sent: the simulator skips the entry. Used for the placeholder that stands
-    /// in for a checked tag an artifact deliberately does not carry (`--ack`).
+    /// in for a checked tag an artifact deliberately does not carry (`--ack`), and for what
+    /// `sync-already-executed` finds already ran on L1.
     #[serde(rename = "alreadyExecuted", skip_serializing_if = "Option::is_none")]
-    already_executed: Option<bool>,
+    pub(crate) already_executed: Option<bool>,
 }
 
 /// Selector → time-advance map. When a sim tx targets one of these,
