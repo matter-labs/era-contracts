@@ -4,8 +4,7 @@
 # addresses here.
 l1_chain_id = 31337
 
-# protocol-ops' localhost ZK token asset ID (`LOCAL_ZK_TOKEN_ASSET_ID`), as in `local.toml`.
-zk_token_asset_id = "0x50c8daa176d24869d010ad74c2d374427601375ca2264e94f73784e299d572d4"
+zk_token_asset_id = "0x29531b98baea905c89e9dcf602fc1ec219c72187989e76331e5fa3bf89c0b124"
 
 # Anvil fixtures run `ZKsyncOSTestnetVerifier`.
 testnet_verifier = true

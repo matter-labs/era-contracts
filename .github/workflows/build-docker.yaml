@@ -8,6 +8,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main, draft-v31, "draft/**", "release/**"]
+    # ready_for_review: the release flow below skips drafts.
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
     inputs:
       ref:
@@ -136,11 +138,15 @@ jobs:
             "$IMAGE" \
             bash -c 'yarn install --frozen-lockfile && yarn test:upgrade'
 
+      # The ecosystem-upgrade workflows' commands, through protocol-ops.sh in this image. Not on
+      # drafts: it verifies the build against AllContractsHashes.json, which a PR regenerates last
+      # (docs/ai-review/docs/ci-green.md, "CI tiers").
       - name: Install Foundry (the release flow's L1)
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         uses: ./.github/actions/install-foundry
 
-      # The ecosystem-upgrade workflows' commands, through protocol-ops.sh in this image.
       - name: Run the release flow in the image
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         timeout-minutes: 30
         run: PROTOCOL_OPS_TAG="$IMAGE_TAG" bash .github/tests/release-flow.sh
 

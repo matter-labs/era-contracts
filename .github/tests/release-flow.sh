@@ -2,10 +2,12 @@
 # The ecosystem-upgrade workflows' protocol-ops commands, end to end, on the anvil-interop fixture the
 # current release upgrades from (env preset `anvil-interop`):
 #   generate  `rehearse-upgrade` and the simulator export (generate-ecosystem-upgrade-calldata.yaml);
-#   handoff   `verify-bundle` and `replay-bundle --fork-url` (its verify-bundle-handoff job);
-#   deploy    `upgrade-broadcast` with the deployer key (deploy-ecosystem-upgrade.yaml), then
-#             `replay-bundle --verify-only` on the result.
-# The bundle travels as the workflows' artifact does: copied out, mounted read-only.
+#   handoff   `replay-bundle --fork-url` (its verify-bundle-handoff job);
+#   deploy    `verify-bundle`, `upgrade-broadcast` with the deployer key (deploy-ecosystem-upgrade.yaml),
+#             then `replay-bundle --verify-only` on the result.
+# The commands only: every phase runs this checkout in one unpushed image, so the bundle names no
+# registry digest; the workflows' digest and commit checks are bundle-image-checks.test.cjs. The bundle
+# is still copied out and mounted read-only, as their downloaded artifact is.
 #
 # Runs in the image PROTOCOL_OPS_TAG names (build-docker.yaml; Linux, for the host network), else from
 # this checkout. Needs anvil, cast and jq.
@@ -39,23 +41,40 @@ send_as() {
 fixture="l1-contracts/test/anvil-interop/chain-states/$(jq -r .upgradeSourceStateVersion \
   l1-contracts/test/anvil-interop/config/anvil-config.json)"
 addresses="$fixture/addresses.json"
+governance="$(jq -r .l1Addresses.governance "$addresses")"
+ctm="$(jq -r .ctmAddresses.chainTypeManager "$addresses")"
 preset="l1-contracts/upgrade-envs/permanent-values/$ENV.toml"
-for address in "$(jq -r .l1Addresses.bridgehub "$addresses")" "$(jq -r .ctmAddresses.chainTypeManager "$addresses")"; do
-  if ! grep -qi "\"$address\"" "$preset"; then
-    echo "error: $preset does not name $address of $addresses: copy the fixture's addresses into it" >&2
+input="$(printf '%s\n' l1-contracts/upgrade-envs/v*/"$ENV".toml | sort -V | tail -1)"
+# The env must name the fixture's values; `yarn new-release` moves the fixture.
+require_named() {
+  if ! grep -qi "\"$2\"" "$1"; then
+    echo "error: $1 does not name $2 of $addresses: copy the fixture's values into it" >&2
     exit 1
   fi
-done
+}
+require_named "$preset" "$(jq -r .l1Addresses.bridgehub "$addresses")"
+require_named "$preset" "$ctm"
+require_named "$preset" "$(jq -r .zkToken.assetId "$addresses")"
+require_named "$input" "$governance"
+require_named "$input" "$ctm"
 
 echo "== L1: $fixture"
+if cast chain-id --rpc-url "$L1" >/dev/null 2>&1; then
+  echo "error: $L1 is in use" >&2
+  exit 1
+fi
 work="$(mktemp -d)"
 gunzip -c "$fixture/31337.json.gz" >"$work/l1-state.json"
 anvil --port "${L1##*:}" --chain-id 31337 --accounts 10 --balance 10000 --gas-limit 100000000 \
   --block-base-fee-per-gas 0 --auto-impersonate --load-state "$work/l1-state.json" >"$work/anvil.log" 2>&1 &
 anvil_pid=$!
-trap 'kill "$anvil_pid"' EXIT
+trap 'kill "$anvil_pid" 2>/dev/null || true; rm -rf "$work"' EXIT
 for _ in $(seq 60); do
   cast chain-id --rpc-url "$L1" >/dev/null 2>&1 && break
+  if ! kill -0 "$anvil_pid" 2>/dev/null; then
+    cat "$work/anvil.log" >&2
+    exit 1
+  fi
   sleep 1
 done
 cast chain-id --rpc-url "$L1" >/dev/null
@@ -63,8 +82,6 @@ cast chain-id --rpc-url "$L1" >/dev/null
 # Production-shaped ownership, as the upgrade test's `transferL1Ownership`
 # (l1-contracts/test/anvil-interop/src/helpers/pipeline-upgrade-runner.ts): governance owns the
 # ecosystem contracts and the CTM, and an EOA the CTM's ProxyAdmin.
-governance="$(jq -r .l1Addresses.governance "$addresses")"
-ctm="$(jq -r .ctmAddresses.chainTypeManager "$addresses")"
 for contract in $(jq -r '.l1Addresses | .bridgehub, .l1SharedBridge, .l1NativeTokenVault, .l1NullifierProxy // empty' \
   "$addresses") "$ctm"; do
   owner="$(cast call "$contract" 'owner()(address)' --rpc-url "$L1")"
@@ -87,6 +104,12 @@ out="${outputs[0]}"
 po ecosystem governance-toml-to-simulator --env "$ENV" --include-manifest "$out/prepare/manifest.json" \
   --camp-a-signers "$DEPLOYER" --emit-sim-inputs "$out/sim-inputs"
 po ecosystem governance-toml-to-simulator --env "$ENV" --out "$out/transaction-simulator.json"
+if ! jq -e '.bundles' "$out/sim-inputs/manifest.json" >/dev/null ||
+  ! jq -e --arg from "$governance" 'any(.[]; (.from | ascii_downcase) == ($from | ascii_downcase))' \
+    "$out/transaction-simulator.json" >/dev/null; then
+  echo "error: the simulator export has no sim-inputs manifest or no governance call" >&2
+  exit 1
+fi
 
 echo "== handoff"
 bundle="$work/bundle"
@@ -94,7 +117,6 @@ result="$work/result"
 cp -R "$out/deploy-bundle" "$bundle"
 mkdir "$result"
 export EXTRA_MOUNTS="$bundle:$bundle:ro $result:$result"
-po ecosystem verify-bundle "$bundle"
 po ecosystem replay-bundle --bundle "$bundle" --fork-url "$L1"
 if [[ -n "${PROTOCOL_OPS_TAG:-}" ]] && ! jq -e --arg tag "$PROTOCOL_OPS_TAG" --arg commit "$(git rev-parse HEAD)" \
   '(.protocol_ops_image.reference | endswith($tag)) and .contracts_commit == $commit
@@ -105,8 +127,12 @@ if [[ -n "${PROTOCOL_OPS_TAG:-}" ]] && ! jq -e --arg tag "$PROTOCOL_OPS_TAG" --a
 fi
 
 echo "== deploy"
+po ecosystem verify-bundle "$bundle"
 po ecosystem upgrade-broadcast --manifest "$bundle/prepare/manifest.json" --l1-rpc-url "$L1" \
   --key "$DEPLOYER=$DEPLOYER_KEY" --skip-unkeyed --max-gas-price-gwei 500 --out "$result/deploy-executed.json"
-[[ -s "$result/transactions.txt" ]]
+if [[ ! -s "$result/transactions.txt" ]]; then
+  echo "error: upgrade-broadcast recorded no transactions in $result/transactions.txt" >&2
+  exit 1
+fi
 po ecosystem replay-bundle --bundle "$bundle" --rpc "$L1" --verify-only
 echo "Release flow passed"
