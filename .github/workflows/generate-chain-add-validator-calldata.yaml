@@ -4,20 +4,20 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment"
+        description: "Target environment = basename of upgrade-envs/permanent-values/<env>.toml (read by protocol_ops --env)"
         required: true
         type: choice
-        options: [stage, stage-interop-tests, sepolia, mainnet]
+        options: [stage, testnet, mainnet, adi]
       protocol_ops_tag:
-        description: "protocol-ops Docker image tag"
+        description: "protocol-ops image released by build-docker.yaml: sha256:<digest>, or a tag"
         required: true
         type: string
       l1_rpc_url:
         description: "L1 RPC URL"
         required: true
         type: string
-      chain_name:
-        description: "Chain name (key in ecosystem.yaml `chains:`)"
+      chain_id:
+        description: "Numeric chain id of the ZK chain (protocol_ops --chain-id)"
         required: true
         type: string
       validator_address:
@@ -38,25 +38,35 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      ENV_DIR: environments/${{ inputs.environment }}
       WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
-      EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
+      # `--out` inside the container lands where upload-artifact reads it.
+      EXTRA_MOUNTS: ${{ github.workspace }}/protocol-ops-workdir:/contracts/work
+      PROTOCOL_OPS_REQUIRE_RELEASE: "1"
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Run add-validator
+        env:
+          PROTOCOL_OPS_TAG: ${{ inputs.protocol_ops_tag }}
+          L1_RPC_URL: ${{ inputs.l1_rpc_url }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          CHAIN_ID: ${{ inputs.chain_id }}
+          VALIDATOR_ADDRESS: ${{ inputs.validator_address }}
+          ACCESS_CONTROL_RESTRICTION: ${{ inputs.access_control_restriction }}
         run: |
           mkdir -p "$WORK_DIR"
-          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+          bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" \
             chain add-validator \
-            --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
-            --ecosystem                  /contracts/env/ecosystem.yaml \
-            --chain                      "${{ inputs.chain_name }}" \
-            --validator-address          "${{ inputs.validator_address }}" \
-            --access-control-restriction "${{ inputs.access_control_restriction }}" \
-            --out /contracts/work/session/safe
+            --l1-rpc-url                 "$L1_RPC_URL" \
+            --env                        "$ENVIRONMENT" \
+            --chain-id                   "$CHAIN_ID" \
+            --validator-address          "$VALIDATOR_ADDRESS" \
+            --access-control-restriction "$ACCESS_CONTROL_RESTRICTION" \
+            --out /contracts/work/safe
       - uses: actions/upload-artifact@v4
         with:
-          name: safe-bundles-chain-add-validator-${{ inputs.chain_name }}-${{ inputs.environment }}
+          name: safe-bundles-chain-add-validator-${{ inputs.chain_id }}-${{ inputs.environment }}
           path: ${{ env.WORK_DIR }}/safe/
           if-no-files-found: error
           retention-days: 30

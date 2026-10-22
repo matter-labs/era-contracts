@@ -26,6 +26,11 @@ jobs:
       - name: Lint errors
         run: yarn l1 errors-lint --check
 
+      - name: Test the calldata workflows' guards and protocol-ops.sh
+        run: >-
+          node --test .github/tests/deploy-verify-only.test.cjs .github/tests/bundle-image-checks.test.cjs
+          .github/tests/protocol-ops-wrapper.test.cjs
+
   codespell:
     runs-on: ubuntu-latest
     steps:

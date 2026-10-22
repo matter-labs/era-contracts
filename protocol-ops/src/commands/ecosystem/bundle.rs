@@ -59,17 +59,14 @@ const OPTIONAL_BUNDLE_FILES: [&str; 2] =
 /// bundle work dir.
 const TRANSACTIONS_LOG: &str = "transactions.txt";
 
-/// The zk-governance commit the governance redeploy is built from by default (same default as
-/// the generate workflow input). Recorded in the bundle as provenance only.
-const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d1772";
-
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
 /// replay can run next to a rehearsal of the same env.
-const ENV_ANVIL_PORTS: [(&str, u16); 4] = [
+const ENV_ANVIL_PORTS: [(&str, u16); 5] = [
     ("stage", 29_545),
     ("testnet", 29_547),
     ("mainnet", 29_549),
     ("adi", 29_551),
+    ("anvil-interop", 29_553),
 ];
 const REPLAY_PORT_OFFSET: u16 = 1;
 const ANVIL_GAS_PRICE_WEI: u64 = 1_000_000_000;
@@ -93,6 +90,14 @@ const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
     "protocol-ops/src",
     "system-contracts/contracts",
 ];
+
+/// Set in the protocol-ops image (`docker/protocol/Dockerfile`): the commits its sources and its
+/// zk-governance checkout were built from.
+const IMAGE_CONTRACTS_COMMIT_ENV: &str = "PROTOCOL_OPS_CONTRACTS_COMMIT";
+const IMAGE_ZK_GOVERNANCE_COMMIT_ENV: &str = "PROTOCOL_OPS_ZK_GOVERNANCE_COMMIT";
+/// Set by `protocol-ops.sh --tag`: the image reference it ran and that image's registry digest.
+const IMAGE_REFERENCE_ENV: &str = "PROTOCOL_OPS_IMAGE";
+const IMAGE_DIGEST_ENV: &str = "PROTOCOL_OPS_IMAGE_DIGEST";
 
 /// [`CONTRACT_SOURCE_PATHSPECS`] plus the upgrade's own input TOMLs.
 fn contract_source_pathspecs(upgrade: &str) -> Vec<String> {
@@ -133,6 +138,9 @@ pub struct DeployBundleMetadata {
     pub upgrade: String,
     pub env: String,
     pub contracts_commit: String,
+    /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in a
+    /// protocol-ops image built with its commit, which runs that commit's sources and configs (see
+    /// `protocol-ops.sh`).
     pub contracts_worktree_dirty: bool,
     pub all_contracts_hashes_sha256: String,
     pub l1: L1Provenance,
@@ -140,8 +148,19 @@ pub struct DeployBundleMetadata {
     pub zk_governance_commit: Option<String>,
     pub toolchain: Toolchain,
     pub generated_by: Option<GeneratedBy>,
+    /// The protocol-ops image the bundle was generated in; absent when generated from a checkout.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol_ops_image: Option<ImageProvenance>,
     /// Bundle-relative POSIX path → SHA-256, for every file except this one.
     pub files: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ImageProvenance {
+    /// The reference the run was started with: `<repo>:<tag>` or `<repo>@sha256:<digest>`.
+    pub reference: String,
+    /// `<repo>@sha256:<digest>`; absent for an image that never came from a registry.
+    pub digest: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -241,6 +260,59 @@ fn github_run_provenance() -> Option<GeneratedBy> {
     })
 }
 
+fn env_value(name: &str) -> Option<String> {
+    std::env::var(name).ok().filter(|value| !value.is_empty())
+}
+
+fn image_provenance() -> Option<ImageProvenance> {
+    Some(ImageProvenance {
+        reference: env_value(IMAGE_REFERENCE_ENV)?,
+        digest: env_value(IMAGE_DIGEST_ENV),
+    })
+}
+
+/// The zk-governance commit the redeploy is built from: the image's (`image`), which `flag` may
+/// only repeat, else `flag`.
+fn zk_governance_commit(
+    flag: Option<&str>,
+    image: Option<String>,
+) -> anyhow::Result<Option<String>> {
+    match (flag, image) {
+        (Some(flag), Some(image)) if flag != image => anyhow::bail!(
+            "--zk-governance-commit {flag}, but this protocol-ops image holds zk-governance {image}"
+        ),
+        (_, Some(image)) => Ok(Some(image)),
+        (flag, None) => Ok(flag.map(str::to_string)),
+    }
+}
+
+/// `image_commit`, the commit the protocol-ops image was built from, else the checkout's HEAD.
+fn contracts_commit(repository_root: &Path, image_commit: Option<&str>) -> String {
+    image_commit
+        .map(str::to_string)
+        .or_else(|| try_capture("git", &["rev-parse", "HEAD"], repository_root))
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+/// The sources that decide the bundle's bytes and differ from [`contracts_commit`], one per
+/// line (empty when none do), or `None` when that cannot be told.
+fn source_changes(
+    repository_root: &Path,
+    upgrade: &str,
+    image_commit: Option<&str>,
+) -> Option<String> {
+    // The image has no git; see `DeployBundleMetadata::contracts_worktree_dirty`.
+    if image_commit.is_some() {
+        return Some(String::new());
+    }
+    let pathspecs = contract_source_pathspecs(upgrade);
+    let git_status_args: Vec<&str> = ["status", "--porcelain", "--"]
+        .into_iter()
+        .chain(pathspecs.iter().map(String::as_str))
+        .collect();
+    try_capture("git", &git_status_args, repository_root)
+}
+
 /// Every regular file below `directory`, as directory-relative POSIX paths.
 fn list_files(directory: &Path, prefix: &str, out: &mut Vec<String>) -> anyhow::Result<()> {
     for entry in fs::read_dir(directory).with_context(|| format!("list {}", directory.display()))? {
@@ -308,26 +380,21 @@ pub fn pack_deploy_bundle(
         .map(|relative| Ok((relative.clone(), sha256_file(&bundle_dir.join(relative))?)))
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
 
-    let pathspecs = contract_source_pathspecs(upgrade);
-    let git_status_args: Vec<&str> = ["status", "--porcelain", "--"]
-        .into_iter()
-        .chain(pathspecs.iter().map(String::as_str))
-        .collect();
-    let source_status = try_capture("git", &git_status_args, repository_root);
+    let image_commit = env_value(IMAGE_CONTRACTS_COMMIT_ENV);
+    let source_status = source_changes(repository_root, upgrade, image_commit.as_deref());
     match source_status.as_deref() {
         Some("") => {}
         Some(dirty) => logger::warn(format!(
             "contract sources differ from the commit; the bundle is marked dirty:
 {dirty}"
         )),
-        None => logger::warn("git status failed; the bundle is marked dirty"),
+        None => logger::warn("source status unknown; the bundle is marked dirty"),
     }
     let metadata = DeployBundleMetadata {
         schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
         upgrade: upgrade.to_string(),
         env: env_cfg.env.clone(),
-        contracts_commit: try_capture("git", &["rev-parse", "HEAD"], repository_root)
-            .unwrap_or_else(|| "unknown".to_string()),
+        contracts_commit: contracts_commit(repository_root, image_commit.as_deref()),
         contracts_worktree_dirty: source_status
             .as_deref()
             .is_none_or(|status| !status.is_empty()),
@@ -347,6 +414,7 @@ pub fn pack_deploy_bundle(
             foundry_zksync: provenance.foundry_zksync_version.clone(),
         },
         generated_by: github_run_provenance(),
+        protocol_ops_image: image_provenance(),
         files,
     };
     let json = serde_json::to_string_pretty(&metadata)? + "\n";
@@ -779,9 +847,9 @@ pub struct RehearseUpgradeArgs {
     #[clap(long, hide = true)]
     pub gw_rpc_url: Option<String>,
     /// zk-governance commit the governance redeploy's sources (`ZK_GOVERNANCE_DIR`) are checked
-    /// out at; recorded in the bundle as provenance.
-    #[clap(long, default_value = DEFAULT_ZK_GOVERNANCE_COMMIT)]
-    pub zk_governance_commit: String,
+    /// out at; recorded in the bundle as provenance. In the protocol-ops image, the one it holds.
+    #[clap(long)]
+    pub zk_governance_commit: Option<String>,
     /// An `[upgrade_executors]` record file for `verify-bootstrap --executor-record`, repeatable
     /// (`prepare-all` only). Needed when the package does not carry the records of the executors
     /// it drives itself, as an ordinary upgrade's package does not.
@@ -795,6 +863,10 @@ pub struct RehearseUpgradeArgs {
 /// Fork L1, prepare the upgrade, pack the deploy bundle, replay it and run the upgrade's checks.
 pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<()> {
     warn_ignored_gw_rpc_url(args.gw_rpc_url.as_deref());
+    let zk_governance_commit = zk_governance_commit(
+        args.zk_governance_commit.as_deref(),
+        env_value(IMAGE_ZK_GOVERNANCE_COMMIT_ENV),
+    )?;
     let env_cfg = EnvConfig::load(&args.env)?;
     let descriptor = UpgradeDescriptor::load(&args.upgrade)?;
     anyhow::ensure!(
@@ -885,7 +957,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &BundleProvenance {
             deployer: Some(args.deployer_address),
             forked_at_block: Some(forked_at_block),
-            zk_governance_commit: Some(args.zk_governance_commit.clone()),
+            zk_governance_commit,
             foundry_zksync_version: args.foundry_zksync_version.clone(),
         },
     )?;
@@ -1065,7 +1137,8 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
     anyhow::ensure!(
         local_hashes == metadata.all_contracts_hashes_sha256,
         "AllContractsHashes.json differs from the bundle's (bundle {}, commit {}; local {}). \
-         The verifier will not recognise the deployed bytecode: check out {} first.",
+         The verifier will not recognise the deployed bytecode: replay from a checkout of {}, or \
+         in the bundle's protocol_ops_image when it names one.",
         metadata.all_contracts_hashes_sha256,
         metadata.contracts_commit,
         local_hashes,
@@ -1212,15 +1285,12 @@ mod tests {
             repo.path(),
         )
         .is_some());
-        let status = || {
-            let pathspecs = contract_source_pathspecs(DEFAULT_UPGRADE);
-            let args: Vec<&str> = ["status", "--porcelain", "--"]
-                .into_iter()
-                .chain(pathspecs.iter().map(String::as_str))
-                .collect();
-            try_capture("git", &args, repo.path()).unwrap()
-        };
+        let status = || source_changes(repo.path(), DEFAULT_UPGRADE, None).unwrap();
         assert!(status().is_empty());
+        assert_eq!(
+            contracts_commit(repo.path(), None),
+            try_capture("git", &["rev-parse", "HEAD"], repo.path()).unwrap()
+        );
         write(&repo.path().join(output), "regenerated\n");
         assert!(
             status().is_empty(),
@@ -1235,6 +1305,13 @@ mod tests {
             write(&repo.path().join(path), "original\n");
             assert!(status().is_empty());
         }
+
+        // In the image, which has no git: its own commit, clean.
+        assert_eq!(
+            source_changes(repo.path(), DEFAULT_UPGRADE, Some("abc")).as_deref(),
+            Some("")
+        );
+        assert_eq!(contracts_commit(repo.path(), Some("abc")), "abc");
     }
 
     const TARGET: &str = "0x0000000000000000000000000000000000000002";
@@ -1259,6 +1336,7 @@ mod tests {
             },
             deployer_address: Some(TARGET.parse().unwrap()),
             zk_governance_commit: None,
+            protocol_ops_image: None,
             toolchain: Toolchain {
                 forge: "test".into(),
                 rustc: "test".into(),
@@ -1310,7 +1388,7 @@ mod tests {
     /// `[contracts]`, or a CTM array that resolves to nothing).
     #[test]
     fn every_committed_env_config_loads() {
-        for env in ["stage", "testnet", "mainnet", "adi"] {
+        for env in ["stage", "testnet", "mainnet", "adi", "anvil-interop"] {
             let cfg = match EnvConfig::load(env) {
                 Ok(cfg) => cfg,
                 // no checkout around the test binary
@@ -1335,6 +1413,48 @@ mod tests {
         let dir = valid_bundle();
         let metadata = verify_bundle_integrity(dir.path()).unwrap();
         assert_eq!(metadata.files.len(), 3);
+    }
+
+    #[test]
+    fn zk_governance_commit_is_the_images() {
+        let image = || Some("image".to_string());
+        assert_eq!(zk_governance_commit(None, None).unwrap(), None);
+        assert_eq!(
+            zk_governance_commit(Some("flag"), None).unwrap().as_deref(),
+            Some("flag")
+        );
+        assert_eq!(
+            zk_governance_commit(None, image()).unwrap().as_deref(),
+            Some("image")
+        );
+        assert_eq!(
+            zk_governance_commit(Some("image"), image())
+                .unwrap()
+                .as_deref(),
+            Some("image")
+        );
+        assert!(zk_governance_commit(Some("flag"), image()).is_err());
+    }
+
+    #[test]
+    fn image_provenance_is_optional_in_the_metadata() {
+        let bundle = tempfile::tempdir().unwrap();
+        let mut metadata = write_metadata(bundle.path(), &[]);
+        let json = serde_json::to_value(&metadata).unwrap();
+        assert!(json.get("protocol_ops_image").is_none());
+        let parsed: DeployBundleMetadata = serde_json::from_value(json).unwrap();
+        assert_eq!(parsed.protocol_ops_image, None);
+
+        metadata.protocol_ops_image = Some(ImageProvenance {
+            reference: "ghcr.io/matter-labs/protocol-ops:tag".into(),
+            digest: Some(format!(
+                "ghcr.io/matter-labs/protocol-ops@sha256:{}",
+                "a".repeat(64)
+            )),
+        });
+        let parsed: DeployBundleMetadata =
+            serde_json::from_value(serde_json::to_value(&metadata).unwrap()).unwrap();
+        assert_eq!(parsed.protocol_ops_image, metadata.protocol_ops_image);
     }
 
     #[test]
