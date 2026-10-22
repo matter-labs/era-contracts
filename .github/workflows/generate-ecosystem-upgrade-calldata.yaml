@@ -81,7 +81,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # Or locally from the downloaded bundle, in the image it records
 # (`protocol_ops_image.digest` in `bundle-metadata.json`) — same code path:
 #
-#   EXTRA_MOUNTS="$PWD/<unpacked-bundle>:/contracts/bundle" \
+#   EXTRA_MOUNTS="$PWD/<unpacked-bundle>:/contracts/bundle:ro" \
 #     ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
 #     --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 #
@@ -96,7 +96,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # held against its `AllContractsHashes.json`, and checks it on L1. The
 # governance owner and CREATE2 salts it needs come from the env config:
 #
-#   EXTRA_MOUNTS="$PWD/<unpacked-bundle>:/contracts/bundle" \
+#   EXTRA_MOUNTS="$PWD/<unpacked-bundle>:/contracts/bundle:ro" \
 #     ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
 #     --bundle /contracts/bundle --rpc <l1-rpc> --verify-only    # already deployed
 #   #  … or --fork-url <l1-rpc> to rehearse the whole thing on a throw-away fork

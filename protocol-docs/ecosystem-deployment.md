@@ -244,8 +244,8 @@ the ZK token asset id from `l1-contracts/upgrade-envs/permanent-values/<name>.to
 `permanent-values` requires `bridgehub_proxy_addr`, `--env` cannot be used for an ecosystem that
 does not exist yet; a fresh ecosystem is deployed with flags.
 
-When `--ctm-proxy` is omitted, `chain init` takes the `--env` preset's ZKsync OS CTM. Without one
-it takes the CTM of the first chain registered on the Bridgehub, which is silently wrong in an
+When `--ctm-proxy` is omitted, `chain init` takes the `--env` preset's ZKsync OS CTM, unless
+`--bridgehub` names another ecosystem. Otherwise it takes the CTM of the first chain registered on the Bridgehub, which is silently wrong in an
 ecosystem with several CTMs, and on a Bridgehub without chains it scans `ChainTypeManagerAdded`
 from block 0, which hosted RPCs may refuse.
 
