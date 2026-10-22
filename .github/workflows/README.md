@@ -27,7 +27,9 @@ Nothing is compiled per run: the image is what gets released and tested.
 The calldata workflows refuse an image without the `org.opencontainers.image.revision` label
 `build-docker` sets (such as those `build-and-push-docker` pushes), and run it with the configs it was
 built with: `protocol-ops.sh` mounts the checkout's `upgrade-envs/` only when the checkout is the
-image's commit, unedited (the ecosystem workflow checks that commit out). A change to `upgrade-envs/`
+image's commit, unedited (the ecosystem workflows check that commit out), and otherwise runs only with
+`PROTOCOL_OPS_REQUIRE_RELEASE=1` (the chain workflows, whose outputs go through `EXTRA_MOUNTS`). A
+change to `upgrade-envs/`
 (salts, owners, presets) therefore needs a new image. Our deployer keys serve only `stage`, `testnet`
 and `mainnet`.
 

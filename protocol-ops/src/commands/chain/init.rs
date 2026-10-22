@@ -120,11 +120,8 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     let owner = Wallet::resolve(args.owner, None, &deployer)?;
 
-    let env_ctm = match args.topology.env_config()? {
-        Some(env) => preset_ctm(env.ctms())?,
-        None => None,
-    };
-    let ctm_proxy = match args.ctm_proxy.or(env_ctm) {
+    let env = args.topology.env_config()?;
+    let ctm_proxy = match given_ctm(args.ctm_proxy, env.as_ref().map(|env| env.ctms()))? {
         Some(ctm) => ctm,
         None => crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, bridgehub)
             .await
@@ -397,14 +394,18 @@ impl FullChainInitOutput {
     }
 }
 
-/// The CTM an env preset names for a new chain: its one ZKsync OS CTM, `None` when it lists
-/// none. The first chain registered on L1 may sit on another (Era) CTM, so discovery is the
-/// fallback.
-fn preset_ctm(ctms: &[CtmEntry]) -> anyhow::Result<Option<Address>> {
-    match ctms {
-        [] => Ok(None),
-        [ctm] => Ok(Some(ctm.proxy)),
-        _ => anyhow::bail!("the env preset lists {} CTMs: pass --ctm-proxy", ctms.len()),
+/// The CTM a new chain registers on, short of discovery: `--ctm-proxy`, else the env preset's one
+/// ZKsync OS CTM (`None` when it lists none). The first chain registered on L1 may sit on another
+/// (Era) CTM, so discovery is the fallback.
+fn given_ctm(
+    ctm_proxy: Option<Address>,
+    preset_ctms: Option<&[CtmEntry]>,
+) -> anyhow::Result<Option<Address>> {
+    match (ctm_proxy, preset_ctms.unwrap_or_default()) {
+        (Some(ctm), _) => Ok(Some(ctm)),
+        (None, []) => Ok(None),
+        (None, [ctm]) => Ok(Some(ctm.proxy)),
+        (None, ctms) => anyhow::bail!("the env preset lists {} CTMs: pass --ctm-proxy", ctms.len()),
     }
 }
 
@@ -445,20 +446,25 @@ mod tests {
     }
 
     #[test]
-    fn preset_ctm_is_the_only_one_it_lists() {
-        assert_eq!(preset_ctm(&[]).unwrap(), None);
-        assert_eq!(
-            preset_ctm(&[ctm(1)]).unwrap(),
-            Some(Address::repeat_byte(1))
-        );
-        assert!(preset_ctm(&[ctm(1), ctm(2)]).is_err());
+    fn given_ctm_is_the_flag_else_the_presets_only_one() {
+        let (one, flag) = (Address::repeat_byte(1), Address::repeat_byte(9));
+        assert_eq!(given_ctm(None, None).unwrap(), None);
+        assert_eq!(given_ctm(None, Some(&[])).unwrap(), None);
+        assert_eq!(given_ctm(None, Some(&[ctm(1)])).unwrap(), Some(one));
+        assert!(given_ctm(None, Some(&[ctm(1), ctm(2)])).is_err());
+        let two = [ctm(1), ctm(2)];
+        assert_eq!(given_ctm(Some(flag), Some(&two)).unwrap(), Some(flag));
+        assert_eq!(given_ctm(Some(flag), Some(&[ctm(1)])).unwrap(), Some(flag));
     }
 
     #[test]
     fn committed_presets_name_one_os_ctm() {
         for env in ["stage", "testnet", "mainnet", "adi"] {
             let cfg = crate::common::env_config::EnvConfig::load(env).unwrap();
-            assert!(preset_ctm(cfg.ctms()).unwrap().is_some(), "{env}");
+            assert!(
+                given_ctm(None, Some(cfg.ctms())).unwrap().is_some(),
+                "{env}"
+            );
         }
     }
 }

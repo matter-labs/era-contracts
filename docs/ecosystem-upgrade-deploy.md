@@ -1,4 +1,4 @@
-# v31 ecosystem upgrade: generate → deploy
+# Ecosystem upgrade: generate → deploy
 
 > **Scope.** Written for the v31 rollout from the `draft-v31` line. On the v35 line the same two steps run the release's upgrade: the
 > generate workflow defaults to `upgrade = v0.35.0-upgrade-system` (only that directory may use
@@ -6,7 +6,7 @@
 > The v31 line's verifier (PUVT, `ecosystem verify-upgrade`) does not exist on this line; the check
 > here is `ecosystem verify-bootstrap`, the registry verifier, as step 3 describes.
 
-The v31 ecosystem upgrade is produced and shipped in **two steps**, each runnable
+An ecosystem upgrade is produced and shipped in **two steps**, each runnable
 locally and in CI:
 
 1. **Generate the calldata** — deploy nothing; on a fork, compute the upgrade
@@ -55,8 +55,8 @@ against the on-chain result before governance signs (step 3).
 
 The local commands below run the image too. `./protocol-ops.sh --tag <tag>` (or
 `--tag sha256:<digest>`) pulls it; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
-Run them from a checkout of the image's commit: only then does the wrapper mount the checkout's
-`l1-contracts/upgrade-envs/` (the image's configs, unedited), so outputs land in the checkout.
+Run them from a checkout of the image's commit, unedited: the wrapper mounts its
+`l1-contracts/upgrade-envs/` so outputs land in it, and refuses another checkout.
 
 ---
 

@@ -120,4 +120,4 @@ How to rehearse the broadcast on a fork first and verify it afterwards:
 ## Changing a config
 
 The configs are part of the image. Tell us what to change: we merge it and release a new image, with a
-new digest. `protocol-ops.sh` doesn't mount an edited `upgrade-envs/` over the image's.
+new digest.
