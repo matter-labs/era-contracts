@@ -170,35 +170,19 @@ recorded in `deploy-executed.json`. Both files are loaded and extended on a
 retry, so a later failure cannot erase the record of earlier transactions. The
 journal is the operational record of the broadcast; the verifier does not read it.
 
-**Locally** (real signing — needs the deployer key):
+**Locally** (real signing — needs the deployer key): broadcast with `replay-bundle --key`, which
+checks the bundle's digests, deployer and chain id before it signs
+([Deploying + verifying from a deploy bundle](#deploying--verifying-from-a-deploy-bundle)). Then
+verify on Etherscan — replay the logged `forge verify-contract` commands VERBATIM, in the image (its
+artifacts are the deployed ones). Step 1 already wrote the exact `--constructor-args <hex>` for every
+contract (from the CREATE2 init code it deployed), so nothing is guessed:
 
 ```bash
 TAG=sha256:<digest>   # the bundle's protocol_ops_image.digest, after the '@'
-BUNDLE="$PWD/<unpacked-bundle-dir>"
-DEPLOYER_ADDR=$(./protocol-ops.sh --tag "$TAG" cast wallet address --private-key "$DEPLOYER_KEY")
-
-# Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
-# deployment's journal.
-mkdir -p deploy-result
-EXTRA_MOUNTS="$BUNDLE:/contracts/bundle $PWD/deploy-result:/contracts/deploy-result" \
-  ./protocol-ops.sh --tag "$TAG" ecosystem upgrade-broadcast \
-  --manifest /contracts/bundle/prepare/manifest.json \
-  --l1-rpc-url <l1-rpc> \
-  --key "${DEPLOYER_ADDR}=${DEPLOYER_KEY}" \
-  --skip-unkeyed \
-  --max-gas-price-gwei 500 \
-  --out /contracts/deploy-result/deploy-executed.json
-
-# Verify on Etherscan — replay the logged forge verify-contract commands VERBATIM,
-# in the image (its artifacts are the deployed ones). Step 1 already wrote the exact
-# `--constructor-args <hex>` for every contract (from the CREATE2 init code it
-# deployed), so nothing is guessed.
 export ETHERSCAN_API_KEY   # protocol-ops.sh passes it into the image
-grep 'forge verify-contract' "$BUNDLE/extra-verification-logs.txt" |
+grep 'forge verify-contract' <unpacked-bundle-dir>/extra-verification-logs.txt |
   sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u |
-  while IFS= read -r cmd; do
-    eval "./protocol-ops.sh --tag $TAG $cmd --chain mainnet --watch --retries 8 --delay 20" || true
-  done
+  xargs -L1 sh -c './protocol-ops.sh --tag "$0" "$@" --chain mainnet --watch --retries 8 --delay 20 || true' "$TAG"
 ```
 
 **In CI:** run the **`Ecosystem Upgrade: Deploy + Verify`** workflow
@@ -258,7 +242,7 @@ names: it re-derives every object from the reviewed creation code in the image's
 
 ```bash
 TAG=sha256:<digest>   # protocol_ops_image.digest, after the '@'
-export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle"
+export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle:ro"
 ./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
   --bundle /contracts/bundle --rpc <l1-rpc> --verify-only
 ```
@@ -319,7 +303,7 @@ file's hash with the bundle's and exits on a mismatch. The image is
 
 ```bash
 TAG=sha256:<digest>   # protocol_ops_image.digest, after the '@'
-export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle"
+export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle:ro"
 ./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
   --bundle /contracts/bundle --fork-url <l1-rpc>
 ```

@@ -99,7 +99,7 @@ checkout of the image's `revision`, so the outputs land in it.
    and sends only the deployer's bundles.
 
    ```bash
-   EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle" \
+   EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle:ro" \
      ./protocol-ops.sh --tag sha256:<digest> ecosystem replay-bundle \
      --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
    ```
