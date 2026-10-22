@@ -172,7 +172,7 @@ elif head="$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" && [[ "$head" == "$
     ':(exclude,glob)l1-contracts/upgrade-envs/*/output/**')" && [[ -z "$edits" ]]; then
   mount_upgrade_envs=1
 elif [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" != "1" ]]; then
-  echo "Error: ${IMAGE} is revision ${IMAGE_REVISION}; this checkout is ${head:-not a git checkout}${edits:+, with edits in upgrade-envs/:
+  echo "Error: ${IMAGE} is revision ${IMAGE_REVISION}; this checkout is ${head:-unreadable by git (git -C ${ERA_PATH} rev-parse HEAD says why)}${edits:+, with edits in upgrade-envs/:
 ${edits}}
 Check that revision out, or set PROTOCOL_OPS_REQUIRE_RELEASE=1 to run with the image's own upgrade-envs/ and take outputs through EXTRA_MOUNTS" >&2
   exit 1

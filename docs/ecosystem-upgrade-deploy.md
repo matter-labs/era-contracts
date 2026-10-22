@@ -184,11 +184,10 @@ contract (from the CREATE2 init code it deployed), so nothing is guessed:
 BUNDLE=<unpacked-bundle-dir>
 # protocol_ops_image.digest in bundle-metadata.json, after the @
 TAG=sha256:<digest>
-# The explorer of the bundle's L1
-export CHAIN="$(jq -r '.l1.chain_id | if . == 1 then "mainnet" elif . == 11155111 then "sepolia" else error("no explorer") end' "$BUNDLE/bundle-metadata.json")"
-# protocol-ops.sh passes it into the image
-export ETHERSCAN_API_KEY
-grep 'forge verify-contract' "$BUNDLE/extra-verification-logs.txt" |
+# CHAIN is the explorer of the bundle L1; protocol-ops.sh passes ETHERSCAN_API_KEY into the image
+CHAIN="$(jq -r '.l1.chain_id | if . == 1 then "mainnet" elif . == 11155111 then "sepolia" else error("no explorer") end' "$BUNDLE/bundle-metadata.json")" &&
+  export CHAIN ETHERSCAN_API_KEY &&
+  grep 'forge verify-contract' "$BUNDLE/extra-verification-logs.txt" |
   sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u |
   xargs -L1 sh -c './protocol-ops.sh --tag "$0" "$@" --chain "$CHAIN" --watch --retries 8 --delay 20' "$TAG"
 ```
