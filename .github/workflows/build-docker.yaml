@@ -136,6 +136,14 @@ jobs:
             "$IMAGE" \
             bash -c 'yarn install --frozen-lockfile && yarn test:upgrade'
 
+      - name: Install Foundry (the release flow's L1)
+        uses: ./.github/actions/install-foundry
+
+      # The ecosystem-upgrade workflows' commands, through protocol-ops.sh in this image.
+      - name: Run the release flow in the image
+        timeout-minutes: 30
+        run: PROTOCOL_OPS_TAG="$IMAGE_TAG" bash .github/tests/release-flow.sh
+
       - name: Login to GitHub Container Registry
         if: github.event_name == 'workflow_dispatch'
         uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
