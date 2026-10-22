@@ -7,7 +7,7 @@ on:
         description: "Target environment = basename of upgrade-envs/permanent-values/<env>.toml (read by protocol_ops --env)"
         required: true
         type: choice
-        options: [stage, stage3, testnet, mainnet, adi]
+        options: [stage, stage3, testnet, mainnet, zksync-os-mainnet, adi]
       protocol_ops_tag:
         description: "protocol-ops Docker image tag"
         required: true
@@ -17,10 +17,11 @@ on:
         required: false
         type: string
         default: ""
-      chain_id:
-        description: "Numeric chain id of the ZK chain (protocol_ops --chain-id)"
+      chains:
+        description: "Chain ids, comma-separated, or `eligible`: every chain on the upgrade's `old_protocol_version` (from upgrade-envs/<upgrade>/<env>.toml), or, without one, every chain behind its CTM whose CTM holds a cut for its version. No eligible chain = nothing to do."
         required: true
         type: string
+        default: "eligible"
       access_control_restriction:
         description: "AccessControlRestriction address (leave default for Ownable ChainAdmin)"
         required: false
@@ -33,17 +34,17 @@ on:
         default: false
 
       upgrade_timestamp:
-        description: "Also prepare the chain's ServerNotifier.setUpgradeTimestamp bundle first, with this timestamp (1 = no waiting; 0 is rejected). Its bundle comes first in the same manifest, so the simulator scenario replays both in order. BLANK = the upgrade bundle only."
+        description: "Also prepare each chain's ServerNotifier.setUpgradeTimestamp bundle first, with this timestamp (1 = no waiting; 0 is rejected). Its bundle comes first in the same manifest, so the simulator scenario replays both in order. BLANK = the upgrade bundle only."
         required: false
         type: string
         default: ""
       upgrade:
-        description: "Upgrade directory under l1-contracts/upgrade-envs/ the bundles belong to, e.g. v0.33.2-verifier. Names the simulator scenario and is where commit_outputs writes. BLANK = artifacts only."
+        description: "Upgrade directory under l1-contracts/upgrade-envs/ the bundles belong to, e.g. v0.33.2-verifier. Names the simulator scenarios and is where commit_outputs writes. BLANK = artifacts only."
         required: false
         type: string
         default: ""
       commit_outputs:
-        description: "Commit the bundles to output/<env>/chain-upgrades/<chain id>/ and the scenario to output/<env>/simulator/ of `upgrade`, on the dispatched branch. Needs `upgrade`, the RELEASE_TOKEN secret and a branch of this repository."
+        description: "Commit each chain's bundles to output/<env>/chain-upgrades/<chain id>/ and its scenario to output/<env>/simulator/ of `upgrade`, on the dispatched branch, in one commit. Needs `upgrade`, the RELEASE_TOKEN secret and a branch of this repository."
         required: false
         type: boolean
         default: false
@@ -54,7 +55,7 @@ permissions:
 jobs:
   upgrade:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
       # protocol-ops.sh mounts the checkout's upgrade-envs/ by default (that is
@@ -63,7 +64,7 @@ jobs:
       EXTRA_MOUNTS: ${{ github.workspace }}/protocol-ops-workdir:/contracts/work
       UPGRADE: ${{ inputs.upgrade }}
       ENVIRONMENT: ${{ inputs.environment }}
-      CHAIN_ID: ${{ inputs.chain_id }}
+      CHAINS: ${{ inputs.chains }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,7 +73,8 @@ jobs:
       - name: Check the inputs
         run: |
           set -euo pipefail
-          printf '%s' "$CHAIN_ID" | grep -qE '^[0-9]+$' || { echo "::error::chain_id must be numeric"; exit 1; }
+          printf '%s' "$CHAINS" | grep -qE '^(eligible|[0-9]+(,[0-9]+)*)$' \
+            || { echo "::error::chains must be comma-separated chain ids or eligible"; exit 1; }
           if [ -n "$UPGRADE" ]; then
             if ! printf '%s' "$UPGRADE" | grep -qE '^[A-Za-z0-9._-]+$' || [ "$UPGRADE" = "." ] || [ "$UPGRADE" = ".." ] \
               || [ ! -d "l1-contracts/upgrade-envs/$UPGRADE" ]; then
@@ -93,9 +95,9 @@ jobs:
           PV="l1-contracts/upgrade-envs/permanent-values/$ENVIRONMENT.toml"
           L1_CHAIN_ID="$(sed -nE 's/^[[:space:]]*l1_chain_id[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PV" | head -1)"
           case "$L1_CHAIN_ID" in
-            1) rpc="$RPC_MAINNET" ;;
-            11155111) rpc="$RPC_SEPOLIA" ;;
-            *) rpc="" ;;
+            1) rpc="$RPC_MAINNET"; network=mainnet ;;
+            11155111) rpc="$RPC_SEPOLIA"; network=sepolia ;;
+            *) echo "::error::no L1 network wired for l1_chain_id=$L1_CHAIN_ID"; exit 1 ;;
           esac
           [ -z "${INPUT_RPC:-}" ] || rpc="$INPUT_RPC"
           if [ -z "$rpc" ]; then
@@ -103,40 +105,15 @@ jobs:
             exit 1
           fi
           echo "::add-mask::$rpc"
-          echo "L1_RPC_URL=$rpc" >> "$GITHUB_ENV"
+          {
+            echo "L1_RPC_URL=$rpc"
+            echo "L1_NETWORK=$network"
+            echo "BRIDGEHUB=$(python3 -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['core_contracts']['bridgehub_proxy_addr'])" "$PV")"
+          } >> "$GITHUB_ENV"
 
-      - name: Run set-upgrade-timestamp
-        if: ${{ inputs.upgrade_timestamp != '' }}
-        run: |
-          mkdir -p "$WORK_DIR"
-          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
-            chain set-upgrade-timestamp \
-            --l1-rpc-url                 "$L1_RPC_URL" \
-            --env                        "${{ inputs.environment }}" \
-            --chain-id                   "${{ inputs.chain_id }}" \
-            --upgrade-timestamp          "${{ inputs.upgrade_timestamp }}" \
-            --access-control-restriction "${{ inputs.access_control_restriction }}" \
-            --out /contracts/work/safe
-
-      - name: Run chain upgrade
-        env:
-          ACKNOWLEDGE_UNRECOMMENDED_NODA: ${{ inputs.acknowledge_unrecommended_noda }}
-        run: |
-          mkdir -p "$WORK_DIR"
-          extra=()
-          [ "$ACKNOWLEDGE_UNRECOMMENDED_NODA" != "true" ] || extra+=(--acknowledge-unrecommended-noda)
-          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
-            chain upgrade \
-            --l1-rpc-url                 "$L1_RPC_URL" \
-            --env                        "${{ inputs.environment }}" \
-            --chain-id                   "${{ inputs.chain_id }}" \
-            --access-control-restriction "${{ inputs.access_control_restriction }}" \
-            "${extra[@]}" \
-            --out /contracts/work/safe
-
-      # The scenario converter is built from this checkout rather than taken from the image:
-      # it is plain Rust (no contracts needed), so the scenario format always matches the branch
-      # whatever `protocol_ops_tag` produced the bundles.
+      # The scenario converter and sync-already-executed are built from this checkout rather than
+      # taken from the image: they are plain Rust (no contracts needed), so the scenario format
+      # always matches the branch whatever `protocol_ops_tag` produced the bundles.
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -152,62 +129,126 @@ jobs:
         working-directory: protocol-ops
         run: cargo build --release
 
-      # One transaction-simulator scenario for the bundles above, in manifest order: the
-      # set-upgrade-timestamp txs are tagged chain_upgrade_<id>_schedule and the upgrade txs
-      # chain_upgrade_<id>_execute. The cut
-      # reverts `NotAllBatchesExecuted()` on a fork of a live chain with batches in flight, so
-      # the simulator is told to settle this chain's diamond first (a real rollout waits instead).
-      - name: Emit the chain's simulator scenario
+      - name: Resolve the chains
         run: |
           set -euo pipefail
-          PV="l1-contracts/upgrade-envs/permanent-values/$ENVIRONMENT.toml"
-          L1_CHAIN_ID="$(sed -nE 's/^[[:space:]]*l1_chain_id[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$PV" | head -1)"
-          case "$L1_CHAIN_ID" in
-            1) network=mainnet ;;
-            11155111) network=sepolia ;;
-            *) echo "::error::no transaction-simulator network for l1_chain_id=$L1_CHAIN_ID"; exit 1 ;;
-          esac
-          BRIDGEHUB="$(python3 -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb'))['core_contracts']['bridgehub_proxy_addr'])" "$PV")"
-          DIAMOND="$(cast call "$BRIDGEHUB" 'getZKChain(uint256)(address)' "$CHAIN_ID" --rpc-url "$L1_RPC_URL")"
+          call() { cast call "$@" --rpc-url "$L1_RPC_URL" | cut -d' ' -f1; }
+          OLD=""
+          if [ "$CHAINS" != "eligible" ]; then
+            ids="${CHAINS//,/ }"
+          else
+            OLD=""
+            INPUT="l1-contracts/upgrade-envs/$UPGRADE/$ENVIRONMENT.toml"
+            if [ -n "$UPGRADE" ] && [ -f "$INPUT" ]; then
+              OLD="$(python3 -c "import tomllib,sys; print(tomllib.load(open(sys.argv[1],'rb')).get('old_protocol_version',''))" "$INPUT")"
+            fi
+            ids=""
+            for id in $(cast call "$BRIDGEHUB" 'getAllZKChainChainIDs()(uint256[])' --rpc-url "$L1_RPC_URL" --json | jq -r '.[0][]'); do
+              version="$(call "$(call "$BRIDGEHUB" 'getZKChain(uint256)(address)' "$id")" 'getProtocolVersion()(uint256)')"
+              if [ -n "$OLD" ]; then
+                [ "$version" = "$OLD" ] && ids="$ids $id"
+                continue
+              fi
+              ctm="$(call "$BRIDGEHUB" 'chainTypeManager(uint256)(address)' "$id")"
+              latest="$(call "$ctm" 'protocolVersion()(uint256)')"
+              cut="$(call "$ctm" 'upgradeCutHash(uint256)(bytes32)' "$version")"
+              if python3 -c "import sys; sys.exit(0 if int(sys.argv[1]) < int(sys.argv[2]) else 1)" "$version" "$latest" \
+                && [ "$cut" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]; then
+                ids="$ids $id"
+              fi
+            done
+          fi
+          ids="$(echo $ids)"
+          if [ -z "$ids" ]; then
+            echo "::notice::No chain to upgrade for $ENVIRONMENT${OLD:+ on version $OLD}"
+          else
+            echo "Chains: $ids"
+          fi
+          echo "CHAIN_IDS=$ids" >> "$GITHUB_ENV"
+
+      # One manifest per chain, under $WORK_DIR/chains/<id>/safe/.
+      - name: Prepare the bundles
+        if: ${{ env.CHAIN_IDS != '' }}
+        env:
+          ACKNOWLEDGE_UNRECOMMENDED_NODA: ${{ inputs.acknowledge_unrecommended_noda }}
+          UPGRADE_TIMESTAMP: ${{ inputs.upgrade_timestamp }}
+          ACR: ${{ inputs.access_control_restriction }}
+          TAG: ${{ inputs.protocol_ops_tag }}
+        run: |
+          set -euo pipefail
+          extra=()
+          [ "$ACKNOWLEDGE_UNRECOMMENDED_NODA" != "true" ] || extra+=(--acknowledge-unrecommended-noda)
+          for id in $CHAIN_IDS; do
+            mkdir -p "$WORK_DIR/chains/$id"
+            if [ -n "$UPGRADE_TIMESTAMP" ]; then
+              bash protocol-ops.sh --tag "$TAG" chain set-upgrade-timestamp \
+                --l1-rpc-url "$L1_RPC_URL" --env "$ENVIRONMENT" --chain-id "$id" \
+                --upgrade-timestamp "$UPGRADE_TIMESTAMP" --access-control-restriction "$ACR" \
+                --out "/contracts/work/chains/$id/safe"
+            fi
+            bash protocol-ops.sh --tag "$TAG" chain upgrade \
+              --l1-rpc-url "$L1_RPC_URL" --env "$ENVIRONMENT" --chain-id "$id" \
+              --access-control-restriction "$ACR" "${extra[@]}" \
+              --out "/contracts/work/chains/$id/safe"
+          done
+
+      # One transaction-simulator scenario per chain, in manifest order: the set-upgrade-timestamp
+      # txs are tagged chain_upgrade_<id>_schedule and the upgrade txs chain_upgrade_<id>_execute.
+      # The cut reverts `NotAllBatchesExecuted()` on a fork of a live chain with batches in flight,
+      # so the simulator is told to settle this chain's diamond first (a real rollout waits instead).
+      - name: Emit the chains' simulator scenarios
+        if: ${{ env.CHAIN_IDS != '' }}
+        run: |
+          set -euo pipefail
+          BIN=./protocol-ops/target/release/protocol_ops
           NAME="${UPGRADE:-chain-upgrade}"
-          SCENARIO="$WORK_DIR/simulator/$(date -u +%Y-%m-%d)-$NAME-$ENVIRONMENT-2-chain-$CHAIN_ID.json"
           mkdir -p "$WORK_DIR/simulator"
-          ./protocol-ops/target/release/protocol_ops ecosystem manifest-to-simulator \
-            --manifest "$WORK_DIR/safe/manifest.json" --network "$network" --tag "chain_upgrade_$CHAIN_ID" \
-            --emulate-all-batches-executed-for "$DIAMOND" --out "$SCENARIO"
-          echo "scenario: $SCENARIO"
+          for id in $CHAIN_IDS; do
+            DIAMOND="$(cast call "$BRIDGEHUB" 'getZKChain(uint256)(address)' "$id" --rpc-url "$L1_RPC_URL")"
+            SCENARIO="$WORK_DIR/simulator/$(date -u +%Y-%m-%d)-$NAME-$ENVIRONMENT-2-chain-$id.json"
+            "$BIN" ecosystem manifest-to-simulator \
+              --manifest "$WORK_DIR/chains/$id/safe/manifest.json" --network "$L1_NETWORK" --tag "chain_upgrade_$id" \
+              --emulate-all-batches-executed-for "$DIAMOND" --out "$SCENARIO"
+            "$BIN" ecosystem sync-already-executed --scenario "$SCENARIO" --l1-rpc-url "$L1_RPC_URL"
+            echo "scenario: $SCENARIO"
+          done
 
       - uses: actions/upload-artifact@v4
+        if: ${{ env.CHAIN_IDS != '' }}
         with:
-          name: safe-bundles-chain-upgrade-${{ inputs.chain_id }}-${{ inputs.environment }}
+          name: safe-bundles-chain-upgrade-${{ inputs.environment }}-${{ github.run_id }}
           path: |
-            ${{ env.WORK_DIR }}/safe/
+            ${{ env.WORK_DIR }}/chains/
             ${{ env.WORK_DIR }}/simulator/
           if-no-files-found: error
           retention-days: 30
 
-      # Opt-in: the same layout the committed per-chain outputs have. Pushes with RELEASE_TOKEN,
-      # as update-hashes-on-demand.yaml does, so the branch must live in this repository.
+      # Opt-in: the same layout the committed per-chain outputs have, every chain in one commit.
+      # Pushes with RELEASE_TOKEN, as update-hashes-on-demand.yaml does, so the branch must live
+      # in this repository.
       - name: Commit and push
-        if: ${{ inputs.commit_outputs && github.ref_type == 'branch' }}
+        if: ${{ inputs.commit_outputs && github.ref_type == 'branch' && env.CHAIN_IDS != '' }}
         env:
           BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           OUT="l1-contracts/upgrade-envs/$UPGRADE/output/$ENVIRONMENT"
-          rm -rf "$OUT/chain-upgrades/$CHAIN_ID"
-          rm -f "$OUT"/simulator/*-"$UPGRADE-$ENVIRONMENT"-2-chain-"$CHAIN_ID".json
-          mkdir -p "$OUT/chain-upgrades/$CHAIN_ID" "$OUT/simulator"
-          cp -r "$WORK_DIR"/safe/. "$OUT/chain-upgrades/$CHAIN_ID/"
+          mkdir -p "$OUT/simulator"
+          for id in $CHAIN_IDS; do
+            rm -rf "$OUT/chain-upgrades/$id"
+            rm -f "$OUT"/simulator/*-"$UPGRADE-$ENVIRONMENT"-2-chain-"$id".json
+            mkdir -p "$OUT/chain-upgrades/$id"
+            cp -r "$WORK_DIR/chains/$id/safe/." "$OUT/chain-upgrades/$id/"
+            git add -A "$OUT/chain-upgrades/$id"
+          done
           cp "$WORK_DIR"/simulator/*.json "$OUT/simulator/"
+          git add -A "$OUT/simulator"
           git config user.name "zksync[bot]"
           git config user.email "zksync[bot]@users.noreply.github.com"
-          git add -A "$OUT/chain-upgrades/$CHAIN_ID" "$OUT/simulator"
           if git diff --cached --quiet; then echo "No changes to commit"; exit 0; fi
           git --no-pager diff --cached --stat
-          git commit -m "chore(upgrade): $UPGRADE $ENVIRONMENT chain $CHAIN_ID upgrade bundles" -m "Generated by $RUN_URL"
-          # Per-chain runs are dispatched side by side: rebase onto whichever landed first.
+          git commit -m "chore(upgrade): $UPGRADE $ENVIRONMENT chain upgrade bundles for ${CHAIN_IDS// /, }" -m "Generated by $RUN_URL"
           for attempt in 1 2 3 4 5; do
             git push origin "HEAD:$BRANCH" && exit 0
             git pull --rebase origin "$BRANCH"
