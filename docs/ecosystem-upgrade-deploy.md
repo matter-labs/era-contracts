@@ -82,13 +82,15 @@ Nothing touches real L1 — the deployer is impersonated.
 **Locally:**
 
 ```bash
-TAG=<tag>   # the released protocol-ops image
+# The released protocol-ops image
+TAG=sha256:<digest>
 # 1a) fork + prepare + verify-bootstrap (writes ecosystem.toml + prepare/ + extra-verification-logs.txt)
 ./protocol-ops.sh --tag "$TAG" ecosystem rehearse-upgrade --env mainnet \
   --fork-url <l1-rpc> --deployer-address <deployer-eoa>
 
 # 1b) emit the sim-inputs + transaction-simulator.json
-OUT=l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/mainnet   # rehearse-upgrade's default upgrade
+# The output of rehearse-upgrade (its default upgrade)
+OUT=l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/mainnet
 ./protocol-ops.sh --tag "$TAG" ecosystem governance-toml-to-simulator \
   --env mainnet --include-manifest "$OUT/prepare/manifest.json" \
   --camp-a-signers <deployer-eoa> --emit-sim-inputs "$OUT/sim-inputs"
@@ -179,8 +181,10 @@ artifacts are the deployed ones). Step 1 already wrote the exact `--constructor-
 contract (from the CREATE2 init code it deployed), so nothing is guessed:
 
 ```bash
-TAG=sha256:<digest>   # the bundle's protocol_ops_image.digest, after the '@'
-export ETHERSCAN_API_KEY   # protocol-ops.sh passes it into the image
+# protocol_ops_image.digest in bundle-metadata.json, after the @
+TAG=sha256:<digest>
+# protocol-ops.sh passes it into the image
+export ETHERSCAN_API_KEY
 grep 'forge verify-contract' <unpacked-bundle-dir>/extra-verification-logs.txt |
   sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u |
   xargs -L1 sh -c './protocol-ops.sh --tag "$0" "$@" --chain mainnet --watch --retries 8 --delay 20 || true' "$TAG"
@@ -242,7 +246,8 @@ names: it re-derives every object from the reviewed creation code in the image's
 `l1-contracts/out` and holds that build against the image's `AllContractsHashes.json`:
 
 ```bash
-TAG=sha256:<digest>   # protocol_ops_image.digest, after the '@'
+# protocol_ops_image.digest in bundle-metadata.json, after the @
+TAG=sha256:<digest>
 export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle:ro"
 ./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
   --bundle /contracts/bundle --rpc <l1-rpc> --verify-only
@@ -303,7 +308,8 @@ file's hash with the bundle's and exits on a mismatch. The image is
 **Rehearse the deploy and verify it — no regeneration:**
 
 ```bash
-TAG=sha256:<digest>   # protocol_ops_image.digest, after the '@'
+# protocol_ops_image.digest in bundle-metadata.json, after the @
+TAG=sha256:<digest>
 export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle:ro"
 ./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
   --bundle /contracts/bundle --fork-url <l1-rpc>

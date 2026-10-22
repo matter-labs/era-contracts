@@ -12,9 +12,9 @@ cargo build --release
 ## Use
 
 Run all commands below from the `protocol-ops` directory. For a rollout, run the same commands in the
-released image instead, `./protocol-ops.sh --tag sha256:<digest> <command>` from a checkout of its commit
-([release flow](../.github/workflows/README.md#release-flow)): its build is the one the calldata is
-reviewed against.
+released image instead, `./protocol-ops.sh --tag sha256:<digest> <command>` from the root of a
+checkout of its commit ([release flow](../.github/workflows/README.md#release-flow)): its build is the
+one the calldata is reviewed against.
 
 ```bash
 cargo run --release --bin protocol_ops -- --help

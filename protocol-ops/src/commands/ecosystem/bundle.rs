@@ -137,8 +137,9 @@ pub struct DeployBundleMetadata {
     pub upgrade: String,
     pub env: String,
     pub contracts_commit: String,
-    /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in the
-    /// protocol-ops image, which runs its own commit's sources and configs (see `protocol-ops.sh`).
+    /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in a
+    /// protocol-ops image built with its commit, which runs that commit's sources and configs (see
+    /// `protocol-ops.sh`).
     pub contracts_worktree_dirty: bool,
     pub all_contracts_hashes_sha256: String,
     pub l1: L1Provenance,
@@ -267,6 +268,21 @@ fn image_provenance() -> Option<ImageProvenance> {
         reference: env_value(IMAGE_REFERENCE_ENV)?,
         digest: env_value(IMAGE_DIGEST_ENV),
     })
+}
+
+/// The zk-governance commit the redeploy is built from: the image's (`image`), which `flag` may
+/// only repeat, else `flag`.
+fn zk_governance_commit(
+    flag: Option<&str>,
+    image: Option<String>,
+) -> anyhow::Result<Option<String>> {
+    match (flag, image) {
+        (Some(flag), Some(image)) if flag != image => anyhow::bail!(
+            "--zk-governance-commit {flag}, but this protocol-ops image holds zk-governance {image}"
+        ),
+        (_, Some(image)) => Ok(Some(image)),
+        (flag, None) => Ok(flag.map(str::to_string)),
+    }
 }
 
 /// `image_commit`, the commit the protocol-ops image was built from, else the checkout's HEAD.
@@ -830,7 +846,7 @@ pub struct RehearseUpgradeArgs {
     #[clap(long, hide = true)]
     pub gw_rpc_url: Option<String>,
     /// zk-governance commit the governance redeploy's sources (`ZK_GOVERNANCE_DIR`) are checked
-    /// out at; recorded in the bundle as provenance. Defaults to the protocol-ops image's.
+    /// out at; recorded in the bundle as provenance. In the protocol-ops image, the one it holds.
     #[clap(long)]
     pub zk_governance_commit: Option<String>,
     /// An `[upgrade_executors]` record file for `verify-bootstrap --executor-record`, repeatable
@@ -846,6 +862,10 @@ pub struct RehearseUpgradeArgs {
 /// Fork L1, prepare the upgrade, pack the deploy bundle, replay it and run the upgrade's checks.
 pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<()> {
     warn_ignored_gw_rpc_url(args.gw_rpc_url.as_deref());
+    let zk_governance_commit = zk_governance_commit(
+        args.zk_governance_commit.as_deref(),
+        env_value(IMAGE_ZK_GOVERNANCE_COMMIT_ENV),
+    )?;
     let env_cfg = EnvConfig::load(&args.env)?;
     let descriptor = UpgradeDescriptor::load(&args.upgrade)?;
     anyhow::ensure!(
@@ -936,10 +956,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &BundleProvenance {
             deployer: Some(args.deployer_address),
             forked_at_block: Some(forked_at_block),
-            zk_governance_commit: args
-                .zk_governance_commit
-                .clone()
-                .or_else(|| env_value(IMAGE_ZK_GOVERNANCE_COMMIT_ENV)),
+            zk_governance_commit,
             foundry_zksync_version: args.foundry_zksync_version.clone(),
         },
     )?;
@@ -1395,6 +1412,27 @@ mod tests {
         let dir = valid_bundle();
         let metadata = verify_bundle_integrity(dir.path()).unwrap();
         assert_eq!(metadata.files.len(), 3);
+    }
+
+    #[test]
+    fn zk_governance_commit_is_the_images() {
+        let image = || Some("image".to_string());
+        assert_eq!(zk_governance_commit(None, None).unwrap(), None);
+        assert_eq!(
+            zk_governance_commit(Some("flag"), None).unwrap().as_deref(),
+            Some("flag")
+        );
+        assert_eq!(
+            zk_governance_commit(None, image()).unwrap().as_deref(),
+            Some("image")
+        );
+        assert_eq!(
+            zk_governance_commit(Some("image"), image())
+                .unwrap()
+                .as_deref(),
+            Some("image")
+        );
+        assert!(zk_governance_commit(Some("flag"), image()).is_err());
     }
 
     #[test]

@@ -120,7 +120,8 @@ touches L1 when its signer executes those bundles (with `upgrade-broadcast`, `de
 or the signer's multisig).
 
 The workflows under `.github/workflows/` run these commands in a released `protocol-ops` image: phases
-1–3 through `generate-ecosystem-upgrade-calldata` and `deploy-ecosystem-upgrade`, phase 6 through
+1–2 and phase 3's fork checks through `generate-ecosystem-upgrade-calldata` and
+`deploy-ecosystem-upgrade` (phase 3 on L1 is run by hand), phase 6 through
 `generate-chain-{set-upgrade-timestamp,upgrade}-calldata`. The release flow
 that produces the image is in `.github/workflows/README.md`.
 
