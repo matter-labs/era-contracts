@@ -12,9 +12,9 @@ import {L1_ANCHOR_MAX_LAG, L1SLOAD_MAX_KEYS} from "../common/Config.sol";
 /// See {protocol-docs/l1sload.md#reading-l1-state}.
 /// @dev The values are whatever the harness last set with {setL1StorageValues}, read from the L1 contract (on anvil,
 /// `eth_getStorageAt` on the L1) or chosen by the test; the precompile reads the L1 state at the anchored block.
-/// Like the precompile, it reverts while `L2InteropRootStorage` holds no anchor, and fails consuming all gas when the
-/// anchor is stale ({protocol-docs/l1sload.md#freshness}) or on input with no key, more than `L1SLOAD_MAX_KEYS` keys
-/// or a partial key.
+/// Like the precompile, it fails consuming all gas with no anchor in `L2InteropRootStorage`, at a stale anchor (by the
+/// same saturating rule, {protocol-docs/l1sload.md#freshness}), or on input with no key, more than `L1SLOAD_MAX_KEYS`
+/// keys or a partial key.
 contract MockL1SloadPrecompile {
     uint256 internal constant ADDRESS_LENGTH = 20;
     uint256 internal constant WORD_LENGTH = 32;
@@ -42,10 +42,12 @@ contract MockL1SloadPrecompile {
         IL2InteropRootStorage rootStorage = IL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR);
         if (rootStorage.l1AnchorBlockHash() == bytes32(0)) {
             assembly {
-                revert(0, 0)
+                invalid()
             }
         }
-        if (block.timestamp > rootStorage.l1AnchorTimestamp() + L1_ANCHOR_MAX_LAG) {
+        // `block.timestamp > anchorTimestamp + L1_ANCHOR_MAX_LAG` without overflow, as ZKsync OS saturates the sum.
+        uint256 anchorTimestamp = rootStorage.l1AnchorTimestamp();
+        if (block.timestamp > anchorTimestamp && block.timestamp - anchorTimestamp > L1_ANCHOR_MAX_LAG) {
             assembly {
                 invalid()
             }

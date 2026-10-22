@@ -55,7 +55,7 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
   and `keccak256("zksync-os.l1sload.anchor.timestamp")` (ZKsync OS reads the hash, [freshness](#freshness) the
   time), and emits `InteropRootAdded` with exactly one side, the block hash, so the ZKsync OS
   event hook folds it into the batch's dependency-roots rolling hash. The anchor is stored only there: neither
-  `interopRoots` nor `latestInteropRootTimestamp` record it. `L1SLOAD` reverts while no anchor is set.
+  `interopRoots` nor `latestInteropRootTimestamp` record it. `L1SLOAD` fails while no anchor is set.
 - **Check on L1.** `Executor._verifyDependencyInteropRoots` takes the expected root and timestamp of an anchor from
   `recordedL1BlockHash(blockNumber)`, with the same checks as for message roots
   ({protocol-docs/message-root.md#interop-root-import-and-the-batch-execution-double-check}).
@@ -65,9 +65,9 @@ uint256(keccak256("zksync.l1-block-hash-import")) - 1`, `blockOrBatchNumber` = t
 ## Freshness
 
 Every read at the anchor is bounded in age: a read is stale when `block.timestamp > anchorTimestamp +
-L1_ANCHOR_MAX_LAG` (1 hour), and fails closed. `anchorTimestamp` is the
-L1 time the anchor was recorded at; the import writes it and execution checks it against the L1 record
-([anchors](#anchors)).
+L1_ANCHOR_MAX_LAG` (1 hour), and fails closed. The sum saturates instead of overflowing, so an anchor timestamp
+ahead of the L2 clock is never stale. `anchorTimestamp` is the L1 time the anchor was recorded at; the import writes
+it and execution checks it against the L1 record ([anchors](#anchors)).
 
 - The bound holds for every read, however the operator composes batches.
 - A chain that never imported an anchor has `anchorTimestamp = 0` and reads nothing, whatever the clock.
@@ -76,8 +76,8 @@ L1 time the anchor was recorded at; the import writes it and execution checks it
 
 The rule is enforced twice, identically:
 
-- **The precompile** fails a call at a stale anchor, consuming all gas passed to it, without asking for a witness.
-  This is the protocol rule, and it binds every caller of `0x101`, `L1Reads` included.
+- **The precompile** fails a call with no anchor or at a stale anchor, consuming all gas passed to it, without asking
+  for a witness. This is the protocol rule, and it binds every caller of `0x101`, `L1Reads` included.
 - **`L1View`** checks the same rule before calling and reverts with the typed `L1AnchorStale`, so gating reads fail
   cheaply and with a clear error.
 

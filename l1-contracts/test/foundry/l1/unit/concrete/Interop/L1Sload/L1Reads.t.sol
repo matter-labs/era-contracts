@@ -34,9 +34,22 @@ contract L1ReadsTest is L1SloadSharedTest {
     L1ReadsHarness internal harness;
     address internal crs;
 
+    /// @dev The gas a test passes to a precompile call that must fail consuming all of it.
+    uint256 internal constant GAS_PASSED = 1_000_000;
+
     function _oneKey(bytes32 _key) internal pure returns (bytes32[] memory keys) {
         keys = new bytes32[](1);
         keys[0] = _key;
+    }
+
+    /// @dev Calls the precompile directly and checks that the call fails consuming all the gas passed to it, as
+    /// ZKsync OS's does, rather than reverting and returning the rest.
+    function _assertReadConsumesAllGas(bytes32 _key) internal {
+        uint256 gasBefore = gasleft();
+        (bool success, ) = L1SLOAD_PRECOMPILE_ADDRESS.call{gas: GAS_PASSED}(abi.encodePacked(crs, _key));
+        uint256 gasUsed = gasBefore - gasleft();
+        assertFalse(success);
+        assertGe(gasUsed, GAS_PASSED);
     }
 
     function setUp() public override {
@@ -55,9 +68,12 @@ contract L1ReadsTest is L1SloadSharedTest {
                                 L1Reads
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev With no anchor the precompile fails consuming the gas passed to it; the mock mirrors that.
     function test_revertWhen_noAnchor() public {
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
         harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
+
+        _assertReadConsumesAllGas(L1View.interopSuspendedSlot(CHAIN_ID));
     }
 
     /// @dev The precompile enforces freshness itself, so a direct read through a stale anchor fails too, consuming the
@@ -68,6 +84,27 @@ contract L1ReadsTest is L1SloadSharedTest {
 
         vm.expectRevert(abi.encodeWithSelector(L1SloadFailed.selector, crs));
         harness.l1sloadMany(crs, _oneKey(L1View.interopSuspendedSlot(CHAIN_ID)));
+
+        _assertReadConsumesAllGas(L1View.interopSuspendedSlot(CHAIN_ID));
+    }
+
+    /// @dev Staleness is computed without overflow, as ZKsync OS saturates `anchorTimestamp + L1_ANCHOR_MAX_LAG`: an
+    /// anchor timestamp whose sum would overflow reads as fresh, through `L1View` and directly. Only a forged import
+    /// could set one, and its batch can't execute on L1. See {protocol-docs/l1sload.md#freshness}.
+    function test_anchorNearTheTopOfUint256ReadsAsFresh() public {
+        _enableInterop(CHAIN_ID);
+        _enableInterop(PEER_CHAIN_ID);
+        _allowInteropPeer(CHAIN_ID, PEER_CHAIN_ID);
+        bytes32[] memory keys = _oneKey(L1View.interopPeerAllowedSlot(CHAIN_ID, PEER_CHAIN_ID));
+
+        // The smallest timestamp whose sum overflows.
+        _importL1Anchor(1, keccak256("anchor 1"), type(uint256).max - L1_ANCHOR_MAX_LAG + 1);
+        assertEq(harness.l1sloadMany(crs, keys)[0], bytes32(uint256(1)));
+        assertTrue(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
+
+        _importL1Anchor(2, keccak256("anchor 2"), type(uint256).max);
+        assertEq(harness.l1sloadMany(crs, keys)[0], bytes32(uint256(1)));
+        assertTrue(harness.isReceiveAllowed(crs, CHAIN_ID, PEER_CHAIN_ID));
     }
 
     function test_readsUpToTheLag() public {

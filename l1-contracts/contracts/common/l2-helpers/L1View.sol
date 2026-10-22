@@ -75,9 +75,14 @@ library L1View {
 
     /// @notice Reverts unless the chain has an L1SLOAD anchor at most `L1_ANCHOR_MAX_LAG` old in L2 block time, so that
     /// gating fails closed without an anchor or on stale L1 state. See {protocol-docs/l1sload.md#freshness}.
+    /// @dev Staleness is `block.timestamp > anchorTimestamp + L1_ANCHOR_MAX_LAG` computed without overflow, the
+    /// precompile's saturating rule.
     function requireFreshAnchor() internal view {
         uint256 anchorTimestamp = IL2InteropRootStorage(L2_INTEROP_ROOT_STORAGE_ADDR).l1AnchorTimestamp();
-        if (anchorTimestamp == 0 || block.timestamp > anchorTimestamp + L1_ANCHOR_MAX_LAG) {
+        if (
+            anchorTimestamp == 0 ||
+            (block.timestamp > anchorTimestamp && block.timestamp - anchorTimestamp > L1_ANCHOR_MAX_LAG)
+        ) {
             revert L1AnchorStale(anchorTimestamp, block.timestamp);
         }
     }
