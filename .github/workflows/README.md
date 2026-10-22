@@ -43,9 +43,9 @@ and `mainnet`.
 
 ## Execute workflows
 
-| Workflow                        | Purpose                                                                                                                                                                                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (the chain-init workflow's, when the deployer also owns the chain). Signs with the deployer secret of the environment's L1, `DEPLOYER_PRIVATE_KEY_SEPOLIA` or `_MAINNET`. |
+| Workflow                        | Purpose                                                                                                                                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `execute-deployer-safe-bundles` | Apply Safe bundles that all target the ecosystem deployer EOA (e.g. the chain-init workflow's, when the deployer signs all of them). Signs with the deployer secret of the environment's L1, `DEPLOYER_PRIVATE_KEY_SEPOLIA` or `_MAINNET`. |
 
 ## Ecosystem-upgrade workflows
 

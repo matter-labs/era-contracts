@@ -342,7 +342,7 @@ jobs:
           ENV_INPUT="l1-contracts/upgrade-envs/${UPGRADE}/${ENVIRONMENT}.toml"
           for f in "$PV" "$UPGRADE_TOML" "$ENV_INPUT"; do
             if [ ! -f "$f" ]; then
-              echo "::error::No config for upgrade '$UPGRADE' / env '$ENVIRONMENT' at $f — commit it first."; exit 1
+              echo "::error::No config for upgrade '$UPGRADE' / env '$ENVIRONMENT' at $f — commit it and release an image with it."; exit 1
             fi
           done
           # `prepare-all` also emits the simulator JSON below; other kinds do not.
@@ -587,7 +587,7 @@ jobs:
         env:
           BUNDLE_IMAGE: ${{ steps.bundle.outputs.image }}
           # Mounted at the same path in the image.
-          EXTRA_MOUNTS: ${{ runner.temp }}/deploy-bundle:${{ runner.temp }}/deploy-bundle
+          EXTRA_MOUNTS: ${{ runner.temp }}/deploy-bundle:${{ runner.temp }}/deploy-bundle:ro
         run: |
           set -euo pipefail
           # The fork anvil runs inside the container, so nothing outlives it.

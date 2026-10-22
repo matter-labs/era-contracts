@@ -227,12 +227,14 @@ jobs:
           if [[ ! "$commit" =~ ^[0-9a-f]{40}$ || "$revision" != "$commit" ]]; then
             echo "::error::$digest was built from '$revision', the bundle from '$commit'"; exit 1
           fi
+          mkdir -p "$RUNNER_TEMP/deploy/result"
           {
             echo "DEPLOY_BUNDLE_DIR=$bundle"
             echo "BUNDLE_IMAGE=${digest#*@}"
             echo "BUNDLE_COMMIT=$commit"
-            # Mounted at the same path, so the commands below take host paths.
-            echo "EXTRA_MOUNTS=$RUNNER_TEMP/deploy:$RUNNER_TEMP/deploy"
+            # Mounted at the same paths, so the commands below take host paths; the
+            # bundle read-only, since later host steps read it.
+            echo "EXTRA_MOUNTS=$bundle:$bundle:ro $RUNNER_TEMP/deploy/result:$RUNNER_TEMP/deploy/result"
           } >> "$GITHUB_ENV"
 
       - name: Checkout the bundle's commit

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{IFinalizeChainInitAbi, IRegisterOnAllChainsAbi, IRegisterZKChainAbi};
 use crate::common::addresses::{ETH_ADDRESS, ZERO_ADDRESS};
+use crate::common::env_config::CtmEntry;
 use crate::common::forge::scripts::{
     register_chain::{NewChainParams, RegisterChainL1Config, RegisterChainOutput},
     REGISTER_CHAIN_INVOCATION,
@@ -45,10 +46,10 @@ pub struct ChainInitArgs {
     #[serde(flatten)]
     pub topology: crate::common::EcosystemArgs,
 
-    /// CTM proxy address. Optional: discovered from L1 when omitted. Pass it for
-    /// the first chain on a fresh ecosystem, where discovery has to fall back to
-    /// scanning `ChainTypeManagerAdded` from block 0 and hosted RPCs cap the
-    /// `eth_getLogs` range.
+    /// CTM proxy address. Optional: the `--env` preset's ZKsync OS CTM, else discovered
+    /// from L1 (the first registered chain's). Pass it for the first chain on a fresh
+    /// ecosystem, where discovery has to fall back to scanning `ChainTypeManagerAdded`
+    /// from block 0 and hosted RPCs cap the `eth_getLogs` range.
     #[clap(long, help_heading = "Input")]
     pub ctm_proxy: Option<Address>,
 
@@ -119,13 +120,17 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     let owner = Wallet::resolve(args.owner, None, &deployer)?;
 
-    let ctm_proxy = match args.ctm_proxy {
+    let env_ctm = match args.topology.env_config()? {
+        Some(env) => preset_ctm(env.ctms())?,
+        None => None,
+    };
+    let ctm_proxy = match args.ctm_proxy.or(env_ctm) {
         Some(ctm) => ctm,
         None => crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, bridgehub)
             .await
             .context("Failed to discover CTM proxy from L1")?,
     };
-    logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
+    logger::info(format!("CTM proxy: {:#x}", ctm_proxy));
 
     crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy)
         .await
@@ -392,6 +397,17 @@ impl FullChainInitOutput {
     }
 }
 
+/// The CTM an env preset names for a new chain: its one ZKsync OS CTM, `None` when it lists
+/// none. The first chain registered on L1 may sit on another (Era) CTM, so discovery is the
+/// fallback.
+fn preset_ctm(ctms: &[CtmEntry]) -> anyhow::Result<Option<Address>> {
+    match ctms {
+        [] => Ok(None),
+        [ctm] => Ok(Some(ctm.proxy)),
+        _ => anyhow::bail!("the env preset lists {} CTMs: pass --ctm-proxy", ctms.len()),
+    }
+}
+
 // ── Output structs ──────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
@@ -413,6 +429,36 @@ impl ChainInitOutputData {
             access_control_restriction_addr: output.access_control_restriction_addr,
             chain_proxy_admin_addr: output.chain_proxy_admin_addr,
             l2_legacy_shared_bridge_addr: output.l2_legacy_shared_bridge_addr,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ctm(byte: u8) -> CtmEntry {
+        CtmEntry {
+            proxy: Address::repeat_byte(byte),
+            rollup_da_manager: None,
+        }
+    }
+
+    #[test]
+    fn preset_ctm_is_the_only_one_it_lists() {
+        assert_eq!(preset_ctm(&[]).unwrap(), None);
+        assert_eq!(
+            preset_ctm(&[ctm(1)]).unwrap(),
+            Some(Address::repeat_byte(1))
+        );
+        assert!(preset_ctm(&[ctm(1), ctm(2)]).is_err());
+    }
+
+    #[test]
+    fn committed_presets_name_one_os_ctm() {
+        for env in ["stage", "testnet", "mainnet", "adi"] {
+            let cfg = crate::common::env_config::EnvConfig::load(env).unwrap();
+            assert!(preset_ctm(cfg.ctms()).unwrap().is_some(), "{env}");
         }
     }
 }

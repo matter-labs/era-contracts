@@ -231,22 +231,23 @@ are described in [Interop registration](./chain-lifecycle.md#interop-registratio
 | L1 RPC, deployer EOA                     | `--l1-rpc-url`, `--deployer-address` (the bundle's signer; no key is given to the simulation)                           |
 | Owner, Era chain id, ZK token asset id   | flags; `ecosystem init` and `ctm init` also take `--env <name>` (see below)                                             |
 | Bridgehub (for `ctm init`, `chain init`) | `--bridgehub`, or the env preset (`--env`)                                                                              |
-| CTM (for `chain init`)                   | `--ctm-proxy`; pass it explicitly (see below)                                                                           |
+| CTM (for `chain init`)                   | `--ctm-proxy`, or the env preset's (see below)                                                                          |
 | VM type, testnet verifier                | `--vm-type`, `--with-testnet-verifier` (defaults to true; pass `false` for a production ecosystem)                      |
 | CREATE2 salt                             | `--create2-factory-salt` (random by default; the same salt and init code return the existing contract, never a new one) |
 | Genesis and L2 bytecodes                 | `configs/genesis/{era,zksync-os}/latest.json` (committed) and the locally built artifacts (not committed)               |
 | Chain parameters                         | chain id, owner, operators, base token and price ratio, `--da-mode`, `--l1-da-validator`, pubdata delivery overrides    |
 
-`--env <name>` exists on `ecosystem init`, `ctm init` and `chain init` (which takes only the
-bridgehub from it); `hub init` takes flags only. For the first two it reads two files: the owner
+`--env <name>` exists on `ecosystem init`, `ctm init` and `chain init` (which takes the bridgehub
+and the CTM from it); `hub init` takes flags only. For the first two it reads two files: the owner
 and the Era chain id come from the release input `l1-contracts/upgrade-envs/<release>/<name>.toml`,
 the ZK token asset id from `l1-contracts/upgrade-envs/permanent-values/<name>.toml`. Since
 `permanent-values` requires `bridgehub_proxy_addr`, `--env` cannot be used for an ecosystem that
 does not exist yet; a fresh ecosystem is deployed with flags.
 
-When `--ctm-proxy` is omitted, `chain init` takes the CTM of the first chain registered on the
-Bridgehub, which is silently wrong in an ecosystem with several CTMs, and on a Bridgehub without
-chains it scans `ChainTypeManagerAdded` from block 0, which hosted RPCs may refuse.
+When `--ctm-proxy` is omitted, `chain init` takes the `--env` preset's ZKsync OS CTM. Without one
+it takes the CTM of the first chain registered on the Bridgehub, which is silently wrong in an
+ecosystem with several CTMs, and on a Bridgehub without chains it scans `ChainTypeManagerAdded`
+from block 0, which hosted RPCs may refuse.
 
 `upgrade-envs/permanent-values/<env>.toml` is the per-environment fact sheet (L1 chain id,
 Bridgehub, CTMs, governance kind); a new ecosystem gets a new file there once its addresses exist,
