@@ -150,3 +150,60 @@ and, once drained, the upgrade.
   v0.33.0 verifier returns the PLONK key (`0xbaaa…`). The node stores the no-argument value as the
   version's snark wrapper VK hash.
 - The chain's first post-upgrade batch executes the L2 upgrade transaction.
+
+### Grant the node's chain upgrader role
+
+The node account needs `UPGRADER_ROLE` on the ValidatorTimelock for its chain diamond. Setting an
+upgrade timestamp does not grant this role. `AdminFunctions.updateValidator` adds every validator
+role; use `deploy-scripts/GrantChainUpgrader.s.sol` to grant only the upgrader permission.
+
+The script supports an **Ownable ChainAdmin**. It discovers the diamond and current ChainAdmin owner,
+checks the L1 network, chain ID, timelock's Bridgehub and validator registration, and the ChainAdmin's
+authority to grant the role. It encodes `grantRole(diamond, UPGRADER_ROLE, account)` inside
+`ChainAdmin.multicall(..., true)`, simulates that exact request locally as the owner, and requires the
+role to be present afterwards. It never broadcasts and needs no private key. Restriction-based
+ChainAdmins and legacy Governance owners need their own execution route.
+
+For stage chain 499, from `l1-contracts/`:
+
+```bash
+mkdir -p script-out
+forge script deploy-scripts/GrantChainUpgrader.s.sol:GrantChainUpgrader \
+  --rpc-url "$L1_RPC_URL" \
+  --sig 'run(uint256,address,uint256,address,address,string)' \
+  11155111 \
+  0x236d1c3ff32bD0Ca26b72Af287E895627c0478cE \
+  499 \
+  0x7E38a259C353e72eEd3F5136c6E6534eb15C7199 \
+  0x62F948cD938B00a7d4E92bc281d51979366C89F3 \
+  script-out/chain-499-upgrader.json
+```
+
+Review `script-out/chain-499-upgrader.json.md` and the decoded fields in the JSON. In MetaMask on
+Sepolia, send **0 ETH** from its `from` address to its `to` address with the exact contents of
+`script-out/chain-499-upgrader.json.calldata`. Do not manually assemble or pad the calldata. At the
+time of this runbook, the expected sender is `0x1454c35737130eB8700e5d0e7a6C44e8aE00aB10` and target
+ChainAdmin is `0x3543055b186b5Fc8B214397955e850c712D831AD`; the script reads both afresh.
+
+After confirmation, check the timelock's `RoleGranted` event for the intended diamond, role and
+account, and verify membership on the real chain:
+
+```bash
+cast call --rpc-url "$L1_RPC_URL" \
+  0x7E38a259C353e72eEd3F5136c6E6534eb15C7199 \
+  'hasRole(address,bytes32,address)(bool)' \
+  0x35360f304599cD6479978E2734F37B57AD6F1696 \
+  0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3 \
+  0x62F948cD938B00a7d4E92bc281d51979366C89F3
+```
+
+Require `true` before proceeding. Receipt success alone is insufficient: `addValidatorRoles` with
+all six flags false succeeds without granting anything. If the role is already present, the script
+stops with `AlreadyGranted()` instead of preparing another transaction. Re-run preparation against
+fresh state if the chain admin or owner changes before signing.
+
+The script tests run without a fork:
+
+```bash
+forge test --match-path test/foundry/l1/unit/deploy-scripts/GrantChainUpgrader.t.sol
+```
