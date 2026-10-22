@@ -62,8 +62,8 @@ Each also takes `--access-control-restriction <address>` when your ChainAdmin us
 AccessControlRestriction; the default, the zero address, is for an Ownable ChainAdmin.
 `docker run --rm --platform linux/amd64 "$IMAGE" protocol_ops chain <command> --help` lists the rest.
 `chain upgrade` takes the upgrade from your CTM on L1, so run it once your ecosystem has the new
-version. The commands are tested against chains on the image's release: for a chain on an older
-version, ask us which image to use.
+version. Use the new release's image while your chain is still on the version before it (the
+release rehearses exactly that upgrade); for a chain further behind, ask us which image to use.
 
 Use an empty `out/` for each command: `manifest.json` is appended to, and `EXECUTE.md` lists every
 bundle in it. `out/` then holds:

@@ -69,9 +69,16 @@ jobs:
         id: deployer
         env:
           ENVIRONMENT: ${{ inputs.environment }}
+          ARTIFACT_NAME: ${{ inputs.artifact_name }}
           KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
           KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
+          # The chain workflows name their artifacts `…-<environment>`; stage and testnet
+          # share the Sepolia key, so a bundle for one must not run as the other.
+          if [[ "$ARTIFACT_NAME" != *-"$ENVIRONMENT" ]]; then
+            echo "error: artifact $ARTIFACT_NAME is not for $ENVIRONMENT" >&2
+            exit 1
+          fi
           # Deployer secrets are per L1, as in deploy-ecosystem-upgrade.yaml.
           case "$ENVIRONMENT" in
             mainnet)       l1=1        secret=MAINNET key="$KEY_MAINNET" ;;
