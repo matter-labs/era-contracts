@@ -86,7 +86,7 @@ is a copy of `upgrade.toml` and the `<env>.toml` inputs in a new directory, with
     - `simulator/…-<env>-1-ecosystem.json`: the ecosystem transaction-simulator scenario;
     - not committed: `deploy-bundle/` (the deployer's calls, what the deploy workflow broadcasts), `prepare/`,
       `fork-rehearsal/`;
-  - written by the per-chain workflow (`generate-chain-upgrade-calldata.yaml`), once the ecosystem is upgraded:
+  - written by the chain workflow (`generate-chain-upgrade-calldata.yaml`), once the ecosystem is upgraded:
     - `chain-upgrades/<id>/`: the per-chain bundles from `protocol_ops chain set-upgrade-timestamp` and
       `chain upgrade`: `01_chain.set-upgrade-timestamp_*.safe.json`, `02_chain.upgrade_*.safe.json` and
       `manifest.json`;
@@ -108,8 +108,8 @@ gh workflow run generate-ecosystem-upgrade-calldata.yaml --ref <branch> -f upgra
 # 2. the deployments
 gh workflow run deploy-ecosystem-upgrade.yaml --ref <branch> -f environment=<env> -f generate_run_id=<run id>
 # 3. governance sends the EXECUTE.md transactions
-# 4. per chain, once the CTM is on the new version
-gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> -f environment=<env> -f chain_id=<id> \
+# 4. the chains: every chain still on v0.33.0 (`eligible`), or a list of ids
+gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> -f environment=<env> -f chains=eligible \
   -f protocol_ops_tag=<tag> -f upgrade=v0.33.2-verifier -f upgrade_timestamp=1 \
   [-f commit_outputs=true]
 ```

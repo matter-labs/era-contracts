@@ -120,10 +120,9 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # chain id; the target version is the one the ecosystem upgrade registered on the
 # chain's CTM with `setNewVersionUpgrade`):
 #
-#   # a) the chain's upgrade calldata for its ChainAdmin
+#   # a) the chains' upgrade calldata for their ChainAdmins (ids, or `eligible`)
 #   gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> \
-#     -f environment=<env> -f protocol_ops_tag=<tag> \
-#     -f l1_rpc_url=<l1-rpc> -f chain_id=<chain-id>
+#     -f environment=<env> -f protocol_ops_tag=<tag> -f chains=<ids|eligible>
 #
 #   # b) when the chain schedules the switch itself
 #   gh workflow run generate-chain-set-upgrade-timestamp-calldata.yaml --ref <branch> \
@@ -563,6 +562,10 @@ jobs:
           "$BIN" ecosystem governance-toml-to-simulator \
             --env "$ENVIRONMENT" \
             --out "$OUT/transaction-simulator.json"
+          # 3) Mark what already ran on L1.
+          "$BIN" ecosystem sync-already-executed \
+            --scenario "$OUT/transaction-simulator.json" --execution "$OUT/execution.json" \
+            --l1-rpc-url "$L1_FORK_URL"
 
       # A verifier-only or forge-script upgrade's ecosystem scenario: the governance stages as their
       # governance sends them (`from` = the CTM's owner at the fork block: the ProtocolUpgradeHandler or the
@@ -596,6 +599,9 @@ jobs:
           SCENARIO="$OUT/simulator/$(date -u +%Y-%m-%d)-$UPGRADE-$ENVIRONMENT-1-ecosystem.json"
           ./protocol-ops/target/release/protocol_ops ecosystem governance-toml-to-simulator \
             "${args[@]}" --out "$SCENARIO"
+          # Mark what already ran on L1, from the env's execution.json.
+          ./protocol-ops/target/release/protocol_ops ecosystem sync-already-executed \
+            --scenario "$SCENARIO" --l1-rpc-url "$L1_FORK_URL"
           echo "scenario: $SCENARIO"
 
       # Upload only the calldata deliverables; the verification logs travel in the
