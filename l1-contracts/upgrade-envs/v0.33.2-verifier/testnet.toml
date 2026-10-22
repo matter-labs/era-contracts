@@ -40,9 +40,6 @@ governance_upgrade_timer_initial_delay = 0
 #   python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
 create2_factory_salt = "0x0750419e7853b4218863380935d7d1b8ed72e12a1df6800574898286705f6587"
 
-# Sender of the CREATE2 deployments in the deployment runbook. Any funded EOA can send them.
-deployer = "0x04Ac70EA1c1581c17a7fDe5e05feC7bBa351567f"
-
 # Every chain on the ZKsync OS CTM that is on v0.33.0. 1401 is still on v0.31.1 and the others on
 # v0.29/v0.30; a cut keyed to v0.33.0 cannot apply to them.
 chain_ids = [1913, 4221, 42111, 88288, 579029, 8022833, 8022834]
