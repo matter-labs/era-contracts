@@ -1,7 +1,6 @@
 # v31 ecosystem upgrade: generate → deploy
 
-> **Scope.** Written for the v31 rollout from the `draft-v31` line, and its paths name that
-> release's upgrade directory. On the v35 line the same two steps run the release's upgrade: the
+> **Scope.** Written for the v31 rollout from the `draft-v31` line. On the v35 line the same two steps run the release's upgrade: the
 > generate workflow defaults to `upgrade = v0.35.0-upgrade-system` (only that directory may use
 > `prepare = "prepare-all"`) and outputs land under `upgrade-envs/v0.35.0-upgrade-system/output/<env>/`.
 > The v31 line's verifier (PUVT, `ecosystem verify-upgrade`) does not exist on this line; the check
@@ -68,7 +67,7 @@ ecosystem contract _on the fork_ to compute deterministic CREATE2 addresses),
 replays the prepare bundles, runs `verify-bootstrap`, and emits the git-portable calldata set.
 Nothing touches real L1 — the deployer is impersonated.
 
-**Outputs** (under `l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/`):
+**Outputs** (under `l1-contracts/upgrade-envs/<upgrade>/output/<env>/`):
 
 | Artifact                                        | Purpose                                                            |
 | ----------------------------------------------- | ------------------------------------------------------------------ |
@@ -109,14 +108,15 @@ the standing proof that the artifact is self-sufficient.
 ### Which ecosystems this runs for
 
 `environment` is just the basename of a config pair — `permanent-values/<env>.toml`
-plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env's
+plus `<upgrade>/<env>.toml` — and the L1 to fork is read from that env's
 `l1_chain_id` (`1` → mainnet, `11155111` → Sepolia). Adding an ecosystem therefore
 needs no workflow edit: commit the config pair, add its anvil port to
 `ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork, and
 release an image with them. The
 verifier takes its reviewer inputs from the env config (the upgrade input's `owner_address` and
 CREATE2 salts, the permanent values' `zk_token_asset_id`), so the env must declare them.
-Committed today: `stage`, `testnet`, `mainnet`, `adi`. The check must pass for both the
+Committed for `v0.35.0-upgrade-system`: `stage`, `testnet`, `mainnet` (`adi` has only its permanent
+values). The check must pass for both the
 generate job and the independent bundle-handoff verification job.
 
 `adi` is the first standalone ecosystem in this list: single-chain, ZKsync-OS, on L1

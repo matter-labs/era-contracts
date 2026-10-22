@@ -1,10 +1,11 @@
 name: "Execute Deployer Safe Bundles"
 
 # Apply Safe Transaction Builder bundles whose `target` is the ecosystem
-# deployer EOA (i.e. bundles emitted by the chain-init workflow). The
-# deployer's private key is pulled from the secret of the environment's L1 and
-# used to sign every tx in the bundle via `protocol-ops dev execute-safe`. Ecosystem
-# upgrade bundles go through `deploy-ecosystem-upgrade.yaml` instead.
+# deployer EOA (e.g. the chain-init workflow's, when the deployer signs all of
+# them; any other target is refused). The deployer's private key is pulled from
+# the secret of the environment's L1 and used to sign every tx in the bundle via
+# `protocol-ops dev execute-safe`. Ecosystem upgrade bundles go through
+# `deploy-ecosystem-upgrade.yaml` instead.
 #
 # The workflow downloads bundles produced by a prior "generate" workflow
 # run, so it's typically dispatched after a generate workflow has been
@@ -19,7 +20,7 @@ on:
         type: choice
         options: [stage, testnet, mainnet]
       protocol_ops_tag:
-        description: "protocol-ops Docker image tag"
+        description: "protocol-ops image released by build-docker.yaml: sha256:<digest>, or a tag"
         required: true
         type: string
       l1_rpc_url:
@@ -127,11 +128,9 @@ jobs:
         run: |
           # The key selected above, read again rather than kept in $GITHUB_ENV.
           if [[ "$SECRET" == MAINNET ]]; then key="$KEY_MAINNET"; else key="$KEY_SEPOLIA"; fi
-          # Iterate manifest.json in declared order; `dev execute-safe` is
-          # idempotent per-bundle (each call is a discrete tx batch under
-          # the deployer key), so a failure mid-way can be resumed by
-          # rerunning with the same artifact — txs already landed will
-          # short-circuit in subsequent runs.
+          # Iterate manifest.json in declared order. There is no receipt journal
+          # (`--out`), so a rerun after a partial failure skips only CREATE2
+          # deploys whose address already has code: check what mined first.
           manifest="$BUNDLE_DIR/manifest.json"
           jq -r '.bundles[].file' "$manifest" | while read -r file; do
             echo ">>> dev execute-safe $file"

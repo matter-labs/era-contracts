@@ -28,7 +28,8 @@ on:
         type: string
         required: true
 
-# Releases run one at a time, so checking that a tag is free and pushing it can't race.
+# Releases run one at a time, so checking that a tag is free and pushing it can't race
+# (GitHub keeps one waiting run per group: a third dispatch replaces the waiting one).
 concurrency:
   group: build-docker-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && 'release' || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
