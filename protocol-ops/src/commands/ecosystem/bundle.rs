@@ -1388,7 +1388,7 @@ mod tests {
     /// `[contracts]`, or a CTM array that resolves to nothing).
     #[test]
     fn every_committed_env_config_loads() {
-        for env in ["stage", "testnet", "mainnet", "adi"] {
+        for env in ["stage", "testnet", "mainnet", "adi", "anvil-interop"] {
             let cfg = match EnvConfig::load(env) {
                 Ok(cfg) => cfg,
                 // no checkout around the test binary

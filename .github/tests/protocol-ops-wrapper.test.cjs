@@ -20,7 +20,8 @@ case "$1 $2" in
 esac
 `;
 
-function checkout() {
+// Runs `fn` on a fresh scratch checkout, removed afterwards.
+function withCheckout(fn) {
   const repo = mkdtempSync(join(tmpdir(), "protocol-ops-wrapper-"));
   copyFileSync(join(__dirname, "../../protocol-ops.sh"), join(repo, "protocol-ops.sh"));
   mkdirSync(join(repo, "l1-contracts/upgrade-envs/v1"), { recursive: true });
@@ -34,7 +35,11 @@ function checkout() {
   git("init", "-q");
   git("add", "protocol-ops.sh", "l1-contracts");
   git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", "fixture");
-  return { repo, head: git("rev-parse", "HEAD") };
+  try {
+    fn({ repo, head: git("rev-parse", "HEAD") });
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 }
 
 function wrapper({ repo }, args, env = {}) {
@@ -56,8 +61,7 @@ function wrapper({ repo }, args, env = {}) {
 const UPGRADE_ENVS_MOUNT = (repo) => `${repo}/l1-contracts/upgrade-envs:/contracts/l1-contracts/upgrade-envs`;
 
 test("a release run from a checkout of its revision mounts upgrade-envs/ and records the image", () => {
-  const fixture = checkout();
-  try {
+  withCheckout((fixture) => {
     const result = wrapper(fixture, ["--tag", "sha256:abc", "chain", "upgrade"], { STUB_REVISION: fixture.head });
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stdout, "container output\n", "pull output must not reach stdout");
@@ -70,22 +74,17 @@ test("a release run from a checkout of its revision mounts upgrade-envs/ and rec
       "chain",
       "upgrade",
     ]);
-  } finally {
-    rmSync(fixture.repo, { recursive: true, force: true });
-  }
+  });
 });
 
 test("outputs under output/ don't count as edits", () => {
-  const fixture = checkout();
-  try {
+  withCheckout((fixture) => {
     mkdirSync(join(fixture.repo, "l1-contracts/upgrade-envs/v1/output/stage"), { recursive: true });
     writeFileSync(join(fixture.repo, "l1-contracts/upgrade-envs/v1/output/stage/ecosystem.toml"), "");
     const result = wrapper(fixture, ["--tag", "t", "chain", "upgrade"], { STUB_REVISION: fixture.head });
     assert.equal(result.status, 0, result.stderr);
     assert.ok(result.run.includes(UPGRADE_ENVS_MOUNT(fixture.repo)));
-  } finally {
-    rmSync(fixture.repo, { recursive: true, force: true });
-  }
+  });
 });
 
 test("another revision, an edited input or a new input is refused, or run on the image's own configs", () => {
@@ -110,8 +109,7 @@ test("another revision, an edited input or a new input is refused, or run on the
       hideUntracked,
     ],
   ]) {
-    const fixture = checkout();
-    try {
+    withCheckout((fixture) => {
       prepare(fixture.repo);
       const env = { STUB_REVISION: revision ?? fixture.head, ...gitConfig };
       const refused = wrapper(fixture, ["--tag", "t", "chain", "upgrade"], env);
@@ -123,53 +121,57 @@ test("another revision, an edited input or a new input is refused, or run on the
       });
       assert.equal(release.status, 0, `${label}: ${release.stderr}`);
       assert.ok(!release.run.includes(UPGRADE_ENVS_MOUNT(fixture.repo)), label);
-    } finally {
-      rmSync(fixture.repo, { recursive: true, force: true });
-    }
+    });
   }
 });
 
 test("PROTOCOL_OPS_REQUIRE_RELEASE refuses an image without a revision label, and local mode", () => {
-  const fixture = checkout();
-  try {
+  withCheckout((fixture) => {
     const release = { PROTOCOL_OPS_REQUIRE_RELEASE: "1" };
     assert.equal(wrapper(fixture, ["--tag", "t", "chain", "upgrade"], release).status, 1);
     assert.equal(wrapper(fixture, ["chain", "upgrade"], release).status, 1);
     assert.equal(wrapper(fixture, ["--tag", "", "chain", "upgrade"]).status, 1, "an empty --tag is not local mode");
     assert.equal(existsSync(join(fixture.repo, "stub/run")), false);
     assert.equal(existsSync(join(fixture.repo, "stub/local")), false);
-  } finally {
-    rmSync(fixture.repo, { recursive: true, force: true });
-  }
+  });
 });
 
 test("an image without a revision label is a local build, run with the checkout's upgrade-envs/", () => {
-  const fixture = checkout();
-  try {
+  withCheckout((fixture) => {
     writeFileSync(join(fixture.repo, "l1-contracts/upgrade-envs/v1/stage.toml"), "x\n");
     const result = wrapper(fixture, ["--tag", "local", "chain", "upgrade"]);
     assert.equal(result.status, 0, result.stderr);
     assert.ok(result.run.includes(UPGRADE_ENVS_MOUNT(fixture.repo)));
-  } finally {
-    rmSync(fixture.repo, { recursive: true, force: true });
-  }
+  });
 });
 
-test("EXTRA_MOUNTS are passed as given, secrets by name only", () => {
-  const fixture = checkout();
-  try {
+// The Etherscan key, and the run a deploy bundle records as `generated_by`.
+const PASSED_THROUGH = ["ETHERSCAN_API_KEY", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GITHUB_RUN_ID", "RUNNER_OS"];
+
+test("EXTRA_MOUNTS are passed as given, the environment by name only", () => {
+  withCheckout((fixture) => {
     const result = wrapper(fixture, ["--tag", "t", "cast", "chain-id"], {
       STUB_REVISION: fixture.head,
       EXTRA_MOUNTS: "/bundle:/bundle:ro /result:/result",
-      ETHERSCAN_API_KEY: "secret",
+      ...Object.fromEntries(PASSED_THROUGH.map((name) => [name, `value-of-${name}`])),
     });
     assert.equal(result.status, 0, result.stderr);
     const run = result.run.join("\n");
     assert.match(run, /^-v\n\/bundle:\/bundle:ro$/m);
     assert.match(run, /^-v\n\/result:\/result$/m);
-    assert.match(run, /^-e\nETHERSCAN_API_KEY$/m);
-    assert.doesNotMatch(run, /secret/);
-  } finally {
-    rmSync(fixture.repo, { recursive: true, force: true });
-  }
+    for (const name of PASSED_THROUGH) {
+      assert.match(run, new RegExp(`^-e\n${name}$`, "m"));
+    }
+    assert.doesNotMatch(run, /value-of-/);
+    assert.ok(!result.run.includes("-w"), "cast runs in the image's working directory");
+  });
+});
+
+test("forge runs from the image's l1-contracts/, for its foundry.toml", () => {
+  withCheckout((fixture) => {
+    const result = wrapper(fixture, ["--tag", "t", "forge", "build"], { STUB_REVISION: fixture.head });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.run.join("\n"), /^-w\n\/contracts\/l1-contracts$/m);
+    assert.deepEqual(result.run.slice(-2), ["forge", "build"]);
+  });
 });
