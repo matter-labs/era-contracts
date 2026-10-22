@@ -177,7 +177,7 @@ po ecosystem replay-bundle --bundle "$bundle" --rpc "$L1" --verify-only
 
 echo "== govern"
 while read -r from to data value; do
-  send_as "$from" "$to" "$data" --value "$value"
+  send_as "$from" "$to" "$data" --value "${value}ether"
 done < <(jq -r '.[] | select(.tag == "governance") | "\(.from) \(.to) \(.data) \(.value)"' \
   "$out/transaction-simulator.json")
 
