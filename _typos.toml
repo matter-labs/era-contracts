@@ -9,7 +9,8 @@ extend-exclude = [
     "*.json",
     "*.lock",
     ".git/",
-    "SECURITY.md"
+    "SECURITY.md",
+    "/zkip-poc/contracts/src/verifiers/"
 ]
 
 [default.extend-words]

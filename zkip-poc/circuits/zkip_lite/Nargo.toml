@@ -1,0 +1,7 @@
+[package]
+name = "zkip_lite"
+type = "lib"
+authors = [""]
+compiler_version = ">=1.0.0"
+
+[dependencies]
