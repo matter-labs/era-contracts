@@ -63,7 +63,9 @@ smaller final circuit/proof; most settlement savings come from sharing that veri
 The final public-input vector is six fields regardless of count. Calldata, state writes and batch checks
 still grow with statement count.
 Maximum node height is 30 (at most 4^31 statements); admitted-chain tree capacity is 2^32. Real L1
-transaction gas limits are much tighter. Aggregation amortizes the fixed verifier cost, not all costs.
+transaction gas limits are much tighter. Aggregation amortizes the fixed verifier cost, not all costs. Existing PoC path/state limits still apply:
+in particular, shared finality paths have depth 7 and source IMT paths depth 16. The larger admission
+capacity does not extend those witness bounds; changing them is a separate leaf-circuit update.
 
 Raw single-sample results and source/log fingerprints:
 [`results/m2-max-multichain-2026-10-23.json`](results/m2-max-multichain-2026-10-23.json).

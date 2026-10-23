@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {ZKIPLiteRegistry} from "../src/ZKIPLiteRegistry.sol";
 import {ZKIPBase} from "./helpers/ZKIPBase.sol";
 import {InvalidProof, OnlyOwner} from "../src/ZKIPLiteErrors.sol";
 import {ChainRegistryHash} from "../src/ChainRegistryHash.sol";
@@ -19,12 +20,22 @@ contract ZKIPRegistryMembershipTest is ZKIPBase {
     /// @dev Known answers from prover/chain_registry.py, also exercised through Noir by the fifth-chain claim.
     function test_admissionRootMatchesPythonAndRejectsDuplicates() public {
         assertEq(reg.chainRegistryRoot(), KNOWN_ADMISSION_ROOT_TWO);
+        vm.expectEmit(address(reg));
+        emit ZKIPLiteRegistry.ChainEnabled(C, bytes32(0));
         reg.enableChain(C, address(simC), bytes32(0));
+        vm.expectEmit(address(reg));
+        emit ZKIPLiteRegistry.ChainEnabled(FOURTH_ZKIP_CHAIN_ID, bytes32(0));
         reg.enableChain(FOURTH_ZKIP_CHAIN_ID, alice, bytes32(0));
+        vm.expectEmit(address(reg));
+        emit ZKIPLiteRegistry.ChainEnabled(FIFTH_ZKIP_CHAIN_ID, bytes32(0));
         reg.enableChain(FIFTH_ZKIP_CHAIN_ID, bob, bytes32(0));
         assertEq(reg.zkipChainCount(), RECURSIVE_TEST_CHAINS);
         assertEq(reg.chainRegistryRoot(), KNOWN_ADMISSION_ROOT_FIVE);
         assertEq(reg.zkipChains(4), FIFTH_ZKIP_CHAIN_ID);
+        (address fifthContract, bytes32 fifthState, , uint256 fifthCount, ) = reg.chains(FIFTH_ZKIP_CHAIN_ID);
+        assertEq(fifthContract, bob);
+        assertEq(fifthState, bytes32(0));
+        assertEq(fifthCount, 1);
         uint256 previousRoot = reg.chainRegistryRoot();
         vm.expectRevert(InvalidProof.selector);
         reg.enableChain(A, address(simA), bytes32(0));

@@ -42,7 +42,7 @@ substituted approved key cannot match the proven digest. Stale slots are still s
 later slots see the state produced by earlier successful slots. Unused slots repeat a real proof.
 Submission arrays must contain exactly the debit and claim counts indicated by the four slot kinds.
 
-Keccak is retained only at this outer commitment boundary because L1 must calculate it. Changing
+The outer commitment boundary uses Keccak because L1 must calculate it. Changing
 the source/finality hash to BLAKE2s is independent of this optimization. The compact aggregate changes
 the outer verification key and submission ABI, so it requires a new verifier registration.
 
@@ -92,7 +92,9 @@ An inclusion mask reports accepted proof inputs, not successful L1 application o
 There is no fixed statement window or fixed chain count in this path. Depth is bounded to 30 and the
 count to 64 bits (at most 4^31 statements under this arity/depth bound), while actual L1 submissions must
 fit transaction gas/calldata limits. Per-statement batch authentication, calldata and state writes remain
-linear; only the final proof and its public-input vector are constant size. This is accounting-proof
+linear; only the final proof and its public-input vector are constant size. The existing research
+bounds on source/finality path depths and private asset/nullifier state also remain; raising those
+bounds changes leaf circuits, not the aggregation protocol. This is accounting-proof
 aggregation, not aggregation of the chains' STF proofs or replacement of production batch settlement.
 
 ## Chain admission beyond four chains
