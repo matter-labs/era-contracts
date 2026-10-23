@@ -4,3 +4,4 @@ circuits/*/Prover_*.toml
 contracts/out/
 contracts/cache/
 prover/__pycache__/
+benchmarks/__pycache__/

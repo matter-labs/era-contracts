@@ -2,6 +2,11 @@
 // Hashes of protocol data are keccak and must match this repo's L1 and L2 contracts byte for byte; ZKIP's own
 // state is Poseidon2.
 
+mod imt;
+mod imt_constants;
+pub use imt::{insert as imt_insert, root_from_halves};
+pub use imt_constants::IMT_MAX_LEAVES;
+
 pub global MAX_ASSETS: u32 = 8;
 pub global NULL_DEPTH: u32 = 24;
 pub global D_IMT: u32 = 16;
@@ -57,7 +62,11 @@ pub fn keccak_lanes<let NL: u32>(msg: [u64; NL]) -> [u64; 4] {
 }
 
 pub fn keccak_pair(a: [u64; 4], b: [u64; 4]) -> [u64; 4] {
-    keccak_lanes([a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]])
+    protocol_hash_lanes([a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3]])
+}
+
+pub fn protocol_hash_lanes<let NL: u32>(_msg: [u64; NL]) -> [u64; 4] {
+    keccak_lanes(_msg)
 }
 
 pub fn bytes_to_lanes<let L: u32, let NL: u32>(b: [u8; L]) -> [u64; NL] {

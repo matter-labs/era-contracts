@@ -40,6 +40,7 @@ contract ChainSim {
     mapping(uint256 batchNumber => ZKIPLiteRegistry.ChainBatchRootPreimage) internal preimages;
     mapping(uint256 batchNumber => ImtInsertion.Proof[]) internal insertProofs;
     mapping(uint256 batchNumber => uint256[]) internal batchValues;
+    mapping(uint256 batchNumber => uint256 count) public batchStartLeafCount;
     mapping(uint256 value => Inclusion) internal inclusions;
 
 
@@ -54,6 +55,7 @@ contract ChainSim {
         require(!open, BatchOpen());
         open = true;
         batchBegin = imt.root();
+        batchStartLeafCount[lastCommitted + 1] = imt.tree._leafNumber;
     }
 
     /// @notice What AtomicFlowManager.append does to the tree for one leg: insert its commit value.

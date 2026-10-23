@@ -29,7 +29,7 @@ contract ZKIPAggE2ETest is ZKIPBase {
         for (uint256 i = 0; i < original.length; ++i) {
             tampered[i] = original[i];
         }
-        tampered[15] = bytes32(uint256(90e6)); // slot 0 (A's debit_4): input 15 is the lock amount
+        tampered[12] = bytes32(uint256(90e6)); // slot 0: input 12 is the lock amount
         sub.publicInputs = tampered;
         vm.expectRevert();
         reg.submitAggregated(sub);
