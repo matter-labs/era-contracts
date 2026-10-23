@@ -10,7 +10,7 @@ Statements reach L1 one by one, or several at once in one aggregated proof.
 
 **Status: research code.**
 
-This branch moves debit IMT insertion checks into ZKIP and adds compact-transfer/hash benchmarks. See the
+This branch moves debit IMT insertion checks into ZKIP, compacts aggregated settlement inputs, and adds transfer/hash benchmarks. See the
 [accounting design](../protocol-docs/zkip-accounting-poc.md) and [benchmark instructions](benchmarks/README.md).
 
 - It is not wired into the Executor or the native token vault: `contracts/src/mocks/` stands in for them.
@@ -48,34 +48,37 @@ This branch moves debit IMT insertion checks into ZKIP and adds compact-transfer
     `claim_2`).
 - **Aggregation.** Each chain hands a zero-knowledge proof (bb's `noir-recursive` target) to an untrusted aggregator.
   - **The aggregator** verifies each proof natively and drops the ones that fail. It then proves `agg_4`, which
-    recursively verifies up to four of them and exposes each one's public inputs plus a commitment to its VK.
+    recursively verifies up to four of them and exposes a digest binding each one's public inputs and VK commitment.
   - **`submitAggregated`** verifies that one proof. It applies each slot whose VK commitment is an approved circuit of
     its kind and whose public inputs are what L1 would hand that circuit now. Any other slot is skipped with
     `SlotSkipped(reason)`, so a stale slot doesn't block the rest of the window.
   - **Privacy:** the inner proofs are zero-knowledge, so the aggregator learns only what L1 sees.
   - **Fallback:** a chain the aggregator leaves out can still submit directly.
+  - **Compact settlement:** the outer proof has 8 public fields rather than 68. L1 reconstructs each statement's
+    digest from authenticated state and the settlement data; the sixteen inner inputs are not repeated in calldata.
+    BLAKE2s is the selected target for source/finality hashes in the separate benchmark experiments.
 
 ## Layout
 
-| Path | What |
-| --- | --- |
-| `circuits/` | Noir workspace: the `zkip_lite` library, the `debit_1`, `debit_4`, `claim_1`, `claim_2` circuits (each pair differs only in `N`) and the `agg_4` aggregation circuit |
-| `prover/prove.py` | Prover bridge for the tests (vm.ffi): builds the private witness, runs nargo and bb, writes VKs and verifiers (`setup`), and plays the aggregator (`aggregate`) |
-| `contracts/src/` | `ZKIPLiteRegistry` (submissions, execute gate), `ImtInsertion`, errors, mocks, generated verifiers |
-| `contracts/test/` | End-to-end tests on real proofs |
-| `work/` | Generated VKs, proofs and timings (ignored) |
+| Path              | What                                                                                                                                                                 |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `circuits/`       | Noir workspace: the `zkip_lite` library, the `debit_1`, `debit_4`, `claim_1`, `claim_2` circuits (each pair differs only in `N`) and the `agg_4` aggregation circuit |
+| `prover/prove.py` | Prover bridge for the tests (vm.ffi): builds the private witness, runs nargo and bb, writes VKs and verifiers (`setup`), and plays the aggregator (`aggregate`)      |
+| `contracts/src/`  | `ZKIPLiteRegistry` (submissions, execute gate), `ImtInsertion`, errors, mocks, generated verifiers                                                                   |
+| `contracts/test/` | End-to-end tests on real proofs                                                                                                                                      |
+| `work/`           | Generated VKs, proofs and timings (ignored)                                                                                                                          |
 
 ## Running it
 
 You need nargo 1.0.0-beta.25, bb 5.2.1 and a bb CRS with at least 2^22 points. The tools are found on `PATH`, or
 through these variables:
 
-| Variable | Meaning |
-| --- | --- |
-| `NARGO`, `BB` | the binaries |
-| `BB_CRS` | the CRS directory; default `~/.bb-crs` |
-| `ZKIP_PROVER_THREADS` | prover threads; default 14 |
-| `ZKIP_CMD_WRAPPER` | a command every nargo and bb call runs under, e.g. a network-denying sandbox |
+| Variable              | Meaning                                                                      |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `NARGO`, `BB`         | the binaries                                                                 |
+| `BB_CRS`              | the CRS directory; default `~/.bb-crs`                                       |
+| `ZKIP_PROVER_THREADS` | prover threads; default 14                                                   |
+| `ZKIP_CMD_WRAPPER`    | a command every nargo and bb call runs under, e.g. a network-denying sandbox |
 
 ```bash
 cd zkip-poc && python3 -I prover/prove.py setup
@@ -91,22 +94,22 @@ an Apple M4 Max, and the 4 aggregation tests ~5. `foundry.toml` uses Prague gas 
 
 ## Tests
 
-| Test | What it shows |
-| --- | --- |
-| `test_swapEndToEnd` | Chain A swaps 60 USDC for B's 25 EURC. Both debits are proven and both claims credited with in-circuit finality, then B withdraws on L1. A second credit of the same leg is unprovable. |
-| `test_multiLegBatchAndBatchedClaims` | A 3-leg batch (`debit_4`), then two credits in one claim (`claim_2`) and one in `claim_1` |
-| `test_overdraftIsUnprovableAndBlocksExecution` | A debit beyond the locked balance has no proof, so its batch never executes |
-| `test_batchWithoutLegsNeedsNoProof` | A batch without legs executes with no ZKIP proof |
-| `test_gateGasForBatchWithoutLegs`, `test_gateGasForFurtherBatchInSameTx` | Gas of the execute gate |
-| `test_imtContinuityIsEnforcedOnL1` | Debit proofs must chain over the leg batches in order |
-| `test_proofBoundToPublicInputs` | A valid proof submitted with different public data is rejected |
-| `test_lateLegCannotBeCredited` | A counter-leg settled after the deadline doesn't make the flow final |
-| `test_nonZkipLegSourceCannotBeCredited` | A leg from a chain that isn't a ZKIP chain can't be credited |
-| `test_unknownAnchorRejected` | Anchors must be existing L1 message roots |
-| `test_aggSwapEndToEnd` | The same swap with one aggregated proof per window: both debits in one, both claims in the next. A tampered public input fails verification. |
-| `test_aggFourSlotsFromTwoChains` | One proof carries 4 debits from 2 chains, 2 batches each. Slots apply in order, so a chain's second batch builds on its first. |
-| `test_aggDropsInvalidProofAndChecksCircuits` | The aggregator drops a corrupted proof and aggregates the rest. A revoked circuit's slot is skipped, and the dropped chain proves directly. |
-| `test_aggStaleSlotIsSkipped` | A slot made stale by a direct submission is skipped; the other slot applies, and nothing applies twice |
+| Test                                                                     | What it shows                                                                                                                                                                           |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test_swapEndToEnd`                                                      | Chain A swaps 60 USDC for B's 25 EURC. Both debits are proven and both claims credited with in-circuit finality, then B withdraws on L1. A second credit of the same leg is unprovable. |
+| `test_multiLegBatchAndBatchedClaims`                                     | A 3-leg batch (`debit_4`), then two credits in one claim (`claim_2`) and one in `claim_1`                                                                                               |
+| `test_overdraftIsUnprovableAndBlocksExecution`                           | A debit beyond the locked balance has no proof, so its batch never executes                                                                                                             |
+| `test_batchWithoutLegsNeedsNoProof`                                      | A batch without legs executes with no ZKIP proof                                                                                                                                        |
+| `test_gateGasForBatchWithoutLegs`, `test_gateGasForFurtherBatchInSameTx` | Gas of the execute gate                                                                                                                                                                 |
+| `test_imtContinuityIsEnforcedOnL1`                                       | Debit proofs must chain over the leg batches in order                                                                                                                                   |
+| `test_proofBoundToPublicInputs`                                          | A valid proof submitted with different public data is rejected                                                                                                                          |
+| `test_lateLegCannotBeCredited`                                           | A counter-leg settled after the deadline doesn't make the flow final                                                                                                                    |
+| `test_nonZkipLegSourceCannotBeCredited`                                  | A leg from a chain that isn't a ZKIP chain can't be credited                                                                                                                            |
+| `test_unknownAnchorRejected`                                             | Anchors must be existing L1 message roots                                                                                                                                               |
+| `test_aggSwapEndToEnd`                                                   | The same swap with one aggregated proof per window: both debits in one, both claims in the next. A tampered public input fails verification.                                            |
+| `test_aggFourSlotsFromTwoChains`                                         | One proof carries 4 debits from 2 chains, 2 batches each. Slots apply in order, so a chain's second batch builds on its first.                                                          |
+| `test_aggDropsInvalidProofAndChecksCircuits`                             | The aggregator drops a corrupted proof and aggregates the rest. A revoked circuit's slot is skipped, and the dropped chain proves directly.                                             |
+| `test_aggStaleSlotIsSkipped`                                             | A slot made stale by a direct submission is skipped; the other slot applies, and nothing applies twice                                                                                  |
 
 ## Original PoC measurements
 
@@ -116,12 +119,12 @@ this branch's revised debit path. Updated comparisons are recorded under `benchm
 These are from an Apple M4 Max. L1 gas is per submission: execution plus calldata plus the 21k base, at Osaka
 pricing.
 
-| Circuit | Gates | Rows | Prove, 4 threads | Prove, 14 threads | Peak RAM | Proof | L1 gas |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `debit_1` | 0.33M | 2^19 | 3.7 s | 2.3 s | 0.63 GB | 9.9 KB | ~1.03M |
-| `debit_4` | 1.31M | 2^21 | 13.0 s | 8.2 s | 2.5 GB | 10.7 KB | ~1.11M (3 legs) |
-| `claim_1` | 1.96M | 2^21 | 19.2 s | 12.1 s | 3.6 GB | 10.7 KB | ~1.06–1.10M |
-| `claim_2` | 3.92M | 2^22 | 36.5 s | 28.1 s | 7.0 GB | 11.1 KB | ~1.13M |
+| Circuit   | Gates | Rows | Prove, 4 threads | Prove, 14 threads | Peak RAM | Proof   | L1 gas          |
+| --------- | ----- | ---- | ---------------- | ----------------- | -------- | ------- | --------------- |
+| `debit_1` | 0.33M | 2^19 | 3.7 s            | 2.3 s             | 0.63 GB  | 9.9 KB  | ~1.03M          |
+| `debit_4` | 1.31M | 2^21 | 13.0 s           | 8.2 s             | 2.5 GB   | 10.7 KB | ~1.11M (3 legs) |
+| `claim_1` | 1.96M | 2^21 | 19.2 s           | 12.1 s            | 3.6 GB   | 10.7 KB | ~1.06–1.10M     |
+| `claim_2` | 3.92M | 2^22 | 36.5 s           | 28.1 s            | 7.0 GB   | 11.1 KB | ~1.13M          |
 
 - **Verifier:** ~0.76–0.82M execution plus ~0.16M of calldata per proof. The rest is L1 bookkeeping, the largest part
   being ~19k gas per leg for the IMT insertion checks.
@@ -135,6 +138,7 @@ pricing.
     - ~1.36M with 4, i.e. ~0.34M per statement.
 
     That's ~1.08M fixed plus ~0.07M per statement. A lone statement is cheaper submitted directly.
+
 - **Where the gates go:**
   - keccak-f1600 costs 17,380 gates and Poseidon2 73.
   - A leg's 1,600-byte bundle hash is ~0.22M gates.

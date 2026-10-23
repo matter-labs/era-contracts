@@ -6,7 +6,12 @@ import {StoredInteropRoot} from "era/common/Messaging.sol";
 import {MockCaps} from "./mocks/MockCaps.sol";
 import {MockMessageRoot} from "./mocks/MockMessageRoot.sol";
 import {revertWith} from "./RevertWith.sol";
-import {DEBIT_1_CIRCUIT_ID} from "./ZKIPLiteConfig.sol";
+import {
+    AGGREGATED_DIGEST_INPUTS,
+    AGGREGATED_STATEMENT_DOMAIN,
+    DEBIT_1_CIRCUIT_ID,
+    ZKIP_STATEMENT_INPUTS
+} from "./ZKIPLiteConfig.sol";
 import {
     BadAggregate,
     BatchNotProven,
@@ -70,11 +75,12 @@ contract ZKIPLiteRegistry {
     }
 
     /// @notice One agg_4 proof and the L1 data of the statements in its slots.
-    /// @dev `publicInputs` is agg_4's public input vector: each slot's 16 inner public inputs, then each slot's VK
-    /// commitment. Debit and claim slots take their data from `debits` and `claims` in slot order, with `proof` empty.
+    /// @dev `publicInputs` contains each slot's statement digest as two 128-bit halves. The digest binds the VK
+    /// commitment and all 16 inner inputs. Debit and claim data follow slot order, with `proof` empty.
     struct AggregatedSubmission {
         bytes proof;
         bytes32[] publicInputs;
+        bytes32[4] vkCommitments;
         uint8[] kinds;
         DebitSubmission[] debits;
         ClaimSubmission[] claims;
@@ -93,10 +99,8 @@ contract ZKIPLiteRegistry {
     uint256 internal constant DEBIT_LARGE = 4;
     uint256 internal constant CLAIM_SMALL = 1;
     uint256 internal constant CLAIM_LARGE = 2;
-    uint256 internal constant CLAIM_PUBLIC_INPUTS = 16;
     uint256 internal constant ANCHORS = 2;
     uint256 internal constant AGG_SLOTS = 4;
-    uint256 internal constant AGG_SLOT_INPUTS = 16;
     uint8 internal constant SLOT_UNUSED = 0;
     uint8 internal constant SLOT_DEBIT = 1;
     uint8 internal constant SLOT_CLAIM = 2;
@@ -218,9 +222,21 @@ contract ZKIPLiteRegistry {
     /// @param _s The aggregated proof and its slots' data.
     function submitAggregated(AggregatedSubmission calldata _s) external {
         require(
-            _s.kinds.length == AGG_SLOTS && _s.publicInputs.length == AGG_SLOTS * (AGG_SLOT_INPUTS + 1),
+            _s.kinds.length == AGG_SLOTS && _s.publicInputs.length == AGG_SLOTS * AGGREGATED_DIGEST_INPUTS,
             BadAggregate()
         );
+        uint256 debitCount;
+        uint256 claimCount;
+        for (uint256 i = 0; i < AGG_SLOTS; ++i) {
+            if (_s.kinds[i] == SLOT_DEBIT) {
+                ++debitCount;
+            } else if (_s.kinds[i] == SLOT_CLAIM) {
+                ++claimCount;
+            } else {
+                require(_s.kinds[i] == SLOT_UNUSED, BadAggregate());
+            }
+        }
+        require(_s.debits.length == debitCount && _s.claims.length == claimCount, BadAggregate());
         _verify(aggVerifier, _s.proof, _s.publicInputs);
         uint256 nextDebit;
         uint256 nextClaim;
@@ -229,8 +245,8 @@ contract ZKIPLiteRegistry {
             if (kind == SLOT_UNUSED) {
                 continue;
             }
-            bytes32[] calldata pi = _s.publicInputs[i * AGG_SLOT_INPUTS:(i + 1) * AGG_SLOT_INPUTS];
-            bytes32 vkCommitment = _s.publicInputs[AGG_SLOTS * AGG_SLOT_INPUTS + i];
+            bytes32[] calldata pi = _s.publicInputs[i * AGGREGATED_DIGEST_INPUTS:(i + 1) * AGGREGATED_DIGEST_INPUTS];
+            bytes32 vkCommitment = _s.vkCommitments[i];
             bytes memory skipped;
             if (kind == SLOT_DEBIT) {
                 skipped = _aggregatedDebit(_s.debits[nextDebit++], vkCommitment, pi);
@@ -283,7 +299,7 @@ contract ZKIPLiteRegistry {
         bytes32 imtRoot;
         uint256 leafCount;
         (err, pi, imtRoot, leafCount) = _checkDebit(_d, circuit == CIRCUIT_DEBIT_1 ? DEBIT_SMALL : DEBIT_LARGE);
-        if (err.length == 0 && keccak256(abi.encodePacked(pi)) != keccak256(abi.encodePacked(_pi))) {
+        if (err.length == 0 && !_statementMatches(_vkCommitment, pi, _pi)) {
             err = abi.encodeWithSelector(SlotInputsMismatch.selector);
         }
         if (err.length == 0) {
@@ -304,12 +320,23 @@ contract ZKIPLiteRegistry {
         }
         bytes32[] memory pi;
         (err, pi) = _checkClaim(_c, size);
-        if (err.length == 0 && keccak256(abi.encodePacked(pi)) != keccak256(abi.encodePacked(_pi))) {
+        if (err.length == 0 && !_statementMatches(_vkCommitment, pi, _pi)) {
             err = abi.encodeWithSelector(SlotInputsMismatch.selector);
         }
         if (err.length == 0) {
             _applyClaim(_c);
         }
+    }
+
+    function _statementMatches(
+        bytes32 _vkCommitment,
+        bytes32[] memory _inputs,
+        bytes32[] calldata _digest
+    ) internal pure returns (bool) {
+        (bytes32 hi, bytes32 lo) = _split(
+            keccak256(abi.encodePacked(AGGREGATED_STATEMENT_DOMAIN, _vkCommitment, _inputs))
+        );
+        return _digest[0] == hi && _digest[1] == lo;
     }
 
     /// @notice The L1 checks of a debit, and the public inputs its circuit of `_size` legs was proven against.
@@ -350,7 +377,7 @@ contract ZKIPLiteRegistry {
         ChainState storage _c,
         DebitSubmission calldata _s
     ) internal view returns (bytes32[] memory pi) {
-        pi = new bytes32[](AGG_SLOT_INPUTS);
+        pi = new bytes32[](ZKIP_STATEMENT_INPUTS);
         pi[0] = bytes32(_s.chainId);
         pi[1] = bytes32(block.chainid);
         pi[2] = _c.stateRoot;
@@ -388,7 +415,7 @@ contract ZKIPLiteRegistry {
         if (_s.numCredits == 0 || _s.numCredits > _size) {
             return (abi.encodeWithSelector(NoVerifier.selector, _s.numCredits), pi);
         }
-        pi = new bytes32[](CLAIM_PUBLIC_INPUTS);
+        pi = new bytes32[](ZKIP_STATEMENT_INPUTS);
         pi[0] = bytes32(_s.chainId);
         pi[1] = bytes32(block.chainid);
         pi[2] = c.stateRoot;

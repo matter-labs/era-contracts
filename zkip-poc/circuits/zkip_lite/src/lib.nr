@@ -4,6 +4,10 @@
 
 mod imt;
 mod imt_constants;
+mod aggregation;
+mod aggregation_constants;
+pub use aggregation::statement_digest;
+pub use aggregation_constants::{AGG_SLOTS, AGG_SLOT_INPUTS, AGG_DIGEST_INPUTS};
 pub use imt::{insert as imt_insert, root_from_halves};
 pub use imt_constants::IMT_MAX_LEAVES;
 

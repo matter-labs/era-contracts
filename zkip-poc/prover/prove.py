@@ -55,6 +55,7 @@ TAG = bytes.fromhex("3445134c")
 CIRCUIT_NAMES = ["debit_1", "debit_4", "claim_1", "claim_2"]
 AGG_INNER = ["debit_1", "debit_4", "claim_1", "claim_2"]  # normalized to 16 public inputs
 AGG_SLOTS = 4
+STATEMENT_DOMAIN = keccak256(b"zkSync:ZKIP:aggregatedStatement:v1")
 
 
 def log(*a):
@@ -250,6 +251,12 @@ def vk_commit(name):
     return p2.hash_many(fields(VK_REC_DIR / name / "vk"))
 
 
+def statement_digest(vk_commitment, public_inputs):
+    assert len(public_inputs) == 16
+    digest = keccak256(STATEMENT_DOMAIN + b32(vk_commitment) + b"".join(map(b32, public_inputs)))
+    return list(hi_lo(digest))
+
+
 def aggregate(manifest, out_dir):
     slots = json.loads(Path(manifest).read_text())["slots"]
     assert 0 < len(slots) <= AGG_SLOTS, "agg_4 takes 1 to 4 proofs"
@@ -277,6 +284,13 @@ def aggregate(manifest, out_dir):
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     _, wall, rss = run([BB, "prove", "-b", CIRCUITS / "target" / "agg_4.json", "-w", CIRCUITS / "target" / (tag + ".gz"),
                         "-k", VK_DIR / "agg_4" / "vk", "-o", out_dir, "-t", "evm", "-c", CRS], timed=True)
+    commitments = [vk_commit(s["circuit"]) for s in use]
+    expected = [limb for s, vk in zip(use, commitments)
+                for limb in statement_digest(vk, fields(Path(s["dir"]) / "public_inputs"))]
+    assert fields(Path(out_dir) / "public_inputs") == expected, "aggregate statement digest mismatch"
+    (Path(out_dir) / "vk_commitments").write_bytes(b"".join(map(b32, commitments)))
+    run([BB, "verify", "-k", VK_DIR / "agg_4" / "vk", "-p", Path(out_dir) / "proof",
+         "-i", Path(out_dir) / "public_inputs", "-t", "evm", "-c", CRS])
     record({"circuit": "agg_4", "target": "evm", "kind": "aggregate", "real_slots": sum(included),
             "execute_s": round(ex_wall, 2), "prove_s": round(wall, 2),
             "peak_rss_mb": round(rss / 2 ** 20) if rss else None,

@@ -36,7 +36,7 @@ for relative in REFERENCE_FILES:
 sys.path.insert(0, str(BASELINE / "prover"))
 import prove as reference
 
-VARIANTS = ("legacy_keccak", "proof_keccak", "compact_keccak", "compact_blake2s", "compact_blake3_source", "compact_blake3", "compact_poseidon2")
+VARIANTS = ("legacy_keccak", "proof_keccak", "compact_keccak", "compact_blake2s_source", "compact_blake2s", "compact_blake3_source", "compact_blake3", "compact_poseidon2")
 TRANSFER_WORDS = 10
 WORD_BYTES = 32
 TRANSFER_BYTES = TRANSFER_WORDS * WORD_BYTES
