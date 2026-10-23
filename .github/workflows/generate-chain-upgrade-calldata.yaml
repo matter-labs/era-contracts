@@ -44,7 +44,7 @@ on:
         type: string
         default: ""
       commit_outputs:
-        description: "Commit each chain's bundles to output/<env>/chain-upgrades/<chain id>/ and its scenario to output/<env>/simulator/ of `upgrade`, on the dispatched branch, in one commit. Needs `upgrade`, the RELEASE_TOKEN secret and a branch of this repository."
+        description: "Commit each chain's bundles to output/<env>/chain-upgrades/<chain id>/ and its scenario to output/<env>/simulator/ of `upgrade`, on the dispatched branch, in one commit. Needs `upgrade`, the MatterLabs Bots App (MATTERLABS_BOTS_APP_ID / MATTERLABS_BOTS_PRIVATE_KEY) and a branch of this repository."
         required: false
         type: boolean
         default: false
@@ -66,9 +66,21 @@ jobs:
       ENVIRONMENT: ${{ inputs.environment }}
       CHAINS: ${{ inputs.chains }}
     steps:
+      # The MatterLabs Bots GitHub App, scoped to this repository: the org's way to push from CI
+      # (RELEASE_TOKEN, the bot user's token, is being retired).
+      - name: Generate GitHub App token
+        if: ${{ inputs.commit_outputs }}
+        id: app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
       - uses: actions/checkout@v4
         with:
-          token: ${{ inputs.commit_outputs && secrets.RELEASE_TOKEN || github.token }}
+          token: ${{ inputs.commit_outputs && steps.app_token.outputs.token || github.token }}
 
       - name: Check the inputs
         run: |
@@ -224,8 +236,7 @@ jobs:
           retention-days: 30
 
       # Opt-in: the same layout the committed per-chain outputs have, every chain in one commit.
-      # Pushes with RELEASE_TOKEN, as update-hashes-on-demand.yaml does, so the branch must live
-      # in this repository.
+      # Pushes with the MatterLabs Bots App token, so the branch must live in this repository.
       - name: Commit and push
         if: ${{ inputs.commit_outputs && github.ref_type == 'branch' && env.CHAIN_IDS != '' }}
         env:

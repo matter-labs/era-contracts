@@ -70,7 +70,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #                                         deployer calls + provenance
 #
 # With `commit_outputs`, a third job commits that env dir to the dispatched branch
-# once both jobs pass (RELEASE_TOKEN; branches of this repository only). For a
+# once both jobs pass (the MatterLabs Bots App; branches of this repository only). For a
 # verifier-only upgrade the rehearsal also generates the bundles of the input's chains
 # that have none yet, and this workflow their scenarios; generate-chain-upgrade-calldata.yaml
 # makes or remakes them for chosen chains and can commit them the same way.
@@ -322,7 +322,7 @@ on:
         default: ""
         type: string
       commit_outputs:
-        description: "Commit the generated files (output/<env>/ minus the deploy bundle and fork scratch: ecosystem.toml, EXECUTE.md, the governance transactions, Etherscan commands, simulator scenario) to the dispatched branch, once both jobs pass. Needs the RELEASE_TOKEN secret and a branch of this repository."
+        description: "Commit the generated files (output/<env>/ minus the deploy bundle and fork scratch: ecosystem.toml, EXECUTE.md, the governance transactions, Etherscan commands, simulator scenario) to the dispatched branch, once both jobs pass. Needs the MatterLabs Bots App (MATTERLABS_BOTS_APP_ID / MATTERLABS_BOTS_PRIVATE_KEY) and a branch of this repository."
         required: false
         default: false
         type: boolean
@@ -789,8 +789,8 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Opt-in (`commit_outputs`): commit the env dir the regen uploaded to the dispatched
-  # branch, once the bundle hand-off was proven too. Pushes with RELEASE_TOKEN, as
-  # update-hashes-on-demand.yaml does, so the branch must live in this repository.
+  # branch, once the bundle hand-off was proven too. Pushes with a MatterLabs Bots App token,
+  # so the branch must live in this repository.
   # ─────────────────────────────────────────────────────────────────────────────
   commit-outputs:
     needs: [regen, verify-bundle-handoff]
@@ -801,11 +801,22 @@ jobs:
       group: upgrade-outputs-${{ github.ref_name }}
       cancel-in-progress: false
     steps:
+      # The MatterLabs Bots GitHub App, scoped to this repository: the org's way to push from CI
+      # (RELEASE_TOKEN, the bot user's token, is being retired).
+      - name: Generate GitHub App token
+        id: app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
       - name: Checkout the dispatched branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ steps.app_token.outputs.token }}
 
       # The run replaced the dated ecosystem scenario; drop the old one so the download does
       # not leave both. Everything else in the artifact overwrites its committed copy.
