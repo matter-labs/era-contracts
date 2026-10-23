@@ -217,6 +217,7 @@ contract ZKIPAggE2ETest is ZKIPBase {
     function test_aggRejectsMalformedSlotCounts() public {
         ZKIPLiteRegistry.AggregatedSubmission memory sub;
         sub.kinds = new uint8[](4);
+        sub.vkCommitments = new bytes32[](4);
         sub.publicInputs = new bytes32[](8);
         sub.kinds[0] = SLOT_DEBIT;
         vm.expectRevert(BadAggregate.selector);

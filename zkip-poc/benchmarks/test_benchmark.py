@@ -137,8 +137,26 @@ class CircuitTests(unittest.TestCase):
 
     def test_non_zkip_source(self):
         data = self.data("claim_1")
-        data["zkip_chains"] = [hex(bench.B), "0x0", "0x0", "0x0"]
+        from chain_registry import ChainRegistry
+        data["chain_registry_root"] = hex(ChainRegistry([bench.B]).root)
         self.execute("claim_1", data, "leg source is not a ZKIP chain")
+
+    def test_admission_path_tampering(self):
+        data = self.data("claim_1")
+        data["registry_path"][0][0][0] = hex(int(data["registry_path"][0][0][0], 16) ^ 1)
+        self.execute("claim_1", data, "leg source is not a ZKIP chain")
+
+    def test_admission_beyond_four_chains(self):
+        from chain_registry import ChainRegistry
+        data = self.data("claim_1")
+        registry = ChainRegistry([1, 2, 3, 4, bench.A, bench.B])
+        data["chain_registry_root"] = hex(registry.root)
+        data["chain_registry_count"] = len(registry.chains)
+        sources = bench.flow(self.variant, 1)["sources"]
+        paths = [registry.membership(source) for source in sources]
+        data["registry_index"] = [[index for index, _ in paths]]
+        data["registry_path"] = [[[hex(x) for x in path] for _, path in paths]]
+        self.execute("claim_1", data)
 
     def test_wrong_destination(self):
         data = self.data("claim_1")

@@ -33,6 +33,7 @@ for relative in REFERENCE_FILES:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(subprocess.check_output(
             ["git", "show", f"{BASELINE_COMMIT}:zkip-poc/{relative}"], cwd=POC))
+sys.path.insert(0, str(POC / "prover"))
 sys.path.insert(0, str(BASELINE / "prover"))
 import prove as reference
 
@@ -295,6 +296,15 @@ def witness(variant, name):
                         assert roots[j] == root
         w["anchor_roots"] = ["0x" + root.hex() for root in roots[:2]]
         toml = reference.claim(size, w, state, None, None)
+        if variant != "legacy_keccak":
+            from chain_registry import ChainRegistry
+            registry = ChainRegistry(w["zkip_chains"])
+            toml = [line for line in toml if not line.startswith("zkip_chains =")]
+            toml += ["chain_registry_root = " + reference.q(registry.root),
+                     "chain_registry_count = " + str(len(registry.chains)), "registry_reserved = [0, 0]"]
+            memberships = [[registry.membership(source) for source in f["sources"]] for f in fs]
+            toml += ["registry_index = " + reference.arr([reference.arr([str(i) for i, _ in pair]) for pair in memberships]),
+                     "registry_path = " + reference.arr([reference.arr([reference.arr([reference.q(x) for x in path]) for _, path in pair]) for pair in memberships])]
     return "\n".join(toml) + "\n", state
 
 

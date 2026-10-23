@@ -3,7 +3,7 @@
 // applies an optional public unlock back to the L1 cap.
 use zkip_lite::{
     apply_delta, cv_key, hi_lo, lanes_to_bytes, null_insert, open_leg, shared_root, State, state_root,
-    BUNDLE_LEN, D_CHAIN, D_IMT, D_SHARED, MAX_ASSETS, NULL_DEPTH, NUM_ANCHORS, NUM_ZKIP_CHAINS, PRE_LEN,
+    BUNDLE_LEN, D_CHAIN, D_IMT, D_SHARED, MAX_ASSETS, NULL_DEPTH, NUM_ANCHORS, PRE_LEN, CHAIN_REGISTRY_DEPTH, assert_chain_member,
 };
 
 global N: u32 = 1;
@@ -17,7 +17,9 @@ fn main(
     num_credits: pub u32,
     anchor_hi: pub [Field; NUM_ANCHORS],
     anchor_lo: pub [Field; NUM_ANCHORS],
-    zkip_chains: pub [Field; NUM_ZKIP_CHAINS],
+    chain_registry_root: pub Field,
+    chain_registry_count: pub u64,
+    registry_reserved: pub [Field; 2],
     unlock_asset_hi: pub Field,
     unlock_asset_lo: pub Field,
     unlock_amount: pub Field,
@@ -45,11 +47,14 @@ fn main(
     shared_height: [[u32; 2]; N],
     shared_path: [[[[u64; 4]; D_SHARED]; 2]; N],
     anchor_sel: [[u32; 2]; N],
+    registry_index: [[u32; 2]; N],
+    registry_path: [[[Field; CHAIN_REGISTRY_DEPTH]; 2]; N],
     null_low: [[Field; 3]; N],
     null_low_index: [Field; N],
     null_low_path: [[Field; NULL_DEPTH]; N],
     null_new_path: [[Field; NULL_DEPTH]; N],
 ) {
+    assert(registry_reserved == [0, 0], "registry reserved inputs");
     let mut st = State { bal_asset, bal_amount, null_root, null_size };
     assert(state_root(st) == prev_state_root, "previous state");
     assert(num_credits <= N, "credit count");
@@ -80,11 +85,8 @@ fn main(
                 assert(rh == anchor_hi[sel], "leg not under the anchor root (hi)");
                 assert(rl == anchor_lo[sel], "leg not under the anchor root (lo)");
                 assert(batch_ts[c][j] <= o.deadline, "leg settled after the deadline");
-                let mut listed = false;
-                for z in 0..NUM_ZKIP_CHAINS {
-                    listed = listed | ((zkip_chains[z] == o.leg_src[j]) & (zkip_chains[z] != 0));
-                }
-                assert(listed, "leg source is not a ZKIP chain");
+                assert_chain_member(o.leg_src[j], registry_index[c][j], registry_path[c][j],
+                                    chain_registry_root, chain_registry_count);
             }
         }
         if c < num_credits {
