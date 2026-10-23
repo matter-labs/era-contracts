@@ -4,6 +4,12 @@ This benchmark compares the original PoC at `cb7382cdb486beb0a6b5ba352cf1a79c256
 IMT insertion checks and compact, single-asset transfers. It measures gates, repeated CPU proving time,
 peak process RSS, proof bytes, public-input bytes, and standalone Solidity verification gas.
 
+[Measured results](MEASUREMENTS.md) and [individual samples](results/m2-max-2026-10-23.json) were collected on
+an Apple M2 Max with four prover threads. The single-leg circuits use three samples each; larger circuits
+use one. All 28 generated verifiers also passed with the default code-size limit (largest runtime: 18,221 bytes).
+An additional [16-leg capacity sample](results/m2-max-batch16-2026-10-23.json) measures batching on one source
+chain. Its size class is benchmark-only; the current registry still accepts at most four legs.
+
 The implemented PoC change is described in [the accounting design](../../protocol-docs/zkip-accounting-poc.md).
 No production protocol contract is changed.
 
@@ -52,8 +58,7 @@ maintaining independent implementations of accounting.
   aggregation. It is **not** a per-transfer production fee. Proof randomness can slightly change calldata gas.
 - Proofs use Barretenberg's zero-knowledge `evm` target throughout. Smaller circuits need not produce
   proportionally smaller proof bytes or lower L1 verification gas.
-- Forge uses the original PoC's enlarged code-size limit. Runtime byte counts are reported separately;
-  compare them with EIP-170 before treating a verifier as deployable.
+- The verifier benchmark uses Foundry's default code-size limit and reports runtime byte counts.
 
 ## Reproduce
 
@@ -71,6 +76,22 @@ export BB_CRS="$PWD/zkip-poc/work/crs"
 NARGO="$NARGO" zkip-poc/work/venv/bin/python -m unittest discover -s zkip-poc/benchmarks -v
 zkip-poc/work/venv/bin/python zkip-poc/benchmarks/benchmark.py --threads 4 --repetitions 3 --evm
 ```
+
+The committed run used `--large-repetitions 1`. Render its JSON with:
+
+```sh
+python3 zkip-poc/benchmarks/summarize.py zkip-poc/work/benchmarks/results.json zkip-poc/benchmarks/MEASUREMENTS.md
+```
+
+The additional capacity experiment is:
+
+```sh
+zkip-poc/work/venv/bin/python zkip-poc/benchmarks/benchmark.py \
+  --variants compact_blake3_source --circuits debit_16 --threads 4 --repetitions 1 --evm \
+  --output zkip-poc/work/benchmarks/batch16-results.json
+```
+
+Pass `--batch16 zkip-poc/work/benchmarks/batch16-results.json` to the report renderer to include that sample.
 
 The first VK generation downloads the required CRS into `BB_CRS`. The default matrix includes `debit_1`,
 `debit_4`, `claim_1`, and `claim_2`. `--variants`, `--circuits`, `--gates-only`, and `--prepare-only` select

@@ -2,16 +2,13 @@
 pragma solidity 0.8.28;
 
 import {Test, console2} from "forge-std/Test.sol";
+import {TRANSACTION_BASE_GAS, ZERO_BYTE_GAS, NONZERO_BYTE_GAS} from "./BenchmarkGasConfig.sol";
 
 interface IBenchmarkVerifier {
     function verify(bytes calldata _proof, bytes32[] calldata _publicInputs) external view returns (bool);
 }
 
 contract VerifierBench is Test {
-    uint256 internal constant TRANSACTION_BASE_GAS = 21_000;
-    uint256 internal constant ZERO_BYTE_GAS = 4;
-    uint256 internal constant NONZERO_BYTE_GAS = 16;
-
     function test_realProofsAndPublicInputBinding() external {
         string memory manifest = vm.readFile("manifest.json");
         string[] memory names = vm.parseJsonStringArray(manifest, ".names");

@@ -10,6 +10,59 @@ import {ZKIPBase} from "./helpers/ZKIPBase.sol";
 /// the aggregator checks every proof natively, drops failures, and proves one agg_4 proof carrying up to four
 /// statements from any chains; L1 verifies only that and applies the slots in order.
 contract ZKIPAggE2ETest is ZKIPBase {
+    function test_aggMixedDebitSizeClasses() public {
+        Swap memory first = _swap(A, B, 10e6, 5e6, uint64(block.timestamp + 1 hours), "mixed-first");
+        Swap memory second = _swap(A, B, 20e6, 10e6, uint64(block.timestamp + 1 hours), "mixed-second");
+        {
+            uint256[] memory values = new uint256[](2);
+            (values[0], values[1]) = (first.cvA, second.cvA);
+            _commitLegs(simA, values);
+        }
+        _commitLegs(simB, _one(first.cvB));
+        Inner[] memory statements = new Inner[](2);
+        {
+            bytes[] memory bundles = new bytes[](2);
+            bytes[] memory preimages = new bytes[](2);
+            uint256[] memory legs = new uint256[](2);
+            (bundles[0], bundles[1]) = (first.bundleA, second.bundleA);
+            (preimages[0], preimages[1]) = (first.pre, second.pre);
+            (legs[0], legs[1]) = (first.legOfA, second.legOfA);
+            statements[0] = _proveDebitRec(simA, 1, bundles, preimages, legs, usdcId, 30e6, "mixed_A");
+        }
+        statements[1] = _proveDebitRec(
+            simB, 1, _oneB(first.bundleB), _oneB(first.pre), _one(1 - first.legOfA), eurcId, 5e6, "mixed_B"
+        );
+        assertEq(statements[0].circuit, "debit_4");
+        assertEq(statements[1].circuit, "debit_1");
+        (ZKIPLiteRegistry.AggregatedSubmission memory sub, bytes memory included) = _aggregate(statements, "mixed");
+        assertEq(included, hex"0101");
+        vm.expectEmit(address(reg));
+        emit ZKIPLiteRegistry.DebitProven(A, 1, 2, statements[0].debit.newStateRoot);
+        vm.expectEmit(address(reg));
+        emit ZKIPLiteRegistry.DebitProven(B, 1, 1, statements[1].debit.newStateRoot);
+        _submitAggregated(sub, "mixed (debit_4 and debit_1)");
+        _adopt(statements[0]);
+        _adopt(statements[1]);
+        {
+            (bytes32 root, bytes32 imt, uint256 count, ) = _chainState(A);
+            assertEq(root, statements[0].debit.newStateRoot);
+            assertEq(imt, statements[0].debit.cbr.imtEnd);
+            assertEq(count, 3);
+        }
+        {
+            (bytes32 root, bytes32 imt, uint256 count, ) = _chainState(B);
+            assertEq(root, statements[1].debit.newStateRoot);
+            assertEq(imt, statements[1].debit.cbr.imtEnd);
+            assertEq(count, 2);
+        }
+        assertEq(caps.cap(A, usdcId), 70e6);
+        assertEq(caps.cap(B, eurcId), 45e6);
+        _execute(simA, 1);
+        _execute(simB, 1);
+        assertEq(simA.lastExecuted(), 1);
+        assertEq(simB.lastExecuted(), 1);
+    }
+
     /// @notice The swap of test_swapEndToEnd with one aggregated proof per window: both debits in the first, both
     /// claims in the second.
     function test_aggSwapEndToEnd() public {

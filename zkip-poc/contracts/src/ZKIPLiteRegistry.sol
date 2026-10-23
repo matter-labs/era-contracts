@@ -6,6 +6,7 @@ import {StoredInteropRoot} from "era/common/Messaging.sol";
 import {MockCaps} from "./mocks/MockCaps.sol";
 import {MockMessageRoot} from "./mocks/MockMessageRoot.sol";
 import {revertWith} from "./RevertWith.sol";
+import {DEBIT_1_CIRCUIT_ID} from "./ZKIPLiteConfig.sol";
 import {
     BadAggregate,
     BatchNotProven,
@@ -102,7 +103,7 @@ contract ZKIPLiteRegistry {
 
     /// @notice Values of `aggCircuit`: the circuit a VK commitment belongs to.
     uint256 public constant CIRCUIT_DEBIT_4 = 1004;
-    uint256 public constant CIRCUIT_DEBIT_1 = 1001;
+    uint256 public constant CIRCUIT_DEBIT_1 = DEBIT_1_CIRCUIT_ID;
     uint256 public constant CIRCUIT_CLAIM_1 = 2001;
     uint256 public constant CIRCUIT_CLAIM_2 = 2002;
 

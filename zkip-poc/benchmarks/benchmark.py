@@ -23,6 +23,7 @@ BASELINE_COMMIT = "cb7382cdb486beb0a6b5ba352cf1a79c2560e497"
 WORK = POC / "work" / "benchmarks"
 BASELINE = WORK / "baseline" / "zkip-poc"
 CIRCUITS = ("debit_1", "debit_4", "claim_1", "claim_2")
+EXPERIMENTAL_CIRCUITS = ("debit_16",)
 REFERENCE_FILES = ["prover/prove.py", "prover/poseidon2.py", "prover/poseidon2_bn254_params.json", "prover/keccak.py",
                    "circuits/zkip_lite/src/lib.nr", "circuits/zkip_lite/Nargo.toml"]
 REFERENCE_FILES += [f"circuits/{name}/{path}" for name in CIRCUITS for path in ("src/main.nr", "Nargo.toml")]
@@ -379,10 +380,16 @@ def generate(variant, names):
     (lib / "lib.nr").write_text(source)
     shutil.copyfile(reference.CIRCUITS / "zkip_lite/Nargo.toml", root / "zkip_lite/Nargo.toml")
     for name in names:
+        source_name = "debit_4" if name in EXPERIMENTAL_CIRCUITS else name
         dst = root / name / "src"
         dst.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(circuit_root / name / "src/main.nr", dst / "main.nr")
-        shutil.copyfile(reference.CIRCUITS / name / "Nargo.toml", dst.parent / "Nargo.toml")
+        main_source = (circuit_root / source_name / "src/main.nr").read_text()
+        package_source = (reference.CIRCUITS / source_name / "Nargo.toml").read_text()
+        if name in EXPERIMENTAL_CIRCUITS:
+            main_source = main_source.replace("global N: u32 = 4;", "global N: u32 = 16;")
+            package_source = package_source.replace('name = "debit_4"', 'name = "debit_16"')
+        (dst / "main.nr").write_text(main_source)
+        (dst.parent / "Nargo.toml").write_text(package_source)
         toml, _ = witness(variant, name)
         (dst.parent / "Prover.toml").write_text(toml)
     (root / "Nargo.toml").write_text("[workspace]\nmembers = " + json.dumps(["zkip_lite", *names]) + "\n")
@@ -420,6 +427,7 @@ def prepare_verifier_bench(rows, bb, crs, env, forge_std):
         (root / "fixtures" / f"{name}.json").write_text(json.dumps(fixture) + "\n")
     (root / "manifest.json").write_text(json.dumps({"names": names}) + "\n")
     shutil.copyfile(HERE / "VerifierBench.t.sol", root / "test/VerifierBench.t.sol")
+    shutil.copyfile(HERE / "BenchmarkGasConfig.sol", root / "test/BenchmarkGasConfig.sol")
     config = f"""[profile.default]
 src = "src"
 test = "test"
@@ -427,8 +435,6 @@ solc_version = "0.8.28"
 evm_version = "prague"
 optimizer = true
 optimizer_runs = 200
-# Match the original PoC. Runtime sizes are reported: these verifiers may exceed EIP-170.
-code_size_limit = 1000000
 gas_limit = 2000000000
 allow_paths = [{json.dumps(str(forge_std.parent))}]
 remappings = [{json.dumps('forge-std/=' + str(forge_std / 'src') + '/')}]
@@ -441,7 +447,7 @@ fs_permissions = [{{ access = "read", path = "./" }}]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--variants", nargs="+", choices=VARIANTS, default=list(VARIANTS))
-    parser.add_argument("--circuits", nargs="+", choices=CIRCUITS, default=list(CIRCUITS))
+    parser.add_argument("--circuits", nargs="+", choices=CIRCUITS + EXPERIMENTAL_CIRCUITS, default=list(CIRCUITS))
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--large-repetitions", type=int, help="Optional sample count for debit_4 and claim_2")
@@ -449,17 +455,22 @@ def main():
     parser.add_argument("--gates-only", action="store_true")
     parser.add_argument("--evm", action="store_true", help="Verify real proofs in Forge and measure verifier-only gas")
     parser.add_argument("--forge-std", type=Path, default=POC.parent / "lib/forge-std")
+    parser.add_argument("--output", type=Path, help="JSON report path; defaults to work/benchmarks/results.json")
     args = parser.parse_args()
     if args.threads < 1 or args.repetitions < 1 or (args.large_repetitions is not None and args.large_repetitions < 1):
         parser.error("threads and repetitions must be positive")
+    if "legacy_keccak" in args.variants and any(name in EXPERIMENTAL_CIRCUITS for name in args.circuits):
+        parser.error("experimental size classes require proof-carried insertions; no legacy baseline exists")
     env = dict(os.environ, HARDWARE_CONCURRENCY=str(args.threads))
     nargo, bb = os.environ.get("NARGO", "nargo"), os.environ.get("BB", "bb")
     crs = os.environ.get("BB_CRS", str(POC / "work/crs"))
-    result_file = WORK / "results.json"
+    result_file = args.output.resolve() if args.output else WORK / "results.json"
+    result_file.parent.mkdir(parents=True, exist_ok=True)
     results = {"machine": platform.platform(), "threads": args.threads, "repetitions": args.repetitions,
                "baseline_commit": BASELINE_COMMIT, "measurements": []}
     results["large_repetitions"] = args.large_repetitions or args.repetitions
     results["experiment_commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=POC, text=True).strip()
+    results["working_tree_changes"] = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=POC, text=True).strip())
     if sys.platform == "darwin":
         results["cpu"] = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
         results["ram_bytes"] = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
