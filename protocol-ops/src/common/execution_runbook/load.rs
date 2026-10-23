@@ -9,8 +9,8 @@ use anyhow::Context;
 use serde::Deserialize;
 use serde_json::Value;
 
-use super::decode::known_function;
 use super::{Runbook, RunbookTx, SourceKind};
+use crate::common::calldata::known_function;
 
 /// Chain ids the runbook names; any other id is shown as `chain <id>`.
 const NETWORKS: [(u64, &str, &str); 2] = [
@@ -225,6 +225,8 @@ fn load_emergency_board(json: Value) -> anyhow::Result<Loaded> {
     let board = file.emergency_upgrade_board;
     let count = file.transactions.len();
     let mut txs = Vec::with_capacity(count);
+    // One or more proposals, each its approveHash txs followed by its executeEmergencyUpgrade.
+    let mut approvals = 0;
     for (i, tx) in file.transactions.into_iter().enumerate() {
         let number = i + 1;
         let what = format!("tx {number} ({})", tx.label);
@@ -237,17 +239,30 @@ fn load_emergency_board(json: Value) -> anyhow::Result<Loaded> {
         if let Some(value) = value.filter(|value| !value.is_zero()) {
             anyhow::bail!("{what} sends value {value}; emergency-upgrade-board txs send none");
         }
-        let is_last = number == count;
-        if is_last {
+        let is_execute = function_name(&tx.data) == Some(EXECUTE_EMERGENCY_UPGRADE);
+        if number == count {
             anyhow::ensure!(
-                function_name(&tx.data) == Some(EXECUTE_EMERGENCY_UPGRADE) && tx.to == board,
+                is_execute && tx.to == board,
                 "{what}: the last tx must call {EXECUTE_EMERGENCY_UPGRADE} on the board {board:#x}"
             );
+        }
+        if is_execute {
+            anyhow::ensure!(
+                tx.to == board,
+                "{what} calls {EXECUTE_EMERGENCY_UPGRADE} on {:#x}, not the board {board:#x}",
+                tx.to
+            );
+            anyhow::ensure!(
+                approvals > 0,
+                "{what}: an {EXECUTE_EMERGENCY_UPGRADE} must follow its proposal's {APPROVE_HASH} txs"
+            );
+            approvals = 0;
         } else {
             anyhow::ensure!(
                 function_name(&tx.data) == Some(APPROVE_HASH) && tx.to != board,
-                "{what}: every tx before the last must call {APPROVE_HASH} on a member Safe"
+                "{what}: every tx must call {APPROVE_HASH} on a member Safe or {EXECUTE_EMERGENCY_UPGRADE} on the board"
             );
+            approvals += 1;
             anyhow::ensure!(
                 tx.from == file.owner,
                 "{what} is sent by {:#x}, but only the owner {:#x} can approve on the member Safes",
