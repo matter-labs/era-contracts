@@ -108,6 +108,8 @@ const ARTIFACTS = {
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
+  ValidatorTimelock: "ValidatorTimelock.sol/ValidatorTimelock.json",
+  ValidiumL1DAValidator: "ValidiumL1DAValidator.sol/ValidiumL1DAValidator.json",
   // Atomic interop (bundle model) — see {protocol-docs/atomicity/README.md#contracts}.
   L2InteropCommitmentTree: "L2InteropCommitmentTree.sol/L2InteropCommitmentTree.json",
   AtomicFlowManager: "AtomicFlowManager.sol/AtomicFlowManager.json",

@@ -1,13 +1,3 @@
-// AGENTS.md mandates "NEVER override storage slots in tests" with no exceptions,
-// but the fork-upgrade harness in this directory is the one place we can't avoid
-// it: forks are pinned at a block whose pending batches haven't yet been
-// executed, and there is no public API to drive `totalBatchesExecuted` to match
-// `totalBatchesCommitted` without replaying many real batch executions on every
-// run. The override below substitutes for that history; it is scoped to fork
-// runs and never touches a real chain.
-//
-// Slot indices below are taken from `forge inspect <Contract> storageLayout`; if any of these contracts ever shift their storage layout
-// these constants need to move with it.
 import type { providers } from "ethers";
 import { Contract, ContractFactory, Wallet, ethers } from "ethers";
 import type { ContractInterface } from "@ethersproject/contracts";
@@ -20,12 +10,6 @@ import {
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
-
-// `ZKChainBase.s` (the only state variable) lives at slot 0 of the proxy, so
-// `ZKChainStorage` field offsets are absolute. Used by
-// `forceBatchExecutedEqualsCommitted`.
-const ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT = 11;
-const ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 
 const systemContextAbi = getAbi("SystemContext") as ContractInterface;
 
@@ -54,33 +38,6 @@ export async function transferOwnable2Step(
     const tx = await contract.connect(signer).acceptOwnership({ gasLimit });
     await tx.wait();
   });
-}
-
-/**
- * Harness-only shim: copy `s.totalBatchesCommitted` onto `s.totalBatchesExecuted`
- * for a chain's diamond proxy so the per-chain upgrade passes
- * its `totalBatchesCommitted == totalBatchesExecuted` guard.
- *
- * In production all committed batches must be executed before a chain's upgrade
- * begins. On a forked chain whose pending batches haven't been executed at fork
- * time, we mark the gap as if execution had caught up — same end-state as the
- * production prerequisite, just realised via storage write instead of running
- * the executor for several batches.
- */
-export async function forceBatchExecutedEqualsCommitted(
-  provider: providers.JsonRpcProvider,
-  diamondProxyAddr: string
-): Promise<void> {
-  const committedHex = await provider.send("eth_getStorageAt", [
-    diamondProxyAddr,
-    ethers.utils.hexValue(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT),
-    "latest",
-  ]);
-  await provider.send("anvil_setStorageAt", [
-    diamondProxyAddr,
-    ethers.utils.hexValue(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT),
-    committedHex,
-  ]);
 }
 
 /**

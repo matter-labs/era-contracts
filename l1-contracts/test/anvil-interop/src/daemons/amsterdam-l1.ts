@@ -29,26 +29,34 @@ export function resolveAmsterdamAnvilBinary(): string {
 }
 
 /**
- * An anvil state dump without its block history, at the Amsterdam L1's block gas limit. The pinned anvil's
- * `blocks` section does not parse in the Amsterdam build, and the dump's own `block.gas_limit` would override
- * `--gas-limit`.
+ * An anvil state dump without its block history, at the Amsterdam L1's block gas limit and with its clock at
+ * `timestamp`. The pinned anvil's `blocks` section does not parse in the Amsterdam build, the dump's own
+ * `block.gas_limit` would override `--gas-limit`, and the pinned anvil resumes its clock at `block.timestamp`:
+ * the dump's is minutes after 1970, and committing a batch subtracts 30 days from it (`Committer`).
  */
-export function toAmsterdamStateDump(dump: Record<string, unknown>): Record<string, unknown> {
+export function toAmsterdamStateDump(dump: Record<string, unknown>, timestamp: number): Record<string, unknown> {
   const state = { ...dump };
   delete state.blocks;
   delete state.transactions;
   if (state.block !== undefined) {
-    state.block = { ...(state.block as Record<string, unknown>), gas_limit: AMSTERDAM_L1_BLOCK_GAS_LIMIT };
+    state.block = {
+      ...(state.block as Record<string, unknown>),
+      gas_limit: AMSTERDAM_L1_BLOCK_GAS_LIMIT,
+      timestamp: ethers.utils.hexValue(timestamp),
+    };
   }
   return state;
 }
 
-/** Writes the Amsterdam copy of the dump at `loadStatePath` into the harness's outputs and returns its path. */
+/**
+ * Writes the Amsterdam copy of the dump at `loadStatePath` into the harness's outputs and returns its path. Its
+ * clock starts now, like the default L1's.
+ */
 export function writeAmsterdamStateDump(loadStatePath: string, port: number): string {
   const outputPath = path.resolve(__dirname, "../../outputs", `l1-state-amsterdam-${port}.json`);
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   const dump = JSON.parse(fs.readFileSync(loadStatePath, "utf-8")) as Record<string, unknown>;
-  fs.writeFileSync(outputPath, JSON.stringify(toAmsterdamStateDump(dump)));
+  fs.writeFileSync(outputPath, JSON.stringify(toAmsterdamStateDump(dump, Math.floor(Date.now() / 1000))));
   return outputPath;
 }
 
