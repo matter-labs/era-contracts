@@ -1,0 +1,68 @@
+{
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "threads": 4,
+  "repetitions": 1,
+  "baseline_commit": "cb7382cdb486beb0a6b5ba352cf1a79c2560e497",
+  "measurements": [
+    {
+      "variant": "compact_blake2s_source",
+      "circuit": "debit_16",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 277946,
+            "circuit_size": 5078422
+          }
+        ]
+      },
+      "bytecode_sha256": "4b2c4cd50e7aac40422c67efda418a63f80340ffaf2ee26f85e02373ee100176",
+      "samples": [
+        {
+          "prove_s": 37.785426375,
+          "peak_rss_bytes": 5296029696
+        }
+      ],
+      "median_prove_s": 37.785426375,
+      "proof_bytes": 11456,
+      "public_input_bytes": 512,
+      "execution_gas": 838215,
+      "calldata_gas": 183520,
+      "transaction_gas": 1042735,
+      "verifier_runtime_bytes": 18222
+    },
+    {
+      "variant": "compact_blake2s_source",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 16506,
+            "circuit_size": 1246628
+          }
+        ]
+      },
+      "bytecode_sha256": "a00af56e7acb141a38b4765ec8b2a2e4324bb495510a4b5969e10a82d50dee0e",
+      "samples": [
+        {
+          "prove_s": 11.21207475,
+          "peak_rss_bytes": 2286845952
+        }
+      ],
+      "median_prove_s": 11.21207475,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171208,
+      "transaction_gas": 993375,
+      "verifier_runtime_bytes": 17798
+    }
+  ],
+  "large_repetitions": 1,
+  "experiment_commit": "1b1826dd206dc7cb5e6f2231b94c1d0224276271",
+  "working_tree_changes": false,
+  "cpu": "Apple M2 Max",
+  "ram_bytes": 34359738368,
+  "nargo": "nargo version = 1.0.0-beta.25\nnoirc version = 1.0.0-beta.25+75061fab15986eedee4e7d9104ff87dd9fa4ca10\n(git version hash: 75061fab15986eedee4e7d9104ff87dd9fa4ca10, is dirty: false)",
+  "bb": "5.2.1",
+  "gas_scope": "standalone verifier, including calldata and 21k base; excludes registry/settlement"
+}

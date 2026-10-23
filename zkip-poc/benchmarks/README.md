@@ -13,17 +13,25 @@ chain. Its size class is benchmark-only; the current registry still accepts at m
 The implemented PoC change is described in [the accounting design](../../protocol-docs/zkip-accounting-poc.md).
 No production protocol contract is changed.
 
+[Compact aggregate settlement measurements](SETTLEMENT.md) compare the original 68 public inputs with
+eight digest fields: about 3% lower L1 submission gas for 14% more outer proving time. This experiment
+keeps the actual protocol roots and is independent of the BLAKE2s source/finality migration.
+
 ## Variants
 
-| Variant | Transfer format | IMT insertion checks | Commitment trees |
-| --- | --- | --- | --- |
-| `legacy_keccak` | Existing 1,600-byte bundle | Original L1 checks, outside this circuit | Existing Keccak |
-| `proof_keccak` | Existing bundle | Inside the debit circuit | Existing Keccak |
-| `compact_keccak` | 320-byte typed transfer | Inside the debit circuit | Keccak |
-| `compact_blake2s` | Typed transfer | Inside the debit circuit | BLAKE2s |
-| `compact_blake3_source` | Typed transfer | Inside the debit circuit | BLAKE3 source IMT; Keccak batch/chain/shared settlement trees |
-| `compact_blake3` | Typed transfer | Inside the debit circuit | BLAKE3 |
-| `compact_poseidon2` | Typed transfer | Inside the debit circuit | Poseidon2, Noir-only comparison |
+| Variant                  | Transfer format            | IMT insertion checks                     | Commitment trees                                               |
+| ------------------------ | -------------------------- | ---------------------------------------- | -------------------------------------------------------------- |
+| `legacy_keccak`          | Existing 1,600-byte bundle | Original L1 checks, outside this circuit | Existing Keccak                                                |
+| `proof_keccak`           | Existing bundle            | Inside the debit circuit                 | Existing Keccak                                                |
+| `compact_keccak`         | 320-byte typed transfer    | Inside the debit circuit                 | Keccak                                                         |
+| `compact_blake2s_source` | Typed transfer             | Inside the debit circuit                 | BLAKE2s source IMT; Keccak batch/chain/shared settlement trees |
+| `compact_blake2s`        | Typed transfer             | Inside the debit circuit                 | BLAKE2s                                                        |
+| `compact_blake3_source`  | Typed transfer             | Inside the debit circuit                 | BLAKE3 source IMT; Keccak batch/chain/shared settlement trees  |
+| `compact_blake3`         | Typed transfer             | Inside the debit circuit                 | BLAKE3                                                         |
+| `compact_poseidon2`      | Typed transfer             | Inside the debit circuit                 | Poseidon2, Noir-only comparison                                |
+
+BLAKE2s is the selected target; BLAKE3 and Poseidon2 remain comparisons. The 4.32s full BLAKE2s claim
+requires a matching settlement hierarchy. The running PoC still uses existing Keccak roots.
 
 The 320-byte transfer consists of ten words: version, source chain, destination chain, asset ID, amount,
 origin chain, origin token, sender, recipient, and a sender-scoped nonce. Origin and token remain to
@@ -45,7 +53,7 @@ maintaining independent implementations of accounting.
   settlement timestamps; that trust boundary is retained in the existing PoC registry tests.
 - The BLAKE/Poseidon variants change the IMT and settlement commitment hierarchy. They require corresponding
   source-chain and settlement changes. They cannot be submitted against existing Keccak roots.
-  `compact_blake3_source` isolates the source-only change while preserving the settlement-side hashes.
+  The `_source` variants isolate the source-only change while preserving the settlement-side hashes.
 - Insertion proofs include the predecessor update, append-slot check, tree-height growth, 256-bit ordering,
   and exact begin/end-root binding. Their proving cost is included in every non-legacy debit measurement.
   Empty slots use the protocol's domain-separated empty-leaf constant, distinct from the zero sentinel leaf.

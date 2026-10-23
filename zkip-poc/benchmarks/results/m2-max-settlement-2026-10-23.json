@@ -1,0 +1,143 @@
+{
+  "baseline_commit": "4773253f074a69e9d091bfff116d62c49e1892fc",
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "threads": 4,
+  "repetitions": 3,
+  "witness_sha256": "e3fd79fe61063ff9fd07a0dc08a2b68d70b85430683dc0c31fb68a80c9d2c354",
+  "measurements": [
+    {
+      "variant": "settlement_baseline",
+      "circuit": "agg_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 613,
+            "circuit_size": 3015574
+          }
+        ]
+      },
+      "samples": [
+        {
+          "prove_s": 21.682298042,
+          "peak_rss_bytes": 4148428800
+        },
+        {
+          "prove_s": 21.211739332999997,
+          "peak_rss_bytes": 4314677248
+        },
+        {
+          "prove_s": 22.19472375,
+          "peak_rss_bytes": 3932897280
+        }
+      ],
+      "median_prove_s": 21.682298042,
+      "proof_bytes": 11072,
+      "public_input_bytes": 2176,
+      "bytecode_sha256": "f3748587cfae044ab9961ae027b1d0183f7d27598ce191c1ac19546510f82b27",
+      "execution_gas": 849355,
+      "calldata_gas": 190788,
+      "transaction_gas": 1061143,
+      "verifier_runtime_bytes": 17752
+    },
+    {
+      "variant": "settlement_compact",
+      "circuit": "agg_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 34533,
+            "circuit_size": 3402153
+          }
+        ]
+      },
+      "samples": [
+        {
+          "prove_s": 25.210922792000005,
+          "peak_rss_bytes": 4846026752
+        },
+        {
+          "prove_s": 24.716009583,
+          "peak_rss_bytes": 4651499520
+        },
+        {
+          "prove_s": 24.460131292,
+          "peak_rss_bytes": 4559945728
+        }
+      ],
+      "median_prove_s": 24.716009583,
+      "proof_bytes": 11072,
+      "public_input_bytes": 256,
+      "bytecode_sha256": "4272e17c6e322f7cb345cb494e44c39b127dfae43d10442e283f46f9a15a12a8",
+      "execution_gas": 830215,
+      "calldata_gas": 177840,
+      "transaction_gas": 1029055,
+      "verifier_runtime_bytes": 18073
+    }
+  ],
+  "gas_scope": "standalone cold verifier + calldata at 4/16 + 21k base, Prague",
+  "experiment_commit": "1b1826dd206dc7cb5e6f2231b94c1d0224276271",
+  "working_tree_changes": false,
+  "nargo": "nargo version = 1.0.0-beta.25\nnoirc version = 1.0.0-beta.25+75061fab15986eedee4e7d9104ff87dd9fa4ca10\n(git version hash: 75061fab15986eedee4e7d9104ff87dd9fa4ca10, is dirty: false)",
+  "bb": "5.2.1",
+  "registry_scope": "existing Forge E2E call harness, warmed test state; not an isolated cold transaction",
+  "registry_baseline": [
+    {
+      "label": "agg_drop (1 debit)",
+      "execution_gas": 910915,
+      "calldata_gas": 196884,
+      "calldata_bytes": 14148,
+      "call_plus_calldata_and_base_gas": 1128799
+    },
+    {
+      "label": "agg_four (4 debits)",
+      "execution_gas": 1075922,
+      "calldata_gas": 206520,
+      "calldata_bytes": 15396,
+      "call_plus_calldata_and_base_gas": 1303442
+    },
+    {
+      "label": "agg_swap_w1 (2 debits)",
+      "execution_gas": 969522,
+      "calldata_gas": 200684,
+      "calldata_bytes": 14564,
+      "call_plus_calldata_and_base_gas": 1191206
+    },
+    {
+      "label": "agg_swap_w2 (2 claims)",
+      "execution_gas": 999434,
+      "calldata_gas": 198044,
+      "calldata_bytes": 14372,
+      "call_plus_calldata_and_base_gas": 1218478
+    }
+  ],
+  "registry_compact": [
+    {
+      "label": "agg_drop (1 debit)",
+      "execution_gas": 891766,
+      "calldata_gas": 185132,
+      "calldata_bytes": 12356,
+      "call_plus_calldata_and_base_gas": 1097898
+    },
+    {
+      "label": "agg_four (4 debits)",
+      "execution_gas": 1048498,
+      "calldata_gas": 195428,
+      "calldata_bytes": 13604,
+      "call_plus_calldata_and_base_gas": 1264926
+    },
+    {
+      "label": "agg_swap_w1 (2 debits)",
+      "execution_gas": 949258,
+      "calldata_gas": 188896,
+      "calldata_bytes": 12772,
+      "call_plus_calldata_and_base_gas": 1159154
+    },
+    {
+      "label": "agg_swap_w2 (2 claims)",
+      "execution_gas": 971145,
+      "calldata_gas": 185944,
+      "calldata_bytes": 12580,
+      "call_plus_calldata_and_base_gas": 1178089
+    }
+  ]
+}

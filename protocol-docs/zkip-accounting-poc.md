@@ -26,12 +26,40 @@ reserved fields. Normalizing the vector allows the aggregator to accept the one-
 forcing single transfers through the four-leg circuit. Verification-key commitments remain explicitly
 approved on L1.
 
+## Compact aggregated settlement
+
+The outer proof recursively verifies the same four inner proofs, but exposes eight fields rather than
+the previous 68. For each slot it exposes the high and low 128-bit halves of
+`keccak256(domain || vkCommitment || innerPublicInputs)`. The domain is
+`keccak256("zkSync:ZKIP:aggregatedStatement:v1")`; every concatenated element is a 32-byte big-endian word,
+and the input vector has exactly sixteen elements. The VK commitment remains Poseidon2 over the
+recursively verified key. The 256-bit statement digest is split rather than reduced modulo the circuit field.
+
+L1 receives the four VK commitments and the debit/claim submissions. It verifies the outer proof,
+checks that the selected VK is approved, reconstructs the sixteen inputs from current authenticated
+state, and compares their digest before applying a slot. A changed amount, root, chain identity or
+substituted approved key cannot match the proven digest. Stale slots are still skipped independently;
+later slots see the state produced by earlier successful slots. Unused slots repeat a real proof.
+Submission arrays must contain exactly the debit and claim counts indicated by the four slot kinds.
+
+Keccak is retained only at this outer commitment boundary because L1 must calculate it. Changing
+the source/finality hash to BLAKE2s is independent of this optimization. The compact aggregate changes
+the outer verification key and submission ABI, so it requires a new verifier registration.
+
+The reduction removes duplicated calldata and public-input processing; it does not remove the outer
+proof's fixed verification cost or the per-chain registry writes. Larger batches amortize those costs.
+Production settlement-tree updates are unchanged by this experiment.
+
 ## Hash and encoding experiments
 
 The running PoC keeps existing Keccak bundles and trees so that insertion proofs can be tested against
 the actual protocol's indexed-Merkle implementation. Separate benchmark variants use compact typed
 transfers and alternative commitment hashes. Their formats, measurements, and trust boundaries are in
 [`zkip-poc/benchmarks/README.md`](../zkip-poc/benchmarks/README.md).
+
+BLAKE2s is the selected target for shared source and finality commitments. BLAKE3 and Poseidon2 remain
+comparison rows. The full BLAKE2s claim measurement assumes a matching settlement hierarchy; the
+source-only variant retains the existing Keccak settlement roots.
 
 Changing source IMT hashes requires a source-chain change. Changing the chain/shared settlement trees
 also requires a settlement change: today those roots are updated using Keccak on L1. Merely substituting

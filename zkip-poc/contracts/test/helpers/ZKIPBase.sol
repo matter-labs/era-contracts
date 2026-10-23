@@ -504,6 +504,9 @@ abstract contract ZKIPBase is Test {
         included = vm.ffi(cmd);
 
         s.proof = vm.readFileBinary(string.concat(outDir, "/proof"));
+        s.vkCommitments = abi.decode(
+            vm.readFileBinary(string.concat(outDir, "/vk_commitments")), (bytes32[4])
+        );
         bytes memory raw = vm.readFileBinary(string.concat(outDir, "/public_inputs"));
         s.publicInputs = new bytes32[](raw.length / 32);
         for (uint256 i = 0; i < s.publicInputs.length; ++i) {
