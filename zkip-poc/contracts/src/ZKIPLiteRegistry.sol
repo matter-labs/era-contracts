@@ -3,17 +3,16 @@ pragma solidity 0.8.28;
 
 import {ChainBatchRootTree} from "era/common/libraries/ChainBatchRootTree.sol";
 import {StoredInteropRoot} from "era/common/Messaging.sol";
-import {ImtInsertion} from "./ImtInsertion.sol";
 import {MockCaps} from "./mocks/MockCaps.sol";
 import {MockMessageRoot} from "./mocks/MockMessageRoot.sol";
 import {revertWith} from "./RevertWith.sol";
+import {DEBIT_1_CIRCUIT_ID} from "./ZKIPLiteConfig.sol";
 import {
     BadAggregate,
     BatchNotProven,
     BatchRootMismatch,
     CapExceeded,
     ImtContinuity,
-    ImtEndMismatch,
     InvalidProof,
     NotTheChain,
     NoVerifier,
@@ -52,8 +51,7 @@ contract ZKIPLiteRegistry {
         uint256 chainId;
         uint256 batchNumber;
         ChainBatchRootPreimage cbr;
-        uint256[] commitValues;
-        ImtInsertion.Proof[] inserts;
+        uint256 numLegs;
         bytes32 lockAssetId;
         uint256 lockAmount;
         bytes32 newStateRoot;
@@ -105,6 +103,7 @@ contract ZKIPLiteRegistry {
 
     /// @notice Values of `aggCircuit`: the circuit a VK commitment belongs to.
     uint256 public constant CIRCUIT_DEBIT_4 = 1004;
+    uint256 public constant CIRCUIT_DEBIT_1 = DEBIT_1_CIRCUIT_ID;
     uint256 public constant CIRCUIT_CLAIM_1 = 2001;
     uint256 public constant CIRCUIT_CLAIM_2 = 2002;
 
@@ -192,7 +191,7 @@ contract ZKIPLiteRegistry {
     /// @notice Proves the debit of every leg a committed batch appended to the chain's IMT.
     /// @param _s The debit and its proof.
     function submitDebit(DebitSubmission calldata _s) external {
-        uint256 size = _s.commitValues.length <= DEBIT_SMALL ? DEBIT_SMALL : DEBIT_LARGE;
+        uint256 size = _s.numLegs <= DEBIT_SMALL ? DEBIT_SMALL : DEBIT_LARGE;
         (bytes memory err, bytes32[] memory pi, bytes32 imtRoot, uint256 leafCount) = _checkDebit(_s, size);
         if (err.length != 0) {
             revertWith(err);
@@ -276,13 +275,14 @@ contract ZKIPLiteRegistry {
         bytes32 _vkCommitment,
         bytes32[] calldata _pi
     ) internal returns (bytes memory err) {
-        if (aggCircuit[_vkCommitment] != CIRCUIT_DEBIT_4) {
+        uint256 circuit = aggCircuit[_vkCommitment];
+        if (circuit != CIRCUIT_DEBIT_1 && circuit != CIRCUIT_DEBIT_4) {
             return abi.encodeWithSelector(UnapprovedCircuit.selector, _vkCommitment);
         }
         bytes32[] memory pi;
         bytes32 imtRoot;
         uint256 leafCount;
-        (err, pi, imtRoot, leafCount) = _checkDebit(_d, DEBIT_LARGE);
+        (err, pi, imtRoot, leafCount) = _checkDebit(_d, circuit == CIRCUIT_DEBIT_1 ? DEBIT_SMALL : DEBIT_LARGE);
         if (err.length == 0 && keccak256(abi.encodePacked(pi)) != keccak256(abi.encodePacked(_pi))) {
             err = abi.encodeWithSelector(SlotInputsMismatch.selector);
         }
@@ -329,21 +329,13 @@ contract ZKIPLiteRegistry {
             err = abi.encodeWithSelector(ImtContinuity.selector, c.provenImtRoot, _s.cbr.imtBegin);
             return (err, pi, imtRoot, leafCount);
         }
-        uint256 legs = _s.commitValues.length;
-        if (legs == 0 || legs > _size || _s.inserts.length != legs) {
+        uint256 legs = _s.numLegs;
+        if (legs == 0 || legs > _size) {
             return (abi.encodeWithSelector(NoVerifier.selector, legs), pi, imtRoot, leafCount);
         }
-        imtRoot = _s.cbr.imtBegin;
-        leafCount = c.provenImtLeafCount;
-        for (uint256 i = 0; i < legs; ++i) {
-            (err, imtRoot) = ImtInsertion.checkInsert(imtRoot, leafCount++, _s.commitValues[i], _s.inserts[i]);
-            if (err.length != 0) {
-                return (err, pi, imtRoot, leafCount);
-            }
-        }
-        if (imtRoot != _s.cbr.imtEnd) {
-            return (abi.encodeWithSelector(ImtEndMismatch.selector), pi, imtRoot, leafCount);
-        }
+        // ZKIP proves the complete insertion sequence between these batch-authenticated roots.
+        imtRoot = _s.cbr.imtEnd;
+        leafCount = c.provenImtLeafCount + legs;
         if (_s.lockAmount != 0) {
             uint256 cap = caps.cap(_s.chainId, _s.lockAssetId);
             if (cap < _s.lockAmount) {
@@ -351,26 +343,24 @@ contract ZKIPLiteRegistry {
                 return (err, pi, imtRoot, leafCount);
             }
         }
-        pi = _debitPublicInputs(c, _s, _size, legs);
+        pi = _debitPublicInputs(c, _s);
     }
 
     function _debitPublicInputs(
         ChainState storage _c,
-        DebitSubmission calldata _s,
-        uint256 _size,
-        uint256 _legs
+        DebitSubmission calldata _s
     ) internal view returns (bytes32[] memory pi) {
-        pi = new bytes32[](8 + 2 * _size);
+        pi = new bytes32[](AGG_SLOT_INPUTS);
         pi[0] = bytes32(_s.chainId);
         pi[1] = bytes32(block.chainid);
         pi[2] = _c.stateRoot;
         pi[3] = _s.newStateRoot;
-        pi[4] = bytes32(_legs);
-        for (uint256 i = 0; i < _legs; ++i) {
-            (pi[5 + i], pi[5 + _size + i]) = _split(bytes32(_s.commitValues[i]));
-        }
-        (pi[5 + 2 * _size], pi[6 + 2 * _size]) = _split(_s.lockAssetId);
-        pi[7 + 2 * _size] = bytes32(_s.lockAmount);
+        pi[4] = bytes32(_s.numLegs);
+        (pi[5], pi[6]) = _split(_s.cbr.imtBegin);
+        (pi[7], pi[8]) = _split(_s.cbr.imtEnd);
+        pi[9] = bytes32(_c.provenImtLeafCount);
+        (pi[10], pi[11]) = _split(_s.lockAssetId);
+        pi[12] = bytes32(_s.lockAmount);
     }
 
     function _applyDebit(DebitSubmission calldata _s, bytes32 _imtRoot, uint256 _leafCount) internal {
@@ -382,7 +372,7 @@ contract ZKIPLiteRegistry {
         c.provenImtRoot = _imtRoot;
         c.provenImtLeafCount = _leafCount;
         provenBatch[_s.chainId][_s.batchNumber] = keccak256(abi.encode(_s.cbr.imtBegin, _s.cbr.imtEnd));
-        emit DebitProven(_s.chainId, _s.batchNumber, _s.commitValues.length, _s.newStateRoot);
+        emit DebitProven(_s.chainId, _s.batchNumber, _s.numLegs, _s.newStateRoot);
     }
 
     /// @notice The L1 checks of a claim, and the public inputs its circuit of `_size` credits was proven against.

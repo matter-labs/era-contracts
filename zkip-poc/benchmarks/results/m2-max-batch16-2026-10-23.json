@@ -1,0 +1,42 @@
+{
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "threads": 4,
+  "repetitions": 1,
+  "baseline_commit": "cb7382cdb486beb0a6b5ba352cf1a79c2560e497",
+  "measurements": [
+    {
+      "variant": "compact_blake3_source",
+      "circuit": "debit_16",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 277946,
+            "circuit_size": 3932878
+          }
+        ]
+      },
+      "bytecode_sha256": "95623e5b7fac38c14e7de55c6378bf43178e88f1fb6ff3b828c575483148586a",
+      "samples": [
+        {
+          "prove_s": 31.184800290999995,
+          "peak_rss_bytes": 4891607040
+        }
+      ],
+      "median_prove_s": 31.184800290999995,
+      "proof_bytes": 11072,
+      "public_input_bytes": 512,
+      "execution_gas": 819675,
+      "calldata_gas": 177460,
+      "transaction_gas": 1018135,
+      "verifier_runtime_bytes": 18011
+    }
+  ],
+  "large_repetitions": 1,
+  "experiment_commit": "a896663a9e08bb6bd6025987cae3813570fee2ec",
+  "cpu": "Apple M2 Max",
+  "ram_bytes": 34359738368,
+  "nargo": "nargo version = 1.0.0-beta.25\nnoirc version = 1.0.0-beta.25+75061fab15986eedee4e7d9104ff87dd9fa4ca10\n(git version hash: 75061fab15986eedee4e7d9104ff87dd9fa4ca10, is dirty: false)",
+  "bb": "5.2.1",
+  "gas_scope": "standalone verifier, including calldata and 21k base; excludes registry/settlement",
+  "working_tree_changes": true
+}

@@ -7,6 +7,7 @@ import {MockCaps} from "../../src/mocks/MockCaps.sol";
 import {MockMessageRoot} from "../../src/mocks/MockMessageRoot.sol";
 import {ChainSim} from "../../src/mocks/ChainSim.sol";
 import {LegBuilder} from "./LegBuilder.sol";
+import {ImtInsertion} from "../../src/ImtInsertion.sol";
 
 /// @notice Shared setup and helpers of the ZKIP-lite end-to-end tests. Every proof is produced during the test by
 /// ../prover/prove.py (vm.ffi: nargo + bb) from the same data the L1 contracts see, and verified on chain by bb's
@@ -79,7 +80,7 @@ abstract contract ZKIPBase is Test {
     bytes32 internal usdcId;
     bytes32 internal eurcId;
     uint256 internal lastPushBlock;
-    bytes32[3] internal aggVkCommitments; // debit_4, claim_1, claim_2
+    bytes32[4] internal aggVkCommitments; // debit_1, debit_4, claim_1, claim_2
     mapping(uint256 chainId => string path) internal stateFile;
     mapping(uint256 chainId => string path) internal pendingState;
     address internal alice = makeAddr("alice");
@@ -136,16 +137,17 @@ abstract contract ZKIPBase is Test {
     /// @dev Registers (or revokes) the agg_4 verifier and the VK commitments of the circuits it may carry.
     function _approveAggregation(bool _approve) internal {
         if (aggVkCommitments[0] == bytes32(0)) {
-            (aggVkCommitments[0], aggVkCommitments[1], aggVkCommitments[2]) =
-                abi.decode(vm.ffi(_prover("vk-commits")), (bytes32, bytes32, bytes32));
+            (aggVkCommitments[0], aggVkCommitments[1], aggVkCommitments[2], aggVkCommitments[3]) =
+                abi.decode(vm.ffi(_prover("vk-commits")), (bytes32, bytes32, bytes32, bytes32));
         }
-        bytes32[] memory commitments = new bytes32[](3);
-        uint256[] memory circuits = new uint256[](3);
-        for (uint256 i = 0; i < 3; ++i) {
+        bytes32[] memory commitments = new bytes32[](4);
+        uint256[] memory circuits = new uint256[](4);
+        for (uint256 i = 0; i < 4; ++i) {
             commitments[i] = aggVkCommitments[i];
         }
         if (_approve) {
-            (circuits[0], circuits[1], circuits[2]) = (reg.CIRCUIT_DEBIT_4(), reg.CIRCUIT_CLAIM_1(), reg.CIRCUIT_CLAIM_2());
+            (circuits[0], circuits[1], circuits[2], circuits[3]) =
+                (reg.CIRCUIT_DEBIT_1(), reg.CIRCUIT_DEBIT_4(), reg.CIRCUIT_CLAIM_1(), reg.CIRCUIT_CLAIM_2());
         }
         IHonkVerifier aggVerifier = address(reg.aggVerifier()) == address(0)
             ? IHonkVerifier(deployCode("Agg4Verifier.sol:HonkVerifier"))
@@ -211,8 +213,7 @@ abstract contract ZKIPBase is Test {
         sub.chainId = _sim.chainId();
         sub.batchNumber = _batch;
         sub.cbr = _sim.preimage(_batch);
-        sub.commitValues = _sim.legsOf(_batch);
-        sub.inserts = _sim.inserts(_batch);
+        sub.numLegs = _sim.legsOf(_batch).length;
         sub.lockAssetId = _lockAsset;
         sub.lockAmount = _lockAmount;
         sub.newStateRoot = _newRoot;
@@ -247,12 +248,17 @@ abstract contract ZKIPBase is Test {
         (bool ok, bytes32 newRoot, bytes memory proof) = _proveDebit(chainId, _bundles, _preimages, _legs, _lockAsset, _lockAmount, _tag);
         assertTrue(ok, string.concat("prover failed: ", _tag));
         ZKIPLiteRegistry.DebitSubmission memory sub = _submission(_sim, _batch, _lockAsset, _lockAmount, newRoot, proof);
+        (, , uint256 beforeCount, ) = _chainState(chainId);
+        vm.expectEmit(address(reg));
+        emit ZKIPLiteRegistry.DebitProven(chainId, _batch, sub.numLegs, newRoot);
         uint256 g = gasleft();
         reg.submitDebit(sub);
         _logGas(string.concat(_tag, ": submitDebit"), g - gasleft(), abi.encodeCall(reg.submitDebit, (sub)));
         stateFile[chainId] = pendingState[chainId];
-        (bytes32 stored, , , ) = _chainState(chainId);
+        (bytes32 stored, bytes32 provenImt, uint256 afterCount, ) = _chainState(chainId);
         assertEq(stored, newRoot);
+        assertEq(provenImt, sub.cbr.imtEnd);
+        assertEq(afterCount, beforeCount + sub.numLegs);
     }
 
     function _claimAndSubmit(uint256 _chainId, Credit[] memory _creditList, bytes32 _unlockAsset, uint256 _unlockAmount, string memory _tag) internal {
@@ -290,8 +296,56 @@ abstract contract ZKIPBase is Test {
         vm.serializeBytes(_tag, "preimages", _w.preimages);
         vm.serializeUint(_tag, "leg_index", _w.legs);
         vm.serializeBytes32(_tag, "lock_asset", _w.lockAsset);
-        string memory json = vm.serializeUint(_tag, "lock_amount", _w.lockAmount);
+        vm.serializeUint(_tag, "lock_amount", _w.lockAmount);
+        string memory json = _serializeDebitImt(_w, _tag);
         return _runProver("debit", _size, json, _w.chainId, _tag, _target);
+    }
+
+    function _serializeDebitImt(DebitWitness memory _w, string memory _tag) internal returns (string memory) {
+        (address chain, , , , ) = reg.chains(_w.chainId);
+        ChainSim sim = ChainSim(chain);
+        uint256 cv = LegBuilder.commitValue(_w.preimages[0], _w.bundles[0]);
+        uint256 batch = sim.inclusion(cv).batchNumber;
+        ZKIPLiteRegistry.ChainBatchRootPreimage memory p = sim.preimage(batch);
+        vm.serializeBytes32(_tag, "imt_begin", p.imtBegin);
+        vm.serializeBytes32(_tag, "imt_end", p.imtEnd);
+        vm.serializeUint(_tag, "leaf_count", sim.batchStartLeafCount(batch));
+        return _serializeInsertions(_tag, sim.inserts(batch));
+    }
+
+    function _serializeInsertions(string memory _tag, ImtInsertion.Proof[] memory _inserts)
+        internal returns (string memory json)
+    {
+        bytes32[] memory values = new bytes32[](_inserts.length);
+        bytes32[] memory nextIndices = new bytes32[](_inserts.length);
+        bytes32[] memory nextValues = new bytes32[](_inserts.length);
+        uint256[] memory indices = new uint256[](_inserts.length);
+        string memory lowPaths = "[";
+        string memory newPaths = "[";
+        for (uint256 i = 0; i < _inserts.length; ++i) {
+            values[i] = bytes32(_inserts[i].low.value);
+            nextIndices[i] = bytes32(_inserts[i].low.nextIndex);
+            nextValues[i] = bytes32(_inserts[i].low.nextValue);
+            indices[i] = _inserts[i].lowIndex;
+            lowPaths = string.concat(lowPaths, i == 0 ? "" : ",", _pathJson(_inserts[i].lowPath));
+            newPaths = string.concat(newPaths, i == 0 ? "" : ",", _pathJson(_inserts[i].newPath));
+        }
+        vm.serializeBytes32(_tag, "insert_low_value", values);
+        vm.serializeBytes32(_tag, "insert_low_next_index", nextIndices);
+        vm.serializeBytes32(_tag, "insert_low_next_value", nextValues);
+        json = vm.serializeUint(_tag, "insert_low_index", indices);
+        // serializeJson replaces the object; append nested arrays to the completed flat witness instead.
+        bytes memory prefix = bytes(json);
+        prefix[prefix.length - 1] = 0x20;
+        json = string.concat(string(prefix), ',"insert_low_path":', lowPaths, '],"insert_new_path":', newPaths, "]}");
+    }
+
+    function _pathJson(bytes32[] memory _path) internal pure returns (string memory result) {
+        result = "[";
+        for (uint256 i = 0; i < _path.length; ++i) {
+            result = string.concat(result, i == 0 ? "" : ",", '"', vm.toString(_path[i]), '"');
+        }
+        result = string.concat(result, "]");
     }
 
     function _proveClaim(uint256 _chainId, Credit[] memory _creditList, bytes32 _unlockAsset, uint256 _unlockAmount, string memory _tag)
@@ -381,6 +435,7 @@ abstract contract ZKIPBase is Test {
         Vm.FfiResult memory r = vm.tryFfi(cmd);
         if (r.exitCode != 0) {
             console2.log(string.concat(_tag, ": prover rejected the witness"));
+            console2.log(string(r.stderr));
             return (false, bytes32(0), "");
         }
         ok = true;
@@ -391,7 +446,7 @@ abstract contract ZKIPBase is Test {
 
     // ------------------------------------------------------------------------- aggregated path
 
-    /// @dev A chain proves a debit for the aggregator: debit_4 (any 1-4 legs), noir-recursive target.
+    /// @dev A chain proves a debit for the aggregator with its smallest supported size class.
     function _proveDebitRec(
         ChainSim _sim,
         uint256 _batch,
@@ -404,10 +459,11 @@ abstract contract ZKIPBase is Test {
     ) internal returns (Inner memory inner) {
         inner.chainId = _sim.chainId();
         DebitWitness memory w = DebitWitness(inner.chainId, _bundles, _preimages, _legs, _lockAsset, _lockAmount);
-        (bool ok, bytes32 newRoot, ) = _proveDebitWith(w, _tag, 4, REC);
+        uint256 size = _bundles.length <= 1 ? 1 : 4;
+        (bool ok, bytes32 newRoot, ) = _proveDebitWith(w, _tag, size, REC);
         assertTrue(ok, string.concat("prover failed: ", _tag));
         inner.kind = SLOT_DEBIT;
-        inner.circuit = "debit_4";
+        inner.circuit = size == 1 ? "debit_1" : "debit_4";
         inner.dir = string.concat(WORK, _tag);
         inner.stateOut = pendingState[inner.chainId];
         inner.debit = _submission(_sim, _batch, _lockAsset, _lockAmount, newRoot, "");

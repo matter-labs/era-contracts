@@ -53,7 +53,7 @@ MAX_ASSETS, NULL_DEPTH = 8, 24
 D_IMT, D_CHAIN, D_SHARED = 16, 18, 7
 TAG = bytes.fromhex("3445134c")
 CIRCUIT_NAMES = ["debit_1", "debit_4", "claim_1", "claim_2"]
-AGG_INNER = ["debit_4", "claim_1", "claim_2"]  # 16 public inputs each, so they fit an agg_4 slot
+AGG_INNER = ["debit_1", "debit_4", "claim_1", "claim_2"]  # normalized to 16 public inputs
 AGG_SLOTS = 4
 
 
@@ -294,24 +294,36 @@ def debit(size, w, state, out_state, out_dir):
     prev = state.root()
     lock_asset, lock_amount = b32(w["lock_asset"]), int(w["lock_amount"])
     lock_slot = state.apply(field(lock_asset), lock_amount, True) if lock_amount else 0
-    cv_hi, cv_lo, slots = [], [], []
+    slots = []
     for k in range(size):
         o = open_leg(bundles[k], preimages[k], legs[k])
         if k < n:
-            h, l = hi_lo(o["own_cv"])
-            cv_hi.append(h), cv_lo.append(l)
             slots.append(state.apply(o["asset"], o["amount"], False) if o["origin"] != chain_id else 0)
         else:
-            cv_hi.append(0), cv_lo.append(0), slots.append(0)
+            slots.append(0)
     lh, ll = hi_lo(lock_asset)
     toml = ["chain_id = " + q(chain_id), "l1_chain_id = " + q(int(w["l1_chain_id"])),
             "prev_state_root = " + q(prev), "new_state_root = " + q(state.root()), "num_legs = %d" % n,
-            "cv_hi = " + arr([q(x) for x in cv_hi]), "cv_lo = " + arr([q(x) for x in cv_lo]),
             "lock_asset_hi = " + q(lh), "lock_asset_lo = " + q(ll), "lock_amount = " + q(lock_amount)]
     toml += state.toml_prev
     toml += ["bundles = " + arr([toml_bytes(b) for b in bundles]), "preimages = " + arr([toml_bytes(b) for b in preimages]),
              "leg_index = " + arr(["true" if x else "false" for x in legs]), "slots = " + arr([str(s) for s in slots]),
              "lock_slot = %d" % lock_slot]
+    bh, bl = hi_lo(b32(w["imt_begin"]))
+    eh, el = hi_lo(b32(w["imt_end"]))
+    toml += ["imt_begin_hi = " + q(bh), "imt_begin_lo = " + q(bl),
+             "imt_end_hi = " + q(eh), "imt_end_lo = " + q(el),
+             "leaf_count = %d" % int(w["leaf_count"]), "reserved = [\"0x0\", \"0x0\", \"0x0\"]"]
+    for key in ("insert_low_value", "insert_low_next_index", "insert_low_next_value"):
+        entries = [b32(v) for v in w[key]]
+        entries += [entries[0]] * (size - len(entries))
+        toml.append(key + " = " + arr([toml_lanes(v) for v in entries[:size]]))
+    entries = [str(v) for v in w["insert_low_index"]]
+    entries += [entries[0]] * (size - len(entries))
+    toml.append("insert_low_index = " + arr(entries[:size]))
+    for key in ("insert_low_path", "insert_new_path"):
+        entries = w[key] + [w[key][0]] * (size - len(w[key]))
+        toml.append(key + " = " + arr([arr([toml_lanes(v) for v in pad_path(path, D_IMT)]) for path in entries[:size]]))
     return toml
 
 

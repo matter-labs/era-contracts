@@ -10,6 +10,9 @@ Statements reach L1 one by one, or several at once in one aggregated proof.
 
 **Status: research code.**
 
+This branch moves debit IMT insertion checks into ZKIP and adds compact-transfer/hash benchmarks. See the
+[accounting design](../protocol-docs/zkip-accounting-poc.md) and [benchmark instructions](benchmarks/README.md).
+
 - It is not wired into the Executor or the native token vault: `contracts/src/mocks/` stands in for them.
 - It is not audited, and it is excluded from the repository's lint.
 - Nothing outside `zkip-poc/` depends on it.
@@ -22,8 +25,8 @@ Statements reach L1 one by one, or several at once in one aggregated proof.
   - `MockCaps` stands in for the vault.
 - **Debits.** A batch that appended legs to the chain's interop commitment tree (the IMT) gets one debit proof, and
   `onExecute` refuses to execute it without one.
-  - **L1 checks** the tree's continuity and every insertion (`ImtInsertion`), and passes the new commit values to the
-    circuit as public inputs.
+  - **L1 checks** the batch root and continuity. The circuit proves every insertion from the batch's IMT begin
+    root to its end root; the stored starting leaf count is public, while values and paths are private.
   - **The circuit** opens each value to its 1,600-byte bundle and the flow preimage, decodes the asset-router call, and
     debits the amount.
   - Batches without legs need no proof.
@@ -105,7 +108,10 @@ an Apple M4 Max, and the 4 aggregation tests ~5. `foundry.toml` uses Prague gas 
 | `test_aggDropsInvalidProofAndChecksCircuits` | The aggregator drops a corrupted proof and aggregates the rest. A revoked circuit's slot is skipped, and the dropped chain proves directly. |
 | `test_aggStaleSlotIsSkipped` | A slot made stale by a direct submission is skipped; the other slot applies, and nothing applies twice |
 
-## Measurements
+## Original PoC measurements
+
+The numbers below are the original #2630/#2631 baseline, before proof-carried insertions. They do not measure
+this branch's revised debit path. Updated comparisons are recorded under `benchmarks/`.
 
 These are from an Apple M4 Max. L1 gas is per submission: execution plus calldata plus the 21k base, at Osaka
 pricing.

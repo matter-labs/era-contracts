@@ -1,0 +1,856 @@
+{
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "threads": 4,
+  "repetitions": 3,
+  "baseline_commit": "cb7382cdb486beb0a6b5ba352cf1a79c2560e497",
+  "measurements": [
+    {
+      "variant": "legacy_keccak",
+      "circuit": "debit_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 5284,
+            "circuit_size": 330104
+          }
+        ]
+      },
+      "bytecode_sha256": "4d964c24c4694613ac9f85d3f8a0e8e45fc0e6c4a9a3d656d7883b5cee6e9f0c",
+      "samples": [
+        {
+          "prove_s": 4.125902958,
+          "peak_rss_bytes": 657489920
+        },
+        {
+          "prove_s": 4.024116666000001,
+          "peak_rss_bytes": 659488768
+        },
+        {
+          "prove_s": 4.245395875000002,
+          "peak_rss_bytes": 683098112
+        }
+      ],
+      "median_prove_s": 4.125902958,
+      "proof_bytes": 9920,
+      "public_input_bytes": 320,
+      "execution_gas": 762323,
+      "calldata_gas": 157876,
+      "transaction_gas": 941199,
+      "verifier_runtime_bytes": 17378
+    },
+    {
+      "variant": "legacy_keccak",
+      "circuit": "debit_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 20533,
+            "circuit_size": 1307895
+          }
+        ]
+      },
+      "bytecode_sha256": "67a5c3997f65ea06036c22d4a468a636466b2705bd7f7af6c89b4fd2b398f724",
+      "samples": [
+        {
+          "prove_s": 15.041632334000003,
+          "peak_rss_bytes": 1982578688
+        }
+      ],
+      "median_prove_s": 15.041632334000003,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 172192,
+      "transaction_gas": 994359,
+      "verifier_runtime_bytes": 17799
+    },
+    {
+      "variant": "legacy_keccak",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 11116,
+            "circuit_size": 1963046
+          }
+        ]
+      },
+      "bytecode_sha256": "4ff79d0e15262c3f8c4735be5cd20094006bffbf7c845e985abdcf5e4c686a82",
+      "samples": [
+        {
+          "prove_s": 23.340105750000006,
+          "peak_rss_bytes": 2923413504
+        },
+        {
+          "prove_s": 25.748178541,
+          "peak_rss_bytes": 2940911616
+        },
+        {
+          "prove_s": 22.946853417000014,
+          "peak_rss_bytes": 2909290496
+        }
+      ],
+      "median_prove_s": 23.340105750000006,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171328,
+      "transaction_gas": 993495,
+      "verifier_runtime_bytes": 17799
+    },
+    {
+      "variant": "legacy_keccak",
+      "circuit": "claim_2",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 22041,
+            "circuit_size": 3921838
+          }
+        ]
+      },
+      "bytecode_sha256": "041716d723a8bddd960ee303bde32244e28c20bae505b893f2df58ccdc88368a",
+      "samples": [
+        {
+          "prove_s": 46.79954516699999,
+          "peak_rss_bytes": 4413652992
+        }
+      ],
+      "median_prove_s": 46.79954516699999,
+      "proof_bytes": 11072,
+      "public_input_bytes": 512,
+      "execution_gas": 819675,
+      "calldata_gas": 177556,
+      "transaction_gas": 1018231,
+      "verifier_runtime_bytes": 18010
+    },
+    {
+      "variant": "proof_keccak",
+      "circuit": "debit_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 8097,
+            "circuit_size": 1504707
+          }
+        ]
+      },
+      "bytecode_sha256": "7069a884f3e87c3da5d07da438bb24103f51590b91a2d7c45023eca076a29787",
+      "samples": [
+        {
+          "prove_s": 16.813261374999996,
+          "peak_rss_bytes": 2652405760
+        },
+        {
+          "prove_s": 17.855303833000022,
+          "peak_rss_bytes": 2720808960
+        },
+        {
+          "prove_s": 17.247780792000015,
+          "peak_rss_bytes": 2989654016
+        }
+      ],
+      "median_prove_s": 17.247780792000015,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171352,
+      "transaction_gas": 993519,
+      "verifier_runtime_bytes": 17799
+    },
+    {
+      "variant": "proof_keccak",
+      "circuit": "debit_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 31638,
+            "circuit_size": 6005134
+          }
+        ]
+      },
+      "bytecode_sha256": "6d1b51a2583e12640ba54f92b167c23c0ff3cc1b5bc7bb1b5f2c5155a68f9a9d",
+      "samples": [
+        {
+          "prove_s": 72.82711924999995,
+          "peak_rss_bytes": 5634408448
+        }
+      ],
+      "median_prove_s": 72.82711924999995,
+      "proof_bytes": 11456,
+      "public_input_bytes": 512,
+      "execution_gas": 838214,
+      "calldata_gas": 183508,
+      "transaction_gas": 1042722,
+      "verifier_runtime_bytes": 18221
+    },
+    {
+      "variant": "proof_keccak",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 11116,
+            "circuit_size": 1963046
+          }
+        ]
+      },
+      "bytecode_sha256": "e21b7c707277f6b1aac0159ce3b68da5f257c348c9259f4a147a02eb20345966",
+      "samples": [
+        {
+          "prove_s": 22.03508554199999,
+          "peak_rss_bytes": 3762388992
+        },
+        {
+          "prove_s": 22.422772415999987,
+          "peak_rss_bytes": 3137880064
+        },
+        {
+          "prove_s": 21.543589166000004,
+          "peak_rss_bytes": 3101114368
+        }
+      ],
+      "median_prove_s": 22.03508554199999,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171424,
+      "transaction_gas": 993591,
+      "verifier_runtime_bytes": 17799
+    },
+    {
+      "variant": "proof_keccak",
+      "circuit": "claim_2",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 22041,
+            "circuit_size": 3921838
+          }
+        ]
+      },
+      "bytecode_sha256": "9320cdf70c156a9e135ef30ac8e1215e3f163065f7db76c10ab983c8f5dc9bc5",
+      "samples": [
+        {
+          "prove_s": 47.960219583000026,
+          "peak_rss_bytes": 5575540736
+        }
+      ],
+      "median_prove_s": 47.960219583000026,
+      "proof_bytes": 11072,
+      "public_input_bytes": 512,
+      "execution_gas": 819675,
+      "calldata_gas": 177436,
+      "transaction_gas": 1018111,
+      "verifier_runtime_bytes": 18010
+    },
+    {
+      "variant": "compact_keccak",
+      "circuit": "debit_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 8287,
+            "circuit_size": 1342499
+          }
+        ]
+      },
+      "bytecode_sha256": "aef7f8897ceea29098822f859815e6b5166f52c499da15406ca3ef6ddb7fa455",
+      "samples": [
+        {
+          "prove_s": 15.445333166999944,
+          "peak_rss_bytes": 2739322880
+        },
+        {
+          "prove_s": 16.228296709000006,
+          "peak_rss_bytes": 2724757504
+        },
+        {
+          "prove_s": 18.51131929199994,
+          "peak_rss_bytes": 1977810944
+        }
+      ],
+      "median_prove_s": 16.228296709000006,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171316,
+      "transaction_gas": 993483,
+      "verifier_runtime_bytes": 17799
+    },
+    {
+      "variant": "compact_keccak",
+      "circuit": "debit_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 32462,
+            "circuit_size": 5355847
+          }
+        ]
+      },
+      "bytecode_sha256": "f2d313a1d8af6a1bc7a0727e6f5c95ff54852ecc9bbec467df641cafe3f47323",
+      "samples": [
+        {
+          "prove_s": 64.66464458299993,
+          "peak_rss_bytes": 6097453056
+        }
+      ],
+      "median_prove_s": 64.66464458299993,
+      "proof_bytes": 11456,
+      "public_input_bytes": 512,
+      "execution_gas": 838214,
+      "calldata_gas": 183688,
+      "transaction_gas": 1042902,
+      "verifier_runtime_bytes": 18221
+    },
+    {
+      "variant": "compact_keccak",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 11378,
+            "circuit_size": 1800907
+          }
+        ]
+      },
+      "bytecode_sha256": "086b403b983da73c07ce1c1f0fb426350f8423e65bcb47caed5b27ca5ac02d52",
+      "samples": [
+        {
+          "prove_s": 22.01030108300006,
+          "peak_rss_bytes": 2869248000
+        },
+        {
+          "prove_s": 22.572991167000055,
+          "peak_rss_bytes": 2642722816
+        },
+        {
+          "prove_s": 21.744785791999902,
+          "peak_rss_bytes": 2965209088
+        }
+      ],
+      "median_prove_s": 22.01030108300006,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171412,
+      "transaction_gas": 993579,
+      "verifier_runtime_bytes": 17800
+    },
+    {
+      "variant": "compact_keccak",
+      "circuit": "claim_2",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 22477,
+            "circuit_size": 3597201
+          }
+        ]
+      },
+      "bytecode_sha256": "2e23bf5dcd4a3e8213731e51e64a5d837813052ae6a3ba1929909fb1ff3d9f2a",
+      "samples": [
+        {
+          "prove_s": 41.59870575000002,
+          "peak_rss_bytes": 5052760064
+        }
+      ],
+      "median_prove_s": 41.59870575000002,
+      "proof_bytes": 11072,
+      "public_input_bytes": 512,
+      "execution_gas": 819675,
+      "calldata_gas": 177472,
+      "transaction_gas": 1018147,
+      "verifier_runtime_bytes": 18010
+    },
+    {
+      "variant": "compact_blake2s",
+      "circuit": "debit_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 17135,
+            "circuit_size": 322034
+          }
+        ]
+      },
+      "bytecode_sha256": "1c9a5b9d08579c24281178c9ba3107ad19d3fb8ae3cf9b87bfea76d9583fc63a",
+      "samples": [
+        {
+          "prove_s": 3.5202025420001064,
+          "peak_rss_bytes": 679821312
+        },
+        {
+          "prove_s": 3.6552714999999125,
+          "peak_rss_bytes": 673857536
+        },
+        {
+          "prove_s": 3.6292607499999576,
+          "peak_rss_bytes": 674136064
+        }
+      ],
+      "median_prove_s": 3.6292607499999576,
+      "proof_bytes": 9920,
+      "public_input_bytes": 512,
+      "execution_gas": 764223,
+      "calldata_gas": 159148,
+      "transaction_gas": 944371,
+      "verifier_runtime_bytes": 17377
+    },
+    {
+      "variant": "compact_blake2s",
+      "circuit": "debit_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 69230,
+            "circuit_size": 1272951
+          }
+        ]
+      },
+      "bytecode_sha256": "23554fd4c6448a6836fb9354ce6a9786a0f32eb4bb99dd3acccdd91a3312e66f",
+      "samples": [
+        {
+          "prove_s": 12.610501833999933,
+          "peak_rss_bytes": 2104950784
+        }
+      ],
+      "median_prove_s": 12.610501833999933,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171316,
+      "transaction_gas": 993483,
+      "verifier_runtime_bytes": 17799
+    },
+    {
+      "variant": "compact_blake2s",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 23530,
+            "circuit_size": 429820
+          }
+        ]
+      },
+      "bytecode_sha256": "767c6be36704050b3bcbd27dda0b216797302c3de60c7011b5f6f493d267f140",
+      "samples": [
+        {
+          "prove_s": 4.24087233299997,
+          "peak_rss_bytes": 830259200
+        },
+        {
+          "prove_s": 4.317700916000035,
+          "peak_rss_bytes": 842170368
+        },
+        {
+          "prove_s": 4.355162583000038,
+          "peak_rss_bytes": 861061120
+        }
+      ],
+      "median_prove_s": 4.317700916000035,
+      "proof_bytes": 9920,
+      "public_input_bytes": 512,
+      "execution_gas": 764223,
+      "calldata_gas": 159172,
+      "transaction_gas": 944395,
+      "verifier_runtime_bytes": 17377
+    },
+    {
+      "variant": "compact_blake2s",
+      "circuit": "claim_2",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 46701,
+            "circuit_size": 854496
+          }
+        ]
+      },
+      "bytecode_sha256": "8b02d2e3094e0c41f541fb5e1040e3893f2f3666068e57228fde5653171f66f9",
+      "samples": [
+        {
+          "prove_s": 8.268842625000048,
+          "peak_rss_bytes": 1392574464
+        }
+      ],
+      "median_prove_s": 8.268842625000048,
+      "proof_bytes": 10304,
+      "public_input_bytes": 512,
+      "execution_gas": 782682,
+      "calldata_gas": 165196,
+      "transaction_gas": 968878,
+      "verifier_runtime_bytes": 17587
+    },
+    {
+      "variant": "compact_blake3_source",
+      "circuit": "debit_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 17135,
+            "circuit_size": 250421
+          }
+        ]
+      },
+      "bytecode_sha256": "2dc0fd34c31ef66f4389b46eb8c1bdcf84792c8dae81d40f27273a8ca59984ae",
+      "samples": [
+        {
+          "prove_s": 2.682662499999992,
+          "peak_rss_bytes": 533069824
+        },
+        {
+          "prove_s": 2.6319963749999715,
+          "peak_rss_bytes": 532660224
+        },
+        {
+          "prove_s": 2.608898124999996,
+          "peak_rss_bytes": 527122432
+        }
+      ],
+      "median_prove_s": 2.6319963749999715,
+      "proof_bytes": 9536,
+      "public_input_bytes": 512,
+      "execution_gas": 745794,
+      "calldata_gas": 152944,
+      "transaction_gas": 919738,
+      "verifier_runtime_bytes": 17166
+    },
+    {
+      "variant": "compact_blake3_source",
+      "circuit": "debit_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 69230,
+            "circuit_size": 986559
+          }
+        ]
+      },
+      "bytecode_sha256": "3f5f13813c2f7ea8039a7a2213d33ebb1a759970f2f1e2820597930a6db8381d",
+      "samples": [
+        {
+          "prove_s": 9.444305917000065,
+          "peak_rss_bytes": 1740603392
+        }
+      ],
+      "median_prove_s": 9.444305917000065,
+      "proof_bytes": 10304,
+      "public_input_bytes": 512,
+      "execution_gas": 782682,
+      "calldata_gas": 165196,
+      "transaction_gas": 968878,
+      "verifier_runtime_bytes": 17588
+    },
+    {
+      "variant": "compact_blake3_source",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 16506,
+            "circuit_size": 1203671
+          }
+        ]
+      },
+      "bytecode_sha256": "1787ddcd58c8f05c563bf3bf536e6fafef000f07057dd70d9d6dcd738fb322ce",
+      "samples": [
+        {
+          "prove_s": 14.442570584000123,
+          "peak_rss_bytes": 2075639808
+        },
+        {
+          "prove_s": 13.992316749999873,
+          "peak_rss_bytes": 2080292864
+        },
+        {
+          "prove_s": 14.524448708999898,
+          "peak_rss_bytes": 2093826048
+        }
+      ],
+      "median_prove_s": 14.442570584000123,
+      "proof_bytes": 10688,
+      "public_input_bytes": 512,
+      "execution_gas": 801167,
+      "calldata_gas": 171472,
+      "transaction_gas": 993639,
+      "verifier_runtime_bytes": 17798
+    },
+    {
+      "variant": "compact_blake3_source",
+      "circuit": "claim_2",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 32653,
+            "circuit_size": 2402239
+          }
+        ]
+      },
+      "bytecode_sha256": "046462178ccb1d9f463b25b364b29c6e5a8e064601fa8395a25a0be4dbb10172",
+      "samples": [
+        {
+          "prove_s": 30.746036209000067,
+          "peak_rss_bytes": 3591405568
+        }
+      ],
+      "median_prove_s": 30.746036209000067,
+      "proof_bytes": 11072,
+      "public_input_bytes": 512,
+      "execution_gas": 819675,
+      "calldata_gas": 177424,
+      "transaction_gas": 1018099,
+      "verifier_runtime_bytes": 18010
+    },
+    {
+      "variant": "compact_blake3",
+      "circuit": "debit_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 17135,
+            "circuit_size": 250421
+          }
+        ]
+      },
+      "bytecode_sha256": "1f431122d04784c5ae2f1159883a9fc9e7daa965b3ba89a8a787b61fa7a936ea",
+      "samples": [
+        {
+          "prove_s": 2.658994666999888,
+          "peak_rss_bytes": 528384000
+        },
+        {
+          "prove_s": 2.6285225420001552,
+          "peak_rss_bytes": 534757376
+        },
+        {
+          "prove_s": 2.6324192920001224,
+          "peak_rss_bytes": 530579456
+        }
+      ],
+      "median_prove_s": 2.6324192920001224,
+      "proof_bytes": 9536,
+      "public_input_bytes": 512,
+      "execution_gas": 745794,
+      "calldata_gas": 152956,
+      "transaction_gas": 919750,
+      "verifier_runtime_bytes": 17166
+    },
+    {
+      "variant": "compact_blake3",
+      "circuit": "debit_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 69230,
+            "circuit_size": 986559
+          }
+        ]
+      },
+      "bytecode_sha256": "4459497e6f73542650106735d956a41baff1d9087cd7301a46fec14645faaec5",
+      "samples": [
+        {
+          "prove_s": 9.150974292,
+          "peak_rss_bytes": 1727954944
+        }
+      ],
+      "median_prove_s": 9.150974292,
+      "proof_bytes": 10304,
+      "public_input_bytes": 512,
+      "execution_gas": 782682,
+      "calldata_gas": 165220,
+      "transaction_gas": 968902,
+      "verifier_runtime_bytes": 17588
+    },
+    {
+      "variant": "compact_blake3",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 23530,
+            "circuit_size": 334229
+          }
+        ]
+      },
+      "bytecode_sha256": "db782b81bc39d3f036271de296f01c742277b1c9930837207305024f05eca1b2",
+      "samples": [
+        {
+          "prove_s": 3.4539749160001065,
+          "peak_rss_bytes": 674463744
+        },
+        {
+          "prove_s": 3.418598250000059,
+          "peak_rss_bytes": 675889152
+        },
+        {
+          "prove_s": 3.4731376249999357,
+          "peak_rss_bytes": 679182336
+        }
+      ],
+      "median_prove_s": 3.4539749160001065,
+      "proof_bytes": 9920,
+      "public_input_bytes": 512,
+      "execution_gas": 764223,
+      "calldata_gas": 159064,
+      "transaction_gas": 944287,
+      "verifier_runtime_bytes": 17378
+    },
+    {
+      "variant": "compact_blake3",
+      "circuit": "claim_2",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 46701,
+            "circuit_size": 663339
+          }
+        ]
+      },
+      "bytecode_sha256": "7985d08806e2d3e87240eb7c75b7b4c31900790981a1a8ab1a3475cd69087a11",
+      "samples": [
+        {
+          "prove_s": 6.9002470830000675,
+          "peak_rss_bytes": 1367703552
+        }
+      ],
+      "median_prove_s": 6.9002470830000675,
+      "proof_bytes": 10304,
+      "public_input_bytes": 512,
+      "execution_gas": 782682,
+      "calldata_gas": 165244,
+      "transaction_gas": 968926,
+      "verifier_runtime_bytes": 17589
+    },
+    {
+      "variant": "compact_poseidon2",
+      "circuit": "debit_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 43807,
+            "circuit_size": 83344
+          }
+        ]
+      },
+      "bytecode_sha256": "093af03830af526312f7eac9865462285d439feebef730bfc25f196010b8f059",
+      "samples": [
+        {
+          "prove_s": 1.0560694580001382,
+          "peak_rss_bytes": 232161280
+        },
+        {
+          "prove_s": 1.0805383330000495,
+          "peak_rss_bytes": 249462784
+        },
+        {
+          "prove_s": 1.0733219589999408,
+          "peak_rss_bytes": 234078208
+        }
+      ],
+      "median_prove_s": 1.0733219589999408,
+      "proof_bytes": 9152,
+      "public_input_bytes": 512,
+      "execution_gas": 727389,
+      "calldata_gas": 146848,
+      "transaction_gas": 895237,
+      "verifier_runtime_bytes": 16956
+    },
+    {
+      "variant": "compact_poseidon2",
+      "circuit": "debit_4",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 181803,
+            "circuit_size": 326420
+          }
+        ]
+      },
+      "bytecode_sha256": "032ddae7a3e5e6cafe8714b3e8dfbaa11a54cbd98b75e917694fe70938d7f89f",
+      "samples": [
+        {
+          "prove_s": 3.7547205420000864,
+          "peak_rss_bytes": 693288960
+        }
+      ],
+      "median_prove_s": 3.7547205420000864,
+      "proof_bytes": 9920,
+      "public_input_bytes": 512,
+      "execution_gas": 764223,
+      "calldata_gas": 159172,
+      "transaction_gas": 944395,
+      "verifier_runtime_bytes": 17378
+    },
+    {
+      "variant": "compact_poseidon2",
+      "circuit": "claim_1",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 60050,
+            "circuit_size": 112582
+          }
+        ]
+      },
+      "bytecode_sha256": "ea01848183d18650f3abd4b840d4b3dae4f379cd242a81163607d8a273f8aece",
+      "samples": [
+        {
+          "prove_s": 1.3601150409999718,
+          "peak_rss_bytes": 306053120
+        },
+        {
+          "prove_s": 1.365036458000077,
+          "peak_rss_bytes": 314753024
+        },
+        {
+          "prove_s": 1.3591917090000152,
+          "peak_rss_bytes": 290357248
+        }
+      ],
+      "median_prove_s": 1.3601150409999718,
+      "proof_bytes": 9152,
+      "public_input_bytes": 512,
+      "execution_gas": 727389,
+      "calldata_gas": 146956,
+      "transaction_gas": 895345,
+      "verifier_runtime_bytes": 16956
+    },
+    {
+      "variant": "compact_poseidon2",
+      "circuit": "claim_2",
+      "gates": {
+        "functions": [
+          {
+            "acir_opcodes": 119806,
+            "circuit_size": 220619
+          }
+        ]
+      },
+      "bytecode_sha256": "1382dd059f4d8234d1dae62283839b89087e0e410dee20ce46cbe2828ee8ab44",
+      "samples": [
+        {
+          "prove_s": 2.6548283339998306,
+          "peak_rss_bytes": 558481408
+        }
+      ],
+      "median_prove_s": 2.6548283339998306,
+      "proof_bytes": 9536,
+      "public_input_bytes": 512,
+      "execution_gas": 745794,
+      "calldata_gas": 152920,
+      "transaction_gas": 919714,
+      "verifier_runtime_bytes": 17164
+    }
+  ],
+  "large_repetitions": 1,
+  "experiment_commit": "a896663a9e08bb6bd6025987cae3813570fee2ec",
+  "cpu": "Apple M2 Max",
+  "ram_bytes": 34359738368,
+  "nargo": "nargo version = 1.0.0-beta.25\nnoirc version = 1.0.0-beta.25+75061fab15986eedee4e7d9104ff87dd9fa4ca10\n(git version hash: 75061fab15986eedee4e7d9104ff87dd9fa4ca10, is dirty: false)",
+  "bb": "5.2.1",
+  "gas_scope": "standalone verifier, including calldata and 21k base; excludes registry/settlement",
+  "working_tree_changes": true
+}
