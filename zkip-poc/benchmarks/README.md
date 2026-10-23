@@ -13,6 +13,10 @@ chain. Its size class is benchmark-only; the current registry still accepts at m
 The implemented PoC change is described in [the accounting design](../../protocol-docs/zkip-accounting-poc.md).
 No production protocol contract is changed.
 
+[Compact aggregate settlement measurements](SETTLEMENT.md) compare the original 68 public inputs with
+eight digest fields: about 3% lower L1 submission gas for 14% more outer proving time. This experiment
+keeps the actual protocol roots and is independent of the BLAKE2s source/finality migration.
+
 ## Variants
 
 | Variant                  | Transfer format            | IMT insertion checks                     | Commitment trees                                               |

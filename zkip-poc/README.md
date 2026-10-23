@@ -57,6 +57,8 @@ This branch moves debit IMT insertion checks into ZKIP, compacts aggregated sett
   - **Compact settlement:** the outer proof has 8 public fields rather than 68. L1 reconstructs each statement's
     digest from authenticated state and the settlement data; the sixteen inner inputs are not repeated in calldata.
     BLAKE2s is the selected target for source/finality hashes in the separate benchmark experiments.
+    [Measured settlement comparisons](benchmarks/SETTLEMENT.md) show about 3% lower submission gas,
+    with 14% more outer proving time.
 
 ## Layout
 
