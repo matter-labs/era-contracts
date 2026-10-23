@@ -17,7 +17,7 @@ uint256 constant NUMBER_UNSHIFTED = 37;
 uint256 constant NUMBER_TO_BE_SHIFTED = 5;
 uint256 constant PAIRING_POINTS_SIZE = 8;
 
-uint256 constant VK_HASH = 0x1f124763f0e2eaed7ddfef2d4d0ee5edcca65c21067b6a9bf6ab15fed00e0c41;
+uint256 constant VK_HASH = 0x2e51242c04912cb61016a3b09701fa4b957fef4250e860393ed2a129b5b04789;
 uint256 constant CIRCUIT_SIZE = 2097152;
 uint256 constant LOG_N = 21;
 uint256 constant NUMBER_PUBLIC_INPUTS = 24;
@@ -2115,16 +2115,16 @@ uint256 internal constant SS_GEMINI_EVALS_LOC = 0x40;
             function loadVk() {
                 mstore(Q_L_X_LOC, 0x1d6306c00f9daebbe371034f4e710a7ecbc89fa7deefed8f2f94e08207ac76a4)
                 mstore(Q_L_Y_LOC, 0x00a86dfe35ea58b87aca832ff17c2a70174a81fbd87f37f854a69b1bb2476ff0)
-                mstore(Q_R_X_LOC, 0x24f1374d6f305144fbdfaaad5b6087b8331cc8bf8bce50d54e3b0c9c815f8f05)
-                mstore(Q_R_Y_LOC, 0x188fcbad4a8eaa88ca5875c0c5e9bbe8182bdf5c85e65873561eb3148fcbcda7)
+                mstore(Q_R_X_LOC, 0x20f6a27ede1b24bf9889ea16022ca436a64bd3f344cf6dba836c29392bfa1235)
+                mstore(Q_R_Y_LOC, 0x15ae06fe7b2e3e5f1967500e21a4b969e5d14ed70c5cd95d7023a3baec340394)
                 mstore(Q_O_X_LOC, 0x18fbf8b09bb9617061fb4c40473eb2cba0dbedbc504af1aad506210abaf4d2ae)
                 mstore(Q_O_Y_LOC, 0x03bb318f51227071d2e0fe42ae6ad420d3e99276291b7e1beae02165b197664e)
                 mstore(Q_4_X_LOC, 0x1b87d756a0ef9d5f1f64059063d4e49e9da88e29479941ece2288309e46d85fd)
                 mstore(Q_4_Y_LOC, 0x22c9912d00e50728f0b44aceb9d715a48b8d6c3e4939c78834f08857194a5aee)
                 mstore(Q_M_X_LOC, 0x2ceca3ce385346d5a6adb7321930f263656d718f96aa7670ab745ecf34cb9898)
                 mstore(Q_M_Y_LOC, 0x2e34aa38df06ec049316be3177d134437f2ecf1ef1bb58b6cae1d8bf0b501b27)
-                mstore(Q_C_X_LOC, 0x0a7b3013e7a6068f4e74cf215b1c0c2381c51e21c50bb02bfc427066ff2c16ad)
-                mstore(Q_C_Y_LOC, 0x1a56b1cee99712e0758cd59b2281c2f1d71e26cf36668b9c18fc7cc83fe0d43f)
+                mstore(Q_C_X_LOC, 0x229c4391eebc37a338167b0b3fddc4771ddf06c654f318295cff200c88290fcf)
+                mstore(Q_C_Y_LOC, 0x0168420001a198c9a92472ebce5513ca80a2ef821b006689f77861f41962b186)
                 mstore(Q_LOOKUP_X_LOC, 0x14f0878236c2dc1290462cd78fcd7c9a25626310c4dee14003ccf3ea8a9c2428)
                 mstore(Q_LOOKUP_Y_LOC, 0x2eaa6c5c20be16a749b28c51bf4409de277073fd0d4b4a67f4db36b05beed16b)
                 mstore(Q_ARITH_X_LOC, 0x19fa937722849bfbc9c45e1ed3fc9fb33d6c875af05b10bdaefb83738e199496)

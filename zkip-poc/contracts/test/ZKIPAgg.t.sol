@@ -105,7 +105,7 @@ contract ZKIPAggE2ETest is ZKIPBase {
         (ZKIPLiteRegistry.AggregatedSubmission memory sub, bytes memory inc) = _aggregate(w, "agg_drop");
         assertEq(inc, hex"0100", "the aggregator drops B's invalid proof");
 
-        // With debit_4 revoked, the slot is skipped and nothing changes.
+        // With debit_1 revoked, the slot is skipped and nothing changes.
         _approveAggregation(false);
         vm.expectEmit(address(reg));
         emit ZKIPLiteRegistry.SlotSkipped(

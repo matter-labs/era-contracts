@@ -15,6 +15,7 @@ No production protocol contract is changed.
 | `proof_keccak` | Existing bundle | Inside the debit circuit | Existing Keccak |
 | `compact_keccak` | 320-byte typed transfer | Inside the debit circuit | Keccak |
 | `compact_blake2s` | Typed transfer | Inside the debit circuit | BLAKE2s |
+| `compact_blake3_source` | Typed transfer | Inside the debit circuit | BLAKE3 source IMT; Keccak batch/chain/shared settlement trees |
 | `compact_blake3` | Typed transfer | Inside the debit circuit | BLAKE3 |
 | `compact_poseidon2` | Typed transfer | Inside the debit circuit | Poseidon2, Noir-only comparison |
 
@@ -38,8 +39,10 @@ maintaining independent implementations of accounting.
   settlement timestamps; that trust boundary is retained in the existing PoC registry tests.
 - The BLAKE/Poseidon variants change the IMT and settlement commitment hierarchy. They require corresponding
   source-chain and settlement changes. They cannot be submitted against existing Keccak roots.
+  `compact_blake3_source` isolates the source-only change while preserving the settlement-side hashes.
 - Insertion proofs include the predecessor update, append-slot check, tree-height growth, 256-bit ordering,
   and exact begin/end-root binding. Their proving cost is included in every non-legacy debit measurement.
+  Empty slots use the protocol's domain-separated empty-leaf constant, distinct from the zero sentinel leaf.
 - Finality still authenticates both legs with depths 16 + 18 + 7. Smaller example trees are not used to
   advertise savings. Unused fixed-size slots still incur proving work.
 - Hash support is not an Airbender performance measurement. BLAKE2s/BLAKE3 are candidates for a common hash;
@@ -72,6 +75,8 @@ zkip-poc/work/venv/bin/python zkip-poc/benchmarks/benchmark.py --threads 4 --rep
 The first VK generation downloads the required CRS into `BB_CRS`. The default matrix includes `debit_1`,
 `debit_4`, `claim_1`, and `claim_2`. `--variants`, `--circuits`, `--gates-only`, and `--prepare-only` select
 smaller experiments. `--forge-std /absolute/path/to/forge-std` can reuse an initialized checkout.
+`--large-repetitions 1` can reduce the number of samples for `debit_4` and `claim_2`; the selected counts and
+every individual sample remain in the JSON report.
 
 Outputs are under ignored `zkip-poc/work/benchmarks/`: generated Noir workspaces, witnesses, real proofs,
 generated Solidity verifiers, `verifiers/gas.log`, and `results.json`. Timings include the `bb prove` process

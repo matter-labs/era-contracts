@@ -1,8 +1,6 @@
-import copy
 import os
 import subprocess
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 import tomli
@@ -21,6 +19,13 @@ def toml_value(value):
 
 
 class FixtureTests(unittest.TestCase):
+    def test_empty_slot_is_distinct_from_sentinel_leaf(self):
+        expected = bytes.fromhex("07a2eee29e5f66808854f031930e2c720a817e17f9ac7083092ef9c1fc8acf39")
+        for variant in bench.VARIANTS:
+            tree = bench.Imt(variant)
+            self.assertEqual(tree.zeros[0], expected)
+            self.assertNotEqual(tree.root(), tree.zeros[0])
+
     def test_compact_format_preserves_accounting_and_nonce(self):
         for variant in bench.VARIANTS:
             with self.subTest(variant=variant):

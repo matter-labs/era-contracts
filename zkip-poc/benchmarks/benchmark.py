@@ -35,7 +35,7 @@ for relative in REFERENCE_FILES:
 sys.path.insert(0, str(BASELINE / "prover"))
 import prove as reference
 
-VARIANTS = ("legacy_keccak", "proof_keccak", "compact_keccak", "compact_blake2s", "compact_blake3", "compact_poseidon2")
+VARIANTS = ("legacy_keccak", "proof_keccak", "compact_keccak", "compact_blake2s", "compact_blake3_source", "compact_blake3", "compact_poseidon2")
 TRANSFER_WORDS = 10
 WORD_BYTES = 32
 TRANSFER_BYTES = TRANSFER_WORDS * WORD_BYTES
@@ -47,6 +47,7 @@ VERSION = 1 << 248
 SENDER, RECIPIENT = 0xA11CE, 0xB0B
 RESERVED_SUBTREE = b"".join(x.to_bytes(8, "little") for x in (
     0x8f6f7c955119c1b4, 0x46b2d61cf64a2c64, 0xee07c67fdcc6fe40, 0x300d41929ea90682))
+IMT_EMPTY_LEAF = reference.keccak256(b"zkSync:IndexedMerkleTree:emptyLeaf")
 
 
 def word(value):
@@ -58,16 +59,21 @@ def words(*values):
 
 
 def protocol_hash(variant, data):
-    if variant.endswith("blake2s"):
+    algorithm = variant.split("_")[1]
+    if algorithm == "blake2s":
         return hashlib.blake2s(data).digest()
-    if variant.endswith("blake3"):
+    if algorithm == "blake3":
         import blake3
         return blake3.blake3(data).digest()
-    if variant.endswith("poseidon2"):
+    if algorithm == "poseidon2":
         assert len(data) % 16 == 0
         limbs = [int.from_bytes(data[i:i + 16], "little") for i in range(0, len(data), 16)]
         return reference.p2.hash_many(limbs).to_bytes(WORD_BYTES, "little")
     return reference.keccak256(data)
+
+
+def settlement_hash(variant, data):
+    return reference.keccak256(data) if variant.endswith("_source") else protocol_hash(variant, data)
 
 
 def asset_id(origin=L1, token=0x1234):
@@ -115,14 +121,16 @@ def flow(variant, nonce):
     return {"bundle": bundle, "pre": pre, "leg": leg, "cvs": cvs, "sources": sources}
 
 
-def path_root(variant, leaf, index, siblings, height):
+def path_root(variant, leaf, index, siblings, height, settlement=False):
+    h = settlement_hash if settlement else protocol_hash
     for i, sibling in enumerate(siblings[:height]):
-        leaf = protocol_hash(variant, sibling + leaf if (index >> i) & 1 else leaf + sibling)
+        leaf = h(variant, sibling + leaf if (index >> i) & 1 else leaf + sibling)
     return leaf
 
 
 def inclusion(variant, cv, source, tag):
     h = lambda data: protocol_hash(variant, data)
+    sh = lambda data: settlement_hash(variant, data)
     path = lambda depth, label: [h(words(tag, label, i)) for i in range(depth)]
     imt_path = path(reference.D_IMT, 1)
     chain_path = path(reference.D_CHAIN, 2)
@@ -130,13 +138,13 @@ def inclusion(variant, cv, source, tag):
     next_index, next_value = bytes(32), bytes(32)
     imt_root = path_root(variant, h(cv + next_index + next_value), 1, imt_path, reference.D_IMT)
     begin, left = h(words(tag, 4)), h(words(tag, 5))
-    batch_root = h(h(left + h(begin + imt_root)) + RESERVED_SUBTREE)
+    batch_root = sh(sh(left + sh(begin + imt_root)) + RESERVED_SUBTREE)
     batch_padding = reference.keccak256(b"zkSync:BatchLeaf")
     chain_padding = reference.keccak256(b"zkSync:ChainIdLeaf")
-    batch_leaf = h(batch_padding + batch_root + words(1, TIMESTAMP))
-    chain_root = path_root(variant, batch_leaf, 1, chain_path, reference.D_CHAIN)
-    shared_leaf = h(chain_padding + chain_root + word(source))
-    root = path_root(variant, shared_leaf, 1, shared_path, reference.D_SHARED)
+    batch_leaf = sh(batch_padding + batch_root + words(1, TIMESTAMP))
+    chain_root = path_root(variant, batch_leaf, 1, chain_path, reference.D_CHAIN, settlement=True)
+    shared_leaf = sh(chain_padding + chain_root + word(source))
+    root = path_root(variant, shared_leaf, 1, shared_path, reference.D_SHARED, settlement=True)
     return root, {
         "imt_next_index": next_index, "imt_next_value": next_value, "imt_index": 1,
         "imt_height": reference.D_IMT, "imt_path": imt_path, "cbr_begin": begin, "cbr_left": left,
@@ -160,7 +168,7 @@ class Imt:
     def __init__(self, variant):
         self.variant = variant
         self.leaves = [[0, 0, 0]]
-        self.zeros = [protocol_hash(variant, bytes(96))]
+        self.zeros = [IMT_EMPTY_LEAF]
         for _ in range(reference.D_IMT):
             self.zeros.append(protocol_hash(variant, self.zeros[-1] * 2))
 
@@ -291,13 +299,14 @@ def witness(variant, name):
 
 def inclusion_root(variant, cv, source, inc):
     h = lambda data: protocol_hash(variant, data)
+    sh = lambda data: settlement_hash(variant, data)
     imt = path_root(variant, h(cv + inc["imt_next_index"] + inc["imt_next_value"]),
                     inc["imt_index"], inc["imt_path"], inc["imt_height"])
-    batch = h(h(inc["cbr_left"] + h(inc["cbr_begin"] + imt)) + RESERVED_SUBTREE)
-    leaf = h(reference.keccak256(b"zkSync:BatchLeaf") + batch + words(inc["batch_number"], inc["batch_ts"]))
-    chain = path_root(variant, leaf, inc["batch_number"], inc["chain_path"], inc["chain_height"])
-    return path_root(variant, h(reference.keccak256(b"zkSync:ChainIdLeaf") + chain + word(source)),
-                     inc["shared_index"], inc["shared_path"], inc["shared_height"])
+    batch = sh(sh(inc["cbr_left"] + sh(inc["cbr_begin"] + imt)) + RESERVED_SUBTREE)
+    leaf = sh(reference.keccak256(b"zkSync:BatchLeaf") + batch + words(inc["batch_number"], inc["batch_ts"]))
+    chain = path_root(variant, leaf, inc["batch_number"], inc["chain_path"], inc["chain_height"], settlement=True)
+    return path_root(variant, sh(reference.keccak256(b"zkSync:ChainIdLeaf") + chain + word(source)),
+                     inc["shared_index"], inc["shared_path"], inc["shared_height"], settlement=True)
 
 
 def hash_function(algorithm):
@@ -329,7 +338,7 @@ def generate(variant, names):
     for extra in circuit_root.joinpath("zkip_lite/src").glob("*.nr"):
         if extra.name != "lib.nr":
             shutil.copyfile(extra, lib / extra.name)
-    algorithm = variant.split("_", 1)[1]
+    algorithm = variant.split("_")[1]
     source = re.sub(r"pub fn protocol_hash_lanes<let NL: u32>\(_msg: \[u64; NL\]\) -> \[u64; 4\] \{\n    keccak_lanes\(_msg\)\n\}\n", "", source)
     if variant != "legacy_keccak":
         zeros = Imt(variant).zeros
@@ -342,6 +351,13 @@ def generate(variant, names):
     source = source[:start] + source[start:end].replace("keccak_lanes(", "protocol_hash_lanes(") + source[end:]
     start = source.index("pub fn shared_root(")
     source = source[:start] + source[start:].replace("keccak_lanes(", "protocol_hash_lanes(")
+    if variant.endswith("_source"):
+        split = source.index("    let live =", start)
+        source = source[:split] + source[split:].replace("protocol_hash_lanes(", "keccak_lanes(").replace("keccak_pair(", "settlement_pair(").replace("merkle_var(", "settlement_merkle(")
+        merkle_start = source.index("pub fn merkle_var<")
+        merkle_end = source.index("// --------------------------------------------------------------------------------------- Poseidon2", merkle_start)
+        source += "\n" + source[merkle_start:merkle_end].replace("merkle_var", "settlement_merkle").replace("keccak_pair", "settlement_pair")
+        source += "\npub fn settlement_pair(_a: [u64; 4], _b: [u64; 4]) -> [u64; 4] { keccak_lanes([_a[0], _a[1], _a[2], _a[3], _b[0], _b[1], _b[2], _b[3]]) }\n"
     source = source.replace("    keccak_lanes([a[0]", "    protocol_hash_lanes([a[0]")
     if variant.startswith("compact_"):
         source = source.replace("pub global BUNDLE_LEN: u32 = 1600;", f"pub global BUNDLE_LEN: u32 = {TRANSFER_BYTES};")
@@ -428,12 +444,13 @@ def main():
     parser.add_argument("--circuits", nargs="+", choices=CIRCUITS, default=list(CIRCUITS))
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--repetitions", type=int, default=3)
+    parser.add_argument("--large-repetitions", type=int, help="Optional sample count for debit_4 and claim_2")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--gates-only", action="store_true")
     parser.add_argument("--evm", action="store_true", help="Verify real proofs in Forge and measure verifier-only gas")
     parser.add_argument("--forge-std", type=Path, default=POC.parent / "lib/forge-std")
     args = parser.parse_args()
-    if args.threads < 1 or args.repetitions < 1:
+    if args.threads < 1 or args.repetitions < 1 or (args.large_repetitions is not None and args.large_repetitions < 1):
         parser.error("threads and repetitions must be positive")
     env = dict(os.environ, HARDWARE_CONCURRENCY=str(args.threads))
     nargo, bb = os.environ.get("NARGO", "nargo"), os.environ.get("BB", "bb")
@@ -441,6 +458,11 @@ def main():
     result_file = WORK / "results.json"
     results = {"machine": platform.platform(), "threads": args.threads, "repetitions": args.repetitions,
                "baseline_commit": BASELINE_COMMIT, "measurements": []}
+    results["large_repetitions"] = args.large_repetitions or args.repetitions
+    results["experiment_commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=POC, text=True).strip()
+    if sys.platform == "darwin":
+        results["cpu"] = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
+        results["ram_bytes"] = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
     if not args.prepare_only:
         results["nargo"] = command([nargo, "--version"], HERE, env)[0].strip()
         results["bb"] = command([bb, "--version"], HERE, env)[0].strip()
@@ -458,11 +480,13 @@ def main():
             out.mkdir(parents=True, exist_ok=True)
             gates, _, _ = command([bb, "gates", "-b", bytecode, "-t", "evm"], root, env)
             row = {"variant": variant, "circuit": name, "gates": json.loads(gates)}
+            row["bytecode_sha256"] = hashlib.sha256(bytecode.read_bytes()).hexdigest()
             if not args.gates_only:
                 command([nargo, "execute", "--package", name, name], root, env)
                 command([bb, "write_vk", "-b", bytecode, "-o", out, "-t", "evm", "-c", crs], root, env)
                 samples = []
-                for _ in range(args.repetitions):
+                repetitions = results["large_repetitions"] if name in ("debit_4", "claim_2") else args.repetitions
+                for _ in range(repetitions):
                     _, seconds, rss = command([bb, "prove", "-b", bytecode, "-w", root / "target" / f"{name}.gz",
                                                "-k", out / "vk", "-o", out, "-t", "evm", "-c", crs], root, env)
                     command([bb, "verify", "-k", out / "vk", "-p", out / "proof", "-i", out / "public_inputs",

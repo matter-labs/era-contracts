@@ -15,7 +15,13 @@ contract ZKIPInsertionTest is ZKIPBase {
 
         // The batch end root includes both insertions. Accounting for only the first cannot reach it.
         (bool ok, , ) = _proveDebit(
-            A, _oneB(first.bundleA), _oneB(first.pre), _one(first.legOfA), usdcId, 100e6, "omitted_leg"
+            A,
+            _oneB(first.bundleA),
+            _oneB(first.pre),
+            _one(first.legOfA),
+            usdcId,
+            100e6,
+            "omitted_leg"
         );
         assertFalse(ok, "omitting a debit must not produce a proof");
         assertEq(caps.cap(A, usdcId), 100e6, "failed proof must not lock funds");

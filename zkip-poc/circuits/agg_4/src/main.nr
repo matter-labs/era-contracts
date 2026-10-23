@@ -1,7 +1,7 @@
 // Cross-chain aggregation of ZKIP proofs: one L1 verification for up to four chains' statements.
 //
 // Each slot recursively verifies one zero-knowledge UltraHonk proof (noir-recursive target) of an aggregatable
-// ZKIP circuit: debit_4, claim_1 or claim_2, all with 16 public inputs. The slot's inner public inputs are public
+// ZKIP circuit: debit_1, debit_4, claim_1 or claim_2, all with 16 public inputs. The slot's inner public inputs are public
 // here, and so is a Poseidon2 commitment to the verification key the slot was checked against; L1 applies a slot
 // only if that commitment belongs to an approved circuit of the slot's kind. Unused slots repeat a real proof and
 // L1 ignores them.

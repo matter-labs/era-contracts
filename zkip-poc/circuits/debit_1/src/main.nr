@@ -57,7 +57,6 @@ fn main(
             if o.origin_chain != chain_id {
                 apply_delta(&mut st, slots[k], o.asset_key, o.amount, false);
             }
-
         }
     }
     assert(imt == root_from_halves(imt_end_hi, imt_end_lo), "IMT end root");
