@@ -238,6 +238,7 @@ export const EMPTY_STRING_KECCAK = utils.keccak256("0x");
 export const GENESIS_BATCH_COMMITMENT = utils.hexZeroPad("0x01", 32);
 export const ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 export const ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
+export const PUBLIC_INPUT_SHIFT = 32;
 
 // L2DACommitmentScheme.EMPTY_NO_DA, from Config.sol.
 export const L2_DA_COMMITMENT_SCHEME_EMPTY_NO_DA = 1;

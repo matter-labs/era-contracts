@@ -21,6 +21,7 @@ import {
   GENESIS_BATCH_COMMITMENT,
   L2_DA_COMMITMENT_SCHEME_EMPTY_NO_DA,
   PROOF_ENCODING_VERSION,
+  PUBLIC_INPUT_SHIFT,
   STORED_BATCH_INFO_TUPLE_TYPE,
   ZKSYNC_OS_MOCK_PROOF_MAGIC,
   ZKSYNC_OS_MOCK_VERIFICATION_TYPE,
@@ -217,12 +218,13 @@ export class BatchSettler {
     }
 
     // ── Prove ──
-    const verifier = new ethers.Contract(await getters.getVerifier(), getAbi("ZKsyncOSTestnetVerifier"), this.provider);
+    // Computed here rather than by the chain's verifier: `MultiProofTestnetVerifier` (v0.35 chain states) has no
+    // `computeZKsyncOSHash`. Both testnet verifiers expect a single batch's commitment shifted by PUBLIC_INPUT_SHIFT.
     const proof = [
       ZKSYNC_OS_MOCK_VERIFICATION_TYPE,
       0, // no previous proof hash to chain onto
       ZKSYNC_OS_MOCK_PROOF_MAGIC,
-      await verifier.computeZKsyncOSHash(0, [storedBatch.commitment]),
+      BigNumber.from(storedBatch.commitment).shr(PUBLIC_INPUT_SHIFT),
     ];
     const proofData = encodeVersioned(
       PROOF_ENCODING_VERSION,

@@ -101,10 +101,12 @@ ANVIL_AMSTERDAM_BIN="$(scripts/install-amsterdam-anvil.sh "$HOME/.cache/anvil-am
 ```
 
 The L1 then runs `--hardfork amsterdam` at mainnet's 60M block gas limit, loaded from a copy of the
-fixture without its block history, which that build cannot parse. The L2s keep `ANVIL_BIN`;
-protocol-ops' forks use the `anvil` on `PATH` (v1.5.1 in CI). A canary first fails the run unless
-the binary's estimates for a few probe transactions match EIP-2780, EIP-7976, EIP-8037 and EIP-8038.
-EIP-8037 state gas lets a deploy's `tx.gas` exceed 2^24, so each L1 transaction declares its estimate.
+fixture without its block history, which that build cannot parse, and with its clock at the current
+time: that build resumes at the fixture's, minutes after 1970, too early to commit a batch. The L2s
+keep `ANVIL_BIN`; protocol-ops' forks use the `anvil` on `PATH` (v1.5.1 in CI). A canary first fails
+the run unless the binary's estimates for a few probe transactions match EIP-2780, EIP-7976, EIP-8037
+and EIP-8038. EIP-8037 state gas lets a deploy's `tx.gas` exceed 2^24, so each L1 transaction
+declares its estimate.
 
 Anvil runs one gas pool where Glamsterdam splits execution gas from a state gas reservoir, so every
 recorded transaction is read back from the node (prestate diff, refund counter, call tree) and
