@@ -10,7 +10,7 @@ Statements reach L1 one by one, or several at once in one aggregated proof.
 
 **Status: research code.**
 
-This branch moves debit IMT insertion checks into ZKIP, compacts aggregated settlement inputs, and adds transfer/hash benchmarks. See the
+This branch adds composable multi-chain accounting aggregation and private chain-admission membership, on top of proof-carried IMT checks and compact settlement inputs. See the
 [accounting design](../protocol-docs/zkip-accounting-poc.md) and [benchmark instructions](benchmarks/README.md).
 
 - It is not wired into the Executor or the native token vault: `contracts/src/mocks/` stands in for them.
@@ -46,26 +46,26 @@ This branch moves debit IMT insertion checks into ZKIP, compacts aggregated sett
   - **On L1:** bb's generated, optimized Solidity verifiers (`contracts/src/verifiers/`).
   - **Size classes:** debits of up to 1 or 4 legs (`debit_1`, `debit_4`), claims of up to 1 or 2 credits (`claim_1`,
     `claim_2`).
-- **Aggregation.** Each chain hands a zero-knowledge proof (bb's `noir-recursive` target) to an untrusted aggregator.
-  - **The aggregator** verifies each proof natively and drops the ones that fail. It then proves `agg_4`, which
-    recursively verifies up to four of them and exposes a digest binding each one's public inputs and VK commitment.
-  - **`submitAggregated`** verifies that one proof. It applies each slot whose VK commitment is an approved circuit of
-    its kind and whose public inputs are what L1 would hand that circuit now. Any other slot is skipped with
-    `SlotSkipped(reason)`, so a stale slot doesn't block the rest of the window.
-  - **Privacy:** the inner proofs are zero-knowledge, so the aggregator learns only what L1 sees.
-  - **Fallback:** a chain the aggregator leaves out can still submit directly.
-  - **Compact settlement:** the outer proof has 8 public fields rather than 68. L1 reconstructs each statement's
-    digest from authenticated state and the settlement data; the sixteen inner inputs are not repeated in calldata.
-    BLAKE2s is the selected target for source/finality hashes in the separate benchmark experiments.
-    [Measured settlement comparisons](benchmarks/SETTLEMENT.md) show about 3% lower submission gas,
-    with 14% more outer proving time.
+- **Aggregation.** Chains provide zero-knowledge accounting proofs to an untrusted aggregator.
+  - `agg_4` and the fixed `agg_16` experiment support small-window comparisons.
+  - The composable path uses `agg_leaf` (up to four accounting proofs), `agg_fold` (up to four recursive
+    nodes of different heights), and `agg_finalize` (one EVM wrapper). A node can represent any number
+    of enabled chains and accounting statements, within the documented depth/transaction limits.
+  - Independently produced per-chain nodes can be combined without the underlying accounting proof files.
+    The final proof always has six public fields. L1 authenticates its ordered statement-tree root, then
+    applies current statements with approved keys; stale/revoked slots are skipped independently.
+  - Claim source membership is private against a depth-32 admitted-chain tree, replacing the four-chain list.
+  - **Privacy:** aggregators learn the public accounting statements, not private balances, paths or counterparties.
+  - **Fallback:** a chain omitted by an aggregator can still submit directly.
+  - [Settlement measurements](benchmarks/SETTLEMENT.md) describe the earlier compact four-slot change;
+    [multi-chain measurements](benchmarks/MULTICHAIN.md) cover the larger wrapper and composable tree.
 
 ## Layout
 
 | Path              | What                                                                                                                                                                 |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `circuits/`       | Noir workspace: the `zkip_lite` library, the `debit_1`, `debit_4`, `claim_1`, `claim_2` circuits (each pair differs only in `N`) and the `agg_4` aggregation circuit |
-| `prover/prove.py` | Prover bridge for the tests (vm.ffi): builds the private witness, runs nargo and bb, writes VKs and verifiers (`setup`), and plays the aggregator (`aggregate`)      |
+| `circuits/`       | Noir workspace: the `zkip_lite` library, the `debit_1`, `debit_4`, `claim_1`, `claim_2` circuits (each pair differs only in `N`) and fixed-window/composable aggregation circuits |
+| `prover/prove.py` | Prover bridge for the tests (vm.ffi): builds the private witness, runs nargo and bb, writes VKs and verifiers (`setup`), and aggregates fixed windows or recursive nodes      |
 | `contracts/src/`  | `ZKIPLiteRegistry` (submissions, execute gate), `ImtInsertion`, errors, mocks, generated verifiers                                                                   |
 | `contracts/test/` | End-to-end tests on real proofs                                                                                                                                      |
 | `work/`           | Generated VKs, proofs and timings (ignored)                                                                                                                          |
@@ -156,4 +156,4 @@ pricing.
   - one bundle layout: ERC20 legs through the asset router.
 - **Refunds** of expired flows aren't covered.
 - **L1 cost.** A direct proof costs ~1M gas on L1, and a full aggregated window ~0.34M per statement.
-- **Aggregation depth.** More than 4 statements per L1 proof needs another recursion level, which isn't built.
+- **Practical capacity.** Recursive aggregation has a height limit of 30; admission has depth 32. L1 work and calldata still grow with exposed updates. These are PoC limits, not a production deployment.

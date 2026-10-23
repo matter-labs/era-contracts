@@ -1,0 +1,583 @@
+{
+  "machine": "macOS-27.0.1-arm64-arm-64bit",
+  "chip": "Apple M2 Max",
+  "memory_bytes": 34359738368,
+  "experiment_commit": "9fd238fb8ac71abc0daa01f8adcdfddd7e6083f1",
+  "working_tree_changes": true,
+  "registry_scope": "warmed Forge E2E calls + calldata 4/16 +21k per submission; not isolated cold transactions",
+  "fixed16_source_scope": "earlier fixed16 prototype before chain-admission/general-tree changes; current fingerprints cover composable17",
+  "fixed16_registry": [
+    {
+      "label": "large_baseline_0: submitAggregated",
+      "execution_gas": 1188848,
+      "calldata_gas": 196560,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1406408
+    },
+    {
+      "label": "large_baseline_1: submitAggregated",
+      "execution_gas": 1108193,
+      "calldata_gas": 195000,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1324193
+    },
+    {
+      "label": "large_baseline_2: submitAggregated",
+      "execution_gas": 1108946,
+      "calldata_gas": 194868,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1324814
+    },
+    {
+      "label": "large_baseline_3: submitAggregated",
+      "execution_gas": 1109700,
+      "calldata_gas": 194952,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1325652
+    },
+    {
+      "label": "large_full_16: submitAggregated",
+      "execution_gas": 1464395,
+      "calldata_gas": 250280,
+      "calldata_bytes": 20228,
+      "call_plus_calldata_and_base_gas": 1735675
+    }
+  ],
+  "recursive17_registry": [
+    {
+      "label": "recursive_baseline_0",
+      "execution_gas": 1147074,
+      "calldata_gas": 195456,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1363530
+    },
+    {
+      "label": "recursive_baseline_1",
+      "execution_gas": 1138516,
+      "calldata_gas": 195276,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1354792
+    },
+    {
+      "label": "recursive_baseline_2",
+      "execution_gas": 1158477,
+      "calldata_gas": 195768,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1375245
+    },
+    {
+      "label": "recursive_baseline_3",
+      "execution_gas": 1143399,
+      "calldata_gas": 195252,
+      "calldata_bytes": 13668,
+      "call_plus_calldata_and_base_gas": 1359651
+    },
+    {
+      "label": "recursive_baseline_4",
+      "execution_gas": 1016113,
+      "calldata_gas": 184968,
+      "calldata_bytes": 12420,
+      "call_plus_calldata_and_base_gas": 1222081
+    },
+    {
+      "label": "recursive_global",
+      "execution_gas": 1487111,
+      "calldata_gas": 243112,
+      "calldata_bytes": 19780,
+      "call_plus_calldata_and_base_gas": 1751223
+    }
+  ],
+  "standalone_scope": "cold final verifier + calldata 4/16 +21k base, Prague; no registry/STF",
+  "standalone_verifiers": [
+    {
+      "variant": "multichain",
+      "circuit": "agg_4",
+      "proof_bytes": 11072,
+      "public_input_bytes": 256,
+      "proof_sha256": "e59e245dd457cff0dc7e724a4f8a3b214e31ec94e2483a4020b1975f3a010178",
+      "execution_gas": 830215,
+      "calldata_gas": 177936,
+      "transaction_gas": 1029151,
+      "verifier_runtime_bytes": 18073
+    },
+    {
+      "variant": "multichain",
+      "circuit": "agg_16",
+      "proof_bytes": 11072,
+      "public_input_bytes": 1056,
+      "proof_sha256": "04a45eeedce1d127580f9b186ee11271c8cc4c3cf9333da509f49148cc385ec4",
+      "execution_gas": 838145,
+      "calldata_gas": 184100,
+      "transaction_gas": 1043245,
+      "verifier_runtime_bytes": 17753
+    },
+    {
+      "variant": "multichain",
+      "circuit": "agg_finalize",
+      "proof_bytes": 10304,
+      "public_input_bytes": 192,
+      "proof_sha256": "77d5c0ce637d2cfcc3517ba8a99eb0d76fffb2d53ed8170472a2cd5794c9f6cf",
+      "execution_gas": 792563,
+      "calldata_gas": 162944,
+      "transaction_gas": 976507,
+      "verifier_runtime_bytes": 17332
+    }
+  ],
+  "circuit_gates": {
+    "agg_4": {
+      "functions": [
+        {
+          "acir_opcodes": 34533,
+          "circuit_size": 3402153
+        }
+      ]
+    },
+    "agg_16": {
+      "functions": [
+        {
+          "acir_opcodes": 645,
+          "circuit_size": 3014471
+        }
+      ]
+    },
+    "agg_leaf": {
+      "functions": [
+        {
+          "acir_opcodes": 34930,
+          "circuit_size": 3437687
+        }
+      ]
+    },
+    "agg_fold": {
+      "functions": [
+        {
+          "acir_opcodes": 1200,
+          "circuit_size": 3050234
+        }
+      ]
+    },
+    "agg_finalize": {
+      "functions": [
+        {
+          "acir_opcodes": 303,
+          "circuit_size": 707115
+        }
+      ]
+    }
+  },
+  "aggregation_metrics_single_samples": [
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "large_full_16_child_0",
+      "real_slots": 4,
+      "execute_s": 0.3,
+      "prove_s": 26.68,
+      "peak_rss_mb": 4325,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "large_full_16_child_1",
+      "real_slots": 4,
+      "execute_s": 0.34,
+      "prove_s": 27.37,
+      "peak_rss_mb": 4313,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "large_full_16_child_2",
+      "real_slots": 4,
+      "execute_s": 0.3,
+      "prove_s": 27.72,
+      "peak_rss_mb": 4460,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "large_full_16_child_3",
+      "real_slots": 4,
+      "execute_s": 0.3,
+      "prove_s": 24.72,
+      "peak_rss_mb": 4568,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_16",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "large_full_16",
+      "real_slots": 16,
+      "execute_s": 0.22,
+      "prove_s": 22.56,
+      "peak_rss_mb": 4171,
+      "proof_bytes": 11072
+    },
+    {
+      "threads": "4",
+      "kind": "aggregation_request",
+      "tag": "large_full_16",
+      "capacity": 16,
+      "real_slots": 16,
+      "wall_s": 131.05
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_leaf",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_chain_0_leaf_0",
+      "real_slots": 4,
+      "execute_s": 0.86,
+      "prove_s": 26.41,
+      "peak_rss_mb": 4224,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_leaf",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_chain_0_leaf_1",
+      "real_slots": 1,
+      "execute_s": 0.29,
+      "prove_s": 24.2,
+      "peak_rss_mb": 4585,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_fold",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_chain_0_fold_0_0",
+      "real_slots": 5,
+      "execute_s": 0.23,
+      "prove_s": 21.33,
+      "peak_rss_mb": 4008,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "kind": "recursive_request",
+      "tag": "recursive_chain_0",
+      "finalize": false,
+      "real_slots": 5,
+      "height": 1,
+      "wall_s": 73.54
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_leaf",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_chain_1_leaf_0",
+      "real_slots": 3,
+      "execute_s": 0.31,
+      "prove_s": 25.51,
+      "peak_rss_mb": 4417,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "kind": "recursive_request",
+      "tag": "recursive_chain_1",
+      "finalize": false,
+      "real_slots": 3,
+      "height": 0,
+      "wall_s": 25.96
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_leaf",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_chain_2_leaf_0",
+      "real_slots": 3,
+      "execute_s": 0.31,
+      "prove_s": 25.93,
+      "peak_rss_mb": 4722,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "kind": "recursive_request",
+      "tag": "recursive_chain_2",
+      "finalize": false,
+      "real_slots": 3,
+      "height": 0,
+      "wall_s": 26.37
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_leaf",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_chain_3_leaf_0",
+      "real_slots": 3,
+      "execute_s": 0.3,
+      "prove_s": 24.74,
+      "peak_rss_mb": 4633,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "kind": "recursive_request",
+      "tag": "recursive_chain_3",
+      "finalize": false,
+      "real_slots": 3,
+      "height": 0,
+      "wall_s": 25.16
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_leaf",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_chain_4_leaf_0",
+      "real_slots": 3,
+      "execute_s": 0.3,
+      "prove_s": 24.72,
+      "peak_rss_mb": 4578,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "kind": "recursive_request",
+      "tag": "recursive_chain_4",
+      "finalize": false,
+      "real_slots": 3,
+      "height": 0,
+      "wall_s": 25.14
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "recursive_baseline_0",
+      "real_slots": 4,
+      "execute_s": 0.79,
+      "prove_s": 24.06,
+      "peak_rss_mb": 4463,
+      "proof_bytes": 11072
+    },
+    {
+      "threads": "4",
+      "kind": "aggregation_request",
+      "tag": "recursive_baseline_0",
+      "capacity": 4,
+      "real_slots": 4,
+      "wall_s": 24.97
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "recursive_baseline_1",
+      "real_slots": 4,
+      "execute_s": 0.29,
+      "prove_s": 24.6,
+      "peak_rss_mb": 4521,
+      "proof_bytes": 11072
+    },
+    {
+      "threads": "4",
+      "kind": "aggregation_request",
+      "tag": "recursive_baseline_1",
+      "capacity": 4,
+      "real_slots": 4,
+      "wall_s": 25.01
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "recursive_baseline_2",
+      "real_slots": 4,
+      "execute_s": 0.3,
+      "prove_s": 24.87,
+      "peak_rss_mb": 4809,
+      "proof_bytes": 11072
+    },
+    {
+      "threads": "4",
+      "kind": "aggregation_request",
+      "tag": "recursive_baseline_2",
+      "capacity": 4,
+      "real_slots": 4,
+      "wall_s": 25.29
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "recursive_baseline_3",
+      "real_slots": 4,
+      "execute_s": 0.29,
+      "prove_s": 24.51,
+      "peak_rss_mb": 4576,
+      "proof_bytes": 11072
+    },
+    {
+      "threads": "4",
+      "kind": "aggregation_request",
+      "tag": "recursive_baseline_3",
+      "capacity": 4,
+      "real_slots": 4,
+      "wall_s": 24.92
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "recursive_baseline_4",
+      "real_slots": 1,
+      "execute_s": 0.32,
+      "prove_s": 25.1,
+      "peak_rss_mb": 4350,
+      "proof_bytes": 11072
+    },
+    {
+      "threads": "4",
+      "kind": "aggregation_request",
+      "tag": "recursive_baseline_4",
+      "capacity": 4,
+      "real_slots": 1,
+      "wall_s": 25.51
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_fold",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_global_fold_0_0",
+      "real_slots": 14,
+      "execute_s": 0.41,
+      "prove_s": 21.64,
+      "peak_rss_mb": 4510,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_fold",
+      "target": "noir-recursive",
+      "kind": "aggregate",
+      "tag": "recursive_global_fold_1_0",
+      "real_slots": 17,
+      "execute_s": 0.2,
+      "prove_s": 20.44,
+      "peak_rss_mb": 4428,
+      "proof_bytes": 14656
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_finalize",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "recursive_global",
+      "real_slots": 17,
+      "execute_s": 0.21,
+      "prove_s": 5.32,
+      "peak_rss_mb": 1141,
+      "proof_bytes": 10304
+    },
+    {
+      "threads": "4",
+      "kind": "recursive_request",
+      "tag": "recursive_global",
+      "finalize": true,
+      "real_slots": 17,
+      "height": 3,
+      "wall_s": 48.45
+    },
+    {
+      "threads": "4",
+      "circuit": "agg_4",
+      "target": "evm",
+      "kind": "aggregate",
+      "tag": "recursive_fifth_counterleg_agg",
+      "real_slots": 1,
+      "execute_s": 0.24,
+      "prove_s": 24.6,
+      "peak_rss_mb": 4570,
+      "proof_bytes": 11072
+    },
+    {
+      "threads": "4",
+      "kind": "aggregation_request",
+      "tag": "recursive_fifth_counterleg_agg",
+      "capacity": 4,
+      "real_slots": 1,
+      "wall_s": 24.93
+    }
+  ],
+  "source_sha256": {
+    "benchmarks/BenchmarkGasConfig.sol": "c8b7edff7512927470c28ec6b42777bac80c17568d787aadea7a81d579c265ee",
+    "benchmarks/VerifierBench.t.sol": "852d14f5649db1d1792806d3245708b9a549f5b0939dc522a9c4a974cab56c06",
+    "benchmarks/multichain.py": "daebe7171aef730f273ceeb093d070fd14ee403fff146a87fe80c38a90dadb45",
+    "circuits/agg_16/src/main.nr": "729e325294c1607bc8c0b2d2f0e06684c54fee89c06615595bb876e8985296db",
+    "circuits/agg_4/src/main.nr": "4d05a47bb093fd42bbe02f6dbd1ade380069692593fc32e8aa91e2277808acd5",
+    "circuits/agg_finalize/src/main.nr": "201218e73a621f1ff72e037a0eddddc595852fe81f463f9f9b935deebec1d112",
+    "circuits/agg_fold/src/main.nr": "d06e1e71b8a83556a8eb2b81872982d516a7198787c0a344d8986997285a5c5c",
+    "circuits/agg_leaf/src/main.nr": "b1ee0c635fc34afa0bfbd9ac19bea64f8bbce6882d1d67e2252ecae9881c602a",
+    "circuits/claim_1/src/main.nr": "fa2955701e00a31bb3cea25bce13a4d9b4eb9e40664b65380e3ada6a9967127f",
+    "circuits/claim_2/src/main.nr": "03d39d1391696b2444c0b4b483aa66780447c493434932c61054e5093ee22d4a",
+    "circuits/debit_1/src/main.nr": "fa3040284eee4820459e99ca5bffec76934a282e9c28b94dc8aec1d13ae98cc5",
+    "circuits/debit_4/src/main.nr": "31bf44bd52338787e64e848da4cea7657d964812c0c2d03cd86d31fd2b7bfc98",
+    "circuits/zkip_lite/src/aggregation.nr": "28ef8fbe1fd19f4f2fa04d0b7c1b22fa9058276fecea434bf7ed725410f7b54e",
+    "circuits/zkip_lite/src/aggregation_constants.nr": "de672b228c7f81cb4bef26e028097fcbbb96c9dbca288bd16ec0518c2062e0cb",
+    "circuits/zkip_lite/src/chain_registry.nr": "59d95b96efe3b0dde0301ac222afcaa75a3446777b24d91b26e32438232e68d1",
+    "circuits/zkip_lite/src/chain_registry_constants.nr": "4c9056338bb873097e2d55b19932a97463d459ee108ab55eb1fca5e67184a502",
+    "circuits/zkip_lite/src/imt.nr": "3ee32b06b0efa44e25c0e5eaef483449ba47ed2f2b62b184449004e980c9138a",
+    "circuits/zkip_lite/src/imt_constants.nr": "61af1e0194cc90b2411bf68e14eed562714afbdb5ab3a5ab014282cc1ce945f7",
+    "circuits/zkip_lite/src/lib.nr": "9ea8ac09b4c98cc938e68cd00bcb3944d2c97635ce4db44b9a24838173636ea7",
+    "circuits/zkip_lite/src/recursive_aggregation.nr": "f720ede55a02741be3edb4fa9bcc7f799737e015b33ed6747dbecf09452501c6",
+    "contracts/foundry.toml": "fa217880dcd53e1e9dd7c8cb6dffc687a320b9d699fe4b45d9f96696b3ba9f82",
+    "contracts/src/AggregationTree.sol": "00f6c54992719eea94fd51208a83041196b8e40a483e91e7db61ce2c0963d8ef",
+    "contracts/src/ChainRegistryConfig.sol": "fa58ba5eefdbf68bf98cbc5730db8217cc147209fb9485d99d77ca381732399f",
+    "contracts/src/ChainRegistryHash.sol": "515109b6470aec6669591fb3108101360caa72ead34e2e73c56b0885284e7331",
+    "contracts/src/ImtInsertion.sol": "354e810c6b1c884e0d350489efa127792864f6ccc151d4d5a6110bfb4bea5f90",
+    "contracts/src/RevertWith.sol": "d04fbe1a55aad0c2ef6d655cf11921daeb84de17512d0e0776f4a93a0814ee86",
+    "contracts/src/ZKIPLiteConfig.sol": "4bb86e62c36bf6ab3f6a53d3a13804d6974a2855e05770a1265c7417bfb57bab",
+    "contracts/src/ZKIPLiteErrors.sol": "49036d841e31617aa18c672878030e80ede8d48a883c36149f8f4133ca3ae838",
+    "contracts/src/ZKIPLiteRegistry.sol": "21f20f399ed8115d687f14d30b17b7901bdb989ea951200d549c0f36a7e9823a",
+    "contracts/test/ZKIPAgg.t.sol": "f8c0ae399e90202c99df7b3d04620cd9e00c923e1c65a03329622866201c5e0a",
+    "contracts/test/ZKIPInsertion.t.sol": "761cfcc0a42f3902bb754319068f5bbcb222a1d6b6747e02f1e786bcf160a6c1",
+    "contracts/test/ZKIPLargeAgg.t.sol": "2531905dc8719203df902e9ff4ee53122e6dadf0341fecdbad64b94fa2ffac3b",
+    "contracts/test/ZKIPLite.t.sol": "00d439ee08a327a2a82f1583a5456ad8b915e5d26ae6d05798f1ee821daf0afc",
+    "contracts/test/ZKIPRecursiveAgg.t.sol": "0427785c04761223111f0dc3152089d612c01218bf0248bb57ae61b2293767f0",
+    "contracts/test/ZKIPRegistryMembership.t.sol": "567c8ef1f79f616a64c6e0a9383d2943cbc786dc4662e427a4fb80c446d90ed8",
+    "contracts/test/helpers/LegBuilder.sol": "d969cbace0856a278bdc9deadb9cce78b44ebefb3f4fc6324558445aaca36c82",
+    "contracts/test/helpers/ZKIPBase.sol": "d6b2b4dbfd4040bdfb4ea2e28a1d8a8acffdc0a049f1cf512d4e9f93d7db3690",
+    "contracts/test/helpers/ZKIPTestConfig.sol": "89f889d2f658fb9b5afe8643c26732246ff346cd62713b4788cbd596f8a7e832",
+    "prover/chain_registry.py": "560635725ae5a7d4f28334995a1cb8cc8dca1c04c8f2b5b194bdf69d574bd3ac",
+    "prover/generate_registry_config.py": "b5ec4ebfaab49e01ad8fea8a696885fcfb8e69e9d5c843725204b9b9defb761e",
+    "prover/keccak.py": "a5a1ec14c447b4e28e2ad2320db5a40a1294a5fa31e3915009a546e6b44235e3",
+    "prover/poseidon2.py": "30b0d1f0895e0cfd4d804a53f1a87573256aea00e14a52eb559f44b895717784",
+    "prover/prove.py": "679a27a550bf81eedd805a930b7f45a32faf821eb427f084286454d192b341e5",
+    "prover/recursive_aggregation.py": "52f1494c0e52005202cb2cca560a5ad95e9a5b0239fd04b37030c9deb168c413",
+    "prover/test_recursive_aggregation.py": "7d42e4c4455030b709166aa19b497b3e5572cfca75b1dbfe1812abc561c270de"
+  },
+  "log_sha256": {
+    "multichain-full-window.log": "83ecdadebe3c9604e180b1dff18b81eaf405064c5180697cb48407cf929cc0a4",
+    "recursive-full-window.log": "fd71bb433cfcca0517ebf083c87045f1b9598a4e92f816dccdfc55c17a4f422f"
+  }
+}

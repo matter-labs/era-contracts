@@ -5,9 +5,26 @@ import {ChainBatchRootTree} from "era/common/libraries/ChainBatchRootTree.sol";
 import {StoredInteropRoot} from "era/common/Messaging.sol";
 import {MockCaps} from "./mocks/MockCaps.sol";
 import {MockMessageRoot} from "./mocks/MockMessageRoot.sol";
+import {ChainRegistryHash} from "./ChainRegistryHash.sol";
+import {
+    CHAIN_REGISTRY_DEPTH,
+    CHAIN_REGISTRY_CAPACITY,
+    CHAIN_REGISTRY_EMPTY_ROOT,
+    REGISTRY_FIELD,
+    REGISTRY_ROUND_CONSTANTS,
+    registryRoundConstants,
+    registryZeros
+} from "./ChainRegistryConfig.sol";
+import {AggregationTree} from "./AggregationTree.sol";
 import {revertWith} from "./RevertWith.sol";
 import {
     AGGREGATED_DIGEST_INPUTS,
+    AGGREGATED_SMALL_SLOTS,
+    AGGREGATED_LARGE_SLOTS,
+    AGGREGATED_CHILD_KEY_INPUTS,
+    DIGEST_LIMB_BITS,
+    RECURSIVE_AGGREGATION_INPUTS,
+    RECURSIVE_AGGREGATION_MAX_HEIGHT,
     AGGREGATED_STATEMENT_DOMAIN,
     DEBIT_1_CIRCUIT_ID,
     ZKIP_STATEMENT_INPUTS
@@ -74,13 +91,26 @@ contract ZKIPLiteRegistry {
         bytes proof;
     }
 
-    /// @notice One agg_4 proof and the L1 data of the statements in its slots.
+    /// @notice One aggregate proof and the L1 data of the statements in its slots.
     /// @dev `publicInputs` contains each slot's statement digest as two 128-bit halves. The digest binds the VK
-    /// commitment and all 16 inner inputs. Debit and claim data follow slot order, with `proof` empty.
+    /// commitment and all 16 inner inputs. The 16-slot wrapper prepends its child-key commitment.
+    /// Debit and claim data follow slot order, with `proof` empty.
     struct AggregatedSubmission {
         bytes proof;
         bytes32[] publicInputs;
-        bytes32[4] vkCommitments;
+        bytes32[] vkCommitments;
+        uint8[] kinds;
+        DebitSubmission[] debits;
+        ClaimSubmission[] claims;
+    }
+
+    /// @notice A recursively aggregated tree and the ordered statements committed by its root.
+    struct RecursiveSubmission {
+        bytes proof;
+        bytes32[] publicInputs;
+        bytes32[] statementDigests;
+        bytes shape;
+        bytes32[] vkCommitments;
         uint8[] kinds;
         DebitSubmission[] debits;
         ClaimSubmission[] claims;
@@ -94,13 +124,11 @@ contract ZKIPLiteRegistry {
         bytes32 executedImtRoot;
     }
 
-    uint256 internal constant MAX_ZKIP_CHAINS = 4;
     uint256 internal constant DEBIT_SMALL = 1;
     uint256 internal constant DEBIT_LARGE = 4;
     uint256 internal constant CLAIM_SMALL = 1;
     uint256 internal constant CLAIM_LARGE = 2;
     uint256 internal constant ANCHORS = 2;
-    uint256 internal constant AGG_SLOTS = 4;
     uint8 internal constant SLOT_UNUSED = 0;
     uint8 internal constant SLOT_DEBIT = 1;
     uint8 internal constant SLOT_CLAIM = 2;
@@ -117,11 +145,17 @@ contract ZKIPLiteRegistry {
 
     mapping(uint256 maxLegs => IHonkVerifier) public debitVerifier;
     mapping(uint256 maxCredits => IHonkVerifier) public claimVerifier;
-    uint256[MAX_ZKIP_CHAINS] public zkipChains;
-    uint256 public zkipChainCount;
+    uint256[] public zkipChains;
+    uint256 public chainRegistryRoot = CHAIN_REGISTRY_EMPTY_ROOT;
+    uint256[CHAIN_REGISTRY_DEPTH] private chainRegistryFrontier;
     mapping(uint256 chainId => ChainState) public chains;
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 imtTransition)) public provenBatch;
     IHonkVerifier public aggVerifier;
+    IHonkVerifier public agg16Verifier;
+    bytes32 public agg4RecursiveVkCommitment;
+    IHonkVerifier public recursiveVerifier;
+    bytes32 public recursiveBaseVkCommitment;
+    bytes32 public recursiveFoldVkCommitment;
     mapping(bytes32 vkCommitment => uint256 circuit) public aggCircuit;
 
     event ChainEnabled(uint256 indexed chainId, bytes32 stateRoot);
@@ -174,14 +208,55 @@ contract ZKIPLiteRegistry {
         }
     }
 
+    /// @notice Registers the 16-slot verifier and the recursive agg_4 key it may wrap.
+    /// @param _verifier The agg_16 verifier.
+    /// @param _childVkCommitment Poseidon2 commitment to the noir-recursive agg_4 key.
+    function setAggregation16(IHonkVerifier _verifier, bytes32 _childVkCommitment) external {
+        require(msg.sender == owner, OnlyOwner());
+        agg16Verifier = _verifier;
+        agg4RecursiveVkCommitment = _childVkCommitment;
+    }
+
+    /// @notice Registers the final wrapper and the recursive base/fold key family.
+    /// @param _verifier The final EVM wrapper verifier.
+    /// @param _baseVkCommitment The noir-recursive agg_leaf key commitment.
+    /// @param _foldVkCommitment The noir-recursive agg_fold key commitment.
+    function setRecursiveAggregation(
+        IHonkVerifier _verifier,
+        bytes32 _baseVkCommitment,
+        bytes32 _foldVkCommitment
+    ) external {
+        require(msg.sender == owner, OnlyOwner());
+        recursiveVerifier = _verifier;
+        recursiveBaseVkCommitment = _baseVkCommitment;
+        recursiveFoldVkCommitment = _foldVkCommitment;
+    }
+
     /// @notice Makes a fresh chain a ZKIP chain (owner-only, one-way).
     /// @param _chainId The chain id.
     /// @param _chain The chain's contract (batch roots, execute gate caller).
     /// @param _initialStateRoot The root of an empty ZKIP state.
     function enableChain(uint256 _chainId, address _chain, bytes32 _initialStateRoot) external {
         require(msg.sender == owner, OnlyOwner());
-        require(zkipChainCount < MAX_ZKIP_CHAINS, TooManyChains());
-        zkipChains[zkipChainCount++] = _chainId;
+        uint256 index = zkipChains.length;
+        require(index < CHAIN_REGISTRY_CAPACITY, TooManyChains());
+        require(
+            _chainId != 0 && _chainId < REGISTRY_FIELD && _chain != address(0) && chains[_chainId].chain == address(0),
+            InvalidProof()
+        );
+        uint256[REGISTRY_ROUND_CONSTANTS] memory rc = registryRoundConstants();
+        uint256[CHAIN_REGISTRY_DEPTH + 1] memory zeros = registryZeros();
+        uint256 node = ChainRegistryHash.leaf(_chainId, rc);
+        for (uint256 level = 0; level < CHAIN_REGISTRY_DEPTH; ++level) {
+            if ((index >> level) & 1 == 0) {
+                chainRegistryFrontier[level] = node;
+                node = ChainRegistryHash.pair(node, zeros[level], rc);
+            } else {
+                node = ChainRegistryHash.pair(chainRegistryFrontier[level], node, rc);
+            }
+        }
+        chainRegistryRoot = node;
+        zkipChains.push(_chainId);
         chains[_chainId] = ChainState({
             chain: _chain,
             stateRoot: _initialStateRoot,
@@ -190,6 +265,11 @@ contract ZKIPLiteRegistry {
             executedImtRoot: ChainBatchRootTree.EMPTY_IMT_ROOT
         });
         emit ChainEnabled(_chainId, _initialStateRoot);
+    }
+
+    /// @notice Number of admitted chains; claims prove their sources belong to chainRegistryRoot privately.
+    function zkipChainCount() external view returns (uint256) {
+        return zkipChains.length;
     }
 
     /// @notice Proves the debit of every leg a committed batch appended to the chain's IMT.
@@ -221,13 +301,22 @@ contract ZKIPLiteRegistry {
     /// circuit now (e.g. its chain proved the batch directly meanwhile), is skipped with `SlotSkipped`.
     /// @param _s The aggregated proof and its slots' data.
     function submitAggregated(AggregatedSubmission calldata _s) external {
+        uint256 slots = _s.kinds.length;
+        require(slots == AGGREGATED_SMALL_SLOTS || slots == AGGREGATED_LARGE_SLOTS, BadAggregate());
+        uint256 offset = slots == AGGREGATED_LARGE_SLOTS ? AGGREGATED_CHILD_KEY_INPUTS : 0;
         require(
-            _s.kinds.length == AGG_SLOTS && _s.publicInputs.length == AGG_SLOTS * AGGREGATED_DIGEST_INPUTS,
+            _s.vkCommitments.length == slots && _s.publicInputs.length == slots * AGGREGATED_DIGEST_INPUTS + offset,
             BadAggregate()
         );
+        if (offset != 0) {
+            require(
+                agg4RecursiveVkCommitment != bytes32(0) && _s.publicInputs[0] == agg4RecursiveVkCommitment,
+                BadAggregate()
+            );
+        }
         uint256 debitCount;
         uint256 claimCount;
-        for (uint256 i = 0; i < AGG_SLOTS; ++i) {
+        for (uint256 i = 0; i < slots; ++i) {
             if (_s.kinds[i] == SLOT_DEBIT) {
                 ++debitCount;
             } else if (_s.kinds[i] == SLOT_CLAIM) {
@@ -237,26 +326,81 @@ contract ZKIPLiteRegistry {
             }
         }
         require(_s.debits.length == debitCount && _s.claims.length == claimCount, BadAggregate());
-        _verify(aggVerifier, _s.proof, _s.publicInputs);
+        _verify(slots == AGGREGATED_SMALL_SLOTS ? aggVerifier : agg16Verifier, _s.proof, _s.publicInputs);
         uint256 nextDebit;
         uint256 nextClaim;
-        for (uint256 i = 0; i < AGG_SLOTS; ++i) {
+        for (uint256 i = 0; i < slots; ++i) {
             uint8 kind = _s.kinds[i];
             if (kind == SLOT_UNUSED) {
                 continue;
             }
-            bytes32[] calldata pi = _s.publicInputs[i * AGGREGATED_DIGEST_INPUTS:(i + 1) * AGGREGATED_DIGEST_INPUTS];
+            bytes32[] calldata pi = _s.publicInputs[
+                offset + i * AGGREGATED_DIGEST_INPUTS:offset + (i + 1) * AGGREGATED_DIGEST_INPUTS
+            ];
             bytes32 vkCommitment = _s.vkCommitments[i];
             bytes memory skipped;
             if (kind == SLOT_DEBIT) {
-                skipped = _aggregatedDebit(_s.debits[nextDebit++], vkCommitment, pi);
+                skipped = _aggregatedDebit(_s.debits[nextDebit++], vkCommitment, _join(pi[0], pi[1]));
             } else if (kind == SLOT_CLAIM) {
-                skipped = _aggregatedClaim(_s.claims[nextClaim++], vkCommitment, pi);
+                skipped = _aggregatedClaim(_s.claims[nextClaim++], vkCommitment, _join(pi[0], pi[1]));
             } else {
                 revert BadAggregate();
             }
             if (skipped.length != 0) {
                 emit SlotSkipped(i, kind, skipped);
+            }
+        }
+    }
+
+    /// @notice Verifies one final proof and applies its ordered statements from any enabled chains.
+    /// @param _s The recursive proof, its committed statement digests and settlement data.
+    function submitRecursive(RecursiveSubmission calldata _s) external {
+        uint256 slots = _s.kinds.length;
+        require(
+            slots != 0 &&
+                _s.publicInputs.length == RECURSIVE_AGGREGATION_INPUTS &&
+                _s.statementDigests.length == slots &&
+                _s.vkCommitments.length == slots,
+            BadAggregate()
+        );
+        require(
+            recursiveBaseVkCommitment != bytes32(0) &&
+                recursiveFoldVkCommitment != bytes32(0) &&
+                _s.publicInputs[0] == recursiveBaseVkCommitment &&
+                _s.publicInputs[1] == recursiveFoldVkCommitment &&
+                uint256(_s.publicInputs[2]) == slots &&
+                uint256(_s.publicInputs[3]) <= RECURSIVE_AGGREGATION_MAX_HEIGHT,
+            BadAggregate()
+        );
+        uint256 debitCount;
+        uint256 claimCount;
+        for (uint256 i = 0; i < slots; ++i) {
+            if (_s.kinds[i] == SLOT_DEBIT) {
+                ++debitCount;
+            } else if (_s.kinds[i] == SLOT_CLAIM) {
+                ++claimCount;
+            } else {
+                require(_s.kinds[i] == SLOT_UNUSED, BadAggregate());
+            }
+        }
+        require(_s.debits.length == debitCount && _s.claims.length == claimCount, BadAggregate());
+        _verify(recursiveVerifier, _s.proof, _s.publicInputs);
+        require(
+            AggregationTree.root(_s.statementDigests, _s.shape, uint256(_s.publicInputs[3])) ==
+                _join(_s.publicInputs[4], _s.publicInputs[5]),
+            BadAggregate()
+        );
+        uint256 nextDebit;
+        uint256 nextClaim;
+        for (uint256 i = 0; i < slots; ++i) {
+            bytes memory skipped;
+            if (_s.kinds[i] == SLOT_DEBIT) {
+                skipped = _aggregatedDebit(_s.debits[nextDebit++], _s.vkCommitments[i], _s.statementDigests[i]);
+            } else if (_s.kinds[i] == SLOT_CLAIM) {
+                skipped = _aggregatedClaim(_s.claims[nextClaim++], _s.vkCommitments[i], _s.statementDigests[i]);
+            }
+            if (skipped.length != 0) {
+                emit SlotSkipped(i, _s.kinds[i], skipped);
             }
         }
     }
@@ -289,7 +433,7 @@ contract ZKIPLiteRegistry {
     function _aggregatedDebit(
         DebitSubmission calldata _d,
         bytes32 _vkCommitment,
-        bytes32[] calldata _pi
+        bytes32 _digest
     ) internal returns (bytes memory err) {
         uint256 circuit = aggCircuit[_vkCommitment];
         if (circuit != CIRCUIT_DEBIT_1 && circuit != CIRCUIT_DEBIT_4) {
@@ -299,7 +443,7 @@ contract ZKIPLiteRegistry {
         bytes32 imtRoot;
         uint256 leafCount;
         (err, pi, imtRoot, leafCount) = _checkDebit(_d, circuit == CIRCUIT_DEBIT_1 ? DEBIT_SMALL : DEBIT_LARGE);
-        if (err.length == 0 && !_statementMatches(_vkCommitment, pi, _pi)) {
+        if (err.length == 0 && !_statementMatches(_vkCommitment, pi, _digest)) {
             err = abi.encodeWithSelector(SlotInputsMismatch.selector);
         }
         if (err.length == 0) {
@@ -312,7 +456,7 @@ contract ZKIPLiteRegistry {
     function _aggregatedClaim(
         ClaimSubmission calldata _c,
         bytes32 _vkCommitment,
-        bytes32[] calldata _pi
+        bytes32 _digest
     ) internal returns (bytes memory err) {
         uint256 size = _c.numCredits <= CLAIM_SMALL ? CLAIM_SMALL : CLAIM_LARGE;
         if (aggCircuit[_vkCommitment] != (size == CLAIM_SMALL ? CIRCUIT_CLAIM_1 : CIRCUIT_CLAIM_2)) {
@@ -320,7 +464,7 @@ contract ZKIPLiteRegistry {
         }
         bytes32[] memory pi;
         (err, pi) = _checkClaim(_c, size);
-        if (err.length == 0 && !_statementMatches(_vkCommitment, pi, _pi)) {
+        if (err.length == 0 && !_statementMatches(_vkCommitment, pi, _digest)) {
             err = abi.encodeWithSelector(SlotInputsMismatch.selector);
         }
         if (err.length == 0) {
@@ -331,12 +475,13 @@ contract ZKIPLiteRegistry {
     function _statementMatches(
         bytes32 _vkCommitment,
         bytes32[] memory _inputs,
-        bytes32[] calldata _digest
+        bytes32 _digest
     ) internal pure returns (bool) {
-        (bytes32 hi, bytes32 lo) = _split(
-            keccak256(abi.encodePacked(AGGREGATED_STATEMENT_DOMAIN, _vkCommitment, _inputs))
-        );
-        return _digest[0] == hi && _digest[1] == lo;
+        return _digest == keccak256(abi.encodePacked(AGGREGATED_STATEMENT_DOMAIN, _vkCommitment, _inputs));
+    }
+
+    function _join(bytes32 _hi, bytes32 _lo) internal pure returns (bytes32) {
+        return bytes32((uint256(_hi) << DIGEST_LIMB_BITS) | uint256(_lo));
     }
 
     /// @notice The L1 checks of a debit, and the public inputs its circuit of `_size` legs was proven against.
@@ -428,9 +573,8 @@ contract ZKIPLiteRegistry {
             }
             (pi[5 + i], pi[7 + i]) = _split(anchor.root);
         }
-        for (uint256 i = 0; i < MAX_ZKIP_CHAINS; ++i) {
-            pi[9 + i] = bytes32(zkipChains[i]);
-        }
+        pi[9] = bytes32(chainRegistryRoot);
+        pi[10] = bytes32(zkipChains.length);
         (pi[13], pi[14]) = _split(_s.unlockAssetId);
         pi[15] = bytes32(_s.unlockAmount);
     }

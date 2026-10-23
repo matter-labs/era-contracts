@@ -5,7 +5,9 @@
   python3 -I prove.py vk-commits                              # VK commitments of the aggregatable circuits
   python3 -I prove.py debit <size> <witness.json> <state_in> <state_out> <out_dir> [evm|rec]
   python3 -I prove.py claim <size> <witness.json> <state_in> <state_out> <out_dir> [evm|rec]
-  python3 -I prove.py aggregate <manifest.json> <out_dir>     # the aggregator: one agg_4 proof for L1
+  python3 -I prove.py aggregate <manifest.json> <out_dir>     # fixed 4/16-slot EVM aggregate
+  python3 -I prove.py aggregate-node <manifest.json> <out_dir> # composable noir-recursive node
+  python3 -I prove.py aggregate-recursive <manifest.json> <out_dir> # final EVM wrapper of a node tree
 
 The forge test supplies the public L1/L2 data (bundles, flow preimages, IMT and message-root paths) as a flat
 witness JSON. This script adds the chain's private ZKIP state (balances and the consumed set), writes the
@@ -55,6 +57,7 @@ TAG = bytes.fromhex("3445134c")
 CIRCUIT_NAMES = ["debit_1", "debit_4", "claim_1", "claim_2"]
 AGG_INNER = ["debit_1", "debit_4", "claim_1", "claim_2"]  # normalized to 16 public inputs
 AGG_SLOTS = 4
+AGG_LARGE_SLOTS = AGG_SLOTS * AGG_SLOTS
 STATEMENT_DOMAIN = keccak256(b"zkSync:ZKIP:aggregatedStatement:v1")
 
 
@@ -257,9 +260,28 @@ def statement_digest(vk_commitment, public_inputs):
     return list(hi_lo(digest))
 
 
+def prove_aggregation(name, toml, out_dir, target, expected, real_slots):
+    tag = Path(out_dir).name
+    key = (VK_REC_DIR if target == "noir-recursive" else VK_DIR) / name / "vk"
+    (CIRCUITS / name / ("Prover_" + tag + ".toml")).write_text("\n".join(toml) + "\n")
+    _, ex_wall, _ = run([NARGO, "execute", "--prover-name", "Prover_" + tag, tag], cwd=CIRCUITS / name)
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    _, wall, rss = run([BB, "prove", "-b", CIRCUITS / "target" / (name + ".json"), "-w", CIRCUITS / "target" / (tag + ".gz"),
+                        "-k", key, "-o", out_dir, "-t", target, "-c", CRS], timed=True)
+    assert fields(Path(out_dir) / "public_inputs") == expected, "aggregate statement digest mismatch"
+    run([BB, "verify", "-k", key, "-p", Path(out_dir) / "proof",
+         "-i", Path(out_dir) / "public_inputs", "-t", target, "-c", CRS])
+    record({"circuit": name, "target": target, "kind": "aggregate", "tag": tag, "real_slots": real_slots,
+            "execute_s": round(ex_wall, 2), "prove_s": round(wall, 2),
+            "peak_rss_mb": round(rss / 2 ** 20) if rss else None,
+            "proof_bytes": (Path(out_dir) / "proof").stat().st_size})
+
+
 def aggregate(manifest, out_dir):
+    started = time.monotonic()
     slots = json.loads(Path(manifest).read_text())["slots"]
-    assert 0 < len(slots) <= AGG_SLOTS, "agg_4 takes 1 to 4 proofs"
+    assert 0 < len(slots) <= AGG_LARGE_SLOTS, "aggregation takes 1 to 16 proofs"
+    capacity = AGG_SLOTS if len(slots) <= AGG_SLOTS else AGG_LARGE_SLOTS
     included = []
     for s in slots:
         d, vk = Path(s["dir"]), VK_REC_DIR / s["circuit"] / "vk"
@@ -273,28 +295,36 @@ def aggregate(manifest, out_dir):
     use = [s for s, ok in zip(slots, included) if ok]
     if not use:
         raise SystemExit("aggregator: no valid proof to aggregate")
-    use += [use[0]] * (AGG_SLOTS - len(use))
-    tag = Path(out_dir).name
-    toml = ["vks = " + arr([arr([q(x) for x in fields(VK_REC_DIR / s["circuit"] / "vk")]) for s in use]),
-            "key_hashes = " + arr([q(fields(VK_REC_DIR / s["circuit"] / "vk_hash")[0]) for s in use]),
-            "proofs = " + arr([arr([q(x) for x in fields(Path(s["dir"]) / "proof")]) for s in use]),
-            "slot_pis = " + arr([arr([q(x) for x in fields(Path(s["dir"]) / "public_inputs")]) for s in use])]
-    (CIRCUITS / "agg_4" / ("Prover_" + tag + ".toml")).write_text("\n".join(toml) + "\n")
-    _, ex_wall, _ = run([NARGO, "execute", "--prover-name", "Prover_" + tag, tag], cwd=CIRCUITS / "agg_4")
-    Path(out_dir).mkdir(parents=True, exist_ok=True)
-    _, wall, rss = run([BB, "prove", "-b", CIRCUITS / "target" / "agg_4.json", "-w", CIRCUITS / "target" / (tag + ".gz"),
-                        "-k", VK_DIR / "agg_4" / "vk", "-o", out_dir, "-t", "evm", "-c", CRS], timed=True)
+    use += [use[0]] * (capacity - len(use))
     commitments = [vk_commit(s["circuit"]) for s in use]
     expected = [limb for s, vk in zip(use, commitments)
                 for limb in statement_digest(vk, fields(Path(s["dir"]) / "public_inputs"))]
-    assert fields(Path(out_dir) / "public_inputs") == expected, "aggregate statement digest mismatch"
+    children = []
+    for group in range(capacity // AGG_SLOTS):
+        start = group * AGG_SLOTS
+        subset = use[start:start + AGG_SLOTS]
+        toml = ["vks = " + arr([arr([q(x) for x in fields(VK_REC_DIR / s["circuit"] / "vk")]) for s in subset]),
+                "key_hashes = " + arr([q(fields(VK_REC_DIR / s["circuit"] / "vk_hash")[0]) for s in subset]),
+                "proofs = " + arr([arr([q(x) for x in fields(Path(s["dir"]) / "proof")]) for s in subset]),
+                "slot_pis = " + arr([arr([q(x) for x in fields(Path(s["dir"]) / "public_inputs")]) for s in subset])]
+        child = Path(out_dir) if capacity == AGG_SLOTS else Path(out_dir) / (Path(out_dir).name + "_child_" + str(group))
+        real = min(AGG_SLOTS, max(0, sum(included) - start))
+        prove_aggregation("agg_4", toml, child, "evm" if capacity == AGG_SLOTS else "noir-recursive",
+                          expected[start * 2:(start + AGG_SLOTS) * 2], real)
+        children.append(child)
+    if capacity == AGG_LARGE_SLOTS:
+        child_vk = fields(VK_REC_DIR / "agg_4/vk")
+        child_hash = fields(VK_REC_DIR / "agg_4/vk_hash")[0]
+        commitment = vk_commit("agg_4")
+        toml = ["child_vk_commitment = " + q(commitment),
+                "vks = " + arr([arr([q(x) for x in child_vk])] * AGG_SLOTS),
+                "key_hashes = " + arr([q(child_hash)] * AGG_SLOTS),
+                "proofs = " + arr([arr([q(x) for x in fields(child / "proof")]) for child in children]),
+                "child_pis = " + arr([arr([q(x) for x in fields(child / "public_inputs")]) for child in children])]
+        prove_aggregation("agg_16", toml, out_dir, "evm", [commitment] + expected, sum(included))
     (Path(out_dir) / "vk_commitments").write_bytes(b"".join(map(b32, commitments)))
-    run([BB, "verify", "-k", VK_DIR / "agg_4" / "vk", "-p", Path(out_dir) / "proof",
-         "-i", Path(out_dir) / "public_inputs", "-t", "evm", "-c", CRS])
-    record({"circuit": "agg_4", "target": "evm", "kind": "aggregate", "real_slots": sum(included),
-            "execute_s": round(ex_wall, 2), "prove_s": round(wall, 2),
-            "peak_rss_mb": round(rss / 2 ** 20) if rss else None,
-            "proof_bytes": (Path(out_dir) / "proof").stat().st_size})
+    record({"kind": "aggregation_request", "tag": Path(out_dir).name, "capacity": capacity,
+            "real_slots": sum(included), "wall_s": round(time.monotonic() - started, 2)})
     print("0x" + "".join("01" if ok else "00" for ok in included))
 
 
@@ -343,16 +373,21 @@ def debit(size, w, state, out_state, out_dir):
 
 def claim(size, w, state, out_state, out_dir):
     chain_id, n = int(w["chain_id"]), int(w["num_credits"])
+    from chain_registry import ChainRegistry
+    registry = ChainRegistry(w["zkip_chains"])
     prev = state.root()
     per = {k: [] for k in ["bundles", "preimages", "credit_leg", "slots", "imt_next_index", "imt_next_value",
                            "imt_index", "imt_height", "imt_path", "cbr_begin", "cbr_left", "batch_number", "batch_ts",
                            "chain_height", "chain_path", "shared_index", "shared_height", "shared_path", "anchor_sel",
-                           "null_low", "null_low_index", "null_low_path", "null_new_path"]}
+                           "null_low", "null_low_index", "null_low_path", "null_new_path", "registry_index", "registry_path"]}
     for c in range(size):
         src_c = min(c, n - 1)  # unused slots repeat credit 0 (their checks are switched off)
         g = lambda key, j=None: w["%s_c%d" % (key, src_c) + ("_l%d" % j if j is not None else "")]
         bundle, pre, leg = b32(g("bundle")), b32(g("preimage")), int(g("credit_leg"))
         o = open_leg(bundle, pre, leg)
+        membership = [registry.membership(chain) for chain in o["src"]]
+        per["registry_index"].append(arr([str(index) for index, _ in membership]))
+        per["registry_path"].append(arr([arr([q(value) for value in path]) for _, path in membership]))
         per["bundles"].append(toml_bytes(bundle)), per["preimages"].append(toml_bytes(pre))
         per["credit_leg"].append("true" if leg else "false")
         for key in ("imt_next_index", "imt_next_value", "cbr_begin", "cbr_left"):
@@ -378,7 +413,8 @@ def claim(size, w, state, out_state, out_dir):
     toml = ["chain_id = " + q(chain_id), "l1_chain_id = " + q(int(w["l1_chain_id"])),
             "prev_state_root = " + q(prev), "new_state_root = " + q(state.root()), "num_credits = %d" % n,
             "anchor_hi = " + arr([q(hi_lo(a)[0]) for a in anchors]), "anchor_lo = " + arr([q(hi_lo(a)[1]) for a in anchors]),
-            "zkip_chains = " + arr([q(int(x)) for x in w["zkip_chains"]]),
+            "chain_registry_root = " + q(registry.root),
+            "chain_registry_count = " + str(len(registry.chains)), "registry_reserved = [0, 0]",
             "unlock_asset_hi = " + q(uh), "unlock_asset_lo = " + q(ul), "unlock_amount = " + q(unlock_amount)]
     toml += state.toml_prev
     toml += ["unlock_slot = %d" % unlock_slot] + ["%s = %s" % (k, arr(v)) for k, v in per.items()]
@@ -388,14 +424,14 @@ def claim(size, w, state, out_state, out_dir):
 def setup():
     run([NARGO, "compile", "--workspace"], cwd=CIRCUITS)
     VERIFIERS.mkdir(parents=True, exist_ok=True)
-    for name in CIRCUIT_NAMES + ["agg_4"]:
+    for name in CIRCUIT_NAMES + ["agg_4", "agg_16", "agg_finalize"]:
         out = VK_DIR / name
         out.mkdir(parents=True, exist_ok=True)
         run([BB, "write_vk", "-b", CIRCUITS / "target" / (name + ".json"), "-o", out, "-t", "evm", "-c", CRS])
         sol = VERIFIERS / (name.title().replace("_", "") + "Verifier.sol")
         run([BB, "write_solidity_verifier", "-k", out / "vk", "-o", sol, "-t", "evm", "--optimized", "-c", CRS])
         log("wrote", sol)
-    for name in AGG_INNER:
+    for name in AGG_INNER + ["agg_4", "agg_leaf", "agg_fold"]:
         out = VK_REC_DIR / name
         out.mkdir(parents=True, exist_ok=True)
         run([BB, "write_vk", "-b", CIRCUITS / "target" / (name + ".json"), "-o", out, "-t", "noir-recursive", "-c", CRS])
@@ -412,6 +448,15 @@ def main():
     if cmd == "vk-commits":
         print("0x" + "".join("%064x" % vk_commit(n) for n in AGG_INNER))
         return
+    if cmd == "agg4-vk-commit":
+        print("0x%064x" % vk_commit("agg_4"))
+        return
+    if cmd == "recursive-vk-commits":
+        print("0x" + "".join("%064x" % vk_commit(n) for n in ("agg_leaf", "agg_fold")))
+        return
+    if cmd in ("aggregate-recursive", "aggregate-node"):
+        import recursive_aggregation
+        return recursive_aggregation.run(sys.modules[__name__], sys.argv[2], sys.argv[3], cmd == "aggregate-recursive")
     if cmd == "aggregate":
         return aggregate(sys.argv[2], sys.argv[3])
     size, w = int(sys.argv[2]), json.loads(Path(sys.argv[3]).read_text())
