@@ -11,7 +11,7 @@ for _ in range(DEPTH):
 class ChainRegistry:
     def __init__(self, chains):
         self.chains = [int(chain) for chain in chains if int(chain) != 0]
-        if len(set(self.chains)) != len(self.chains) or len(self.chains) >= 1 << DEPTH:
+        if len(set(self.chains)) != len(self.chains) or len(self.chains) > 1 << DEPTH:
             raise ValueError("invalid admitted-chain list")
         if any(not 0 < chain < p2.P for chain in self.chains):
             raise ValueError("chain id is not canonical")

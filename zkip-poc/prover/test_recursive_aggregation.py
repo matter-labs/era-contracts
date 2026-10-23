@@ -48,6 +48,11 @@ class TreeTests(unittest.TestCase):
                 aggregation.run(Bridge, manifest, Path(directory, "out"))
             verify.assert_not_called()
 
+    def test_admission_exact_capacity(self):
+        with patch("chain_registry.DEPTH", 2):
+            self.assertEqual(len(ChainRegistry([1, 2, 3, 4]).chains), 4)
+            with self.assertRaises(ValueError): ChainRegistry([1, 2, 3, 4, 5])
+
     def test_admission_paths_beyond_four_chains(self):
         chains = list(range(270270, 270277))
         registry = ChainRegistry(chains)

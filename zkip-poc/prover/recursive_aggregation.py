@@ -186,8 +186,12 @@ def run(bridge, manifest, out_dir, finalize=True):
     while len(nodes) > 1:
         next_nodes = []
         for offset in range(0, len(nodes), ARITY):
+            children = nodes[offset:offset + ARITY]
+            if len(children) == 1:
+                next_nodes.append(children[0])
+                continue
             directory = out_dir / "nodes" / (out_dir.name + "_fold_" + str(level) + "_" + str(offset // ARITY))
-            next_nodes.append(prove_fold(bridge, nodes[offset:offset + ARITY], directory, family))
+            next_nodes.append(prove_fold(bridge, children, directory, family))
         nodes, level = next_nodes, level + 1
     root = nodes[0]
     if finalize:
