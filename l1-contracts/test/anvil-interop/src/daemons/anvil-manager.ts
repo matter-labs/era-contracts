@@ -2,8 +2,11 @@ import { spawn, execSync } from "child_process";
 import type { providers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
+import { AMSTERDAM_L1_BLOCK_GAS_LIMIT } from "../core/const";
+import { L1_GAS_RULES } from "../core/glamsterdam-gas";
 import type { AnvilChain } from "../core/types";
 import { waitForChainReady, formatChainInfo, createProvider } from "../core/utils";
+import { assertAmsterdamL1, resolveAmsterdamAnvilBinary, writeAmsterdamStateDump } from "./amsterdam-l1";
 
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();
@@ -72,13 +75,17 @@ export class AnvilManager {
       throw new Error(`Chain ${chainId}: loadStatePath and forkUrl are mutually exclusive`);
     }
     const isL1 = role === "l1";
+    const amsterdamL1 = isL1 && L1_GAS_RULES === "amsterdam";
+    if (amsterdamL1 && dumpStatePath) {
+      throw new Error("L1_GAS_RULES=amsterdam is a measurement mode: chain states are dumped by the pinned anvil");
+    }
     const rpcUrl = `http://127.0.0.1:${port}`;
 
     // Kill any stale process (e.g. from a previous KEEP_CHAINS run) on this port
     this.killProcessOnPort(port);
 
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
-    const anvilBinary = this.resolveAnvilBinary();
+    const anvilBinary = amsterdamL1 ? resolveAmsterdamAnvilBinary() : this.resolveAnvilBinary();
 
     // Log resolved binary for debugging CI issues
     const binaryExists = fs.existsSync(anvilBinary);
@@ -105,7 +112,8 @@ export class AnvilManager {
       "--balance",
       "10000",
       "--gas-limit",
-      "100000000", // Increase block gas limit to 100M to accommodate L2 genesis upgrade
+      // 100M accommodates the L2 genesis upgrade.
+      amsterdamL1 ? AMSTERDAM_L1_BLOCK_GAS_LIMIT.toString() : "100000000",
       // Pin the base fee to zero: EIP-1559's multiplicative update keeps zero at zero forever, so
       // `eth_gasPrice` (and with it every broadcast tx's effective gas price) is a constant suggested
       // tip. A live, block-height-dependent gas price leaks into governance operation calldata and
@@ -114,6 +122,7 @@ export class AnvilManager {
       "--block-base-fee-per-gas",
       "0",
       "--auto-impersonate", // Allow impersonating any address without signatures
+      ...(amsterdamL1 ? ["--hardfork", "amsterdam"] : []),
     ];
 
     // Enable step-level tracing when running in coverage mode.
@@ -134,8 +143,9 @@ export class AnvilManager {
       args.push("--dump-state", dumpStatePath);
     }
 
+    const amsterdamStatePath = amsterdamL1 && loadStatePath ? writeAmsterdamStateDump(loadStatePath, port) : undefined;
     if (loadStatePath) {
-      args.push("--load-state", loadStatePath);
+      args.push("--load-state", amsterdamStatePath ?? loadStatePath);
     }
 
     if (forkUrl) {
@@ -152,6 +162,7 @@ export class AnvilManager {
       env: {
         ...process.env,
         PATH: enrichedPath,
+        ...(amsterdamL1 ? { FOUNDRY_DISABLE_NIGHTLY_WARNING: "1" } : {}),
       },
     });
 
@@ -200,6 +211,12 @@ export class AnvilManager {
       }
       console.error(`   anvil command: ${anvilBinary} ${args.join(" ")}`);
       throw new Error(`Failed to start ${formatChainInfo(chainId, port, isL1)}`);
+    }
+    if (amsterdamStatePath) {
+      fs.rmSync(amsterdamStatePath);
+    }
+    if (amsterdamL1) {
+      await assertAmsterdamL1(createProvider(rpcUrl), anvilBinary);
     }
 
     console.log(`✅ ${formatChainInfo(chainId, port, isL1)} started successfully`);

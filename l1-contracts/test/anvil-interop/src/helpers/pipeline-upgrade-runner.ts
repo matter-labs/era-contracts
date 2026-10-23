@@ -20,7 +20,8 @@
  *      the one `RegistryBootstrapSequence.actions()` derives, closing with the edge's completion
  *      check; `protocol-ops ecosystem verify-bootstrap` must pass on the package (see
  *      `verifyPackageAsReviewed`). Then `protocol-ops ecosystem upgrade-governance` replays that
- *      one bundle.
+ *      one bundle, and the completion check and the edge's post-state are read back live
+ *      (`assertBootstrapCompleted`).
  *   5. Per-chain legacy handed-cut crossing, recorded-L2-tx verification, and the L2 relay of
  *      the proposed upgrade transaction on each chain's anvil fork.
  *   6. Final protocol-version verification on every upgraded chain.
@@ -76,10 +77,12 @@ import { BatchSettler } from "./batch-settlement";
 import type { GenesisBatchParams } from "./batch-settlement";
 import { transferOwnable2Step } from "./harness-shims";
 import {
+  assertCtmTransitionApplied,
   assertLegsApplied,
   discoverDomainExecutors,
   findLegExecution,
   readProxyAdmin,
+  keepL1SettledChains,
   readProxyImplementation,
   selectUpgradeChains,
   snapshotProxyUpgradeLegs,
@@ -90,18 +93,18 @@ import {
 import {
   assertBootstrapBundle,
   assertBootstrapCompleted,
-  assertBootstrapExecutorsGoverned,
   assertServerNotifierState,
   installLegacyFacet,
   crossBootstrapEdgeOnChains,
 } from "./bootstrap-upgrade-stage";
 import type { GovernanceCall, MergedGovernanceOutput } from "./governance-bundle";
 import { assertBundleIs, assertRegistryHopBundle, upgradeLegsOf } from "./governance-bundle";
-import { recordL1TransactionGas } from "./l1-transaction-gas";
-import { proxyUpgradeSlotIndex } from "./registry-manifest";
+import { l1GasOverrides, recordL1TransactionGas } from "./l1-transaction-gas";
 import { createProvider, impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
+import type { GatedChain } from "./upgrade-interop-gating";
+import { depositBeforeUpgrade, registerLegacyInteropPair, runInteropGatingProcedure } from "./upgrade-interop-gating";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -113,6 +116,12 @@ const UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY = 2;
 const anvilInteropDir = path.resolve(__dirname, "../..");
 const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 const contractsRootDir = path.resolve(l1ContractsDir, "..");
+
+// What `verify-bootstrap` / `verify-package` print for the outcomes the harness holds them to.
+const UNCONSULTED_RECORDS_REPORT = "recorded deployment(s) no check of this review consulted";
+const FREEZE_AUTHORITY_REPORT = "so freezing the CTM's chains directly answers to the executors' governance";
+// Upper bound on a verifier report the harness reads back.
+const PROTOCOL_OPS_REPORT_MAX_BYTES = 64 * 1024 * 1024;
 
 // Function selectors for the ComplexUpgrader entry points.
 const SELECTORS = {
@@ -160,6 +169,11 @@ export type PipelineUpgradeScenario = {
    * legs, and every chain crosses through the cut-READING `upgradeChainFromVersion` (see runRecurringHop).
    */
   followUps?: RecurringUpgradeHop[];
+  /**
+   * Registers the first two target chains with each other before the upgrade and takes them through
+   * {protocol-docs/interop-gating.md#order-per-chain} after it, before any follow-up hop.
+   */
+  checkInteropGating?: boolean;
 };
 
 export type RecurringUpgradeHop = {
@@ -208,16 +222,30 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
     const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
-    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
-    if (upgradeChainAddresses.length === 0) {
-      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
-    }
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
     const l1Provider = createProvider(l1Chain.rpcUrl);
+    const upgradeChainAddresses = await keepL1SettledChains(
+      l1Provider,
+      l1Addresses.bridgehub,
+      selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles)
+    );
+    if (upgradeChainAddresses.length === 0) {
+      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
+    }
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+    const gatingContext = { l1Provider, chainAdminOwner: defaultSigner, l1Addresses };
+    const gatedChains = scenario.checkInteropGating ? selectGatedChains(anvilManager, upgradeChainAddresses) : null;
+    if (gatedChains) {
+      console.log("\n── Registering a legacy interop pair ──");
+      await registerLegacyInteropPair(gatingContext, ...gatedChains);
+      console.log("\n── Depositing to the gated chains before the upgrade ──");
+      for (const chain of gatedChains) {
+        await depositBeforeUpgrade(gatingContext, chain);
+      }
+    }
 
     const ctm = new ethers.Contract(ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
     const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
@@ -314,11 +342,13 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       rpcUrl: l1Chain.rpcUrl,
       ecosystemToml: mergedEcosystemToml,
       governance: l1Addresses.governance,
+      bridgehub: l1Addresses.bridgehub,
       reviewedBuildHashes,
       executorRecords: [],
     });
 
     // ── Execute the governance bundle via protocol-ops ──
+    const lastPreUpgradeBlock = await l1Provider.getBlockNumber();
     console.log("\n── Replaying the governance bundle ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
@@ -328,22 +358,6 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       executeBundles: true,
     });
 
-    const migration = new ethers.Contract(migrationAddr, getAbi("RegistryBootstrapMigration"), l1Provider);
-    const notifierRow = (await migration.getManifest()).ctmProxyUpgrades[
-      proxyUpgradeSlotIndex("CTMContract", "ServerNotifier")
-    ];
-    await assertServerNotifierState(
-      l1Provider,
-      ctmAddresses.chainTypeManager,
-      {
-        admin: ctmProxyAdmin,
-        owner: ctmExecutor,
-        pendingOwner: ethers.constants.AddressZero,
-        implementation: notifierRow.implNew,
-        chainTypeManager: ctmAddresses.chainTypeManager,
-      },
-      "held by the CTM executor and re-pointed by migrate() after the governance replay"
-    );
     const validatorTimelock: string = await new ethers.Contract(
       ctmAddresses.chainTypeManager,
       getAbi("IChainTypeManager"),
@@ -360,13 +374,12 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       );
     }
     console.log("  ✓ the ValidatorTimelock is governance-owned after the replay");
-    await assertBootstrapCompleted(l1Provider, migrationAddr);
-    await assertBootstrapExecutorsGoverned(
-      l1Provider,
-      migrationAddr,
-      await readProxyAdmin(l1Provider, l1Addresses.messageRoot),
-      l1Addresses.governance
-    );
+    await assertBootstrapCompleted(l1Provider, {
+      migration: migrationAddr,
+      coreTransition: bootstrapCoreTransition,
+      ecosystemProxyAdmin: await readProxyAdmin(l1Provider, l1Addresses.messageRoot),
+      governance: l1Addresses.governance,
+    });
 
     // ── Per-chain legacy crossing + L2 relay ──
     await runLegacyChainLegAndRelayL2({
@@ -390,6 +403,11 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
     await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
+    if (gatedChains) {
+      console.log("── Replacing the legacy interop pair with an allowed one ──");
+      await runInteropGatingProcedure(gatingContext, lastPreUpgradeBlock, ...gatedChains);
+      console.log("✅ Interop gating procedure verified\n");
+    }
 
     // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
     // forward the way a production env file does.
@@ -482,7 +500,8 @@ function readReportedEip7702Checker(mergedEcosystemTomlPath: string): string | u
  *   4. End state: one transaction emitted each leg's domain event once, in leg order; each row
  *      object's proxies run their `implNew`, with `ProxyImplementationUpgraded` exactly for the
  *      rows that moved; chains and CTM at the new version, the transition committed for the
- *      departing version, and the CTM on the transition's release.
+ *      departing version, the CTM on the transition's release, and the CTM domain still held by
+ *      the CTM executor (`assertCtmTransitionApplied`).
  */
 async function runRecurringHop(
   scenario: PipelineUpgradeScenario,
@@ -616,6 +635,7 @@ async function runRecurringHop(
       rpcUrl: ctx.rpcUrl,
       ecosystemToml: mergedEcosystemToml,
       governance: ctx.l1Addresses.governance,
+      bridgehub: ctx.l1Addresses.bridgehub,
       reviewedBuildHashes: ctx.reviewedBuildHashes,
       executorRecords: [ctx.executorRecords],
     });
@@ -644,7 +664,7 @@ async function runRecurringHop(
       await impersonateAndRun(l1Provider, admin, async (signer) => {
         await sendAndCheck(
           l1Provider,
-          signer.sendTransaction({ to: chain.diamondProxy, data, gasLimit: 10_000_000 }),
+          signer.sendTransaction({ to: chain.diamondProxy, data, ...l1GasOverrides(10_000_000) }),
           `chain ${chain.chainId}: upgradeChainFromVersion(${oldVersion.toHexString()})`
         );
       });
@@ -699,18 +719,19 @@ async function runRecurringHop(
     if (!version.eq(ethers.BigNumber.from(hop.expectedProtocolVersion))) {
       throw new Error(`CTM protocol version ${version.toHexString()}, expected ${hop.expectedProtocolVersion}`);
     }
-    const committed: string = await ctm.upgradeTransition(oldVersion);
-    if (committed.toLowerCase() !== transitionAddr.toLowerCase()) {
-      throw new Error(`CTM committed transition ${committed} for the departing version, expected ${transitionAddr}`);
-    }
-    const executor = new ethers.Contract(executorAddr, getAbi("CTMUpgradeExecutor"), l1Provider);
-    await executor.validateTransitionApplied(transitionAddr);
+    await assertCtmTransitionApplied(
+      l1Provider,
+      ctx.ctmAddresses.chainTypeManager,
+      transitionAddr,
+      oldVersion,
+      executors.ctmExecutor
+    );
+    console.log(
+      `  ✓ CTM commits ${transitionAddr} for ${oldVersion.toHexString()} and runs its release; ` +
+        `domain held by ${executors.ctmExecutor}`
+    );
     const transition = new ethers.Contract(transitionAddr, getAbi("ICTMTransition"), l1Provider);
     const newRelease: string = await transition.newRelease();
-    const currentRelease: string = await ctm.currentRelease();
-    if (currentRelease.toLowerCase() !== newRelease.toLowerCase()) {
-      throw new Error(`CTM currentRelease ${currentRelease} is not the transition's target release ${newRelease}`);
-    }
     // Read off the OBJECT rather than the prepare's logs: this is what governance and the chains
     // read, and it is the only evidence that unchanged contracts were not silently redeployed.
     if (hop.expectsReusedReleaseMembers) {
@@ -790,6 +811,23 @@ async function runRecurringHop(
 
 // ── Shared tx helper ─────────────────────────────────────────────────
 
+function selectGatedChains(
+  anvilManager: AnvilManager,
+  upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>
+): [GatedChain, GatedChain] {
+  if (upgradeChainAddresses.length < 2) {
+    throw new Error(`The interop gating check needs two upgraded chains, got ${upgradeChainAddresses.length}`);
+  }
+  const [chain, peer] = upgradeChainAddresses.slice(0, 2).map(({ chainId, diamondProxy }) => {
+    const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chainId);
+    if (!l2Chain) {
+      throw new Error(`Missing running L2 chain ${chainId}`);
+    }
+    return { chainId, diamondProxy, provider: createProvider(l2Chain.rpcUrl) };
+  });
+  return [chain, peer];
+}
+
 async function sendAndCheck(
   provider: ethers.providers.JsonRpcProvider,
   txPromise: Promise<ethers.providers.TransactionResponse>,
@@ -801,7 +839,7 @@ async function sendAndCheck(
     const trace = await traceFailedTx(provider, receipt.transactionHash);
     throw new Error(`${label} reverted:\n${trace}`);
   }
-  recordL1TransactionGas(receipt, tx.gasLimit, {
+  await recordL1TransactionGas(provider, receipt, tx.gasLimit, {
     phase: "chain-upgrade",
     bundle: label,
     index: 1,
@@ -934,6 +972,28 @@ function runProtocolOps(args: string[], extraEnv?: Record<string, string>): void
   }
 }
 
+/** {@link runProtocolOps}, echoing what it printed on stdout and returning it. */
+function runProtocolOpsForReport(args: string[]): string {
+  const result = spawnSync("./protocol-ops.sh", args, {
+    cwd: contractsRootDir,
+    stdio: ["inherit", "pipe", "inherit"],
+    encoding: "utf8",
+    maxBuffer: PROTOCOL_OPS_REPORT_MAX_BYTES,
+    env: {
+      ...process.env,
+      PROTOCOL_CONTRACTS_ROOT: contractsRootDir,
+    },
+  });
+  process.stdout.write(result.stdout ?? "");
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`protocol-ops failed: ${args.join(" ")}`);
+  }
+  return result.stdout;
+}
+
 /**
  * Writes the hashes of the build that deploys this scenario's objects (`scripts/calculate-hashes.ts
  * --output`), for `verify-package --contract-hashes`. The committed `AllContractsHashes.json` is
@@ -955,20 +1015,24 @@ function writeReviewedBuildHashes(outputPath: string): void {
 /**
  * `protocol-ops ecosystem verify-bootstrap` / `verify-package` (one command, two names) on a merged
  * prepare output, run the way a reviewer runs it before governance signs: against the live L1, the
- * reviewed governance owner and the `local` env's permanent values. Throws when the verifier reports
- * any error.
+ * reviewed governance owner and the `local` env's permanent values. The fixture's Bridgehub is not the
+ * one `local` names, so it is the reviewer's `--expected-bridgehub`. Throws when the verifier reports
+ * any error, when it reports a construction record no check consulted (every deployment of these
+ * prepares is a member the package installs, so an unconsulted one means a check was skipped), and
+ * for the bootstrap when the report lacks the freeze-authority check.
  */
 function verifyPackageAsReviewed(params: {
   command: "verify-bootstrap" | "verify-package";
   rpcUrl: string;
   ecosystemToml: string;
   governance: string;
+  bridgehub: string;
   reviewedBuildHashes: string;
   /** Files carrying `[upgrade_executors]` records the package itself does not carry. */
   executorRecords: string[];
 }): void {
   console.log(`\n── ${params.command}: reviewing the package before governance replays it ──`);
-  runProtocolOps([
+  const report = runProtocolOpsForReport([
     "ecosystem",
     params.command,
     "--ecosystem-toml",
@@ -979,10 +1043,18 @@ function verifyPackageAsReviewed(params: {
     params.governance,
     "--env",
     "local",
+    "--expected-bridgehub",
+    params.bridgehub,
     "--contract-hashes",
     params.reviewedBuildHashes,
     ...params.executorRecords.flatMap((record) => ["--executor-record", record]),
   ]);
+  if (report.includes(UNCONSULTED_RECORDS_REPORT)) {
+    throw new Error(`${params.command} left construction records unconsulted (see its report above)`);
+  }
+  if (params.command === "verify-bootstrap" && !report.includes(FREEZE_AUTHORITY_REPORT)) {
+    throw new Error("verify-bootstrap did not establish who may freeze the CTM's chains");
+  }
 }
 
 function safeBundlesInDir(dir: string): Array<{ file: string; target: string }> {
@@ -1034,7 +1106,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string, phase: "prepar
           to: transactions[i].to,
           value: ethers.BigNumber.from(transactions[i].value),
           data: transactions[i].data,
-          gasLimit: ETHEREUM_L1_TX_GAS_LIMIT,
+          ...l1GasOverrides(ETHEREUM_L1_TX_GAS_LIMIT),
         });
         const receipt = await tx.wait();
         if (receipt.status !== 1) {
@@ -1043,7 +1115,7 @@ async function executeSafeBundles(outDir: string, rpcUrl: string, phase: "prepar
             `Safe bundle ${path.basename(bundle.file)} tx ${i + 1}/${transactions.length} reverted:\n${trace}`
           );
         }
-        recordL1TransactionGas(receipt, tx.gasLimit, {
+        await recordL1TransactionGas(provider, receipt, tx.gasLimit, {
           phase,
           bundle: path.basename(bundle.file),
           index: i + 1,
@@ -1081,8 +1153,9 @@ export async function runEcosystemUpgradeScripts(params: {
       ANVIL_DEFAULT_ACCOUNT_ADDR,
       "--ctm-proxy",
       params.upgradeHarnessInputs.ctmProxyAddress,
-      "--rollup-da-manager-address",
-      params.upgradeHarnessInputs.rollupDaManagerAddress,
+      ...(params.upgradeHarnessInputs.rollupDaManagerAddress
+        ? ["--rollup-da-manager-address", params.upgradeHarnessInputs.rollupDaManagerAddress]
+        : []),
       "--create2-factory-salt",
       params.upgradeHarnessInputs.create2FactorySalt,
       "--upgrade-input-path",
@@ -1609,6 +1682,11 @@ function replaceTomlBareValue(contents: string, key: string, value: string): str
   return pattern.test(contents) ? contents.replace(pattern, `$1${value}`) : `${key} = ${value}\n${contents}`;
 }
 
+/** `address`, unless it is absent or the zero address a template leaves for "unset". */
+function nonZeroAddress(address: string | undefined): string | undefined {
+  return address && !ethers.BigNumber.from(address).isZero() ? address : undefined;
+}
+
 export function prepareUpgradeHarnessInputs(
   scenario: PipelineUpgradeScenario,
   state: {
@@ -1624,7 +1702,8 @@ export function prepareUpgradeHarnessInputs(
   bridgehubAddress: string;
   protocolOpsOutDir: string;
   upgradeInputArg: string;
-  rollupDaManagerAddress: string;
+  /** The template's `rollup_da_manager` when it names one; otherwise protocol-ops resolves the CTM's own. */
+  rollupDaManagerAddress?: string;
   create2FactorySalt: string;
   isZKsyncOS: boolean;
   ctmProxyAddress: string;
@@ -1689,7 +1768,7 @@ export function prepareUpgradeHarnessInputs(
     bridgehubAddress: state.l1Addresses.bridgehub,
     protocolOpsOutDir,
     upgradeInputArg: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
-    rollupDaManagerAddress: permanentValuesToml.ctm_contracts?.rollup_da_manager ?? ethers.constants.AddressZero,
+    rollupDaManagerAddress: nonZeroAddress(permanentValuesToml.ctm_contracts?.rollup_da_manager),
     create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
     isZKsyncOS: scenario.isZKsyncOS,
     ctmProxyAddress: state.ctmAddresses.chainTypeManager,

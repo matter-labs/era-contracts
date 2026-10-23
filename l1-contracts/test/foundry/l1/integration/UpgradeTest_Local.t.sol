@@ -23,6 +23,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -41,13 +42,18 @@ import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ChainRouting} from "test-utils/ChainRouting.sol";
 import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
+import {RegistryPostState} from "../unit/concrete/Upgrades/registry/RegistryPostState.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {BootstrapManifest, ProxyUpgradeRow, ReleaseManifest} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {ContractsBytecodesLib} from "../../../../deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 /// @notice Stands in for the genesis engine a pre-v35 CTM runs: its only entrypoint is the
 ///         six-argument `genesisUpgrade` the pre-v35 Admin facet called, not the argument-less one
@@ -131,11 +137,23 @@ contract ChainUpgradeForLocalTest is DefaultChainUpgrade {
     }
 }
 
+/// @notice Chain leg of the bootstrap edge for a chain whose admin does not act: the CTM owner
+///         crosses it through its checked cut-taking passthrough, which hands the committed cut to
+///         the chain's pre-v35 entrypoint.
+/// @dev Pranks the CTM's owner, the CTM executor that governance drives through `forward`.
+contract ChainUpgradeByCTMOwnerForLocalTest is DefaultChainUpgrade {
+    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public override {
+        ChainTypeManager ctm = ChainTypeManager(IZKChain(config.chainDiamondProxyAddress).getChainTypeManager());
+        vm.prank(ctm.owner());
+        ctm.upgradeChainFromVersion(config.chainChainId, config.oldProtocolVersion, diamondCutData);
+    }
+}
+
 /// @notice The fixture the v35 BOOTSTRAP edge leaves behind, built through the real prepare
 ///         pipeline: a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v35`
 ///         deploying the executor + `RegistryBootstrapMigration`, and the one governance bundle
-///         `RegistryBootstrapSequence` derives (bindings, the ecosystem handover and core leg,
-///         nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes the
+///         `RegistryBootstrapSequence` derives (the notifier accept, the ecosystem handover and core
+///         leg, nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes the
 ///         executor's accept — and the completion check) performing the whole edge.
 /// @dev Abstract so the post-bootstrap state can be reused: it is the only in-forge fixture whose
 ///      ecosystem is registry-driven, which is what a RECURRING prepare needs to run against (see
@@ -145,7 +163,8 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     UpgradeIntegrationTestBase,
     L1ContractDeployer,
     ZKChainDeployer,
-    TokenDeployer
+    TokenDeployer,
+    RegistryPostState
 {
     using stdToml for string;
 
@@ -167,7 +186,7 @@ abstract contract UpgradeIntegrationBootstrapFixture is
         return new CTMUpgradeForLocalTest();
     }
 
-    function createChainUpgrade() internal override returns (DefaultChainUpgrade) {
+    function createChainUpgrade() internal virtual override returns (DefaultChainUpgrade) {
         return new ChainUpgradeForLocalTest();
     }
 
@@ -426,6 +445,118 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         );
     }
 
+    /// @notice Every member the bootstrap prepare deploys carries a `[member_deployments]` record in
+    ///         the output of the leg that deployed it, and re-derives from it: the build artifact's
+    ///         creation code and the recorded constructor arguments, under the recorded salt through
+    ///         the deterministic factory, land exactly at the member — the derivation
+    ///         `protocol-ops ecosystem verify-bootstrap` performs (`member_construction`).
+    /// @dev This fixture's CTM is deployed from the current sources, so the prepare reuses every
+    ///      member it was born with (same code, same arguments) and records none for them; they are
+    ///      skipped here. protocol-ops exempts only the verifiers the chains run at a bootstrap, so
+    ///      it would refuse those reused members as unrecorded: a real bootstrap departs from a
+    ///      pre-registry CTM built from earlier sources and redeploys every other member. This test
+    ///      checks the records, not that exemption rule.
+    function test_bootstrapMembersAreReproducibleFromTheirRecords() public view {
+        CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
+        string memory root = vm.projectRoot();
+        string memory coreOutput = vm.readFile(string.concat(root, CORE_OUTPUT));
+        string memory ctmOutput = vm.readFile(string.concat(root, CTM_OUTPUT));
+        (, bytes32 coreSalt) = coreUpgrade.getCreate2FactoryParams();
+        (, bytes32 ctmSalt) = ctmUpgrade.getCreate2FactoryParams();
+        BootstrapManifest memory manifest = bootstrap.bootstrapMigration().getManifest();
+        ReleaseManifest memory release = CTMRelease(manifest.currentRelease).getManifest();
+
+        ReleaseManifest memory born = CTMRelease(ctmAddresses.stateTransition.currentRelease).getManifest();
+
+        uint256 facets = release.genesisFacets.length;
+        uint256 recordedFacets = 0;
+        for (uint256 i = 0; i < facets; ++i) {
+            if (_namedBy(born, release.genesisFacets[i].facet)) {
+                continue;
+            }
+            ++recordedFacets;
+            (string memory name, bytes memory args) = _recordedMember(
+                ctmOutput,
+                ctmSalt,
+                release.genesisFacets[i].facet
+            );
+            // The two immutables code identity cannot see, held at their source.
+            if (keccak256(bytes(name)) == keccak256("AdminFacet")) {
+                (uint256 l1ChainId, address rollupDAManager) = abi.decode(args, (uint256, address));
+                assertEq(l1ChainId, block.chainid, "AdminFacet is built for this L1");
+                assertEq(
+                    rollupDAManager,
+                    ctmUpgrade.getAddresses().daAddresses.daContracts.rollupDAManager,
+                    "AdminFacet is built over the prepare's RollupDAManager"
+                );
+            } else if (keccak256(bytes(name)) == keccak256("MailboxFacet")) {
+                (, , , bool isTestnet) = abi.decode(args, (uint256, address, address, bool));
+                assertTrue(isTestnet, "MailboxFacet is built for the env's testnet verifier");
+            }
+        }
+        assertGt(recordedFacets, 0, "the edge deploys facets of its own");
+        if (!_namedBy(born, release.diamondInit)) {
+            _recordedMember(ctmOutput, ctmSalt, release.diamondInit);
+        }
+        // Discovery reports a legacy engine (see `simulateLegacyGenesisEngine`), so the prepare
+        // always deploys the genesis upgrade.
+        _recordedMember(ctmOutput, ctmSalt, release.genesisUpgrade);
+        _recordedMember(ctmOutput, ctmSalt, manifest.upgradeEngine);
+        // The prepare deploys the composer either way; this L1-only fixture's plan names none.
+        assertEq(manifest.l2Plan.delegateComposer, address(0), "an L1-only plan names no composer");
+        uint256 ctmRows = manifest.ctmProxyUpgrades.length;
+        for (uint256 i = 0; i < ctmRows; ++i) {
+            if (manifest.ctmProxyUpgrades[i].implNew != address(0)) {
+                _recordedMember(ctmOutput, ctmSalt, manifest.ctmProxyUpgrades[i].implNew);
+            }
+        }
+        ProxyUpgradeRow[] memory coreRows = coreUpgrade.coreTransition().getManifest().proxyUpgrades;
+        uint256 coreRowCount = coreRows.length;
+        for (uint256 i = 0; i < coreRowCount; ++i) {
+            if (coreRows[i].implNew != address(0)) {
+                _recordedMember(coreOutput, coreSalt, coreRows[i].implNew);
+            }
+        }
+    }
+
+    /// @dev Whether `_release` names `_member` as a facet, its `DiamondInit`, genesis upgrade or verifier.
+    function _namedBy(ReleaseManifest memory _release, address _member) private pure returns (bool) {
+        if (_member == _release.diamondInit || _member == _release.genesisUpgrade || _member == _release.verifier) {
+            return true;
+        }
+        uint256 length = _release.genesisFacets.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (_release.genesisFacets[i].facet == _member) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// @dev The `[member_deployments]` record of `_member` in `_output`, re-derived: returns the
+    ///      recorded contract and constructor arguments once they are proven to land at `_member`.
+    function _recordedMember(
+        string memory _output,
+        bytes32 _salt,
+        address _member
+    ) private view returns (string memory name, bytes memory args) {
+        string memory key = string.concat("$.member_deployments['", vm.toString(_member), "']");
+        assertTrue(vm.keyExistsToml(_output, key), string.concat("no record of ", vm.toString(_member)));
+        name = _output.readString(string.concat(key, ".contract"));
+        args = _output.readBytes(string.concat(key, ".constructor_args"));
+        assertEq(
+            _output.readAddress(string.concat(key, ".create2_factory")),
+            DeployScriptUtils.DETERMINISTIC_CREATE2_ADDRESS,
+            "recorded through the deterministic factory"
+        );
+        assertEq(_output.readBytes32(string.concat(key, ".create2_salt")), _salt, "recorded under the leg's salt");
+        assertEq(
+            DeployScriptUtils.canonicalCreate2Address(_salt, ContractsBytecodesLib.getCreationCodeEVM(name), args),
+            _member,
+            string.concat(name, " re-derives from its record")
+        );
+    }
+
     function test_bootstrapUpgrade_Local() public {
         CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
         address ctm = ctmUpgrade.getCTMAddress();
@@ -540,6 +671,17 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
 
         _assertBootstrapJoinsTheRegistryModel(bootstrap, ctm, bridgehub, executor);
         _assertInteropFeeManagerKept(ctm, bridgehub);
+        _assertBackfillWindowOpened(bridgehub);
+    }
+
+    /// @dev The vault's swap opened the backfill window of the chains registered before the upgrade, and only theirs
+    ///      ({protocol-docs/interop-gating.md#backfill}).
+    function _assertBackfillWindowOpened(address _bridgehub) private view {
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(
+            address(IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault())
+        );
+        assertTrue(nativeTokenVault.chainBalanceBackfillPending(eraZKChainId), "pre-upgrade chain not pending");
+        assertFalse(nativeTokenVault.chainBalanceBackfillPending(NEW_CHAIN_ID), "new chain pending");
     }
 
     /// @dev The upgraded CTM keeps the interop fee manager it had, with the chains' prepaid
@@ -582,8 +724,8 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     ///      and declared by the CTM prepare; the core prepare of this edge declares nothing, so the
     ///      merged bundle is exactly the object's. The harness already executed it green in
     ///      `internalTest`; this asserts the emitted shape (the notifier accept first, the ecosystem
-    ///      handover and core leg, the completion check last), that the completion check holds, and
-    ///      the notifier handover.
+    ///      handover and core leg, the completion check last), that the completion check holds, the
+    ///      post-state the edge leaves, and the notifier handover.
     function _assertBootstrapJoinsTheRegistryModel(
         CTMUpgradeForLocalTest _bootstrap,
         address _ctm,
@@ -594,7 +736,11 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         RegistryBootstrapMigration migration = _bootstrap.bootstrapMigration();
         address coreExecutor = address(coreUpgrade.getCoreUpgradeExecutor());
         Call[] memory bundle = _bootstrap.prepareGovernanceCalls();
-        assertEq(bundle.length, 7, "v35 bundle: the notifier accept, the core leg, the CTM handover, the edge");
+        assertEq(
+            bundle.length,
+            7,
+            "v35 bundle: the notifier accept, the core leg, the CTM handover, the edge, the completion check"
+        );
         assertEq(bundle[0].target, _executor, "the notifier accept opens the bundle");
         assertEq(
             bundle[1].target,
@@ -618,6 +764,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         );
         assertEq(coreUpgrade.externalActionEntries().length, 0, "the core prepare of a derived edge authors nothing");
         migration.validateApplied();
+        _assertBootstrapApplied(migration);
         assertEq(_bootstrap.bootstrapSequence().MIGRATION(), address(migration), "the sequence names this edge");
         assertEq(
             IOwnable(address(CoreUpgradeExecutor(payable(coreExecutor)).PROXY_ADMIN())).owner(),
@@ -673,5 +820,27 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "unexpected init selector"
         );
         return abi.decode(_initCalldata[4:], (address));
+    }
+}
+
+/// @notice The bootstrap edge over the same fixture, with the lagging pre-v35 chain crossed by the
+///         CTM owner instead of its admin (see {ChainUpgradeByCTMOwnerForLocalTest}).
+contract UpgradeIntegrationTestLocalCTMOwnerCrossing is UpgradeIntegrationBootstrapFixture {
+    function createChainUpgrade() internal override returns (DefaultChainUpgrade) {
+        return new ChainUpgradeByCTMOwnerForLocalTest();
+    }
+
+    function test_theCTMOwnerCrossesAPreV35ChainOverTheBootstrapEdge() public view {
+        address release = IChainTypeManager(ctmUpgrade.getCTMAddress()).currentRelease();
+        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "the chain crossed the edge");
+        assertEq(
+            address(IGetters(_eraDiamond).getVerifier()),
+            ICTMRelease(release).verifier(),
+            "the chain runs the pinned release's verifier"
+        );
+        assertTrue(
+            ChainRouting.matchesRelease(ICTMRelease(release), _eraDiamond),
+            "the bootstrap engine reinstalled exactly the release's routing"
+        );
     }
 }

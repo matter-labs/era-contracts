@@ -7,10 +7,9 @@ pragma solidity ^0.8.21;
 /// @custom:security-contact security@matterlabs.dev
 /// @notice A facet that declares the function selectors it serves, so that diamond cuts can be
 ///         composed on-chain instead of shipping selector lists as calldata.
-/// @dev Consumed by `CTMUpgradeComposer`: when a registry does not pin a selector list for a
-///      facet version (`ICTMRegistry.facetSelectors` returns empty), the composer reads the list
-///      from the facet itself. Registry lists remain as a bootstrap override for facet versions
-///      deployed before this interface existed.
+/// @dev The only source of a facet's routing: a release stores no selector lists, so chain
+///      creation (`ReleaseFacetReader`) and transition derivation (`TransitionDerivationLib`) read
+///      them from the facets themselves.
 /// @dev The list is generated from the audited facet source (`forge inspect <Facet>
 ///      methodIdentifiers`) and hard-coded into the facet's bytecode; auditing the facet source
 ///      audits the list.

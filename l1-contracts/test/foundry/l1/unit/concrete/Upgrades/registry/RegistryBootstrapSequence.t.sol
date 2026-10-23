@@ -26,6 +26,7 @@ import {
     BootstrapAuthorityNotHeld,
     BootstrapNominationPending,
     BootstrapNotYetExecuted,
+    BootstrapServerNotifierNotBound,
     ProxyUpgradeDomainMismatch,
     RegistryTargetHasNoCode,
     ZeroAddress
@@ -486,6 +487,74 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
         vm.expectRevert(
             abi.encodeWithSelector(BootstrapAuthorityNotHeld.selector, address(ecosystemProxyAdmin), governor)
         );
+        this.runBundle(bundle);
+        _assertEdgeNotApplied();
+    }
+
+    /// @notice The ChainAdmin owns the notifier until the bundle's accept, so it can re-bind it to
+    ///         another CTM after review; `migrate()` then refuses the edge (§2 (b)) and the whole
+    ///         bundle reverts, the accept and the core leg included.
+    function test_revertWhen_theChainAdminRebindsTheNotifierBeforeTheBundle() public {
+        _chainAdminHandsOverTheNotifier();
+        address otherCtm = makeAddr("otherCtm");
+        vm.prank(chainAdmin);
+        ServerNotifier(address(notifierProxy)).setChainTypeManager(IChainTypeManager(otherCtm));
+
+        Call[] memory bundle = _calls(sequence.actions());
+        vm.expectRevert(
+            abi.encodeWithSelector(BootstrapServerNotifierNotBound.selector, address(chainContractAddress), otherCtm)
+        );
+        this.runBundle(bundle);
+        _assertEdgeNotApplied();
+        assertEq(Ownable2Step(address(notifierProxy)).owner(), chainAdmin, "the accept is rolled back too");
+    }
+
+    /// @notice The ChainAdmin withdrawing its nomination fails the bundle's first call, the accept.
+    function test_revertWhen_theChainAdminRevokesTheNomination() public {
+        _chainAdminHandsOverTheNotifier();
+        Call[] memory bundle = _calls(sequence.actions());
+        vm.prank(chainAdmin);
+        Ownable2Step(address(notifierProxy)).transferOwnership(address(0));
+
+        vm.expectRevert("Ownable2Step: caller is not the new owner");
+        this.runBundle(bundle);
+        _assertEdgeNotApplied();
+    }
+
+    /// @notice The CTM's owner re-pointing the CTM at another notifier after review makes
+    ///         `migrate()` refuse the edge (§2 (a)), and the whole bundle reverts.
+    function test_revertWhen_theOwnerRepointsTheNotifierBeforeTheBundle() public {
+        _chainAdminHandsOverTheNotifier();
+        address other = makeAddr("otherNotifier");
+        vm.prank(governor);
+        chainContractAddress.setServerNotifier(other);
+
+        Call[] memory bundle = _calls(sequence.actions());
+        vm.expectRevert(
+            abi.encodeWithSelector(BootstrapServerNotifierNotBound.selector, address(notifierProxy), other)
+        );
+        this.runBundle(bundle);
+        _assertEdgeNotApplied();
+    }
+
+    /// @notice The ecosystem `ProxyAdmin` handover precedes the core leg in the derived order (which
+    ///         protocol-ops holds the bundle to); without it, the core leg reverts and the whole
+    ///         bundle with it.
+    function test_revertWhen_theCoreLegRunsWithoutTheEcosystemHandover() public {
+        _chainAdminHandsOverTheNotifier();
+        Call[] memory derived = _calls(sequence.actions());
+        // The derived bundle minus the ecosystem ProxyAdmin handover (index 1, after the accept).
+        Call[] memory bundle = new Call[](derived.length - 1);
+        uint256 next = 0;
+        for (uint256 i = 0; i < derived.length; ++i) {
+            if (i == 1) {
+                continue;
+            }
+            bundle[next] = derived[i];
+            ++next;
+        }
+
+        vm.expectRevert("Ownable: caller is not the owner");
         this.runBundle(bundle);
         _assertEdgeNotApplied();
     }

@@ -1,22 +1,47 @@
-//! The executor records a review re-derives the executors' construction from.
+//! The deploy-time records a review re-derives construction from: the executors' and the
+//! members'.
 //!
 //! An executor's address commits to its ORIGINAL constructor arguments — among them the owner it
 //! was built for, which moves afterwards (a fresh ecosystem builds its executors for the deployer
 //! and nominates governance). Re-deriving from the current owner therefore cannot tell a genuine
 //! executor whose owner moved from a counterfeit; re-deriving from what the deploying run RECORDED
-//! can ([`super::lifecycle`]).
+//! can ([`super::lifecycle`]). A member's address likewise commits to the constructor arguments
+//! its immutables were written from, which nothing on chain answers for most members
+//! ([`super::member_construction`]).
 //!
-//! A record sits wherever a run that deployed executors wrote its `[upgrade_executors]` table:
-//! at the root of a forge init output (`DeployL1CoreContracts`, `DeployCTM`), and under `[core]` /
-//! `[ctms.<key>]` of a merged prepare package (`CoreUpgrade_v35`, `CTMUpgrade_v35`). Records from
-//! several files merge into one set; two DIFFERENT records of the same executor are refused, since
-//! the review cannot say which one describes the object it verifies.
+//! An executor record sits wherever a run that deployed executors wrote its `[upgrade_executors]`
+//! table: at the root of a forge init output (`DeployL1CoreContracts`, `DeployCTM`), and under
+//! `[core]` / `[ctms.<key>]` of a merged prepare package (`CoreUpgrade_v35`, `CTMUpgrade_v35`). A
+//! member record is a prepare's `[member_deployments]` table, found at the same three places.
+//! Records from several places merge into one set; two DIFFERENT records of the same object are
+//! refused, since the review cannot say which one describes the object it verifies.
 
 use std::path::Path;
 
 use anyhow::Context;
 
+use crate::common::forge::scripts::member_deployments::{self, MemberDeployments};
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
+
+/// Every `table` in `root` — at the root, under `[core]` and under each `[ctms.<key>]` — with the
+/// location it sits at.
+fn tables_named<'a>(root: &'a toml::Value, table: &str) -> Vec<(String, &'a toml::Value)> {
+    let mut locations: Vec<(String, &toml::Value)> = Vec::new();
+    if let Some(value) = root.get(table) {
+        locations.push((format!("[{table}]"), value));
+    }
+    if let Some(value) = root.get("core").and_then(|core| core.get(table)) {
+        locations.push((format!("[core.{table}]"), value));
+    }
+    if let Some(ctms) = root.get("ctms").and_then(toml::Value::as_table) {
+        for (key, ctm) in ctms {
+            if let Some(value) = ctm.get(table) {
+                locations.push((format!("[ctms.{key}.{table}]"), value));
+            }
+        }
+    }
+    locations
+}
 
 /// Every `[upgrade_executors]` table in `root` — at the root, under `[core]` and under each
 /// `[ctms.<key>]` — merged into one set. `source` names the file in errors.
@@ -24,30 +49,43 @@ pub(crate) fn records_in(
     root: &toml::Value,
     source: &str,
 ) -> anyhow::Result<UpgradeExecutorsRecord> {
-    let mut locations: Vec<(String, &toml::Value)> = Vec::new();
-    if let Some(value) = root.get("upgrade_executors") {
-        locations.push(("[upgrade_executors]".to_string(), value));
-    }
-    if let Some(value) = root
-        .get("core")
-        .and_then(|core| core.get("upgrade_executors"))
-    {
-        locations.push(("[core.upgrade_executors]".to_string(), value));
-    }
-    if let Some(ctms) = root.get("ctms").and_then(toml::Value::as_table) {
-        for (key, ctm) in ctms {
-            if let Some(value) = ctm.get("upgrade_executors") {
-                locations.push((format!("[ctms.{key}.upgrade_executors]"), value));
-            }
-        }
-    }
-
+    let locations = tables_named(root, "upgrade_executors");
     let mut merged = UpgradeExecutorsRecord::default();
     for (location, value) in locations {
         let record: UpgradeExecutorsRecord = value.clone().try_into().with_context(|| {
             format!("{source}: {location} does not decode as an executor record")
         })?;
         merge_records(&mut merged, record, &format!("{source} {location}"))?;
+    }
+    Ok(merged)
+}
+
+/// Every `[member_deployments]` table in `root` — at the root, under `[core]` and under each
+/// `[ctms.<key>]` — merged into one set. `source` names the file in errors. A package without
+/// any has no records: every member it newly installs is then unrecorded, which the review
+/// reports.
+pub(crate) fn member_records_in(
+    root: &toml::Value,
+    source: &str,
+) -> anyhow::Result<MemberDeployments> {
+    let mut merged = MemberDeployments::new();
+    for (location, value) in tables_named(root, "member_deployments") {
+        let entries = member_deployments::parse_table(value).with_context(|| {
+            format!("{source}: {location} does not decode as member deployment records")
+        })?;
+        for (address, record) in entries {
+            match merged.get(&address) {
+                None => {
+                    merged.insert(address, record);
+                }
+                Some(held) if *held == record => {}
+                Some(held) => anyhow::bail!(
+                    "conflicting member deployment records for {address}: {source} {location} \
+                     records {record:?}, but an earlier record says {held:?}. The review cannot \
+                     tell which one describes the deployed member"
+                ),
+            }
+        }
     }
     Ok(merged)
 }
@@ -307,5 +345,107 @@ mod tests {
         let path = dir.join("init.toml");
         std::fs::write(&path, nested("upgrade_executors", &ctm_record_toml())).unwrap();
         assert!(load_record_file(&path).unwrap().ctm_executor.is_some());
+    }
+
+    // ───────────────────────── member deployment records ─────────────────────────
+
+    fn member_toml(prefix: &str, key: &str, contract: &str) -> String {
+        format!(
+            "[{prefix}member_deployments.{key}]\n\
+             contract = \"{contract}\"\n\
+             create2_factory = \"0x4e59b44847b379578588920cA78FbF26c0B4956C\"\n\
+             create2_salt = \"{}\"\n\
+             constructor_args = \"0x\"\n",
+            B256::repeat_byte(0x5A)
+        )
+    }
+
+    fn members(body: &str) -> anyhow::Result<MemberDeployments> {
+        member_records_in(&toml::from_str(body).unwrap(), "test.toml")
+    }
+
+    const CHECKSUMMED: &str = "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed";
+
+    /// A prepare output carries its records at the root; a merged package under `[core]` and each
+    /// `[ctms.<key>]`. All are found and merge into one set.
+    #[test]
+    fn member_records_are_found_at_the_root_under_core_and_under_each_ctm() {
+        let a = Address::repeat_byte(0xA0).to_string();
+        let b = Address::repeat_byte(0xB0).to_string();
+        let c = Address::repeat_byte(0xC0).to_string();
+        let records = members(&format!(
+            "{}{}{}",
+            member_toml("", &a, "AdminFacet"),
+            member_toml("core.", &b, "L1MessageRoot"),
+            member_toml("ctms.zksync_os.", &c, "DefaultUpgrade")
+        ))
+        .unwrap();
+        assert_eq!(records.len(), 3);
+        let record = &records[&Address::repeat_byte(0xB0)];
+        assert_eq!(record.contract, "L1MessageRoot");
+        assert_eq!(record.create2_salt, B256::repeat_byte(0x5A));
+        assert!(record.constructor_args.is_empty());
+    }
+
+    /// Forge writes the key EIP-55 checksummed; the same deployment recorded twice — under two
+    /// spellings of its address, or at two places — is one statement.
+    #[test]
+    fn an_identical_member_record_duplicate_merges() {
+        let records = members(&format!(
+            "{}{}",
+            member_toml("core.", CHECKSUMMED, "AdminFacet"),
+            member_toml("ctms.zksync_os.", &CHECKSUMMED.to_lowercase(), "AdminFacet")
+        ))
+        .unwrap();
+        assert_eq!(records.len(), 1);
+        assert!(records.contains_key(&CHECKSUMMED.parse::<Address>().unwrap()));
+    }
+
+    #[test]
+    fn conflicting_member_records_are_refused() {
+        let err = members(&format!(
+            "{}{}",
+            member_toml("core.", CHECKSUMMED, "AdminFacet"),
+            member_toml("ctms.zksync_os.", CHECKSUMMED, "GettersFacet")
+        ))
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.contains("conflicting member deployment records"),
+            "{err}"
+        );
+    }
+
+    /// A field the format does not know would be an input the derivation ignores.
+    #[test]
+    fn an_unknown_record_field_is_refused() {
+        let body = format!(
+            "{}initializer = \"0x\"\n",
+            member_toml("", CHECKSUMMED, "AdminFacet")
+        );
+        let err = format!("{:#}", members(&body).unwrap_err());
+        assert!(err.contains("does not decode"), "{err}");
+    }
+
+    #[test]
+    fn a_key_that_is_no_address_is_refused() {
+        let err = format!(
+            "{:#}",
+            members(&member_toml("", "admin_facet", "AdminFacet")).unwrap_err()
+        );
+        assert!(err.contains("is not an address"), "{err}");
+    }
+
+    #[test]
+    fn a_package_without_member_records_has_none() {
+        assert!(
+            members("[core.registry]\ncore_transition_addr = \"0x00\"\n")
+                .unwrap()
+                .is_empty()
+        );
+        // The table an empty run writes.
+        assert!(members("[ctms.zksync_os.member_deployments]\n")
+            .unwrap()
+            .is_empty());
     }
 }

@@ -137,7 +137,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                 "ProxyUpgradeTransition"
             )
         );
-        coreTransition.validate();
     }
 
     /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a
@@ -610,6 +609,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         if (recorded) {
             vm.serializeString("root", "upgrade_executors", executorsRecord);
         }
+        serializeMemberDeployments();
         // The salt this run's CREATE2 deployments used, so a reviewer re-derives its objects
         // without being told it out of band.
         vm.serializeBytes32("root", "create2_factory_salt", _create2FactorySalt);
@@ -631,6 +631,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         // does not exist in the file yet, so append sections by re-serializing into the same
         // "root" object and rewriting the whole file instead.
         vm.serializeString("root", "external_actions", externalActionEntries());
+        serializeMemberDeployments();
         string memory updatedToml = vm.serializeString("root", "governance_calls", governanceCallsSerialized);
         vm.writeToml(updatedToml, upgradeConfig.outputPath);
     }

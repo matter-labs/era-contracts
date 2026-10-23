@@ -8,6 +8,7 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
+import {IAdminWithCut} from "./chain-interfaces/IAdminWithCut.sol";
 import {IMigrator} from "./chain-interfaces/IMigrator.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
@@ -16,7 +17,6 @@ import {ICTMRelease} from "../upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "../upgrades/registry/objects/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "../upgrades/registry/libraries/CTMUpgradeComposer.sol";
 import {L2PlanLib} from "../upgrades/registry/libraries/L2PlanLib.sol";
-import {ObjectAnchorLib} from "../upgrades/registry/libraries/ObjectAnchorLib.sol";
 import {BytecodesSupplier} from "../upgrades/BytecodesSupplier.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
@@ -37,6 +37,7 @@ import {
 import {ProtocolVersionTooSmall} from "../upgrades/ZkSyncUpgradeErrors.sol";
 import {
     ChainAlreadyLive,
+    GenesisBatchHashZero,
     NoCommittedUpgradeCutForVersion,
     ReleaseProtocolVersionMismatch,
     TransitionNotCommitted,
@@ -46,6 +47,7 @@ import {
 } from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
@@ -56,9 +58,6 @@ import {TxStatus} from "../common/Messaging.sol";
 contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
-
-    /// @notice Address of the interop center
-    address public immutable INTEROP_CENTER;
 
     /// @notice Address of the L1 bytecodes supplier used for upgrades
     address public immutable L1_BYTECODES_SUPPLIER;
@@ -176,13 +175,16 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// initialized.
     constructor(
         address _bridgehub,
-        address _interopCenter,
         address _l1BytecodesSupplier,
         address _permissionlessValidator,
         address _l1InteropFeeManager
     ) reentrancyGuardInitializer {
+        // Priority mode exists on L1 only, so a Gateway CTM (whose bridgehub is the L2 built-in) has
+        // no permissionless validator.
+        if (_bridgehub != L2_BRIDGEHUB_ADDR && _permissionlessValidator == address(0)) {
+            revert ZeroAddress();
+        }
         BRIDGE_HUB = _bridgehub;
-        INTEROP_CENTER = _interopCenter;
         L1_BYTECODES_SUPPLIER = _l1BytecodesSupplier;
         PERMISSIONLESS_VALIDATOR = _permissionlessValidator;
         L1_INTEROP_FEE_MANAGER = _l1InteropFeeManager;
@@ -219,6 +221,19 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev Out of the modifier so its body is not repeated at every guarded function.
     function _checkChainAssetHandler() private view {
         if (msg.sender != IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()) {
+            revert Unauthorized(msg.sender);
+        }
+    }
+
+    /// @notice the owner or the Bridgehub's owner can call
+    modifier onlyOwnerOrBridgehubOwner() {
+        _checkOwnerOrBridgehubOwner();
+        _;
+    }
+
+    /// @dev Out of the modifier so its body is not repeated at every guarded function.
+    function _checkOwnerOrBridgehubOwner() private view {
+        if (msg.sender != owner() && msg.sender != Ownable2StepUpgradeable(BRIDGE_HUB).owner()) {
             revert Unauthorized(msg.sender);
         }
     }
@@ -279,8 +294,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev THE single point every release passes through — initialization, every transition and
     ///      the bootstrap edge, each right after it moved `protocolVersion`: the release's own check
-    ///      surface, then its version. The genesis params need no check here: a release refuses a
-    ///      zero genesis batch hash at construction and a codeless genesis upgrade in `validate()`.
+    ///      surface, then its version and genesis batch hash.
     /// @dev The release is the one governance approved; its construction is verified off-chain,
     ///      not here — see "Provenance and validation" in {docs/registry-driven-upgrades.md}.
     function _setCurrentRelease(address _release) internal {
@@ -292,6 +306,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         uint256 releaseProtocolVersion = release.protocolVersion();
         if (releaseProtocolVersion != protocolVersion) {
             revert ReleaseProtocolVersionMismatch(protocolVersion, releaseProtocolVersion);
+        }
+        // slither-disable-next-line unused-return
+        (, bytes32 genesisBatchHash, ) = release.genesisParams();
+        if (genesisBatchHash == bytes32(0)) {
+            revert GenesisBatchHashZero();
         }
 
         currentRelease = _release;
@@ -365,7 +384,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev set ServerNotifier.
     /// @param _serverNotifier the new serverNotifier address
-    function setServerNotifier(address _serverNotifier) external onlyOwnerOrAdmin {
+    function setServerNotifier(address _serverNotifier) external onlyOwner {
         address oldServerNotifier = serverNotifierAddress;
         serverNotifierAddress = _serverNotifier;
         emit NewServerNotifier(oldServerNotifier, _serverNotifier);
@@ -387,6 +406,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         if (fromRelease != currentRelease) {
             revert TransitionReleaseMismatch(fromRelease, currentRelease);
         }
+        _requireExecutable(_transition);
         uint256 oldProtocolVersion = _transition.oldProtocolVersion();
         uint256 newProtocolVersion = _transition.newProtocolVersion();
         _commitVersionEdge(oldProtocolVersion, newProtocolVersion);
@@ -400,15 +420,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @inheritdoc IChainTypeManager
     /// @dev The recovery invariant this preserves is stated once in
     ///      {protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition}.
-    ///      Unlike a commit it moves neither `protocolVersion` nor `currentRelease`. The bytecode
-    ///      publication the executor checks before a commit is checked here, because this path is
-    ///      reached through the executor's `forward`.
+    ///      Unlike a commit it moves neither `protocolVersion` nor `currentRelease`.
     function replaceUpgradeTransition(
         ICTMTransition _expectedTransition,
         ICTMTransition _replacement
     ) external onlyOwner {
-        ObjectAnchorLib.requireCode(address(_expectedTransition));
-        ObjectAnchorLib.requireCode(address(_replacement));
         uint256 oldProtocolVersion = _expectedTransition.oldProtocolVersion();
         address committed = upgradeTransition[oldProtocolVersion];
         if (committed != address(_expectedTransition)) {
@@ -417,14 +433,22 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         if (address(_replacement) == committed) {
             revert UpgradeTransitionUnchanged(committed);
         }
-        _replacement.validate();
+        _requireExecutable(_replacement);
         _requireSameDeparture(_expectedTransition, _replacement);
         _requireSameDeadline(_expectedTransition, _replacement);
         _requireOnwardDestination(_expectedTransition, _replacement);
-        L2PlanLib.requirePublished(BytecodesSupplier(L1_BYTECODES_SUPPLIER), _replacement.l2Plan().factoryDepHashes);
 
         emit UpgradeTransitionReplaced(oldProtocolVersion, committed, address(_replacement));
         _recordTransition(oldProtocolVersion, _replacement.newProtocolVersion(), _replacement);
+    }
+
+    /// @dev What every transition this CTM commits — first or as a replacement — needs from the
+    ///      state at execution: the code it names, and every L2 bytecode its plan depends on
+    ///      published on the supplier, or the committed edge fails on every chain's L2 leg.
+    /// @param _transition The transition about to be committed.
+    function _requireExecutable(ICTMTransition _transition) private view {
+        _transition.validate();
+        L2PlanLib.requirePublished(BytecodesSupplier(L1_BYTECODES_SUPPLIER), _transition.l2Plan().factoryDepHashes);
     }
 
     /// @dev Records `_transition` as THE commitment for chains departing `_oldProtocolVersion`.
@@ -547,15 +571,17 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return block.timestamp <= protocolVersionDeadline(_protocolVersion);
     }
 
-    /// @dev freezes the specified chain
+    /// @notice Freezes the specified chain. Callable by the owner and by the Bridgehub's owner
+    ///         ({protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain}).
     /// @param _chainId the chainId of the chain
-    function freezeChain(uint256 _chainId) external onlyOwner {
+    function freezeChain(uint256 _chainId) external onlyOwnerOrBridgehubOwner {
         IZKChain(getZKChain(_chainId)).freezeDiamond();
     }
 
-    /// @dev unfreezes the specified chain
+    /// @notice Unfreezes the specified chain. Callable by the owner and by the Bridgehub's owner
+    ///         ({protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain}).
     /// @param _chainId the chainId of the chain
-    function unfreezeChain(uint256 _chainId) external onlyOwner {
+    function unfreezeChain(uint256 _chainId) external onlyOwnerOrBridgehubOwner {
         IZKChain(getZKChain(_chainId)).unfreezeDiamond();
     }
 
@@ -784,6 +810,21 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // Emit event with backward compatible hack.
         emit NewUpgradeCutData(newProtocolVersion, _cutData);
         _setCurrentRelease(_newRelease);
+    }
+
+    /// @dev execute predefined upgrade
+    /// @param _chainId the chainId of the chain
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _diamondCut the diamond cut data
+    // TODO(v36): DELETE — only chains on pre-v35 Admin facets route the cut-taking entrypoint; the
+    //            v35 bootstrap is the last edge they cross.
+    function upgradeChainFromVersion(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion,
+        Diamond.DiamondCutData calldata _diamondCut
+    ) external onlyOwner {
+        address chainAddress = getZKChain(_chainId);
+        IAdminWithCut(chainAddress).upgradeChainFromVersion(chainAddress, _oldProtocolVersion, _diamondCut);
     }
 
     /// @dev Re-commits the cut for a LEGACY-committed version (operational fix-up while pre-v35

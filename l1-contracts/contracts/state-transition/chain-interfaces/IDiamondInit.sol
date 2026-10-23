@@ -7,7 +7,7 @@ interface IDiamondInit {
     /// @dev The two arguments are the ONLY per-chain data a chain is created with; everything
     ///      else is read from the ChainTypeManager — which is simply `msg.sender`, since the CTM
     ///      is the one deploying the diamond proxy (and delegatecall preserves the sender) — and
-    ///      from the genesis registry / bridgehub it points at.
+    ///      from its current release and the bridgehub.
     /// @param _chainId The chain id of the new chain.
     /// @param _admin The address to be set as the chain's admin.
     function initialize(uint256 _chainId, address _admin) external returns (bytes32);

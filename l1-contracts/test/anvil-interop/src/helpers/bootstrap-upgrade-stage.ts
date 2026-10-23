@@ -10,19 +10,25 @@
  *   `upgradeChainFromVersion`, handing the committed cut.
  * - `assertBootstrapBundle`: the merged prepare's governance bundle is the one
  *   `RegistryBootstrapSequence.actions()` derives, ending in the completion check.
- * - `assertBootstrapCompleted`: the completion check re-run read-only after the governance replay.
- * - `assertBootstrapExecutorsGoverned`: the domain executors the migration names are the ones later
- *   hops discover through custody, and governance owns both outright.
+ * - `assertBootstrapCompleted`: the completion check re-run read-only after the governance replay,
+ *   and the edge's post-state read live.
  * - `assertServerNotifierState`: the ServerNotifier's custody (also used by the recurring runner).
  */
 
 import { ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
-import type { ExpectedCall, MergedGovernanceOutput } from "./governance-bundle";
+import type { ExpectedCall, GovernanceCall, MergedGovernanceOutput } from "./governance-bundle";
 import { assertBundleIs, governanceCallsOf } from "./governance-bundle";
+import { l1GasOverrides } from "./l1-transaction-gas";
 import { proxyUpgradeDomain, proxyUpgradeSlotIndex } from "./registry-manifest";
-import { discoverDomainExecutors, readProxyAdmin, readProxyImplementation } from "./upgrade-test-utils";
+import {
+  assertCtmDomainHeldBy,
+  discoverDomainExecutors,
+  mismatch,
+  readProxyAdmin,
+  readProxyImplementation,
+} from "./upgrade-test-utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -72,7 +78,7 @@ export async function installLegacyFacet(
     for (const chain of chains) {
       await sendAndCheck(
         l1Provider,
-        ctm.connect(signer).executeUpgrade(chain.chainId, addCut, { gasLimit: DEFAULT_GAS_LIMIT }),
+        ctm.connect(signer).executeUpgrade(chain.chainId, addCut, l1GasOverrides(DEFAULT_GAS_LIMIT)),
         `install legacy facet on chain ${chain.chainId}`
       );
     }
@@ -172,9 +178,30 @@ export async function deriveBootstrapBundle(
 }
 
 /**
+ * Throws unless `bundle` closes with a value-free completion check (`validateAppliedCalldata`) on
+ * the migration: nothing may run after it, so a failing check reverts the whole edge.
+ */
+export function assertBundleClosesWithCompletionCheck(
+  bundle: GovernanceCall[],
+  migrationAddr: string,
+  validateAppliedCalldata: string
+): void {
+  const closing = bundle[bundle.length - 1];
+  if (
+    !closing ||
+    closing.target.toLowerCase() !== migrationAddr.toLowerCase() ||
+    !closing.value.isZero() ||
+    closing.data.toLowerCase() !== validateAppliedCalldata.toLowerCase()
+  ) {
+    const got = closing ? `target ${closing.target}, selector ${closing.data.slice(0, 10)}` : "an empty bundle";
+    throw new Error(`the bootstrap bundle does not close with ${migrationAddr}.validateApplied() (got ${got})`);
+  }
+}
+
+/**
  * Throws unless the merged prepare output's governance bundle is exactly the derived bootstrap
  * bundle ({@link deriveBootstrapBundle}) — in particular, that it closes with the migration's
- * `validateApplied()`.
+ * `validateApplied()` ({@link assertBundleClosesWithCompletionCheck}).
  */
 export async function assertBootstrapBundle(
   l1Provider: ethers.providers.JsonRpcProvider,
@@ -183,17 +210,10 @@ export async function assertBootstrapBundle(
   coreTransition: string
 ): Promise<void> {
   const bundle = governanceCallsOf(merged);
-  const closing = bundle[bundle.length - 1];
   const validateApplied = new ethers.utils.Interface(getAbi("RegistryBootstrapMigration")).encodeFunctionData(
     "validateApplied"
   );
-  if (
-    !closing ||
-    closing.target.toLowerCase() !== migrationAddr.toLowerCase() ||
-    closing.data.toLowerCase() !== validateApplied.toLowerCase()
-  ) {
-    throw new Error(`the bootstrap bundle does not close with ${migrationAddr}.validateApplied()`);
-  }
+  assertBundleClosesWithCompletionCheck(bundle, migrationAddr, validateApplied);
   const expected = await deriveBootstrapBundle(l1Provider, migrationAddr, coreTransition);
   assertBundleIs(bundle, expected, "the bootstrap governance bundle");
   console.log(`  ✓ the governance bundle is the derived bootstrap sequence (${bundle.length} calls)`);
@@ -201,32 +221,83 @@ export async function assertBootstrapBundle(
 
 /**
  * Re-runs the edge's completion check, `RegistryBootstrapMigration.validateApplied()`, read-only
- * after the governance replay. The bundle's last call already enforces it, but the harness executes
- * the Safe bundles protocol-ops builds from the merged TOML, not the TOML whose shape it asserted;
- * this checks the state those left. A revert is rethrown with the decoded error.
+ * after the governance replay, then reads the edge's post-state live. The bundle's last call
+ * already enforces the check, but the harness executes the Safe bundles protocol-ops builds from
+ * the merged TOML, not the TOML whose shape it asserted; this checks the state those left. A revert
+ * is rethrown with the decoded error. Throws, naming every mismatch, unless the migration ran; the
+ * CTM is at the migration's version on the
+ * release its manifest pins; every row of the core transition and every participating CTM-domain
+ * row runs its `implNew`; the migration's CTM executor holds the CTM domain
+ * ({@link assertCtmDomainHeldBy}) with the manifest's ProxyAdmin and ServerNotifier; and governance
+ * owns both executors ({@link assertBootstrapExecutorsGoverned}).
+ * @param params.coreTransition The Core-domain `ProxyUpgradeTransition` the bundle applied (the
+ *        migration's manifest does not name it).
+ * @param params.ecosystemProxyAdmin The ecosystem ProxyAdmin (the MessageRoot proxy's admin).
  */
 export async function assertBootstrapCompleted(
   l1Provider: ethers.providers.JsonRpcProvider,
-  migrationAddr: string
+  params: { migration: string; coreTransition: string; ecosystemProxyAdmin: string; governance: string }
 ): Promise<void> {
-  const migration = new ethers.Contract(migrationAddr, getAbi("RegistryBootstrapMigration"), l1Provider);
+  const migration = new ethers.Contract(params.migration, getAbi("RegistryBootstrapMigration"), l1Provider);
   try {
     await migration.validateApplied();
   } catch (error) {
     const e = error as { errorName?: string; errorArgs?: unknown[]; message?: string };
     const reason = e.errorName ? `${e.errorName}(${(e.errorArgs ?? []).join(", ")})` : e.message;
-    throw new Error(`RegistryBootstrapMigration ${migrationAddr}: validateApplied() reverted: ${reason}`);
+    throw new Error(`RegistryBootstrapMigration ${params.migration}: validateApplied() reverted: ${reason}`);
   }
   console.log("  ✓ RegistryBootstrapMigration.validateApplied() holds");
+  const m = await migration.getManifest();
+  const ctm = new ethers.Contract(m.ctm, getAbi("IChainTypeManager"), l1Provider);
+  const coreRows: Array<{ proxy: string; implNew: string }> = await new ethers.Contract(
+    params.coreTransition,
+    getAbi("IProxyUpgradeTransition"),
+    l1Provider
+  ).rows();
+  const ctmRows = (m.ctmProxyUpgrades as Array<{ proxy: string; implNew: string }>).filter(
+    (row) => row.implNew !== ethers.constants.AddressZero
+  );
+  const problems = [
+    ...mismatch("migration executed()", await migration.executed(), true),
+    ...mismatch("CTM protocolVersion()", await ctm.protocolVersion(), await migration.newProtocolVersion()),
+    ...mismatch("CTM currentRelease()", await ctm.currentRelease(), m.currentRelease),
+  ];
+  for (const [domain, rows] of [
+    ["core", coreRows],
+    ["CTM-domain", ctmRows],
+  ] as const) {
+    for (const row of rows) {
+      const live = await readProxyImplementation(l1Provider, row.proxy);
+      problems.push(...mismatch(`${domain} row ${row.proxy} implementation`, live, row.implNew));
+    }
+  }
+  if (problems.length !== 0) {
+    throw new Error(`RegistryBootstrapMigration ${params.migration} did not complete:\n${problems.join("\n")}`);
+  }
+
+  const held = await assertCtmDomainHeldBy(l1Provider, m.ctm, m.ctmExecutor);
+  const manifestNotifier: string = m.ctmProxyUpgrades[proxyUpgradeSlotIndex("CTMContract", "ServerNotifier")].proxy;
+  const custody = [
+    ...mismatch("CTM ProxyAdmin", held.ctmProxyAdmin, m.ctmProxyAdmin),
+    ...mismatch("CTM serverNotifierAddress()", held.serverNotifier, manifestNotifier),
+  ];
+  if (custody.length !== 0) {
+    throw new Error(`the CTM domain is not the one migration ${params.migration} names:\n${custody.join("\n")}`);
+  }
+  await assertBootstrapExecutorsGoverned(l1Provider, params.migration, params.ecosystemProxyAdmin, params.governance);
+  console.log(
+    `  ✓ the bootstrap completed: CTM at ${(await ctm.protocolVersion()).toHexString()} on release ` +
+      `${m.currentRelease}, ${coreRows.length + ctmRows.length} row(s) at implNew, the CTM domain held by ${m.ctmExecutor}`
+  );
 }
 
 /**
- * After the governance replay: the executors later hops discover through custody (the CTM's owner,
- * the ecosystem ProxyAdmin's owner) are exactly the two the migration names, and governance owns
- * both with no nomination pending.
+ * The executors later hops discover through custody (the CTM's owner, the ecosystem ProxyAdmin's
+ * owner) are exactly the two the migration names, and governance owns both with no nomination
+ * pending.
  * @param ecosystemProxyAdmin The ecosystem ProxyAdmin (the MessageRoot proxy's admin).
  */
-export async function assertBootstrapExecutorsGoverned(
+async function assertBootstrapExecutorsGoverned(
   l1Provider: ethers.providers.JsonRpcProvider,
   migrationAddr: string,
   ecosystemProxyAdmin: string,
@@ -325,7 +396,7 @@ export async function crossBootstrapEdgeOnChains(
     await impersonateAndRun(l1Provider, admin, async (signer) => {
       await sendAndCheck(
         l1Provider,
-        signer.sendTransaction({ to: chain.diamondProxy, data, gasLimit: DEFAULT_GAS_LIMIT }),
+        signer.sendTransaction({ to: chain.diamondProxy, data, ...l1GasOverrides(DEFAULT_GAS_LIMIT) }),
         `chain ${chain.chainId}: legacy upgradeChainFromVersion(handed cut)`
       );
     });

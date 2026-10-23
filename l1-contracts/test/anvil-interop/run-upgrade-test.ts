@@ -32,8 +32,13 @@ runPipelineUpgradeScenario({
   installLegacyCutTakingFacet: false,
   // gwSettled chains are not covered: their upgrade routes through the gateway CTM, which the
   // registry model cannot bump yet (no EraVM-deployable release). Chain 10 (L1-settled) and 11
-  // (the gateway itself, which settles on L1) are the supported shapes.
+  // (the gateway itself, which settles on L1) are the supported shapes. The runner keeps only the
+  // chains that settle on L1 in the source states, since chains 12 and 14 settle on the gateway in
+  // the v0.34.0 states but on L1 in the current config.
   targetRoles: ["directSettled", "gateway"],
+  // Runs on the two target chains: the gateway stands in as an ordinary L1-settled peer, being the
+  // only other chain the upgrade covers.
+  checkInteropGating: true,
   // Then two registry-driven hops on the bootstrapped ecosystem, each departing from the state the
   // previous one left, both driven by the base prepare pipeline and both emitting a governance bundle
   // of exactly the ordered domain-executor legs the hop needs (`applyL1Upgrade` when the ecosystem

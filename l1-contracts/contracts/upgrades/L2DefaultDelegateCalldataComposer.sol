@@ -26,7 +26,11 @@ contract L2DefaultDelegateCalldataComposer is IL2DelegateCalldataComposer {
                 (
                     address(IBridgehubBase(_bridgehub).l1CtmDeployer()),
                     _newRelease.fixedForceDeploymentsData(),
-                    ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId)
+                    ZKChainSpecificForceDeploymentsLib.build({
+                        _bridgehub: _bridgehub,
+                        _chainId: _chainId,
+                        _isGenesis: false
+                    })
                 )
             );
     }

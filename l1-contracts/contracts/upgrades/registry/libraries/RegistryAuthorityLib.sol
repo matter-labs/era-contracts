@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ObjectAnchorLib} from "./ObjectAnchorLib.sol";
 import {CTMUpgradeExecutor} from "../executors/CTMUpgradeExecutor.sol";
@@ -86,10 +85,8 @@ library RegistryAuthorityLib {
         }
     }
 
-    /// @notice Reverts unless the ServerNotifier is the CTM's and serves it, sits under the CTM-domain
-    ///         `ProxyAdmin`, and is owned by the CTM executor with no nomination outstanding.
-    /// @dev `getProxyAdmin` reverts without data while the proxy is still under another admin: a
-    ///      transparent proxy answers `admin()` only to its own admin.
+    /// @notice Reverts unless the ServerNotifier is the CTM's and serves it, and is owned by the CTM
+    ///         executor with no nomination outstanding.
     /// @param _a The authority shape to check.
     function requireNotifierHandedOver(Authority memory _a) internal view {
         address ctmNotifier = IChainTypeManager(_a.ctm).serverNotifierAddress();
@@ -105,10 +102,6 @@ library RegistryAuthorityLib {
             revert BootstrapAuthorityNotHeld(_a.serverNotifier, notifierOwner);
         }
         requireNoNomination(_a.serverNotifier);
-        address notifierAdmin = _a.ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(_a.serverNotifier));
-        if (notifierAdmin != address(_a.ctmProxyAdmin)) {
-            revert BootstrapAuthorityNotHeld(_a.serverNotifier, notifierAdmin);
-        }
     }
 
     /// @notice Reverts while an `Ownable2Step` nomination is outstanding on `_target`.

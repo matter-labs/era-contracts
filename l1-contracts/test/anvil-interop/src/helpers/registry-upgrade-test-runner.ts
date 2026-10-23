@@ -17,8 +17,9 @@
  *   4. CONSUME the committed manifest scripts/registry-manifests/v35-local.json (any drift from the
  *      live deployment fails), or with `REGEN_REGISTRIES=1` EMIT it from the live deployment; then
  *      deploy the `CTMRelease`, the Core-domain `ProxyUpgradeTransition` (plus a CTM-domain one when
- *      the manifest changes a CTM-domain proxy) and the `CTMTransition` from it and `validate()` them.
- *      The transition departs from the CTM's live `currentRelease`.
+ *      the manifest changes a CTM-domain proxy) and the `CTMTransition` from it, and run the
+ *      release's and the transition's `validate()`. The transition departs from the CTM's live
+ *      `currentRelease`.
  *   5. Governance accepts its nomination on both executors (a fresh deployment only nominates it),
  *      then executes ONE bundle through the ecosystem `Governance` (`scheduleTransparent` +
  *      `execute`): `applyL1Upgrade` -> [`applyInfrastructureUpgrade`] -> `applyCTMUpgrade`. A bundle
@@ -66,10 +67,12 @@ import {
   transitionInitArgs,
 } from "./registry-manifest";
 import { assertServerNotifierState } from "./bootstrap-upgrade-stage";
+import { l1GasOverrides } from "./l1-transaction-gas";
 import type { ExpectedCall, UpgradeLeg } from "./governance-bundle";
 import type { ChainRole } from "../core/types";
 import { BatchSettler } from "./batch-settlement";
 import {
+  assertCtmTransitionApplied,
   assertLegsApplied,
   discoverDomainExecutors,
   readProxyImplementation,
@@ -122,6 +125,8 @@ const DETERMINISTIC_SOURCES = [
   "contracts/state-transition/chain-deps/DiamondInit.sol",
   "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol",
   "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
+  "contracts/state-transition/verifiers/MultiProofVerifier.sol",
+  "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol",
   "contracts/core/message-root/L1MessageRoot.sol",
   "contracts/dev-contracts/MockContractDeployer.sol",
   "contracts/upgrades/registry/objects/CTMRelease.sol",
@@ -260,6 +265,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       rollupDAManager: live.rollupDAManager,
       bridgehub: l1Addresses.bridgehub,
       chainAssetHandler: live.chainAssetHandler,
+      ziskRangeVerifier: live.ziskRangeVerifier,
     });
 
     // ── 4. Regenerate (EMIT) or validate (CONSUME) the committed manifest, then deploy the
@@ -297,9 +303,10 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       { kind: "ctmTransition", executor: executors.ctmExecutor, object: objects.transition },
     ];
 
-    // `validate()` is what the executors call on the execution path; running it here makes a
-    // manifest naming an address without code fail in this step rather than mid-upgrade. The row
-    // objects' snapshot validates them, checks their domain and records each row's source.
+    // The CTM runs these `validate()`s itself (the transition's at commit, the release's at
+    // install); running them here makes a manifest naming an address without code fail in this
+    // step rather than mid-upgrade. The row objects' snapshot checks their domain and records each
+    // row's source.
     const releaseContract = new ethers.Contract(objects.release, getAbi("ICTMRelease"), l1Provider);
     const transition = new ethers.Contract(objects.transition, getAbi("ICTMTransition"), l1Provider);
     let rowSnapshots: Awaited<ReturnType<typeof snapshotProxyUpgradeLegs>>;
@@ -381,8 +388,14 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       live.newVersion.toString(),
       "CTMUpgradeApplied records the new version"
     );
-    await ctmExecutor.validateTransitionApplied(objects.transition);
-    console.log("  ✓ validateTransitionApplied(transition) holds after the bundle");
+    await assertCtmTransitionApplied(
+      l1Provider,
+      ctm.address,
+      objects.transition,
+      live.oldVersion,
+      executors.ctmExecutor
+    );
+    console.log("  ✓ the CTM commits the transition and runs its release; the CTM executor holds the CTM domain");
 
     // Settled only now: it sends from the deployer, whose nonces the manifest's addresses depend on.
     console.log("\n── Settling a batch on each target chain ──");
@@ -400,7 +413,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       await sendAsOwner(
         l1Provider,
         ctmExecutor,
-        (c) => c.upgradeChain(objects.transition, chain.chainId, { gasLimit: DEFAULT_GAS_LIMIT }),
+        (c) => c.upgradeChain(objects.transition, chain.chainId, l1GasOverrides(DEFAULT_GAS_LIMIT)),
         `ctmExecutor.upgradeChain(transition) for chain ${chain.chainId}`
       );
       console.log(`  ✓ chain ${chain.chainId} upgraded`);
@@ -423,11 +436,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       await ctm.currentRelease(),
       objects.release,
       "CTM currentRelease moved to the transition's target release"
-    );
-    assertEq(
-      await ctm.upgradeTransition(live.oldVersion),
-      objects.transition,
-      "CTM transition committed for the departing version"
     );
     assertEq(
       await ctm.upgradeCutHash(live.oldVersion),
@@ -529,6 +537,8 @@ type LiveUpgradeInputs = {
   messageRootProxy: string;
   /** The proxy's live (pre-upgrade) implementation — the source side of the ecosystem edge. */
   messageRootImplOld: string;
+  /** The live multi-proof verifier's ZiSK side, which the fresh multi-proof verifier reuses. */
+  ziskRangeVerifier: string;
 };
 
 /** The probed live facet address by name (see readLiveUpgradeInputs facet probes). */
@@ -607,6 +617,19 @@ async function readLiveUpgradeInputs(
   const adminFacetView = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("AdminFacet"), l1Provider);
   const rollupDAManager: string = await adminFacetView.getRollupDAManager();
 
+  // The harness CTM deploys a multi-proof testnet verifier (`multi_proof_verifier` in its config).
+  const liveVerifier = new ethers.Contract(
+    await firstDiamond.getVerifier(),
+    getAbi("MultiProofTestnetVerifier"),
+    l1Provider
+  );
+  const liveMultiProofVerifier = new ethers.Contract(
+    await liveVerifier.INNER_VERIFIER(),
+    getAbi("MultiProofVerifier"),
+    l1Provider
+  );
+  const ziskRangeVerifier: string = await liveMultiProofVerifier.ZISK_RANGE_VERIFIER();
+
   const genesisUpgrade: string = await ctm.l1GenesisUpgrade();
 
   const bridgehubAddr: string = await ctm.BRIDGE_HUB();
@@ -637,6 +660,7 @@ async function readLiveUpgradeInputs(
     ecosystemProxyAdmin: await readAddressSlot(messageRootProxy, EIP1967_ADMIN_SLOT),
     messageRootProxy,
     messageRootImplOld: await readAddressSlot(messageRootProxy, EIP1967_IMPL_SLOT),
+    ziskRangeVerifier,
   };
 }
 
@@ -725,14 +749,18 @@ async function executeGovernanceBundle(
     const connected = governance.connect(signer);
     await sendAndCheck(
       l1Provider,
-      connected.scheduleTransparent(operation, delay, { gasLimit: DEFAULT_GAS_LIMIT }),
+      connected.scheduleTransparent(operation, delay, l1GasOverrides(DEFAULT_GAS_LIMIT)),
       `${label}: Governance.scheduleTransparent`
     );
     if (!delay.isZero()) {
       await l1Provider.send("evm_increaseTime", [delay.toNumber()]);
       await l1Provider.send("evm_mine", []);
     }
-    const execute = connected.execute(operation, { gasLimit: DEFAULT_GAS_LIMIT });
+    // A tx expected to revert cannot be estimated, so it keeps the fixed limit under either gas rules.
+    const execute = connected.execute(
+      operation,
+      expectRevert ? { gasLimit: DEFAULT_GAS_LIMIT } : l1GasOverrides(DEFAULT_GAS_LIMIT)
+    );
     if (!expectRevert) {
       return sendAndCheck(l1Provider, execute, `${label}: Governance.execute`);
     }
@@ -802,6 +830,7 @@ async function deployUpgradeImplementations(
     rollupDAManager: string;
     bridgehub: string;
     chainAssetHandler: string;
+    ziskRangeVerifier: string;
   }
 ): Promise<DeployedImplementations> {
   const deployFrom = async (
@@ -852,10 +881,17 @@ async function deployUpgradeImplementations(
     newCommitterFacet: await deployDeterministic("CommitterFacet", [params.l1ChainId]),
     newDefaultUpgrade: await deployDeterministic("DefaultUpgrade", []),
     newDiamondInit: await deployDeterministic("DiamondInit", []),
-    // The ZKsync OS testnet verifier over the plonk sub-verifier deployed above; no proofs are
-    // verified in this harness.
+    // A multi-proof testnet verifier like the live one: the ZKsync OS testnet verifier over the plonk
+    // sub-verifier deployed above, next to the live ZiSK side. Interop chains require the second
+    // proof system ({protocol-docs/interop-gating.md#second-proof-system-requirement}), so a
+    // single-proof verifier would not be accepted. No proofs are verified in this harness.
     newVerifierPlonk,
-    newVerifier: await deployDeterministic("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
+    newVerifier: await deployDeterministic("MultiProofTestnetVerifier", [
+      await deployDeterministic("MultiProofVerifier", [
+        await deployDeterministic("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
+        params.ziskRangeVerifier,
+      ]),
+    ]),
     // Ecosystem leg: a fresh L1MessageRoot implementation with the live immutable values.
     newMessageRootImpl: await deployDeterministic("L1MessageRoot", [params.bridgehub, params.chainAssetHandler]),
   };

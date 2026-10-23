@@ -22,11 +22,4 @@ interface IProxyUpgradeTransition is IManifestHash {
     /// @notice Every proxy participating in this upgrade, as complete typed rows (the slots marked
     ///         "not upgraded" are dropped).
     function rows() external view returns (ProxyUpgradeRow[] memory);
-
-    /// @notice Reverts unless every row's `implNew` is deployed code. The executors call it before
-    ///         applying the rows.
-    /// @dev It does NOT attest that the code is the reviewed code — that is governance's
-    ///      approval of this object's row ADDRESSES, established off-chain before approval (see
-    ///      {docs/registry-driven-upgrades.md}).
-    function validate() external view;
 }

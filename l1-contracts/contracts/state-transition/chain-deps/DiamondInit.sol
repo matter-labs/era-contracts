@@ -52,6 +52,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     function initialize(uint256 _chainId, address _admin) public virtual reentrancyGuardInitializer returns (bytes32) {
         IChainTypeManager ctm = IChainTypeManager(msg.sender);
         address bridgehub = ctm.BRIDGE_HUB();
+        if (bridgehub == address(0)) {
+            revert ZeroAddress();
+        }
         uint256 protocolVersion = ctm.protocolVersion();
         address validatorTimelock = ctm.validatorTimelockPostV29();
         // Registered by the bridgehub before it calls into the CTM, in both the chain-creation
@@ -64,22 +67,18 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         if (validatorTimelock == address(0)) {
             revert ZeroAddress();
         }
-        if (bridgehub == address(0)) {
-            revert ZeroAddress();
-        }
         if (baseTokenAssetId == bytes32(0)) {
             revert EmptyAssetId();
         }
 
-        // Everything chain-independent is read from the current release the CTM pins — the
-        // committed chain-creation cut carries no init payload. Facets are installed here, by the
-        // init itself, from the release's facet rows and each facet's own self-description.
+        // Everything chain-independent is read from the current release the CTM pins. Facets are
+        // installed here, by the init itself, from the release's facet rows and each facet's own
+        // self-description.
         address currentRelease = ctm.currentRelease();
         if (currentRelease == address(0)) {
             revert ZeroAddress();
         }
         ICTMRelease release = ICTMRelease(currentRelease);
-        release.validate();
         Diamond.FacetCut[] memory facetCuts = ReleaseFacetReader.newChainInstallations(release);
         if (facetCuts.length != 0) {
             Diamond.diamondCut(

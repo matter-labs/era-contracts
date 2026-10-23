@@ -24,10 +24,13 @@ use super::genesis::GenesisImage;
 use super::lifecycle::{
     verify_executor_owners, verify_lifecycle_construction, CtmExecutorReview, LifecycleReview,
 };
+use super::member_construction::{MemberReview, ReviewedEnv};
 use super::package::{DeadlineChange, RecoveredReplacement, ReplacementPackage};
 use super::provenance::{expect_code_present, tolerate};
 use super::shell::verify_shell_kept;
-use super::upgrade::{cross_check, verify_bytecodes_published, verify_transition, ArrivingRelease};
+use super::upgrade::{
+    cross_check, verify_bytecodes_published, verify_transition, ArrivingRelease, Publication,
+};
 use super::views::{CTMTransitionView, CtmView};
 
 /// Verify a transition replacement against the live L1 it targets.
@@ -39,10 +42,12 @@ pub(crate) async fn verify<P: Provider>(
     package: &ReplacementPackage,
     expected_governance_owner: Option<Address>,
     salts: &[B256],
+    env: &ReviewedEnv,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     let mut reviewed: BTreeMap<Address, String> = BTreeMap::new();
     let forward = &package.forward;
+    let members = MemberReview::new(&package.member_records, env, Some(forward.ctm), None);
 
     result.print_info("== Package ==");
     result.report_ok(&format!(
@@ -97,6 +102,7 @@ pub(crate) async fn verify<P: Provider>(
         build,
         ArrivingRelease::Existing,
         result,
+        &members,
         "the replacement transition",
         forward.replacement,
         salts,
@@ -206,7 +212,17 @@ pub(crate) async fn verify<P: Provider>(
 
     // ── 4. Readiness ──
     result.print_info("\n== Readiness ==");
-    verify_bytecodes_published(provider, result, &ctm, forward.replacement).await?;
+    verify_bytecodes_published(
+        provider,
+        result,
+        &ctm,
+        Publication {
+            object: forward.replacement,
+            label: "the replacement",
+            required_by: "`ChainTypeManager.replaceUpgradeTransition`",
+        },
+    )
+    .await?;
 
     // ── 5. The L2 proxy logic chains crossing the edge keep ──
     if let Some(edge) = &replacement_edge {
@@ -238,6 +254,7 @@ pub(crate) async fn verify<P: Provider>(
     for action in &package.external_actions {
         result.print_info(&format!("    · {}", action.describe()));
     }
+    members.report_unconsulted(result);
     Ok(())
 }
 
@@ -701,6 +718,7 @@ mod tests {
                 reported_old_version: None,
                 reported_new_version: None,
                 executor_records: Default::default(),
+                member_records: Default::default(),
             };
             let mut result = VerificationResult::default();
             verify(
@@ -710,6 +728,7 @@ mod tests {
                 &package,
                 Some(GOVERNANCE),
                 &[],
+                &ReviewedEnv::default(),
                 &mut result,
             )
             .await
@@ -809,11 +828,17 @@ mod tests {
         assert_eq!(judge(&facts).errors, 1);
     }
 
+    /// The error names the CTM's own refusal, so the report says which on-chain check it predicts.
+    fn assert_refused_with(result: &VerificationResult, error: &str) {
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error(error), "{:?}", result.error_messages);
+    }
+
     #[test]
     fn a_replacement_identical_to_the_expected_fails() {
         let mut facts = facts();
         facts.replacement.address = T34;
-        assert_eq!(judge(&facts).errors, 1);
+        assert_refused_with(&judge(&facts), "UpgradeTransitionUnchanged");
     }
 
     /// The source is the replaced transition's release, NOT the CTM's current release: a
@@ -829,7 +854,7 @@ mod tests {
     fn a_replacement_pinning_another_deadline_fails() {
         let mut facts = facts();
         facts.replacement.deadline = v(DEADLINE + 1);
-        assert_eq!(judge(&facts).errors, 1);
+        assert_refused_with(&judge(&facts), "TransitionDeadlineMismatch");
     }
 
     /// Lower than what it replaces, even onto a release a chain could continue from.
@@ -839,7 +864,7 @@ mod tests {
         facts.replacement.new_version = v(V34 + 1);
         facts.replacement.new_release = Address::repeat_byte(0x3F);
         facts.onward = Some((Address::repeat_byte(0xAF), Some(Address::repeat_byte(0x3F))));
-        assert_eq!(judge(&facts).errors, 1);
+        assert_refused_with(&judge(&facts), "ProtocolVersionTooSmall");
     }
 
     /// Landing on a release the onward edge does not depart from: chains would be stranded.
@@ -909,10 +934,22 @@ mod tests {
         let published = (B256::repeat_byte(0x01), Some(v(17)));
         let unpublished = (B256::repeat_byte(0x02), Some(U256::ZERO));
         let mut result = VerificationResult::default();
-        judge_bytecode_publication(&mut result, supplier, &[published, unpublished]);
+        let required_by = "`ChainTypeManager.replaceUpgradeTransition`";
+        judge_bytecode_publication(
+            &mut result,
+            supplier,
+            &[published, unpublished],
+            required_by,
+        );
         assert_eq!(result.errors, 1);
+        assert!(result.has_error("`ChainTypeManager.replaceUpgradeTransition` refuses it"));
         let mut result = VerificationResult::default();
-        judge_bytecode_publication(&mut result, supplier, &[published, (B256::ZERO, None)]);
+        judge_bytecode_publication(
+            &mut result,
+            supplier,
+            &[published, (B256::ZERO, None)],
+            required_by,
+        );
         assert_eq!(
             result.errors, 0,
             "an unreadable block was reported when read"

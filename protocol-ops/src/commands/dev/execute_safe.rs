@@ -166,11 +166,10 @@ impl ResumeJournal {
 
 /// Per-tx gas estimate buffer in basis points (12500 = 125% = 25% headroom).
 const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
-/// Maximum per-tx gas limit: EIP-7825's transaction gas cap (2^24), which
-/// mainnet and Sepolia enforce since Fusaka. A tx declaring more is refused at
-/// send even when its execution would fit. It is also below reth's elastic
-/// block gas limit (~30M on a quiet chain), so a single tx never equals or
-/// exceeds the block limit (which reth rejects with `gas limit too high`).
+/// EIP-7825's transaction gas cap (2^24), enforced on mainnet and Sepolia since
+/// Fusaka. Before Glamsterdam a tx declaring more is refused at send even when
+/// its execution would fit; from Glamsterdam (EIP-8037) it bounds only
+/// execution gas, and state gas lets `tx.gas` exceed it (see `buffered_gas_limit`).
 const PER_TX_GAS_LIMIT_CAP: u64 = 1 << 24;
 /// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
 /// it (anvil/reth on a quiet local chain reports near-zero).
@@ -233,11 +232,31 @@ fn format_gwei(gas_price: u128) -> String {
 }
 
 /// Gas limit for a call whose `eth_estimateGas` returned `estimate`: the
-/// estimate plus `GAS_ESTIMATE_BUFFER_BPS` headroom, clamped to
-/// `PER_TX_GAS_LIMIT_CAP`.
-fn buffered_gas_limit(estimate: u64) -> u64 {
+/// estimate plus `GAS_ESTIMATE_BUFFER_BPS` headroom. An estimate within
+/// `PER_TX_GAS_LIMIT_CAP` keeps the buffered limit within it, because a
+/// pre-Glamsterdam node refuses a tx declaring more. Such a node never
+/// estimates above the cap, so a larger estimate comes from Glamsterdam rules,
+/// where the limit is bounded by `block_gas_limit` instead (a tx declaring more
+/// than the block holds is refused too).
+fn buffered_gas_limit(estimate: u64, block_gas_limit: u64) -> u64 {
     let buffered = estimate.saturating_mul(GAS_ESTIMATE_BUFFER_BPS) / 10_000;
-    std::cmp::min(buffered, PER_TX_GAS_LIMIT_CAP)
+    let ceiling = if estimate <= PER_TX_GAS_LIMIT_CAP {
+        PER_TX_GAS_LIMIT_CAP
+    } else {
+        block_gas_limit
+    };
+    std::cmp::max(estimate, std::cmp::min(buffered, ceiling))
+}
+
+/// Gas limit of the latest L1 block, the ceiling `buffered_gas_limit` uses for
+/// estimates above `PER_TX_GAS_LIMIT_CAP`.
+async fn latest_block_gas_limit<P: Provider>(provider: &P) -> anyhow::Result<u64> {
+    let block = provider
+        .get_block_by_number(alloy::eips::BlockNumberOrTag::Latest)
+        .await
+        .context("eth_getBlockByNumber(latest)")?
+        .ok_or_else(|| anyhow::anyhow!("eth_getBlockByNumber(latest) returned no block"))?;
+    Ok(block.header.gas_limit)
 }
 
 /// Next gas price for a stuck-tx retry, or `None` once at/above the ceiling.
@@ -643,6 +662,7 @@ pub async fn execute_one_bundle(
         "Gas-price ceiling {} gwei (bumps stuck txs up to this)",
         format_gwei(max_gas_price_wei)
     ));
+    let block_gas_limit = latest_block_gas_limit(&provider).await?;
 
     // Parse + sign + submit each tx sequentially, awaiting its receipt
     // before the next. Some bundle txs depend on contracts deployed by
@@ -689,15 +709,14 @@ pub async fn execute_one_bundle(
         }
 
         // Estimate gas per tx so we don't trip node-side `gas limit too
-        // high` rejections, then add headroom within the per-tx cap (see
-        // `buffered_gas_limit`).
+        // high` rejections, then add headroom (see `buffered_gas_limit`).
         let estimate_req = TransactionRequest::default()
             .with_from(from)
             .with_to(to)
             .with_input(data.clone())
             .with_value(value);
         let gas_limit: u64 = match provider.estimate_gas(estimate_req).await {
-            Ok(est) => buffered_gas_limit(est),
+            Ok(est) => buffered_gas_limit(est, block_gas_limit),
             Err(e) => {
                 // Idempotent skip: if estimation fails and the tx targets the
                 // CREATE2 factory, check whether the output address already has
@@ -1239,6 +1258,7 @@ pub async fn execute_one_bundle_unlocked(
     // in during prepare with a much lower gas price.
     let gas_price = GAS_PRICE_FLOOR_WEI;
     logger::info(format!("Using gas price {} gwei", format_gwei(gas_price)));
+    let block_gas_limit = latest_block_gas_limit(&provider).await?;
 
     let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
@@ -1284,7 +1304,7 @@ pub async fn execute_one_bundle_unlocked(
             .with_input(data.clone())
             .with_value(value);
         let gas_limit: u64 = match provider.estimate_gas(estimate_req).await {
-            Ok(estimated) => buffered_gas_limit(estimated),
+            Ok(estimated) => buffered_gas_limit(estimated, block_gas_limit),
             Err(e) => {
                 // Keep unlocked replay idempotent like the signed path:
                 // skip already-deployed CREATE2 txs / known already-done ops.
@@ -1713,11 +1733,24 @@ mod tests {
     /// smaller estimates keep their full buffer.
     #[test]
     fn buffered_gas_limit_stays_within_the_eip7825_cap() {
+        const BLOCK: u64 = 60_000_000;
         assert_eq!(super::PER_TX_GAS_LIMIT_CAP, 16_777_216);
-        assert_eq!(super::buffered_gas_limit(1_000_000), 1_250_000);
-        assert_eq!(super::buffered_gas_limit(13_421_772), 16_777_215);
-        assert_eq!(super::buffered_gas_limit(14_000_000), 16_777_216);
-        assert_eq!(super::buffered_gas_limit(u64::MAX), 16_777_216);
+        assert_eq!(super::buffered_gas_limit(1_000_000, BLOCK), 1_250_000);
+        assert_eq!(super::buffered_gas_limit(13_421_772, BLOCK), 16_777_215);
+        assert_eq!(super::buffered_gas_limit(14_000_000, BLOCK), 16_777_216);
+        assert_eq!(super::buffered_gas_limit(16_777_216, BLOCK), 16_777_216);
+    }
+
+    /// Under Glamsterdam (EIP-8037) a deploy's state gas lets its estimate
+    /// exceed 2^24; the buffer then stops at the block gas limit, and never
+    /// goes below the estimate itself.
+    #[test]
+    fn buffered_gas_limit_above_the_cap_is_bounded_by_the_block() {
+        const BLOCK: u64 = 60_000_000;
+        assert_eq!(super::buffered_gas_limit(16_777_217, BLOCK), 20_971_521);
+        assert_eq!(super::buffered_gas_limit(29_109_458, BLOCK), 36_386_822);
+        assert_eq!(super::buffered_gas_limit(55_000_000, BLOCK), BLOCK);
+        assert_eq!(super::buffered_gas_limit(BLOCK, BLOCK), BLOCK);
     }
 
     /// A spent nonce we never sent at (a stale pending nonce) is resent at the

@@ -17,8 +17,8 @@
 //! and the length — to match ([`super::construction::ReviewedArtifact::is_runtime_of`]). That
 //! proves the account runs the reviewed CODE; the VALUES in the masked slots are the deploying
 //! constructor's, and this module says nothing about them. For the objects a package names that
-//! is closed by their construction ([`super::construction`]); for the members those objects name
-//! it is the limit of this check (see the module docs of [`super::members`]).
+//! is closed by their construction ([`super::construction`]); for each member a package newly
+//! installs, by its construction record ([`super::member_construction`]).
 //!
 //! Code the build does not produce for the expected contract is an error — never a warning that
 //! could accompany a successful review.
@@ -311,7 +311,7 @@ pub(crate) async fn expect_code_identity<P: Provider>(
 }
 
 /// Reports whether an address is a deployed contract at all — the precondition every object
-/// this package names has to meet, and the one the objects' own `validate()` enforces on-chain.
+/// this package names has to meet.
 pub(crate) async fn expect_code_present<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
@@ -326,7 +326,7 @@ pub(crate) async fn expect_code_present<P: Provider>(
     if code.is_empty() {
         result.report_error(&format!(
             "{label} at {address} has NO code: the object names an address nothing is deployed \
-             to, and `validate()` refuses it on-chain"
+             to"
         ));
         return Ok(false);
     }

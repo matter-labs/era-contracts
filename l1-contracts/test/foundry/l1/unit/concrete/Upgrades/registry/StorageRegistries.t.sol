@@ -35,6 +35,7 @@ import {
     L2BytecodeInfoLength,
     L2BytecodeRowRemoved,
     L2BytecodeTableShrunk,
+    L2PlanDelegateNeedsComposer,
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps,
     PatchCannotCarryL2Upgrade,
@@ -755,12 +756,43 @@ contract StorageRegistriesTest is Test {
         );
     }
 
+    /// @dev The CTM reads the deadline on every batch commit of a chain on the departing version
+    ///      (`protocolVersionIsActive`), so it is served from its own slot, not by decoding the
+    ///      manifest.
+    function test_oldProtocolVersionDeadlineIsServedWithoutDecodingTheManifest() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        CTMTransition newTransition = new CTMTransition(manifest);
+
+        uint256 gasBefore = gasleft();
+        uint256 deadline = newTransition.oldProtocolVersionDeadline();
+        uint256 scalarReadGas = gasBefore - gasleft();
+        gasBefore = gasleft();
+        uint256 manifestDeadline = newTransition.getManifest().oldProtocolVersionDeadline;
+        uint256 manifestReadGas = gasBefore - gasleft();
+
+        assertEq(deadline, manifest.oldProtocolVersionDeadline, "the pinned deadline");
+        assertEq(deadline, manifestDeadline, "the manifest's deadline");
+        assertLt(scalarReadGas, manifestReadGas / 2, "the getter must not decode the manifest");
+    }
+
     function test_revertWhen_fromReleaseZero() public {
         // Pre-registry migration is one-time migration code in the legacy scripts, not a
         // permanent zero-source special case.
         TransitionManifest memory manifest = _transitionManifest();
         manifest.fromRelease = address(0);
 
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMTransition(manifest);
+    }
+
+    function test_revertWhen_newReleaseOrEngineZero() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.newRelease = address(0);
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMTransition(manifest);
+
+        manifest = _transitionManifest();
+        manifest.upgradeEngine = address(0);
         vm.expectRevert(ZeroAddress.selector);
         new CTMTransition(manifest);
     }
@@ -778,7 +810,6 @@ contract StorageRegistriesTest is Test {
         assertEq(infrastructure.rows().length, 2, "both participating slots become rows");
         assertEq(infrastructure.manifestHash(), keccak256(abi.encode(manifest)), "the domain is committed too");
         assertEq(keccak256(abi.encode(infrastructure.getManifest())), keccak256(abi.encode(manifest)));
-        infrastructure.validate();
     }
 
     /// @dev The inventory length is the DOMAIN's: a Core manifest carrying the CTM inventory's length
@@ -829,6 +860,43 @@ contract StorageRegistriesTest is Test {
         });
         vm.expectRevert(RegistryUnknownKey.selector);
         new ProxyUpgradeTransition(manifest);
+    }
+
+    /// @dev The rows are exactly the participating slots, in slot order — never one with a zero
+    ///      `implNew`, including an inert slot naming a proxy but no implementation (objlib-46).
+    function testFuzz_rowsAreExactlyTheParticipatingSlots(uint256 _implMask, uint256 _proxyMask) public {
+        ProxyUpgradeRow[] memory slots = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
+        uint256 participating = 0;
+        for (uint256 i = 0; i < slots.length; ++i) {
+            if ((_implMask >> i) & 1 == 1) {
+                // A participating slot is a full, unique edge.
+                slots[i] = ProxyUpgradeRow({
+                    proxy: address(uint160(0xA000 + i)),
+                    expectedOldImpl: address(uint160(0xC000 + i)),
+                    implNew: address(uint160(0xB000 + i)),
+                    callInitializeUpgrade: false
+                });
+                ++participating;
+            } else if ((_proxyMask >> i) & 1 == 1) {
+                slots[i].proxy = address(uint160(0xA000 + i));
+            }
+        }
+        vm.assume(participating != 0);
+        ProxyUpgradeRow[] memory rows = new ProxyUpgradeTransition(
+            ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: slots})
+        ).rows();
+        assertEq(rows.length, participating, "one row per participating slot");
+        uint256 next = 0;
+        for (uint256 i = 0; i < slots.length; ++i) {
+            if (slots[i].implNew != address(0)) {
+                assertEq(rows[next].implNew, slots[i].implNew, "in slot order");
+                assertEq(rows[next].proxy, slots[i].proxy, "with the slot's proxy");
+                ++next;
+            }
+        }
+        for (uint256 i = 0; i < rows.length; ++i) {
+            assertTrue(rows[i].implNew != address(0), "no row has a zero implNew");
+        }
     }
 
     /// @dev A domain outside the enum is not representable: the constructor's ABI decoding refuses
@@ -891,23 +959,15 @@ contract StorageRegistriesTest is Test {
         committed.validate();
     }
 
-    /// @dev A zero composer is a legal plan with a delegate target: the delegate is called with
-    ///      EMPTY calldata, and there is no composer to require code at.
-    function test_zeroDelegateComposerComposesEmptyDelegateCalldata() public {
+    /// @dev Without a composer the delegate would be called with EMPTY calldata, which the upgrade
+    ///      delegate rejects on every chain (see `ComposedL2UpgradeTxExecution.t.sol`), so the
+    ///      transition refuses to exist.
+    function test_revertWhen_delegateWithoutComposer() public {
         TransitionManifest memory manifest = _transitionManifest();
         manifest.l2Plan.delegateComposer = address(0);
-        CTMTransition uncomposed = new CTMTransition(manifest);
-        assertEq(uncomposed.l2Plan().delegateComposer, address(0), "no composer is served as zero");
-        uncomposed.validate();
 
-        L2CanonicalTransaction memory transaction = _l2Tx(uncomposed);
-        L2UpgradePlan memory plan = uncomposed.l2Plan();
-        assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the plan still has an L2 side");
-        assertEq(
-            transaction.data,
-            abi.encodeCall(IComplexUpgrader.forceDeployAndUpgradeUniversal, (plan.deployments, plan.delegateTo, "")),
-            "without a composer the delegate is called with empty calldata"
-        );
+        vm.expectRevert(L2PlanDelegateNeedsComposer.selector);
+        new CTMTransition(manifest);
     }
 
     // ─────────────────────────── derived L2 deployments ───────────────────────────
@@ -1508,23 +1568,16 @@ contract StorageRegistriesTest is Test {
         committed.validate();
     }
 
+    /// @dev A release checks its own members. A transition checks only the code it names itself:
+    ///      its releases are validated at its construction and where they are installed.
     function test_validateRejectsAMemberThatLostItsCode() public {
-        coreTransition.validate();
         newRelease.validate();
         transition.validate();
 
-        // Empty one facet of the FROM release: the release, and transitively the transition
-        // (which validates both edges), must stop validating.
         vm.etch(facetOldAdmin, "");
         vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, facetOldAdmin));
         fromRelease.validate();
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, facetOldAdmin));
         transition.validate();
-
-        // Same for the core transition's named implementation.
-        vm.etch(coreImplNew, "");
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, coreImplNew));
-        coreTransition.validate();
     }
 
     // ─────────────────────────── Core-domain inventory ───────────────────────────

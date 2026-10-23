@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
@@ -18,7 +18,7 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
+import {AssetHandlerNotAllowed, NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {
     AddressAlreadySet,
     AssetDeploymentTrackerNotSet,
@@ -29,6 +29,7 @@ import {
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
@@ -192,6 +193,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _originalCaller,
         uint256 _amount
     ) public payable virtual override onlyBridgehub whenNotPaused {
+        _checkAssetHandlerAllowed(_chainId, _assetId);
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
@@ -222,6 +224,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                     _assetId,
                     _assetHandlerAddressOnCounterpart
                 );
+        }
+        if (encodingVersion == NEW_ENCODING_VERSION) {
+            // slither-disable-next-line unused-return
+            (bytes32 assetId, ) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
+            _checkAssetHandlerAllowed(_chainId, assetId);
         }
         return
             _bridgehubDeposit({
@@ -261,12 +268,32 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         return _senderChainId != block.chainid && _senderAddress == L2_ASSET_ROUTER_ADDR;
     }
 
+    /// @notice Reverts if the handler of `_assetId` may not move assets to or from `_chainId`: chains without
+    /// interop may only use the native token vault and the chain asset handler. An unregistered asset is
+    /// routed to the native token vault. See {protocol-docs/interop-gating.md#asset-handler-restriction}.
+    /// @param _chainId The chain the transfer goes to or comes from.
+    /// @param _assetId The asset being transferred.
+    function _checkAssetHandlerAllowed(uint256 _chainId, bytes32 _assetId) internal view {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (
+            assetHandler == address(0) ||
+            assetHandler == address(nativeTokenVault) ||
+            assetHandler == BRIDGE_HUB.chainAssetHandler()
+        ) {
+            return;
+        }
+        if (!IL1MessageRoot(address(BRIDGE_HUB.messageRoot())).isInteropEnabled(_chainId)) {
+            revert AssetHandlerNotAllowed(_chainId, _assetId, assetHandler);
+        }
+    }
+
     /// @inheritdoc AssetRouterBase
     function finalizeDeposit(
         uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData
     ) public payable override onlySelf nonReentrant {
+        _checkAssetHandlerAllowed(_sourceChainId, _assetId);
         _finalizeDeposit(_sourceChainId, _assetId, _transferData, address(nativeTokenVault));
         emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
     }
@@ -283,6 +310,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         bytes calldata _assetData
     ) external override onlyNullifier nonReentrant whenNotPaused {
+        _checkAssetHandlerAllowed(_chainId, _assetId);
         IL1AssetHandler(assetHandlerAddress[_assetId]).bridgeConfirmTransferResult({
             _chainId: _chainId,
             _txStatus: _txStatus,

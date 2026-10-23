@@ -22,8 +22,8 @@ import {L2EcosystemContract, L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/Con
 /// @notice Storage-backed, write-once description of one CTM release.
 /// @dev A release names its members by ADDRESS. What those addresses run is what governance
 ///      reviewed before approving this object; the contract's own job is to refuse a member
-///      that is not a deployed contract at all, which `validate()` does on every path that
-///      installs or applies the release.
+///      that is not a deployed contract at all, which `validate()` does before a transition is
+///      built from the release and when a CTM installs it.
 contract CTMRelease is ICTMRelease, ManifestStorage {
     /// @notice Pins the full manifest. There is NO state-mutating function on this contract: the
     ///         manifest is written once, at construction, so write-once is structural rather than a
@@ -44,8 +44,8 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
 
         // Code existence is deliberately NOT checked here: a release may legitimately be
         // constructed in the same transaction that deploys its members, and `validate()` holds
-        // the requirement on every path that installs or applies the release, which is where it
-        // is actually needed.
+        // the requirement before a transition is built from the release and when a CTM installs
+        // it, which is where it is actually needed.
         // The one facet-set check kept: an empty set would describe an unusable chain and derive
         // a remove-everything delta in any transition departing toward it.
         if (_manifest.genesisFacets.length == 0) {
@@ -107,7 +107,6 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         ObjectAnchorLib.requireCode(m.diamondInit);
         ObjectAnchorLib.requireCode(m.genesisUpgrade);
         ObjectAnchorLib.requireCode(m.verifier);
-        _requireUniqueFacetRows(m.genesisFacets);
         uint256 facetsLength = m.genesisFacets.length;
         bytes4[][] memory routing = new bytes4[][](facetsLength);
         for (uint256 i = 0; i < facetsLength; ++i) {
@@ -166,9 +165,9 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
     }
 
     /// @dev One row per facet address. A repeated address describes a routing no diamond can hold
-    ///      (`Diamond.diamondCut` would re-add selectors already routed). Checked at construction
-    ///      AND on every `validate()`, because the two answer to different threats: a mistake in an
-    ///      authored manifest, and rows read off an object some caller could not attest.
+    ///      (`Diamond.diamondCut` would re-add selectors already routed). Checked at construction,
+    ///      against a mistake in an authored manifest; `validate()` refuses the same repetition
+    ///      through the selectors it repeats ({_requireNoDuplicateSelectors}).
     function _requireUniqueFacetRows(GenesisFacet[] memory _facets) private pure {
         uint256 length = _facets.length;
         for (uint256 i = 0; i < length; ++i) {
@@ -184,8 +183,8 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         }
     }
 
-    /// @dev An open-addressing set over the release's selectors: `validate()` runs on every chain
-    ///      creation, where a pairwise scan of the ~a hundred selectors costs ~0.9M gas. A slot holds
+    /// @dev An open-addressing set over the release's selectors: a pairwise scan of the ~a hundred
+    ///      selectors costs ~0.9M gas. A slot holds
     ///      `selector + 1`, so zero marks it empty; the table is never more than half full, so a
     ///      probe always ends at an empty slot.
     function _requireNoDuplicateSelectors(bytes4[][] memory _routing) private pure {

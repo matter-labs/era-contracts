@@ -14,9 +14,21 @@ import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {EmptyAssetId, GenesisBatchHashZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {L2DACommitmentScheme, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
+import {
+    L2DACommitmentScheme,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    PRIORITY_TX_MAX_GAS_LIMIT
+} from "contracts/common/Config.sol";
 
 contract InitializeTest is DiamondInitTest {
+    /// @dev The length of a serialized L2 log must differ from that of an L2 log tree node's
+    ///      preimage (two words), or a log could be passed off as a node. Both are constants, so
+    ///      the `assert`s in the CTM constructor and `DiamondInit` cannot fail at runtime; this
+    ///      test is what catches a constant change.
+    function test_anL2LogIsNotTheSizeOfATreeNodePreimage() public pure {
+        assertTrue(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32, "an L2 log must not be the size of a node preimage");
+    }
+
     /// @dev Builds the standard genesis cut. Kept separate from the deploy so revert tests can
     ///      place `vm.expectRevert` directly before the proxy creation.
     function _buildCut(uint256 _chainId, address _admin) internal returns (Diamond.DiamondCutData memory) {
@@ -75,13 +87,6 @@ contract InitializeTest is DiamondInitTest {
             Utils.TEST_CHAIN_TYPE_MANAGER,
             abi.encodeWithSelector(IChainTypeManager.BRIDGE_HUB.selector),
             abi.encode(address(0))
-        );
-        // The zero bridgehub is also where the asset id would be read from; mock it non-zero so
-        // the test pins the bridgehub check specifically.
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(Utils.TEST_BASE_TOKEN_ASSET_ID)
         );
 
         Diamond.DiamondCutData memory cut = _buildCut(Utils.TEST_CHAIN_ID, Utils.TEST_CHAIN_ADMIN);

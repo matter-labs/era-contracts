@@ -32,7 +32,7 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {PRIORITY_TX_MAX_GAS_LIMIT, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {ISelfDescribingFacet} from "contracts/state-transition/chain-interfaces/ISelfDescribingFacet.sol";
-import {LiveRoutingDiverged, ProtocolIdMismatch} from "contracts/common/L1ContractErrors.sol";
+import {LiveRoutingDiverged, ProtocolIdMismatch, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
@@ -491,22 +491,24 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
         }
     }
 
-    function test_permissionlessUpgradeChainAfterDeadline() public {
-        // Governance commits the hop but never executes the chain upgrade. Once the old-version
-        // deadline (1000, pinned by the transition) passes, the upgrade is operationally
-        // mandatory and ANYONE may execute it — no discretionary inputs remain.
+    /// @dev Governance commits the hop but never executes the chain upgrade. Even once the
+    ///      old-version deadline (1000, pinned by the transition) has passed, only governance or the
+    ///      chain's own admin decides when the chain crosses.
+    function test_revertWhen_strangerUpgradesChainAfterDeadline() public {
         _commitHop(transitionV32);
+        uint256 versionBefore = IGetters(chainAddress).getProtocolVersion();
 
+        address keeper = makeAddr("keeper");
         vm.warp(1001);
-        vm.prank(makeAddr("keeper"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, keeper));
+        vm.prank(keeper);
         ctmExecutor.upgradeChain(ICTMTransition(address(transitionV32)), chainId);
 
-        assertEq(IGetters(chainAddress).getProtocolVersion(), V32, "keeper-executed upgrade must land");
-        assertEq(address(IGetters(chainAddress).getVerifier()), verifierV32);
+        assertEq(IGetters(chainAddress).getProtocolVersion(), versionBefore, "the chain did not cross");
     }
 
     /// @dev Upgrading is the chain's own decision, so its admin may execute the committed hop at
-    ///      any point in the window — a stranger still has to wait for the deadline
+    ///      any point in the window; a stranger is refused
     ///      (`test_revertWhen_strangerUpgradesChainBeforeDeadline` in CTMUpgradeExecutor.t.sol).
     function test_chainAdminUpgradesTheirOwnChainBeforeTheDeadline() public {
         _commitHop(transitionV32);

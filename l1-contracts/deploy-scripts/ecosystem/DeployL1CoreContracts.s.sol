@@ -154,6 +154,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     function deployUpgradeExecutor() internal {
         address deployer = getDeployerAddress();
         ProxyAdmin proxyAdmin = ProxyAdmin(coreAddresses.shared.transparentProxyAdmin);
+        require(address(proxyAdmin) != address(0), "ecosystem ProxyAdmin not deployed");
         CoreUpgradeExecutor coreExecutor = CoreUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(

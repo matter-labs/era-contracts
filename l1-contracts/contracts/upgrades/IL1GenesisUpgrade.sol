@@ -15,10 +15,12 @@ interface IL1GenesisUpgrade {
     /// @param _zkChain the address of the zk chain
     /// @param _l2Transaction the l2 genesis upgrade transaction
     /// @param _protocolVersion the current protocol version
+    /// @param _factoryDeps the factory dependencies needed for the upgrade
     event GenesisUpgrade(
         address indexed _zkChain,
         L2CanonicalTransaction _l2Transaction,
-        uint256 indexed _protocolVersion
+        uint256 indexed _protocolVersion,
+        bytes[] _factoryDeps
     );
 
     /// @notice The main function that will be called by the Admin facet at genesis.

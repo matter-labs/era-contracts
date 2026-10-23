@@ -119,7 +119,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         settlementLayer[_chainId] = block.chainid;
 
         // The bridgehub passes only the minimal chain-specific data (id + admin) to the CTM: the
-        // CTM reads all genesis data from its genesis registry, and DiamondInit reads the base
+        // CTM reads all genesis data from its current release, and DiamondInit reads the base
         // token asset id from the bridgehub (registered just above).
         address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
             _chainId: _chainId,

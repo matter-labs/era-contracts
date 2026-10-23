@@ -20,8 +20,13 @@ import { getInteropSourceAddress } from "../../src/core/accounts";
 import { getAbi, getCreationBytecode } from "../../src/core/contracts";
 import { getL2Chain, getChainIdByRole, createProvider } from "../../src/core/utils";
 
-const ETH_AMOUNT_MIN = ethers.utils.parseEther("0.1");
-const ETH_AMOUNT_MAX = ethers.utils.parseEther("0.5");
+// The direct-settled chain has interop, so L1 caps its withdrawals at the interop pool
+// ({protocol-docs/interop-gating.md#interop-pool}), which holds little more than this spec's deposit: the withdrawal
+// stays below the deposit.
+const DEPOSIT_AMOUNT_MIN = ethers.utils.parseEther("0.5");
+const DEPOSIT_AMOUNT_MAX = ethers.utils.parseEther("1");
+const WITHDRAWAL_AMOUNT_MIN = ethers.utils.parseEther("0.1");
+const WITHDRAWAL_AMOUNT_MAX = ethers.utils.parseEther("0.5");
 
 describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
   this.timeout(0);
@@ -45,7 +50,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         l2RpcUrl: getL2Chain(state.chains!, directSettledChainId).rpcUrl,
         chainId: directSettledChainId,
         l1Addresses: state.l1Addresses!,
-        amount: randomBigNumber(ETH_AMOUNT_MIN, ETH_AMOUNT_MAX),
+        amount: randomBigNumber(DEPOSIT_AMOUNT_MIN, DEPOSIT_AMOUNT_MAX),
         recipient: ANVIL_RECIPIENT_ADDR,
       });
     });
@@ -58,7 +63,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         l2RpcUrl: getL2Chain(state.chains!, directSettledChainId).rpcUrl,
         chainId: directSettledChainId,
         l1Addresses: state.l1Addresses!,
-        amount: randomBigNumber(ETH_AMOUNT_MIN, ETH_AMOUNT_MAX),
+        amount: randomBigNumber(WITHDRAWAL_AMOUNT_MIN, WITHDRAWAL_AMOUNT_MAX),
         l1Recipient: ANVIL_RECIPIENT_ADDR,
       });
     });

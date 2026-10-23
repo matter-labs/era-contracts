@@ -46,7 +46,9 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
             _l2ProtocolUpgradeTx: l2ProtocolUpgradeTx
         });
 
-        emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, protocolVersion);
+        // Genesis factory deps are published to the bytecodes supplier, never carried here; the
+        // field stays because node genesis loaders filter on this event signature.
+        emit GenesisUpgrade(address(this), l2ProtocolUpgradeTx, protocolVersion, new bytes[](0));
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
@@ -84,7 +86,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis {
                 _chainId,
                 address(IBridgehubBase(_bridgehub).l1CtmDeployer()),
                 _release.fixedForceDeploymentsData(),
-                ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId)
+                ZKChainSpecificForceDeploymentsLib.build({_bridgehub: _bridgehub, _chainId: _chainId, _isGenesis: true})
             )
         );
         // Genesis installs its L2 contract set through a plain `upgrade` delegate call rather than

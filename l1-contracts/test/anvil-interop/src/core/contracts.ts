@@ -39,6 +39,8 @@ const ARTIFACTS = {
   BootstrapUpgrade: "BootstrapUpgrade.sol/BootstrapUpgrade.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
+  MultiProofVerifier: "MultiProofVerifier.sol/MultiProofVerifier.json",
+  MultiProofTestnetVerifier: "MultiProofTestnetVerifier.sol/MultiProofTestnetVerifier.json",
   ZKsyncOSVerifierPlonk: "ZKsyncOSVerifierPlonk.sol/ZKsyncOSVerifierPlonk.json",
   ProxyAdmin: "ProxyAdmin.sol/ProxyAdmin.json",
   L1MessageRoot: "L1MessageRoot.sol/L1MessageRoot.json",

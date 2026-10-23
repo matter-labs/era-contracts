@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {ManifestStorage} from "../objects/ManifestStorage.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
@@ -25,12 +24,10 @@ import {
     BootstrapNotYetExecuted,
     BootstrapReleaseNotInstalled,
     BootstrapServerNotifierRowMissing,
-    ProxyUpgradeRowMismatch,
-    RegistryUnknownKey,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
-import {BootstrapManifest, L2UpgradePlan, ProxyUpgradeRow} from "../RegistryTypes.sol";
+import {AuthoredL2Plan, BootstrapManifest, L2UpgradePlan} from "../RegistryTypes.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {CTMUpgradeComposer} from "../libraries/CTMUpgradeComposer.sol";
 import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol";
@@ -56,10 +53,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
     ///         starting state that no longer exists anyway, but failing loudly is clearer.
     bool public executed;
 
-    /// @dev The FINAL L2 plan, constructed at construction and stored as its ABI encoding (see
-    ///      {CTMTransition} for why).
-    bytes internal encodedL2Plan;
-
     /// @dev The genesis release's version, read at construction (see {newProtocolVersion}).
     uint256 internal derivedNewProtocolVersion;
 
@@ -76,32 +69,18 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
         ) {
             revert ZeroAddress();
         }
-        // An edge with no implementation swaps is not a bootstrap; it would silently reduce to
-        // "install a release and hand over authority", which is a different (unreviewed) operation.
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(_manifest.ctmProxyUpgrades, CTM_CONTRACT_COUNT);
-        if (rows.length == 0) {
-            revert RegistryUnknownKey();
-        }
-        // Same row discipline as {ProxyUpgradeTransition} (shared lib).
-        ProxyUpgradeRowLib.validateRows(rows);
+        // Same row discipline as {ProxyUpgradeTransition}; the length check also makes the
+        // ServerNotifier slot below addressable.
+        ProxyUpgradeRowLib.validateRows(ProxyUpgradeRowLib.toRows(_manifest.ctmProxyUpgrades, CTM_CONTRACT_COUNT));
         // The notifier's slot is mandatory: its proxy is what `validate()` holds the one-time
         // notifier handover against.
         if (_manifest.ctmProxyUpgrades[uint256(CTMContract.ServerNotifier)].implNew == address(0)) {
             revert BootstrapServerNotifierRowMissing();
         }
-        // The L2 leg, exactly as a transition constructs it: the genesis release's table (the target
-        // state, installed in full — there is no departing release to diff against) plus the
-        // authored delegate and extras, with the same shape rules ({L2PlanLib.build}).
         ICTMRelease release = ICTMRelease(_manifest.currentRelease);
         uint256 newVersion = release.protocolVersion();
         derivedNewProtocolVersion = newVersion;
-        L2UpgradePlan memory plan = L2PlanLib.build(
-            TransitionDerivationLib.deriveL2DeploymentsFromTable(
-                release.l2BytecodeInfos(),
-                release.l2SystemProxyBytecodeInfo()
-            ),
-            _manifest.l2Plan
-        );
+        L2UpgradePlan memory plan = _buildL2Plan(release, _manifest.l2Plan);
         // Held to the edge rules of a `CTMTransition`: chains cross this edge through the same
         // per-chain version checks, so an edge they would refuse must not be committable.
         VersionEdgeLib.requireValidEdge({
@@ -111,7 +90,6 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
             _upgradeTimestamp: _manifest.upgradeTimestamp,
             _hasL2Side: plan.deployments.length != 0
         });
-        encodedL2Plan = abi.encode(plan);
     }
 
     /// @inheritdoc IRegistryBootstrapMigration
@@ -133,10 +111,12 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
     }
 
     /// @inheritdoc ICommittedUpgrade
-    /// @dev The stored derived-plus-extra deployments with the authored delegate leg and factory
-    ///      dependencies.
+    /// @dev Rebuilt on every read rather than stored: it is a pure function of the write-once
+    ///      genesis release and the pinned manifest, and storing the full table's plan does not fit
+    ///      a 60M block under Glamsterdam's state-gas pricing.
     function l2Plan() public view returns (L2UpgradePlan memory) {
-        return abi.decode(encodedL2Plan, (L2UpgradePlan));
+        BootstrapManifest memory m = getManifest();
+        return _buildL2Plan(ICTMRelease(m.currentRelease), m.l2Plan);
     }
 
     /// @inheritdoc IRegistryBootstrapMigration
@@ -179,7 +159,8 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
             revert BootstrapAuthorityNotHeld(address(m.ctmProxyAdmin), proxyAdminOwner);
         }
 
-        RegistryAuthorityLib.requireExecutorAuthorities(_authority(m));
+        RegistryAuthorityLib.Authority memory authority = _authority(m);
+        RegistryAuthorityLib.requireExecutorAuthorities(authority);
 
         // The departing version fixes which ecosystem this edge is valid for.
         uint256 liveVersion = IChainTypeManager(m.ctm).protocolVersion();
@@ -187,36 +168,20 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
             revert OutdatedProtocolVersion(liveVersion, m.expectedProtocolVersion);
         }
 
-        // Checked before the rows: a notifier still under its old administrator cannot be read
-        // through `ctmProxyAdmin` at all.
-        RegistryAuthorityLib.requireNotifierHandedOver(_authority(m));
-
-        // Every implementation swap is source-checked: replaying a stale migration, or running it
-        // against an ecosystem someone already moved, cannot silently re-point a proxy. A row
-        // already at `implNew` is fine — `applyRows` skips it.
-        ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(m.ctmProxyUpgrades, CTM_CONTRACT_COUNT);
-        uint256 rowsLength = rows.length;
-        for (uint256 i = 0; i < rowsLength; ++i) {
-            ProxyUpgradeRow memory row = rows[i];
-            address liveImpl = m.ctmProxyAdmin.getProxyImplementation(ITransparentUpgradeableProxy(row.proxy));
-            if (liveImpl != row.expectedOldImpl && liveImpl != row.implNew) {
-                revert ProxyUpgradeRowMismatch(row.proxy, row.expectedOldImpl, liveImpl);
-            }
-            ObjectAnchorLib.requireCode(row.implNew);
-        }
+        RegistryAuthorityLib.requireNotifierHandedOver(authority);
 
         ObjectAnchorLib.requireCode(m.upgradeEngine);
         if (m.l2Plan.delegateComposer != address(0)) {
             ObjectAnchorLib.requireCode(m.l2Plan.delegateComposer);
         }
+        // Before `l2Plan()`, which reads the release's table.
+        ObjectAnchorLib.requireCode(m.currentRelease);
         // The composed L2 transaction must find every bytecode it depends on already published
         // on the CTM's supplier, or the edge fails on every chain's L2 leg.
         L2PlanLib.requirePublished(
             BytecodesSupplier(IChainTypeManager(m.ctm).L1_BYTECODES_SUPPLIER()),
             l2Plan().factoryDepHashes
         );
-
-        ObjectAnchorLib.requireCode(m.currentRelease);
         ICTMRelease(m.currentRelease).validate();
     }
 
@@ -249,6 +214,27 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
         // `migrate()` completed, nothing is parked on this spent object — in the shape a fresh
         // deployment is born with.
         RegistryAuthorityLib.requireRegistryAuthority(_authority(m));
+    }
+
+    /// @notice The edge's L2 leg, exactly as a transition constructs it: the genesis release's
+    ///         table (the target state, installed in full; there is no departing release to diff
+    ///         against) plus the authored delegate and extras, with the same shape rules
+    ///         ({L2PlanLib.build}).
+    /// @param _release The genesis release.
+    /// @param _authored The manifest's authored L2 input.
+    /// @return The final L2 plan.
+    function _buildL2Plan(
+        ICTMRelease _release,
+        AuthoredL2Plan memory _authored
+    ) private view returns (L2UpgradePlan memory) {
+        return
+            L2PlanLib.build(
+                TransitionDerivationLib.deriveL2DeploymentsFromTable(
+                    _release.l2BytecodeInfos(),
+                    _release.l2SystemProxyBytecodeInfo()
+                ),
+                _authored
+            );
     }
 
     /// @param _m The manifest.
@@ -308,8 +294,8 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
         // Authority leaves in the same transaction it arrived. The ProxyAdmin is plain `Ownable`,
         // so its transfer lands immediately. The CTM is `Ownable2Step`: nominate the executor and
         // complete the handover through its `acceptCTMOwnership()` in the SAME transaction — the
-        // accept is permissionless-safe (see its docs), so the CTM never sits owned by this
-        // spent one-shot object waiting for a separate governance call.
+        // executor accepts for the CTM's current owner, which is this migration here — so the CTM
+        // never sits owned by this spent one-shot object waiting for a separate governance call.
         Ownable2Step(m.ctm).transferOwnership(m.ctmExecutor);
         m.ctmProxyAdmin.transferOwnership(m.ctmExecutor);
         CTMUpgradeExecutor(payable(m.ctmExecutor)).acceptCTMOwnership();

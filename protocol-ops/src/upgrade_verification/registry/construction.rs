@@ -48,10 +48,9 @@
 //!   deployment could birthday-search two CREATE2 preimages onto one 160-bit address (~2^80
 //!   work). That is the standard CREATE2 collision bound every counterfactual-address system
 //!   lives with, and it is not reachable by rewriting a package.
-//! * It says nothing about what the object's MEMBERS run — the facets, the verifier, each
-//!   `implNew`. Those are held to the reviewed build by their runtime code
-//!   ([`super::members`], [`super::rows`]), which proves their code but not the values their own
-//!   constructors wrote into their immutable slots.
+//! * It says nothing about the object's MEMBERS — the facets, the verifier, each `implNew`. Their
+//!   code is held to the reviewed build by its runtime ([`super::members`], [`super::rows`]), and
+//!   their construction is re-derived from the prepare's record ([`super::member_construction`]).
 //! * It requires the reviewed commit to be BUILT locally (`l1-contracts/out`), because the
 //!   address derivation needs the creation-code BYTES and `AllContractsHashes.json` records only
 //!   their hash. The hash is what the local build is then held against, so a doctored `out/`
@@ -61,6 +60,8 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::path::PathBuf;
 
+use alloy::dyn_abi::{DynSolType, Specifier};
+use alloy::json_abi::Param;
 use alloy::primitives::{keccak256, Address, Bytes, B256};
 use alloy::sol_types::SolValue;
 
@@ -68,6 +69,7 @@ use crate::upgrade_verification::constants::ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
 use crate::upgrade_verification::paths::repo_relative_path;
 use crate::upgrade_verification::report::VerificationResult;
 
+use super::external_backends::ZiskBackendPins;
 use super::members;
 use super::provenance::CodeIdentity;
 
@@ -94,6 +96,14 @@ const OBJECT_ARTIFACTS: &[(&str, &str)] = &[
     ("CTMUpgradeExecutor.sol", "CTMUpgradeExecutor"),
 ];
 
+/// The proxy `DeployUtils.deployTuppWithContractAndProxyAdmin` puts in front of a singleton, as
+/// `(artifact file, contract)`: what a proxy only the package reports must run
+/// ([`super::rows`]).
+pub(crate) const REVIEWED_PROXY: (&str, &str) = (
+    "TransparentUpgradeableProxy.sol",
+    "TransparentUpgradeableProxy",
+);
+
 /// One contract as the reviewed commit builds it.
 pub(crate) struct ReviewedArtifact {
     /// `<File>.sol` under `l1-contracts/out`.
@@ -103,6 +113,9 @@ pub(crate) struct ReviewedArtifact {
     runtime: Bytes,
     /// The byte ranges of `runtime` the constructor fills in (`immutableReferences`).
     immutables: Vec<Range<usize>>,
+    /// The constructor's parameters, by name and type, in declaration order (none when the
+    /// contract declares no constructor).
+    constructor_inputs: Vec<(String, DynSolType)>,
 }
 
 impl ReviewedArtifact {
@@ -112,6 +125,10 @@ impl ReviewedArtifact {
 
     pub(crate) fn creation_code(&self) -> &Bytes {
         &self.creation_code
+    }
+
+    pub(crate) fn constructor_inputs(&self) -> &[(String, DynSolType)] {
+        &self.constructor_inputs
     }
 
     /// How many immutable slots the comparison in [`Self::is_runtime_of`] leaves out.
@@ -151,18 +168,43 @@ pub(crate) type TestArtifact = (
 pub(crate) struct ReviewedBuild {
     identity: CodeIdentity,
     loaded: HashMap<&'static str, Result<ReviewedArtifact, String>>,
+    /// The pinned `ZiskVerifier` Plonk backends ([`super::external_backends`]), or why they could
+    /// not be read — reported only when a backend is reached.
+    zisk_backends: Result<ZiskBackendPins, String>,
 }
 
+/// What [`ReviewedBuild::zisk_backends`] holds until [`ReviewedBuild::with_zisk_backends`] sets it.
+const NO_ZISK_BACKEND_PINS: &str = "no ZiSK backend pins were loaded for this run";
+
 impl ReviewedBuild {
-    /// Loads the artifact of every object type a registry package can name and of every member
-    /// kind its objects name ([`members::MEMBER_ARTIFACTS`]), cross-checking each artifact's
-    /// creation code and deployed bytecode against `identity`.
+    /// Loads the artifact of every object type a registry package can name, of every member
+    /// kind its objects name ([`members::MEMBER_ARTIFACTS`]) and of [`REVIEWED_PROXY`],
+    /// cross-checking each artifact's creation code and deployed bytecode against `identity`.
     pub(crate) fn load(identity: CodeIdentity) -> Self {
         let mut loaded = HashMap::new();
-        for (file, name) in OBJECT_ARTIFACTS.iter().chain(members::MEMBER_ARTIFACTS) {
+        for (file, name) in OBJECT_ARTIFACTS
+            .iter()
+            .chain(members::MEMBER_ARTIFACTS)
+            .chain([&REVIEWED_PROXY])
+        {
             loaded.insert(*name, load_one(&identity, file, name));
         }
-        Self { identity, loaded }
+        Self {
+            identity,
+            loaded,
+            zisk_backends: Err(NO_ZISK_BACKEND_PINS.to_string()),
+        }
+    }
+
+    /// The build with the ZiSK backend pins `pins` (or why they could not be read).
+    pub(crate) fn with_zisk_backends(mut self, pins: Result<ZiskBackendPins, String>) -> Self {
+        self.zisk_backends = pins;
+        self
+    }
+
+    /// The pinned ZiSK Plonk backends, or why none can be consulted.
+    pub(crate) fn zisk_backends(&self) -> Result<&ZiskBackendPins, &str> {
+        self.zisk_backends.as_ref().map_err(String::as_str)
     }
 
     /// A build holding exactly the given creation code (and no runtime), for tests that drive the
@@ -190,10 +232,28 @@ impl ReviewedBuild {
                     creation_code: Bytes::from(creation_code),
                     runtime: Bytes::from(runtime),
                     immutables,
+                    constructor_inputs: Vec::new(),
                 }),
             );
         }
-        Self { identity, loaded }
+        Self {
+            identity,
+            loaded,
+            zisk_backends: Err(NO_ZISK_BACKEND_PINS.to_string()),
+        }
+    }
+
+    /// The build with `name`'s loaded artifact declaring a constructor of `inputs`
+    /// (`(name, solidity type)`), for tests of the construction records.
+    #[cfg(test)]
+    pub(crate) fn with_constructor(mut self, name: &str, inputs: &[(&str, &str)]) -> Self {
+        if let Some(Ok(artifact)) = self.loaded.get_mut(name) {
+            artifact.constructor_inputs = inputs
+                .iter()
+                .map(|(param, ty)| (param.to_string(), ty.parse().expect("a solidity type")))
+                .collect();
+        }
+        self
     }
 
     /// The hashes the build is held against.
@@ -246,6 +306,8 @@ fn load_one(
     let runtime = bytes_at("deployedBytecode")?;
     let immutables =
         immutable_ranges(&json, runtime.len()).map_err(|e| format!("{}: {e}", path.display()))?;
+    let constructor_inputs =
+        constructor_inputs(&json).map_err(|e| format!("{}: {e}", path.display()))?;
 
     // The local build is held against the COMMITTED hash file, so everything derived from it
     // rests on the reviewed commit rather than on whatever happens to sit in `out/`.
@@ -287,7 +349,38 @@ fn load_one(
         creation_code,
         runtime,
         immutables,
+        constructor_inputs,
     })
+}
+
+/// The `abi` constructor's parameters as `(name, type)`; none when the ABI declares no constructor.
+fn constructor_inputs(json: &serde_json::Value) -> Result<Vec<(String, DynSolType)>, String> {
+    let abi = json
+        .get("abi")
+        .and_then(|abi| abi.as_array())
+        .ok_or("the artifact has no `abi` array")?;
+    let Some(constructor) = abi
+        .iter()
+        .find(|entry| entry.get("type").and_then(|t| t.as_str()) == Some("constructor"))
+    else {
+        return Ok(Vec::new());
+    };
+    let inputs: Vec<Param> = serde_json::from_value(
+        constructor
+            .get("inputs")
+            .cloned()
+            .unwrap_or(serde_json::Value::Array(Vec::new())),
+    )
+    .map_err(|e| format!("its constructor's inputs do not parse ({e})"))?;
+    inputs
+        .iter()
+        .map(|param| {
+            param
+                .resolve()
+                .map(|ty| (param.name.clone(), ty))
+                .map_err(|e| format!("constructor parameter {} has no ABI type ({e})", param.name))
+        })
+        .collect()
 }
 
 /// The `deployedBytecode.immutableReferences` byte ranges, all inside the deployed bytecode. An
@@ -530,6 +623,32 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    /// The constructor's parameters come from the artifact's ABI, by name and type; an ABI without
+    /// a constructor declares none.
+    #[test]
+    fn constructor_inputs_are_read_from_the_abi() {
+        let json = serde_json::json!({
+            "abi": [
+                {"type": "function", "name": "f", "inputs": [], "outputs": []},
+                {"type": "constructor", "inputs": [
+                    {"name": "_l1ChainId", "type": "uint256", "internalType": "uint256"},
+                    {"name": "_rollupDAManager", "type": "address", "internalType": "contract RollupDAManager"}
+                ], "stateMutability": "nonpayable"}
+            ]
+        });
+        assert_eq!(
+            constructor_inputs(&json).unwrap(),
+            vec![
+                ("_l1ChainId".to_string(), DynSolType::Uint(256)),
+                ("_rollupDAManager".to_string(), DynSolType::Address)
+            ]
+        );
+        assert!(constructor_inputs(&serde_json::json!({"abi": []}))
+            .unwrap()
+            .is_empty());
+        assert!(constructor_inputs(&serde_json::json!({})).is_err());
     }
 
     #[test]
@@ -925,5 +1044,29 @@ mod tests {
             ),
             ConstructionVerdict::NotCanonical { .. }
         ));
+    }
+
+    /// The proxy a reported singleton must run is the one the prepares put in front of a
+    /// singleton, and the reviewed commit records its hashes.
+    #[test]
+    fn the_reviewed_proxy_is_the_one_the_prepares_deploy() {
+        const DEPLOY_UTILS_SOL: &str =
+            include_str!("../../../../l1-contracts/deploy-scripts/utils/deploy/DeployUtils.sol");
+        let (file, contract) = REVIEWED_PROXY;
+        assert!(
+            solidity_fn_body(DEPLOY_UTILS_SOL, "deployTuppWithContractAndProxyAdmin")
+                .contains(&format!("type({contract}).creationCode")),
+            "DeployUtils deploys another proxy than {contract}"
+        );
+        assert!(
+            DEPLOY_UTILS_SOL.contains(&format!("/{file}\";")),
+            "{contract} is not imported from {file}"
+        );
+        let identity = CodeIdentity::from_hashes_file(
+            &crate::upgrade_verification::contract_hashes::contract_hashes_path(None),
+        )
+        .unwrap();
+        assert!(identity.creation_code_hash_of(contract).is_some());
+        assert!(identity.deployed_code_hash_of(contract).is_some());
     }
 }

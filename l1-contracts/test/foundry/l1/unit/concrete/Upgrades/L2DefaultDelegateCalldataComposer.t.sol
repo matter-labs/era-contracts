@@ -108,7 +108,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
         ZKChainSpecificForceDeploymentsData memory data = abi.decode(chainData, (ZKChainSpecificForceDeploymentsData));
         assertEq(data.baseTokenMetadata.name, ERC20_NAME, "metadata not read from the local token");
         assertEq(data.baseTokenMetadata.symbol, ERC20_SYMBOL, "wrong symbol");
-        assertEq(data.baseTokenMetadata.decimals, COMPOSED_DECIMALS, "wrong decimals");
+        assertEq(data.baseTokenMetadata.decimals, ERC20_DECIMALS, "the token's own decimals on an upgrade");
         assertEq(data.baseTokenL1Address, address(erc20LocalToken), "wrong L1 base token address");
         assertEq(data.baseTokenBridgingData.originToken, erc20OriginToken, "wrong origin token");
         assertEq(data.baseTokenBridgingData.originChainId, ERC20_ORIGIN_CHAIN_ID, "wrong origin chain");
@@ -116,13 +116,30 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
     }
 
     /// @dev A chain whose base token serves no usable metadata — none at all, or Maker-style
-    ///      `bytes32` — is not composable: the read reverts rather than substituting defaults.
-    function test_revertWhen_baseTokenHasNoUsableMetadata() public {
-        vm.expectRevert();
-        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID);
-
-        vm.expectRevert();
-        defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, BYTES32_METADATA_CHAIN_ID);
+    ///      `bytes32` — is still composable here. Genesis deliberately permits such a base token,
+    ///      and the upgrade path probes it the same tolerant way, so the chain does not become
+    ///      unupgradeable the moment its metadata has to be recomposed.
+    function test_composesForBaseTokensWithoutUsableMetadata() public view {
+        assertEq(
+            defaultComposer.composeDelegateCalldata(ICTMRelease(address(release)), bridgehub, NO_METADATA_CHAIN_ID),
+            abi.encodeCall(
+                IL2DefaultUpgrade.upgrade,
+                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(NO_METADATA_CHAIN_ID))
+            ),
+            "a token without metadata must compose the defaults"
+        );
+        assertEq(
+            defaultComposer.composeDelegateCalldata(
+                ICTMRelease(address(release)),
+                bridgehub,
+                BYTES32_METADATA_CHAIN_ID
+            ),
+            abi.encodeCall(
+                IL2DefaultUpgrade.upgrade,
+                (ctmDeployerStub, _fixedForceDeploymentsData(), _expectedPerChainData(BYTES32_METADATA_CHAIN_ID))
+            ),
+            "a bytes32-returning token must compose the defaults too"
+        );
     }
 
     /// @dev Nothing is cached in the composer: a different release or a Bridgehub naming another

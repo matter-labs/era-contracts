@@ -13,7 +13,8 @@ happens _after_ the proof checks out.
 ![Atomic interop timeout path: absence proof against Chain B's settled IMT roots, refund on Chain A](./img/atomic_flow_recovery.png)
 
 1. **`authorizeRefund(flow, missingLegIndex, absence)`** — verifies one timeout absence proof for the
-   missing leg (bound to that leg's declared source chain), then flips **this chain's** `Committed` legs
+   missing leg (bound to that leg's declared source chain, which this chain must accept:
+   {protocol-docs/interop-gating.md#receive-filter}), then flips **this chain's** `Committed` legs
    of the flow to `Revertable`, emitting `FlowRefundAuthorized` for each. Legs committed on other chains
    are not in this manager's state and are simply skipped; each chain authorizes its own legs from the
    same absence proof. One proof of _one_ missing leg is enough to unwind the whole flow, because a flow

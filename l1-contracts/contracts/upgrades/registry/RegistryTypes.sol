@@ -120,8 +120,8 @@ struct L2UpgradePlan {
 ///        table-derived set, each at its bytecode-derived address. Usually empty.
 /// @param delegateComposer The {IL2DelegateCalldataComposer} that DEFINES what the delegate is
 ///        called with, from the target release and the ecosystem's Bridgehub — no authored
-///        calldata bytes ride the manifest. Zero means the delegate is called with empty
-///        calldata; nonzero requires a delegate.
+///        calldata bytes ride the manifest. Set exactly when there is a delegate (see
+///        {L2PlanLib.build}).
 struct AuthoredL2Plan {
     bytes delegateBytecodeInfo;
     bytes[] extraBytecodeInfos;

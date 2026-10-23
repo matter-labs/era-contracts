@@ -95,8 +95,7 @@ library ProxyUpgradeRowLib {
     }
 
     /// @notice Applies a proxy upgrade transition of `_domain` through `_admin`: the object must be
-    ///         deployed code of that domain and pass its own `validate()`, then {applyRows} runs its
-    ///         rows.
+    ///         deployed code of that domain, then {applyRows} runs its rows.
     /// @param _admin The applying executor's bound `ProxyAdmin`.
     /// @param _transition The write-once transition governance approved.
     /// @param _domain The domain the applying executor administers.
@@ -110,16 +109,17 @@ library ProxyUpgradeRowLib {
         if (transitionDomain != _domain) {
             revert ProxyUpgradeDomainMismatch(uint8(_domain), uint8(transitionDomain));
         }
-        _transition.validate();
         applyRows(_admin, _transition.rows());
     }
 
     /// @notice Applies every row with the source-checked semantics above through `_admin`, the
     ///         applying contract's bound `ProxyAdmin`, which administers every proxy of its domain,
-    ///         then verifies every row's proxy runs its `implNew` before returning.
+    ///         after {requireRowCode} over the whole set, then verifies every row's proxy runs its
+    ///         `implNew` before returning.
     /// @dev The verification is a separate pass after every swap, so a reinitializer that moves
     ///      any proxy of the row set is caught too.
     function applyRows(ProxyAdmin _admin, ProxyUpgradeRow[] memory _rows) internal {
+        requireRowCode(_rows);
         uint256 length = _rows.length;
         for (uint256 i = 0; i < length; ++i) {
             ITransparentUpgradeableProxy proxy = ITransparentUpgradeableProxy(_rows[i].proxy);

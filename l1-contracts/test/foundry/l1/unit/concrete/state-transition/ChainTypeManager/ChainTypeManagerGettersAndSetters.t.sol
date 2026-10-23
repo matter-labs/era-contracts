@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
     function setUp() public {
@@ -73,36 +72,27 @@ contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
         chainContractAddress.setServerNotifier(newServerNotifier);
     }
 
-    // Test setServerNotifier by admin (not just owner)
-    function test_setServerNotifierByAdmin() public {
-        // First set an admin
+    /// @dev The notifier is part of the governed CTM domain: once the bootstrap hands it to the CTM
+    ///      executor, only governance (through the CTM's owner) may re-point the CTM at another one.
+    function test_RevertWhen_setServerNotifierByAdmin() public {
         address ctmAdmin = makeAddr("ctmAdmin");
         vm.prank(governor);
         chainContractAddress.setPendingAdmin(ctmAdmin);
-
         vm.prank(ctmAdmin);
         chainContractAddress.acceptAdmin();
 
-        // Now admin can call setServerNotifier
-        address newServerNotifier = makeAddr("newServerNotifier");
-
+        address before = chainContractAddress.serverNotifierAddress();
         vm.prank(ctmAdmin);
-        chainContractAddress.setServerNotifier(newServerNotifier);
-
-        address result = chainContractAddress.serverNotifierAddress();
-        assertEq(result, newServerNotifier, "Server notifier should be updated by admin");
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setServerNotifier(makeAddr("newServerNotifier"));
+        assertEq(chainContractAddress.serverNotifierAddress(), before, "the notifier is unchanged");
     }
 
-    // Test setServerNotifier reverts when not owner or admin
-    function test_RevertWhen_setServerNotifierNotOwnerOrAdmin() public {
+    function test_RevertWhen_setServerNotifierByStranger() public {
         vm.stopPrank();
-
-        address notOwnerOrAdmin = makeAddr("notOwnerOrAdmin");
-        address newServerNotifier = makeAddr("newServerNotifier");
-
-        vm.prank(notOwnerOrAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notOwnerOrAdmin));
-        chainContractAddress.setServerNotifier(newServerNotifier);
+        vm.prank(makeAddr("stranger"));
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setServerNotifier(makeAddr("newServerNotifier"));
     }
 
     // Test getSemverProtocolVersion

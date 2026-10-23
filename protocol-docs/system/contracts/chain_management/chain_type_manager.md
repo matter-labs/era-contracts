@@ -13,7 +13,8 @@ rules needed for them to trust one another's settled state.
 - Commit semver protocol versions as transitions, from which the chains' upgrade cut, verifier and the
   old version's deadline are derived.
 - Execute an approved upgrade for a chain. Once a protocol-version deadline expires, commits under
-  that version fail; freezing and unfreezing remain separate CTM-owner operations.
+  that version fail; freezing and unfreezing remain separate operations, open to the CTM owner and
+  to the Bridgehub's owner ([freezing a chain](../../../ecosystem-upgrade-coordination.md#freezing-a-chain)).
 - Forward the limited administrative operations exposed by the chain diamond, such as validator, fee,
   and porter configuration.
 

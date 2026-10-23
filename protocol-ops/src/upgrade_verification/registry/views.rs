@@ -179,7 +179,6 @@ sol! {
         function getManifest() external view returns (ProxyUpgradeTransitionManifest memory);
         function domain() external view returns (uint8);
         function rows() external view returns (ProxyUpgradeRow[] memory);
-        function validate() external view;
     }
 
     /// The live owner and outstanding nomination of an `Ownable2Step` lifecycle object.
@@ -218,11 +217,18 @@ sol! {
         bytes l2SystemProxyBytecodeInfo;
     }
 
-    /// The release's own reads, including the manifest its address commits to.
+    /// The release's own reads, including the manifest its address commits to. `validate()` is
+    /// state-independent, so its `eth_call` before the vote predicts the install; the errors are
+    /// the ones it reverts with.
     #[sol(rpc)]
     contract CTMReleaseView {
+        error RegistryTargetHasNoCode(address target);
+        error RegistryEmptySelectors(address facet);
+        error RegistryDuplicateSelector(bytes4 selector);
+
         function manifestHash() external view returns (bytes32);
         function getManifest() external view returns (ReleaseManifest memory);
+        function protocolVersion() external view returns (uint256);
         function validate() external view;
     }
 
@@ -259,8 +265,9 @@ sol! {
     }
 
     /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read
-    /// `L2PlanLib.requirePublished` performs when the CTM leg applies, so a zero here is the
-    /// readiness failure that would revert `applyCTMUpgrade`. The event carries the published code.
+    /// `L2PlanLib.requirePublished` performs when the CTM commits a transition (and the bootstrap
+    /// migration's `validate()`), so a zero here is the readiness failure that would revert it.
+    /// The event carries the published code.
     #[sol(rpc)]
     contract BytecodesSupplierView {
         event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
@@ -268,10 +275,11 @@ sol! {
     }
 
     /// The chain registry the bootstrap's lagging-chain report enumerates, the live values a
-    /// release's force deployments are held against, and the ecosystem proxies an inventory's
-    /// slots must name.
+    /// release's force deployments are held against, the ecosystem proxies an inventory's
+    /// slots must name, and the owner a CTM also takes its chain freezes from.
     #[sol(rpc)]
     contract BridgehubView {
+        function owner() external view returns (address);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
         function chainTypeManager(uint256 _chainId) external view returns (address);
         function assetRouter() external view returns (address);
@@ -283,18 +291,23 @@ sol! {
         function getZKChain(uint256 _chainId) external view returns (address);
     }
 
-    /// A chain's diamond, for the verifier its chain runs today.
+    /// A chain's diamond, for the verifier its chain runs today and the RollupDAManager its Admin
+    /// facet was built over.
     #[sol(rpc)]
     contract ZkChainGettersView {
         function getVerifier() external view returns (address);
+        function getRollupDAManager() external view returns (address);
     }
 
     /// The asset router's links to the nullifier and the native token vault, which an ecosystem
-    /// inventory's slots must name.
+    /// inventory's slots must name, and the WETH token and owner new ecosystem implementations
+    /// are built with.
     #[sol(rpc)]
     contract L1AssetRouterView {
         function L1_NULLIFIER() external view returns (address);
         function nativeTokenVault() external view returns (address);
+        function L1_WETH_TOKEN() external view returns (address);
+        function owner() external view returns (address);
     }
 
     /// The nullifier's link to the interop handler, which an ecosystem inventory's slot must name.

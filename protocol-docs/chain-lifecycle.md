@@ -42,6 +42,12 @@ version, fee params, the priority tree, and the `nativeTokenVault` reference (th
 constant `L2_NATIVE_TOKEN_VAULT_ADDR` when running under the L2 Bridgehub, otherwise derived from
 the Bridgehub's asset router — no immutable needed).
 
+Every address and hash it reads is zero-checked, so creation fails rather than leave a chain
+without one. On L1 this includes the Bridgehub's asset router, that router's native token vault, and
+the CTM's `PERMISSIONLESS_VALIDATOR`, the settler of a chain in priority mode (an L1-only feature);
+each refuses with `ZeroAddress`. The L1 CTM also refuses a zero permissionless validator at
+construction.
+
 It also stores the chain's genesis (batch 0) chain batch root:
 `s.l2LogsRootHashes[0] = ChainBatchRootTree.genesisChainBatchRoot()`. Batch 0 has no
 L2->L1 logs, no multichain root, and a freshly seeded (empty) interop commitment tree at both batch
@@ -78,39 +84,25 @@ interop-registration time instead (next section).
 ## Interop registration (`ChainRegistrationSender`)
 
 `ChainRegistrationSender` registers a chain on another chain's `L2Bridgehub`
-(`registerChainForInterop`). There are two entry points, differing only in who pays:
+(`allowInteropPeer`) for the pairs the chain admins whitelisted. Who may whitelist which pair, and
+how a registration is re-sent, is in
+{protocol-docs/interop-gating.md#interop-peer-whitelist}. Chains settling on L1 participate in interop
+without a gateway: L1 itself builds interop roots (`MessageRootBase.addChainBatchRootV32`) and serves
+the corresponding inclusion proofs.
 
-- **`registerChain(chainToBeRegistered, chainRegisteredOn)`** — the free ease-of-use path. It sends
-  the registration as an **L2 service transaction**
-  (`IMailbox.requestL2ServiceTransaction` on the target chain), so the caller supplies no base
-  tokens at all. Because it is free it is rate-limited structurally: the
-  `chainRegisteredOnChain[a][b]` mapping makes it callable **once per ordered chain pair**
-  (`ChainAlreadyRegistered` on a repeat), which prevents spamming service transactions.
-- **`bridgehubDeposit`** — the caller-funded path, driven through the Bridgehub's two-bridges flow.
-  Anyone can trigger it, but the caller pays the base tokens for the L1->L2 transaction; no ETH
-  `msg.value` is accepted. Not once-per-pair, since the caller bears the cost.
-
-Both call `_checkSettlementLayers` directly and build their payload with the shared
-`_getL2TxCalldata`, so every check below applies on both paths regardless of who pays.
-
-Checks performed before sending the registration:
+Checks performed before sending a registration (every path that sends one builds it with
+`_getL2RegistrationCalldata`):
 
 - The chain to be registered is known to the Bridgehub (its `baseTokenAssetId` is non-zero).
-- Both chains settle on the **same** settlement layer (`ChainsSettlementLayerMismatch` otherwise).
-  Both settling directly on L1 is permitted as of v33: L1 itself builds interop roots
-  (`MessageRootBase.addChainBatchRootV32`) and serves the corresponding inclusion proofs, so
-  L1-settled chains participate in interop directly. (In v31 this case was rejected with
-  the now-removed `ChainsSettlingOnL1` error.)
 - The chain to be registered has at least one batch leaf in this layer's message root
   (`messageRoot.chainTreeLeafCount(chainId) > 0`), else it reverts with
   `ChainHasNoBatchesInMessageRoot`. This is the second enforcement point of the atomic-interop
   timeout precondition: interop towards a chain is only enabled once the chain both has its
   `sharedTree` leaf and has a batch in its chain tree.
 
-No backfill of pre-existing chains is needed for this gate: during v31 the ZK Gateway was never
-activated and registration required that a chain does **not** settle on L1, so at the start of v33
-no chains have been registered for interop — every chain passes through this gate (and gets its
-tree populated) before interop can target it.
+The pairs the removed consent-free `registerChain` registered passed the same checks, so no chain is
+registered for interop with an empty tree. Governance clears them
+({protocol-docs/interop-gating.md#legacy-registrations}).
 
 ## Settlement-layer migration (`ChainAssetHandler`)
 
@@ -120,8 +112,9 @@ The chain asset handler treats chains themselves as bridgeable assets of their C
 on the source settlement layer collects the chain's migration data (protocol version, batch
 number, base-token bridging data, etc.) and de-registers it locally; `bridgeMint` on the
 destination layer deploys/re-registers the chain there. Both are callable only via the asset
-router, and both are guarded by the runtime `migrationPaused` flag (a governance pause for
-incident response) **and** the release-level migrations ban below. On migration to a settlement layer,
+router, and both are guarded by two runtime pauses for incident response, the ecosystem-wide one
+of the handler's owner (`pauseMigration`) and the per-CTM one of that CTM's owner
+(`pauseCTMMigration`), **and** by the release-level migrations ban below, which is checked first. On migration to a settlement layer,
 `bridgeBurn` also fills `originToken`/`originChainId` of the base-token bridging data, which the
 destination's `L2NativeTokenVault.updateL2` consumes to initialize the chain's base token.
 
@@ -139,7 +132,7 @@ risks for the time being:
 - The switch is `CHAIN_MIGRATIONS_ENABLED = false` in `common/Config.sol`, surfaced via
   `ChainAssetHandlerBase.migrationsEnabled()` and enforced by the `whenMigrationsEnabled` modifier
   on `bridgeBurn` and `bridgeMint`, which revert with `ChainMigrationsDisabled`.
-- This is a **release-level** ban, unlike the runtime `migrationPaused` flag: it cannot be lifted
+- This is a **release-level** ban, unlike the runtime pauses: it cannot be lifted
   by a governance call and requires a protocol upgrade that redeploys the chain asset handler with
   the constant set to `true`.
 - Recovery of a failed migration (`bridgeConfirmTransferResult`) is intentionally **not** gated by

@@ -648,6 +648,8 @@ fn known_functions_have_the_selectors_the_contracts_use() {
         ("0x68e98978", "`applyInfrastructureUpgrade(address)`"),
         ("0x7b1b716a", "`applyCTMUpgrade(address)`"),
         ("0x71b0e408", "`forward(...)`"),
+        ("0x8fd3ab80", "`migrate()`"),
+        ("0xfe30c9fd", "`validateApplied()`"),
     ];
     for (selector, display) in expected {
         assert_eq!(

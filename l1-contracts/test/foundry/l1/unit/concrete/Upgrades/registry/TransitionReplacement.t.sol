@@ -311,27 +311,21 @@ contract TransitionReplacementTest is ChainTypeManagerTest, RegistryDrivenUpgrad
         assertEq(chainContractAddress.upgradeTransition(0), address(transitionV32));
     }
 
+    /// @dev The departure is read off the expected transition first; on a codeless address that
+    ///      read fails without data.
     function test_revertWhen_theExpectedTransitionIsNotDeployed() public {
         _commitAndComplete(transitionV32);
         CTMTransition repaired = _transition(_r0(), _r32(), defaultUpgrade, FIXTURE_DEADLINE, _delegatePlan());
         address codeless = makeAddr("codelessTransition");
-        _expectReplaceRevert(
-            CTMTransition(codeless),
-            repaired,
-            0,
-            abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless)
-        );
+        _expectReplaceRevert(CTMTransition(codeless), repaired, 0, "");
     }
 
+    /// @dev The replacement's own `validate()` is the first call to it; a codeless replacement
+    ///      fails it without data, and the mapping is unchanged (ctm-14).
     function test_revertWhen_theReplacementIsNotDeployed() public {
         _commitAndComplete(transitionV32);
         address codeless = makeAddr("codelessTransition");
-        _expectReplaceRevert(
-            transitionV32,
-            CTMTransition(codeless),
-            0,
-            abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless)
-        );
+        _expectReplaceRevert(transitionV32, CTMTransition(codeless), 0, "");
     }
 
     /// @dev Compare-and-replace: a proposal naming a transition that is no longer the committed
@@ -417,6 +411,24 @@ contract TransitionReplacementTest is ChainTypeManagerTest, RegistryDrivenUpgrad
             0,
             abi.encodeWithSelector(TransitionDeadlineMismatch.selector, FIXTURE_DEADLINE, FIXTURE_DEADLINE + 1000)
         );
+    }
+
+    /// @dev A replacement pinning a past deadline would expire the departing version at once,
+    ///      halting batch commitment on every chain still on it.
+    function test_revertWhen_theReplacementPinsAPastDeadline() public {
+        _commitAndComplete(transitionV32);
+        uint256 pastDeadline = 1;
+        vm.warp(FIXTURE_DEADLINE / 2);
+        CTMTransition expiring = _transition(_r0(), _r32(), defaultUpgrade, pastDeadline, _delegatePlan());
+
+        _expectReplaceRevert(
+            transitionV32,
+            expiring,
+            0,
+            abi.encodeWithSelector(TransitionDeadlineMismatch.selector, FIXTURE_DEADLINE, pastDeadline)
+        );
+        assertEq(chainContractAddress.protocolVersionDeadline(0), FIXTURE_DEADLINE, "the deadline is unchanged");
+        assertTrue(chainContractAddress.protocolVersionIsActive(0), "and the departing version is still active");
     }
 
     function test_revertWhen_theReplacementLandsBeforeTheReplacedTarget() public {

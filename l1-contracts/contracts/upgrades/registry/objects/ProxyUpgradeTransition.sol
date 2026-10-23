@@ -17,7 +17,8 @@ import {ProxyUpgradeDomain, ProxyUpgradeRow, ProxyUpgradeTransitionManifest} fro
 ///         {manifestHash} against the audited manifest).
 /// @dev Rows are source-checked edges (`expectedOldImpl -> implNew`). What each `implNew` RUNS is
 ///      what governance reviewed before approving this object; the object's own job is to refuse a
-///      target that is not a deployed contract at all.
+///      malformed inventory at construction. A target that is not a deployed contract at all is
+///      refused where the rows are applied ({ProxyUpgradeRowLib.applyRows}).
 contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
     /// @notice Pins the full manifest.
     /// @param _manifest The manifest to pin. Its inventory length is checked against the member
@@ -48,11 +49,6 @@ contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
     /// @inheritdoc IProxyUpgradeTransition
     function rows() external view returns (ProxyUpgradeRow[] memory) {
         return _rows();
-    }
-
-    /// @inheritdoc IProxyUpgradeTransition
-    function validate() external view {
-        ProxyUpgradeRowLib.requireRowCode(_rows());
     }
 
     function _rows() private view returns (ProxyUpgradeRow[] memory) {

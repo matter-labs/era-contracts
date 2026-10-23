@@ -60,12 +60,14 @@ import {
     BootstrapServerNotifierRowMissing,
     L2BytecodeNotPublished,
     L2BytecodeInfoLength,
+    L2PlanDelegateNeedsComposer,
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps,
     PatchCannotCarryL2Upgrade,
     ProxyUpgradeRowMismatch,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
+    RegistryInventoryLengthMismatch,
     RegistryTargetHasNoCode,
     RegistryDuplicateProxyRow,
     TransitionDeadlineBeforeUpgrade,
@@ -655,32 +657,6 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         assertEq(keccak256(abi.encode(transaction)), keccak256(abi.encode(_expectedL2Tx(plan, DELEGATE_CALLDATA))));
     }
 
-    /// @dev A zero composer is a legal plan with a delegate target: the delegate is called with
-    ///      EMPTY calldata, there is no composer pin to hold, and the edge commits.
-    function test_composedL2Tx_withoutComposerCallsTheDelegateWithEmptyCalldata() public {
-        AuthoredL2Plan memory plan = _authoredPlan();
-        plan.delegateComposer = address(0);
-        RegistryBootstrapMigration uncomposed = _deployAndAuthorize(_manifestWithL2Plan(plan));
-        L2UpgradePlan memory served = uncomposed.l2Plan();
-        assertEq(served.delegateComposer, address(0), "no composer is served as zero");
-
-        L2CanonicalTransaction memory transaction = uncomposed.l2UpgradeTx(chainId);
-        assertEq(transaction.txType, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, "the plan still has an L2 side");
-        assertEq(
-            transaction.data,
-            abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (served.deployments, served.delegateTo, "")
-            ),
-            "without a composer the delegate is called with empty calldata"
-        );
-
-        uint256 oldVersion = chainContractAddress.protocolVersion();
-        L2PlanFixtures.publish(bytecodesSupplier, L2PlanFixtures.codes(DELEGATE_CODE));
-        uncomposed.migrate();
-        assertEq(chainContractAddress.upgradeCutHash(oldVersion), keccak256(abi.encode(uncomposed.upgradeCut())));
-    }
-
     // ─────────────────────────────── final L2 plan ───────────────────────────────
 
     /// @dev The FINAL plan is the genesis release's table-derived set followed by the authored
@@ -1065,6 +1041,41 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         new RegistryBootstrapMigration(manifest);
     }
 
+    function test_revertWhen_manifestNamesAZeroAddress() public {
+        BootstrapManifest[] memory manifests = new BootstrapManifest[](6);
+        for (uint256 i = 0; i < manifests.length; ++i) {
+            manifests[i] = _manifest();
+        }
+        manifests[0].ctm = address(0);
+        manifests[1].ctmProxyAdmin = ProxyAdmin(address(0));
+        manifests[2].currentRelease = address(0);
+        manifests[3].ctmExecutor = address(0);
+        manifests[4].coreExecutor = address(0);
+        manifests[5].governance = address(0);
+        for (uint256 i = 0; i < manifests.length; ++i) {
+            vm.expectRevert(ZeroAddress.selector);
+            new RegistryBootstrapMigration(manifests[i]);
+        }
+    }
+
+    /// @dev The CTM inventory has exactly one slot per `CTMContract` member, which is also what makes
+    ///      the mandatory ServerNotifier slot addressable.
+    function test_revertWhen_manifestInventoryHasTheWrongLength() public {
+        uint256[2] memory lengths = [CTM_CONTRACT_COUNT - 1, CTM_CONTRACT_COUNT + 1];
+        for (uint256 k = 0; k < lengths.length; ++k) {
+            BootstrapManifest memory manifest = _manifest();
+            ProxyUpgradeRow[] memory resized = new ProxyUpgradeRow[](lengths[k]);
+            for (uint256 i = 0; i < resized.length && i < CTM_CONTRACT_COUNT; ++i) {
+                resized[i] = manifest.ctmProxyUpgrades[i];
+            }
+            manifest.ctmProxyUpgrades = resized;
+            vm.expectRevert(
+                abi.encodeWithSelector(RegistryInventoryLengthMismatch.selector, CTM_CONTRACT_COUNT, lengths[k])
+            );
+            new RegistryBootstrapMigration(manifest);
+        }
+    }
+
     /// @dev Two rows for one proxy would BOTH pass the source check (they compare against the same
     ///      pre-migration implementation) and the last would silently win — so the reviewed edge
     ///      and the executed edge would differ. Same rule {ProxyUpgradeTransition} enforces.
@@ -1158,6 +1169,18 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         new RegistryBootstrapMigration(manifest);
     }
 
+    /// @dev Without a composer the delegate would be called with EMPTY calldata, which the upgrade
+    ///      delegate rejects on every chain (see `ComposedL2UpgradeTxExecution.t.sol`).
+    function test_revertWhen_delegateWithoutComposer() public {
+        AuthoredL2Plan memory plan = _authoredPlan();
+        plan.delegateComposer = address(0);
+
+        BootstrapManifest memory manifest = _manifestWithL2Plan(plan);
+
+        vm.expectRevert(L2PlanDelegateNeedsComposer.selector);
+        new RegistryBootstrapMigration(manifest);
+    }
+
     /// @dev A plan whose CONSTRUCTED factory deps exceed what `BaseZkSyncUpgrade` accepts must be
     ///      rejected at pin time: otherwise the edge commits and every per-chain upgrade then
     ///      reverts. The delegate plus `MAX_NEW_FACTORY_DEPS` distinct extras is one past the cap.
@@ -1198,6 +1221,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         chainContractAddress.transferOwnership(address(staleMigration));
         ctmProxyAdmin.transferOwnership(address(staleMigration));
 
+        // Refused before any row moves, not by the CTM's own version check after the swaps.
+        vm.expectCall(address(ctmProxyAdmin), abi.encodeWithSelector(ProxyAdmin.upgrade.selector), 0);
         vm.expectRevert(
             abi.encodeWithSelector(
                 OutdatedProtocolVersion.selector,
@@ -1206,6 +1231,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             )
         );
         staleMigration.migrate();
+        assertFalse(staleMigration.executed(), "a refused edge must stay unspent");
+        assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implV31, "no row is applied");
     }
 
     function test_revertWhen_proxyIsNotAtTheExpectedImplementation() public {
@@ -1386,7 +1413,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     }
 
     /// @dev Ownership handed over, but the proxy is still under its old ProxyAdmin. A transparent
-    ///      proxy answers `admin()` only to its own admin, so the check reverts without data.
+    ///      proxy answers its admin's reads only to that admin, so `applyRows` reverts without data.
     function test_revertWhen_notifierStillUnderItsOldProxyAdmin() public {
         (BootstrapManifest memory manifest, TransparentUpgradeableProxy fresh) = _manifestWithFreshNotifier();
         _nominateExecutorForNotifier(fresh);
@@ -1431,6 +1458,23 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
             abi.encodeWithSelector(BootstrapServerNotifierNotBound.selector, address(notifierProxy), other)
         );
         migration.migrate();
+    }
+
+    /// @dev The CTM's admin cannot re-point it at all: `setServerNotifier` is owner-only.
+    function test_theCTMAdminCannotRepointTheNotifier() public {
+        address ctmAdmin = makeAddr("ctmAdmin");
+        vm.prank(governor);
+        chainContractAddress.setPendingAdmin(ctmAdmin);
+        vm.prank(ctmAdmin);
+        chainContractAddress.acceptAdmin();
+
+        vm.prank(ctmAdmin);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainContractAddress.setServerNotifier(makeAddr("otherNotifier"));
+
+        _handOverAuthority();
+        migration.migrate();
+        migration.validateApplied();
     }
 
     /// @dev ... and it must serve this CTM.
@@ -1557,6 +1601,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.currentRelease = address(_deployRelease(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)));
         RegistryBootstrapMigration authorized = _deployAndAuthorize(manifest);
 
+        vm.expectCall(address(ctmProxyAdmin), abi.encodeWithSelector(ProxyAdmin.upgrade.selector), 0);
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, emptyFacet));
         authorized.migrate();
         assertFalse(authorized.executed(), "a refused edge must stay unspent");
@@ -1565,7 +1610,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     /// @dev The bootstrap installs the release without cutting a diamond, so a selector two facets
     ///      route would surface only in every chain's crossing (`FacetExists`). The migration
-    ///      refuses the release before it spends itself.
+    ///      refuses the release before it spends itself and before any row moves.
     function test_revertWhen_releaseRoutesASelectorTwice() public {
         bytes4 shared = ISelfDescribingFacet(facetCuts[1].facet).selectors()[0];
         bytes4[] memory colliding = new bytes4[](1);
@@ -1575,6 +1620,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         manifest.currentRelease = address(_deployRelease(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT)));
         RegistryBootstrapMigration authorized = _deployAndAuthorize(manifest);
 
+        vm.expectCall(address(ctmProxyAdmin), abi.encodeWithSelector(ProxyAdmin.upgrade.selector), 0);
         vm.expectRevert(abi.encodeWithSelector(RegistryDuplicateSelector.selector, shared));
         authorized.migrate();
         assertFalse(authorized.executed(), "a refused edge must stay unspent");

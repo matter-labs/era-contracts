@@ -359,7 +359,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     /// @notice Deploys the CTM executor and hands it the whole CTM domain — the CTM (whose nomination
-    ///         its permissionless `acceptCTMOwnership` completes), the CTM-domain ProxyAdmin and the
+    ///         its `acceptCTMOwnership` completes), the CTM-domain ProxyAdmin and the
     ///         ServerNotifier (accepted through `forward`) — then nominates the ecosystem governance on
     ///         it: the CTM half of what the v35 bootstrap ends with. Constructed for the deployer,
     ///         which performs the handover; governance accepts afterwards.
@@ -370,6 +370,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         address ctmProxyAdmin = ctmAddresses.admin.transparentProxyAdmin;
         address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
         address governance = _ecosystemGovernance();
+        require(ctm != address(0) && ctmProxyAdmin != address(0), "CTM or its ProxyAdmin not deployed");
         CTMUpgradeExecutor executor = CTMUpgradeExecutor(
             payable(
                 deployViaCreate2AndNotify(

@@ -10,13 +10,24 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 
 ## Gateway is softly deprecated
 
-v33 onwards deploys no Gateway, and its ceremony tooling is gone. The settlement-layer machinery in the contracts, the scripts that stand a Gateway up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04–06) remain so that a future settlement layer can use chain migration; removing them is tracked in EVM-1729. Support for the legacy Era Gateway is gone. Beyond keeping those tests passing, nothing depends on the Gateway.
+v33 onwards deploys no Gateway, and its ceremony tooling is gone. The settlement-layer machinery in the contracts, the scripts that stand a Gateway up in tests, the foundry Gateway suites and the anvil-interop Gateway specs (04 and 05) remain so that a future settlement layer can use chain migration; removing them is tracked in EVM-1729. Support for the legacy Era Gateway is gone. Beyond keeping those tests passing, nothing depends on the Gateway.
 
 Unless the user explicitly asks about the Gateway:
 
 - Don't reason about the Gateway, Gateway-settled chains or chain migration while designing, implementing or reviewing a change, and don't add Gateway cases to new tests or docs.
 - Don't extend, refactor or rename Gateway code. Gateway-named identifiers in the core contracts (`migrateToGateway`, `InteropCenter.forwardTransactionOnGateway`, …) are ABI and stay as they are.
 - If a change breaks an existing Gateway test, the smallest fix that keeps it passing is enough.
+
+## Era (EraVM) does not get v34 or later
+
+Era chains and the Era CTM receive nothing from v34 onward; they stay on their own line. Everything on
+`draft/v0.34.0` and later, including the v35 registry-driven upgrade system, is for ZKsync OS only.
+
+Unless the user explicitly asks about Era:
+
+- Don't design, review or test a v34+ change for Era chains, the Era CTM, EraVM-only contracts or Era server
+  consumers (the zksync-era server, EraVM bootloader paths).
+- An Era-only consequence of a v34+ change is not a finding.
 
 ## Code style requirements
 
@@ -67,6 +78,16 @@ address result = _tryAddress(target, "someFunction()");
 - These patterns make debugging extremely difficult
 - They mask initialization issues and timing problems
 - The codebase should fail fast and clearly, not silently return defaults
+
+**SCOPE:**
+
+- The rule stops our own code from hiding failures of our own contracts and scripts.
+- It does not forbid protocol code that probes arbitrary third-party contracts where "unsupported"
+  is a valid, specified answer (for example a base token without `name()`/`symbol()` or one
+  returning `bytes32`, where a typed call would make the chain impossible to create or upgrade).
+- Never remove or rewrite an existing try/catch or `staticcall` in protocol contracts to satisfy
+  this rule, because that changes protocol behaviour; raise it with the PR owner.
+- A new use needs the owner's approval and a comment naming the "unsupported" answer it handles.
 
 ### NEVER Override Storage Slots in Tests
 
@@ -340,6 +361,9 @@ regenerate whatever it invalidates. A bump changes solc metadata in every artifa
 `AllContractsHashes.json` always needs regenerating (`zkstack-out` and `selectors` are ABI-derived
 and unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
 committed anvil-interop chain states; regenerate those too if a bump changes it.
+
+One anvil is pinned separately: [`.github/amsterdam-anvil.env`](.github/amsterdam-anvil.env), for
+the L1 of the Glamsterdam gas check only. Its header says what it covers and when to bump it.
 
 ### Building Artifacts
 

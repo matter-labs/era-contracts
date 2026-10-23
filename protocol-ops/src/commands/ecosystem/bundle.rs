@@ -632,6 +632,7 @@ fn package_verification_args(
         executor_records: executor_records.to_vec(),
         contract_hashes: None,
         env: Some(env_cfg.env.clone()),
+        expected_bridgehub: None,
     })
 }
 
@@ -1523,6 +1524,8 @@ mod tests {
                 assert!(args.create2_salts.contains(&salt), "{env}: {salt} missing");
             }
             assert_eq!(args.env.as_deref(), Some(env));
+            // The Bridgehub is the env's own.
+            assert_eq!(args.expected_bridgehub, None);
             assert_eq!(args.executor_records, vec![record]);
         }
     }

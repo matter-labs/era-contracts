@@ -1,0 +1,222 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
+import {
+    ProofSystem,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+} from "contracts/common/Config.sol";
+import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {SecondProofSystemAlreadyRequired} from "contracts/state-transition/L1StateTransitionErrors.sol";
+
+import {InteropGatingDeployer} from "../_SharedInteropGatingDeployer.t.sol";
+
+/// @notice A diamond-cut initializer that replaces the verifier without the check of `BaseZkSyncUpgrade._setVerifier`,
+/// standing in for an upgrade that forgets it.
+contract VerifierOverwrite is ZKChainBase {
+    function overwriteVerifier(IVerifier _verifier) external returns (bytes32) {
+        s.verifier = _verifier;
+        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
+    }
+}
+
+/// @notice The permanent second proof system requirement and the ZiSK switch auth it changes. See
+/// {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+contract SecondProofSystemRequirementTest is InteropGatingDeployer {
+    uint8 internal constant ZISK_DISABLED = uint8(1 << uint8(ProofSystem.Zisk));
+
+    address internal chain;
+    address internal chainAdmin;
+    address internal governance;
+
+    function setUp() public {
+        _deployInteropGatingEcosystem();
+        chain = getZKChainAddress(zkChainIds[0]);
+        governance = addresses.bridgehubOwnerAddress;
+        // The harness gives the chain the Bridgehub owner as its admin; the auth split needs them apart.
+        chainAdmin = makeAddr("chainAdmin");
+        vm.prank(IGetters(chain).getAdmin());
+        IAdmin(chain).setPendingAdmin(chainAdmin);
+        vm.prank(chainAdmin);
+        IAdmin(chain).acceptAdmin();
+        assertNotEq(chainAdmin, governance);
+    }
+
+    function test_permanentlyRequireSecondProofSystem() public {
+        assertFalse(IGetters(chain).isSecondProofSystemRequired());
+
+        vm.expectEmit(true, true, true, true, chain);
+        emit IAdmin.SecondProofSystemRequired();
+        vm.prank(chainAdmin);
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
+
+        assertTrue(IGetters(chain).isSecondProofSystemRequired());
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE);
+    }
+
+    function test_permanentlyRequireSecondProofSystem_revertWhen_alreadyRequired() public {
+        _requireSecondProofSystem();
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(SecondProofSystemAlreadyRequired.selector);
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
+
+        assertTrue(IGetters(chain).isSecondProofSystemRequired());
+    }
+
+    function test_permanentlyRequireSecondProofSystem_revertWhen_ziskDisabled() public {
+        _setZiskStatus(chainAdmin, false);
+
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
+
+        assertFalse(IGetters(chain).isSecondProofSystemRequired());
+    }
+
+    function test_permanentlyRequireSecondProofSystem_revertWhen_notAdmin() public {
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, governance));
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
+
+        assertFalse(IGetters(chain).isSecondProofSystemRequired());
+    }
+
+    /// @notice Before the requirement, only the chain admin switches ZiSK, in both directions.
+    function test_beforeRequirement_adminSwitchesZisk() public {
+        _setZiskStatus(chainAdmin, false);
+        _setZiskStatus(chainAdmin, true);
+    }
+
+    function test_beforeRequirement_revertWhen_governanceDisablesZisk() public {
+        _expectUnauthorizedZiskSwitch(governance, false);
+    }
+
+    function test_afterRequirement_revertWhen_adminDisablesZisk() public {
+        _requireSecondProofSystem();
+        _expectUnauthorizedZiskSwitch(chainAdmin, false);
+    }
+
+    /// @notice The emergency switch: governance disables ZiSK on a chain under the requirement, which stays under
+    /// it; the chain admin can turn it back on.
+    function test_afterRequirement_governanceDisablesAndAdminReenablesZisk() public {
+        _requireSecondProofSystem();
+
+        _setZiskStatus(governance, false);
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_PLONK_VERIFICATION_TYPE);
+        assertTrue(IGetters(chain).isSecondProofSystemRequired());
+
+        _setZiskStatus(chainAdmin, true);
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE);
+    }
+
+    function test_afterRequirement_revertWhen_governanceEnablesZisk() public {
+        _requireSecondProofSystem();
+        _setZiskStatus(governance, false);
+        _expectUnauthorizedZiskSwitch(governance, true);
+    }
+
+    /// @notice The Admin facet refuses any diamond cut that leaves a chain under the requirement on a verifier
+    /// without the multi-proof mode, here one the chain type manager's owner executes.
+    function test_afterRequirement_revertWhen_upgradeSetsSingleProofVerifier() public {
+        _requireSecondProofSystem();
+        address verifierBefore = IGetters(chain).getVerifier();
+        Diamond.DiamondCutData memory cut = _verifierOverwrite(
+            address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))))
+        );
+
+        vm.prank(_ctmOwner());
+        vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
+        addresses.chainTypeManager.executeUpgrade(zkChainIds[0], cut);
+
+        assertEq(IGetters(chain).getVerifier(), verifierBefore);
+    }
+
+    function test_afterRequirement_upgradeSetsMultiProofVerifier() public {
+        _requireSecondProofSystem();
+        _assertRequiringChainUpgradesToMultiProofVerifier();
+
+        assertFalse(IGetters(chain).disabledProofSystems().zisk, "the upgrade must keep ZiSK on");
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE);
+    }
+
+    /// @notice The check reads what the verifier supports, not the chain's flags: a chain under the requirement
+    /// whose ZiSK governance switched off still upgrades to a multi-proof verifier, and ZiSK stays off.
+    function test_afterRequirement_upgradeAfterEmergencyZiskOffSetsMultiProofVerifier() public {
+        _requireSecondProofSystem();
+        _setZiskStatus(governance, false);
+        _assertRequiringChainUpgradesToMultiProofVerifier();
+
+        assertTrue(IGetters(chain).disabledProofSystems().zisk, "the upgrade must keep ZiSK off");
+        assertEq(IGetters(chain).getProofMode(), ZKSYNC_OS_PLONK_VERIFICATION_TYPE);
+    }
+
+    function test_beforeRequirement_upgradeSetsSingleProofVerifier() public {
+        address newVerifier = address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))));
+        Diamond.DiamondCutData memory cut = _verifierOverwrite(newVerifier);
+
+        vm.prank(_ctmOwner());
+        addresses.chainTypeManager.executeUpgrade(zkChainIds[0], cut);
+
+        assertEq(IGetters(chain).getVerifier(), newVerifier);
+    }
+
+    function _assertRequiringChainUpgradesToMultiProofVerifier() internal {
+        address newVerifier = address(
+            new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
+        );
+        Diamond.DiamondCutData memory cut = _verifierOverwrite(newVerifier);
+
+        vm.prank(_ctmOwner());
+        addresses.chainTypeManager.executeUpgrade(zkChainIds[0], cut);
+
+        assertEq(IGetters(chain).getVerifier(), newVerifier);
+        assertTrue(IGetters(chain).isSecondProofSystemRequired(), "the upgrade must keep the requirement");
+    }
+
+    function _verifierOverwrite(address _verifier) internal returns (Diamond.DiamondCutData memory) {
+        return
+            Diamond.DiamondCutData({
+                facetCuts: new Diamond.FacetCut[](0),
+                initAddress: address(new VerifierOverwrite()),
+                initCalldata: abi.encodeCall(VerifierOverwrite.overwriteVerifier, (IVerifier(_verifier)))
+            });
+    }
+
+    function _ctmOwner() internal view returns (address) {
+        return IOwnable(address(addresses.chainTypeManager)).owner();
+    }
+
+    function _requireSecondProofSystem() internal {
+        vm.prank(chainAdmin);
+        IAdmin(chain).permanentlyRequireSecondProofSystem();
+    }
+
+    function _setZiskStatus(address _caller, bool _enabled) internal {
+        uint8 oldMask = IGetters(chain).disabledProofSystems().zisk ? ZISK_DISABLED : 0;
+        vm.expectEmit(true, true, true, true, chain);
+        emit IAdmin.NewDisabledProofSystems(oldMask, _enabled ? 0 : ZISK_DISABLED);
+        vm.prank(_caller);
+        IAdmin(chain).setProofSystemStatus(ProofSystem.Zisk, _enabled);
+        assertEq(IGetters(chain).disabledProofSystems().zisk, !_enabled);
+    }
+
+    function _expectUnauthorizedZiskSwitch(address _caller, bool _enabled) internal {
+        bool disabledBefore = IGetters(chain).disabledProofSystems().zisk;
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        IAdmin(chain).setProofSystemStatus(ProofSystem.Zisk, _enabled);
+        assertEq(IGetters(chain).disabledProofSystems().zisk, disabledBefore);
+    }
+
+    // add this to be excluded from coverage report
+    function test() internal override {}
+}

@@ -81,8 +81,7 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
         assertEq(ctm.protocolVersion(), 0, "the CTM starts at the release's version");
     }
 
-    /// @dev A zero genesis upgrade is refused by the release constructor (`ZeroAddress`); the one
-    ///      that reaches the CTM is a nonzero address without code, which `validate()` refuses.
+    /// @dev A codeless (or zero) genesis upgrade pins, and the install-time `validate()` refuses it.
     function test_RevertWhen_releaseGenesisUpgradeHasNoCode() public {
         ReleaseManifest memory manifest = _validReleaseManifest();
         address codeless = makeAddr("codelessGenesisUpgrade");

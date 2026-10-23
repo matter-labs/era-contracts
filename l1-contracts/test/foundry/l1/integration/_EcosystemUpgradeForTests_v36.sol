@@ -6,6 +6,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {CoreUpgrade_v36} from "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
 import {CTMUpgrade_v36} from "deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol";
 import {TrimmedUpgradeOutput} from "./_EcosystemUpgradeForTests.sol";
+import {MemberDeploymentsRecord} from "deploy-scripts/utils/MemberDeploymentsRecord.sol";
 
 /// @notice Memory-trimmed test variants of the v36 (first registry-driven) Core/CTM prepare
 ///         scripts, driven by the anvil-interop pipeline upgrade runner through protocol-ops
@@ -65,7 +66,8 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
                 chainTypeManagerProxy: getAddresses().stateTransition.proxies.chainTypeManager,
                 transparentProxyAdmin: getAddresses().admin.transparentProxyAdmin,
                 forceDeploymentsData: generatedData.forceDeploymentsData
-            })
+            }),
+            _memberDeployments: MemberDeploymentsRecord.serialize(memberDeployments)
         });
     }
 }

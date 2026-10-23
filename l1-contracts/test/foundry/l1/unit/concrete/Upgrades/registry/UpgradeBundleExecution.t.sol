@@ -260,8 +260,7 @@ contract UpgradeBundleExecutionTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.currentRelease(), address(release));
         assertEq(_liveImpl(ecosystemProxyAdmin, ecosystemProxy), implNew, "the core row must be applied");
         assertEq(_liveImpl(ctmProxyAdmin, ctmDomainProxy), implNew, "the CTM-domain row must be applied");
-        // The post-state check `applyCTMUpgrade` ends with keeps holding afterwards.
-        ctmExecutor.validateTransitionApplied(ICTMTransition(address(transition)));
+        _assertTransitionApplied(chainContractAddress, ICTMTransition(address(transition)), address(ctmExecutor));
     }
 
     /// @dev A core-only upgrade is one call and buys no chain-version edge.

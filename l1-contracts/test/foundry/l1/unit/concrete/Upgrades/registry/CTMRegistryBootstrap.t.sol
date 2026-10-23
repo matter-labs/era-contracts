@@ -7,6 +7,7 @@ import {
     GenesisBatchHashZero,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
+    RegistryTargetHasNoCode,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {
@@ -119,6 +120,37 @@ contract CTMRegistryBootstrapTest is Test {
         // Version validation moved to the transition; a release still rejects a zero genesisUpgrade.
         ReleaseManifest memory manifest = _genesisManifest();
         manifest.genesisUpgrade = address(0);
+
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMRelease(manifest);
+    }
+
+    function test_constructorRevertsOnZeroDiamondInit() public {
+        ReleaseManifest memory manifest = _genesisManifest();
+        manifest.diamondInit = address(0);
+
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMRelease(manifest);
+    }
+
+    /// @dev Construction does not check code (members may be deployed in the same transaction);
+    ///      the install-time `validate()` refuses a codeless member.
+    function test_aCodelessGenesisUpgradeIsRefusedAtInstall() public {
+        ReleaseManifest memory manifest = _genesisManifest();
+        address codeless = makeAddr("codelessGenesisUpgrade");
+        manifest.genesisUpgrade = codeless;
+
+        CTMRelease release = new CTMRelease(manifest);
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, codeless));
+        release.validate();
+    }
+
+    /// @dev The verifier is the one member a chain installs without reading it again: `DiamondInit`
+    ///      and the upgrade engine take it from the release as it is, so the release refuses a zero
+    ///      one at construction (objlib-01).
+    function test_constructorRevertsOnZeroVerifier() public {
+        ReleaseManifest memory manifest = _genesisManifest();
+        manifest.verifier = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new CTMRelease(manifest);

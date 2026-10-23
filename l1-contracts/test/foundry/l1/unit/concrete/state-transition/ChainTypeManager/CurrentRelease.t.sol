@@ -12,11 +12,14 @@ import {
     GENESIS_BATCH_COMMITMENT
 } from "contracts/common/Config.sol";
 import {
+    GenesisBatchHashZero,
     ReleaseProtocolVersionMismatch,
     TransitionReleaseMismatch,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
+import {L2UpgradePlan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
 /// @notice The CTM's `currentRelease` — the release new chains are created from — moves only
@@ -59,6 +62,11 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
             abi.encodeCall(ICTMTransition.upgradeEngine, ()),
             abi.encode(makeAddr("upgradeEngine"))
         );
+        // The commit's own checks: the code the transition names, and an L2 plan with nothing to
+        // publish.
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.validate, ()), "");
+        L2UpgradePlan memory emptyPlan;
+        vm.mockCall(address(transition), abi.encodeCall(ICommittedUpgrade.l2Plan, ()), abi.encode(emptyPlan));
     }
 
     function test_initializationStartsAtTheReleasesVersion() public view {
@@ -88,6 +96,11 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
 
         assertEq(chainContractAddress.protocolVersion(), NEW_VERSION, "the version is the release's own");
         assertEq(chainContractAddress.currentRelease(), newRelease, "the release moved with it");
+        assertEq(
+            ICTMRelease(newRelease).protocolVersion(),
+            chainContractAddress.protocolVersion(),
+            "the installed release is the release of the CTM's version"
+        );
         assertEq(chainContractAddress.l1GenesisUpgrade(), newGenesisUpgrade, "genesis reads the new release");
         IExecutor.StoredBatchInfo memory batchZero = IExecutor.StoredBatchInfo({
             batchNumber: 0,
@@ -127,6 +140,11 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
 
         assertEq(chainContractAddress.protocolVersion(), NEW_VERSION, "the version moved");
         assertEq(chainContractAddress.currentRelease(), newRelease, "and the release with it, in the same call");
+        assertEq(
+            ICTMRelease(chainContractAddress.currentRelease()).protocolVersion(),
+            chainContractAddress.protocolVersion(),
+            "the installed release is the release of the CTM's version"
+        );
         assertEq(chainContractAddress.upgradeTransition(0), address(transition), "the edge is committed");
     }
 
@@ -161,5 +179,39 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
         );
         vm.prank(governor);
         chainContractAddress.setNewVersionUpgradeFromTransition(transition);
+    }
+
+    /// @dev The transition is mocked: a real `CTMTransition` reads its target's version off
+    ///      `newRelease` at construction, so it can never name a zero one.
+    function test_revertWhen_theTransitionNamesNoRelease() public {
+        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, address(0));
+
+        vm.expectRevert(ZeroAddress.selector);
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
+
+        assertEq(chainContractAddress.currentRelease(), Utils.TEST_GENESIS_REGISTRY, "the release did not move");
+        assertEq(chainContractAddress.protocolVersion(), 0, "nor did the version");
+    }
+
+    /// @dev Every chain created from a release with a zero genesis batch hash would get an unusable
+    ///      batch zero. A real `CTMRelease` refuses one at construction, so the release is mocked
+    ///      here to isolate the CTM's own check.
+    function test_revertWhen_theTransitionsReleaseHasNoGenesisBatchHash() public {
+        address newRelease = _releaseAt(NEW_VERSION);
+        vm.mockCall(
+            newRelease,
+            abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
+            abi.encode(makeAddr("genesisUpgrade"), bytes32(0), uint64(1))
+        );
+        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, newRelease);
+
+        vm.expectRevert(GenesisBatchHashZero.selector);
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
+
+        assertEq(chainContractAddress.currentRelease(), Utils.TEST_GENESIS_REGISTRY, "the release did not move");
+        assertEq(chainContractAddress.protocolVersion(), 0, "nor did the version");
+        assertEq(chainContractAddress.upgradeTransition(0), address(0), "nor was the edge committed");
     }
 }

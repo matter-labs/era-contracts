@@ -28,17 +28,22 @@
 //!      produces for its role? ([`provenance`], [`members`]) — the live code against the
 //!      reviewed artifact, byte for byte outside its immutable slots: each release's facets,
 //!      `DiamondInit`, genesis upgrade and verifier tree, each L2 bytecode the release's table or
-//!      a plan names, each engine and composer, each row's `implNew`.
-//!   3. Does every proxy inventory belong to the domain its leg applies, and does every row name
-//!      the proxy of its slot, discovered on chain from the Bridgehub or the CTM? ([`rows`])
+//!      a plan names, each engine and composer, each row's `implNew`. Was each member the package
+//!      newly installs BUILT from argument values the review holds — the values that comparison
+//!      masks? ([`member_construction`]) The ZiSK Plonk backend, which no reviewed build
+//!      describes, is held to its pin ([`external_backends`]).
+//!   3. Does every proxy inventory belong to the domain its leg applies, upgrade something, and
+//!      hold only real edges, each naming the proxy of its slot, discovered on chain from the
+//!      Bridgehub or the CTM? ([`rows`])
 //!   4. Does every release the package installs pin the reviewed genesis — the genesis config's
-//!      root and the force deployments the prepare wrote? ([`genesis`])
+//!      root and the force deployments the prepare wrote ([`genesis`]) — and pass its own
+//!      `validate()`, which the CTM runs when it installs it?
 //!   5. Is authority bound where the review says — each executor to the independently reviewed
 //!      CTM and ProxyAdmin — and to the expected governance owner, with no nomination outstanding
 //!      on any authority the upgrade drives?
 //!   6. Does every proxy row depart from the implementation that is actually live, read through
-//!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only — the bootstrap's
-//!      completion check does not re-read implementations (`docs/registry-driven-upgrades.md`).
+//!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only; what a replayed bundle
+//!      leaves behind is checked by `ecosystem upgrade-governance` ([`applied`]).
 //!   7. Do chains crossing an edge keep the system-proxy logic new chains get? ([`shell`])
 //!   8. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
 //!      addresses, as one contiguous run in canonical order — and is every other call a reviewed
@@ -56,8 +61,8 @@
 //! It does not re-derive facet cuts, L2 transactions or proposals. Those are derived on-chain
 //! from the release pair, and `TransitionDerivationLib` is audited code — re-deriving them here
 //! would be a second implementation to keep in sync, which is exactly what the registry model
-//! set out to remove. It also does not call the objects' own `validate()`: that runs against
-//! post-execution state, so beforehand it reverts by design and tells a reviewer nothing.
+//! set out to remove. The only object `validate()` it calls is the arriving release's, which
+//! reads no live state; the others judge the state at execution, which a review cannot see.
 
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
@@ -67,10 +72,13 @@ use crate::common::ethereum::get_provider;
 use crate::upgrade_verification::contract_hashes::contract_hashes_path;
 use crate::upgrade_verification::report::VerificationResult;
 
+pub(crate) mod applied;
 pub(crate) mod bootstrap;
 pub(crate) mod construction;
+pub(crate) mod external_backends;
 pub(crate) mod genesis;
 pub(crate) mod lifecycle;
+pub(crate) mod member_construction;
 pub(crate) mod members;
 pub(crate) mod package;
 pub(crate) mod provenance;
@@ -84,7 +92,9 @@ pub(crate) mod upgrade;
 pub(crate) mod views;
 
 use construction::ReviewedBuild;
+use external_backends::ZiskBackendPins;
 use genesis::{ExpectedForceDeployments, ReviewedGenesis};
+use member_construction::ReviewedEnv;
 use package::RegistryPackage;
 use provenance::CodeIdentity;
 use views::CommittedUpgradeView;
@@ -101,7 +111,10 @@ use views::CommittedUpgradeView;
 /// the package's own ([`records`]). `env` names the upgrade env whose permanent values hold the
 /// reviewed ZK token asset id an installed release's force deployments are held against
 /// ([`genesis`]); a replacement, or an upgrade without a transition leg, installs no release and
-/// does not need it. `contract_hashes`
+/// does not need it. The env's permanent values are also what the members' constructor
+/// arguments are held against where they come from the env ([`member_construction`]), and it
+/// selects the ZiSK backend pins that apply ([`external_backends`]). `expected_bridgehub`
+/// replaces the env's `bridgehub_proxy_addr` as the Bridgehub under review. `contract_hashes`
 /// replaces the committed `AllContractsHashes.json` the build is held against (see the
 /// `--contract-hashes` help).
 #[allow(clippy::too_many_arguments)]
@@ -112,6 +125,7 @@ pub(crate) async fn verify(
     extra_create2_salts: &[B256],
     executor_records: &[std::path::PathBuf],
     env: Option<&str>,
+    expected_bridgehub: Option<Address>,
     contract_hashes: Option<&std::path::Path>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
@@ -125,9 +139,21 @@ pub(crate) async fn verify(
             hashes_path.display()
         ));
     }
-    let build = ReviewedBuild::load(identity);
+    let build = ReviewedBuild::load(identity).with_zisk_backends(ZiskBackendPins::load(env));
     let genesis_root = genesis::reviewed_genesis_root();
     let genesis_image = genesis::reviewed_genesis_image();
+    let env_config = env.map(EnvConfig::load).transpose()?;
+    if let (Some(expected), Some(config)) = (expected_bridgehub, &env_config) {
+        if expected != config.bridgehub() {
+            result.report_warn(&format!(
+                "--expected-bridgehub {expected} is not env {}'s bridgehub_proxy_addr {}: the flag \
+                 is the reviewed Bridgehub, and this run reviews a harness L1, not the env's",
+                config.env,
+                config.bridgehub()
+            ));
+        }
+    }
+    let reviewed_env = ReviewedEnv::new(env_config.as_ref(), expected_bridgehub);
 
     let mut package = RegistryPackage::load(ecosystem_toml)?;
     let held = match &mut package {
@@ -150,6 +176,7 @@ pub(crate) async fn verify(
                 &package,
                 expected_governance_owner,
                 &salts,
+                &reviewed_env,
                 result,
             )
             .await
@@ -157,7 +184,7 @@ pub(crate) async fn verify(
         RegistryPackage::Upgrade(package) => {
             // Only a transition leg installs a release whose force deployments pin the token.
             let zk_token_asset_id = if package.leg(package::LegKind::Transition).is_some() {
-                reviewed_zk_token_asset_id(env)?
+                reviewed_zk_token_asset_id(env_config.as_ref())?
             } else {
                 B256::ZERO
             };
@@ -175,12 +202,13 @@ pub(crate) async fn verify(
                 &package,
                 expected_governance_owner,
                 &salts,
+                &reviewed_env,
                 result,
             )
             .await
         }
         RegistryPackage::Bootstrap(package) => {
-            let zk_token_asset_id = reviewed_zk_token_asset_id(env)?;
+            let zk_token_asset_id = reviewed_zk_token_asset_id(env_config.as_ref())?;
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
@@ -195,6 +223,7 @@ pub(crate) async fn verify(
                 &package,
                 expected_governance_owner,
                 &salts,
+                &reviewed_env,
                 result,
             )
             .await
@@ -202,9 +231,9 @@ pub(crate) async fn verify(
     }
 }
 
-/// The ZK token asset id `env`'s reviewed permanent values declare. Required on the paths that
+/// The ZK token asset id the reviewed env's permanent values declare. Required on the paths that
 /// install a release, so a missing env or key stops the run before anything is verified.
-fn reviewed_zk_token_asset_id(env: Option<&str>) -> anyhow::Result<B256> {
+fn reviewed_zk_token_asset_id(env: Option<&EnvConfig>) -> anyhow::Result<B256> {
     let env = env.ok_or_else(|| {
         anyhow::anyhow!(
             "this package installs a release whose force deployments pin the ZK token asset id: \
@@ -212,7 +241,7 @@ fn reviewed_zk_token_asset_id(env: Option<&str>) -> anyhow::Result<B256> {
              `zk_token_asset_id`"
         )
     })?;
-    EnvConfig::load(env)?.require_zk_token_asset_id()
+    env.require_zk_token_asset_id()
 }
 
 /// The reviewed salts: whatever the package recorded, plus whatever the reviewer supplied,
@@ -298,10 +327,10 @@ mod tests {
 
         let stage = EnvConfig::load("stage").unwrap();
         assert_eq!(
-            reviewed_zk_token_asset_id(Some("stage")).unwrap(),
+            reviewed_zk_token_asset_id(Some(&stage)).unwrap(),
             stage.require_zk_token_asset_id().unwrap()
         );
-        assert!(reviewed_zk_token_asset_id(Some("no-such-env")).is_err());
+        assert!(EnvConfig::load("no-such-env").is_err());
     }
 
     #[test]

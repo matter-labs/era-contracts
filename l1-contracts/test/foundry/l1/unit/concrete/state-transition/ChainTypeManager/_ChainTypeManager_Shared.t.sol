@@ -60,7 +60,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     address internal diamondInit;
-    address internal interopCenterAddress;
     address internal governor;
     address internal admin;
     address internal baseToken;
@@ -84,7 +83,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
         vm.warp(1);
 
-        interopCenterAddress = makeAddr("interopCenter");
         governor = makeAddr("governor");
         admin = makeAddr("admin");
         baseToken = makeAddr("baseToken");
@@ -125,7 +123,6 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         bytecodesSupplier = new BytecodesSupplier();
         chainTypeManager = new ChainTypeManager(
             address(bridgehub),
-            interopCenterAddress,
             address(bytecodesSupplier),
             address(permissionlessValidator),
             address(0)

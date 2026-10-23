@@ -25,6 +25,8 @@ error AlreadyPermanentRollup();
 error AlreadyWhitelisted(address);
 // 0x5e85ae73
 error AmountMustBeGreaterThanZero();
+// 0xfa5dbe08
+error ArrayLengthMismatch(uint256 firstLength, uint256 secondLength);
 // 0x76fc80ad
 error AssetDeploymentTrackerNotSet(bytes32 assetId);
 // 0xfde974f4
@@ -256,6 +258,8 @@ error L2BytecodeNotPublished(bytes32 bytecodeHash);
 error L2BytecodeRowRemoved(uint256 member);
 // 0x4ef29fe3
 error L2BytecodeTableShrunk(uint256 fromLength, uint256 newLength);
+// 0x46b9c0b4
+error L2PlanDelegateNeedsComposer();
 // 0x5493e4b1
 error L2PlanNeedsDelegate();
 // 0xf074914a
@@ -342,6 +346,8 @@ error NotInitializedReentrancyGuard();
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0xc5441a63
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
+// 0x93ff51ed
+error NotMultiProofMode(uint256 proofMode);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0x9d7bb13f
@@ -424,6 +430,8 @@ error RemoveFunctionFacetAddressNotZero(address facet);
 error RemoveFunctionFacetAddressZero();
 // 0xf6fd7071
 error RemovingPermanentRestriction();
+// 0xffc0fd93
+error RenounceOwnershipDisabled();
 // 0x3580370c
 error ReplaceFunctionFacetAddressZero();
 // 0xf126e113
@@ -500,8 +508,6 @@ error UnsupportedProofBatchEncoding(uint8 version);
 error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
-// 0xd7f878f7
-error UpgradeNotPermissionlessYet(uint256 deadline);
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145
@@ -538,7 +544,6 @@ error ZKsyncOSMaxTxGasLimitTooLow();
 error ZKsyncOSNotForceDeployForExistingContract(address);
 // 0xb24b1ccb
 error ZKsyncOSNotForceDeployToPrecompileAddress(address);
-// 0x5ca97564
 
 enum UpgradeTxVerifyParam {
     From,

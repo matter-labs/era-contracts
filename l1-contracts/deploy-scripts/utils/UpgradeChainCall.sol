@@ -4,16 +4,7 @@ pragma solidity ^0.8.21;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-
-/// @notice The cut-TAKING entrypoint, which v31 through v34 expose. v35 replaced it with the
-///         cut-reading form on `IAdmin`.
-interface IAdminWithCut {
-    function upgradeChainFromVersion(
-        address _chainAddress,
-        uint256 _protocolVersion,
-        Diamond.DiamondCutData calldata _cutData
-    ) external;
-}
+import {IAdminWithCut} from "contracts/state-transition/chain-interfaces/IAdminWithCut.sol";
 
 /// @title Upgrade-call encoder for the chain diamonds this tooling supports.
 /// @author Matter Labs

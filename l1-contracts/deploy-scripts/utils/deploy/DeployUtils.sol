@@ -3,9 +3,19 @@ pragma solidity ^0.8.10;
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {ContractsBytecodesLib} from "../bytecode/ContractsBytecodesLib.sol";
+import {MemberDeployment, MemberDeploymentsRecord} from "../MemberDeploymentsRecord.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 abstract contract DeployUtils is Create2FactoryUtils {
+    /// @notice Every contract this run deployed (or found already deployed) through
+    ///         {deploySimpleContract} or as a {deployTuppWithContractAndProxyAdmin} implementation, in
+    ///         order: what an upgrade prepare records as `[member_deployments]` (see
+    ///         {MemberDeploymentsRecord}).
+    MemberDeployment[] internal memberDeployments;
+
+    /// @dev Whether {memberDeployments} already holds an address.
+    mapping(address deployed => bool recorded) internal memberDeploymentRecorded;
+
     function deployTuppWithContract(string memory contractName) public returns (address implementation, address proxy) {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin(contractName, transparentProxyAdmin());
     }
@@ -14,12 +24,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         string memory contractName,
         address proxyAdmin
     ) public returns (address implementation, address proxy) {
+        bytes memory constructorArgs = getCreationCalldata(contractName);
         implementation = deployViaCreate2AndNotify(
             getCreationCode(contractName),
-            getCreationCalldata(contractName),
+            constructorArgs,
             contractName,
             string.concat(contractName, " Implementation")
         );
+        _recordMemberDeployment(implementation, contractName, constructorArgs);
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
@@ -43,10 +55,44 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function transparentProxyAdmin() internal virtual returns (address);
 
     function deploySimpleContract(string memory contractName) public returns (address contractAddress) {
-        contractAddress = deployViaCreate2AndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
-            contractName
+        bytes memory constructorArgs = getCreationCalldata(contractName);
+        contractAddress = deployViaCreate2AndNotify(getCreationCode(contractName), constructorArgs, contractName);
+        _recordMemberDeployment(contractAddress, contractName, constructorArgs);
+    }
+
+    /// @notice Sets the `root` serialization object's `member_deployments` to {memberDeployments}.
+    /// @dev Called before every write of an upgrade prepare's output: `root` is as process-global as
+    ///      the record's own object (see {MemberDeploymentsRecord.serialize}).
+    function serializeMemberDeployments() internal {
+        vm.serializeString(
+            "root",
+            MemberDeploymentsRecord.RECORD_KEY,
+            MemberDeploymentsRecord.serialize(memberDeployments)
+        );
+    }
+
+    /// @notice Adds a CREATE2 deployment of the run to {memberDeployments}, once per address.
+    /// @param _deployed Where it landed.
+    /// @param _contractName The artifact contract name its creation code was read from.
+    /// @param _constructorArgs The bytes appended to its creation code.
+    function _recordMemberDeployment(
+        address _deployed,
+        string memory _contractName,
+        bytes memory _constructorArgs
+    ) internal {
+        if (memberDeploymentRecorded[_deployed]) {
+            return;
+        }
+        memberDeploymentRecorded[_deployed] = true;
+        (address factory, bytes32 salt) = getCreate2FactoryParams();
+        memberDeployments.push(
+            MemberDeployment({
+                deployed: _deployed,
+                contractName: _contractName,
+                create2Factory: factory,
+                create2Salt: salt,
+                constructorArgs: _constructorArgs
+            })
         );
     }
 

@@ -62,9 +62,22 @@ pub struct VerifyBootstrapArgs {
     /// `upgrade-envs/permanent-values/<env>.toml` the package is held against. Every release the
     /// package installs pins that file's `zk_token_asset_id` in its genesis force deployments, so
     /// a recurring or bootstrap package is refused without it; a replacement installs no release
-    /// and does not need it.
+    /// and does not need it. The env's `testnet_verifier`, `bridgehub_proxy_addr` and each CTM's
+    /// `rollup_da_manager` are also what the constructor arguments of every member the package
+    /// newly installs are held against (its `l1_chain_id` must equal the RPC's), and it selects
+    /// the ZiSK backend pins that apply: without it, a `_isTestnet` argument is unverified, and so
+    /// is every argument that comes from the Bridgehub unless `--expected-bridgehub` names it.
     #[clap(long)]
     pub env: Option<String>,
+
+    /// The Bridgehub of the ecosystem the package upgrades, in place of the env's
+    /// `bridgehub_proxy_addr`. The constructor arguments of every member the package installs
+    /// are held against it and against what is discovered through it, and the package's CTM and
+    /// `bridgehub_proxy_addr` must agree with it. Only for an ecosystem the env file does not
+    /// describe — a harness's scratch L1; the report says which one was used. Without it or
+    /// `--env`, every argument that comes from the Bridgehub is unverified.
+    #[clap(long)]
+    pub expected_bridgehub: Option<Address>,
 
     /// A hashes file in the `AllContractsHashes.json` format to hold the local build and the live
     /// code against, instead of the committed `AllContractsHashes.json`. Only for a harness that
@@ -86,6 +99,7 @@ pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
         &args.create2_salts,
         &args.executor_records,
         args.env.as_deref(),
+        args.expected_bridgehub,
         args.contract_hashes.as_deref(),
         &mut result,
     )

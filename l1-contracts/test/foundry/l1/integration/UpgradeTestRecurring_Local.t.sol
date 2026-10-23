@@ -447,11 +447,12 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
 
         _runUpgrade(core, hop);
         assertEq(IChainTypeManager(inputs.ctm).protocolVersion(), _nextVersion(), "the CTM committed the edge");
-        assertEq(
-            IChainTypeManager(inputs.ctm).currentRelease(),
-            ICTMTransition(transition).newRelease(),
-            "the CTM moved to the new release"
+        _assertTransitionApplied(
+            IChainTypeManager(inputs.ctm),
+            ICTMTransition(transition),
+            hop.boundCTMUpgradeExecutor()
         );
+        _assertNotifierHeldBy(IChainTypeManager(inputs.ctm), hop.boundCTMUpgradeExecutor());
     }
 
     /// @notice A validator holding `UPGRADER_ROLE` crosses a registry-driven edge through the
@@ -745,6 +746,12 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             "the infrastructure leg landed"
         );
         assertEq(IChainTypeManager(inputs.ctm).protocolVersion(), _nextVersion(), "the version leg landed");
+        _assertTransitionApplied(
+            IChainTypeManager(inputs.ctm),
+            ICTMTransition(hop.preparedTransition()),
+            hop.boundCTMUpgradeExecutor()
+        );
+        _assertNotifierHeldBy(IChainTypeManager(inputs.ctm), hop.boundCTMUpgradeExecutor());
     }
 
     // ───────────────────────────── refusals ─────────────────────────────

@@ -8,5 +8,21 @@ pragma solidity 0.8.28;
  * @custom:security-contact security@matterlabs.dev
  */
 interface IL1MessageRoot {
+    /// @notice Governance enabled interop for the chain.
+    event InteropEnabled(uint256 indexed chainId);
+
     function v31UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
+
+    /// @notice Enables interop for a chain. One-way: there is no way to disable it. Callable by the
+    /// Bridgehub owner, once the chain is no longer pending its balance backfill.
+    /// See {protocol-docs/interop-gating.md#enabling-interop}.
+    /// @param _chainId The chain to enable interop for.
+    /// @param _requireSecondProofSystem Whether the chain must permanently require its second proof system and be
+    /// in multi-proof mode.
+    function enableInterop(uint256 _chainId, bool _requireSecondProofSystem) external;
+
+    /// @notice Returns whether governance enabled interop for the chain; false for unknown chains.
+    /// See {protocol-docs/interop-gating.md}.
+    /// @param _chainId The chain to query.
+    function isInteropEnabled(uint256 _chainId) external view returns (bool);
 }

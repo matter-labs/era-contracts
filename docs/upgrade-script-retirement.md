@@ -44,8 +44,8 @@ Finished, and described where it now lives:
   migration (`upgradeFromBootstrap`); nothing is repackaged into an intermediate struct.
 - **`CTMUpgradeBase` and `DefaultL2UpgradeStrategy` are gone**; the L2 side a version authors is
   one `authorL2Side` result.
-- **Objects carry no codehash pins.** Every object and member is a plain address, `validate()`
-  enforces that every named contract is deployed code, and provenance is governance's approval of
+- **Objects carry no codehash pins.** Every object and member is a plain address, the chain
+  enforces only that every named contract is deployed code, and provenance is governance's approval of
   the exact deployed objects, verified off-chain before every vote. Described in
   [registry-driven-upgrades.md](registry-driven-upgrades.md#provenance-and-validation).
 - Batch 1 (below) is implemented; batch 2 is partially implemented.
@@ -104,6 +104,9 @@ Landed, each verified by naming the surviving owner of the responsibility:
   the TypeScript and Rust tooling read receipts, logs and proofs.
 - `DefaultChainUpgrade.run`, `upgradeChainWithoutCut`, `setUpgradeTimestamp` and `getChainConfig`
   are deleted; they duplicated `AdminFunctions.upgradeChainFromCTM` and `adminScheduleUpgrade`.
+- `FinalizeUpgrade.s.sol` (the v31-era post-upgrade init), its `IFinalizeUpgrade` script interface
+  and zkstack-out artifact, and its only helper `MulticallWithGas` are deleted; protocol-ops bound
+  the interface but never called it.
 - Eight dead members on the upgrade bases and the introspector, the one-field `GatewayConfig`
   struct and both copies of the empty `saveOutputVersionSpecific` extension point are deleted, and
   so are `DeployCTM.run()` / `IDeployCTM.run` and its `state_transition_implementation_addr` output

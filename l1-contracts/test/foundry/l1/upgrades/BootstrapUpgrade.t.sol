@@ -5,12 +5,13 @@ import {BaseZkSyncUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {BootstrapUpgrade} from "contracts/upgrades/BootstrapUpgrade.sol";
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
+import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {TimeNotReached} from "contracts/common/L1ContractErrors.sol";
+import {TimeNotReached, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -141,6 +142,22 @@ contract BootstrapUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(engine.getVerifier(), otherVerifier, "the verifier comes off the release the migration names");
         assertTrue(otherVerifier != verifier, "the two releases really do install different verifiers");
         assertEq(engine.facetAddress(SEL_ARRIVING), facetArriving, "that release's routing is installed");
+    }
+
+    /// @dev The bootstrap edge installs its release's verifier through the same committed-object
+    ///      entry as every transition, so a release naming none is refused here too. A real
+    ///      `CTMRelease` refuses a zero verifier at construction, so its `verifier()` is mocked here
+    ///      to isolate the engine's own check.
+    function test_revertWhen_upgradeFromBootstrap_theReleaseNamesNoVerifier() public {
+        RegistryBootstrapMigration migration = _migration(genesisRelease, 0, address(engine), false);
+        vm.mockCall(address(genesisRelease), abi.encodeCall(ICTMRelease.verifier, ()), abi.encode(address(0)));
+
+        vm.expectRevert(ZeroAddress.selector);
+        engine.upgradeFromBootstrap(address(migration));
+
+        assertEq(engine.getProtocolVersion(), 0, "the version is unchanged");
+        assertEq(engine.getVerifier(), legacyVerifier, "the legacy verifier is unchanged");
+        assertEq(engine.facetAddress(SEL_DEPARTING), facetDeparting, "the legacy routing is unchanged");
     }
 
     function test_revertWhen_upgradeFromBootstrap_beforeTheSchedule() public {

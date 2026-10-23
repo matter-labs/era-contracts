@@ -25,6 +25,7 @@ import {
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerL1ChainIdZero,
@@ -38,6 +39,7 @@ import {
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
     ManagerCommittedLegSourceChainMismatch,
+    ManagerLegSourceChainNotAllowed,
     ManagerLegSourceChainNotRegistered,
     ManagerTooManyLegs,
     ManagerLegSourceChainIdsLengthMismatch,
@@ -196,6 +198,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
             if (_finality.proofs[i].sourceChainId != preimage.legSourceChainIds[i]) {
                 revert ProofSourceChainMismatch(preimage.legSourceChainIds[i], _finality.proofs[i].sourceChainId);
             }
+            _checkLegSourceAllowed(preimage.legSourceChainIds[i]);
             uint256 value = AtomicInteropProof.commitValue(flow.flowId, preimage.legBundleHashes[i]);
             AtomicInteropProof.verifyInclusion(
                 _finality.proofs[i],
@@ -225,6 +228,7 @@ contract AtomicFlowManager is IAtomicFlowManager {
         if (_absence.sourceChainId != missingLegChainId) {
             revert ProofSourceChainMismatch(missingLegChainId, _absence.sourceChainId);
         }
+        _checkLegSourceAllowed(missingLegChainId);
 
         uint256 value = AtomicInteropProof.commitValue(_flow.flowId, preimage.legBundleHashes[_missingLegIndex]);
         AtomicInteropProof.verifyTimeoutAbsence(_absence, value, preimage.deadline, preimage.settlementLayerChainId);
@@ -325,6 +329,17 @@ contract AtomicFlowManager is IAtomicFlowManager {
     function _checkSettlementLayerIsL1(uint256 _settlementLayerChainId) internal view {
         if (_settlementLayerChainId != L1_CHAIN_ID) {
             revert ManagerSettlementLayerNotL1(L1_CHAIN_ID, _settlementLayerChainId);
+        }
+    }
+
+    /// @notice Reverts unless this chain accepts interop from `_legSourceChainId`: the chain itself, or a peer
+    /// its admin allowed. See {protocol-docs/interop-gating.md#receive-filter}.
+    /// @param _legSourceChainId The source chain of a leg whose proof this chain is about to accept.
+    function _checkLegSourceAllowed(uint256 _legSourceChainId) internal view {
+        if (
+            _legSourceChainId != block.chainid && !IL2Bridgehub(address(L2_BRIDGEHUB)).isPeerAllowed(_legSourceChainId)
+        ) {
+            revert ManagerLegSourceChainNotAllowed(_legSourceChainId);
         }
     }
 

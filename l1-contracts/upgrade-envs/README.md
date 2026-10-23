@@ -34,7 +34,8 @@ impersonated. Update it when a release moves an address; never put per-release v
 
 What the release needs from the environment: the owner address and Era chain id, the CREATE2 salt
 for the core deploys and one per CTM under `[create2_factory_salts]`, and the release's one-off
-switches (`redeploy_zk_governance`, `[contracts] eip7702_checker`). Keep it small: anything derivable from L1 is read from L1 instead. The old protocol version in particular
+switches (`redeploy_zk_governance`, which `yarn new-release` does not copy into the next release,
+`[contracts] eip7702_checker`). Keep it small: anything derivable from L1 is read from L1 instead. The old protocol version in particular
 is not read from here: the CTM script reads it from the CTM. The `old_protocol_version` and
 `testnet_verifier` keys some input files still carry are dead.
 

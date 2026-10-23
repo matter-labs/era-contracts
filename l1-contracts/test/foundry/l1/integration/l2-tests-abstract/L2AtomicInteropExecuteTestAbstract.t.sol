@@ -24,6 +24,8 @@ import {
     WrongDestinationChainId
 } from "contracts/interop/InteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
+import {ManagerLegSourceChainNotAllowed} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
@@ -65,6 +67,10 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         // Proof fixtures from the builder: `tree` acts as the REMOTE chain's IMT oracle, plus the
         // real L2InteropRootStorage etched at its canonical address.
         _setUpAtomicFixtures();
+        // Both chains share this EVM, so its one Bridgehub also holds the destination's whitelist, whose
+        // receive filter must accept this (source) chain.
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.allowInteropPeer(block.chainid, baseTokenAssetId);
     }
 
     /// @dev The destination-side receiver of the transferred tokens (deterministic; recomputed in
@@ -280,6 +286,31 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             )
         );
         _executeOnDestination(finality);
+    }
+
+    /// @notice RECEIVE FILTER: once the destination drops the source from its whitelist, a flow with a
+    /// leg from that source cannot execute there even with every leg proven — the bundle stays
+    /// `Unreceived` and nothing is minted.
+    function test_executeAtomicBundle_RevertWhen_SourceNotAllowed() public {
+        _setUpAtomicStack();
+        _sendAtomicLegWithRemotePeer(keccak256("atomic execute disallowed-source salt"), bytes(""));
+        AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
+
+        uint256 sourceChainId = block.chainid;
+        uint256 receiverBalanceBefore = IERC20(ectx.l2Token).balanceOf(_receiver());
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        l2Bridgehub.deregisterChainForInterop(sourceChainId);
+
+        vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, sourceChainId));
+        _executeOnDestination(finality);
+
+        L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        assertEq(
+            uint256(handler.bundleStatus(ectx.bundleHash)),
+            uint256(BundleStatus.Unreceived),
+            "bundle must stay Unreceived"
+        );
+        assertEq(IERC20(ectx.l2Token).balanceOf(_receiver()), receiverBalanceBefore, "nothing must be minted");
     }
 
     /// @notice The bundle executes only on its destination chain: without the chain-id switch the

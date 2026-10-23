@@ -13,11 +13,19 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2CanonicalTransactionLib} from "contracts/state-transition/libraries/L2CanonicalTransactionLib.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {
+    ETH_TOKEN_ADDRESS,
+    ProofSystem,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {PreviousUpgradeNotFinalized} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {TimeNotReached} from "contracts/common/L1ContractErrors.sol";
+import {NotMultiProofMode, TimeNotReached, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -132,6 +140,22 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         assertEq(engine.getVerifier(), newVerifier);
         assertEq(engine.getProtocolVersion(), protocolVersion);
         assertEq(engine.facetAddress(SEL_DEPARTING), facetDeparting, "no facet change on a verifier-only hop");
+    }
+
+    /// @dev `_upgrade` reads a zero verifier as "leave unchanged", so a target release naming none
+    ///      would upgrade the chain while silently keeping the departing verifier. A real
+    ///      `CTMRelease` refuses a zero verifier at construction, so its `verifier()` is mocked here
+    ///      to isolate the engine's own check.
+    function test_revertWhen_upgradeFromTransition_theTargetReleaseNamesNoVerifier() public {
+        CTMTransition transition = _defaultTransition(0);
+        vm.mockCall(address(newRelease), abi.encodeCall(ICTMRelease.verifier, ()), abi.encode(address(0)));
+
+        vm.expectRevert(ZeroAddress.selector);
+        engine.upgradeFromTransition(address(transition));
+
+        assertEq(engine.getProtocolVersion(), 0, "the version is unchanged");
+        assertEq(engine.getVerifier(), fromVerifier, "the departing verifier is unchanged");
+        assertEq(engine.facetAddress(SEL_DEPARTING), facetDeparting, "the routing is unchanged");
     }
 
     function test_revertWhen_upgradeFromTransition_beforeTheSchedule() public {
@@ -282,7 +306,7 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         );
         assertEq(data.baseTokenMetadata.name, ERC20_NAME, "metadata not read from the local token");
         assertEq(data.baseTokenMetadata.symbol, ERC20_SYMBOL, "wrong symbol");
-        assertEq(data.baseTokenMetadata.decimals, COMPOSED_DECIMALS, "wrong decimals");
+        assertEq(data.baseTokenMetadata.decimals, ERC20_DECIMALS, "the token's own decimals on an upgrade");
         // The recorded address is the same local token the metadata came from; the bridging data
         // still describes the token on its origin chain.
         assertEq(data.baseTokenL1Address, address(erc20LocalToken), "wrong L1 base token address");
@@ -342,5 +366,58 @@ contract DefaultUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
         );
         engine.upgradeFromTransition(address(transition));
         assertEq(engine.getL2SystemContractsUpgradeTxHash(), keccak256(abi.encode(served)), "and the committed one");
+    }
+
+    // ─────────────────────────── second proof system requirement ───────────────────────────
+
+    /// @notice A chain that requires its second proof system can't take a verifier patch to a verifier without it.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+    function test_revertWhen_RequiringChainPatchesToSingleProofVerifier() public {
+        address singleProofVerifier = address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))));
+        CTMTransition patch = _verifierPatch(singleProofVerifier);
+        engine.setSecondProofSystemRequired(true);
+
+        vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
+        engine.upgradeFromTransition(address(patch));
+
+        assertEq(engine.getProtocolVersion(), protocolVersion);
+        assertEq(engine.getVerifier(), fromVerifier);
+    }
+
+    function test_RequiringChainPatchesToMultiProofVerifier() public {
+        _assertRequiringChainPatchesToMultiProofVerifier(0);
+    }
+
+    /// @notice After an emergency ZiSK-off, a verifier patch keeps both the requirement and ZiSK off.
+    function test_RequiringChainPatchesAfterEmergencyZiskOff() public {
+        _assertRequiringChainPatchesToMultiProofVerifier(uint8(1 << uint8(ProofSystem.Zisk)));
+    }
+
+    function _assertRequiringChainPatchesToMultiProofVerifier(uint8 _disabledProofSystems) internal {
+        address multiProofVerifier = address(
+            new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
+        );
+        CTMTransition patch = _verifierPatch(multiProofVerifier);
+        engine.setSecondProofSystemRequired(true);
+        engine.setDisabledProofSystems(_disabledProofSystems);
+
+        engine.upgradeFromTransition(address(patch));
+
+        assertEq(engine.getVerifier(), multiProofVerifier);
+        assertEq(engine.getProtocolVersion(), SemVer.packSemVer(0, 1, 1));
+        assertTrue(engine.getSecondProofSystemRequired(), "the upgrade must keep the requirement");
+        assertEq(engine.getDisabledProofSystems(), _disabledProofSystems, "the upgrade keeps the flags");
+        assertEq(
+            engine.getProofMode(),
+            _disabledProofSystems == 0 ? ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE : ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+        );
+    }
+
+    /// @dev A same-minor patch (0.1.0 -> 0.1.1) that changes only the verifier, the shape the CTM uses to ship a new one.
+    function _verifierPatch(address _verifier) internal returns (CTMTransition) {
+        engine.setProtocolVersion(protocolVersion);
+        CTMRelease departing = _release(_departingFacets(), fromVerifier, protocolVersion);
+        CTMRelease patched = _release(_departingFacets(), _verifier, SemVer.packSemVer(0, 1, 1));
+        return _transition(departing, patched, 0, address(engine), _emptyPlan());
     }
 }

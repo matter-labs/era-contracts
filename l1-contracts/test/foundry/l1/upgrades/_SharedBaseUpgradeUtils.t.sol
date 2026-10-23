@@ -50,6 +50,26 @@ abstract contract BaseUpgradeUtils is ZKChainBase {
         s.feeParams.priorityTxMaxPubdata = _priorityTxMaxPubdata;
     }
 
+    function setSecondProofSystemRequired(bool _required) public {
+        s.secondProofSystemRequired = _required;
+    }
+
+    function setDisabledProofSystems(uint8 _disabledProofSystems) public {
+        s.disabledProofSystems = _disabledProofSystems;
+    }
+
+    function getSecondProofSystemRequired() public view returns (bool) {
+        return s.secondProofSystemRequired;
+    }
+
+    function getDisabledProofSystems() public view returns (uint8) {
+        return s.disabledProofSystems;
+    }
+
+    function getProofMode() public view returns (uint256) {
+        return _getProofMode();
+    }
+
     function setProtocolVersion(uint256 _protocolVersion) public {
         s.protocolVersion = _protocolVersion;
     }

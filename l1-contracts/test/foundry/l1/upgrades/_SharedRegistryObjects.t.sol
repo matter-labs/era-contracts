@@ -75,8 +75,8 @@ abstract contract RegistryObjectsFixture is Test {
     address internal ctmDeployerStub = makeAddr("ctmDeployer");
     address internal erc20OriginToken = makeAddr("erc20OriginToken");
     TestnetERC20Token internal erc20LocalToken;
-    /// @dev Base tokens without usable metadata: composing for a chain based on either reverts
-    ///      (see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`).
+    /// @dev Base tokens the metadata probe must tolerate rather than revert on — a chain may be
+    ///      created on either, and every later upgrade recomposes the same data for it.
     NoMetadataToken internal noMetadataToken;
     Bytes32MetadataToken internal bytes32MetadataToken;
 
@@ -101,12 +101,17 @@ abstract contract RegistryObjectsFixture is Test {
     bytes32 internal constant ERC20_BASE_TOKEN_ASSET_ID = keccak256("erc20BaseTokenAssetId");
     bytes32 internal constant NO_METADATA_BASE_TOKEN_ASSET_ID = keccak256("noMetadataBaseTokenAssetId");
     bytes32 internal constant BYTES32_METADATA_BASE_TOKEN_ASSET_ID = keccak256("bytes32MetadataBaseTokenAssetId");
+    /// @dev What the probe substitutes for a token it cannot read a string out of.
+    string internal constant DEFAULT_BASE_TOKEN_NAME = "Base Token";
+    string internal constant DEFAULT_BASE_TOKEN_SYMBOL = "BT";
     string internal constant ERC20_NAME = "Local Token";
     string internal constant ERC20_SYMBOL = "LOC";
     uint256 internal constant ERC20_DECIMALS = 6;
-    /// @dev What the composition records for every base token, whatever its `decimals()` answers —
-    ///      see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
-    uint256 internal constant COMPOSED_DECIMALS = 18;
+    /// @dev What genesis records for every base token; an upgrade records the token's own
+    ///      `decimals()` — see `ZKChainSpecificForceDeploymentsLib._baseTokenMetadata`.
+    uint256 internal constant GENESIS_DECIMALS = 18;
+    /// @dev What an upgrade records for a token that does not answer `decimals()`.
+    uint256 internal constant DEFAULT_DECIMALS = 18;
 
     function _setUpRegistryObjects(bytes memory _fixedDelegateCalldata) internal {
         fixtureDelegateCalldata = _fixedDelegateCalldata;
@@ -372,14 +377,19 @@ abstract contract RegistryObjectsFixture is Test {
         transaction.factoryDeps = _plan.factoryDepHashes;
     }
 
-    /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the two fixture chains, as the default
-    ///      composer must read it off the mocked ecosystem.
+    /// @dev The `ZKChainSpecificForceDeploymentsData` of one of the fixture chains, as the default
+    ///      composer (the upgrade path) must read it off the mocked ecosystem.
     function _expectedPerChainData(uint256 _chainId) internal view returns (bytes memory) {
+        return _expectedPerChainData(_chainId, false);
+    }
+
+    /// @dev The same for either path; they differ only in the base token's decimals.
+    function _expectedPerChainData(uint256 _chainId, bool _isGenesis) internal view returns (bytes memory) {
         // The recorded address is always the token's representation on THIS layer, which for the
         // ERC20 chain is a different contract from its origin token.
         address localToken;
         address originToken;
-        uint256 originChainId;
+        uint256 originChainId = block.chainid;
         bytes32 assetId;
         TokenMetadata memory metadata;
         if (_chainId == ETH_CHAIN_ID) {
@@ -397,7 +407,34 @@ abstract contract RegistryObjectsFixture is Test {
                 ERC20_ORIGIN_CHAIN_ID,
                 ERC20_BASE_TOKEN_ASSET_ID
             );
-            metadata = TokenMetadata({name: ERC20_NAME, symbol: ERC20_SYMBOL, decimals: COMPOSED_DECIMALS});
+            metadata = TokenMetadata({
+                name: ERC20_NAME,
+                symbol: ERC20_SYMBOL,
+                decimals: _isGenesis ? GENESIS_DECIMALS : ERC20_DECIMALS
+            });
+        } else if (_chainId == NO_METADATA_CHAIN_ID) {
+            (localToken, originToken, assetId) = (
+                address(noMetadataToken),
+                address(noMetadataToken),
+                NO_METADATA_BASE_TOKEN_ASSET_ID
+            );
+            metadata = TokenMetadata({
+                name: DEFAULT_BASE_TOKEN_NAME,
+                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
+                decimals: _isGenesis ? GENESIS_DECIMALS : DEFAULT_DECIMALS
+            });
+        } else {
+            (localToken, originToken, assetId) = (
+                address(bytes32MetadataToken),
+                address(bytes32MetadataToken),
+                BYTES32_METADATA_BASE_TOKEN_ASSET_ID
+            );
+            // Maker-style: no string metadata, but a conforming `decimals()`.
+            metadata = TokenMetadata({
+                name: DEFAULT_BASE_TOKEN_NAME,
+                symbol: DEFAULT_BASE_TOKEN_SYMBOL,
+                decimals: _isGenesis ? GENESIS_DECIMALS : ERC20_DECIMALS
+            });
         }
         return
             abi.encode(

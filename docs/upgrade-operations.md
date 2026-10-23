@@ -31,11 +31,12 @@ Steps 1–2 are RENDERED from live state by the bootstrap prepare
 prepare output's `[ctm_admin_calls].server_notifier_handover`, declared as `admin`-phase external
 actions, and run by protocol-ops right after the prepares (`UpgradeFull::run_ctm_admin_steps`). Step
 3 is derived only while the notifier is not yet the executor's, so the bootstrap bundle reverts
-until steps 1–2 landed. `RegistryBootstrapMigration.validate()` refuses to run unless the
-manifest's mandatory notifier row names the CTM's notifier, the notifier serves the CTM, sits under
-`ctmProxyAdmin` and is owned by the CTM executor with no nomination outstanding;
-`validateApplied()` keeps checking all of it. `protocol-ops ecosystem verify-bootstrap` reports the
-handover as its own prerequisite.
+until steps 1–2 landed, and step 3 itself reverts unless the CTM executor is the nominee.
+`RegistryBootstrapMigration.validate()` refuses to run unless the manifest's mandatory notifier row
+names the CTM's notifier, the notifier serves the CTM and is owned by the CTM executor with no
+nomination outstanding, and the notifier's row applies only through `ctmProxyAdmin`;
+`validateApplied()` keeps checking the ownership and the binding. `protocol-ops ecosystem
+verify-bootstrap` reports the handover as its own prerequisite.
 
 The handover is not undone if the bootstrap is cancelled afterwards: the notifier then simply
 belongs to the CTM domain early. A recurring prepare has no admin calls.
@@ -49,8 +50,9 @@ same bindings and owned by governance, through the predecessor's `forward`:
 
 - the core domain: `ProxyAdmin.transferOwnership(successor)` on the ecosystem `ProxyAdmin`;
 - a CTM domain: `transferOwnership(successor)` on the CTM, its `ProxyAdmin` and the ServerNotifier;
-  the successor's `acceptCTMOwnership()` (permissionless, gated by the nomination) and a
-  `forward([notifier.acceptOwnership()])` complete the two-step handovers.
+  the successor's `acceptCTMOwnership()` (called by governance, the successor's owner, or by the
+  predecessor in the same `forward`) and a `forward([notifier.acceptOwnership()])` complete the
+  two-step handovers.
 
 Hand over before preparing the next upgrade: the prepares name the executor that holds each domain
 at prepare time (the ecosystem `ProxyAdmin`'s owner, the CTM's owner), and the merge derives the
@@ -71,8 +73,12 @@ architecture document).
 - **`CallForwarded(target, value, data)`** on both executors. Every owner operation outside the
   upgrade entrypoints is a `forward` (see the authority matrix in the architecture document), so each
   event must match a call governance approved; anything else is a bypass of the object-driven path.
+  The one exception is a chain's `Freeze` / `Unfreeze` without a `CallForwarded`: the Bridgehub's
+  owner freezing directly, as the Security Council's freeze does
+  ([freezing a chain](../protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain)).
 - **Ownership changes** (`OwnershipTransferStarted` / `OwnershipTransferred`) on the executors, the
-  CTM, both `ProxyAdmin`s and the ServerNotifier: expected only during executor succession or
+  CTM, both `ProxyAdmin`s, the ServerNotifier and the Bridgehub (whose owner can freeze the CTM's
+  chains): expected only during executor succession or
   [governance self-migration](governance-self-migration.md).
 
 ## Recovery

@@ -234,7 +234,8 @@ contract ServerNotifierHandoverTest is CTMUpgradeExecutorFixture {
         ctmExecutor.forward(accept);
     }
 
-    /// @dev The state `RegistryBootstrapMigration.validate()` requires of the notifier.
+    /// @dev The state the bootstrap bundle needs the notifier in: under the CTM-domain ProxyAdmin (for
+    ///      `migrate`'s row) and owned by the CTM executor (what the bundle's accept establishes).
     function _assertHandedOver() internal view {
         assertEq(
             ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(address(notifierProxy))),

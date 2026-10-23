@@ -8,6 +8,8 @@ on:
     paths:
       - ".github/workflows/anvil-interop-ci.yaml"
       - ".github/actions/setup-anvil-interop/**"
+      - ".github/actions/install-amsterdam-anvil/**"
+      - ".github/amsterdam-anvil.env"
       - "l1-contracts/contracts/**"
       - "l1-contracts/deploy-scripts/**"
       - "l1-contracts/dev/**"
@@ -91,9 +93,10 @@ jobs:
   # Latest upgrade test: boots the previous release's chain states (`upgradeSourceStateVersion` in
   # config/anvil-config.json), prepares the upgrade with protocol-ops' default scripts, executes the
   # governance calls and per-chain upgrades, and checks every chain reached the genesis protocol version.
-  # On this release the default upgrade is the registry bootstrap edge (the four-call handover +
-  # migrate(), chains crossing via the legacy handed-cut entrypoint), followed by a patch and a
-  # recurring registry-driven hop on the same chains.
+  # On this release the default upgrade is the registry bootstrap edge (the handover calls,
+  # migrate() and the closing validateApplied() completion check, with chains crossing via the
+  # legacy handed-cut entrypoint), followed by a patch and a recurring registry-driven hop on the
+  # same chains.
   upgrade-test:
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -142,6 +145,66 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         env:
           ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
+        run: |
+          yarn test:upgrade
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
+
+  # upgrade-test with the L1 under Glamsterdam's gas rules (L1_GAS_RULES=amsterdam) and the separately
+  # pinned anvil that implements them; what it asserts is in the anvil-interop README (Upgrade Tests).
+  upgrade-test-glamsterdam:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          # Nested libraries affect solc remappings and the metadata the genesis image pins.
+          submodules: recursive
+
+      # The committed chain states need a state-compatible Anvil, while the
+      # release bytecode is reproduced with the `build` Forge pin.
+      - name: Install Anvil toolchain (state-compatible with committed states)
+        uses: ./.github/actions/install-foundry
+
+      - name: Preserve the pinned Anvil before switching to the build toolchain
+        run: cp "$(command -v anvil)" "$RUNNER_TEMP/anvil-pinned"
+
+      - name: Install foundry
+        uses: ./.github/actions/install-foundry
+
+      - name: Install the Amsterdam L1 anvil
+        uses: ./.github/actions/install-amsterdam-anvil
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Warm solc build cache
+        uses: ./.github/actions/warm-solc-cache
+
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run the latest upgrade test under Glamsterdam gas rules
+        working-directory: l1-contracts/test/anvil-interop
+        env:
+          ANVIL_BIN: ${{ runner.temp }}/anvil-pinned
+          L1_GAS_RULES: amsterdam
         run: |
           yarn test:upgrade
 

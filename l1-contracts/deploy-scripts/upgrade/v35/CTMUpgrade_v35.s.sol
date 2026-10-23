@@ -227,6 +227,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         // live EIP-1967 slot rather than any address book — the migration validates every row
         // against it, so a stale book entry would fail loudly at the wrong time.
         ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(ctmProxy));
+        require(address(ctmProxyAdmin) != address(0), "CTM proxy has no admin");
         // The two-executor model hands the CTM domain's admin to the CTM executor and the
         // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
         // the collision would only surface as a bundle revert. ZKsyncOS CTMs (the only ones

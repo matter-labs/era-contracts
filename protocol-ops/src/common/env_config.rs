@@ -567,14 +567,15 @@ mod tests {
         );
     }
 
-    /// The v35 release is the one that replaces the governance set, on both PUH-governed envs.
-    /// A later release's directory simply omits the key.
+    /// The current release keeps the live governance set: its PUH-governed envs load without the
+    /// key and redeploy nothing. The redeploy's wiring calls the handler's `reinitializer(2)`,
+    /// which v31 spends, so it would revert the bundle.
     #[test]
-    fn v35_env_inputs_declare_the_governance_redeploy() {
+    fn current_env_inputs_do_not_redeploy_the_governance_set() {
         for env in ["stage", "mainnet"] {
             let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
             assert_eq!(cfg.governance_kind(), GovernanceKind::Puh, "{env}");
-            assert!(cfg.redeploys_zk_governance().unwrap(), "{env}");
+            assert!(!cfg.redeploys_zk_governance().unwrap(), "{env}");
         }
     }
 

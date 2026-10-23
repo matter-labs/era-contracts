@@ -2,7 +2,7 @@
 // probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
 // `./runtime-config` instead of importing a constant from here.
 
-import { utils } from "ethers";
+import { BigNumber, utils } from "ethers";
 
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
@@ -58,6 +58,10 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
+// Chain ID under which `L1NativeTokenVault` records the interop pool's totals:
+// uint256(keccak256("interop.pool")) - 1, as `INTEROP_POOL_CHAIN_ID` in Config.sol.
+export const INTEROP_POOL_CHAIN_ID = BigNumber.from(utils.id("interop.pool")).sub(1);
+
 // Default gas limits for test transactions.
 // Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
 // via {AtomicFlowManager.append}. The dynamic-height IndexedMerkleTree (#2235, FullMerkle-backed) insert
@@ -66,6 +70,45 @@ export const ATOMIC_SEND_BUNDLE_GAS_LIMIT = 3_000_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 // Current Ethereum L1 transaction cap, independent of the block gas limit (EIP-7825).
 export const ETHEREUM_L1_TX_GAS_LIMIT = 2 ** 24;
+
+// ── Glamsterdam L1 gas rules (L1_GAS_RULES=amsterdam) ──
+// Mainnet's block gas limit: under EIP-8037 a transaction's state gas may take its tx.gas up to it.
+export const AMSTERDAM_L1_BLOCK_GAS_LIMIT = 60_000_000;
+// EIP-8037 state gas: the cost per state byte times the bytes a transaction adds, a new account counting
+// as 120 bytes and a new storage slot as 64.
+export const GLAMSTERDAM_COST_PER_STATE_BYTE = 1530;
+export const GLAMSTERDAM_NEW_ACCOUNT_BYTES = 120;
+export const GLAMSTERDAM_STORAGE_SLOT_BYTES = 64;
+// EIP-2780 intrinsic gas: a base, plus a cold recipient other than the sender or a contract creation,
+// plus a value transfer to another account.
+export const GLAMSTERDAM_TX_BASE_GAS = 12_000;
+export const GLAMSTERDAM_TX_COLD_RECIPIENT_GAS = 3_000;
+export const GLAMSTERDAM_TX_CREATE_GAS = 12_000;
+export const GLAMSTERDAM_TX_VALUE_GAS = 6_000;
+// Calldata: 4 / 16 gas per zero / non-zero byte, 2 per 32-byte initcode word (EIP-3860), and
+// EIP-7976's floor of 64 per byte.
+export const CALLDATA_ZERO_BYTE_GAS = 4;
+export const CALLDATA_NONZERO_BYTE_GAS = 16;
+export const INITCODE_WORD_GAS = 2;
+export const EVM_WORD_BYTES = 32;
+export const GLAMSTERDAM_CALLDATA_FLOOR_GAS_PER_BYTE = 64;
+// EIP-3529: the refund applied is at most a fifth of the gas used before it.
+export const MAX_REFUND_QUOTIENT = 5;
+// EIP-150: a call or create forwards at most all but one 64th of the caller's remaining gas.
+export const CALL_GAS_RETAINED_DIVISOR = 64;
+// Execution gas of the opcodes the Amsterdam L1 canary runs: PUSH1 (Gverylow), and an SSTORE to a cold slot
+// whose value changes, EIP-8038's COLD_STORAGE_ACCESS plus STORAGE_WRITE.
+export const EVM_PUSH_GAS = 3;
+export const GLAMSTERDAM_COLD_STORAGE_ACCESS_GAS = 2_100;
+export const GLAMSTERDAM_STORAGE_WRITE_GAS = 10_000;
+// JS tracer returning a transaction's final refund counter: receipts only report gas after the refund.
+export const REFUND_COUNTER_TRACER =
+  "{r:0, step: function(l){ this.r = l.getRefund(); }, fault: function(){}, result: function(){ return this.r; }}";
+// Runtime size of the contract the Amsterdam L1 canary deploys: its code-deposit state gas dwarfs the
+// rest of the estimate.
+export const GLAMSTERDAM_CANARY_RUNTIME_BYTES = 1000;
+// Zero calldata bytes the Amsterdam L1 canary sends to an account: enough for EIP-7976's floor to bind.
+export const GLAMSTERDAM_CANARY_CALLDATA_BYTES = 1000;
 // The CTM deployment builds the release's complete L2 bytecode inventory in script memory.
 // Foundry's default execution-memory cap is too small for that deterministic artifact pass.
 export const CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024;
@@ -117,9 +160,9 @@ export const NTV_WETH_TOKEN_SLOT = 251;
 export const NTV_L1_CHAIN_ID_SLOT = 253;
 
 // Event signatures
-// GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed)
+// GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed, bytes[])
 export const GENESIS_UPGRADE_EVENT_SIG =
-  "GenesisUpgrade(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),uint256)";
+  "GenesisUpgrade(address,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),uint256,bytes[])";
 export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";
@@ -159,6 +202,15 @@ export const FAILING_INTEROP_CALL_REASON = "Intentional interop receiver failure
 // From SemVer.sol: bit offsets of the minor and major components in a packed protocol version.
 export const SEMVER_MINOR_OFFSET = 32;
 export const SEMVER_MAJOR_OFFSET = 64;
+
+// Deposit encoding version of the consent-free registration that `ChainRegistrationSender.bridgehubDeposit`
+// accepted before the interop peer whitelist, see {protocol-docs/interop-gating.md#legacy-registrations}.
+export const LEGACY_CHAIN_REGISTRATION_ENCODING_VERSION = "0x01";
+
+// Bounds, in ether, of the random deposit the upgrade test makes to each gated chain before the upgrade, which
+// governance then backfills, see {protocol-docs/interop-gating.md#backfill-amounts}.
+export const PRE_UPGRADE_DEPOSIT_MIN_ETH = "1";
+export const PRE_UPGRADE_DEPOSIT_MAX_ETH = "10";
 
 // ── Batch settlement (src/helpers/batch-settlement.ts) ──────────
 

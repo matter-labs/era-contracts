@@ -9,10 +9,11 @@
 //!                         registry bootstrap's ServerNotifier handover; none on a
 //!                         recurring upgrade). Emits per-script governance TOMLs.
 //!   `upgrade-governance`  replays the package's one governance bundle
-//!                         (`[governance_calls] calls`) on an anvil fork and emits
-//!                         one Safe bundle (governance owner signs). Accepts
-//!                         multiple `--governance-toml` args and replays their
-//!                         bundles in the order given.
+//!                         (`[governance_calls] calls`) on an anvil fork, holds a
+//!                         registry package's fork state against what it must
+//!                         leave, and emits one Safe bundle (governance owner
+//!                         signs). Accepts multiple `--governance-toml` args and
+//!                         replays their bundles in the order given.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -40,6 +41,9 @@ use crate::common::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::wallets::Wallet;
 use crate::common::SharedRunArgs;
+use crate::upgrade_verification::registry::applied;
+use crate::upgrade_verification::registry::package::RegistryPackage;
+use crate::upgrade_verification::report::VerificationResult;
 
 // ── upgrade-governance (the one governance bundle on a fork) ──────────────
 
@@ -417,9 +421,12 @@ fn derive_executor_legs(
 ///
 /// Each TOML's `[governance_calls] calls` is one `governanceExecuteCalls` (legacy Governance) or
 /// `governanceExecuteCallsDirect` (PUH) invocation signed by `sender` (the governance owner), so
-/// they merge into one governance Safe bundle. A bootstrap bundle needs no separate completion
-/// check: its last call is `RegistryBootstrapMigration.validateApplied()`, so an incomplete edge
-/// reverts the replay itself. Returns the resolved governance contract address for diagnostics.
+/// they merge into one governance Safe bundle. A bootstrap bundle's last call is
+/// `RegistryBootstrapMigration.validateApplied()`, so an incomplete edge reverts the replay
+/// itself. Right after a registry package's bundle runs, the fork is also held against the whole
+/// state it must have left ([`expect_applied`]), so a bundle that executes without landing fails
+/// the command here.
+/// Returns the resolved governance contract address for diagnostics.
 pub async fn replay_governance_calls(
     runner: &mut ForgeRunner,
     sender: &Wallet,
@@ -443,8 +450,35 @@ pub async fn replay_governance_calls(
         )
         .await
         .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
+        expect_applied(&runner.rpc_url, toml_path, governance_addr)
+            .await
+            .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
     }
     Ok(governance_addr)
+}
+
+/// When `governance_toml` is a registry package, holds the fork state after its bundle against
+/// everything the package must have left ([`applied::verify_applied`]); any unmet expectation
+/// fails. A TOML that is not a registry package is left alone.
+async fn expect_applied(
+    rpc_url: &str,
+    governance_toml: &Path,
+    governance: Address,
+) -> anyhow::Result<()> {
+    let Some(package) = RegistryPackage::load_if_registry(governance_toml)? else {
+        logger::info(format!(
+            "{} is not a registry package: no post-state to check",
+            governance_toml.display()
+        ));
+        return Ok(());
+    };
+    logger::step("Checking the state the bundle left");
+    let provider = crate::common::ethereum::get_provider(rpc_url)?;
+    let mut result = VerificationResult::default();
+    applied::verify_applied(&provider, &package, governance, &mut result).await;
+    result
+        .ensure_success()
+        .context("the replayed bundle executed but did not leave the state its package describes")
 }
 
 fn read_governance_calls(governance_toml: &Path) -> anyhow::Result<String> {
@@ -2013,7 +2047,6 @@ mod tests {
     /// legs it recovers reconciling against the summaries the merge carried over.
     #[test]
     fn the_merged_package_loads_as_an_upgrade() {
-        use crate::upgrade_verification::registry::package::RegistryPackage;
         let core = core_body(Some(CORE_TRANSITION));
         let mut ctm = ctm_body(&[("ctm_transition_addr", TRANSITION)]);
         let mut state_transition = toml::value::Table::new();
@@ -2040,6 +2073,43 @@ mod tests {
         assert_eq!(package.legs.len(), 2);
         assert_eq!(package.legs[0].object, CORE_TRANSITION);
         assert_eq!(package.legs[1].object, TRANSITION);
+    }
+
+    /// After a replay, a governance TOML that is no registry package has no post-state to check
+    /// and reads nothing; a registry package is held against the fork, so one whose state cannot
+    /// be read fails the command.
+    #[tokio::test]
+    async fn the_post_replay_check_holds_only_registry_packages() {
+        const UNREACHABLE: &str = "http://127.0.0.1:1";
+        let dir = tempfile::tempdir().unwrap();
+        let plain = dir.path().join("plain.toml");
+        fs::write(
+            &plain,
+            format!(
+                "[governance_calls]\ncalls = \"{}\"\n",
+                bundle_hex(&[call(0x51, &[0x04])])
+            ),
+        )
+        .unwrap();
+        expect_applied(UNREACHABLE, &plain, Address::ZERO)
+            .await
+            .expect("a TOML that is no registry package is not read back");
+
+        let doc = merge_prepare_outputs(
+            prepare_output(core_body(Some(CORE_TRANSITION)), &[]),
+            Vec::new(),
+            &[],
+        )
+        .unwrap();
+        let package = dir.path().join("ecosystem.toml");
+        fs::write(&package, toml::to_string(&doc).unwrap()).unwrap();
+        let err = expect_applied(UNREACHABLE, &package, Address::ZERO)
+            .await
+            .expect_err("an unreadable post-state is not a landed one");
+        assert!(
+            format!("{err:#}").contains("did not leave the state its package describes"),
+            "{err:#}"
+        );
     }
 
     /// The CTM prepare's probes reach the simulator: the merge lifts them out of

@@ -228,15 +228,15 @@ Tooling sources: [prepare helpers](./l1-contracts/deploy-scripts/upgrade/default
 [simulation](./l1-contracts/dev/simulation/). The probe and its temporary implementation are never
 broadcast. New tooling libraries also use only internal/private functions.
 
-| Interface group            | New declarations                                                                                                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Objects                    | `ICTMRelease`, `ICTMTransition`, `IProxyUpgradeTransition`, `ICommittedUpgrade`, `IManifestHash`, `IL2DelegateCalldataComposer` |
-| Executors                  | `IUpgradeExecutorBase`, `ICoreUpgradeExecutor`, `ICTMUpgradeExecutor`                                                           |
-| Bootstrap                  | `IBootstrapUpgrade`, `IRegistryBootstrapMigration`, `IRegistryBootstrapSequence`                                                |
-| Existing-contract adapters | `ILegacyChainTypeManager`, `ISelfDescribingFacet`, `IProxyUpgradeInitializable` (declared in `IUpgradeInit.sol`)                |
-| Script-only                | `ICoreUpgradePrepare`, `ICTMUpgradePrepare` (in `IUpgradePrepare.sol`), `IAdminWithCut` (in `UpgradeChainCall.sol`)             |
+| Interface group            | New declarations                                                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Objects                    | `ICTMRelease`, `ICTMTransition`, `IProxyUpgradeTransition`, `ICommittedUpgrade`, `IManifestHash`, `IL2DelegateCalldataComposer`   |
+| Executors                  | `IUpgradeExecutorBase`, `ICoreUpgradeExecutor`, `ICTMUpgradeExecutor`                                                             |
+| Bootstrap                  | `IBootstrapUpgrade`, `IRegistryBootstrapMigration`, `IRegistryBootstrapSequence`                                                  |
+| Existing-contract adapters | `ILegacyChainTypeManager`, `ISelfDescribingFacet`, `IProxyUpgradeInitializable` (declared in `IUpgradeInit.sol`), `IAdminWithCut` |
+| Script-only                | `ICoreUpgradePrepare`, `ICTMUpgradePrepare` (in `IUpgradePrepare.sol`)                                                            |
 
-The 15 runtime interfaces and two runtime data files are separate from the 14 tooling source
+The 16 runtime interfaces and two runtime data files are separate from the 14 tooling source
 files above. Test fixtures and mocks are omitted from the runtime diagrams; they exercise these
 same components rather than adding protocol deployments.
 
@@ -263,8 +263,9 @@ Security review should focus on the full authority and execution path:
 - Check that the proposal carries every leg the upgrade needs, in canonical order: no contract ties
   the legs together. Review governance's recovery powers (`forward`, `replaceUpgradeTransition`,
   executor succession) alongside them.
-- Execution checks the applied L1 state. It does not prove that every chain has completed its L2
-  upgrade. Bytecode publication checks likewise do not establish the safety of the bytecode.
+- Execution checks the applied L1 state, and `ecosystem upgrade-governance` checks it again on its
+  fork replay. Neither proves that every chain has completed its L2 upgrade. Bytecode publication
+  checks likewise do not establish the safety of the bytecode.
 
 The [script-retirement plan](./docs/upgrade-script-retirement.md) tracks the remaining tooling
 consolidation.

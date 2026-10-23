@@ -377,7 +377,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](68);
+        bytes4[] memory selectors = new bytes4[](70);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -448,6 +448,8 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
         selectors[i++] = UtilsFacet.util_getPubdataContent.selector;
         selectors[i++] = UtilsFacet.util_setDeprecatedPrecommitmentForTheLatestBatch.selector;
+        selectors[i++] = UtilsFacet.util_getSecondProofSystemRequired.selector;
+        selectors[i++] = UtilsFacet.util_getDisabledProofSystems.selector;
 
         return selectors;
     }

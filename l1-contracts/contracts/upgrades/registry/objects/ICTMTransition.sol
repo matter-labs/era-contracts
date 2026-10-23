@@ -62,9 +62,10 @@ interface ICTMTransition is ICommittedUpgrade, IManifestHash {
     /// @param _chainId The chain to compose for.
     function l2UpgradeTx(address _bridgehub, uint256 _chainId) external view returns (L2CanonicalTransaction memory);
 
-    /// @notice Reverts unless BOTH releases validate and every contract this transition names
-    ///         (engine, composer) is deployed code. THE enforcement surface: the paths that commit
-    ///         or apply a transition call it.
+    /// @notice Reverts unless every contract this transition names itself (engine, composer) is
+    ///         deployed code. `ChainTypeManager` calls it whenever it commits a transition, first
+    ///         or as a replacement; the releases are validated at the transition's construction and
+    ///         where they are installed.
     /// @dev It does NOT attest that the code is the reviewed code — that is governance's
     ///      approval of this object's member ADDRESSES, established off-chain before approval
     ///      (see {docs/registry-driven-upgrades.md}).

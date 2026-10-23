@@ -10,6 +10,7 @@ import {MAX_NEW_FACTORY_DEPS} from "../../../common/Config.sol";
 import {
     L2BytecodeNotPublished,
     L2BytecodeInfoLength,
+    L2PlanDelegateNeedsComposer,
     L2PlanNeedsDelegate,
     L2PlanTooManyFactoryDeps
 } from "../../../common/L1ContractErrors.sol";
@@ -37,8 +38,10 @@ library L2PlanLib {
     /// @dev Refuses what L2 could not execute: `L2ComplexUpgrader.forceDeployAndUpgradeUniversal`
     ///      unconditionally ends with the delegatecall, so deployments without a delegate would
     ///      construct here and revert on L2 forever; a composer without a delegate would be dead
-    ///      payload; and more factory dependencies than `BaseZkSyncUpgrade._verifyFactoryDeps`
-    ///      accepts would let `applyCTMUpgrade` bump the CTM and then fail every chain upgrade.
+    ///      payload; a delegate without a composer would be delegatecalled with empty calldata,
+    ///      which `L2DefaultUpgrade` (no fallback) rejects, failing every chain's L2 upgrade; and
+    ///      more factory dependencies than `BaseZkSyncUpgrade._verifyFactoryDeps` accepts would let
+    ///      `applyCTMUpgrade` bump the CTM and then fail every chain upgrade.
     /// @param _derived The table-derived deployments (see {TransitionDerivationLib}).
     /// @param _authored The manifest's authored L2 input.
     function build(
@@ -70,16 +73,19 @@ library L2PlanLib {
         if (!hasDelegate && (plan.deployments.length != 0 || plan.delegateComposer != address(0))) {
             revert L2PlanNeedsDelegate();
         }
+        if (hasDelegate && plan.delegateComposer == address(0)) {
+            revert L2PlanDelegateNeedsComposer();
+        }
         if (plan.factoryDepHashes.length > MAX_NEW_FACTORY_DEPS) {
             revert L2PlanTooManyFactoryDeps(plan.factoryDepHashes.length, MAX_NEW_FACTORY_DEPS);
         }
     }
 
     /// @notice Reverts unless every factory dependency has been published on `_supplier`.
-    /// @dev Live L1 state, so it belongs where the upgrade COMMITS (the executor's apply and the
-    ///      bootstrap's migrate), not at construction: publication can legitimately happen after
-    ///      the object is built, and it must hold when the edge is committed or the L2
-    ///      transaction fails on every chain.
+    /// @dev Live L1 state, so it belongs where the upgrade COMMITS (the CTM's commit and replace,
+    ///      and the bootstrap's `migrate`), not at construction: publication can legitimately
+    ///      happen after the object is built, and it must hold when the edge is committed or the
+    ///      L2 transaction fails on every chain.
     function requirePublished(BytecodesSupplier _supplier, uint256[] memory _hashes) internal view {
         uint256 length = _hashes.length;
         for (uint256 i = 0; i < length; ++i) {

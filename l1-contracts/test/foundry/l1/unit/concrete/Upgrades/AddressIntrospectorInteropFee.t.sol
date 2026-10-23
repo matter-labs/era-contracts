@@ -20,7 +20,7 @@ contract AddressIntrospectorInteropFeeTest is Test {
 
     function setUp() public {
         manager = makeAddr("interopFeeManager");
-        ctm = new ChainTypeManager(makeAddr("bridgehub"), makeAddr("interopCenter"), address(0), address(0), manager);
+        ctm = new ChainTypeManager(makeAddr("bridgehub"), address(0), makeAddr("permissionlessValidator"), manager);
     }
 
     function test_reusesTheManagerOfTheCTM() public {

@@ -71,6 +71,10 @@ pub const L2_ECOSYSTEM_FIXED_ADDRESSES: [(&str, usize, Address); 21] = [
 /// The source-sync test below fails the build if the append-only enum moves it.
 pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 19;
 
+/// The committed pins of the snarkJS Plonk backend `ZiskVerifier` delegates to, relative to the
+/// repository root (see `registry::external_backends`).
+pub const ZISK_PLONK_BACKEND_PIN_PATH: &str = "tools/verifier-gen/data/ZiSK_plonk_backend.toml";
+
 /// `ProxyUpgradeDomain.Core` — the domain tag of a `ProxyUpgradeTransition` whose inventory is
 /// indexed by `L1EcosystemContract` and applied by the `CoreUpgradeExecutor`. The source-sync test
 /// below fails the build if the append-only enum moves it.

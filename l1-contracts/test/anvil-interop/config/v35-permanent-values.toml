@@ -15,7 +15,7 @@ bridgehub_proxy_addr = "0x0000000000000000000000000000000000000000"
 
 [ctm_contracts]
 ctm_proxy_addr = "0x0000000000000000000000000000000000000000"
-rollup_da_manager = "0x0000000000000000000000000000000000000000"
+# No `rollup_da_manager`: the prepare resolves the CTM's own from a chain registered on it.
 # Resolved from the CTM by the introspector.
 l1_bytecodes_supplier_addr = "0x0000000000000000000000000000000000000000"
 

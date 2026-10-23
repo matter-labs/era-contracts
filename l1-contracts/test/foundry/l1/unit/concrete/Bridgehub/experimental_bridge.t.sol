@@ -17,7 +17,7 @@ import {
     L2TransactionRequestTwoBridgesInner,
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
+import {MockChainTypeManagerWBH} from "contracts/dev-contracts/test/MockChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
@@ -43,6 +43,7 @@ import {
     BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
     ETH_TOKEN_ADDRESS,
     HARD_CODED_CHAIN_ID,
+    INTEROP_POOL_CHAIN_ID,
     MAINNET_CHAIN_ID,
     MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
@@ -78,7 +79,7 @@ contract ExperimentalBridgeTest is Test {
     DummyBridgehubSetter internal dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
-    DummyChainTypeManagerWBH internal mockCTM;
+    MockChainTypeManagerWBH internal mockCTM;
     DummyZKChain internal mockChainContract;
     // These are real `L1AssetRouter` instances used as stand-in asset routers in the
     // bridgehub tests; the legacy `DummySharedBridge` dev stub has been removed.
@@ -158,7 +159,7 @@ contract ExperimentalBridgeTest is Test {
             )
         );
         weth = makeAddr("WETH");
-        mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
+        mockCTM = new MockChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
         mockChainContract = new DummyZKChain(address(bridgehub), block.chainid, address(0), eip7702Checker);
 
@@ -660,6 +661,26 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(deployerAddress);
         IL1Bridgehub(address(bridgehub)).createNewChain({
             _chainId: chainId,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _admin: admin
+        });
+    }
+
+    /// @dev The interop pool's totals live under `INTEROP_POOL_CHAIN_ID` in `L1NativeTokenVault`, so no chain may
+    /// ever get it: the chain ID cap rules it out.
+    function test_RevertWhen_interopPoolChainIdOnCreate(uint256 randomValue) public useRandomToken(randomValue) {
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+
+        vm.expectRevert(ChainIdTooBig.selector);
+        vm.prank(deployerAddress);
+        IL1Bridgehub(address(bridgehub)).createNewChain({
+            _chainId: INTEROP_POOL_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
             _admin: admin

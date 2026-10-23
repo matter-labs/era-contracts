@@ -25,8 +25,9 @@ import {RegistryBootstrapMigration} from "./RegistryBootstrapMigration.sol";
 /// @dev DESCRIBES the bundle, it never executes it: every call runs on the authority of the
 ///      governance account that sends it, and `Governance` issues ordinary calls.
 /// @dev Everything but the two objects is derived: the manifest names the CTM, its `ProxyAdmin` and
-///      both domain executors, and the core executor names the ecosystem `ProxyAdmin`. Derivation is at read time, so a sequence read against a drifted ecosystem
-///      answers with the drift rather than a stale snapshot of it.
+///      both domain executors, and the core executor names the ecosystem `ProxyAdmin`. Derivation
+///      is at read time, so a sequence read against a drifted ecosystem answers with the drift
+///      rather than a stale snapshot of it.
 contract RegistryBootstrapSequence is IRegistryBootstrapSequence {
     using ObjectAnchorLib for address;
 

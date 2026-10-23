@@ -11,6 +11,9 @@ import {SignatureChecker} from "@openzeppelin/contracts-v4/utils/cryptography/Si
 import {IERC1271} from "@openzeppelin/contracts-v4/interfaces/IERC1271.sol";
 import {Address} from "@openzeppelin/contracts-v4/utils/Address.sol";
 
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
 import {EmergencyUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol";
 import {IEmergencyUpgrageBoard} from "deploy-scripts/interfaces/IEmergencyUpgrageBoard.sol";
 import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
@@ -233,8 +236,8 @@ contract EmergencyUpgradeBoardDouble is EIP712 {
 
 /// @notice zk-governance `ProtocolUpgradeHandler`, reduced to its emergency execution and the
 ///         Security Council's approval record. Not modelled: the freeze bookkeeping and the
-///         `_unfreeze` pre-step of `executeEmergencyUpgrade`, which only lifts ecosystem-wide
-///         pauses no upgrade relies on.
+///         `_unfreeze` pre-step of `executeEmergencyUpgrade`, which lifts the ecosystem pauses and
+///         unfreezes every chain through its CTM; its chain half is {ProtocolUpgradeHandlerFreezeDouble}.
 contract ProtocolUpgradeHandlerDouble {
     event EmergencyUpgradeExecuted(bytes32 indexed _id);
     event UpgradeApprovedBySecurityCouncil(bytes32 indexed _id);
@@ -290,6 +293,61 @@ contract ProtocolUpgradeHandlerDouble {
             }
         }
         emit EmergencyUpgradeExecuted(id);
+    }
+}
+
+/// @notice zk-governance `ProtocolUpgradeHandler` (`84c50f5`), reduced to the chain half of its
+///         freeze and unfreeze: the chain loop of `_freeze` / `_unfreeze`, which `softFreeze`,
+///         `hardFreeze`, `reinforceFreeze`, `unfreeze`, `reinforceUnfreeze` and
+///         `executeEmergencyUpgrade` run, and the single-chain `reinforceFreezeOneChain` /
+///         `reinforceUnfreezeOneChain`. For each chain on a CTM it supports, the handler calls that
+///         CTM's `freezeChain` / `unfreezeChain` itself. Not modelled: who may trigger these, the
+///         freeze bookkeeping, the ecosystem pauses after the loop, and the Era CTM.
+/// @dev The handler wraps each looped call in `try/catch`, so a CTM that refuses it is skipped
+///      without a trace. Here the refusal reverts, so a test sees it.
+contract ProtocolUpgradeHandlerFreezeDouble {
+    IBridgehubBase public immutable BRIDGE_HUB;
+    address public immutable ZKSYNC_OS_CHAIN_TYPE_MANAGER;
+
+    constructor(IBridgehubBase _bridgehub, address _zksyncOsChainTypeManager) {
+        BRIDGE_HUB = _bridgehub;
+        ZKSYNC_OS_CHAIN_TYPE_MANAGER = _zksyncOsChainTypeManager;
+    }
+
+    /// @notice `_freeze`'s chain loop.
+    function freezeChains() external {
+        uint256[] memory chainIds = BRIDGE_HUB.getAllZKChainChainIDs();
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            if (BRIDGE_HUB.chainTypeManager(chainIds[i]) == ZKSYNC_OS_CHAIN_TYPE_MANAGER) {
+                IChainTypeManager(ZKSYNC_OS_CHAIN_TYPE_MANAGER).freezeChain(chainIds[i]);
+            }
+        }
+    }
+
+    /// @notice `_unfreeze`'s chain loop.
+    function unfreezeChains() external {
+        uint256[] memory chainIds = BRIDGE_HUB.getAllZKChainChainIDs();
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            if (BRIDGE_HUB.chainTypeManager(chainIds[i]) == ZKSYNC_OS_CHAIN_TYPE_MANAGER) {
+                IChainTypeManager(ZKSYNC_OS_CHAIN_TYPE_MANAGER).unfreezeChain(chainIds[i]);
+            }
+        }
+    }
+
+    function reinforceFreezeOneChain(uint256 _chainId) external {
+        _chainTypeManager(_chainId).freezeChain(_chainId);
+    }
+
+    function reinforceUnfreezeOneChain(uint256 _chainId) external {
+        _chainTypeManager(_chainId).unfreezeChain(_chainId);
+    }
+
+    function _chainTypeManager(uint256 _chainId) private view returns (IChainTypeManager) {
+        require(
+            BRIDGE_HUB.chainTypeManager(_chainId) == ZKSYNC_OS_CHAIN_TYPE_MANAGER,
+            "Unsupported chain type manager"
+        );
+        return IChainTypeManager(ZKSYNC_OS_CHAIN_TYPE_MANAGER);
     }
 }
 

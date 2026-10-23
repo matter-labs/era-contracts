@@ -85,17 +85,20 @@ external action.
 
 Each leg is owner-only and checks its object before acting:
 
-- `applyL1Upgrade` and `applyInfrastructureUpgrade` require the object to have code, to be of the
-  executor's own domain (`ProxyUpgradeDomainMismatch`) and to `validate()`. They apply its rows
-  through the executor's bound `ProxyAdmin`, each departing from its `expectedOldImpl` or already at
-  its `implNew`, then require every row's proxy to run its `implNew`, and emit `L1UpgradeApplied` /
-  `CTMInfrastructureUpgradeApplied`.
-- `applyCTMUpgrade` requires the transition to have code and to `validate()`, checks both of its
-  edges against the live CTM (`currentRelease`, `protocolVersion`) and that every L2 factory
-  dependency is published on the CTM's `BytecodesSupplier`, and commits it
-  (`setNewVersionUpgradeFromTransition`: transition, version and target release together). It then
-  requires the CTM to commit exactly this transition for its departure and to have reached its
-  target, and emits `CTMUpgradeApplied`.
+- `applyL1Upgrade` and `applyInfrastructureUpgrade` require the object to have code and to be of the
+  executor's own domain (`ProxyUpgradeDomainMismatch`), and every row's `implNew` to have code
+  before the first swap. They apply its rows through the executor's bound `ProxyAdmin`, each
+  departing from its `expectedOldImpl` or already at its `implNew`, then require every row's proxy
+  to run its `implNew`, and emit `L1UpgradeApplied` / `CTMInfrastructureUpgradeApplied`.
+- `applyCTMUpgrade` requires the transition to have code and commits it
+  (`setNewVersionUpgradeFromTransition`: transition, version and target release together). The
+  commit's checks are the CTM's, so a commit sent through `forward` gets them too
+  ([Where each check lives](./ecosystem-upgrade.md#where-each-check-lives)): the transition departs
+  from the live `currentRelease` and `protocolVersion` and moves the version forward, its engine and
+  composer have code, every L2 factory dependency is published on the CTM's `BytecodesSupplier`, and
+  the target release passes its `validate()` as it is installed. `applyCTMUpgrade` then requires the
+  CTM to commit exactly this transition for its departure and to have reached its target, and emits
+  `CTMUpgradeApplied`.
 
 The proposal is the atomicity boundary: one `Governance` or `ProtocolUpgradeHandler` execution runs
 its calls in order and reverts all of them when one fails, so rows an earlier leg applied are rolled
@@ -115,7 +118,7 @@ elsewhere:
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | The ecosystem leg precedes the CTM legs; the CTM-domain rows precede the commit     | The merge derives the legs in canonical order; package verification requires exactly that order, as one contiguous run                                                                                             |
 | An upgrade's legs apply together or not at all                                      | One governance proposal execution                                                                                                                                                                                  |
-| Each object is applied by its own domain                                            | Each entrypoint checks the object's domain and validates it before acting                                                                                                                                          |
+| Each object is applied by its own domain                                            | The proxy entrypoints check the object's code and domain; only the CTM's owner, its executor, can commit a transition                                                                                              |
 | The legs governance signs apply the reviewed objects through the reviewed executors | Package verification recovers every (executor, object) pair from the calldata, re-encodes each leg from the reviewed values and reconciles the prepare's summaries; a missing, duplicated or substituted leg fails |
 | The CTM legs reach the intended CTM                                                 | The CTM executor's immutable binding, which package verification holds against the independently reviewed CTM and `ProxyAdmin`                                                                                     |
 | An executed upgrade is identifiable                                                 | The governance proposal and its transaction, and each leg's domain event                                                                                                                                           |
@@ -138,14 +141,30 @@ The three entrypoints and `forward` are owner-only, and governance owns both exe
 the only authorization; there is no binding between executors to configure or keep in sync. Every
 other owner operation of a domain — freezing a chain, moving a deadline, replacing a committed
 transition — is an ordinary call through the executor's owner-gated, event-logged `forward`; the
-executors carry no typed passthroughs for them. An urgent fix of one domain is a proposal of the one
-leg it needs.
+executors carry no typed passthroughs for them. Freezing has a second route,
+[below](#freezing-a-chain). An urgent fix of one domain is a proposal of the one leg it needs.
 
 A domain moves to a successor executor through the predecessor's `forward`; nothing else names an
 executor, so nothing else is rebound. The successor's immutable bindings say which domain it acts
 on, not that its code is the reviewed code, so governance approval of its construction remains
 required. The procedure is
 [executor succession](../docs/upgrade-operations.md#executor-succession).
+
+### Freezing a chain
+
+`ChainTypeManager.freezeChain` and `unfreezeChain` accept two callers: the CTM's owner (its executor,
+so governance through `forward`) and the Bridgehub's owner, directly. On a `ProtocolUpgradeHandler`
+ecosystem the Bridgehub's owner is the handler, which freezes and unfreezes chains by calling their
+CTM itself: the Security Council's soft freeze, hard freeze and unfreeze, the `reinforce*` variants,
+and the unfreeze that opens every emergency upgrade. Without the second caller they would stop
+reaching a CTM's chains once the bootstrap hands that CTM to its executor. The direct route leaves no
+`CallForwarded` entry; the chain's own `Freeze` / `Unfreeze` events remain.
+
+The second caller is safe only while the Bridgehub's owner is the executors' governance, so
+`verify-bootstrap` holds `bridgehub.owner()` to the bootstrap manifest's governance before the edge
+is signed. The handler wraps each chain's call in `try/catch`, so a chain it failed to freeze goes
+unreported: after a freeze, check `isDiamondStorageFrozen()` on every chain and use the handler's
+`reinforceFreezeOneChain`, which reverts visibly, for any that is not.
 
 ## Replacing a committed transition
 
@@ -161,10 +180,12 @@ pinned deadline, lands no earlier than what it replaces, and lands on a release 
 from: the current release at the current version, otherwise the source release of the transition
 committed onward from its target version. Nothing revokes a commitment without replacing it, so
 ordinary commits extend the path and replacements only redirect it into the existing one. A
-different release object that merely shares a committed version number is never a destination. The
-replacement's own `validate()` and the publication of its L2 bytecodes on the CTM's supplier are
-checked as on a commit. The invariant is structural: it does not prove that an intermediate
-release's L2 effects may be skipped, which remains a review question.
+different release object that merely shares a committed version number is never a destination.
+Every transition's own edge moves the version forward (`VersionEdgeLib`), so the path stays
+monotonic. The CTM also refuses the committed transition itself as its replacement, which would
+repair nothing. The replacement's engine and composer code and the publication of its L2 bytecodes
+on the CTM's supplier are checked as on a commit. The invariant is structural: it does not prove
+that an intermediate release's L2 effects may be skipped, which remains a review question.
 
 Consequences:
 
@@ -174,7 +195,8 @@ Consequences:
   chain-side version check refuses to replay the replacement from the earlier source.
 - A deadline change stays a separate `setProtocolVersionDeadline`, which may ride the same `forward`.
 - Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) are repaired by the
-  legacy cut setter, which refuses a registry-committed departure.
+  legacy cut setter, which refuses a registry-committed departure and a version nothing was
+  committed for.
 
 ### Preparing and verifying a replacement
 
@@ -231,5 +253,6 @@ introduce placeholder lists, loops or a second CTM today solely for this extensi
 - Production preparation and both Anvil pipelines: `UpgradeTestRecurring_Local.t.sol` prepares the
   infrastructure-only, chain-release, mixed and three-leg shapes and the refused ones, and runs each
   as its ordered bundle; `yarn test:upgrade` drives the bootstrap and then recurring hops, verifying
-  each merged package and asserting that one transaction emitted every leg's domain event in order;
+  each merged package, asserting that one transaction emitted every leg's domain event in order and
+  checking the state each bundle left;
   `yarn test:upgrade-recurring` runs a hop over objects the harness deploys.

@@ -35,6 +35,9 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "applyInfrastructureUpgrade(address)",
     "applyCTMUpgrade(address)",
     "forward((address,uint256,bytes)[])",
+    // RegistryBootstrapMigration (the v35 bootstrap edge and its completion check)
+    "migrate()",
+    "validateApplied()",
     // ChainAssetHandler
     "pauseMigration()",
     "unpauseMigration()",

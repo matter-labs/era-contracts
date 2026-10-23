@@ -66,6 +66,7 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
         ctmProxyAdmin2.transferOwnership(address(ctmExecutor2));
         vm.prank(governor);
         ctm2.transferOwnership(address(ctmExecutor2));
+        vm.prank(governor);
         ctmExecutor2.acceptCTMOwnership();
         assertEq(ctm2.currentRelease(), address(fromRelease));
 
@@ -149,6 +150,7 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
         });
         vm.prank(governor);
         previous.forward(calls);
+        vm.prank(governor);
         replacement.acceptCTMOwnership();
         assertEq(ctmProxyAdmin.owner(), address(replacement));
         assertEq(chainContractAddress.owner(), address(replacement));

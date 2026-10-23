@@ -11,6 +11,7 @@ import {ICTMTransition} from "./registry/objects/ICTMTransition.sol";
 import {CTMUpgradeComposer} from "./registry/libraries/CTMUpgradeComposer.sol";
 import {LiveRoutingReader} from "./registry/libraries/LiveRoutingReader.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
+import {ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -20,12 +21,11 @@ import {L2CanonicalTransaction} from "../common/Messaging.sol";
 ///         {docs/registry-driven-upgrades.md}.
 contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     /// @inheritdoc IDefaultUpgrade
-    /// @dev CTM binding is commitment-based: this init only runs through the cut the chain reads
-    ///      from its own CTM (`upgradeCutForVersion`), which derives it from the transition that CTM
-    ///      committed — a transition cannot be aimed at a foreign CTM's chains. No `validate()`
-    ///      here either: that cut's init calldata names THIS transition address, so the object is
-    ///      the committed one by construction, and its `validate()` ran when it was committed;
-    ///      code present then is present now.
+    /// @dev No CTM check: `requireReleaseRouting` below binds the transition to its departing
+    ///      release's routing, not to a CTM ({docs/registry-driven-upgrades.md#flow-upgrading}).
+    ///      No `validate()` either: the committed cut's init calldata names THIS transition
+    ///      address, so the object is the committed one by construction, and its `validate()` ran
+    ///      when it was committed; code present then is present now.
     function upgradeFromTransition(address _transition) external returns (bytes32) {
         _requireAllBatchesExecuted();
         ICTMTransition transition = ICTMTransition(_transition);
@@ -64,10 +64,15 @@ contract DefaultUpgrade is BaseZkSyncUpgrade, IDefaultUpgrade {
     ///      CTM may already have moved past it.
     function _upgradeFromCommittedObject(ICommittedUpgrade _object) internal {
         (uint256 newProtocolVersion, uint256 upgradeTimestamp, address newRelease) = _object.upgradeTarget();
+        address newVerifier = ICTMRelease(newRelease).verifier();
+        // Checked here, not left to `_upgrade`, which reads zero as "leave unchanged" for genesis.
+        if (newVerifier == address(0)) {
+            revert ZeroAddress();
+        }
         _upgrade({
             _newProtocolVersion: newProtocolVersion,
             _upgradeTimestamp: upgradeTimestamp,
-            _verifier: ICTMRelease(newRelease).verifier(),
+            _verifier: newVerifier,
             _l2ProtocolUpgradeTx: CTMUpgradeComposer.buildL2UpgradeTxFromPlan({
                 _plan: _object.l2Plan(),
                 _newRelease: ICTMRelease(newRelease),

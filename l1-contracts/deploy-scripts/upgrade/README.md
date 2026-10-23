@@ -81,7 +81,8 @@ On one anvil fork of L1, in this order:
 4. The ServerNotifier handover calls (bootstrap only), executed on the fork as each target's live
    owner (`UpgradeFull::run_ctm_admin_steps`; see the
    [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
-5. On PUH-governed environments, the PUH/Guardians redeploy (`zk_governance.rs`).
+5. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
+   PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it.
 6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
    `acceptOwnership` normalization) → the core prepare's declared calls → the executor legs,
@@ -95,7 +96,13 @@ On one anvil fork of L1, in this order:
    calldata alike, not by headcount (`check_bundle_provenance`).
 
 Every prepare deployment rides the CREATE2 factory; the deployer's Safe bundles and `manifest.json`
-land under `--out` (default `upgrade-envs/<version>/output/<env>/protocol-ops/prepare/`).
+land under `--out` (default `upgrade-envs/<version>/output/<env>/protocol-ops/prepare/`). Each
+prepare output also records every contract the run deployed through `deploySimpleContract` or as a
+proxy implementation — reused deployments included, since the factory returns the existing address —
+in `[member_deployments]`, keyed by address: the contract, the CREATE2 factory, the salt and the exact
+constructor arguments (`MemberDeploymentsRecord`). The merge carries it under `[core]` and
+`[ctms.<key>]`, and the review ([§4](#4-verify)) re-derives every member the package newly
+installs from it.
 
 ## 3. Review
 
@@ -127,7 +134,10 @@ construction (the write-once objects from their manifests, the bootstrap sequenc
 it was constructed over — under the salts each prepare leg records in its output
 (`create2_factory_salt`) — and the executors from the `[upgrade_executors]` record of the run that
 deployed them, without which an executor is unverified), that every object and every member it
-names runs the reviewed build's code for its role, that every proxy row names its slot's proxy,
+names runs the reviewed build's code for its role, that every member the package newly installs
+re-derives from its `[member_deployments]` record with each constructor argument equal to the live or
+env value the prepare took it from (without a record it is unverified), that `ZiskVerifier`'s Plonk
+backend runs the pinned runtime, that every proxy row names its slot's proxy,
 the bound authority and the owner the upgrade is driven by, every row's departing implementation,
 that chains crossing the edge keep the system-proxy logic new chains get, readiness,
 and that the calldata governance signs invokes the reviewed upgrade, in canonical order, and
@@ -137,7 +147,10 @@ checks and deliberately does not is in
 
 ## 5. Deployer broadcast
 
-Execute the deployer bundles through the Safe UI, or replay them under the EOA keys:
+Replay the deployer bundles under the EOA keys, one transaction per call. Do not send a deployer
+bundle as one Safe UI batch: its deploys together exceed EIP-7825's 2^24 per-transaction cap, and
+after Glamsterdam single deploys exceed it on their own (their state gas is outside the cap), which
+`upgrade-broadcast` accounts for:
 
 ```sh
 cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manifest.json --l1-rpc-url <rpc> --key 0x<addr>=0x<key>
@@ -149,10 +162,12 @@ cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manife
 cargo run -p protocol_ops -- ecosystem upgrade-governance --env <env> --l1-rpc-url <rpc>
 ```
 
-replays the governance bundle of `<env-out>/ecosystem.toml` on a fork as governance and emits the
-governance Safe bundle; `ecosystem governance-toml-to-simulator` emits the transaction-simulator
-JSON. On the bootstrap edge the bundle ends with the edge's completion check
-(`RegistryBootstrapMigration.validateApplied()`), so the replay fails unless the edge completed.
+replays the governance bundle of `<env-out>/ecosystem.toml` on a fork as governance, fails unless
+the fork is left in the state the package describes
+([where each check lives](../../../protocol-docs/ecosystem-upgrade.md#where-each-check-lives)), and
+emits the governance Safe bundle; `ecosystem governance-toml-to-simulator` emits the transaction-simulator JSON. On the
+bootstrap edge the bundle ends with the edge's completion check
+(`RegistryBootstrapMigration.validateApplied()`), so the replay itself reverts unless the edge completed.
 Monitoring and recovery: the [operations document](../../../docs/upgrade-operations.md).
 
 ## Emergency execution
@@ -214,6 +229,19 @@ Who may trigger the crossing and when is `CTMUpgradeExecutor.upgradeChain`'s pol
 document, "Flow: upgrading"). `chain set-upgrade-timestamp` schedules it on the ServerNotifier
 ({protocol-docs/upgrade-scheduling.md}); `chain set-da-validator-pair` restores the DA pair the
 upgrade resets.
+
+On the v35 bootstrap edge `upgradeChain` does not apply: the departing version has no transition.
+A chain's admin crosses it with the migration's `upgradeCut()`, and governance can cross a chain
+itself with `ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)` through
+`CTMUpgradeExecutor.forward`, a passthrough kept only until no chain can depart a pre-v35 version.
+
+**Chain admins behind an `AccessControlRestriction`.** Every crossing after the bootstrap edge calls
+the chain's two-argument `upgradeChainFromVersion(address,uint256)` (`0x03129ad9`) instead of the
+cut-taking `upgradeChainFromVersion(address,uint256,DiamondCutData)` (`0x3b6d7534`). A role the
+restriction requires for the old selector does not carry over: before the chain's first crossing
+after v35, the restriction's default admin sets it for the new one
+(`setRequiredRoleForCall(chainAddress, 0x03129ad9, role)`); until then only the default admin can
+send the crossing.
 
 Server and monitoring consumers must read the final transaction through
 `transition.l2UpgradeTx(bridgehub, chainId)` or `bootstrap.l2UpgradeTx(chainId)`. These views

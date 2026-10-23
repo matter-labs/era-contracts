@@ -12,8 +12,8 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 
 /// @dev The library is `internal`; this harness is the only way to call it from a test.
 contract ZKChainSpecificForceDeploymentsLibHarness {
-    function build(address _bridgehub, uint256 _chainId) external view returns (bytes memory) {
-        return ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId);
+    function build(address _bridgehub, uint256 _chainId, bool _isGenesis) external view returns (bytes memory) {
+        return ZKChainSpecificForceDeploymentsLib.build(_bridgehub, _chainId, _isGenesis);
     }
 }
 
@@ -64,6 +64,21 @@ contract MockERC20TokenWithBytes32Metadata {
 
     function decimals() external pure returns (uint8) {
         return 6;
+    }
+}
+
+/// @dev `decimals()` answers with two ABI words instead of one.
+contract MockERC20TokenWithWideDecimals {
+    function name() external pure returns (string memory) {
+        return "Wide Token";
+    }
+
+    function symbol() external pure returns (string memory) {
+        return "WIDE";
+    }
+
+    function decimals() external pure returns (uint256, uint256) {
+        return (6, 6);
     }
 }
 
@@ -119,14 +134,26 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         );
     }
 
-    function _build() internal view returns (ZKChainSpecificForceDeploymentsData memory) {
-        return abi.decode(lib.build(bridgehubMock, CHAIN_ID), (ZKChainSpecificForceDeploymentsData));
+    function _build(bool _isGenesis) internal view returns (ZKChainSpecificForceDeploymentsData memory) {
+        return abi.decode(lib.build(bridgehubMock, CHAIN_ID, _isGenesis), (ZKChainSpecificForceDeploymentsData));
+    }
+
+    /// @dev The metadata on both paths, which differ only in `decimals`.
+    function _assertMetadata(string memory _name, string memory _symbol, uint256 _upgradeDecimals) internal view {
+        ZKChainSpecificForceDeploymentsData memory genesisData = _build(true);
+        ZKChainSpecificForceDeploymentsData memory upgradeData = _build(false);
+        assertEq(genesisData.baseTokenMetadata.name, _name, "genesis name");
+        assertEq(genesisData.baseTokenMetadata.symbol, _symbol, "genesis symbol");
+        assertEq(genesisData.baseTokenMetadata.decimals, 18, "genesis decimals");
+        assertEq(upgradeData.baseTokenMetadata.name, _name, "upgrade name");
+        assertEq(upgradeData.baseTokenMetadata.symbol, _symbol, "upgrade symbol");
+        assertEq(upgradeData.baseTokenMetadata.decimals, _upgradeDecimals, "upgrade decimals");
     }
 
     // ─────────────────────────── metadata ───────────────────────────
 
     function test_ethBaseTokenUsesTheHardcodedEtherMetadata() public view {
-        ZKChainSpecificForceDeploymentsData memory chainData = _build();
+        ZKChainSpecificForceDeploymentsData memory chainData = _build(false);
 
         assertEq(chainData.baseTokenBridgingData.assetId, BASE_TOKEN_ASSET_ID);
         assertEq(chainData.baseTokenBridgingData.originChainId, block.chainid);
@@ -135,43 +162,49 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         assertEq(chainData.l2LegacySharedBridge, address(0));
         assertEq(chainData.predeployedL2WethAddress, address(0));
         assertEq(chainData.baseTokenL1Address, ETH_TOKEN_ADDRESS);
-        assertEq(chainData.baseTokenMetadata.name, "Ether");
-        assertEq(chainData.baseTokenMetadata.symbol, "ETH");
-        assertEq(chainData.baseTokenMetadata.decimals, 18);
+        _assertMetadata("Ether", "ETH", 18);
     }
 
     function test_erc20BaseTokenMetadataIsReadFromTheToken() public {
         MockERC20TokenWithMetadata token = new MockERC20TokenWithMetadata("Test Token", "TTK", 6);
         _setBaseToken(address(token), address(token));
 
-        ZKChainSpecificForceDeploymentsData memory chainData = _build();
+        ZKChainSpecificForceDeploymentsData memory chainData = _build(false);
 
         assertEq(chainData.baseTokenL1Address, address(token));
-        assertEq(chainData.baseTokenMetadata.name, "Test Token");
-        assertEq(chainData.baseTokenMetadata.symbol, "TTK");
-        // Not the token's own 6: every base token gets 18, which is what every live chain has.
-        assertEq(chainData.baseTokenMetadata.decimals, 18);
+        // The token's own 6 on an upgrade; genesis records 18.
+        _assertMetadata("Test Token", "TTK", 6);
     }
 
-    /// @dev Typed reads: a token that serves no metadata fails the build instead of getting defaults.
-    function test_revertWhen_baseTokenHasNoMetadata() public {
+    /// @dev Tolerance, not leniency for its own sake: a chain may be created on a token that serves
+    ///      no metadata, and every later upgrade recomposes these same values.
+    function test_baseTokenWithoutMetadataFallsBackToTheDefaults() public {
         MockERC20TokenWithoutMetadata token = new MockERC20TokenWithoutMetadata();
         _setBaseToken(address(token), address(token));
 
-        vm.expectRevert();
-        lib.build(bridgehubMock, CHAIN_ID);
+        assertEq(_build(false).baseTokenL1Address, address(token));
+        _assertMetadata("Base Token", "BT", 18);
     }
 
-    /// @dev A `bytes32`-returning (Maker-style) token does not decode as a `string`.
-    function test_revertWhen_baseTokenReturnsBytes32Metadata() public {
+    /// @dev A `bytes32`-returning (Maker-style) token is treated as having no string metadata; its
+    ///      conforming `decimals()` is still read on an upgrade.
+    function test_baseTokenReturningBytes32MetadataFallsBackToTheDefaults() public {
         MockERC20TokenWithBytes32Metadata token = new MockERC20TokenWithBytes32Metadata(
             bytes32("Maker"),
             bytes32("MKR")
         );
         _setBaseToken(address(token), address(token));
 
-        vm.expectRevert();
-        lib.build(bridgehubMock, CHAIN_ID);
+        assertEq(_build(false).baseTokenL1Address, address(token));
+        _assertMetadata("Base Token", "BT", 6);
+    }
+
+    /// @dev Only an answer of exactly one ABI word is read as the decimals.
+    function test_decimalsNotAnsweredWithOneWordFallBackTo18() public {
+        MockERC20TokenWithWideDecimals token = new MockERC20TokenWithWideDecimals();
+        _setBaseToken(address(token), address(token));
+
+        _assertMetadata("Wide Token", "WIDE", 18);
     }
 
     // ─────────────────────────── the base token's recorded address ───────────────────────────
@@ -190,12 +223,12 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
             abi.encode(ORIGIN_CHAIN_ID)
         );
 
-        ZKChainSpecificForceDeploymentsData memory chainData = _build();
+        ZKChainSpecificForceDeploymentsData memory chainData = _build(false);
 
         assertEq(chainData.baseTokenL1Address, address(localToken), "the local representation is recorded");
         assertEq(chainData.baseTokenMetadata.name, "Bridged Token", "the metadata comes from that same token");
         assertEq(chainData.baseTokenMetadata.symbol, "BRG");
-        assertEq(chainData.baseTokenMetadata.decimals, 18);
+        assertEq(chainData.baseTokenMetadata.decimals, 8);
         assertEq(chainData.baseTokenBridgingData.originToken, originToken, "the origin identity is kept separately");
         assertEq(chainData.baseTokenBridgingData.originChainId, ORIGIN_CHAIN_ID);
     }
@@ -208,6 +241,6 @@ contract ZKChainSpecificForceDeploymentsLibTest is Test {
         uint256 unknownChainId = 999;
 
         vm.expectRevert();
-        lib.build(bridgehubMock, unknownChainId);
+        lib.build(bridgehubMock, unknownChainId, false);
     }
 }

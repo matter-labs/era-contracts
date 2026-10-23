@@ -41,6 +41,9 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
     ///      upgrade reads it without decoding either release.
     uint256 internal derivedOldProtocolVersion;
     uint256 internal derivedNewProtocolVersion;
+    /// @dev The manifest's `oldProtocolVersionDeadline`, kept apart so the CTM's batch-commit check
+    ///      (`protocolVersionIsActive`) reads it without decoding the manifest.
+    uint256 internal pinnedOldProtocolVersionDeadline;
 
     /// @notice Pins the manifest and DERIVES the delta. No state-mutating function exists on this
     ///         contract: everything is written once, at construction.
@@ -59,14 +62,15 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
         uint256 newVersion = ICTMRelease(_manifest.newRelease).protocolVersion();
         derivedOldProtocolVersion = oldVersion;
         derivedNewProtocolVersion = newVersion;
+        pinnedOldProtocolVersionDeadline = _manifest.oldProtocolVersionDeadline;
 
         // The engine's code existence is checked by `validate()` on the execution paths, not
         // here — see {ProxyUpgradeTransition}. Both release EDGES are validated, though: the
         // delta below is derived from their manifests, so a malformed edge would silently
         // produce a malformed cut.
-        // WHICH releases these are is governance's decision, established by review: the
-        // executor's release-edge check ties `fromRelease` to the CTM's live `currentRelease`,
-        // and `newRelease` is what the same commit then installs.
+        // WHICH releases these are is governance's decision, established by review: the CTM's
+        // release-edge check ties `fromRelease` to its live `currentRelease`, and `newRelease` is
+        // what the same commit then installs.
         ICTMRelease(_manifest.newRelease).validate();
         ICTMRelease(_manifest.fromRelease).validate();
 
@@ -187,7 +191,7 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
     }
 
     function oldProtocolVersionDeadline() external view returns (uint256) {
-        return getManifest().oldProtocolVersionDeadline;
+        return pinnedOldProtocolVersionDeadline;
     }
 
     function upgradeTimestamp() external view returns (uint256) {
@@ -216,13 +220,12 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
     }
 
     /// @inheritdoc ICTMTransition
-    /// @dev THE enumeration of what this transition names itself: the upgrade engine and the
+    /// @dev THE enumeration of the code this transition names itself: the upgrade engine and the
     ///      delegate composer (version-specific CODE in place of authored calldata) when the plan
-    ///      names one. The two release edges are objects with check surfaces of their own.
+    ///      names one. The two releases are validated at construction and where they are
+    ///      installed.
     function validate() external view {
         TransitionManifest memory m = getManifest();
-        ICTMRelease(m.newRelease).validate();
-        ICTMRelease(m.fromRelease).validate();
         ObjectAnchorLib.requireCode(m.upgradeEngine);
         if (m.l2Plan.delegateComposer != address(0)) {
             ObjectAnchorLib.requireCode(m.l2Plan.delegateComposer);

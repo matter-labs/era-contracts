@@ -217,6 +217,12 @@ impl<'a> UpgradeInner<'a> {
 
         let rollup_da_manager = match ctm.rollup_da_manager {
             Some(addr) => {
+                anyhow::ensure!(
+                    !addr.is_zero(),
+                    "the RollupDAManager override for CTM {ctm_proxy:#x} is the zero address, \
+                     which the new AdminFacet would pin as its immutable; omit the override to \
+                     resolve the CTM's own from a chain registered on it"
+                );
                 logger::info(format!("RollupDAManager (override): {addr:#x}"));
                 addr
             }

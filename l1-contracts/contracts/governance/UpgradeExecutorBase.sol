@@ -6,7 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {Call} from "./Common.sol";
 import {IUpgradeExecutorBase} from "./IUpgradeExecutorBase.sol";
-import {ZeroAddress} from "../common/L1ContractErrors.sol";
+import {RenounceOwnershipDisabled, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @title UpgradeExecutorBase
 /// @author Matter Labs
@@ -43,6 +43,13 @@ abstract contract UpgradeExecutorBase is Ownable2Step, IUpgradeExecutorBase {
             }
             emit CallForwarded(_calls[i].target, _calls[i].value, _calls[i].data);
         }
+    }
+
+    /// @notice Always reverts: an ownerless executor would strand every authority it holds, which is
+    ///         what the constructor's zero-owner check exists to prevent. Ownership only moves
+    ///         through the two-step transfer.
+    function renounceOwnership() public pure override {
+        revert RenounceOwnershipDisabled();
     }
 
     /// @notice The executor may need to hold ETH, e.g. to fund governance-initiated priority

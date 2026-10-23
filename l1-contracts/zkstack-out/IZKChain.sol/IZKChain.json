@@ -1060,6 +1060,19 @@
   },
   {
     "type": "function",
+    "name": "isSecondProofSystemRequired",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isValidator",
     "inputs": [
       {
@@ -1181,6 +1194,13 @@
   {
     "type": "function",
     "name": "permanentlyAllowPriorityMode",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "permanentlyRequireSecondProofSystem",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -2463,6 +2483,12 @@
         "internalType": "uint64"
       }
     ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "SecondProofSystemRequired",
+    "inputs": [],
     "anonymous": false
   },
   {

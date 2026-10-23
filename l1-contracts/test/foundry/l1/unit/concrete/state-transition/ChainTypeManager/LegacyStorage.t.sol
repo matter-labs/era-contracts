@@ -6,6 +6,8 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
+import {L2UpgradePlan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
 /// @notice Stands in for the pre-v35 CTM implementation a live proxy runs before the bootstrap
@@ -14,22 +16,13 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 /// @dev The pre-v35 implementation is not part of this build, so the stand-in writes through the
 ///      declarations the current implementation retains. That they sit where the v34 layout put
 ///      them is what the slot assertions of {ChainTypeManagerLegacyStorageTest} pin.
-contract PreV35ChainTypeManagerStandIn is ChainTypeManager {
+contract MockPreV35ChainTypeManager is ChainTypeManager {
     constructor(
         address _bridgehub,
-        address _interopCenter,
         address _l1BytecodesSupplier,
         address _permissionlessValidator,
         address _l1InteropFeeManager
-    )
-        ChainTypeManager(
-            _bridgehub,
-            _interopCenter,
-            _l1BytecodesSupplier,
-            _permissionlessValidator,
-            _l1InteropFeeManager
-        )
-    {}
+    ) ChainTypeManager(_bridgehub, _l1BytecodesSupplier, _permissionlessValidator, _l1InteropFeeManager) {}
 
     /// @param _protocolVersion The version the verifier is recorded for.
     /// @param _verifier The verifier recorded.
@@ -58,15 +51,14 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
     uint256 internal constant LEGACY_VERSION = uint256(34) << 32;
     uint256 internal constant NEW_VERSION = uint256(1) << 32;
 
-    PreV35ChainTypeManagerStandIn internal preV35Implementation;
+    MockPreV35ChainTypeManager internal preV35Implementation;
 
     function setUp() public {
         deploy();
-        preV35Implementation = new PreV35ChainTypeManagerStandIn(
+        preV35Implementation = new MockPreV35ChainTypeManager(
             address(bridgehub),
-            interopCenterAddress,
             address(bytecodesSupplier),
-            address(0),
+            address(permissionlessValidator),
             address(0)
         );
     }
@@ -81,11 +73,8 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
     function _writePreV35StateThenSwap(address _verifier, address _defaultUpgrade) internal {
         _swapImplementation(address(preV35Implementation));
         vm.startPrank(governor);
-        PreV35ChainTypeManagerStandIn(address(chainContractAddress)).setProtocolVersionVerifier(
-            LEGACY_VERSION,
-            _verifier
-        );
-        PreV35ChainTypeManagerStandIn(address(chainContractAddress)).setDefaultUpgrade(_defaultUpgrade);
+        MockPreV35ChainTypeManager(address(chainContractAddress)).setProtocolVersionVerifier(LEGACY_VERSION, _verifier);
+        MockPreV35ChainTypeManager(address(chainContractAddress)).setDefaultUpgrade(_defaultUpgrade);
         vm.stopPrank();
         _swapImplementation(address(chainTypeManager));
     }
@@ -160,6 +149,9 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
             abi.encodeCall(ICTMTransition.upgradeEngine, ()),
             abi.encode(makeAddr("upgradeEngine"))
         );
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.validate, ()), "");
+        L2UpgradePlan memory emptyPlan;
+        vm.mockCall(address(transition), abi.encodeCall(ICommittedUpgrade.l2Plan, ()), abi.encode(emptyPlan));
 
         vm.prank(governor);
         chainContractAddress.setNewVersionUpgradeFromTransition(transition);

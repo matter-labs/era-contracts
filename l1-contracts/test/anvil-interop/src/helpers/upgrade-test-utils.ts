@@ -1,7 +1,8 @@
 /**
  * Small utilities shared by the upgrade test runners: version and chain selection, proxy slot
- * reads, failed-transaction traces, and the chain-side view of the direct upgrade legs (executor
- * discovery, leg encoding, and the assertions that one governance execution applied them).
+ * reads, failed-transaction traces, the chain-side view of the direct upgrade legs (executor
+ * discovery, leg encoding, and the assertions that one governance execution applied them), and the
+ * post-state an applied CTM transition leaves.
  */
 
 import * as fs from "fs";
@@ -65,6 +66,26 @@ export function selectUpgradeChains(
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
     return targetRoles.includes(role);
   });
+}
+
+/**
+ * The chains among `chains` that settle on L1 in the loaded states. Roles come from the current config, whose
+ * topology can differ from that of an older release's states, so the settlement layer is read on-chain.
+ */
+export async function keepL1SettledChains(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  bridgehubAddr: string,
+  chains: Array<{ chainId: number; diamondProxy: string }>
+): Promise<Array<{ chainId: number; diamondProxy: string }>> {
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  const settledOnL1: Array<{ chainId: number; diamondProxy: string }> = [];
+  for (const chain of chains) {
+    if ((await bridgehub.settlementLayer(chain.chainId)).eq(l1ChainId)) {
+      settledOnL1.push(chain);
+    }
+  }
+  return settledOnL1;
 }
 
 /**
@@ -184,6 +205,105 @@ export async function discoverDomainExecutors(
   return { coreExecutor, ctmExecutor };
 }
 
+// ── Post-state of an applied upgrade ─────────────────────────────────
+
+/**
+ * `  what: live L, expected E` when `live` differs from `expected`, as a one-element list to spread
+ * into a mismatch report; none when they agree. Strings compare case-insensitively, `BigNumber`s
+ * print as hex.
+ */
+export function mismatch(what: string, live: unknown, expected: unknown): string[] {
+  const show = (v: unknown) => (ethers.BigNumber.isBigNumber(v) ? v.toHexString() : String(v));
+  return show(live).toLowerCase() === show(expected).toLowerCase()
+    ? []
+    : [`  ${what}: live ${show(live)}, expected ${show(expected)}`];
+}
+
+/**
+ * Throws, naming every mismatch, unless `ctmExecutor` holds the CTM domain: it is bound to the CTM
+ * and to the CTM's ProxyAdmin and owns both, with no nomination outstanding on the CTM; the CTM's
+ * ServerNotifier sits under that ProxyAdmin, is owned by `ctmExecutor` with no nomination
+ * outstanding, and is bound to the CTM both ways (`serverNotifierAddress()`, `chainTypeManager()`).
+ * Returns the ProxyAdmin and the ServerNotifier it read.
+ */
+export async function assertCtmDomainHeldBy(
+  provider: ethers.providers.Provider,
+  ctmAddr: string,
+  ctmExecutor: string
+): Promise<{ ctmProxyAdmin: string; serverNotifier: string }> {
+  await requireCode(provider, ctmExecutor, "the CTM executor");
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), provider);
+  const ctmOwnable = new ethers.Contract(ctmAddr, getAbi("Ownable2Step"), provider);
+  const executor = new ethers.Contract(ctmExecutor, getAbi("CTMUpgradeExecutor"), provider);
+  const ctmProxyAdmin = await readProxyAdmin(provider, ctmAddr);
+  const serverNotifier = ethers.utils.getAddress(await ctm.serverNotifierAddress());
+  await requireCode(provider, serverNotifier, `the ServerNotifier CTM ${ctmAddr} names,`);
+  const notifier = new ethers.Contract(serverNotifier, getAbi("ServerNotifier"), provider);
+  const zero = ethers.constants.AddressZero;
+  const problems = [
+    ...mismatch("CTM owner()", await ctmOwnable.owner(), ctmExecutor),
+    ...mismatch("CTM pendingOwner()", await ctmOwnable.pendingOwner(), zero),
+    ...mismatch(
+      `CTM ProxyAdmin ${ctmProxyAdmin} owner()`,
+      await new ethers.Contract(ctmProxyAdmin, getAbi("ProxyAdmin"), provider).owner(),
+      ctmExecutor
+    ),
+    ...mismatch("CTM executor CHAIN_TYPE_MANAGER()", await executor.CHAIN_TYPE_MANAGER(), ctmAddr),
+    ...mismatch("CTM executor CTM_PROXY_ADMIN()", await executor.CTM_PROXY_ADMIN(), ctmProxyAdmin),
+    ...mismatch(`ServerNotifier ${serverNotifier} owner()`, await notifier.owner(), ctmExecutor),
+    ...mismatch(`ServerNotifier ${serverNotifier} pendingOwner()`, await notifier.pendingOwner(), zero),
+    ...mismatch(`ServerNotifier ${serverNotifier} chainTypeManager()`, await notifier.chainTypeManager(), ctmAddr),
+    ...mismatch(
+      `ServerNotifier ${serverNotifier} proxy admin`,
+      await readProxyAdmin(provider, serverNotifier),
+      ctmProxyAdmin
+    ),
+  ];
+  if (problems.length !== 0) {
+    throw new Error(`CTM executor ${ctmExecutor} does not hold the domain of CTM ${ctmAddr}:\n${problems.join("\n")}`);
+  }
+  return { ctmProxyAdmin, serverNotifier };
+}
+
+/**
+ * Throws, naming every mismatch, unless `transition` is applied on the CTM: it departs from
+ * `oldVersion` and is committed for it, the CTM runs its new version on its target release, that
+ * release's own `protocolVersion()` agrees, and `ctmExecutor` still holds the CTM domain
+ * ({@link assertCtmDomainHeldBy}).
+ */
+export async function assertCtmTransitionApplied(
+  provider: ethers.providers.Provider,
+  ctmAddr: string,
+  transitionAddr: string,
+  oldVersion: ethers.BigNumber,
+  ctmExecutor: string
+): Promise<void> {
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), provider);
+  const transition = new ethers.Contract(transitionAddr, getAbi("ICTMTransition"), provider);
+  const version: ethers.BigNumber = await ctm.protocolVersion();
+  const currentRelease: string = await ctm.currentRelease();
+  const problems = [
+    ...mismatch("transition oldProtocolVersion()", await transition.oldProtocolVersion(), oldVersion),
+    ...mismatch(
+      `CTM upgradeTransition(${oldVersion.toHexString()})`,
+      await ctm.upgradeTransition(oldVersion),
+      transitionAddr
+    ),
+    ...mismatch("CTM protocolVersion()", version, await transition.newProtocolVersion()),
+    ...mismatch("CTM currentRelease()", currentRelease, await transition.newRelease()),
+  ];
+  if ((await provider.getCode(currentRelease)) === "0x") {
+    problems.push(`  CTM currentRelease() ${currentRelease} has no code`);
+  } else {
+    const release = new ethers.Contract(currentRelease, getAbi("ICTMRelease"), provider);
+    problems.push(...mismatch(`release ${currentRelease} protocolVersion()`, await release.protocolVersion(), version));
+  }
+  if (problems.length !== 0) {
+    throw new Error(`CTMTransition ${transitionAddr} is not applied on CTM ${ctmAddr}:\n${problems.join("\n")}`);
+  }
+  await assertCtmDomainHeldBy(provider, ctmAddr, ctmExecutor);
+}
+
 /** Each leg's executor contract, entrypoint and domain event. */
 const LEG_ENTRYPOINTS: Record<
   UpgradeLegKind,
@@ -233,8 +353,8 @@ export type ProxyUpgradeLegSnapshot = {
 
 /**
  * Reads each row-object leg's `ProxyUpgradeTransition` before execution: it must be of the leg's
- * domain and validate, and every row's live implementation is recorded so the execution's swaps can
- * be told from its idempotent skips. The transition leg carries no rows and is skipped.
+ * domain, and every row's live implementation is recorded so the execution's swaps can be told from
+ * its idempotent skips. The transition leg carries no rows and is skipped.
  */
 export async function snapshotProxyUpgradeLegs(
   provider: ethers.providers.Provider,
@@ -251,7 +371,6 @@ export async function snapshotProxyUpgradeLegs(
     if (liveDomain !== proxyUpgradeDomain(domain)) {
       throw new Error(`the ${leg.kind} leg's object ${leg.object} is of domain ${liveDomain}, expected ${domain}`);
     }
-    await object.callStatic.validate();
     const rows: Array<{ proxy: string; implNew: string }> = await object.rows();
     snapshots.push({
       leg,
