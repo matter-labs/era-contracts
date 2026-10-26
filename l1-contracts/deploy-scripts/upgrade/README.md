@@ -82,7 +82,9 @@ On one anvil fork of L1, in this order:
    owner (`UpgradeFull::run_ctm_admin_steps`; see the
    [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
 5. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
-   PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it.
+   PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it, and the deployer plan
+   check refuses such a release until it learns the redeploy's salt and artifacts
+   ([Deployer signing](../../../docs/upgrade-operations.md#deployer-signing)).
 6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring, and while a
    CTM predates the bootstrap, the `acceptOwnership()` of that CTM or its `ValidatorTimelock` when
@@ -224,7 +226,8 @@ Gotchas:
   governance calls. They must land before the proposal.
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the
-  handler names when the calldata is emitted.
+  handler names when the calldata is emitted. The deployer plan check refuses such a release for
+  now (step 5).
 
 Companions:
 

@@ -87,7 +87,8 @@ OUT=l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/mainnet
 ```
 
 A zk-governance checkout (`ZK_GOVERNANCE_DIR`, `--zk-governance-commit`) is needed only by a
-release whose input declares `redeploy_zk_governance = true`; no v0.35.0 input does.
+release whose input declares `redeploy_zk_governance = true`; no v0.35.0 input does, and the deployer plan
+check refuses such a release for now ([Deployer signing](upgrade-operations.md#deployer-signing)).
 
 **In CI:** run the **`Ecosystem Upgrade Calldata: Regenerate + Verify`**
 workflow (`generate-ecosystem-upgrade-calldata.yaml`). It does 1a + 1b and
@@ -173,7 +174,8 @@ yarn && yarn l1 build:foundry
 cd protocol-ops && cargo build --release && cd ..
 
 # Hold every deployer call against this checkout before the key signs anything.
-./protocol-ops/target/release/protocol_ops ecosystem check-deployer-plan --bundle "$BUNDLE"
+./protocol-ops/target/release/protocol_ops ecosystem check-deployer-plan --bundle "$BUNDLE" \
+  --l1-rpc-url <l1-rpc>
 
 # Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
 # deployment's journal. Keep it out of the env's output directory: the committed

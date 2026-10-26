@@ -141,8 +141,10 @@ value and be either
 A role that belongs to a CTM (the CTM, its `ValidatorTimelock`, `ProxyAdmin`, `BytecodesSupplier`
 and `ctm_admin_calls` ChainAdmin) counts only in a `[ctms.<key>]` table whose
 `chain_type_manager_proxy` is one of the env's `[[ctm_contracts.ctms]]`; a table naming such a role
-without a CTM is refused. The CTMs' `ProxyAdmin` and `BytecodesSupplier` are read over
-`--l1-rpc-url` (`replay-bundle` passes its `--fork-url` or `--rpc`), never taken from the bundle.
+without a CTM is refused. The CTMs' `ProxyAdmin` and `BytecodesSupplier`, and the ecosystem
+`ProxyAdmin` (the EIP-1967 admin of the env's `bridgehub_proxy_addr`), are read over `--l1-rpc-url`
+(`replay-bundle` passes its `--rpc`, or in a rehearsal the fork it replays on), never taken from the
+bundle. Without `--env` or `--bundle`, the package's own CTMs and Bridgehub stand in for the env's.
 
 A refusal names the call's index, Safe file, target, selector and value. A prepare that needs
 another call extends the allowlist in review. The package's other addresses and records come from
@@ -155,7 +157,9 @@ bundle names: `prepare-all` is the release's own directory, and a `forge-script`
 deployer signs anything declares its salts and owner in its own `upgrade-envs/<upgrade>/<env>.toml`
 and records its deployments in `[member_deployments]` like a prepare does; nothing is skipped by
 upgrade kind. The env's `l1_chain_id` must equal the bundle's `l1.chain_id` and the RPC's chain id.
-A bundle in which the deployer signs nothing passes. Signing (`replay-bundle --key`, and
+A bundle in which the deployer signs nothing passes. A release input declaring
+`redeploy_zk_governance = true` is refused: the PUH/Guardians redeploy deploys under its own salt
+from zk-governance artifacts, which the check does not know yet. Signing (`replay-bundle --key`, and
 `check-deployer-plan --bundle`, which the deploy workflow runs) also requires this checkout to be
 the bundle's `contracts_commit` with no change to the contract sources and reviewed inputs the
 generation tracks, a bundle not marked `contracts_worktree_dirty`, and the build to be read from
