@@ -41,20 +41,6 @@ export function packProtocolVersion(version: SemVer): string {
     .toHexString();
 }
 
-/**
- * Test-only compatibility bridge: the pre-generated chain states still carry the genesis-upgrade
- * tx hash from chain creation, which a real chain's server clears once it processes the batch and
- * which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`.
- */
-export async function clearGenesisUpgradeTxHash(
-  provider: ethers.providers.JsonRpcProvider,
-  chains: Array<{ chainId: number; diamondProxy: string }>
-): Promise<void> {
-  for (const chain of chains) {
-    await provider.send("anvil_setStorageAt", [chain.diamondProxy, "0x22", ethers.constants.HashZero]);
-  }
-}
-
 /** A transparent proxy's admin, read from its EIP-1967 slot: the proxy answers `admin()` only to it. */
 export async function readProxyAdmin(provider: ethers.providers.Provider, proxy: string): Promise<string> {
   return readAddressSlot(provider, proxy, EIP1967_ADMIN_SLOT);
@@ -80,6 +66,26 @@ export function selectUpgradeChains(
     if (!role) throw new Error(`Missing chain role for chain ${chain.chainId}`);
     return targetRoles.includes(role);
   });
+}
+
+/**
+ * The chains among `chains` that settle on L1 in the loaded states. Roles come from the current config, whose
+ * topology can differ from that of an older release's states, so the settlement layer is read on-chain.
+ */
+export async function keepL1SettledChains(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  bridgehubAddr: string,
+  chains: Array<{ chainId: number; diamondProxy: string }>
+): Promise<Array<{ chainId: number; diamondProxy: string }>> {
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  const l1ChainId = (await l1Provider.getNetwork()).chainId;
+  const settledOnL1: Array<{ chainId: number; diamondProxy: string }> = [];
+  for (const chain of chains) {
+    if ((await bridgehub.settlementLayer(chain.chainId)).eq(l1ChainId)) {
+      settledOnL1.push(chain);
+    }
+  }
+  return settledOnL1;
 }
 
 /**
@@ -118,6 +124,32 @@ export async function traceFailedTx(provider: ethers.providers.JsonRpcProvider, 
   } catch {
     return `  tx: ${txHash}\n  (could not fetch trace details)`;
   }
+}
+
+/** Waits for `txPromise`'s receipt, throwing with a trace of the failed tx if it reverted. */
+export async function sendAndCheck(
+  provider: ethers.providers.JsonRpcProvider,
+  txPromise: Promise<ethers.providers.TransactionResponse>,
+  label: string
+): Promise<ethers.providers.TransactionReceipt> {
+  const tx = await txPromise;
+  let receipt: ethers.providers.TransactionReceipt;
+  try {
+    receipt = await tx.wait();
+  } catch (error) {
+    // ethers v5 throws CALL_EXCEPTION on status-0 receipts before we can inspect them.
+    const failed = (error as { receipt?: ethers.providers.TransactionReceipt }).receipt;
+    if (failed) {
+      const trace = await traceFailedTx(provider, failed.transactionHash);
+      throw new Error(`${label} reverted:\n${trace}`);
+    }
+    throw error;
+  }
+  if (receipt.status !== 1) {
+    const trace = await traceFailedTx(provider, receipt.transactionHash);
+    throw new Error(`${label} reverted:\n${trace}`);
+  }
+  return receipt;
 }
 
 // ── Direct upgrade legs ──────────────────────────────────────────────

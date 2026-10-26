@@ -1,8 +1,10 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
+import { ContractFactory, Wallet } from "ethers";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
-import { ensureDirectoryExists, parseForgeScriptOutput, saveTomlConfig } from "../core/utils";
+import { getAbi, getCreationBytecode } from "../core/contracts";
+import { createProvider, ensureDirectoryExists, parseForgeScriptOutput, saveTomlConfig } from "../core/utils";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, CTM_DEPLOYMENT_FORGE_MEMORY_LIMIT_BYTES } from "../core/const";
 import { runForgeScript } from "../core/forge";
 import {
@@ -34,16 +36,29 @@ export class ForgeDeployer {
     ensureDirectoryExists(this.outputDir);
   }
 
-  private prepareCtmConfig(zkTokenAssetId: string): string {
+  private async prepareCtmConfig(zkTokenAssetId: string): Promise<string> {
     const baseConfigPath = path.join(this.projectRoot, ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE);
     const generatedConfigRelative = "/test/anvil-interop/outputs/ctm-deployment.generated.toml";
     const generatedConfigPath = path.join(this.projectRoot, generatedConfigRelative);
     const config = parseForgeScriptOutput(baseConfigPath);
 
     config.zk_token_asset_id = zkTokenAssetId;
+    config.zisk_plonk_verifier_addr = await this.deployZiskPlonkVerifierStandIn();
     saveTomlConfig(generatedConfigPath, config);
 
     return generatedConfigRelative;
+  }
+
+  /**
+   * Deploys the contract the multi-proof CTM uses as the ZiSK Plonk verifier. The harness never submits proofs,
+   * so any code serves; the CTM deployment only requires that the address holds some.
+   */
+  private async deployZiskPlonkVerifierStandIn(): Promise<string> {
+    const wallet = new Wallet(this.privateKey, createProvider(this.rpcUrl));
+    const factory = new ContractFactory(getAbi("EmptyContract"), getCreationBytecode("EmptyContract"), wallet);
+    const standIn = await factory.deploy();
+    await standIn.deployed();
+    return standIn.address;
   }
 
   async deployL1Core(): Promise<CoreDeployedAddresses> {
@@ -96,7 +111,7 @@ export class ForgeDeployer {
   async deployCTM(bridgehubAddr: string, zkTokenAssetId: string): Promise<CTMDeployedAddresses> {
     console.log("📦 Deploying ChainTypeManager...");
 
-    const ctmConfigRelative = this.prepareCtmConfig(zkTokenAssetId);
+    const ctmConfigRelative = await this.prepareCtmConfig(zkTokenAssetId);
     const envVars = {
       CTM_CONFIG: ctmConfigRelative,
       CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,

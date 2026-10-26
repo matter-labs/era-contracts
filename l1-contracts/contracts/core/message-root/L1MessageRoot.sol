@@ -5,11 +5,22 @@ pragma solidity 0.8.28;
 import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IL1MessageRoot} from "./IL1MessageRoot.sol";
-import {InvalidSettlementLayerForBatch, LocallyNoChainsAtGenesis} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    InteropAlreadyEnabled,
+    InvalidSettlementLayerForBatch,
+    LocallyNoChainsAtGenesis,
+    SecondProofSystemNotRequired,
+    ZKChainNotRegistered
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
-import {ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {IOwnable} from "../../common/interfaces/IOwnable.sol";
+import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE} from "../../common/Config.sol";
+import {NotMultiProofMode, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
+import {ChainBalanceBackfillPending} from "../../bridge/L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -34,6 +45,9 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @dev It may be replaced with a library of constant values for cheaper access.
     mapping(uint256 chainId => uint256 batchNumber) public v31UpgradeChainBatchNumber;
 
+    /// @notice Whether governance enabled interop for the chain. See {protocol-docs/interop-gating.md}.
+    mapping(uint256 chainId => bool enabled) internal interopEnabled;
+
     /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _chainAssetHandler Address of the chain asset handler.
@@ -52,6 +66,31 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         uint256 allZKChainsLength = allZKChains.length;
         /// locally there are no chains deployed before.
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function enableInterop(uint256 _chainId, bool _requireSecondProofSystem) external {
+        require(msg.sender == IOwnable(BRIDGE_HUB).owner(), Unauthorized(msg.sender));
+        address zkChain = IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(!interopEnabled[_chainId], InteropAlreadyEnabled(_chainId));
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(
+            address(IL1AssetRouter(address(IBridgehubBase(BRIDGE_HUB).assetRouter())).nativeTokenVault())
+        );
+        require(!nativeTokenVault.chainBalanceBackfillPending(_chainId), ChainBalanceBackfillPending(_chainId));
+        if (_requireSecondProofSystem) {
+            require(IGetters(zkChain).isSecondProofSystemRequired(), SecondProofSystemNotRequired(_chainId));
+            uint256 proofMode = IGetters(zkChain).getProofMode();
+            require(proofMode == ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE, NotMultiProofMode(proofMode));
+        }
+
+        interopEnabled[_chainId] = true;
+        emit InteropEnabled(_chainId);
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function isInteropEnabled(uint256 _chainId) external view returns (bool) {
+        return interopEnabled[_chainId];
     }
 
     function _proveL2LeafInclusionOnSettlementLayer(

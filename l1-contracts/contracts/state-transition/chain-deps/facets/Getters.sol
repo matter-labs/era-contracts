@@ -12,7 +12,6 @@ import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
-import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
@@ -108,7 +107,12 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
 
     /// @inheritdoc IGetters
     function getProofMode() external view returns (uint256) {
-        return IZKsyncOSVerifier(address(s.verifier)).getProofMode(s.disabledProofSystems);
+        return _getProofMode();
+    }
+
+    /// @inheritdoc IGetters
+    function isSecondProofSystemRequired() external view returns (bool) {
+        return s.secondProofSystemRequired;
     }
 
     /// @inheritdoc IGetters
@@ -354,7 +358,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     ///      (see `Utils.getAllSelectors`), in ascending selector order. Guarded against drift by
     ///      FacetSelfDescription.t.sol and `yarn l1 facet-selectors --check`.
     function selectors() public pure returns (bytes4[] memory result) {
-        uint32[54] memory list = [
+        uint32[55] memory list = [
             // getPubdataPricingMode()
             uint32(0x06d49e5b),
             // getPriorityTxMaxGasLimit()
@@ -411,6 +415,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
             uint32(0x84364651),
             // isPriorityQueueActive()
             uint32(0x8708474e),
+            // isSecondProofSystemRequired()
+            uint32(0x90985aac),
             // getChainTypeManager()
             uint32(0x946ebad1),
             // getBaseTokenAssetId()

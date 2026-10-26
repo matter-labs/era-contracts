@@ -21,6 +21,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -52,6 +53,11 @@ contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
         tokenAddress[_assetId] = _token;
     }
 
+    /// @dev Records a bridged token the way the vault does after deploying it, without the beacon deployment.
+    function setNewTokenStorage(bytes32 _assetId, address _token, uint256 _originChainId) external {
+        _setNewTokenStorage(_assetId, _token, _originChainId);
+    }
+
     /// @dev Stands in for the pre-v31 per-chain accounting that an already-deployed vault carries into the
     /// upgrade. There is no production writer for it anymore, so the population tests have to seed it here.
     function setDeprecatedChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _balance) external {
@@ -67,7 +73,7 @@ contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
     function test() internal virtual {}
 }
 
-contract L1NativeTokenVaultTest is Test {
+abstract contract L1NativeTokenVaultTestBase is Test {
     using stdStorage for StdStorage;
 
     L1NativeTokenVaultTestHelper public nativeTokenVault;
@@ -91,7 +97,7 @@ contract L1NativeTokenVaultTest is Test {
     bytes32 public tokenAssetId;
     bytes32 public ETH_TOKEN_ASSET_ID;
 
-    function setUp() public {
+    function setUp() public virtual {
         owner = makeAddr("owner");
         proxyAdmin = makeAddr("proxyAdmin");
         bridgehubAddress = makeAddr("bridgehub");
@@ -134,12 +140,9 @@ contract L1NativeTokenVaultTest is Test {
             _assetRouter: address(assetRouter),
             _l1Nullifier: l1Nullifier
         });
-        TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
-            address(nativeTokenVaultImpl),
-            proxyAdmin,
-            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
+        nativeTokenVault = L1NativeTokenVaultTestHelper(
+            payable(_deployNativeTokenVaultProxy(address(nativeTokenVaultImpl)))
         );
-        nativeTokenVault = L1NativeTokenVaultTestHelper(payable(nativeTokenVaultProxy));
 
         // Setup mocks
         vm.mockCall(
@@ -151,6 +154,19 @@ contract L1NativeTokenVaultTest is Test {
             chainAssetHandler,
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
+        );
+        // The vault is isolated from the message root, from which it only reads whether a chain's interop is
+        // enabled: it is disabled for every chain unless a test enables it. The mock matches any chain ID, and
+        // `_mockInteropEnabled` overrides it for one.
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehubBase.messageRoot.selector),
+            abi.encode(messageRootAddress)
+        );
+        vm.mockCall(
+            messageRootAddress,
+            abi.encodeWithSelector(IL1MessageRoot.isInteropEnabled.selector),
+            abi.encode(false)
         );
 
         // Setup L1Nullifier
@@ -174,6 +190,61 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.registerEthToken();
     }
 
+    /// @dev Deploys the vault's proxy in front of `_impl`, freshly initialized.
+    function _deployNativeTokenVaultProxy(address _impl) internal virtual returns (address) {
+        return
+            address(
+                new TransparentUpgradeableProxy(
+                    _impl,
+                    proxyAdmin,
+                    abi.encodeCall(L1NativeTokenVault.initialize, (owner, tokenBeacon))
+                )
+            );
+    }
+
+    function _mockInteropEnabled(uint256 _chainId, bool _enabled) internal {
+        vm.mockCall(
+            messageRootAddress,
+            abi.encodeCall(IL1MessageRoot.isInteropEnabled, (_chainId)),
+            abi.encode(_enabled)
+        );
+    }
+
+    /// @dev Deposits `_amount` of the native test token to `chainId` through the real
+    /// assetRouter->bridgeBurn path and returns the burn data used.
+    function _depositNativeTestToken(uint256 _amount) internal returns (bytes memory data) {
+        data = _depositNativeTestToken(chainId, _amount);
+    }
+
+    /// @dev Deposits `_amount` of the native test token to `_chainId` through the real
+    /// assetRouter->bridgeBurn path and returns the burn data used.
+    function _depositNativeTestToken(uint256 _chainId, uint256 _amount) internal returns (bytes memory data) {
+        testToken.mint(owner, _amount);
+        vm.prank(owner);
+        testToken.approve(address(nativeTokenVault), _amount);
+
+        data = DataEncoding.encodeBridgeBurnData(_amount, owner, address(testToken));
+        vm.prank(address(assetRouter));
+        nativeTokenVault.bridgeBurn(_chainId, 0, tokenAssetId, owner, data);
+    }
+
+    function _assetIdArray(bytes32 _assetId) internal pure returns (bytes32[] memory assetIds) {
+        assetIds = new bytes32[](1);
+        assetIds[0] = _assetId;
+    }
+
+    function _amountArray(uint256 _amount) internal pure returns (uint256[] memory amounts) {
+        amounts = new uint256[](1);
+        amounts[0] = _amount;
+    }
+
+    function _setChainBalanceBackfill(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        vm.prank(owner);
+        nativeTokenVault.setChainBalanceBackfill(_chainId, _assetIdArray(_assetId), _amountArray(_amount));
+    }
+}
+
+contract L1NativeTokenVaultTest is L1NativeTokenVaultTestBase {
     /*//////////////////////////////////////////////////////////////
                         _getOriginChainId Tests
     //////////////////////////////////////////////////////////////*/
@@ -291,6 +362,8 @@ contract L1NativeTokenVaultTest is Test {
             abi.encodeWithSelector(IBridgedStandardToken.bridgeMint.selector, owner, amount),
             abi.encode()
         );
+        // Stands in for the deposit this claim refunds, which the chain's balance cap requires.
+        _setChainBalanceBackfill(chainId, bridgedAssetId, amount);
 
         vm.prank(address(assetRouter));
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
@@ -299,18 +372,6 @@ contract L1NativeTokenVaultTest is Test {
     /*//////////////////////////////////////////////////////////////
                     bridgedOut net flow accounting
     //////////////////////////////////////////////////////////////*/
-
-    /// @dev Deposits `_amount` of the native test token through the real
-    /// assetRouter->bridgeBurn path and returns the burn data used.
-    function _depositNativeTestToken(uint256 _amount) internal returns (bytes memory data) {
-        testToken.mint(owner, _amount);
-        vm.prank(owner);
-        testToken.approve(address(nativeTokenVault), _amount);
-
-        data = DataEncoding.encodeBridgeBurnData(_amount, owner, address(testToken));
-        vm.prank(address(assetRouter));
-        nativeTokenVault.bridgeBurn(chainId, 0, tokenAssetId, owner, data);
-    }
 
     function test_bridgedOut_IncreasesOnNativeDeposit() public {
         uint256 amount = 100;
@@ -386,6 +447,8 @@ contract L1NativeTokenVaultTest is Test {
             abi.encodeWithSelector(IBridgedStandardToken.bridgeMint.selector, owner, amount),
             abi.encode()
         );
+        // Stands in for the deposit this claim refunds, which the chain's balance cap requires.
+        _setChainBalanceBackfill(chainId, bridgedAssetId, amount);
 
         vm.prank(address(assetRouter));
         nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
@@ -396,11 +459,6 @@ contract L1NativeTokenVaultTest is Test {
     /*//////////////////////////////////////////////////////////////
                         bridgedOut population
     //////////////////////////////////////////////////////////////*/
-
-    function _assetIdArray(bytes32 _assetId) internal pure returns (bytes32[] memory assetIds) {
-        assetIds = new bytes32[](1);
-        assetIds[0] = _assetId;
-    }
 
     /// @dev The vault reads the chain list from the bridgehub when it falls back to its own legacy entries.
     ///      The bridgehub lists ZK chains only — never L1 itself — which is why the sum needs no exclusion.
@@ -528,6 +586,8 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.bridgeMint(chainId, tokenAssetId, mintData);
 
         nativeTokenVault.populateBridgedOut(_assetIdArray(tokenAssetId));
+        // The chain's own balance cap needs its pre-upgrade balance as well.
+        _setChainBalanceBackfill(chainId, tokenAssetId, amount);
 
         uint256 balanceBefore = testToken.balanceOf(owner);
         vm.prank(address(assetRouter));

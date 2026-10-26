@@ -214,6 +214,13 @@ export function getChainIdsByRole(config: AnvilChainConfig[], role: ChainRole): 
   return config.filter((c) => c.role === role).map((c) => c.chainId);
 }
 
+/**
+ * Find all chain IDs that setup enables interop for, in config order.
+ */
+export function getInteropChainIds(config: AnvilChainConfig[]): number[] {
+  return config.filter((c) => c.interop).map((c) => c.chainId);
+}
+
 export function formatChainInfo(chainId: number, port: number, isL1: boolean): string {
   const type = isL1 ? "L1" : "L2";
   return `${type} Chain ${chainId} on port ${port}`;

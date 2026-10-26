@@ -217,23 +217,25 @@ test("intrinsic or floor gas over 2^24 fails", () => {
   ]);
 });
 
-test("the Amsterdam state dump drops the block history and pins the block gas limit", () => {
+test("the Amsterdam state dump drops the block history and pins the block gas limit and clock", () => {
   const dump = {
-    block: { number: "0x11f", gas_limit: 100_000_000 },
+    block: { number: "0x11f", timestamp: "0x120", gas_limit: 100_000_000 },
     accounts: { [SENDER]: { nonce: 1 } },
     best_block_number: 287,
     blocks: [{ header: {} }],
     transactions: [],
   };
-  assert.deepEqual(toAmsterdamStateDump(dump), {
-    block: { number: "0x11f", gas_limit: AMSTERDAM_L1_BLOCK_GAS_LIMIT },
+  const timestamp = 1_700_000_000;
+  assert.deepEqual(toAmsterdamStateDump(dump, timestamp), {
+    block: { number: "0x11f", timestamp: "0x6553f100", gas_limit: AMSTERDAM_L1_BLOCK_GAS_LIMIT },
     accounts: { [SENDER]: { nonce: 1 } },
     best_block_number: 287,
   });
   // The committed fixture's decompressed copy is never rewritten in place.
   assert.equal(dump.block.gas_limit, 100_000_000);
+  assert.equal(dump.block.timestamp, "0x120");
   assert.equal(dump.blocks.length, 1);
-  assert.deepEqual(toAmsterdamStateDump({ accounts: {} }), { accounts: {} });
+  assert.deepEqual(toAmsterdamStateDump({ accounts: {} }, timestamp), { accounts: {} });
 });
 
 run();

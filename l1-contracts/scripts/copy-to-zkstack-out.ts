@@ -25,7 +25,6 @@ const REQUIRED_CONTRACTS = [
   "IDeployCTM.sol",
   "IDeployL1CoreContracts.sol",
   "IRegisterCTM.sol",
-  "IRegisterOnAllChains.sol",
   "IFinalizeChainInit.sol",
   "IUpgradePrepare.sol",
   "IL1NativeTokenVault.sol",

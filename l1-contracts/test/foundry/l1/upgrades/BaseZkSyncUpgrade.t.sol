@@ -12,7 +12,10 @@ import {
     MAX_ALLOWED_MINOR_VERSION_DELTA,
     MAX_NEW_FACTORY_DEPS,
     PRIORITY_TX_MAX_GAS_LIMIT,
+    ProofSystem,
     UPGRADE_TX_MAX_GAS_LIMIT,
+    ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+    ZKSYNC_OS_PLONK_VERIFICATION_TYPE,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -28,6 +31,7 @@ import {
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {
+    NotMultiProofMode,
     PubdataGreaterThanLimit,
     TimeNotReached,
     TooManyFactoryDeps,
@@ -37,6 +41,8 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -378,5 +384,84 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         _upgrade();
 
         assertEq(baseZkSyncUpgrade.getVerifier(), installed, "zero must not clear the verifier");
+    }
+
+    /// @notice A chain that required its second proof system can't upgrade to a verifier without it.
+    /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
+    function test_revertWhen_RequiringChainUpgradesToSingleProofVerifier() public {
+        verifier = _singleProofVerifier();
+        baseZkSyncUpgrade.setSecondProofSystemRequired(true);
+        uint256 versionBefore = baseZkSyncUpgrade.getProtocolVersion();
+        address verifierBefore = baseZkSyncUpgrade.getVerifier();
+
+        vm.expectRevert(abi.encodeWithSelector(NotMultiProofMode.selector, ZKSYNC_OS_PLONK_VERIFICATION_TYPE));
+        _upgrade();
+
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), versionBefore);
+        assertEq(baseZkSyncUpgrade.getVerifier(), verifierBefore);
+    }
+
+    function test_RequiringChainUpgradesToMultiProofVerifier() public {
+        _assertRequiringChainUpgradesToMultiProofVerifier(0);
+    }
+
+    /// @notice The requirement checks what the new verifier supports, not the chain's current disable flags, so a
+    /// chain under it still upgrades after governance switched ZiSK off, and ZiSK stays off.
+    function test_RequiringChainUpgradesAfterEmergencyZiskOff() public {
+        _assertRequiringChainUpgradesToMultiProofVerifier(uint8(1 << uint8(ProofSystem.Zisk)));
+    }
+
+    function test_UnlockedChainUpgradesToSingleProofVerifier() public {
+        verifier = _singleProofVerifier();
+
+        _upgrade();
+
+        assertEq(baseZkSyncUpgrade.getVerifier(), verifier);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
+    }
+
+    /// @notice An upgrade that keeps the installed verifier runs no check: the requirement was met when it was installed.
+    function test_RequiringChainUpgradesKeepingItsVerifier() public {
+        address multiProofVerifier = _multiProofVerifier();
+        baseZkSyncUpgrade.setVerifier(multiProofVerifier);
+        baseZkSyncUpgrade.setSecondProofSystemRequired(true);
+        verifier = address(0);
+
+        _upgrade();
+
+        assertEq(baseZkSyncUpgrade.getVerifier(), multiProofVerifier);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
+    }
+
+    function _assertRequiringChainUpgradesToMultiProofVerifier(uint8 _disabledProofSystems) internal {
+        address multiProofVerifier = _multiProofVerifier();
+        verifier = multiProofVerifier;
+        baseZkSyncUpgrade.setSecondProofSystemRequired(true);
+        baseZkSyncUpgrade.setDisabledProofSystems(_disabledProofSystems);
+        address verifierBefore = baseZkSyncUpgrade.getVerifier();
+
+        vm.expectEmit(true, true, false, true, address(baseZkSyncUpgrade));
+        emit BaseZkSyncUpgrade.NewVerifier(verifierBefore, multiProofVerifier);
+        _upgrade();
+
+        assertEq(baseZkSyncUpgrade.getVerifier(), multiProofVerifier);
+        assertEq(baseZkSyncUpgrade.getProtocolVersion(), protocolVersion);
+        assertTrue(baseZkSyncUpgrade.getSecondProofSystemRequired(), "the upgrade must keep the requirement");
+        assertEq(baseZkSyncUpgrade.getDisabledProofSystems(), _disabledProofSystems, "the upgrade keeps the flags");
+        assertEq(
+            baseZkSyncUpgrade.getProofMode(),
+            _disabledProofSystems == 0 ? ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE : ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+        );
+    }
+
+    function _singleProofVerifier() internal returns (address) {
+        return address(new ZKsyncOSVerifier(IVerifier(makeAddr("airbenderPlonk"))));
+    }
+
+    function _multiProofVerifier() internal returns (address) {
+        return
+            address(
+                new MultiProofVerifier(IVerifier(makeAddr("airbenderVerifier")), IVerifier(makeAddr("ziskVerifier")))
+            );
     }
 }

@@ -68,6 +68,8 @@ export interface AnvilChainConfig {
   port: number;
   role: ChainRole;
   settlement?: SettlementType;
+  /** Whether setup enables interop for this chain and allows it as a peer of every other such chain. */
+  interop?: boolean;
   /** L1 base token address, or "custom" to deploy a fresh ERC20. Defaults to ETH_TOKEN_ADDRESS if omitted. */
   baseToken?: string;
 }

@@ -9,7 +9,6 @@ import {ChainCreationParams} from "contracts/state-transition/ILegacyChainTypeMa
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 
-import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
@@ -447,7 +446,6 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
                 testnetVerifier: _config.testnetVerifier,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
-                interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: ctmAddresses.daAddresses.daContracts.rollupDAManager,
                 chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
                 l1BytecodesSupplier: ctmAddresses.stateTransition.proxies.bytecodesSupplier,

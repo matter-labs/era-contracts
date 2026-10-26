@@ -7,6 +7,7 @@ import type { AnvilManager } from "./daemons/anvil-manager";
 import { ForgeDeployer } from "./deployers/deployer";
 import { ChainRegistry } from "./deployers/chain-registry";
 import { GatewaySetup } from "./deployers/gateway-setup";
+import { InteropChainRegistrar } from "./deployers/interop-chain-registrar";
 import type {
   AnvilConfig,
   AnvilChainConfig,
@@ -18,7 +19,7 @@ import type {
   L2ChainInfo,
   PriorityRequestData,
 } from "./core/types";
-import { getChainIdsByRole, timeIt, createProvider } from "./core/utils";
+import { getChainDiamondProxy, getChainIdsByRole, getInteropChainIds, timeIt, createProvider } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
 import { getInteropSourceAddress, getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
@@ -268,8 +269,20 @@ export class DeploymentRunner {
         ],
         config: [
           { chainId: gwChainId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gateway", settlement: "l1" },
-          { chainId: chainAId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gwSettled", settlement: "gateway" },
-          { chainId: chainBId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gwSettled", settlement: "gateway" },
+          {
+            chainId: chainAId,
+            port: LIVE_CHAIN_PORT_PLACEHOLDER,
+            role: "directSettled",
+            settlement: "l1",
+            interop: true,
+          },
+          {
+            chainId: chainBId,
+            port: LIVE_CHAIN_PORT_PLACEHOLDER,
+            role: "directSettled",
+            settlement: "l1",
+            interop: true,
+          },
         ],
       },
       l1Addresses: this.emptyLiveL1Addresses({
@@ -320,30 +333,6 @@ export class DeploymentRunner {
       throw new Error(`Chain config not found for chain ${chainId}`);
     }
     return chainConfig;
-  }
-
-  private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
-    const l2Chains = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
-    const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
-    if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement || thisChain.role !== "gwSettled") {
-      return [];
-    }
-
-    return l2Chains
-      .filter((chainConfig) => chainConfig.chainId !== chainId)
-      .filter((chainConfig) => chainConfig.role === "gwSettled")
-      .filter((chainConfig) => chainConfig.settlement === thisChain.settlement)
-      .map((chainConfig) => chainConfig.chainId);
-  }
-
-  private buildInteropChainMap(chainConfigs: AnvilConfig["chains"]): Map<number, number[]> {
-    const l2ChainConfigs = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
-    return new Map(
-      l2ChainConfigs.map((chainConfig) => [
-        chainConfig.chainId,
-        this.computeInteropChainIds(chainConfig.chainId, chainConfigs),
-      ])
-    );
   }
 
   private buildRegistrationConfigs(
@@ -479,27 +468,6 @@ export class DeploymentRunner {
     await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, rpcUrl, genesisTx);
     done();
     console.log(`  Chain ${chain.chainId} system contracts initialized`);
-  }
-
-  private async registerInteropChainsForL2Chain(
-    registry: ChainRegistry,
-    chain: ChainAddresses,
-    l2RpcUrlsByChainId: Map<number, string>,
-    interopChainIdsByChainId: Map<number, number[]>
-  ): Promise<void> {
-    const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
-    if (!rpcUrl) {
-      throw new Error(`L2 chain ${chain.chainId} not found`);
-    }
-    const interopChainIds = interopChainIdsByChainId.get(chain.chainId);
-    if (!interopChainIds) {
-      throw new Error(`Interop chain plan not found for chain ${chain.chainId}`);
-    }
-
-    const done = timeIt(`registerInterop chain ${chain.chainId}`);
-    await registry.registerInteropChainsOnL2(chain.chainId, chain.diamondProxy, rpcUrl, interopChainIds);
-    done();
-    console.log(`  Chain ${chain.chainId} interop registrations completed`);
   }
 
   private async unpauseChainDeposits(
@@ -644,23 +612,33 @@ export class DeploymentRunner {
     return { chainAddresses };
   }
 
-  async step6RegisterInteropChains(
+  async step5SetupInterop(
     l1RpcUrl: string,
     l2Chains: L2ChainInfo[],
     chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
-    ctmAddresses: CTMDeployedAddresses,
     chainAddresses: ChainAddresses[]
   ): Promise<void> {
-    console.log("\n=== Step 6: Register Interop Chains ===\n");
+    console.log("\n=== Step 5: Enable Interop and Allow Peers ===\n");
 
-    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-    const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
+    const registrar = new InteropChainRegistrar(l1RpcUrl, l1Addresses);
+    const interopChainIds = getInteropChainIds(chainConfigs);
     const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
-    const interopChainIdsByChainId = this.buildInteropChainMap(chainConfigs);
+    const diamondProxy = (chainId: number) => getChainDiamondProxy(chainAddresses, chainId);
 
-    for (const chain of chainAddresses) {
-      await this.registerInteropChainsForL2Chain(registry, chain, l2RpcUrlsByChainId, interopChainIdsByChainId);
+    // Allowing a peer requires interop to be enabled on both chains, so every chain is enabled first.
+    for (const chainId of interopChainIds) {
+      await registrar.enableInterop(chainId, diamondProxy(chainId));
+    }
+    for (const chainId of interopChainIds) {
+      const rpcUrl = l2RpcUrlsByChainId.get(chainId);
+      if (!rpcUrl) {
+        throw new Error(`L2 chain ${chainId} not found`);
+      }
+      const l2Provider = createProvider(rpcUrl);
+      for (const peerChainId of interopChainIds.filter((id) => id !== chainId)) {
+        await registrar.allowInteropPeer(chainId, peerChainId, diamondProxy(chainId), l2Provider);
+      }
     }
   }
 
@@ -871,13 +849,17 @@ export class DeploymentRunner {
       ctmAddresses
     );
 
-    // Step 5: Setup gateway if configured
+    // Step 5 must run before the gateway setup, which hands the Bridgehub ownership that
+    // `enableInterop` requires from the default Anvil account to Governance.
+    await this.step5SetupInterop(chains.l1.rpcUrl, chains.l2, chains.config, l1Addresses, chainAddresses);
+
+    // Step 6: Setup gateway if configured
     const gatewayConfig = config.chains.find((c) => c.role === "gateway");
     if (gatewayConfig) {
       const gwChain = this.getGatewayChainOrThrow(gatewayConfig.chainId, chains.l2);
       const l2ChainRpcUrls = this.toRpcUrlMap(chains.l2);
       const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
-      await this.step5SetupGateway(
+      await this.step6SetupGateway(
         chains.l1.rpcUrl,
         gatewayConfig.chainId,
         l1Addresses,
@@ -888,19 +870,10 @@ export class DeploymentRunner {
       );
     }
 
-    await this.step6RegisterInteropChains(
-      chains.l1.rpcUrl,
-      chains.l2,
-      chains.config,
-      l1Addresses,
-      ctmAddresses,
-      chainAddresses
-    );
-
     return { chains, l1Addresses, ctmAddresses, chainAddresses };
   }
 
-  async step5SetupGateway(
+  async step6SetupGateway(
     l1RpcUrl: string,
     gatewayChainId: number,
     l1Addresses: CoreDeployedAddresses,
@@ -909,7 +882,7 @@ export class DeploymentRunner {
     gwSettledChainIds?: number[],
     l2ChainRpcUrls?: Map<number, string>
   ): Promise<{ gatewayCTMAddr: string }> {
-    console.log("\n=== Step 5: Setting Up Gateway ===\n");
+    console.log("\n=== Step 6: Setting Up Gateway ===\n");
 
     const gatewaySetup = new GatewaySetup(l1RpcUrl, l1Addresses, ctmAddresses);
 

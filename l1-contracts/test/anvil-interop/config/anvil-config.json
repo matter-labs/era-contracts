@@ -11,7 +11,8 @@
       "chainId": 10,
       "port": 4050,
       "role": "directSettled",
-      "settlement": "l1"
+      "settlement": "l1",
+      "interop": true
     },
     {
       "chainId": 11,
@@ -22,8 +23,9 @@
     {
       "chainId": 12,
       "port": 4052,
-      "role": "gwSettled",
-      "settlement": "gateway"
+      "role": "directSettled",
+      "settlement": "l1",
+      "interop": true
     },
     {
       "chainId": 13,
@@ -34,8 +36,9 @@
     {
       "chainId": 14,
       "port": 4054,
-      "role": "gwSettled",
-      "settlement": "gateway",
+      "role": "directSettled",
+      "settlement": "l1",
+      "interop": true,
       "baseToken": "custom"
     }
   ]

@@ -10,27 +10,32 @@ import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.s
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../bridgehub/IBridgehubBase.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
+import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
+import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
-    ChainAlreadyRegistered,
     ChainHasNoBatchesInMessageRoot,
-    ChainsSettlementLayerMismatch,
+    InteropNotEnabled,
+    InteropPeerAlreadyAllowed,
+    InteropPeerNotAllowed,
+    InvalidInteropPeer,
     NoEthAllowed,
     ZKChainNotRegistered
 } from "../bridgehub/L1BridgehubErrors.sol";
 import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
-/// @dev The encoding version of the data.
-bytes1 constant CHAIN_REGISTRATION_SENDER_ENCODING_VERSION = 0x01;
+/// @dev The encoding version of `bridgehubDeposit` data that re-sends the registration of an allowed pair.
+/// The retired version `0x01` registered any pair without consent.
+bytes1 constant CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION = 0x02;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them.
-/// See {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
+/// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them, for the pairs
+/// the chain admins whitelisted. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
@@ -39,8 +44,12 @@ contract ChainRegistrationSender is
 {
     IBridgehubBase public immutable BRIDGE_HUB;
 
+    /// @dev Written by the retired consent-free registration and read by nothing.
     mapping(uint256 chainToBeRegistered => mapping(uint256 chainRegisteredOn => bool isRegistered))
-        public chainRegisteredOnChain;
+        internal __DEPRECATED_chainRegisteredOnChain;
+
+    /// @inheritdoc IChainRegistrationSender
+    mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -64,31 +73,56 @@ contract ChainRegistrationSender is
         _transferOwnership(_owner);
     }
 
-    /// @notice Registers a chain for interop via a service transaction, so no base tokens are
-    /// needed (ease-of-use path). Callable only once per pair to prevent spamming; both chains must
-    /// settle on the same settlement layer.
-    /// @param chainToBeRegistered the chain to be registered
-    /// @param chainRegisteredOn the chain to register on
-    function registerChain(uint256 chainToBeRegistered, uint256 chainRegisteredOn) external {
-        require(!chainRegisteredOnChain[chainToBeRegistered][chainRegisteredOn], ChainAlreadyRegistered());
-        _checkSettlementLayers(chainToBeRegistered, chainRegisteredOn);
+    /// @inheritdoc IChainRegistrationSender
+    function allowInteropPeer(uint256 _chainId, uint256 _peerChainId) external nonReentrant {
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(msg.sender == IGetters(zkChain).getAdmin(), Unauthorized(msg.sender));
+        _checkPeerPair(_chainId, _peerChainId);
+        require(BRIDGE_HUB.getZKChain(_peerChainId) != address(0), ZKChainNotRegistered());
+        require(!interopPeerAllowed[_chainId][_peerChainId], InteropPeerAlreadyAllowed(_chainId, _peerChainId));
+        IL1MessageRoot messageRoot = IL1MessageRoot(address(BRIDGE_HUB.messageRoot()));
+        require(messageRoot.isInteropEnabled(_chainId), InteropNotEnabled(_chainId));
+        require(messageRoot.isInteropEnabled(_peerChainId), InteropNotEnabled(_peerChainId));
 
-        chainRegisteredOnChain[chainToBeRegistered][chainRegisteredOn] = true;
+        interopPeerAllowed[_chainId][_peerChainId] = true;
+        emit InteropPeerAllowed(_chainId, _peerChainId);
 
-        IMailbox chainRegisteredOnAddress = IMailbox(BRIDGE_HUB.getZKChain(chainRegisteredOn));
         // slither-disable-next-line unused-return
-        chainRegisteredOnAddress.requestL2ServiceTransaction(
-            address(L2_BRIDGEHUB_ADDR),
-            _getL2TxCalldata(chainToBeRegistered)
-        );
+        IMailbox(zkChain).requestL2ServiceTransaction(L2_BRIDGEHUB_ADDR, _getL2RegistrationCalldata(_peerChainId));
+    }
+
+    /// @inheritdoc IChainRegistrationSender
+    // The call to the ZK chain precedes the next pair's write; the function is `nonReentrant`.
+    // slither-disable-next-line reentrancy-no-eth
+    function deregisterInteropPairs(
+        uint256 _chainRegisteredOn,
+        uint256[] calldata _chainsToDeregister
+    ) external nonReentrant {
+        address zkChain = BRIDGE_HUB.getZKChain(_chainRegisteredOn);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(msg.sender == owner() || msg.sender == IGetters(zkChain).getAdmin(), Unauthorized(msg.sender));
+        uint256 chainsLength = _chainsToDeregister.length;
+        for (uint256 i = 0; i < chainsLength; ++i) {
+            uint256 chainToDeregister = _chainsToDeregister[i];
+            _checkPeerPair(_chainRegisteredOn, chainToDeregister);
+
+            delete interopPeerAllowed[_chainRegisteredOn][chainToDeregister];
+            emit InteropPairDeregistered(_chainRegisteredOn, chainToDeregister);
+            // slither-disable-next-line unused-return
+            IMailbox(zkChain).requestL2ServiceTransaction(
+                L2_BRIDGEHUB_ADDR,
+                abi.encodeCall(IL2Bridgehub.deregisterChainForInterop, (chainToDeregister))
+            );
+        }
     }
 
     /// @inheritdoc IL1CrossChainSender
-    /// @dev Registers a chain on the L2 via a normal deposit: anyone can trigger it (via the
-    /// Bridgehub), but the caller provides the base tokens.
+    /// @dev Re-sends the registration of an allowed pair via a normal deposit: anyone can trigger it
+    /// (via the Bridgehub), but the caller provides the base tokens.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
-        uint256 chainRegisteredOn,
+        uint256 _chainRegisteredOn,
         address,
         uint256,
         bytes calldata _data
@@ -97,21 +131,20 @@ contract ChainRegistrationSender is
             revert NoEthAllowed();
         }
         bytes1 encodingVersion = _data[0];
-        if (encodingVersion != CHAIN_REGISTRATION_SENDER_ENCODING_VERSION) {
+        if (encodingVersion != CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION) {
             revert UnsupportedEncodingVersion();
         }
 
-        uint256 chainToBeRegistered = abi.decode(_data[1:], (uint256));
-        address chainToBeRegisteredAddress = BRIDGE_HUB.getZKChain(chainToBeRegistered);
-        if (chainToBeRegisteredAddress == address(0)) {
-            revert ZKChainNotRegistered();
-        }
-        _checkSettlementLayers(chainToBeRegistered, chainRegisteredOn);
+        uint256 peerChainId = abi.decode(_data[1:], (uint256));
+        require(
+            interopPeerAllowed[_chainRegisteredOn][peerChainId],
+            InteropPeerNotAllowed(_chainRegisteredOn, peerChainId)
+        );
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
             l2Contract: L2_BRIDGEHUB_ADDR,
-            l2Calldata: _getL2TxCalldata(chainToBeRegistered),
+            l2Calldata: _getL2RegistrationCalldata(peerChainId),
             factoryDeps: new bytes[](0),
             // `txDataHash` exists so token bridges can recover funds after a failed L2 leg; nothing
             // to recover here, so `bytes32(0)` is fine.
@@ -119,32 +152,32 @@ contract ChainRegistrationSender is
         });
     }
 
-    /// @notice Used to get the L2 transaction calldata for the chain registration.
-    /// @dev Also enforces the atomic-interop timeout precondition: the chain being registered must
-    /// already have at least one batch inside this layer's message root. No backfill of
-    /// pre-existing chains is needed — see {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
-    /// @param chainToBeRegistered the chain to be registered
-    /// @return the L2 transaction calldata
-    function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
-        bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(chainToBeRegistered);
+    /// @notice Returns the L2 Bridgehub calldata allowing interop with `_peerChainId`.
+    /// @dev Also enforces the atomic-interop timeout precondition: the peer must already have at least
+    /// one batch inside this layer's message root. See {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
+    /// @param _peerChainId The chain to register.
+    function _getL2RegistrationCalldata(uint256 _peerChainId) internal view returns (bytes memory) {
+        bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_peerChainId);
         if (baseTokenAssetId == bytes32(0)) {
             revert ZKChainNotRegistered();
         }
-        if (BRIDGE_HUB.messageRoot().chainTreeLeafCount(chainToBeRegistered) == 0) {
-            revert ChainHasNoBatchesInMessageRoot(chainToBeRegistered);
+        if (BRIDGE_HUB.messageRoot().chainTreeLeafCount(_peerChainId) == 0) {
+            revert ChainHasNoBatchesInMessageRoot(_peerChainId);
         }
-        return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
+        return abi.encodeCall(IL2Bridgehub.allowInteropPeer, (_peerChainId, baseTokenAssetId));
     }
 
-    /// @notice Checks that both chains are settling on the same settlement layer. As of v33 both
-    /// settling directly on L1 is permitted — see {protocol-docs/chain-lifecycle.md#interop-registration-chainregistrationsender}.
-    /// @param chainToBeRegistered the chain to be registered
-    /// @param chainRegisteredOn the chain to register on
-    function _checkSettlementLayers(uint256 chainToBeRegistered, uint256 chainRegisteredOn) internal view {
-        uint256 chainToBeRegisteredSettlementLayer = BRIDGE_HUB.settlementLayer(chainToBeRegistered);
-        uint256 chainRegisteredOnSettlementLayer = BRIDGE_HUB.settlementLayer(chainRegisteredOn);
-        if (chainToBeRegisteredSettlementLayer != chainRegisteredOnSettlementLayer) {
-            revert ChainsSettlementLayerMismatch(chainToBeRegisteredSettlementLayer, chainRegisteredOnSettlementLayer);
+    /// @notice Rejects pairs whose L2 Bridgehub entry must never change: the chain itself, L1, and a chain
+    /// settling on the chain, which the chain's L2 Bridgehub registered as a settlement layer.
+    /// @param _chainId The chain whose L2 Bridgehub is written.
+    /// @param _peerChainId The chain whose entry is written.
+    function _checkPeerPair(uint256 _chainId, uint256 _peerChainId) internal view {
+        if (
+            _peerChainId == _chainId ||
+            _peerChainId == block.chainid ||
+            BRIDGE_HUB.settlementLayer(_peerChainId) == _chainId
+        ) {
+            revert InvalidInteropPeer(_chainId, _peerChainId);
         }
     }
 

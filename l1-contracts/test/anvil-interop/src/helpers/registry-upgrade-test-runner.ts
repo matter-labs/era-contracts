@@ -30,8 +30,8 @@
  *      through the real `L2ComplexUpgrader`.
  *
  * Harness patches (deviations from production):
- * - `clearGenesisUpgradeTxHash`: no server ever executes a batch on these anvil chains, so the
- *   genesis upgrade transaction stays pending and would block the bump (`PreviousUpgradeNotFinalized`).
+ * - Before the chains are upgraded, one empty batch is settled on each (see batch-settlement.ts):
+ *   with no server, their genesis upgrade would otherwise stay pending and block the bump.
  * - The transition's L2 delegate is placed at its derived address with `anvil_setCode`: the anvil
  *   L2 contract deployer is a no-op stub. The synthetic bump has no L2 init logic, so the no-op
  *   `MockContractDeployer` stand-in is the faithful equivalent.
@@ -70,13 +70,14 @@ import { assertServerNotifierState } from "./bootstrap-upgrade-stage";
 import { l1GasOverrides } from "./l1-transaction-gas";
 import type { ExpectedCall, UpgradeLeg } from "./governance-bundle";
 import type { ChainRole } from "../core/types";
+import { BatchSettler } from "./batch-settlement";
 import {
   assertCtmTransitionApplied,
   assertLegsApplied,
-  clearGenesisUpgradeTxHash,
   discoverDomainExecutors,
   readProxyImplementation,
   selectUpgradeChains,
+  sendAndCheck,
   snapshotProxyUpgradeLegs,
   traceFailedTx,
   upgradeLegCall,
@@ -124,6 +125,8 @@ const DETERMINISTIC_SOURCES = [
   "contracts/state-transition/chain-deps/DiamondInit.sol",
   "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol",
   "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
+  "contracts/state-transition/verifiers/MultiProofVerifier.sol",
+  "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol",
   "contracts/core/message-root/L1MessageRoot.sol",
   "contracts/dev-contracts/MockContractDeployer.sol",
   "contracts/upgrades/registry/objects/CTMRelease.sol",
@@ -178,31 +181,6 @@ function assertTrue(condition: boolean, message: string): void {
     throw new Error(`Assertion failed: ${message}`);
   }
   console.log(`  ✓ ${message}`);
-}
-
-async function sendAndCheck(
-  provider: ethers.providers.JsonRpcProvider,
-  txPromise: Promise<ethers.providers.TransactionResponse>,
-  label: string
-): Promise<ethers.providers.TransactionReceipt> {
-  const tx = await txPromise;
-  let receipt: ethers.providers.TransactionReceipt;
-  try {
-    receipt = await tx.wait();
-  } catch (error) {
-    // ethers v5 throws CALL_EXCEPTION on status-0 receipts before we can inspect them.
-    const failed = (error as { receipt?: ethers.providers.TransactionReceipt }).receipt;
-    if (failed) {
-      const trace = await traceFailedTx(provider, failed.transactionHash);
-      throw new Error(`${label} reverted:\n${trace}`);
-    }
-    throw error;
-  }
-  if (receipt.status !== 1) {
-    const trace = await traceFailedTx(provider, receipt.transactionHash);
-    throw new Error(`${label} reverted:\n${trace}`);
-  }
-  return receipt;
 }
 
 /** The `name` events `contract` emitted in `receipt`, decoded. */
@@ -287,6 +265,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       rollupDAManager: live.rollupDAManager,
       bridgehub: l1Addresses.bridgehub,
       chainAssetHandler: live.chainAssetHandler,
+      ziskRangeVerifier: live.ziskRangeVerifier,
     });
 
     // ── 4. Regenerate (EMIT) or validate (CONSUME) the committed manifest, then deploy the
@@ -418,9 +397,18 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     );
     console.log("  ✓ the CTM commits the transition and runs its release; the CTM executor holds the CTM domain");
 
-    // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains (see
-    // module docs); cleared once, before the first bump.
-    await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
+    // Settled only now: it sends from the deployer, whose nonces the manifest's addresses depend on.
+    console.log("\n── Settling a batch on each target chain ──");
+    const [, genesisBatchHash, genesisIndexRepeatedStorageChanges] = await new ethers.Contract(
+      live.fromRelease,
+      getAbi("ICTMRelease"),
+      l1Provider
+    ).genesisParams();
+    const settler = await BatchSettler.create(deployer, upgradeChains, {
+      genesisBatchHash,
+      genesisIndexRepeatedStorageChanges,
+    });
+    await settler.settleNextBatch(upgradeChains);
     for (const chain of upgradeChains) {
       await sendAsOwner(
         l1Provider,
@@ -549,6 +537,8 @@ type LiveUpgradeInputs = {
   messageRootProxy: string;
   /** The proxy's live (pre-upgrade) implementation — the source side of the ecosystem edge. */
   messageRootImplOld: string;
+  /** The live multi-proof verifier's ZiSK side, which the fresh multi-proof verifier reuses. */
+  ziskRangeVerifier: string;
 };
 
 /** The probed live facet address by name (see readLiveUpgradeInputs facet probes). */
@@ -627,6 +617,19 @@ async function readLiveUpgradeInputs(
   const adminFacetView = new ethers.Contract(upgradeChains[0].diamondProxy, getAbi("AdminFacet"), l1Provider);
   const rollupDAManager: string = await adminFacetView.getRollupDAManager();
 
+  // The harness CTM deploys a multi-proof testnet verifier (`multi_proof_verifier` in its config).
+  const liveVerifier = new ethers.Contract(
+    await firstDiamond.getVerifier(),
+    getAbi("MultiProofTestnetVerifier"),
+    l1Provider
+  );
+  const liveMultiProofVerifier = new ethers.Contract(
+    await liveVerifier.INNER_VERIFIER(),
+    getAbi("MultiProofVerifier"),
+    l1Provider
+  );
+  const ziskRangeVerifier: string = await liveMultiProofVerifier.ZISK_RANGE_VERIFIER();
+
   const genesisUpgrade: string = await ctm.l1GenesisUpgrade();
 
   const bridgehubAddr: string = await ctm.BRIDGE_HUB();
@@ -657,6 +660,7 @@ async function readLiveUpgradeInputs(
     ecosystemProxyAdmin: await readAddressSlot(messageRootProxy, EIP1967_ADMIN_SLOT),
     messageRootProxy,
     messageRootImplOld: await readAddressSlot(messageRootProxy, EIP1967_IMPL_SLOT),
+    ziskRangeVerifier,
   };
 }
 
@@ -826,6 +830,7 @@ async function deployUpgradeImplementations(
     rollupDAManager: string;
     bridgehub: string;
     chainAssetHandler: string;
+    ziskRangeVerifier: string;
   }
 ): Promise<DeployedImplementations> {
   const deployFrom = async (
@@ -876,10 +881,17 @@ async function deployUpgradeImplementations(
     newCommitterFacet: await deployDeterministic("CommitterFacet", [params.l1ChainId]),
     newDefaultUpgrade: await deployDeterministic("DefaultUpgrade", []),
     newDiamondInit: await deployDeterministic("DiamondInit", []),
-    // The ZKsync OS testnet verifier over the plonk sub-verifier deployed above; no proofs are
-    // verified in this harness.
+    // A multi-proof testnet verifier like the live one: the ZKsync OS testnet verifier over the plonk
+    // sub-verifier deployed above, next to the live ZiSK side. Interop chains require the second
+    // proof system ({protocol-docs/interop-gating.md#second-proof-system-requirement}), so a
+    // single-proof verifier would not be accepted. No proofs are verified in this harness.
     newVerifierPlonk,
-    newVerifier: await deployDeterministic("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
+    newVerifier: await deployDeterministic("MultiProofTestnetVerifier", [
+      await deployDeterministic("MultiProofVerifier", [
+        await deployDeterministic("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
+        params.ziskRangeVerifier,
+      ]),
+    ]),
     // Ecosystem leg: a fresh L1MessageRoot implementation with the live immutable values.
     newMessageRootImpl: await deployDeterministic("L1MessageRoot", [params.bridgehub, params.chainAssetHandler]),
   };

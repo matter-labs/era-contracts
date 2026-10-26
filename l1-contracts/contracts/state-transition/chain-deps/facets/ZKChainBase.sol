@@ -28,6 +28,7 @@ import {
 } from "../../../common/Config.sol";
 import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IZKsyncOSVerifier} from "../../chain-interfaces/IZKsyncOSVerifier.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 
@@ -181,6 +182,11 @@ contract ZKChainBase is ReentrancyGuard {
             s.__DEPRECATED_priorityQueue.head = startIndex;
             s.__DEPRECATED_priorityQueue.tail = startIndex;
         }
+    }
+
+    /// @notice Returns the real proof format the chain accepts under its current verifier and disabled proof systems.
+    function _getProofMode() internal view returns (uint256) {
+        return IZKsyncOSVerifier(address(s.verifier)).getProofMode(s.disabledProofSystems);
     }
 
     function _getTotalPriorityTxs() internal view returns (uint256) {

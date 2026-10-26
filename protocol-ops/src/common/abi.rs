@@ -163,15 +163,6 @@ pub mod i_deploy_l1_core_contracts {
 }
 pub use i_deploy_l1_core_contracts::IDeployL1CoreContractsAbi;
 
-pub mod i_register_on_all_chains {
-    alloy::sol!(
-        #[sol(rpc)]
-        IRegisterOnAllChainsAbi,
-        "../l1-contracts/zkstack-out/IRegisterOnAllChains.sol/IRegisterOnAllChains.json"
-    );
-}
-pub use i_register_on_all_chains::IRegisterOnAllChainsAbi;
-
 pub mod il1_native_token_vault {
     alloy::sol!(
         #[sol(rpc)]

@@ -2,7 +2,7 @@
 // probes the upstream chain). Read it via `runtimeConfig.l1ChainId` from
 // `./runtime-config` instead of importing a constant from here.
 
-import { utils } from "ethers";
+import { BigNumber, utils } from "ethers";
 
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
@@ -57,6 +57,10 @@ export const ANVIL_RECIPIENT_ADDR = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
+
+// Chain ID under which `L1NativeTokenVault` records the interop pool's totals:
+// uint256(keccak256("interop.pool")) - 1, as `INTEROP_POOL_CHAIN_ID` in Config.sol.
+export const INTEROP_POOL_CHAIN_ID = BigNumber.from(utils.id("interop.pool")).sub(1);
 
 // Default gas limits for test transactions.
 // Every interop send is atomic: it appends the leg's commit value to the chain's {L2InteropCommitmentTree}
@@ -198,3 +202,47 @@ export const FAILING_INTEROP_CALL_REASON = "Intentional interop receiver failure
 // From SemVer.sol: bit offsets of the minor and major components in a packed protocol version.
 export const SEMVER_MINOR_OFFSET = 32;
 export const SEMVER_MAJOR_OFFSET = 64;
+
+// Deposit encoding version of the consent-free registration that `ChainRegistrationSender.bridgehubDeposit`
+// accepted before the interop peer whitelist, see {protocol-docs/interop-gating.md#legacy-registrations}.
+export const LEGACY_CHAIN_REGISTRATION_ENCODING_VERSION = "0x01";
+
+// Bounds, in ether, of the random deposit the upgrade test makes to each gated chain before the upgrade, which
+// governance then backfills, see {protocol-docs/interop-gating.md#backfill-amounts}.
+export const PRE_UPGRADE_DEPOSIT_MIN_ETH = "1";
+export const PRE_UPGRADE_DEPOSIT_MAX_ETH = "10";
+
+// ── Batch settlement (src/helpers/batch-settlement.ts) ──────────
+
+// Mirrors IExecutor.StoredBatchInfo.
+export const STORED_BATCH_INFO_TUPLE_TYPE =
+  "tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 dependencyRootsRollingHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)";
+// Mirrors CommitBatchInfoZKsyncOS in contracts/state-transition/chain-interfaces/ICommitter.sol, which
+// gained the trailing `interopFeeUnits` with commit encoding version 6.
+const COMMIT_BATCH_INFO_ZKSYNC_OS_FIELDS =
+  "uint64 batchNumber, bytes32 newStateCommitment, uint256 numberOfLayer1Txs, uint256 numberOfLayer2Txs, bytes32 priorityOperationsHash, bytes32 dependencyRootsRollingHash, bytes32 l2LogsTreeRoot, uint8 daCommitmentScheme, bytes32 daCommitment, uint64 firstBlockTimestamp, uint64 firstBlockNumber, uint64 lastBlockTimestamp, uint64 lastBlockNumber, uint256 chainId, bytes operatorDAInput, uint256 slChainId, bytes32 chainConfigHash";
+export const COMMIT_BATCH_INFO_ZKSYNC_OS_TUPLE_TYPE = `tuple(${COMMIT_BATCH_INFO_ZKSYNC_OS_FIELDS}, uint256 interopFeeUnits)`;
+export const COMMIT_BATCH_INFO_ZKSYNC_OS_V5_TUPLE_TYPE = `tuple(${COMMIT_BATCH_INFO_ZKSYNC_OS_FIELDS})`;
+// Mirrors BatchDecoder.DecodedExecuteData (with PriorityOpsBatchInfo and InteropRoot).
+export const DECODED_EXECUTE_DATA_TUPLE_TYPE = `tuple(${STORED_BATCH_INFO_TUPLE_TYPE}[] batchesData, tuple(bytes32[] leftPath, bytes32[] rightPath, bytes32[] itemHashes)[] priorityOpsData, tuple(uint256 chainId, uint256 blockOrBatchNumber, uint256 timestamp, bytes32[] sides)[][] dependencyRoots)`;
+
+// From BatchDecoder.sol. The commit encoding was 5 up to v0.34 and is 6 from v0.35 on.
+export const COMMIT_ENCODING_VERSION = 6;
+export const COMMIT_ENCODING_VERSION_V5 = 5;
+export const COMMIT_ENCODING_VERSION_6_FIRST_MINOR = 35;
+export const PROOF_ENCODING_VERSION = 1;
+export const EXECUTE_ENCODING_VERSION = 2;
+
+// From Config.sol.
+export const EMPTY_STRING_KECCAK = utils.keccak256("0x");
+export const GENESIS_BATCH_COMMITMENT = utils.hexZeroPad("0x01", 32);
+export const ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
+export const ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
+export const PUBLIC_INPUT_SHIFT = 32;
+
+// L2DACommitmentScheme.EMPTY_NO_DA, from Config.sol.
+export const L2_DA_COMMITMENT_SCHEME_EMPTY_NO_DA = 1;
+// `genesis_root` of configs/genesis/zksync-os/latest.json on draft/v0.34.0, which the chains of the frozen
+// v0.34.0 chain states were created from. Their legacy CTM keeps only the hash of batch zero, not its fields.
+// `yarn new-release` does not move it: it changes together with run-upgrade-test.ts's `v35-*.toml` templates.
+export const V0_34_ZKSYNC_OS_GENESIS_ROOT = "0x3ff401323b3f14c4b0d098138892ff1571208e2387b95cd5d987319cf06e9f59";

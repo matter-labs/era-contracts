@@ -6,8 +6,12 @@ import { ANVIL_RECIPIENT_ADDR } from "../../src/core/const";
 import { getL1RpcUrl, getL2RpcUrl, getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 import { randomBigNumber } from "../../src/helpers/balance-helpers";
 
-const ETH_AMOUNT_MIN = ethers.utils.parseEther("0.1");
-const ETH_AMOUNT_MAX = ethers.utils.parseEther("0.5");
+// The GW-settled chain has no interop, so L1 caps its withdrawals at what was deposited into it
+// ({protocol-docs/interop-gating.md#per-chain-balance-cap}): the withdrawal stays below the deposit.
+const DEPOSIT_AMOUNT_MIN = ethers.utils.parseEther("0.5");
+const DEPOSIT_AMOUNT_MAX = ethers.utils.parseEther("1");
+const WITHDRAWAL_AMOUNT_MIN = ethers.utils.parseEther("0.1");
+const WITHDRAWAL_AMOUNT_MAX = ethers.utils.parseEther("0.5");
 
 describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
   this.timeout(0);
@@ -33,7 +37,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         l2RpcUrl: getL2RpcUrl(state, gwSettledChainId),
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
-        amount: randomBigNumber(ETH_AMOUNT_MIN, ETH_AMOUNT_MAX),
+        amount: randomBigNumber(DEPOSIT_AMOUNT_MIN, DEPOSIT_AMOUNT_MAX),
         recipient: ANVIL_RECIPIENT_ADDR,
         gwRpcUrl: getL2RpcUrl(state, gwChainId),
       });
@@ -47,7 +51,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         l2RpcUrl: getL2RpcUrl(state, gwSettledChainId),
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
-        amount: randomBigNumber(ETH_AMOUNT_MIN, ETH_AMOUNT_MAX),
+        amount: randomBigNumber(WITHDRAWAL_AMOUNT_MIN, WITHDRAWAL_AMOUNT_MAX),
         l1Recipient: ANVIL_RECIPIENT_ADDR,
       });
     });

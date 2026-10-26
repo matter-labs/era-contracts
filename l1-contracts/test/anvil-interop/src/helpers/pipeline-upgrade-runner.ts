@@ -6,6 +6,8 @@
  * pre-generated anvil chain states of the departing version:
  *
  *   1. Load the frozen chain states (`chain-states/<stateVersion>`) and select target chains.
+ *      Settle one batch on each (see batch-settlement.ts): the fixtures' chains never settled one,
+ *      so their genesis upgrade is still pending and would block the upgrade.
  *   2. Normalize L1 ownership (fixtures leave contracts with the deployer; governance needs them).
  *   3. (Only when the scenario asks for it) install the pre-v35 cut-taking entrypoint
  *      (`LegacyTestAdminFacet`) on the target chains. A fixture frozen from a branch whose
@@ -71,14 +73,16 @@ import {
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
+import { BatchSettler } from "./batch-settlement";
+import type { GenesisBatchParams } from "./batch-settlement";
+import { transferOwnable2Step } from "./harness-shims";
 import {
   assertCtmTransitionApplied,
   assertLegsApplied,
-  clearGenesisUpgradeTxHash,
   discoverDomainExecutors,
   findLegExecution,
   readProxyAdmin,
+  keepL1SettledChains,
   readProxyImplementation,
   selectUpgradeChains,
   snapshotProxyUpgradeLegs,
@@ -99,6 +103,8 @@ import { l1GasOverrides, recordL1TransactionGas } from "./l1-transaction-gas";
 import { createProvider, impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
+import type { GatedChain } from "./upgrade-interop-gating";
+import { depositBeforeUpgrade, registerLegacyInteropPair, runInteropGatingProcedure } from "./upgrade-interop-gating";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -148,7 +154,8 @@ export type PipelineUpgradeScenario = {
    * (the anvil L2s cannot force-deploy, so the harness `anvil_setCode`s it).
    */
   l2DelegateBytecodeName: ContractName;
-  clearGenesisUpgradeTxHash?: boolean;
+  /** Genesis parameters of the CTM the `stateVersion` chains were created from (see batch-settlement.ts). */
+  sourceGenesis: GenesisBatchParams;
   /**
    * Install `LegacyTestAdminFacet` before governance. Needed ONLY for fixtures whose Admin
    * facet is the cut-READING (v35+) variant; a fixture with the real pre-v35 cut-taking facet
@@ -162,6 +169,11 @@ export type PipelineUpgradeScenario = {
    * legs, and every chain crosses through the cut-READING `upgradeChainFromVersion` (see runRecurringHop).
    */
   followUps?: RecurringUpgradeHop[];
+  /**
+   * Registers the first two target chains with each other before the upgrade and takes them through
+   * {protocol-docs/interop-gating.md#order-per-chain} after it, before any follow-up hop.
+   */
+  checkInteropGating?: boolean;
 };
 
 export type RecurringUpgradeHop = {
@@ -187,8 +199,8 @@ export type RecurringUpgradeHop = {
   /**
    * Run this hop with the previous upgrade's L2 transaction still PENDING, and assert it survives
    * untouched. Only a patch edge may do this: `BaseZkSyncUpgrade` deliberately skips the
-   * "previous upgrade finalized" check when the minor version does not change. Every other hop
-   * has the pending hash cleared first, since these sequencer-less chains never finalize it.
+   * "previous upgrade finalized" check when the minor version does not change. Before every other
+   * hop a batch carrying it is settled first.
    */
   keepsPendingL2Upgrade?: boolean;
   /** Assert this hop re-pointed the MessageRoot proxy at a freshly deployed implementation. */
@@ -210,20 +222,40 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
     const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
-    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
-    if (upgradeChainAddresses.length === 0) {
-      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
-    }
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) {
       throw new Error("L1 chain not started");
     }
     const l1Provider = createProvider(l1Chain.rpcUrl);
+    const upgradeChainAddresses = await keepL1SettledChains(
+      l1Provider,
+      l1Addresses.bridgehub,
+      selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles)
+    );
+    if (upgradeChainAddresses.length === 0) {
+      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
+    }
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+    const gatingContext = { l1Provider, chainAdminOwner: defaultSigner, l1Addresses };
+    const gatedChains = scenario.checkInteropGating ? selectGatedChains(anvilManager, upgradeChainAddresses) : null;
+    if (gatedChains) {
+      console.log("\n── Registering a legacy interop pair ──");
+      await registerLegacyInteropPair(gatingContext, ...gatedChains);
+      console.log("\n── Depositing to the gated chains before the upgrade ──");
+      for (const chain of gatedChains) {
+        await depositBeforeUpgrade(gatingContext, chain);
+      }
+    }
 
     const ctm = new ethers.Contract(ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
     const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
     console.log(`\nDeparting protocol version: ${oldVersion.toHexString()}`);
+
+    // ── Settle the fixture chains' genesis upgrade batch ──
+    // Before the ownership handover: the default account is still the chains' admin here.
+    console.log("\n── Settling a batch on each target chain ──");
+    const settler = await BatchSettler.create(defaultSigner, upgradeChainAddresses, scenario.sourceGenesis);
+    await settler.settleNextBatch(upgradeChainAddresses);
 
     // ── Transfer L1 contract ownership to governance ──
     console.log("\n── Preparing L1 ownership for upgrade ──");
@@ -316,6 +348,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
 
     // ── Execute the governance bundle via protocol-ops ──
+    const lastPreUpgradeBlock = await l1Provider.getBlockNumber();
     console.log("\n── Replaying the governance bundle ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
@@ -348,12 +381,6 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
       governance: l1Addresses.governance,
     });
 
-    // ── Prepare diamond state for chain upgrades ──
-    if (scenario.clearGenesisUpgradeTxHash) {
-      console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
-      await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
-    }
-
     // ── Per-chain legacy crossing + L2 relay ──
     await runLegacyChainLegAndRelayL2({
       l1Provider,
@@ -376,6 +403,11 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     });
     await verifyInteropFeeManager(l1Provider, ctmAddresses.chainTypeManager, l1Addresses.bridgehub);
     console.log("✅ Pipeline upgrade scenario verified successfully!\n");
+    if (gatedChains) {
+      console.log("── Replacing the legacy interop pair with an allowed one ──");
+      await runInteropGatingProcedure(gatingContext, lastPreUpgradeBlock, ...gatedChains);
+      console.log("✅ Interop gating procedure verified\n");
+    }
 
     // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
     // forward the way a production env file does.
@@ -387,6 +419,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
         l1Addresses,
         ctmAddresses,
         upgradeChainAddresses,
+        settler,
         eip7702Checker: reportedEip7702Checker,
         executorRecords: mergedEcosystemToml,
         reviewedBuildHashes,
@@ -479,6 +512,7 @@ async function runRecurringHop(
     l1Addresses: { bridgehub: string; governance: string; messageRoot: string };
     ctmAddresses: { chainTypeManager: string };
     upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
+    settler: BatchSettler;
     /** The live EIP-7702 checker as the previous hop's prepare reported it. */
     eip7702Checker?: string;
     /** The bootstrap package: the records of the executors every hop runs through. */
@@ -493,8 +527,8 @@ async function runRecurringHop(
   const oldVersion: ethers.BigNumber = await ctm.protocolVersion();
   console.log(`  departing protocol version: ${oldVersion.toHexString()}`);
 
-  // The previous hop's L2 leg is still "pending" on these sequencer-less chains (see module docs),
-  // which blocks a MINOR upgrade. A patch hop deliberately keeps it, to prove it survives.
+  // The previous hop's L2 leg is pending until a batch carrying it is executed, which blocks a
+  // MINOR upgrade. A patch hop deliberately keeps it, to prove it survives.
   const pendingL2TxHashes = new Map<number, string>();
   if (hop.keepsPendingL2Upgrade) {
     for (const chain of upgradeChainAddresses) {
@@ -507,7 +541,7 @@ async function runRecurringHop(
     }
     console.log("  keeping the pending L2 upgrade transaction: a patch must not disturb it");
   } else {
-    await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
+    await ctx.settler.settleNextBatch(upgradeChainAddresses);
   }
 
   const hopScenario: PipelineUpgradeScenario = {
@@ -776,6 +810,23 @@ async function runRecurringHop(
 }
 
 // ── Shared tx helper ─────────────────────────────────────────────────
+
+function selectGatedChains(
+  anvilManager: AnvilManager,
+  upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>
+): [GatedChain, GatedChain] {
+  if (upgradeChainAddresses.length < 2) {
+    throw new Error(`The interop gating check needs two upgraded chains, got ${upgradeChainAddresses.length}`);
+  }
+  const [chain, peer] = upgradeChainAddresses.slice(0, 2).map(({ chainId, diamondProxy }) => {
+    const l2Chain = anvilManager.getL2Chains().find((c) => c.chainId === chainId);
+    if (!l2Chain) {
+      throw new Error(`Missing running L2 chain ${chainId}`);
+    }
+    return { chainId, diamondProxy, provider: createProvider(l2Chain.rpcUrl) };
+  });
+  return [chain, peer];
+}
 
 async function sendAndCheck(
   provider: ethers.providers.JsonRpcProvider,
@@ -1255,11 +1306,6 @@ async function runLegacyChainLegAndRelayL2(params: {
 
   for (const chain of params.upgradeChainAddresses) {
     console.log(`\n── Chain ${chain.chainId}: legacy handed-cut crossing ──`);
-
-    // The per-chain upgrade requires `totalBatchesCommitted == totalBatchesExecuted`. On a
-    // forked chain with uncommitted-but-pending batches at fork time, model the "all batches
-    // executed" prerequisite without running the executor.
-    await forceBatchExecutedEqualsCommitted(params.l1Provider, chain.diamondProxy);
 
     await crossBootstrapEdgeOnChains(params.l1Provider, [chain], params.oldVersion, params.cut, sendAndCheck);
 

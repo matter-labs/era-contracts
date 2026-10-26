@@ -2199,7 +2199,7 @@ mod tests {
                 CTM_ADMIN,
             );
             for (proxy, admin) in [(BRIDGEHUB, ECO_ADMIN), (CTM, CTM_ADMIN)] {
-                l1.storage(proxy, EIP1967_PROXY_ADMIN_SLOT.into(), admin.into_word());
+                l1.storage(proxy, EIP1967_PROXY_ADMIN_SLOT, admin.into_word());
             }
             // The CTM: registered on the reviewed Bridgehub or not, built over another one, at the
             // manifest's departing version with nobody nominated, and naming `TIMELOCK`.
