@@ -16,10 +16,9 @@ Nothing is compiled per run: the image is what gets released and tested.
    `gh workflow run build-docker.yaml --ref <release branch> -f ref=<commit> -f tested_with_integration_tests=true -f integration_tests_run_url=<that run>`.
    `--ref` picks the copy of the workflow that runs, so use the release branch's. It refuses to push
    without the two inputs. Before pushing, it checks the image's contract build against its
-   `AllContractsHashes.json`, runs the anvil-interop upgrade test (`run-upgrade-test.ts`: the
-   previous release's chain states, upgraded with this image's `protocol_ops`) inside the image, and
-   runs the generate, handoff and deploy commands through `protocol-ops.sh --tag` against the same
-   fixture, then the governance calls and a partner's chain commands (`set-upgrade-timestamp`,
+   `AllContractsHashes.json`, runs the generate, handoff and deploy commands through
+   `protocol-ops.sh --tag` against the anvil-interop fixture (the previous release's chain states),
+   then the governance calls and a partner's chain commands (`set-upgrade-timestamp`,
    `add-validator`) with `docker run`, as the partner guide does (`.github/tests/release-flow.sh`).
    The run summary gives the digest.
 4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata`, the chain
@@ -34,12 +33,10 @@ Nothing is compiled per run: the image is what gets released and tested.
    post-upgrade test calls). That is the rehearsal in the target's own state.
 
 The calldata workflows refuse an image without the `org.opencontainers.image.revision` label
-`build-docker` sets (such as those `build-and-push-docker` pushes), and run it with the configs it was
-built with: `protocol-ops.sh` mounts the checkout's `upgrade-envs/` only when the checkout is the
-image's commit, unedited (the ecosystem workflows check that commit out), and otherwise runs only with
-`PROTOCOL_OPS_REQUIRE_RELEASE=1` (the chain workflows, whose outputs go through `EXTRA_MOUNTS`). A
-change to `upgrade-envs/` (salts, owners, presets) therefore needs a new image. Our deployer keys
-serve only `stage`, `testnet` and `mainnet`.
+`build-docker` sets (such as those `build-and-push-docker` pushes). `protocol-ops.sh --tag` runs the
+image's own configs and mounts only output directories from the checkout, so a change to
+`upgrade-envs/` (salts, owners, presets) needs a new image. Our deployer keys serve only `stage`,
+`testnet` and `mainnet`.
 
 ## Mapping
 

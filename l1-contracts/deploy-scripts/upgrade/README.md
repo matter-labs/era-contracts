@@ -15,8 +15,8 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
 `chain set-upgrade-timestamp` go through `AdminFunctions.s.sol`. In a rollout `protocol_ops` runs in
 the released image, from the root of a checkout of its commit (`./protocol-ops.sh --tag sha256:<digest>`,
 as below; [release flow](../../../.github/workflows/README.md#release-flow)). File arguments are then
-paths in the image: under `l1-contracts/upgrade-envs/` or `l1-contracts/script-out/`, which the wrapper
-mounts, or mounted with `EXTRA_MOUNTS`.
+paths in the image: the image's own files, `l1-contracts/script-out/` and each upgrade's `output/`
+(the wrapper mounts those from the checkout), or what `EXTRA_MOUNTS` mounts.
 
 ## Layout
 

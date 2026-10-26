@@ -276,7 +276,8 @@ jobs:
           cat "$META"
           bundle_run="$(jq -r '.generated_by.workflow_run // empty' "$META")"
           bundle_env="$(jq -r '.env // empty' "$META")"
-          bundle_dirty="$(jq -r 'if has("contracts_worktree_dirty") then (.contracts_worktree_dirty | tostring) else empty end' "$META")"
+          # Absent for a bundle generated in the image (bundle.rs, `contracts_worktree_dirty`).
+          bundle_dirty="$(jq -r '.contracts_worktree_dirty // false' "$META")"
           if [ "$bundle_run" != "$GENERATE_RUN_URL" ]; then
             echo "::error::bundle provenance run '$bundle_run' does not match proven run '$GENERATE_RUN_URL'"; exit 1
           fi

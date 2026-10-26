@@ -306,7 +306,8 @@ jobs:
           fi
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
-      # So that protocol-ops.sh mounts its upgrade-envs/, where the outputs land.
+      # So that the configs checked below are the image's, and protocol-ops.sh mounts the
+      # upgrade's output/, where the outputs land.
       - name: Checkout the image's revision
         uses: actions/checkout@v4
         with:
@@ -418,7 +419,7 @@ jobs:
           set -euo pipefail
           OUT="l1-contracts/upgrade-envs/$UPGRADE/output/$ENVIRONMENT"
           # Relative paths resolve the same inside the image (its workdir is
-          # the contracts root, with upgrade-envs mounted from this checkout).
+          # the contracts root, with $OUT mounted from this checkout).
           po() { bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" "$@"; }
           # $DEPLOYER_ADDR (resolved earlier) is the Camp-A signer. Its bundles
           # are dropped from the sim-inputs: they're broadcast to the real chain,
@@ -536,7 +537,7 @@ jobs:
             echo "commit=$commit"
           } >> "$GITHUB_OUTPUT"
 
-      # protocol-ops.sh, and its upgrade-envs/ for the replay's outputs.
+      # protocol-ops.sh, and the upgrade's output/ it mounts for the replay's outputs.
       - name: Checkout the bundle's commit
         uses: actions/checkout@v4
         with:

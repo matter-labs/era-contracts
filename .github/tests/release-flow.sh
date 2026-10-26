@@ -11,8 +11,8 @@
 #             checked on L1. Not `chain upgrade`: the fixture's chains still have the previous
 #             upgrade's L2 transaction pending, which an L1-only fixture can't finalize.
 # The commands only: every phase runs this checkout in one unpushed image, so the bundle names no
-# registry digest; the workflows' digest and commit checks are bundle-image-checks.test.cjs. The bundle
-# is still copied out and mounted read-only, as their downloaded artifact is.
+# registry digest, and the workflows' own digest and commit checks don't run here. The bundle is still
+# copied out and mounted read-only, as their downloaded artifact is.
 #
 # Runs in the image PROTOCOL_OPS_TAG names (build-docker.yaml; Linux, for the host network), else from
 # this checkout. Needs anvil, cast and jq.
@@ -159,7 +159,7 @@ export EXTRA_MOUNTS="$bundle:$bundle:ro $result:$result"
 po ecosystem replay-bundle --bundle "$bundle" --fork-url "$L1"
 if [[ -n "${PROTOCOL_OPS_TAG:-}" ]] && ! jq -e --arg tag "$PROTOCOL_OPS_TAG" --arg commit "$(git rev-parse HEAD)" \
   '(.protocol_ops_image.reference | endswith($tag)) and .contracts_commit == $commit
-   and .contracts_worktree_dirty == false and (.zk_governance_commit | length) == 40' \
+   and (has("contracts_worktree_dirty") | not) and (.zk_governance_commit | length) == 40' \
   "$bundle/bundle-metadata.json" >/dev/null; then
   echo "error: $bundle/bundle-metadata.json does not record the image and its commits" >&2
   exit 1

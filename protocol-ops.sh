@@ -22,19 +22,19 @@
 #   ./protocol-ops.sh forge script deploy-scripts/Foo.s.sol --rpc-url …
 #   ./protocol-ops.sh --tag sha256:<digest> cast call 0xaddr 'foo()(uint256)' --rpc-url …
 #
+# Docker mode runs the image's own configs (l1-contracts/upgrade-envs/). Only
+# outputs are mounted from this checkout: l1-contracts/script-out/ and, for every
+# upgrade here with an upgrade.toml, its output/ directory, so `--env <env>`
+# writes land in upgrade-envs/<v>/output/<env>/ on the host.
+#
 # Environment:
 #   EXTRA_MOUNTS     — Docker mode: space-separated host:container mount pairs,
-#                      e.g. "/tmp/cfg:/contracts/cfg". Use this to point output
-#                      somewhere other than the in-tree default (the host's
-#                      l1-contracts/upgrade-envs/, mounted when it is the
-#                      image's own, so `--env <env>` writes land in
-#                      upgrade-envs/<v>/output/<env>/ on the host).
+#                      e.g. "/tmp/out:/contracts/out", for `--out` and inputs
+#                      such as a deploy bundle.
 #   PROTOCOL_OPS_REQUIRE_RELEASE=1
-#                    — Docker mode: refuse an image without the
+#                    — refuse local mode and an image without the
 #                      org.opencontainers.image.revision label, i.e. one not
-#                      released by build-docker.yaml, and run it with its own
-#                      upgrade-envs/ from any checkout (outputs only through
-#                      EXTRA_MOUNTS). The chain workflows and
+#                      released by build-docker.yaml. The chain workflows and
 #                      execute-deployer-safe-bundles set it.
 #   PROTOCOL_OPS_BIN — Local mode only: path to a pre-built protocol_ops
 #                      binary. If unset, the wrapper runs `cargo build
@@ -155,30 +155,10 @@ if [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" == "1" && -z "$IMAGE_REVISION" ]]; the
   echo "Error: ${IMAGE} has no revision label (org.opencontainers.image.revision): release an image with build-docker.yaml" >&2
   exit 1
 fi
-
-# The image reads its own `l1-contracts/upgrade-envs/`. The host's is mounted
-# over it, so `--env <env>` writes (Safe bundles, manifest.json, ecosystem.toml)
-# land in the in-tree path (upgrade-envs/<v>/output/<env>/) the operator
-# commits, only when the two are the same: this checkout at the image's revision
-# with no edits outside the outputs, or an image without a revision (a local
-# build, never a release). Otherwise those writes would be lost with the
-# container, so that takes PROTOCOL_OPS_REQUIRE_RELEASE=1.
-HOST_UPGRADE_ENVS="${ERA_PATH}/l1-contracts/upgrade-envs"
-mount_upgrade_envs=""
-if [[ -z "$IMAGE_REVISION" ]]; then
-  mount_upgrade_envs=1
-elif head="$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" && [[ "$head" == "$IMAGE_REVISION" ]] &&
-  edits="$(git -C "$ERA_PATH" status --porcelain --untracked-files=all -- l1-contracts/upgrade-envs \
-    ':(exclude,glob)l1-contracts/upgrade-envs/*/output/**')" && [[ -z "$edits" ]]; then
-  mount_upgrade_envs=1
-elif [[ "${PROTOCOL_OPS_REQUIRE_RELEASE:-}" != "1" ]]; then
-  echo "Error: ${IMAGE} is revision ${IMAGE_REVISION}; this checkout is ${head:-unreadable by git (git -C ${ERA_PATH} rev-parse HEAD says why)}${edits:+, with edits in upgrade-envs/:
-${edits}}
-Check that revision out, or set PROTOCOL_OPS_REQUIRE_RELEASE=1 to run with the image's own upgrade-envs/ and take outputs through EXTRA_MOUNTS" >&2
-  exit 1
-else
-  echo "Note: l1-contracts/upgrade-envs/ is the image's own; whatever the command writes there stays in the container" >&2
+if [[ -n "$IMAGE_REVISION" && "$(git -C "$ERA_PATH" rev-parse HEAD 2>/dev/null)" != "$IMAGE_REVISION" ]]; then
+  echo "Warning: ${IMAGE} is revision ${IMAGE_REVISION} and this checkout is not: upgrade-envs/*/output/ is this checkout's, and the outputs of an upgrade it lacks stay in the container" >&2
 fi
+
 HOST_SCRIPT_OUT="${ERA_PATH}/l1-contracts/script-out"
 mkdir -p "${HOST_SCRIPT_OUT}"
 
@@ -201,9 +181,12 @@ docker_args=(
   -e PROTOCOL_OPS_IMAGE_DIGEST="${IMAGE_DIGEST}"
   -v "${HOST_SCRIPT_OUT}:/contracts/l1-contracts/script-out"
 )
-if [[ -n "$mount_upgrade_envs" ]]; then
-  docker_args+=(-v "${HOST_UPGRADE_ENVS}:/contracts/l1-contracts/upgrade-envs")
-fi
+for descriptor in "${ERA_PATH}"/l1-contracts/upgrade-envs/*/upgrade.toml; do
+  [[ -f "$descriptor" ]] || continue
+  output="${descriptor%/upgrade.toml}/output"
+  mkdir -p "$output"
+  docker_args+=(-v "${output}:/contracts/l1-contracts/upgrade-envs/${output#"${ERA_PATH}/l1-contracts/upgrade-envs/"}")
+done
 
 run_args=("$TOOL" "$@")
 

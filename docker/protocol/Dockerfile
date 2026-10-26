@@ -170,7 +170,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.js)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates bash openssl jq curl gnupg lsof && \
+      ca-certificates bash openssl jq curl gnupg && \
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     npm i -g yarn@${YARN_VERSION} && \
@@ -201,10 +201,8 @@ COPY --from=forge-builder /contracts/AllContractsHashes.json /contracts/AllContr
 COPY --from=forge-builder /zk-governance /zk-governance
 
 # Repository files read at runtime: the ZiSK backend pin (the verifier), and the
-# wrapper and hash script the anvil-interop upgrade test calls (build-docker.yaml
-# runs it in the image).
+# hash script build-docker.yaml checks a release's build with.
 COPY --from=forge-builder /contracts/tools/verifier-gen/data/ZiSK_plonk_backend.toml /contracts/tools/verifier-gen/data/ZiSK_plonk_backend.toml
-COPY --from=forge-builder /contracts/protocol-ops.sh /contracts/protocol-ops.sh
 COPY --from=forge-builder /contracts/scripts/calculate-hashes.ts /contracts/scripts/calculate-hashes.ts
 
 # Sanity

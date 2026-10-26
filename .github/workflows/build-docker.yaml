@@ -1,7 +1,7 @@
 name: Build Docker Image
 
-# Builds the protocol-ops image the calldata workflows run and rehearses an
-# upgrade in it; a dispatch also releases it (.github/workflows/README.md#release-flow).
+# Builds the protocol-ops image the calldata workflows run and runs the release
+# flow in it; a dispatch also releases it (.github/workflows/README.md#release-flow).
 
 on:
   push:
@@ -124,19 +124,6 @@ jobs:
       - name: Check the image's contract hashes
         if: github.event_name == 'workflow_dispatch'
         run: docker run --rm "$IMAGE" yarn calculate-hashes:check
-
-      # The anvil-interop upgrade test (anvil-interop-ci.yaml's `upgrade-test`)
-      # run entirely from the image: its protocol_ops, forge, anvil and
-      # artifacts upgrade the previous release's ecosystem
-      # (`upgradeSourceStateVersion` chain states) and its chains to this one.
-      - name: Rehearse the upgrade in the image
-        timeout-minutes: 40
-        run: |
-          docker run --rm --network=host \
-            -e ANVIL_BIN=/usr/local/bin/anvil \
-            -w /contracts/l1-contracts/test/anvil-interop \
-            "$IMAGE" \
-            bash -c 'yarn install --frozen-lockfile && yarn test:upgrade'
 
       # The ecosystem-upgrade workflows' commands, through protocol-ops.sh in this image, then a
       # partner's chain commands, by `docker run` (docs/protocol-ops-for-partners.md). Not on

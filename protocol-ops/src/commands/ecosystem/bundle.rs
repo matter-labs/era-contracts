@@ -138,10 +138,11 @@ pub struct DeployBundleMetadata {
     pub upgrade: String,
     pub env: String,
     pub contracts_commit: String,
-    /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Always false in a
-    /// protocol-ops image built with its commit, which runs that commit's sources and configs (see
-    /// `protocol-ops.sh`).
-    pub contracts_worktree_dirty: bool,
+    /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Absent when
+    /// generated in the protocol-ops image, which has no git: it runs its commit's configs unless
+    /// a `docker run` mounts others, which it can't tell.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contracts_worktree_dirty: Option<bool>,
     pub all_contracts_hashes_sha256: String,
     pub l1: L1Provenance,
     pub deployer_address: Option<Address>,
@@ -294,25 +295,6 @@ fn contracts_commit(repository_root: &Path, image_commit: Option<&str>) -> Strin
         .unwrap_or_else(|| "unknown".to_string())
 }
 
-/// The sources that decide the bundle's bytes and differ from [`contracts_commit`], one per
-/// line (empty when none do), or `None` when that cannot be told.
-fn source_changes(
-    repository_root: &Path,
-    upgrade: &str,
-    image_commit: Option<&str>,
-) -> Option<String> {
-    // The image has no git; see `DeployBundleMetadata::contracts_worktree_dirty`.
-    if image_commit.is_some() {
-        return Some(String::new());
-    }
-    let pathspecs = contract_source_pathspecs(upgrade);
-    let git_status_args: Vec<&str> = ["status", "--porcelain", "--"]
-        .into_iter()
-        .chain(pathspecs.iter().map(String::as_str))
-        .collect();
-    try_capture("git", &git_status_args, repository_root)
-}
-
 /// Every regular file below `directory`, as directory-relative POSIX paths.
 fn list_files(directory: &Path, prefix: &str, out: &mut Vec<String>) -> anyhow::Result<()> {
     for entry in fs::read_dir(directory).with_context(|| format!("list {}", directory.display()))? {
@@ -381,23 +363,29 @@ pub fn pack_deploy_bundle(
         .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
 
     let image_commit = env_value(IMAGE_CONTRACTS_COMMIT_ENV);
-    let source_status = source_changes(repository_root, upgrade, image_commit.as_deref());
-    match source_status.as_deref() {
-        Some("") => {}
-        Some(dirty) => logger::warn(format!(
-            "contract sources differ from the commit; the bundle is marked dirty:
+    let contracts_worktree_dirty = image_commit.is_none().then(|| {
+        let pathspecs = contract_source_pathspecs(upgrade);
+        let git_status_args: Vec<&str> = ["status", "--porcelain", "--"]
+            .into_iter()
+            .chain(pathspecs.iter().map(String::as_str))
+            .collect();
+        let source_status = try_capture("git", &git_status_args, repository_root);
+        match source_status.as_deref() {
+            Some("") => {}
+            Some(dirty) => logger::warn(format!(
+                "contract sources differ from the commit; the bundle is marked dirty:
 {dirty}"
-        )),
-        None => logger::warn("source status unknown; the bundle is marked dirty"),
-    }
+            )),
+            None => logger::warn("git status failed; the bundle is marked dirty"),
+        }
+        source_status.is_none_or(|status| !status.is_empty())
+    });
     let metadata = DeployBundleMetadata {
         schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
         upgrade: upgrade.to_string(),
         env: env_cfg.env.clone(),
         contracts_commit: contracts_commit(repository_root, image_commit.as_deref()),
-        contracts_worktree_dirty: source_status
-            .as_deref()
-            .is_none_or(|status| !status.is_empty()),
+        contracts_worktree_dirty,
         all_contracts_hashes_sha256: sha256_file(&repository_root.join("AllContractsHashes.json"))?,
         l1: L1Provenance {
             chain_id: env_cfg.l1_chain_id(),
@@ -1285,7 +1273,14 @@ mod tests {
             repo.path(),
         )
         .is_some());
-        let status = || source_changes(repo.path(), DEFAULT_UPGRADE, None).unwrap();
+        let status = || {
+            let pathspecs = contract_source_pathspecs(DEFAULT_UPGRADE);
+            let args: Vec<&str> = ["status", "--porcelain", "--"]
+                .into_iter()
+                .chain(pathspecs.iter().map(String::as_str))
+                .collect();
+            try_capture("git", &args, repo.path()).unwrap()
+        };
         assert!(status().is_empty());
         assert_eq!(
             contracts_commit(repo.path(), None),
@@ -1306,11 +1301,7 @@ mod tests {
             assert!(status().is_empty());
         }
 
-        // In the image, which has no git: its own commit, clean.
-        assert_eq!(
-            source_changes(repo.path(), DEFAULT_UPGRADE, Some("abc")).as_deref(),
-            Some("")
-        );
+        // In the image, which has no git: its own commit.
         assert_eq!(contracts_commit(repo.path(), Some("abc")), "abc");
     }
 
@@ -1328,7 +1319,7 @@ mod tests {
             upgrade: DEFAULT_UPGRADE.to_string(),
             env: "stage".to_string(),
             contracts_commit: "test".to_string(),
-            contracts_worktree_dirty: false,
+            contracts_worktree_dirty: Some(false),
             all_contracts_hashes_sha256: "0".repeat(64),
             l1: L1Provenance {
                 chain_id: Some(1),
@@ -1437,7 +1428,7 @@ mod tests {
     }
 
     #[test]
-    fn image_provenance_is_optional_in_the_metadata() {
+    fn image_fields_are_optional_in_the_metadata() {
         let bundle = tempfile::tempdir().unwrap();
         let mut metadata = write_metadata(bundle.path(), &[]);
         let json = serde_json::to_value(&metadata).unwrap();
@@ -1445,6 +1436,7 @@ mod tests {
         let parsed: DeployBundleMetadata = serde_json::from_value(json).unwrap();
         assert_eq!(parsed.protocol_ops_image, None);
 
+        // As generated in the image: no worktree to call dirty.
         metadata.protocol_ops_image = Some(ImageProvenance {
             reference: "ghcr.io/matter-labs/protocol-ops:tag".into(),
             digest: Some(format!(
@@ -1452,9 +1444,12 @@ mod tests {
                 "a".repeat(64)
             )),
         });
-        let parsed: DeployBundleMetadata =
-            serde_json::from_value(serde_json::to_value(&metadata).unwrap()).unwrap();
+        metadata.contracts_worktree_dirty = None;
+        let json = serde_json::to_value(&metadata).unwrap();
+        assert!(json.get("contracts_worktree_dirty").is_none());
+        let parsed: DeployBundleMetadata = serde_json::from_value(json).unwrap();
         assert_eq!(parsed.protocol_ops_image, metadata.protocol_ops_image);
+        assert_eq!(parsed.contracts_worktree_dirty, None);
     }
 
     #[test]
@@ -1541,8 +1536,9 @@ mod tests {
             ["ecosystem.toml", "prepare/01.safe.json", MANIFEST_FILE]
         );
         assert_eq!(metadata.l1.forked_at_block, Some(42));
-        assert!(
+        assert_eq!(
             metadata.contracts_worktree_dirty,
+            Some(true),
             "a non-git directory must count as dirty"
         );
         assert!(bundle.join(BUNDLE_METADATA_FILE).is_file());

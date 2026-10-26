@@ -55,9 +55,8 @@ against the on-chain result before governance signs (step 3).
 
 The local commands below run the image too. `./protocol-ops.sh --tag <tag>` (or
 `--tag sha256:<digest>`) pulls it; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
-Run them from a checkout of the image's commit, unedited: the wrapper mounts its
-`l1-contracts/upgrade-envs/` so outputs land in it, and refuses another checkout for a released
-image.
+Run them from a checkout of the image's commit: the wrapper mounts each upgrade's `output/` from it,
+so outputs land in the checkout. Everything else, configs included, is the image's.
 
 ---
 

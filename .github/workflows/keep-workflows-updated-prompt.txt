@@ -18,7 +18,7 @@ When modifying a workflow:
    correspond to `TODO(v30-removal)` flags in protocol-ops.
 4. Verify the workflow name matches the protocol-ops subcommand's purpose.
 5. Keep the release flow in .github/workflows/README.md true: the image
-   `build-docker` releases (after its gate and rehearsal) is what every
+   `build-docker` releases (after its gate and release flow) is what every
    calldata workflow runs.
 
 Mapping (workflow -> protocol-ops command):
