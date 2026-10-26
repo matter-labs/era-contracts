@@ -30,8 +30,8 @@
  *      through the real `L2ComplexUpgrader`.
  *
  * Harness patches (deviations from production):
- * - `clearGenesisUpgradeTxHash`: no server ever executes a batch on these anvil chains, so the
- *   genesis upgrade transaction stays pending and would block the bump (`PreviousUpgradeNotFinalized`).
+ * - Before the chains are upgraded, one empty batch is settled on each (see batch-settlement.ts):
+ *   with no server, their genesis upgrade would otherwise stay pending and block the bump.
  * - The transition's L2 delegate is placed at its derived address with `anvil_setCode`: the anvil
  *   L2 contract deployer is a no-op stub. The synthetic bump has no L2 init logic, so the no-op
  *   `MockContractDeployer` stand-in is the faithful equivalent.
@@ -70,13 +70,14 @@ import { assertServerNotifierState } from "./bootstrap-upgrade-stage";
 import { l1GasOverrides } from "./l1-transaction-gas";
 import type { ExpectedCall, UpgradeLeg } from "./governance-bundle";
 import type { ChainRole } from "../core/types";
+import { BatchSettler } from "./batch-settlement";
 import {
   assertCtmTransitionApplied,
   assertLegsApplied,
-  clearGenesisUpgradeTxHash,
   discoverDomainExecutors,
   readProxyImplementation,
   selectUpgradeChains,
+  sendAndCheck,
   snapshotProxyUpgradeLegs,
   traceFailedTx,
   upgradeLegCall,
@@ -180,31 +181,6 @@ function assertTrue(condition: boolean, message: string): void {
     throw new Error(`Assertion failed: ${message}`);
   }
   console.log(`  ✓ ${message}`);
-}
-
-async function sendAndCheck(
-  provider: ethers.providers.JsonRpcProvider,
-  txPromise: Promise<ethers.providers.TransactionResponse>,
-  label: string
-): Promise<ethers.providers.TransactionReceipt> {
-  const tx = await txPromise;
-  let receipt: ethers.providers.TransactionReceipt;
-  try {
-    receipt = await tx.wait();
-  } catch (error) {
-    // ethers v5 throws CALL_EXCEPTION on status-0 receipts before we can inspect them.
-    const failed = (error as { receipt?: ethers.providers.TransactionReceipt }).receipt;
-    if (failed) {
-      const trace = await traceFailedTx(provider, failed.transactionHash);
-      throw new Error(`${label} reverted:\n${trace}`);
-    }
-    throw error;
-  }
-  if (receipt.status !== 1) {
-    const trace = await traceFailedTx(provider, receipt.transactionHash);
-    throw new Error(`${label} reverted:\n${trace}`);
-  }
-  return receipt;
 }
 
 /** The `name` events `contract` emitted in `receipt`, decoded. */
@@ -421,9 +397,18 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
     );
     console.log("  ✓ the CTM commits the transition and runs its release; the CTM executor holds the CTM domain");
 
-    // The chains' genesis upgrade tx is still pending on the sequencer-less anvil chains (see
-    // module docs); cleared once, before the first bump.
-    await clearGenesisUpgradeTxHash(l1Provider, upgradeChains);
+    // Settled only now: it sends from the deployer, whose nonces the manifest's addresses depend on.
+    console.log("\n── Settling a batch on each target chain ──");
+    const [, genesisBatchHash, genesisIndexRepeatedStorageChanges] = await new ethers.Contract(
+      live.fromRelease,
+      getAbi("ICTMRelease"),
+      l1Provider
+    ).genesisParams();
+    const settler = await BatchSettler.create(deployer, upgradeChains, {
+      genesisBatchHash,
+      genesisIndexRepeatedStorageChanges,
+    });
+    await settler.settleNextBatch(upgradeChains);
     for (const chain of upgradeChains) {
       await sendAsOwner(
         l1Provider,

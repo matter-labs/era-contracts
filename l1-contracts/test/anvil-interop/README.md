@@ -101,10 +101,12 @@ ANVIL_AMSTERDAM_BIN="$(scripts/install-amsterdam-anvil.sh "$HOME/.cache/anvil-am
 ```
 
 The L1 then runs `--hardfork amsterdam` at mainnet's 60M block gas limit, loaded from a copy of the
-fixture without its block history, which that build cannot parse. The L2s keep `ANVIL_BIN`;
-protocol-ops' forks use the `anvil` on `PATH` (v1.5.1 in CI). A canary first fails the run unless
-the binary's estimates for a few probe transactions match EIP-2780, EIP-7976, EIP-8037 and EIP-8038.
-EIP-8037 state gas lets a deploy's `tx.gas` exceed 2^24, so each L1 transaction declares its estimate.
+fixture without its block history, which that build cannot parse, and with its clock at the current
+time: that build resumes at the fixture's, minutes after 1970, too early to commit a batch. The L2s
+keep `ANVIL_BIN`; protocol-ops' forks use the `anvil` on `PATH` (v1.5.1 in CI). A canary first fails
+the run unless the binary's estimates for a few probe transactions match EIP-2780, EIP-7976, EIP-8037
+and EIP-8038. EIP-8037 state gas lets a deploy's `tx.gas` exceed 2^24, so each L1 transaction
+declares its estimate.
 
 Anvil runs one gas pool where Glamsterdam splits execution gas from a state gas reservoir, so every
 recorded transaction is read back from the node (prestate diff, refund counter, call tree) and
@@ -418,7 +420,7 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **Upgrade harness storage patches**: the upgrade runners apply two direct `anvil_setStorageAt` patches on L1. Before governance, `clearGenesisUpgradeTxHash` clears the genesis-upgrade tx hash the fixture's chains still carry, which a real chain's server clears once it processes the batch and which otherwise blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before each per-chain upgrade, `forceBatchExecutedEqualsCommitted` copies `totalBatchesCommitted` onto `totalBatchesExecuted` so the upgrade's outstanding-batches check passes without a sequencer and prover. Both are test-only compatibility bridges, not a production upgrade flow.
+- **Empty settled batches**: no server runs on the anvil chains, so the fixture chains never settled a batch and still carry their genesis upgrade tx, which blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before upgrading, the upgrade runners commit, prove and execute one empty batch on each target chain through the CTM's `ValidatorTimelock` (`src/helpers/batch-settlement.ts`), proven with the testnet verifier's mock proof and committed against a `ValidiumL1DAValidator` pair the harness sets, as the fixture chains have none. The executed batch clears the upgrade tx hash, as a server's batch carrying it would. The bootstrap scenario settles one again before each follow-up hop that must not inherit the previous hop's pending L2 upgrade.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
 - **Temporary upgrade inputs**: the upgrade harness copies the scenario's config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
