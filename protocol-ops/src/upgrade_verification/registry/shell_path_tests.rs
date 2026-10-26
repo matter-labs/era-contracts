@@ -143,7 +143,8 @@ impl ShellPathFixture {
 
     /// The reads of a transition-only upgrade, in the order `upgrade::verify` makes them.
     pub(super) fn upgrade_reads(&self) {
-        self.unrelated_read(); // eth_chainId for genesis expectations (package names no CTM).
+        // eth_chainId for genesis expectations (no reviewed Bridgehub: nothing past it is read).
+        self.unrelated_read();
         self.transition_reads(false);
         self.code(true); // The CTM executor, whose bound CTM the departing state is read through.
         self.address(CTM);
@@ -153,6 +154,7 @@ impl ShellPathFixture {
         self.address(CTM_EXECUTOR); // CTM owner.
         self.address(CTM_EXECUTOR); // CTM-domain ProxyAdmin owner.
         self.address(Address::ZERO); // CTM pending owner.
+        self.unrelated_read(); // The ValidatorTimelock's owners are outside this regression.
         self.asserter
             .push_success(&Bytes::from(U256::from(OLD_VERSION).abi_encode()));
         self.address(FROM_RELEASE);
@@ -160,11 +162,22 @@ impl ShellPathFixture {
     }
 
     pub(super) fn replacement_reads(&self) {
+        self.replacement_reads_bound(None);
+    }
+
+    /// [`Self::replacement_reads`] with a reviewed Bridgehub: `binding` is whether it registers
+    /// the forward's CTM and the Bridgehub that CTM answers as its `BRIDGE_HUB()`.
+    pub(super) fn replacement_reads_bound(&self, binding: Option<(bool, Address)>) {
         self.transition_reads(true);
         self.code(false); // Replaced transition's unrelated state checks are isolated out.
         self.address(CTM_EXECUTOR);
         self.address(Address::ZERO); // CTM pending owner.
         self.code(false); // CTM executor construction is outside this regression.
+        if let Some((registered, bridgehub)) = binding {
+            self.asserter
+                .push_success(&Bytes::from(registered.abi_encode()));
+            self.address(bridgehub);
+        }
         self.address(GOVERNANCE); // The CTM executor's owner.
         self.address(Address::ZERO); // Its pending owner.
         self.readiness_and_shell_reads();

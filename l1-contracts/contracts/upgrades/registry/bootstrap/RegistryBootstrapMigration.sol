@@ -48,6 +48,9 @@ import {TransitionDerivationLib} from "../libraries/TransitionDerivationLib.sol"
 /// @dev Authority is never parked: `migrate()` acquires nothing it does not hand onward in the same
 ///      transaction. Governance transfers ownership in, the migration executes, and ownership
 ///      leaves to the executors before the call returns.
+/// @dev The CTM-domain `ProxyAdmin`'s transfer in is one-step, and only `migrate()` hands it on
+///      (there is no way back): send that transfer only inside the bundle that runs `migrate()`,
+///      as {RegistryBootstrapSequence.actions} derives it.
 contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStorage {
     /// @notice Set once `migrate` has run. The edge is one-shot: replaying it would re-check a
     ///         starting state that no longer exists anyway, but failing loudly is clearer.

@@ -29,7 +29,7 @@ use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 use alloy::sol_types::{SolCall, SolValue};
 
-use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
+use crate::common::external_actions::ExternalAction;
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::constants::{
@@ -40,6 +40,8 @@ use crate::upgrade_verification::report::VerificationResult;
 use super::construction::{
     canonical_create2_address, constructor_args, expect_canonical_construction, ReviewedBuild,
 };
+use super::declared_calls::{judge_declared_calls, DerivedRun};
+use super::ecosystem_binding::{bind_to_reviewed_ecosystem, EcosystemClaims};
 use super::genesis::ReviewedGenesis;
 use super::lifecycle::{
     verify_executor_owners, verify_lifecycle_construction, CoreExecutorReview, CtmExecutorReview,
@@ -54,7 +56,7 @@ use super::rows::{
 };
 use super::upgrade::{
     cross_check, verify_bytecodes_published, verify_proxy_upgrade_transition, verify_release,
-    Publication,
+    verify_validator_timelock_owner, Publication,
 };
 use super::views::{
     self, BootstrapCall, BridgehubView, CTMUpgradeExecutorView, CtmView,
@@ -178,12 +180,13 @@ pub(crate) async fn verify<P: Provider>(
     ) {
         reviewed.insert(package.migration, "the bootstrap migration".to_string());
     }
+    let reviewed_bridgehub = env.bridgehub().map(|bridgehub| bridgehub.address);
     let mut genesis = genesis.clone();
     genesis
         .force_deployments
         .read_live(
             provider,
-            Some(manifest.ctm),
+            reviewed_bridgehub,
             Some(manifest.governance),
             "the manifest's governance",
         )
@@ -193,6 +196,7 @@ pub(crate) async fn verify<P: Provider>(
     let chains = read_chain_versions(
         provider,
         result,
+        reviewed_bridgehub,
         manifest.ctm,
         manifest.expectedProtocolVersion,
     )
@@ -262,6 +266,20 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
+    bind_to_reviewed_ecosystem(
+        provider,
+        result,
+        env.bridgehub(),
+        &EcosystemClaims {
+            reported_bridgehub: package.reported_singletons.bridgehub,
+            ctms: std::iter::once(manifest.ctm)
+                .chain(package.reported_ctm)
+                .collect(),
+            core_proxy_admin: bindings.core_proxy_admin,
+            ctm_proxy_admin: bindings.ctm.zip(bindings.ctm_proxy_admin),
+        },
+    )
+    .await;
     let sequence = locate_sequence(provider, build, result, package, salts, &mut reviewed).await?;
     render_derived_payloads(provider, result, package.migration).await;
 
@@ -330,6 +348,14 @@ pub(crate) async fn verify<P: Provider>(
         ),
     }
     verify_freeze_authority(provider, result, &manifest).await;
+    verify_validator_timelock_owner(
+        provider,
+        result,
+        manifest.ctm,
+        (manifest.governance, "the manifest's governance"),
+        (&package.calls, &package.external_actions),
+    )
+    .await;
 
     // ── 4. The one-time ServerNotifier handover: a precondition of the edge, half of which
     //    governance cannot perform ──
@@ -427,6 +453,7 @@ pub(crate) async fn verify<P: Provider>(
             departure_unreadable: (!handover.under_ctm_proxy_admin)
                 .then_some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
             reported: package.reported_singletons,
+            reviewed_bridgehub: env.bridgehub(),
         },
     )
     .await?;
@@ -447,11 +474,6 @@ pub(crate) async fn verify<P: Provider>(
             );
             return Ok(());
         };
-        let bridgehub = tolerate(
-            ctm.BRIDGE_HUB().call().await,
-            result,
-            "the CTM's BRIDGE_HUB(), through which the ecosystem rows' proxies are discovered",
-        );
         let outcome = verify_inventory(
             provider,
             build,
@@ -460,9 +482,10 @@ pub(crate) async fn verify<P: Provider>(
                 inventory: Inventory::Ecosystem,
                 rows: core_rows,
                 domain_admin: eco_admin_addr,
-                anchor: bridgehub,
+                anchor: reviewed_bridgehub,
                 departure_unreadable: None,
                 reported: Default::default(),
+                reviewed_bridgehub: env.bridgehub(),
             },
         )
         .await?;
@@ -484,9 +507,8 @@ pub(crate) async fn verify<P: Provider>(
     verify_derived_sequence(provider, result, package, sequence, &authorities).await;
 
     // A bootstrap edge legitimately declares external actions — the derived sequence itself
-    // rides as declared actions, and so do the merge's extras. They are the reviewable list,
-    // so they are PRINTED rather than flagged; what the bundle check above flags is anything
-    // that is neither derived nor declared, or that reaches an authority outside the sequence.
+    // rides as declared actions, and so do the merge's extras. They are the reviewable list, so
+    // they are PRINTED here; the bundle check above holds the bundle to them.
     if package.external_actions.is_empty() {
         result.report_warn(
             "the prepare declared NO external actions, which a bootstrap edge cannot be: its \
@@ -562,18 +584,19 @@ struct ChainVersion {
     verifier: Option<Address>,
 }
 
-/// Every chain the CTM's Bridgehub registers on `ctm`, with its protocol version and, for a chain
-/// at `departing`, the verifier it runs.
+/// Every chain the reviewed Bridgehub registers on `ctm` — never a registry the package's CTM
+/// names, since the verifier a chain here runs is carried over into the release — with its
+/// protocol version and, for a chain at `departing`, the verifier it runs.
 ///
-/// Reads, in order: the CTM's `BRIDGE_HUB()`, the Bridgehub's `getAllZKChainChainIDs()`, then per
-/// chain `chainTypeManager(id)` and, for the CTM's own chains, the CTM's `getProtocolVersion(id)`
-/// — and at the departing version the Bridgehub's `getZKChain(id)` and the chain's
-/// `getVerifier()`. The reads are informational, so a failed one is a warning rather than an
-/// error: an unread verifier only withholds the carry-over, and the release's verifier then fails
-/// on its own.
+/// Reads, in order: the Bridgehub's `getAllZKChainChainIDs()`, then per chain
+/// `chainTypeManager(id)` and, for the CTM's own chains, the CTM's `getProtocolVersion(id)` — and
+/// at the departing version the Bridgehub's `getZKChain(id)` and the chain's `getVerifier()`. The
+/// reads are informational, so a failed one is a warning rather than an error: an unread verifier
+/// only withholds the carry-over, and the release's verifier then fails on its own.
 async fn read_chain_versions<P: Provider>(
     provider: &P,
     result: &mut VerificationResult,
+    bridgehub: Option<Address>,
     ctm: Address,
     departing: U256,
 ) -> Vec<ChainVersion> {
@@ -584,12 +607,9 @@ async fn read_chain_versions<P: Provider>(
         ));
     };
     let ctm_view = CtmView::new(ctm, provider);
-    let bridgehub = match ctm_view.BRIDGE_HUB().call().await {
-        Ok(bridgehub) => BridgehubView::new(bridgehub, provider),
-        Err(e) => {
-            not_enumerable(result, &e);
-            return Vec::new();
-        }
+    let Some(bridgehub) = bridgehub.map(|bridgehub| BridgehubView::new(bridgehub, provider)) else {
+        not_enumerable(result, &"there is no reviewed Bridgehub");
+        return Vec::new();
     };
     let chain_ids = match bridgehub.getAllZKChainChainIDs().call().await {
         Ok(ids) => ids,
@@ -1125,15 +1145,15 @@ async fn verify_derived_sequence<P: Provider>(
 /// The derived calls must appear as one contiguous run, in order and one-for-one, that ENDS the
 /// bundle: the edge's own steps depend on each other (the handovers before `migrate()`), and its
 /// last call is the completion check `validateApplied()` on the migration, so nothing may follow
-/// it. Ahead of that run the merge may prepend its extras — the governance-set wiring, the CTM
-/// `acceptOwnership()` normalization — and every such call is held to the rule the recurring path
-/// enforces: it must be a declared governance external action, or it is an ERROR. One rule is
-/// stricter here. The derived run is the COMPLETE list of what the edge needs from its
-/// authorities (the CTM, both ProxyAdmins, the executors, the objects), so a call to any of them
-/// outside the run is an ERROR whether declared or not: a `transferOwnership` nomination, a second
-/// `applyL1Upgrade`, a `forward` added beside the legitimate calls is exactly how a bundle would
-/// carry authority governance never reviewed, and `validateApplied()` on chain refuses a pending
-/// nomination for the same reason.
+/// it. The derived run is the COMPLETE list of what the edge needs from its authorities (the CTM,
+/// both ProxyAdmins, the executors, the objects), so a call to any of them outside the run is an
+/// ERROR whether declared or not: a `transferOwnership` nomination, a second `applyL1Upgrade`, a
+/// `forward` added beside the legitimate calls is exactly how a bundle would carry authority
+/// governance never reviewed, and `validateApplied()` on chain refuses a pending nomination for
+/// the same reason. That includes the merge's CTM `acceptOwnership()`: a CTM with a nomination
+/// outstanding fails this review, so the nomination must be accepted in an earlier governance
+/// execution, before the bootstrap is prepared. Every other call — the derived run's included —
+/// is held to the one declared-calls rule ([`judge_declared_calls`]).
 fn verify_bundle(
     submitted: &[GovernanceCall],
     derived: &[views::BootstrapAction],
@@ -1204,48 +1224,34 @@ fn verify_bundle(
     }
 
     let in_run = |index: usize| run.is_some_and(|at| (at..at + derived.len()).contains(&index));
-    let mut extras = 0usize;
+    let mut accounted: Vec<(usize, &GovernanceCall)> = Vec::with_capacity(submitted.len());
     for (index, call) in submitted.iter().enumerate() {
-        if in_run(index) {
-            continue;
-        }
-        let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
-        if let Some(what) = authorities.get(&call.target) {
-            extras += 1;
-            result.report_error(&format!(
-                "the bundle calls {what} ({}) with selector 0x{selector} outside the derived \
-                 sequence: the edge's authorities take exactly the derived calls, so an extra \
-                 one — a `transferOwnership` nomination, a second `applyL1Upgrade`, a `forward` \
-                 — is authority the review never saw, whether or not the package declares it",
-                call.target
-            ));
-            continue;
-        }
-        match declared
-            .iter()
-            .find(|action| action.phase == GOVERNANCE_PHASE && action.is_call(call))
-        {
-            Some(action) => result.print_info(&format!(
-                "  bundle -> declared external action `{}` on {} (selector 0x{selector})",
-                action.label, call.target
-            )),
-            None => {
-                extras += 1;
+        if !in_run(index) {
+            if let Some(what) = authorities.get(&call.target) {
+                let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
                 result.report_error(&format!(
-                    "the bundle calls {} (selector 0x{selector}), which is neither derived by the \
-                     sequence nor a declared governance external action: the bundle carries an \
-                     instruction no part of this review accounts for",
+                    "the bundle calls {what} ({}) with selector 0x{selector} outside the derived \
+                     sequence: the edge's authorities take exactly the derived calls, so an extra \
+                     one — a `transferOwnership` nomination, a second `applyL1Upgrade`, a `forward` \
+                     — is authority the review never saw, whether or not the package declares it",
                     call.target
                 ));
+                continue;
             }
         }
+        accounted.push((index, call));
     }
-    if extras == 0 && run.is_some() {
-        result.report_ok(
-            "every submitted call is derived by the sequence or a declared external action to a \
-             target outside the edge's authorities",
-        );
-    }
+    judge_declared_calls(
+        &accounted,
+        declared,
+        &DerivedRun {
+            at: run.map(|at| at..at + derived.len()),
+            name: "the derived run",
+            member: "derived by the sequence",
+            declared: true,
+        },
+        result,
+    );
 }
 
 #[cfg(test)]
@@ -1461,7 +1467,8 @@ mod tests {
             &extra,
         ));
         let result = run(&submitted, &declared);
-        assert_eq!(result.errors, 1);
+        // The authority call, and its now-unmatched declaration.
+        assert_eq!(result.errors, 2);
     }
 
     /// The same for every authority and any selector — a second nomination of the migration on
@@ -1494,12 +1501,13 @@ mod tests {
         let wiring = call(PUH, vec![0x99, 0x88, 0x77, 0x66]);
         let mut submitted = vec![wiring.clone()];
         submitted.extend(submitted_from(&derived));
-        let mut declared = declared_from(&derived);
-        declared.push(ExternalAction::governance(
+        // The merge's order: its extras are declared ahead of the prepare's derived run.
+        let mut declared = vec![ExternalAction::governance(
             "wire the new governance set",
             "governance",
             &wiring,
-        ));
+        )];
+        declared.extend(declared_from(&derived));
         let result = run(&submitted, &declared);
         assert_eq!(result.errors, 0);
     }
@@ -1589,6 +1597,93 @@ mod tests {
             &declared_from(&elsewhere),
         );
         assert_eq!(result.errors, 1);
+    }
+
+    // ── declared external actions: one for one, in declared order, every one present ──
+
+    fn value_transfer() -> GovernanceCall {
+        GovernanceCall {
+            target: PUH,
+            value: U256::from(1_000_000_000_000_000_000u128),
+            data: Vec::new(),
+        }
+    }
+
+    /// `extras ++ derived`, declared in the same order: what the merge produces.
+    fn with_extras(extras: &[GovernanceCall]) -> (Vec<GovernanceCall>, Vec<ExternalAction>) {
+        let derived = derived_bundle();
+        let mut submitted = extras.to_vec();
+        submitted.extend(submitted_from(&derived));
+        let mut declared: Vec<ExternalAction> = extras
+            .iter()
+            .map(|c| ExternalAction::governance("extra", "governance", c))
+            .collect();
+        declared.extend(declared_from(&derived));
+        (submitted, declared)
+    }
+
+    #[test]
+    fn the_merge_shaped_bundle_passes() {
+        let (submitted, declared) = with_extras(&[value_transfer(), call(PUH, vec![0x99, 0x88])]);
+        let result = run(&submitted, &declared);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// Finding 4: a declared value transfer carried twice ahead of the run.
+    #[test]
+    fn a_declared_action_carried_twice_fails() {
+        let (mut submitted, declared) = with_extras(&[value_transfer()]);
+        submitted.insert(0, value_transfer());
+        let result = run(&submitted, &declared);
+        assert!(
+            result.has_error("more often than it is declared"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn a_declared_action_missing_from_the_bundle_fails() {
+        let (mut submitted, declared) = with_extras(&[value_transfer()]);
+        submitted.remove(0);
+        let result = run(&submitted, &declared);
+        assert!(
+            result.has_error("never carries"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn declared_actions_out_of_their_declared_order_fail() {
+        let (a, b) = (
+            call(PUH, vec![0xa1, 0, 0, 1]),
+            call(PUH, vec![0xa1, 0, 0, 2]),
+        );
+        let (mut submitted, declared) = with_extras(&[a, b]);
+        submitted.swap(0, 1);
+        let result = run(&submitted, &declared);
+        assert!(
+            result.has_error("out of their declared order"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    /// The prepare declares the whole derived run; a package that does not is not the merge's.
+    #[test]
+    fn an_undeclared_derived_run_fails() {
+        let derived = derived_bundle();
+        let result = run(&submitted_from(&derived), &[]);
+        assert!(
+            result.has_error("is not declared"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, derived.len() as u64);
     }
 
     // ───────────────────────── the sequence as an oracle ─────────────────────────
@@ -2036,6 +2131,237 @@ mod tests {
         assert!(result.has_error("could not be read"));
     }
 
+    // ───────────────────────── the reviewed Bridgehub, through the real path ─────────────────────
+
+    /// The live state the full-path F1 / L-21 test runs against: the edge's CTM, registered on the
+    /// reviewed Bridgehub (or not), but built over another Bridgehub that answers the ecosystem's
+    /// getters too; a core transition upgrading the ecosystem's `L1MessageRoot`; a timelock owned by
+    /// `timelock_owner`. Everything the four call sites under test do not read is left unanswered,
+    /// alike in every run: the rest of the edge is unverified the same way each time.
+    struct ReviewedRootRun {
+        registered: bool,
+        /// What the reviewed Bridgehub, and the CTM's own Bridgehub, answer as `messageRoot()`.
+        message_root: (Address, Address),
+        timelock_owner: Address,
+    }
+
+    const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+    const CTMS_BRIDGEHUB: Address = Address::repeat_byte(0xF0);
+    const ROOT_PROXY: Address = Address::repeat_byte(0x7A);
+    const OTHER_PROXY: Address = Address::repeat_byte(0x7B);
+    const TIMELOCK: Address = Address::repeat_byte(0x7C);
+
+    impl ReviewedRootRun {
+        fn manifest() -> views::BootstrapManifest {
+            views::BootstrapManifest {
+                expectedProtocolVersion: U256::from(V34),
+                coreExecutor: CORE_EXECUTOR,
+                ..manifest_with(notifier_row())
+            }
+        }
+
+        async fn verify(&self) -> (VerificationResult, super::super::keyed_l1::KeyedL1) {
+            use super::super::genesis::ExpectedForceDeployments;
+            use super::super::views::{BridgehubView, ProxyUpgradeTransitionView};
+            use crate::upgrade_verification::constants::{
+                L1_ECOSYSTEM_CONTRACTS, PROXY_UPGRADE_DOMAIN_CORE,
+            };
+
+            let manifest = Self::manifest();
+            let governance = manifest.governance;
+            let l1 = super::super::keyed_l1::KeyedL1::default();
+            l1.answer(
+                MIGRATION,
+                RegistryBootstrapMigrationView::getManifestCall {},
+                manifest.clone(),
+            );
+            l1.answer(
+                MIGRATION,
+                RegistryBootstrapMigrationView::newProtocolVersionCall {},
+                U256::from(V34 + (1 << 32)),
+            );
+            // The executors, bound to the manifest's domains.
+            l1.code(CORE_EXECUTOR, b"\x60");
+            l1.answer(
+                CORE_EXECUTOR,
+                views::CoreUpgradeExecutorView::PROXY_ADMINCall {},
+                ECO_ADMIN,
+            );
+            l1.code(CTM_EXECUTOR, b"\x60");
+            l1.answer(
+                CTM_EXECUTOR,
+                CTMUpgradeExecutorView::CHAIN_TYPE_MANAGERCall {},
+                CTM,
+            );
+            l1.answer(
+                CTM_EXECUTOR,
+                CTMUpgradeExecutorView::CTM_PROXY_ADMINCall {},
+                CTM_ADMIN,
+            );
+            for (proxy, admin) in [(BRIDGEHUB, ECO_ADMIN), (CTM, CTM_ADMIN)] {
+                l1.storage(proxy, EIP1967_PROXY_ADMIN_SLOT.into(), admin.into_word());
+            }
+            // The CTM: registered on the reviewed Bridgehub or not, built over another one, at the
+            // manifest's departing version with nobody nominated, and naming `TIMELOCK`.
+            l1.answer(
+                BRIDGEHUB,
+                BridgehubView::chainTypeManagerIsRegisteredCall {
+                    _chainTypeManager: CTM,
+                },
+                self.registered,
+            );
+            l1.answer(CTM, CtmView::BRIDGE_HUBCall {}, CTMS_BRIDGEHUB);
+            l1.answer(CTM, CtmView::protocolVersionCall {}, U256::from(V34));
+            l1.answer(CTM, CtmView::pendingOwnerCall {}, Address::ZERO);
+            l1.answer(CTM, CtmView::validatorTimelockPostV29Call {}, TIMELOCK);
+            l1.answer(
+                TIMELOCK,
+                views::Ownable2StepView::ownerCall {},
+                self.timelock_owner,
+            );
+            l1.answer(
+                TIMELOCK,
+                views::Ownable2StepView::pendingOwnerCall {},
+                Address::ZERO,
+            );
+            // The core transition upgrades the ecosystem's `L1MessageRoot` at `ROOT_PROXY`.
+            let mut rows = vec![inert_row(); L1_ECOSYSTEM_CONTRACTS.len()];
+            assert_eq!(L1_ECOSYSTEM_CONTRACTS[2], "L1MessageRoot");
+            rows[2] = ProxyUpgradeRow {
+                proxy: ROOT_PROXY,
+                expectedOldImpl: Address::repeat_byte(0x3C),
+                implNew: Address::repeat_byte(0x3D),
+                callInitializeUpgrade: false,
+            };
+            l1.answer(
+                CORE_TRANSITION,
+                ProxyUpgradeTransitionView::getManifestCall {},
+                views::ProxyUpgradeTransitionManifest {
+                    domain: PROXY_UPGRADE_DOMAIN_CORE,
+                    proxyUpgrades: rows,
+                },
+            );
+            let (reviewed_root, ctms_root) = self.message_root;
+            l1.answer(BRIDGEHUB, BridgehubView::messageRootCall {}, reviewed_root);
+            l1.answer(CTMS_BRIDGEHUB, BridgehubView::messageRootCall {}, ctms_root);
+            l1.answer(CTMS_BRIDGEHUB, BridgehubView::ownerCall {}, governance);
+
+            let mut package = package();
+            package.release = manifest.currentRelease;
+            let genesis = ReviewedGenesis {
+                genesis_root: Err("isolated out".to_string()),
+                image: Err("isolated out".to_string()),
+                force_deployments_data: None,
+                force_deployments: ExpectedForceDeployments::unread(B256::ZERO),
+            };
+            let mut result = VerificationResult::default();
+            verify(
+                &l1.provider(),
+                &ReviewedBuild::from_parts(&[]),
+                &genesis,
+                &package,
+                Some(governance),
+                &[SALT],
+                &ReviewedEnv::for_test(None, Some(BRIDGEHUB)),
+                &mut result,
+            )
+            .await
+            .unwrap();
+            (result, l1)
+        }
+    }
+
+    /// F1 test 8 and OZ L-21, through `bootstrap::verify` itself: the edge's CTM is held against
+    /// the reviewed Bridgehub's registry, every ecosystem read — the ecosystem leg's slots, the
+    /// live force-deployment values, the chain enumeration — starts at the reviewed Bridgehub
+    /// even though the CTM names another, and the ValidatorTimelock is held to governance. Each
+    /// call site, removed or re-anchored on the CTM's `BRIDGE_HUB()`, fails one assertion here.
+    #[tokio::test]
+    async fn the_bootstrap_is_bound_to_the_reviewed_bridgehub() {
+        use super::super::views::BridgehubView;
+        let governance = ReviewedRootRun::manifest().governance;
+        let control_run = ReviewedRootRun {
+            registered: true,
+            message_root: (ROOT_PROXY, OTHER_PROXY),
+            timelock_owner: governance,
+        };
+        let (control, l1) = control_run.verify().await;
+        assert!(
+            control.has_error(&format!(
+                "the CTM {CTM} is built over Bridgehub {CTMS_BRIDGEHUB}, not the reviewed \
+                 {BRIDGEHUB}"
+            )),
+            "{:?}",
+            control.error_messages
+        );
+        assert!(
+            !control.has_error("is not registered on the reviewed Bridgehub")
+                && !control.has_error("L1MessageRoot is")
+                && !control.has_error("ValidatorTimelock"),
+            "{:?}",
+            control.error_messages
+        );
+        for (read, through_reviewed) in [
+            (
+                "the live force-deployment values",
+                l1.called::<BridgehubView::MAX_NUMBER_OF_ZK_CHAINSCall>(BRIDGEHUB),
+            ),
+            (
+                "the chain enumeration",
+                l1.called::<BridgehubView::getAllZKChainChainIDsCall>(BRIDGEHUB),
+            ),
+            (
+                "the ecosystem leg's slots",
+                l1.called::<BridgehubView::messageRootCall>(BRIDGEHUB),
+            ),
+        ] {
+            assert!(
+                through_reviewed,
+                "{read} must be read through the reviewed Bridgehub"
+            );
+        }
+        // The CTM's own Bridgehub is asked only who may freeze the CTM's chains.
+        assert_eq!(
+            l1.selectors_called_on(CTMS_BRIDGEHUB),
+            vec![BridgehubView::ownerCall::SELECTOR],
+            "no ecosystem read follows the CTM's BRIDGE_HUB()"
+        );
+
+        let (unregistered, _) = ReviewedRootRun {
+            registered: false,
+            ..control_run
+        }
+        .verify()
+        .await;
+        assert_eq!(unregistered.errors, control.errors + 1);
+        assert!(unregistered.has_error(&format!(
+            "the CTM {CTM} is not registered on the reviewed Bridgehub {BRIDGEHUB}"
+        )));
+
+        // The CTM's Bridgehub names the row's proxy as the message root; the reviewed one does not.
+        let (relabelled, _) = ReviewedRootRun {
+            message_root: (OTHER_PROXY, ROOT_PROXY),
+            ..control_run
+        }
+        .verify()
+        .await;
+        assert_eq!(relabelled.errors, control.errors + 1);
+        assert!(relabelled.has_error(&format!(
+            "names proxy {ROOT_PROXY}, but the live L1MessageRoot is {OTHER_PROXY}"
+        )));
+
+        let (timelock_elsewhere, _) = ReviewedRootRun {
+            timelock_owner: ATTACKER,
+            ..control_run
+        }
+        .verify()
+        .await;
+        assert_eq!(timelock_elsewhere.errors, control.errors + 1);
+        assert!(timelock_elsewhere.has_error(&format!(
+            "the ValidatorTimelock {TIMELOCK} is owned by {ATTACKER}"
+        )));
+    }
+
     // ───────────────────────── chains below the departing version ─────────────────────────
 
     /// v0.34.0 and v0.33.0 in the packed encoding.
@@ -2084,10 +2410,10 @@ mod tests {
         assert_eq!((result.errors, result.warnings), (0, 0));
     }
 
-    /// The live read path, in the order it queries: the CTM's Bridgehub, its chain ids, then per
-    /// chain its CTM and — for this CTM's chains only — the version the CTM reports, and for a
-    /// chain at the departing version its diamond and the verifier it runs: the verifier a
-    /// bootstrap release may carry over.
+    /// The live read path, in the order it queries: the reviewed Bridgehub's chain ids (never the
+    /// CTM's own `BRIDGE_HUB()`), then per chain its CTM and — for this CTM's chains only — the
+    /// version the CTM reports, and for a chain at the departing version its diamond and the
+    /// verifier it runs: the verifier a bootstrap release may carry over.
     #[tokio::test]
     async fn the_chains_are_enumerated_through_the_bridgehub_and_filtered_by_ctm() {
         const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
@@ -2095,7 +2421,6 @@ mod tests {
         const DIAMOND: Address = Address::repeat_byte(0xD1);
         const LIVE_VERIFIER: Address = Address::repeat_byte(0xFE);
         let asserter = Asserter::new();
-        asserter.push_success(&Bytes::from(BRIDGEHUB.abi_encode()));
         let ids = vec![U256::from(270u64), U256::from(271u64), U256::from(272u64)];
         asserter.push_success(&Bytes::from(ids.abi_encode()));
         asserter.push_success(&Bytes::from(CTM.abi_encode()));
@@ -2107,7 +2432,14 @@ mod tests {
         asserter.push_success(&Bytes::from(U256::from(V33).abi_encode()));
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
-        let chains = read_chain_versions(&provider, &mut result, CTM, U256::from(V34)).await;
+        let chains = read_chain_versions(
+            &provider,
+            &mut result,
+            Some(BRIDGEHUB),
+            CTM,
+            U256::from(V34),
+        )
+        .await;
         assert!(asserter.read_q().is_empty());
         assert_eq!((result.errors, result.warnings), (0, 0));
         let read: Vec<(U256, Option<U256>, Option<Address>)> = chains
@@ -2125,5 +2457,13 @@ mod tests {
                 (U256::from(272u64), Some(U256::from(V33)), None),
             ]
         );
+
+        // Without a reviewed Bridgehub nothing is enumerated, and that is not "none lagging".
+        let asserter = Asserter::new();
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter);
+        let mut result = VerificationResult::default();
+        let chains = read_chain_versions(&provider, &mut result, None, CTM, U256::from(V34)).await;
+        assert!(chains.is_empty());
+        assert_eq!((result.errors, result.warnings), (0, 1));
     }
 }

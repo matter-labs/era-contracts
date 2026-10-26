@@ -39,6 +39,7 @@ use crate::upgrade_verification::report::VerificationResult;
 use super::construction::{
     canonical_create2_address, ReviewedBuild, DETERMINISTIC_CREATE2_FACTORY,
 };
+use super::ecosystem_binding::ReviewedBridgehub;
 use super::members::SubVerifierGetter;
 use super::provenance::{classify_code, CodeVerdict};
 use super::rows::{discover_slot_proxy, CtmImmutable, CtmImmutableExpectations, Inventory};
@@ -51,8 +52,9 @@ pub(super) enum ArgSource {
     L1ChainId,
     /// The env's `testnet_verifier`.
     IsTestnet,
-    /// The reviewed Bridgehub ([`ReviewedEnv`]); the package's CTM's `BRIDGE_HUB()` and its
-    /// `bridgehub_proxy_addr`, when it names them, must agree.
+    /// The reviewed Bridgehub ([`ReviewedEnv`], [`super::ecosystem_binding`]) — never the
+    /// package's; the package's CTM's `BRIDGE_HUB()` and its `bridgehub_proxy_addr`, when it names
+    /// them, must agree (the binding states the same rule for the whole package).
     Bridgehub,
     /// The live ecosystem proxy of the `L1EcosystemContract` member, discovered through the
     /// reviewed Bridgehub ([`discover_slot_proxy`]).
@@ -236,8 +238,8 @@ pub(crate) struct ReviewedEnv {
     testnet_verifier: Option<bool>,
     l1_chain_id: Option<u64>,
     /// The Bridgehub under review and where the review takes it from: `--expected-bridgehub`,
-    /// else the env's `bridgehub_proxy_addr`.
-    bridgehub: Option<(Address, String)>,
+    /// else the env's `bridgehub_proxy_addr` ([`super::ecosystem_binding`]).
+    bridgehub: Option<ReviewedBridgehub>,
     /// `[[ctm_contracts.ctms]]`: every CTM the env lists, with the `rollup_da_manager` it
     /// declares for it.
     ctms: BTreeMap<Address, Option<Address>>,
@@ -248,11 +250,14 @@ impl ReviewedEnv {
     /// names in place of the env's when given.
     pub(crate) fn new(config: Option<&EnvConfig>, expected_bridgehub: Option<Address>) -> Self {
         let bridgehub = match (expected_bridgehub, config) {
-            (Some(bridgehub), _) => Some((bridgehub, "the reviewer's --expected-bridgehub".into())),
-            (None, Some(config)) => Some((
-                config.bridgehub(),
-                format!("env {}'s bridgehub_proxy_addr", config.env),
-            )),
+            (Some(address), _) => Some(ReviewedBridgehub {
+                address,
+                source: "the reviewer's --expected-bridgehub".into(),
+            }),
+            (None, Some(config)) => Some(ReviewedBridgehub {
+                address: config.bridgehub(),
+                source: format!("env {}'s bridgehub_proxy_addr", config.env),
+            }),
             (None, None) => None,
         };
         Self {
@@ -272,6 +277,11 @@ impl ReviewedEnv {
         }
     }
 
+    /// The Bridgehub under review, when the reviewer names one.
+    pub(crate) fn bridgehub(&self) -> Option<&ReviewedBridgehub> {
+        self.bridgehub.as_ref()
+    }
+
     /// The env's name for the report.
     fn env(&self) -> String {
         match &self.name {
@@ -286,8 +296,10 @@ impl ReviewedEnv {
         Self {
             name: Some("test".to_string()),
             testnet_verifier,
-            bridgehub: bridgehub
-                .map(|bridgehub| (bridgehub, "env test's bridgehub_proxy_addr".to_string())),
+            bridgehub: bridgehub.map(|address| ReviewedBridgehub {
+                address,
+                source: "env test's bridgehub_proxy_addr".to_string(),
+            }),
             ..Default::default()
         }
     }
@@ -511,7 +523,11 @@ impl<'a> MemberReview<'a> {
     /// The reviewed Bridgehub, once the package's CTM and its `bridgehub_proxy_addr` (whichever
     /// it names) agree with it.
     async fn read_bridgehub<P: Provider>(&self, provider: &P) -> Established {
-        let Some((reviewed, source)) = self.env.bridgehub.clone() else {
+        let Some(ReviewedBridgehub {
+            address: reviewed,
+            source,
+        }) = self.env.bridgehub.clone()
+        else {
             return Err(
                 "neither --env nor --expected-bridgehub names the Bridgehub under review".into(),
             );
@@ -1768,10 +1784,10 @@ mod tests {
         let reviewed = ReviewedEnv::new(Some(&stage), None);
         assert_eq!(
             reviewed.bridgehub,
-            Some((
-                stage.bridgehub(),
-                "env stage's bridgehub_proxy_addr".to_string()
-            ))
+            Some(ReviewedBridgehub {
+                address: stage.bridgehub(),
+                source: "env stage's bridgehub_proxy_addr".to_string()
+            })
         );
         assert_eq!(reviewed.testnet_verifier, stage.testnet_verifier());
         assert_eq!(reviewed.l1_chain_id, stage.l1_chain_id());
@@ -1781,7 +1797,10 @@ mod tests {
         let overridden = ReviewedEnv::new(Some(&stage), Some(OTHER));
         assert_eq!(
             overridden.bridgehub,
-            Some((OTHER, "the reviewer's --expected-bridgehub".to_string()))
+            Some(ReviewedBridgehub {
+                address: OTHER,
+                source: "the reviewer's --expected-bridgehub".to_string()
+            })
         );
         assert_eq!(ReviewedEnv::new(None, None).bridgehub, None);
     }

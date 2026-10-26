@@ -334,17 +334,17 @@ pub(crate) struct UpgradePackage {
     pub(crate) reported_ctm_transition: Option<Address>,
     /// `[ctms.*.registry] ctm_upgrade_executor_addr`, reconciled with the CTM legs' target.
     pub(crate) reported_ctm_executor: Option<Address>,
-    /// `[ctms.*.state_transition] chain_type_manager_proxy` — the CTM this package upgrades, the
-    /// independently reviewed value the CTM executor's `CHAIN_TYPE_MANAGER` is held against
-    /// (an executor names its CTM only as an immutable, so without it that binding is unverified,
-    /// which the verifier reports as an error rather than comparing the read value with itself).
+    /// `[ctms.*.state_transition] chain_type_manager_proxy` — the CTM this package upgrades, held
+    /// against the reviewed Bridgehub's registry (`ecosystem_binding`), and the value the CTM
+    /// executor's `CHAIN_TYPE_MANAGER` is held against (an executor names its CTM only as an
+    /// immutable, so without it that binding is unverified, which the verifier reports as an
+    /// error rather than comparing the read value with itself).
     pub(crate) reported_ctm: Option<Address>,
     /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — likewise for the executor's
     /// `CTM_PROXY_ADMIN`.
     pub(crate) reported_ctm_proxy_admin: Option<Address>,
     /// The ecosystem's Bridgehub and the CTM domain's singletons as the prepares report them. The
-    /// Bridgehub is where the ecosystem inventory's slots are discovered when the package names no
-    /// CTM to read it from.
+    /// Bridgehub is only held against the reviewed one (`ecosystem_binding`), never used as a root.
     pub(crate) reported_singletons: ReportedSingletons,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
@@ -530,8 +530,9 @@ pub(crate) struct LifecycleInputs {
     pub(crate) core_proxy_admin: Option<Address>,
 }
 
-/// The ecosystem's Bridgehub and the CTM domain's singleton proxies as the prepares report them —
-/// the last fallbacks a new `ChainTypeManager` implementation's immutables are held against.
+/// The ecosystem's Bridgehub — held against the reviewed one — and the CTM domain's singleton
+/// proxies as the prepares report them, the last fallbacks a new `ChainTypeManager`
+/// implementation's immutables are held against.
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct ReportedSingletons {
     /// `[core.upgrade_addresses.bridgehub] bridgehub_proxy_addr`.
@@ -887,6 +888,9 @@ pub(crate) struct ReplacementPackage {
     /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — the CTM executor's
     /// `CTM_PROXY_ADMIN` is held against it.
     pub(crate) reported_ctm_proxy_admin: Option<Address>,
+    /// `[core.upgrade_addresses.bridgehub] bridgehub_proxy_addr`, when the package carries a core
+    /// section: held against the reviewed Bridgehub.
+    pub(crate) reported_bridgehub: Option<Address>,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
     /// The prepare's declared external actions (the forward is one of them).
@@ -948,6 +952,7 @@ impl ReplacementPackage {
                 "deployed_addresses",
                 "transparent_proxy_admin",
             ),
+            reported_bridgehub: ReportedSingletons::in_package(root, None).bridgehub,
             calls,
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, Some(&ctm_key)),

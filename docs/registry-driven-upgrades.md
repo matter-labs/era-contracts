@@ -93,7 +93,7 @@ flowchart TB
     TRANS -.->|"fromRelease"| FROM
     TRANS -.->|"newRelease"| TO
     TRANS -.->|"upgradeEngine"| ENGINE
-    TRANS -.->|"optional l2Plan.delegateComposer"| COMPOSER
+    TRANS -.->|"l2Plan.delegateComposer, with a delegate"| COMPOSER
 ```
 
 The two release boxes are instances of the same `CTMRelease` type, and the two inventory boxes of
@@ -435,6 +435,12 @@ approved manifest, pass `validate()` and still route security-critical selectors
 chose. Objects therefore carry no codehash of themselves or of their members: a hash supplied
 beside the address it describes can only agree with itself.
 
+Every package kind is verified against one reviewed Bridgehub, the env's `bridgehub_proxy_addr` or
+`--expected-bridgehub`, and every ecosystem lookup below starts there. What the package names is
+held against it: its `bridgehub_proxy_addr` must be it, every CTM it drives must be registered on it
+and built over it, and the executors' `ProxyAdmin`s must be the ones administering the Bridgehub and
+the CTM.
+
 The verification answers three questions for every object a package names:
 
 1. **Was it PRODUCED by the reviewed code's constructor, from its reviewed arguments?** Every
@@ -473,38 +479,40 @@ keccak256)`) — it is the identity check, which proves their code but not the v
    implementation behind a proxy the package introduces, a proxy that must run the reviewed
    `TransparentUpgradeableProxy` with the CTM-domain `ProxyAdmin` in its EIP-1967 admin slot — is
    re-derived from its record and the reviewed creation code, and each recorded argument is held against the live source the prepare
-   read it from (the L1 chain id, the Bridgehub and the proxies discovered through it, the chain
-   cap, the asset router's WETH token and owner, the rollup DA manager of a chain on the CTM, the
-   CTM's own immutables, the sub-verifiers the walk read) or the env's permanent values
-   (`testnet_verifier`), never against anything the package supplies. The Bridgehub is the
-   reviewer's (the env's `bridgehub_proxy_addr`, or `--expected-bridgehub`); the package's CTM and
-   `bridgehub_proxy_addr` must agree with it. A member the departing release (or, at the bootstrap,
+   read it from (the L1 chain id, the reviewed Bridgehub and the proxies discovered through it, the
+   chain cap, the asset router's WETH token and owner, the rollup DA manager of a chain on the CTM,
+   the CTM's own immutables, the sub-verifiers the walk read) or the env's permanent values
+   (`testnet_verifier`), never against anything the package supplies. A member the departing release (or, at the bootstrap,
    the verifier the chains run, with its tree) already names was reviewed when it was installed and
    is not re-derived. A release may carry over the verifier already in force where it departs
    from, which an earlier build produced. `ZiskVerifier`'s snarkJS Plonk backend is built outside
    this repository, so it is held to the runtime codehash pinned in
    `tools/verifier-gen/data/ZiSK_plonk_backend.toml` instead. Every proxy row must also name the
-   proxy of its slot, discovered on chain from the Bridgehub or the CTM. Code the build does not
-   produce for the role is a finding.
+   proxy of its slot, discovered on chain from the reviewed Bridgehub or from a CTM registered on
+   it. Code the build does not produce for the role is a finding.
 3. **Do the governance calls execute those objects, and nothing else?** For an upgrade the bundle
    carries the executor legs its objects need, each re-encoded from the reviewed executor and
    object, exactly once and as one contiguous run in canonical order (core, CTM infrastructure, CTM
-   transition); every other call is a declared external action, and none may reach the executors,
-   the objects, the CTM or either `ProxyAdmin`. For the bootstrap
-   edge the bundle carries the run the construction-verified `RegistryBootstrapSequence` derives,
-   contiguous and in order, and every other call must be a declared external action to a target
-   OUTSIDE the edge's authorities: a call to the CTM, a `ProxyAdmin`, an executor or an object
-   beyond the derived run — a `transferOwnership` nomination appended after the
-   legitimate calls, say — is an error whether the package declares it or not. On chain,
+   transition), and no other call may reach the executors, the objects, the CTM or either
+   `ProxyAdmin`. For the bootstrap edge the bundle carries the run the construction-verified
+   `RegistryBootstrapSequence` derives, contiguous and in order, and no other call may reach the
+   edge's authorities: a call to the CTM, a `ProxyAdmin`, an executor or an object beyond the
+   derived run — a `transferOwnership` nomination appended after the legitimate calls, say — is an
+   error whether the package declares it or not. On chain,
    `RegistryBootstrapMigration.validateApplied()` refuses a pending nomination on every
-   `Ownable2Step` authority the edge lands on or drives, for the same reason.
+   `Ownable2Step` authority the edge lands on or drives, for the same reason. For every package
+   kind, the calls other than the executor legs ARE the package's governance-phase declarations:
+   one for one, in declared order, every declaration present; the bootstrap's derived run and a
+   replacement's `forward` are declared like any other call.
 
 The tool's full checklist, including what it deliberately does not check, is in
 [`ai-review/docs/protocol-ops.md`](ai-review/docs/protocol-ops.md).
 
 Its limits, stated so they are not mistaken for coverage: the salt is a package input, so an
 attacker free to choose both a salt and a counterfeit deployment faces the standard ~2^80 CREATE2
-address-collision bound rather than a 160-bit preimage; the derivation binds an object to its
+address-collision bound rather than a 160-bit preimage; the reviewed Bridgehub is an input too, so
+a review run against the wrong env reviews the wrong ecosystem, while the package's own Bridgehub
+and CTM are cross-checked against it, never trusted; the derivation binds an object to its
 MANIFEST, never to what the manifest's members RUN — a genuine object built from a manifest naming
 an attacker's facet verifies perfectly, which is why question 2 holds every member to the reviewed
 build; the values in a CARRIED-OVER member's immutable slots are the ones an earlier review
@@ -686,7 +694,8 @@ the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction comp
 plan with the executing chain’s ID and Bridgehub. The delegate composer builds final
 chain-specific calldata directly, in one pass; tooling reads that same transaction through
 `ICTMTransition.l2UpgradeTx(bridgehub, chainId)`, which forwards to the per-release engine, and
-`IRegistryBootstrapMigration.l2UpgradeTx(chainId)` for the bootstrap edge.
+`IRegistryBootstrapMigration.l2UpgradeTx(chainId)` for the bootstrap edge. What a node must do to
+follow an edge is [Node integration](../protocol-docs/node-upgrade-integration.md).
 There is no intermediate proposal struct, selector resolution or re-diffing at execution time.
 
 The transition's third derived read is for reviewers: `ICTMTransition.releaseDiff()` compares the two
@@ -767,7 +776,10 @@ L1 members — must carry the departing release's L2 description over to the tar
 implementation table and shared proxy shell, the force-deployment blob, the genesis upgrade (it
 composes a new chain's L2 genesis transaction) and the genesis batch. Existing chains receive no L2
 transaction on such an edge, so a new chain created at the target release must start from the same
-L2 state they are in (`L1OnlyEdgeChangesL2State`). An edge that changes the L2 description must
+L2 state they are in (`L1OnlyEdgeChangesL2State`). A minor edge without an L2 side runs only on
+nodes that accept its all-zero transaction
+([node integration](../protocol-docs/node-upgrade-integration.md#requirements), requirement 3);
+until then it has no working path on ZKsync OS. An edge that changes the L2 description must
 carry an L2 side — at least an authored delegate that brings existing chains there — and so is a
 minor edge. The prepare rebuilds the L2 bytecode and reuses the live genesis upgrade only when its
 code is identical, so such an edge is built from a tree in which they compile to the departing
@@ -785,7 +797,8 @@ before chains may upgrade. Both are the transition's, and both are chain-side �
 [the coordination document](../protocol-docs/ecosystem-upgrade-coordination.md#the-chain-schedule).
 
 **L2 plan.** `L2PlanLib.build` checks the remaining input constraints: canonical bytecode-info
-lengths, a delegate whenever deployments or a composer exist, and the execution limit on the
+lengths, a delegate whenever deployments or a composer exist, a composer whenever there is a
+delegate (`L2DefaultUpgrade` has no fallback for empty calldata), and the execution limit on the
 constructed factory-dependency count. Deployment addresses, types, delegate membership and
 factory-dependency membership follow from construction rather than caller-supplied fields.
 
@@ -862,7 +875,9 @@ the one-time ServerNotifier handover is a precondition of the edge (see the
 Governance nominates the migration as CTM owner and transfers the CTM-domain `ProxyAdmin` to it;
 `migrate()` accepts the CTM, performs the whole edge and hands both to the bound executor in the
 same transaction (the CTM through `CTMUpgradeExecutor.acceptCTMOwnership()`, which admits the
-executor's owner or the CTM's current owner, here the migration). Authority is never parked.
+executor's owner or the CTM's current owner, here the migration). Authority is never parked. That
+needs the `ProxyAdmin` transfer, which is one-step, to run only inside the bundle that runs
+`migrate()`: the migration has no other way to hand the `ProxyAdmin` on, or back.
 
 `validate()` runs on the execution path and requires that the migration holds both ownerships, that
 the CTM sits at the departing version, that the ServerNotifier handover completed, that every
@@ -962,6 +977,8 @@ Gateway deployer takes a pre-deployed release address instead (`GatewayCTMDeploy
   coordination spec.
 - [Upgrade operations](upgrade-operations.md) — the ServerNotifier handover, executor
   succession, monitoring, recovery and the incident-only migration pauses.
+- [Node integration](../protocol-docs/node-upgrade-integration.md) — what a ZKsync OS node must do
+  to follow an edge; a rollout gate.
 - [Upgrade scripts runbook](../l1-contracts/deploy-scripts/upgrade/README.md) — prepare, compose,
   verify, replay, chain crossing.
 - [Script retirement plan](upgrade-script-retirement.md) — what tooling still decides, and the

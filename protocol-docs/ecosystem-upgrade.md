@@ -208,7 +208,9 @@ Three independent checks, all read-only:
 
 - **Package verification** (`protocol_ops ecosystem verify-bootstrap --ecosystem-toml …
 --l1-rpc-url … --env <env> --expected-governance-owner … --executor-record … --create2-salt …`,
-  alias `verify-package`; the runbook's "Verify" has the full invocation) re-derives every
+  alias `verify-package`; the runbook's "Verify" has the full invocation) holds every package kind
+  to one reviewed Bridgehub, the `--env`'s `bridgehub_proxy_addr` (or `--expected-bridgehub`, for a
+  harness L1), so `--env` is required for every package. It re-derives every
   object's CREATE2 address from the reviewed creation code and the arguments it was constructed with
   (for a write-once object, the manifest it serves), checks live runtime code against
   `AllContractsHashes.json`, holds the genesis data and L2 bytecode table of the release the edge
@@ -216,7 +218,7 @@ Three independent checks, all read-only:
   implementation slot and implementation code at each member's fixed address), checks the
   executors' bindings and the owner the upgrade is driven by, and checks that the governance calls
   carry the executor legs once, contiguous and in canonical order, and that every other call is a
-  declared external action. It is mandatory before
+  declared external action, one for one and in declared order. It is mandatory before
   every vote; what it establishes and what it does not is
   [Provenance and validation](../docs/registry-driven-upgrades.md#provenance-and-validation).
 - **The transaction simulator** (`matter-labs/transaction-simulator`) replays the governance call
@@ -233,10 +235,13 @@ Three independent checks, all read-only:
 Governance signs one bundle, `[governance_calls] calls` of `ecosystem.toml`. For a recurring upgrade
 it is the executor legs — `CoreUpgradeExecutor.applyL1Upgrade`,
 `CTMUpgradeExecutor.applyInfrastructureUpgrade`, `CTMUpgradeExecutor.applyCTMUpgrade`, each when
-its object exists, in that order — plus the declared external actions (the merger's PUH wiring and
-CTM `acceptOwnership` normalization, and whatever calls the release declared); on the v35
+its object exists, in that order — plus the declared external actions (the merger's PUH wiring when
+the release redeploys the governance set, and whatever calls the release declared); on the v35
 bootstrap edge it is the run the `RegistryBootstrapSequence` derives, ending with
-`RegistryBootstrapMigration.validateApplied()`.
+`RegistryBootstrapMigration.validateApplied()`, after the merger's `acceptOwnership()` of a
+`ValidatorTimelock` whose pending owner is governance. The CTM is an authority of the edge, so a
+bundle carrying the CTM's `acceptOwnership()` does not verify: a CTM nomination to governance is
+accepted in an earlier governance execution, before the bootstrap is prepared.
 
 The bundle is one atomic transaction: the legs apply the ecosystem proxy rows, then the CTM-domain
 rows, then `setNewVersionUpgradeFromTransition` (which commits the transition and installs the
@@ -298,7 +303,9 @@ otherwise.
    its next block (block N) and holds every later batch until the chain's L1 version moves, so the
    cut's preconditions must already hold: if the cut then reverts, the chain is stuck. Run after
    the cut, the call reverts (`CutDataForProtocolVersionNotAvailable`), since no transition is
-   committed from the new version.
+   committed from the new version. How the node resolves the edge and its transaction is
+   [Node integration](./node-upgrade-integration.md); schedule a chain only after its nodes pass the
+   [runbook's node pre-flight](../l1-contracts/deploy-scripts/upgrade/README.md#7-chain-crossing).
 3. `tools/upgrade-readiness-checker` waits until the node has the upgrade transaction in block N
    and block N-1 is finalized, that is, every batch before the upgrade has been executed on L1. This
    is the signal that the L1 cut can be sent now, not that the upgrade is done.
@@ -324,8 +331,10 @@ otherwise.
    new version for good once that batch has been executed on L1.
 
 `protocol_ops` checks only one of the preconditions explicitly: `chain upgrade` refuses to leave a
-validium-priced chain in an unrecommended DA state. Everything else is covered only by the fork
-replay when the bundle is prepared, which reflects the chain's state at that moment.
+chain in a DA state it should not run (the
+[runbook](../l1-contracts/deploy-scripts/upgrade/README.md#7-chain-crossing) lists them). Everything
+else is covered only by the fork replay when the bundle is prepared, which reflects the chain's
+state at that moment.
 
 ### 7. Close-out
 
@@ -433,8 +442,9 @@ The steps, the rules preparation enforces and the tests every release ships with
   wait for and `upgrade-readiness-checker` does not apply. The ZKsync OS node switches its protocol
   version only on the chain's `UpgradeTimestampUpdated` event, so `chain set-upgrade-timestamp` is
   still needed. The cut still reverts (`NotAllBatchesExecuted`) unless every committed batch has
-  been executed on L1. A minor bump without an L2 upgrade transaction has no working path on ZKsync
-  OS today: for any minor bump the node expects an upgrade transaction.
+  been executed on L1. A minor bump without an L2 upgrade transaction needs a node that accepts the
+  all-zero transaction ([Node integration](./node-upgrade-integration.md#requirements), requirement
+  3); until the server meets it, such a bump has no working path on ZKsync OS.
 - **Emergency.** Governance can freeze a chain (`freezeChain`, `unfreezeChain`) and execute an
   arbitrary cut for it (`ChainTypeManager.executeUpgrade(chainId, cut)`); both are CTM owner
   methods, reached through `CTMUpgradeExecutor.forward`

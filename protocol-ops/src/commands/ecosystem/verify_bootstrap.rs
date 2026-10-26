@@ -59,23 +59,22 @@ pub struct VerifyBootstrapArgs {
     pub executor_records: Vec<PathBuf>,
 
     /// The upgrade env (`stage`, `mainnet`, ...) whose reviewed
-    /// `upgrade-envs/permanent-values/<env>.toml` the package is held against. Every release the
-    /// package installs pins that file's `zk_token_asset_id` in its genesis force deployments, so
-    /// a recurring or bootstrap package is refused without it; a replacement installs no release
-    /// and does not need it. The env's `testnet_verifier`, `bridgehub_proxy_addr` and each CTM's
-    /// `rollup_da_manager` are also what the constructor arguments of every member the package
-    /// newly installs are held against (its `l1_chain_id` must equal the RPC's), and it selects
-    /// the ZiSK backend pins that apply: without it, a `_isTestnet` argument is unverified, and so
-    /// is every argument that comes from the Bridgehub unless `--expected-bridgehub` names it.
+    /// `upgrade-envs/permanent-values/<env>.toml` the package is held against — required for every
+    /// package. Its `bridgehub_proxy_addr` is the reviewed Bridgehub the package is bound to (see
+    /// `--expected-bridgehub`). Every release the package installs pins its `zk_token_asset_id` in
+    /// its genesis force deployments. Its `testnet_verifier` and each CTM's `rollup_da_manager`
+    /// are also what the constructor arguments of every member the package newly installs are
+    /// held against (its `l1_chain_id` must equal the RPC's), and it selects the ZiSK backend pins
+    /// that apply: without it, a `_isTestnet` argument is unverified. Only a harness that names
+    /// the Bridgehub with `--expected-bridgehub` runs without it, and then a package installing a
+    /// release is still refused.
     #[clap(long)]
     pub env: Option<String>,
 
-    /// The Bridgehub of the ecosystem the package upgrades, in place of the env's
-    /// `bridgehub_proxy_addr`. The constructor arguments of every member the package installs
-    /// are held against it and against what is discovered through it, and the package's CTM and
-    /// `bridgehub_proxy_addr` must agree with it. Only for an ecosystem the env file does not
-    /// describe — a harness's scratch L1; the report says which one was used. Without it or
-    /// `--env`, every argument that comes from the Bridgehub is unverified.
+    /// The reviewed Bridgehub of the ecosystem the package targets: every ecosystem slot is
+    /// discovered through it and every CTM the package drives must be registered on it. Defaults
+    /// to the --env's permanent-values bridgehub_proxy_addr; only a harness whose L1 is not the
+    /// env's passes it (the report warns when it differs from the env's).
     #[clap(long)]
     pub expected_bridgehub: Option<Address>,
 

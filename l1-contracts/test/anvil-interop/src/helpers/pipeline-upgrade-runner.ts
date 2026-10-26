@@ -1117,8 +1117,46 @@ export async function runEcosystemUpgradeScripts(params: {
   );
 
   if (params.executeBundles) {
+    checkDeployerPlan(prepareOutDir, params.upgradeHarnessInputs, params.rpcUrl);
     await executeSafeBundles(prepareOutDir, params.rpcUrl, "prepare");
   }
+}
+
+/**
+ * `protocol-ops ecosystem check-deployer-plan` on the prepare's deployer bundles, before they are
+ * replayed: the check the deploy workflow runs before it signs. The harness is the reviewer here:
+ * governance and the core salt are its own inputs, and the CTM prepare draws a random salt when the
+ * env declares none, so that salt is taken from the CTM prepare's output. The CTMs' ProxyAdmin and
+ * BytecodesSupplier are read from the L1 the bundles are about to be replayed on.
+ */
+function checkDeployerPlan(prepareOutDir: string, inputs: UpgradeHarnessInputs, rpcUrl: string): void {
+  const ecosystemToml = path.join(inputs.protocolOpsOutDir, "ecosystem.toml");
+  const merged = parseToml(fs.readFileSync(ecosystemToml, "utf8")) as {
+    ctms?: Record<string, { create2_factory_salt?: string }>;
+  };
+  const ctmSalts = Object.values(merged.ctms ?? {}).flatMap((ctm) =>
+    ctm.create2_factory_salt ? [ctm.create2_factory_salt] : []
+  );
+  const reviewedBuildHashes = path.join(inputs.protocolOpsOutDir, "reviewed-build-hashes.json");
+  writeReviewedBuildHashes(reviewedBuildHashes);
+  console.log("\n── check-deployer-plan: holding the deployer's calls to the reviewed build ──");
+  runProtocolOps([
+    "ecosystem",
+    "check-deployer-plan",
+    "--manifest",
+    path.join(prepareOutDir, "manifest.json"),
+    "--ecosystem-toml",
+    ecosystemToml,
+    "--deployer",
+    ANVIL_DEFAULT_ACCOUNT_ADDR,
+    "--l1-rpc-url",
+    rpcUrl,
+    "--governance",
+    inputs.governance,
+    "--contract-hashes",
+    reviewedBuildHashes,
+    ...[inputs.create2FactorySalt, ...ctmSalts].flatMap((salt) => ["--create2-salt", salt]),
+  ]);
 }
 
 export async function runEcosystemGovernanceUpgrade(params: {
@@ -1659,6 +1697,8 @@ export function prepareUpgradeHarnessInputs(
   /** The template's `rollup_da_manager` when it names one; otherwise protocol-ops resolves the CTM's own. */
   rollupDaManagerAddress?: string;
   create2FactorySalt: string;
+  /** The governance owner the upgrade input names (`owner_address`). */
+  governance: string;
   isZKsyncOS: boolean;
   ctmProxyAddress: string;
   cleanup: () => void;
@@ -1724,6 +1764,7 @@ export function prepareUpgradeHarnessInputs(
     upgradeInputArg: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
     rollupDaManagerAddress: nonZeroAddress(permanentValuesToml.ctm_contracts?.rollup_da_manager),
     create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
+    governance: state.l1Addresses.governance,
     isZKsyncOS: scenario.isZKsyncOS,
     ctmProxyAddress: state.ctmAddresses.chainTypeManager,
     // Kept alongside the chains: debugging a run needs the INPUTS that produced it (the

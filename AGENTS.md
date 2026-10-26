@@ -492,7 +492,10 @@ Each step once, in this order:
 6. Only then, regenerate artifacts.
 
 Tests come before formatting, never after. Formatting cannot break a test, so a green suite stays
-green; the reverse order makes you re-run the suite after every fix-up.
+green; the reverse order makes you re-run the suite after every fix-up. `yarn lint:sol --fix` is
+not only formatting: solhint's fixer rewrites code. It must be a no-op on `.sol` files at step 4;
+if it changes one, review the change, then run `forge build` and the tests covering that file again
+before committing.
 
 ### Subagents and parallel branches
 
@@ -555,7 +558,7 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 
 1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
 2. **Run the errors lint**, only if an error declaration changed: `cd l1-contracts && yarn errors-lint --fix`
-3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
+3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix` (a `.sol` change by `lint:sol --fix` means re-testing, see Order of Work)
 4. **Check solc warnings**: `yarn l1 solc-warnings`
 5. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
 6. **Verify no uncommitted changes**: `git status`

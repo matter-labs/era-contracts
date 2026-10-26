@@ -194,6 +194,12 @@ Consequences:
 - A chain that already crossed keeps the state it reached and continues on its own onward edge: the
   chain-side version check refuses to replay the replacement from the earlier source.
 - A deadline change stays a separate `setProtocolVersionDeadline`, which may ride the same `forward`.
+- A chain that scheduled its crossing before the replacement still crosses the replacement, so its
+  node must resolve the edge at execution
+  ([node integration](./node-upgrade-integration.md#requirements), requirement 4). The runbook
+  checks before the replacement that no such chain's schedule has already passed, and re-runs their
+  schedules after it
+  ([chain crossing](../l1-contracts/deploy-scripts/upgrade/README.md#7-chain-crossing)).
 - Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) are repaired by the
   legacy cut setter, which refuses a registry-committed departure and a version nothing was
   committed for.
@@ -248,8 +254,10 @@ introduce placeholder lists, loops or a second CTM today solely for this extensi
   or a replacement (`commands/ecosystem/upgrade.rs`); the package loader refuses mixed kinds and
   missing, duplicated, substituted or value-carrying legs and unknown executor selectors
   (`upgrade_verification/registry/package.rs`); `verify_upgrade_calls` refuses a swapped or
-  interrupted run, undeclared, duplicated, missing or reordered external actions, and any other call
-  reaching an upgrade authority (`upgrade_verification/registry/upgrade.rs`).
+  interrupted run and any other call reaching an upgrade authority
+  (`upgrade_verification/registry/upgrade.rs`); `judge_declared_calls` holds every package kind's
+  calls other than the legs to its declarations one for one and in declared order, refusing
+  undeclared, duplicated, missing or reordered ones (`upgrade_verification/registry/declared_calls.rs`).
 - Production preparation and both Anvil pipelines: `UpgradeTestRecurring_Local.t.sol` prepares the
   infrastructure-only, chain-release, mixed and three-leg shapes and the refused ones, and runs each
   as its ordered bundle; `yarn test:upgrade` drives the bootstrap and then recurring hops, verifying
