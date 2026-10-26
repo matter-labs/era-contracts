@@ -1072,15 +1072,10 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
         local_hashes,
         metadata.contracts_commit
     );
-    match &mode {
-        ReplayMode::Rehearse { fork_url } => {
-            deployer_plan::check_bundle(&bundle_dir, &metadata, fork_url).await?
-        }
-        ReplayMode::Broadcast { rpc_url, .. } => {
-            deployer_plan::require_checkout_at(&paths::contracts_root(), &metadata)?;
-            deployer_plan::check_bundle(&bundle_dir, &metadata, rpc_url).await?
-        }
-        ReplayMode::Verify { .. } => {}
+    // A rehearsal checks its plan on the fork it replays on (below).
+    if let ReplayMode::Broadcast { rpc_url, .. } = &mode {
+        deployer_plan::require_checkout_at(&paths::contracts_root(), &metadata)?;
+        deployer_plan::check_bundle(&bundle_dir, &metadata, rpc_url).await?;
     }
     // Replay state goes next to the env's other outputs, never into the bundle (the handoff artifact).
     let paths = BundlePaths {
@@ -1121,6 +1116,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 metadata.l1.forked_at_block,
             )?;
             let rpc_url = anvil.endpoint();
+            deployer_plan::check_bundle(&bundle_dir, &metadata, &rpc_url).await?;
             fund_signers(&descriptor, &rpc_url, &env_cfg, deployer, &paths).await?;
             broadcast_impersonated(&rpc_url, &paths).await?;
             check_upgrade(

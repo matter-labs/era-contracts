@@ -18,7 +18,8 @@
 //!
 //! A role that belongs to one CTM is taken only from that CTM's `[ctms.<key>]` table, and the CTM
 //! must be one the env declares. The CTM's ProxyAdmin and BytecodesSupplier are also read from L1
-//! ([`CtmFacts`]) before anything is signed, so a bundle cannot name its own.
+//! ([`CtmFacts`]) before anything is signed, as is the ecosystem ProxyAdmin (the EIP-1967 admin of
+//! the env's Bridgehub), so a bundle cannot name its own.
 //!
 //! What it does not establish: the package's other addresses and records come from the bundle.
 //! The constructor arguments, a proxy's initializer and a published bytecode are not judged here;
@@ -90,6 +91,13 @@ const BOOTSTRAP_SEQUENCE: &str = "RegistryBootstrapSequence";
 const ADMIN_PHASE: &str = "admin";
 /// Where a `[ctms.<key>]` table names its CTM proxy.
 const CTM_PROXY_PATH: [&str; 2] = ["state_transition", "chain_type_manager_proxy"];
+/// Where the core prepare names the Bridgehub.
+const BRIDGEHUB_PATH: [&str; 4] = [
+    "core",
+    "upgrade_addresses",
+    "bridgehub",
+    "bridgehub_proxy_addr",
+];
 
 /// What a call target must be in the package for an [`ALLOWLIST`] entry to admit it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -247,6 +255,8 @@ pub(crate) struct PackageView {
     admin_actions: Vec<AdminAction>,
     /// Tables the check refuses outright.
     faults: Vec<String>,
+    /// The Bridgehub the core prepare names, which stands in for the env's without one.
+    bridgehub: Option<Address>,
 }
 
 /// A table a prepare output can sit at: the root, `[core]` or a `[ctms.<key>]`.
@@ -328,6 +338,8 @@ impl PackageView {
         let mut view = PackageView {
             members: records::member_records_in(root, source)?,
             executors: records::records_in(root, source)?,
+            bridgehub: address_at(root, &BRIDGEHUB_PATH)
+                .with_context(|| format!("{source}: {}", BRIDGEHUB_PATH.join(".")))?,
             ..Self::default()
         };
         collect_addresses(root, &mut view.named);
@@ -604,6 +616,10 @@ pub(crate) struct ReviewedInputs {
     pub(crate) env_ctms: Option<BTreeSet<Address>>,
     /// [`CtmFacts`] of every CTM in [`Self::env_ctms`] (or the package's).
     pub(crate) ctm_facts: BTreeMap<Address, CtmFacts>,
+    /// The EIP-1967 admin on L1 of the env's Bridgehub (without an env, the package's), which
+    /// the package's ecosystem ProxyAdmin must be. `None` when no Bridgehub is known, which
+    /// leaves no ecosystem ProxyAdmin to admit.
+    pub(crate) ecosystem_proxy_admin: Option<Address>,
 }
 
 /// What a deployment of the plan put where.
@@ -705,8 +721,21 @@ impl PlanChecker<'_> {
             .ok_or_else(|| format!("no L1 facts were read for the CTM {ctm}"))
     }
 
-    /// Holds a holder of a role L1 also fixes to what L1 says about its CTM.
+    /// Holds a holder of a role L1 also fixes to what L1 says about its CTM, or about the
+    /// Bridgehub.
     fn bound_on_l1(&self, role: Role, target: Address, holder: &Holder) -> Result<(), String> {
+        if role == Role::EcosystemProxyAdmin {
+            return match self.inputs.ecosystem_proxy_admin {
+                Some(on_l1) if on_l1 == target => Ok(()),
+                Some(on_l1) => Err(format!(
+                    "{target} is not the EIP-1967 admin of the Bridgehub on L1, which is {on_l1}"
+                )),
+                None => Err(format!(
+                    "{target} cannot be held to the Bridgehub's admin on L1: the package names no \
+                     [core.upgrade_addresses.bridgehub] bridgehub_proxy_addr"
+                )),
+            };
+        }
         let (fact, what): (fn(&CtmFacts) -> Address, &str) = match role {
             Role::CtmProxyAdmin => (|facts| facts.proxy_admin, "EIP-1967 admin"),
             Role::BytecodesSupplier => {
@@ -959,10 +988,14 @@ impl PlanChecker<'_> {
                 shape()
             ));
         }
-        let ecosystem_admin = !self
+        let ecosystem_admin = self
             .package
             .holders_of(Role::EcosystemProxyAdmin, admin)
-            .is_empty();
+            .iter()
+            .any(|holder| {
+                self.bound_on_l1(Role::EcosystemProxyAdmin, admin, holder)
+                    .is_ok()
+            });
         let ctm_admin = self
             .package
             .holders_of(Role::CtmProxyAdmin, admin)
@@ -970,8 +1003,8 @@ impl PlanChecker<'_> {
             .any(|holder| self.bound_on_l1(Role::CtmProxyAdmin, admin, holder).is_ok());
         if !ecosystem_admin && !ctm_admin {
             return Err(format!(
-                "{} its admin {admin} is neither the package's ecosystem ProxyAdmin nor the \
-                 ProxyAdmin of one of its CTMs on L1",
+                "{} its admin {admin} is neither the ecosystem ProxyAdmin nor the ProxyAdmin of \
+                 one of its CTMs on L1",
                 shape()
             ));
         }
@@ -1262,6 +1295,14 @@ pub(crate) fn check_plan(
 /// The factory, salts, governance owner and CTMs `env` declares. The CTM facts are read from L1
 /// separately ([`read_ctm_facts`]).
 fn env_inputs(env_cfg: &EnvConfig) -> anyhow::Result<ReviewedInputs> {
+    // `deploy_puh_guardians` deploys under its own salt from zk-governance artifacts, neither of
+    // which the check knows.
+    anyhow::ensure!(
+        !env_cfg.redeploys_zk_governance()?,
+        "{} declares `redeploy_zk_governance = true`, but the deployer plan check does not cover \
+         the PUH/Guardians redeploy: a bundle that carries it cannot be signed",
+        env_cfg.upgrade_input_path.display()
+    );
     let factory = env_cfg.create2_factory().with_context(|| {
         format!(
             "{} declares no create2_factory_addr",
@@ -1290,6 +1331,7 @@ fn env_inputs(env_cfg: &EnvConfig) -> anyhow::Result<ReviewedInputs> {
         governance,
         env_ctms: Some(env_cfg.ctms().iter().map(|ctm| ctm.proxy).collect()),
         ctm_facts: BTreeMap::new(),
+        ecosystem_proxy_admin: None,
     })
 }
 
@@ -1309,6 +1351,15 @@ fn validate_inputs(inputs: &ReviewedInputs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The EIP-1967 admin of `proxy` on L1.
+async fn read_proxy_admin<P: Provider>(provider: &P, proxy: Address) -> anyhow::Result<Address> {
+    let word = provider
+        .get_storage_at(proxy, EIP1967_PROXY_ADMIN_SLOT.into())
+        .await
+        .with_context(|| format!("read the EIP-1967 admin slot of {proxy}"))?;
+    Ok(Address::from_word(word.into()))
+}
+
 /// [`CtmFacts`] of each of `ctms`, read from L1 before anything is signed.
 pub(crate) async fn read_ctm_facts<P: Provider>(
     provider: &P,
@@ -1316,10 +1367,7 @@ pub(crate) async fn read_ctm_facts<P: Provider>(
 ) -> anyhow::Result<BTreeMap<Address, CtmFacts>> {
     let mut facts = BTreeMap::new();
     for &ctm in ctms {
-        let admin_word = provider
-            .get_storage_at(ctm, EIP1967_PROXY_ADMIN_SLOT.into())
-            .await
-            .with_context(|| format!("read the EIP-1967 admin slot of the CTM {ctm}"))?;
+        let proxy_admin = read_proxy_admin(provider, ctm).await?;
         let bytecodes_supplier = CtmView::new(ctm, provider)
             .L1_BYTECODES_SUPPLIER()
             .call()
@@ -1328,7 +1376,7 @@ pub(crate) async fn read_ctm_facts<P: Provider>(
         facts.insert(
             ctm,
             CtmFacts {
-                proxy_admin: Address::from_word(admin_word.into()),
+                proxy_admin,
                 bytecodes_supplier,
             },
         );
@@ -1502,6 +1550,7 @@ pub(crate) async fn check_bundle(
     ensure_rpc_chain(&provider, chain_id).await?;
     let env_ctms = env_cfg.ctms().iter().map(|ctm| ctm.proxy).collect();
     inputs.ctm_facts = read_ctm_facts(&provider, &env_ctms).await?;
+    inputs.ecosystem_proxy_admin = Some(read_proxy_admin(&provider, env_cfg.bridgehub()).await?);
     report(
         &reviewed_build_of(&paths::contracts_root())?,
         &PackageView::load(&bundle_dir.join("ecosystem.toml"))?,
@@ -1574,8 +1623,8 @@ pub struct CheckDeployerPlanArgs {
     /// `contracts_commit` with clean contract sources.
     #[clap(long, conflicts_with_all = ["manifest", "ecosystem_toml", "deployer", "env", "contract_hashes"])]
     pub bundle: Option<PathBuf>,
-    /// The L1 the plan would be signed for: each CTM's ProxyAdmin and BytecodesSupplier are read
-    /// from it.
+    /// The L1 the plan would be signed for: each CTM's ProxyAdmin and BytecodesSupplier, and the
+    /// Bridgehub's ProxyAdmin, are read from it.
     #[clap(long)]
     pub l1_rpc_url: String,
     /// A prepare output's `manifest.json` (instead of `--bundle`).
@@ -1587,7 +1636,7 @@ pub struct CheckDeployerPlanArgs {
     /// The deployer EOA whose bundles are checked.
     #[clap(long)]
     pub deployer: Option<Address>,
-    /// The env whose factory, salts, owner and CTMs are the reviewed inputs.
+    /// The env whose factory, salts, owner, CTMs and Bridgehub are the reviewed inputs.
     #[clap(long)]
     pub env: Option<String>,
     /// The reviewed governance owner, instead of the env's `owner_address`.
@@ -1623,7 +1672,8 @@ pub async fn run(args: CheckDeployerPlanArgs) -> anyhow::Result<()> {
         return Ok(());
     };
     let provider = get_provider(&args.l1_rpc_url)?;
-    let mut inputs = match &args.env {
+    let package = PackageView::load(ecosystem_toml)?;
+    let (mut inputs, bridgehub) = match &args.env {
         Some(env) => {
             let env_cfg = EnvConfig::load(env)?;
             ensure_rpc_chain(
@@ -1633,25 +1683,31 @@ pub async fn run(args: CheckDeployerPlanArgs) -> anyhow::Result<()> {
                     .with_context(|| format!("the env {env} declares no l1_chain_id"))?,
             )
             .await?;
-            env_inputs(&env_cfg)?
+            (env_inputs(&env_cfg)?, Some(env_cfg.bridgehub()))
         }
-        None => ReviewedInputs {
-            factory: DETERMINISTIC_CREATE2_FACTORY,
-            salts: BTreeSet::new(),
-            governance: args
-                .governance
-                .context("pass --governance or --env: the governance owner is a reviewed input")?,
-            env_ctms: None,
-            ctm_facts: BTreeMap::new(),
-        },
+        None => (
+            ReviewedInputs {
+                factory: DETERMINISTIC_CREATE2_FACTORY,
+                salts: BTreeSet::new(),
+                governance: args.governance.context(
+                    "pass --governance or --env: the governance owner is a reviewed input",
+                )?,
+                env_ctms: None,
+                ctm_facts: BTreeMap::new(),
+                ecosystem_proxy_admin: None,
+            },
+            package.bridgehub,
+        ),
     };
     if let Some(governance) = args.governance {
         inputs.governance = governance;
     }
     inputs.salts.extend(args.create2_salts.iter().copied());
-    let package = PackageView::load(ecosystem_toml)?;
     let ctms = inputs.env_ctms.clone().unwrap_or_else(|| package.ctms());
     inputs.ctm_facts = read_ctm_facts(&provider, &ctms).await?;
+    if let Some(bridgehub) = bridgehub {
+        inputs.ecosystem_proxy_admin = Some(read_proxy_admin(&provider, bridgehub).await?);
+    }
     report(
         &reviewed_build(args.contract_hashes.as_deref())?,
         &package,
@@ -1672,6 +1728,7 @@ mod tests {
     const SUPPLIER: Address = Address::repeat_byte(0xB5);
     const CTM: Address = Address::repeat_byte(0xC7);
     const CTM_PROXY_ADMIN: Address = Address::repeat_byte(0xCA);
+    const ECOSYSTEM_PROXY_ADMIN: Address = Address::repeat_byte(0xEA);
     const NOTIFIER: Address = Address::repeat_byte(0x9E);
     const OLD_NOTIFIER_ADMIN: Address = Address::repeat_byte(0x6B);
     const CHAIN_ADMIN: Address = Address::repeat_byte(0x16);
@@ -1690,12 +1747,25 @@ mod tests {
                 "CTMUpgradeExecutor",
                 creation("CTMUpgradeExecutor"),
             ),
+            (
+                REVIEWED_PROXY.0,
+                REVIEWED_PROXY.1,
+                creation(REVIEWED_PROXY.1),
+            ),
         ])
         .with_constructor(
             "AdminFacet",
             &[("_l1ChainId", "uint256"), ("_rollupDAManager", "address")],
         )
         .with_constructor("CTMRelease", &[("_manifest", "(uint256,address[])")])
+        .with_constructor(
+            REVIEWED_PROXY.1,
+            &[
+                ("_logic", "address"),
+                ("admin_", "address"),
+                ("_data", "bytes"),
+            ],
+        )
     }
 
     fn landing(salt: B256, init: &[u8]) -> Address {
@@ -1853,6 +1923,7 @@ data = "{nominate}"
             governance: GOVERNANCE,
             env_ctms: Some([CTM].into()),
             ctm_facts: [(CTM, live_ctm())].into(),
+            ecosystem_proxy_admin: Some(ECOSYSTEM_PROXY_ADMIN),
         }
     }
 
@@ -2291,6 +2362,105 @@ data = "{nominate}"
         );
     }
 
+    /// The package's ecosystem ProxyAdmin is held to the EIP-1967 admin of the env's Bridgehub.
+    #[test]
+    fn the_ecosystem_proxy_admin_agrees_with_l1() {
+        let named = format!(
+            "{}\n[core.upgrade_addresses.shared]\ntransparent_proxy_admin = \"{ECOSYSTEM_PROXY_ADMIN}\"\n",
+            package_toml()
+        );
+        let mut plan = clean_plan();
+        plan.push((ECOSYSTEM_PROXY_ADMIN, U256::ZERO, handover_to(GOVERNANCE)));
+        let verdict = check_plan(
+            &build(),
+            &package_from(&named),
+            &inputs(),
+            &calls(plan.clone()),
+        );
+        assert!(verdict.refused.is_empty(), "{:#?}", verdict.refused);
+        assert!(verdict
+            .admitted
+            .last()
+            .unwrap()
+            .contains("on the ecosystem ProxyAdmin ([core.upgrade_addresses.shared]"));
+
+        let mut moved = inputs();
+        moved.ecosystem_proxy_admin = Some(STRANGER);
+        let verdict = check_plan(
+            &build(),
+            &package_from(&named),
+            &moved,
+            &calls(plan.clone()),
+        );
+        assert_eq!(verdict.refused.len(), 1, "{:#?}", verdict.refused);
+        assert!(
+            verdict.refused[0].contains(&format!(
+                "{ECOSYSTEM_PROXY_ADMIN} is not the EIP-1967 admin of the Bridgehub on L1, which \
+                 is {STRANGER}"
+            )),
+            "{}",
+            verdict.refused[0]
+        );
+
+        // Without an env, a package naming no Bridgehub has nothing to hold its admin to.
+        let mut unknown = inputs();
+        unknown.ecosystem_proxy_admin = None;
+        let verdict = check_plan(&build(), &package_from(&named), &unknown, &calls(plan));
+        assert_eq!(verdict.refused.len(), 1, "{:#?}", verdict.refused);
+        assert!(
+            verdict.refused[0].contains("the package names no [core.upgrade_addresses.bridgehub]"),
+            "{}",
+            verdict.refused[0]
+        );
+    }
+
+    /// A proxy the package names, in front of a recorded implementation, is admitted under the
+    /// ecosystem ProxyAdmin only while that is the Bridgehub's admin on L1.
+    #[test]
+    fn a_proxy_under_the_ecosystem_proxy_admin_agrees_with_l1() {
+        let logic = landing(SALT, &admin_init());
+        let init = [
+            creation(REVIEWED_PROXY.1),
+            (logic, ECOSYSTEM_PROXY_ADMIN, Bytes::new()).abi_encode_params(),
+        ]
+        .concat();
+        let named = format!(
+            "{}\n[core.upgrade_addresses.shared]\ntransparent_proxy_admin = \"{ECOSYSTEM_PROXY_ADMIN}\"\n\n\
+             [core.deployed_addresses]\nproxy_addr = \"{}\"\n",
+            package_toml(),
+            landing(SALT, &init)
+        );
+        let mut plan = clean_plan();
+        plan.push((
+            DETERMINISTIC_CREATE2_FACTORY,
+            U256::ZERO,
+            deploy(SALT, &init).1,
+        ));
+        let verdict = check_plan(
+            &build(),
+            &package_from(&named),
+            &inputs(),
+            &calls(plan.clone()),
+        );
+        assert!(verdict.refused.is_empty(), "{:#?}", verdict.refused);
+        assert!(verdict.admitted.last().unwrap().contains(&format!(
+            "a TransparentUpgradeableProxy in front of the recorded implementation {logic}"
+        )));
+
+        let mut moved = inputs();
+        moved.ecosystem_proxy_admin = Some(STRANGER);
+        let verdict = check_plan(&build(), &package_from(&named), &moved, &calls(plan));
+        assert_eq!(verdict.refused.len(), 1, "{:#?}", verdict.refused);
+        assert!(
+            verdict.refused[0].contains(&format!(
+                "its admin {ECOSYSTEM_PROXY_ADMIN} is neither the ecosystem ProxyAdmin nor the \
+                 ProxyAdmin of one of its CTMs on L1"
+            )),
+            "{}",
+            verdict.refused[0]
+        );
+    }
+
     #[test]
     fn a_plan_the_deployer_signs_nothing_of_needs_no_check() {
         let dir = tempfile::tempdir().unwrap();
@@ -2494,6 +2664,29 @@ data = "{nominate}"
                 assert!(per_ctm.contains_key(&ctm), "{env}: no salt for CTM {ctm}");
             }
         }
+    }
+
+    /// The PUH/Guardians redeploy deploys under a salt and from artifacts the check does not know.
+    #[test]
+    fn a_release_redeploying_the_governance_set_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("stage.toml"),
+            "redeploy_zk_governance = true\n",
+        )
+        .unwrap();
+        let cfg = match EnvConfig::load_from_upgrade_env_dir("stage", dir.path().to_str().unwrap())
+        {
+            Ok(cfg) => cfg,
+            // no checkout around the test binary
+            Err(_) if crate::common::paths::resolve_l1_contracts_path().is_err() => return,
+            Err(e) => panic!("{e:#}"),
+        };
+        let error = env_inputs(&cfg).unwrap_err().to_string();
+        assert!(
+            error.contains("declares `redeploy_zk_governance = true`, but the deployer plan check"),
+            "{error}"
+        );
     }
 
     #[test]
