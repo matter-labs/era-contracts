@@ -142,7 +142,7 @@ abstract contract UpgradeIntegrationBootstrapFixture is
 
     function setUp() public virtual {
         previousRelease = _loadPreviousRelease();
-        FixtureChain memory chain = _fixtureChain(UPGRADED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+        FixtureChain memory chain = _fixtureChain(previousRelease, UPGRADED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
         _prepareSettlement(chain);
         _settleBatch(chain);
         _installChainAdmin(chain);

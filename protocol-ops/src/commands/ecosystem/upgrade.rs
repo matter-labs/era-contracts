@@ -2197,8 +2197,9 @@ mod release_script_tests {
 
     /// The Foundry full-flow upgrade test of the default edge (`UpgradeTest_Local`, the registry
     /// bootstrap) must run the scripts this command prepares with by default: its CTM test subclass
-    /// extends the default CTM script, and it runs the default core script (or a subclass). A release that changes a default here fails
-    /// this until that test is moved onto the new scripts too.
+    /// extends the default CTM script, and it runs the default core script (or a subclass). A
+    /// release that changes a default here fails this until that test is moved onto the new
+    /// scripts too.
     #[test]
     fn prepare_defaults_match_the_foundry_full_flow_test() {
         let contract_name = |script_path: &str| -> String {

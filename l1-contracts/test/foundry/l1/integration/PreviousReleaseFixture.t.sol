@@ -36,8 +36,8 @@ contract PreviousReleaseFixtureTest is PreviousReleaseFixture {
     }
 
     function test_settlingClearsTheGenesisUpgradeAndExecutesEveryCommittedBatch() public {
-        _loadPreviousRelease();
-        FixtureChain memory chain = _fixtureChain(L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+        PreviousRelease memory release = _loadPreviousRelease();
+        FixtureChain memory chain = _fixtureChain(release, L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
         IGetters getters = IGetters(chain.diamondProxy);
         assertTrue(getters.getL2SystemContractsUpgradeTxHash() != bytes32(0), "fixture chain has no pending upgrade");
 
@@ -52,8 +52,8 @@ contract PreviousReleaseFixtureTest is PreviousReleaseFixture {
     }
 
     function test_settlesConsecutiveBatches() public {
-        _loadPreviousRelease();
-        FixtureChain memory chain = _fixtureChain(L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+        PreviousRelease memory release = _loadPreviousRelease();
+        FixtureChain memory chain = _fixtureChain(release, L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
         _prepareSettlement(chain);
         _settleBatch(chain);
         _settleBatch(chain);
@@ -63,7 +63,7 @@ contract PreviousReleaseFixtureTest is PreviousReleaseFixture {
 
     function test_handsTheEcosystemToGovernanceAndTheChainToAChainAdmin() public {
         PreviousRelease memory release = _loadPreviousRelease();
-        FixtureChain memory chain = _fixtureChain(L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+        FixtureChain memory chain = _fixtureChain(release, L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
 
         address chainAdmin = _installChainAdmin(chain);
         _handAuthorityToGovernance(release);
@@ -93,12 +93,31 @@ contract PreviousReleaseFixtureTest is PreviousReleaseFixture {
     }
 
     function test_RevertWhen_GenesisRootIsNotTheChainsBatchZero() public {
-        _loadPreviousRelease();
+        PreviousRelease memory release = _loadPreviousRelease();
         vm.expectRevert(bytes("batch zero does not match the chain's stored genesis batch"));
-        this.fixtureChainExternal(L1_SETTLED_CHAIN_ID, keccak256("not the genesis root"));
+        this.fixtureChainExternal(release, L1_SETTLED_CHAIN_ID, keccak256("not the genesis root"));
     }
 
-    function fixtureChainExternal(uint256 _chainId, bytes32 _genesisRoot) external view returns (uint64) {
-        return _fixtureChain(_chainId, _genesisRoot).lastBatch.batchNumber;
+    function test_RevertWhen_ChainIsNotInTheFixture() public {
+        PreviousRelease memory release = _loadPreviousRelease();
+        vm.expectRevert(bytes("chain not in the fixture"));
+        this.fixtureChainExternal(release, type(uint64).max, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+    }
+
+    function test_RevertWhen_FixtureChainAlreadyCommitted() public {
+        PreviousRelease memory release = _loadPreviousRelease();
+        FixtureChain memory chain = _fixtureChain(release, L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+        _prepareSettlement(chain);
+        _settleBatch(chain);
+        vm.expectRevert(bytes("fixture chain already committed"));
+        this.fixtureChainExternal(release, L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+    }
+
+    function fixtureChainExternal(
+        PreviousRelease memory _release,
+        uint256 _chainId,
+        bytes32 _genesisRoot
+    ) external view returns (uint64) {
+        return _fixtureChain(_release, _chainId, _genesisRoot).lastBatch.batchNumber;
     }
 }

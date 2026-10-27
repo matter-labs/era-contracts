@@ -14,7 +14,6 @@ import {
     ZKSYNC_OS_MOCK_PROOF_MAGIC,
     ZKSYNC_OS_MOCK_VERIFICATION_TYPE
 } from "contracts/common/Config.sol";
-import {InteropRoot} from "contracts/common/Messaging.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -23,12 +22,12 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
-import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {Utils as TestUtils} from "../../unit/concrete/Utils/Utils.sol";
 
 import {
     ANVIL_FIXTURE_DEPLOYER,
@@ -161,9 +160,11 @@ abstract contract PreviousReleaseFixture is Test {
     }
 
     /// @notice The fixture chain `_chainId`, positioned at batch zero for {_settleBatch}.
+    /// @param _release The release {_loadPreviousRelease} loaded.
     /// @param _genesisBatchHash The genesis root of the release the chain was created from. Batch zero is rebuilt
     ///        from it and checked against the chain's stored hash, since a pre-registry CTM keeps only that hash.
     function _fixtureChain(
+        PreviousRelease memory _release,
         uint256 _chainId,
         bytes32 _genesisBatchHash
     ) internal view returns (FixtureChain memory chain) {
@@ -172,7 +173,7 @@ abstract contract PreviousReleaseFixture is Test {
                 vm.projectRoot(),
                 ANVIL_INTEROP_DIR,
                 "/chain-states/",
-                _previousStateVersion(),
+                _release.stateVersion,
                 "/addresses.json"
             )
         );
@@ -250,25 +251,13 @@ abstract contract PreviousReleaseFixture is Test {
         proof[0] = ZKSYNC_OS_MOCK_VERIFICATION_TYPE;
         proof[2] = ZKSYNC_OS_MOCK_PROOF_MAGIC;
         proof[3] = uint256(storedBatch.commitment) >> PUBLIC_INPUT_SHIFT;
+        (, , bytes memory proveData) = TestUtils.encodeProveBatchesData(prevBatch, batches, proof);
         vm.prank(ANVIL_FIXTURE_DEPLOYER);
-        timelock.proveBatchesSharedBridge(
-            _chain.diamondProxy,
-            batchNumber,
-            batchNumber,
-            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), abi.encode(prevBatch, batches, proof))
-        );
+        timelock.proveBatchesSharedBridge(_chain.diamondProxy, batchNumber, batchNumber, proveData);
 
-        BatchDecoder.DecodedExecuteData memory executeData;
-        executeData.batchesData = batches;
-        executeData.priorityOpsData = new PriorityOpsBatchInfo[](1);
-        executeData.dependencyRoots = new InteropRoot[][](1);
+        (, , bytes memory executeData) = TestUtils.encodeExecuteBatchesData(batches, new PriorityOpsBatchInfo[](1));
         vm.prank(ANVIL_FIXTURE_DEPLOYER);
-        timelock.executeBatchesSharedBridge(
-            _chain.diamondProxy,
-            batchNumber,
-            batchNumber,
-            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE), abi.encode(executeData))
-        );
+        timelock.executeBatchesSharedBridge(_chain.diamondProxy, batchNumber, batchNumber, executeData);
 
         assertEq(getters.getTotalBatchesExecuted(), batchNumber, "batch not executed");
         assertEq(getters.getL2SystemContractsUpgradeTxHash(), bytes32(0), "system upgrade tx still pending");
@@ -329,7 +318,8 @@ abstract contract PreviousReleaseFixture is Test {
             chainConfigHash: c.chainConfigHash,
             interopFeeUnits: 0
         });
-        return bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION_COMMIT), abi.encode(_prevBatch, current));
+        (, , bytes memory commitData) = TestUtils.encodeCommitBatchesDataZKsyncOS(_prevBatch, current);
+        return commitData;
     }
 
     function _committedCommitment(address _diamondProxy) private returns (bytes32 commitment) {
@@ -353,12 +343,5 @@ abstract contract PreviousReleaseFixture is Test {
         IOwnable(_target).transferOwnership(_newOwner);
         vm.prank(_newOwner);
         IOwnable(_target).acceptOwnership();
-    }
-
-    function _previousStateVersion() private view returns (string memory) {
-        string memory anvilConfig = vm.readFile(
-            string.concat(vm.projectRoot(), ANVIL_INTEROP_DIR, "/config/anvil-config.json")
-        );
-        return anvilConfig.readString(".upgradeSourceStateVersion");
     }
 }
