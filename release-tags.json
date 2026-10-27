@@ -33,6 +33,12 @@
       "commit": "0efa1dd07c556fe9dc43923a7c856167c0d3a558",
       "branch": "release/v0.33.0-atomic-interop",
       "genesis": { "era": "0.33.0", "zksync-os": "0.33.2" }
+    },
+    {
+      "name": "zip-18",
+      "commit": "8ecd3f81663171b54a58262baf44f38f10d8615f",
+      "branch": "release/era-mainnet-zip-18",
+      "genesis": { "era": "0.33.0", "zksync-os": "0.31.2" }
     }
   ],
   "deployments": [

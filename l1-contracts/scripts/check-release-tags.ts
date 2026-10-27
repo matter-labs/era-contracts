@@ -10,12 +10,12 @@ import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const CTM_ABI = require("./abi/IChainTypeManager.json").abi;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const GETTERS_ABI = require("./abi/IGetters.json").abi;
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const BRIDGEHUB_ABI = require("./abi/IBridgehubBase.json").abi;
+// Both the CTM and a chain's diamond (IGetters) expose this.
+const SEMVER_ABI = ["function getSemverProtocolVersion() view returns (uint32, uint32, uint32)"];
+const BRIDGEHUB_ABI = [
+  "function chainTypeManager(uint256 chainId) view returns (address)",
+  "function getZKChain(uint256 chainId) view returns (address)",
+];
 
 const REPO_ROOT = path.join(__dirname, "..", "..");
 const MANIFEST_PATH = path.join(REPO_ROOT, "release-tags.json");
@@ -184,25 +184,34 @@ async function checkDeployments(_manifest: Manifest, _requireOnchain: boolean) {
     }
     const provider = providers.get(rpcUrl)!;
 
-    const ctmVersion = await semver(new ethers.Contract(deployment.ctm, CTM_ABI, provider));
-    if (ctmVersion != deployment.protocolVersion) {
-      errors.push(`${label}: CTM is at ${ctmVersion}, release-tags.json says ${deployment.protocolVersion}`);
+    try {
+      await checkOnchain(deployment, label, provider);
+    } catch (error) {
+      // An unreachable RPC or a failed call is reported, not mistaken for a mismatch.
+      errors.push(`${label}: on-chain check failed: ${error instanceof Error ? error.message : error}`);
     }
+  }
+}
 
-    const bridgehub = new ethers.Contract(deployment.bridgehub, BRIDGEHUB_ABI, provider);
-    for (const chainId of deployment.chains) {
-      const chainCtm: string = await bridgehub.chainTypeManager(chainId);
-      if (chainCtm.toLowerCase() != deployment.ctm.toLowerCase()) {
-        errors.push(`${label}: chain ${chainId} is registered under CTM ${chainCtm}`);
-        continue;
-      }
-      const diamond = new ethers.Contract(await bridgehub.getZKChain(chainId), GETTERS_ABI, provider);
-      const chainVersion = await semver(diamond);
-      if (chainVersion != deployment.protocolVersion) {
-        errors.push(
-          `${label}: chain ${chainId} is at ${chainVersion}, release-tags.json says ${deployment.protocolVersion}`
-        );
-      }
+async function checkOnchain(_deployment: Deployment, _label: string, _provider: ethers.providers.Provider) {
+  const ctmVersion = await semver(new ethers.Contract(_deployment.ctm, SEMVER_ABI, _provider));
+  if (ctmVersion != _deployment.protocolVersion) {
+    errors.push(`${_label}: CTM is at ${ctmVersion}, release-tags.json says ${_deployment.protocolVersion}`);
+  }
+
+  const bridgehub = new ethers.Contract(_deployment.bridgehub, BRIDGEHUB_ABI, _provider);
+  for (const chainId of _deployment.chains) {
+    const chainCtm: string = await bridgehub.chainTypeManager(chainId);
+    if (chainCtm.toLowerCase() != _deployment.ctm.toLowerCase()) {
+      errors.push(`${_label}: chain ${chainId} is registered under CTM ${chainCtm}`);
+      continue;
+    }
+    const diamond = new ethers.Contract(await bridgehub.getZKChain(chainId), SEMVER_ABI, _provider);
+    const chainVersion = await semver(diamond);
+    if (chainVersion != _deployment.protocolVersion) {
+      errors.push(
+        `${_label}: chain ${chainId} is at ${chainVersion}, release-tags.json says ${_deployment.protocolVersion}`
+      );
     }
   }
 }
