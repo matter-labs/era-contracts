@@ -233,8 +233,9 @@ The server uses contracts in two ways: **prebuilt** bootloaders per VM in `etc/m
   - stage: `0xd669494442609879b209CcA8eba2BdC904D2E69D`, owner of the 12 member Safes behind the Emergency Upgrade Board
     (`approveHash` on each, then `executeEmergencyUpgrade`);
   - testnet2 (the customer ZKsync OS testnets): `0xD64e136566a9E04eb05B30184fF577F52682D182`, same emergency path;
-  - testnet3 (EraVM): governed by a ProtocolUpgradeHandler since 2026-10, so the same emergency path;
-    `0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b` still owns chain 312's ChainAdmin;
+  - testnet3 (EraVM): `0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b`, owner of the member Safes behind the Emergency
+    Upgrade Board of its ProtocolUpgradeHandler (since 2026-10, so the same emergency path) and of the ChainAdmins of
+    chains 312 and 300300;
   - stage3: `0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`, through a legacy `Governance` (`scheduleTransparent` +
     `execute`);
   - chain upgrades are a ChainAdmin `multicall` from that ChainAdmin's owner.

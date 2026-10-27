@@ -1386,10 +1386,11 @@ mod tests {
     /// `[contracts]`, or a CTM array that resolves to nothing).
     #[test]
     fn every_committed_env_config_loads() {
+        if crate::common::paths::resolve_l1_contracts_path().is_err() {
+            return; // no checkout around the test binary
+        }
         for env in ["stage", "testnet", "mainnet", "adi", "testnet3"] {
-            let Ok(cfg) = EnvConfig::load(env) else {
-                return; // no checkout around the test binary
-            };
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("{env}: {e:#}"));
             assert_ne!(cfg.bridgehub(), Address::ZERO, "{env}: bridgehub is unset");
             assert!(
                 !cfg.ctms().is_empty(),
