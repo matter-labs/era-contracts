@@ -1,10 +1,9 @@
 # Permanent values for `testnet3`: the EraVM testnet ecosystem on Sepolia (chain 312, the Era testnet
 # that replaced chain 301), deployed at v0.31.1 in Sepolia block 11759177.
 #
-# The bridgehub, the CTM and the ChainAssetHandler are owned by a legacy `Governance.sol`
-# (0xD7b2fEB2…) whose owner and security council are the EOA 0xeC6A5c56… and whose minDelay is 0, so
-# an upgrade is `scheduleTransparent(op, 0)` + `execute(op)` from that EOA. The EOA also owns both
-# chains' ChainAdmins.
+# The bridgehub, the CTM and the ChainAssetHandler are owned by a ProtocolUpgradeHandler (since
+# 2026-10; before that by a legacy `Governance.sol`), so governance calls go through its Emergency
+# Upgrade Board. The chains' ChainAdmins are owned by the EOA 0xeC6A5c56….
 
 l1_chain_id = 11155111
 
@@ -16,7 +15,7 @@ create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 
 [core_contracts]
 bridgehub_proxy_addr = "0xF49C690785b9fE5261d786237348A66896e2F477"
-governance_kind = "legacy"
+governance_kind = "puh"
 
 [[ctm_contracts.ctms]]
 proxy = "0x4d058d138F477c4b97B3D762f923811b20220078"

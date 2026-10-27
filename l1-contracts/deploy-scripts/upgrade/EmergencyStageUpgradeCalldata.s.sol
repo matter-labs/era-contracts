@@ -9,8 +9,6 @@ import {
 } from "../utils/Utils.sol";
 import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol";
 import {IEmergencyUpgrageBoard} from "../interfaces/IEmergencyUpgrageBoard.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {Call} from "contracts/governance/Common.sol";
 import {Script, console2} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -27,10 +25,6 @@ interface ISafeMsg {
 
 interface IOwnableT {
     function owner() external view returns (address);
-}
-
-interface ILegacyGovernanceT {
-    function minDelay() external view returns (uint256);
 }
 
 interface IEmergencyUpgradeBoardHandlerT {
@@ -72,8 +66,6 @@ contract EmergencyStageUpgradeCalldata is Script {
     bytes32 constant SALT = bytes32(0);
     /// @notice `core_contracts.governance_kind` of an env whose bridgehub is owned by a ProtocolUpgradeHandler.
     string constant PUH_GOVERNANCE_KIND = "puh";
-    /// @notice `core_contracts.governance_kind` of an env whose bridgehub is owned by a legacy `Governance.sol`.
-    string constant LEGACY_GOVERNANCE_KIND = "legacy";
     /// @notice Governance stages in an `ecosystem.toml` (`governance_calls.stage{0,1,2}_calls`).
     uint256 constant GOVERNANCE_STAGE_COUNT = 3;
 
@@ -132,29 +124,6 @@ contract EmergencyStageUpgradeCalldata is Script {
         console2.log("Written to", path);
     }
 
-    /// @notice Governance stages 0, 1 and 2 of `_ecosystemToml` as ONE governance operation on the ecosystem of
-    /// `_permanentValues`, written to `_outputJson` for `protocol_ops dev execution-runbook`. A
-    /// ProtocolUpgradeHandler env gets the emergency proposal of {emergencyUpgradeAllStages}. A legacy
-    /// `Governance.sol` env gets `scheduleTransparent(op, 0)` then `execute(op)`, both from the Governance's
-    /// owner, as a transaction-simulator JSON list. Only for upgrades with no timer between their stages.
-    function governanceAllStages(
-        string memory _permanentValues,
-        string memory _ecosystemToml,
-        string memory _outputJson
-    ) external {
-        string memory path = string.concat(vm.projectRoot(), _outputJson);
-        if (_isGovernanceKind(_permanentValues, PUH_GOVERNANCE_KIND)) {
-            EmergencyBoard memory board = _resolveBoard(_permanentValues);
-            EmergencyTx[] memory txs = _buildProposal(board, _loadAllStages(_ecosystemToml));
-            _logProposal(board, txs, "ALL GOVERNANCE STAGES");
-            vm.writeFile(path, _proposalJson(board, txs, _ecosystemToml));
-        } else {
-            require(_isGovernanceKind(_permanentValues, LEGACY_GOVERNANCE_KIND), "unknown governance_kind");
-            vm.writeFile(path, _legacyGovernanceJson(_permanentValues, _loadAllStages(_ecosystemToml)));
-        }
-        console2.log("Written to", path);
-    }
-
     /// @notice Read-only: prints the emergency path of the ecosystem of `_permanentValues` (handler, board,
     /// the members whose approvals the board needs, and their owner) and checks that the owner can approve
     /// on every one of them. Builds no proposal.
@@ -170,87 +139,6 @@ contract EmergencyStageUpgradeCalldata is Script {
         _logMembers("Security Council", board.securityCouncil, council);
         console2.log("ZK Foundation Safe:", board.zkFoundationSafe);
         console2.log("Approving Safes (approveHash txs per proposal):", guardians.length + council.length + 1);
-    }
-
-    function _isGovernanceKind(string memory _permanentValues, string memory _kind) internal view returns (bool) {
-        string memory toml = vm.readFile(string.concat(vm.projectRoot(), _permanentValues));
-        return keccak256(bytes(toml.readString("$.core_contracts.governance_kind"))) == keccak256(bytes(_kind));
-    }
-
-    /// @dev `scheduleTransparent(op, 0)` and `execute(op)` on the bridgehub's legacy Governance, both from its
-    ///      owner, in the transaction-simulator JSON layout. `execute` needs the delay to have passed, so the
-    ///      Governance's `minDelay` must be 0 for the two to go out back to back.
-    function _legacyGovernanceJson(
-        string memory _permanentValues,
-        IProtocolUpgradeHandler.Call[] memory _calls
-    ) internal view returns (string memory json) {
-        string memory toml = vm.readFile(string.concat(vm.projectRoot(), _permanentValues));
-        address governance = IOwnableT(toml.readAddress("$.core_contracts.bridgehub_proxy_addr")).owner();
-        require(ILegacyGovernanceT(governance).minDelay() == 0, "legacy Governance has a non-zero minDelay");
-        address owner = IOwnableT(governance).owner();
-
-        uint256 callCount = _calls.length;
-        Call[] memory calls = new Call[](callCount);
-        for (uint256 i = 0; i < callCount; ++i) {
-            calls[i] = Call({target: _calls[i].target, value: _calls[i].value, data: _calls[i].data});
-        }
-        IGovernance.Operation memory operation = IGovernance.Operation({
-            calls: calls,
-            predecessor: bytes32(0),
-            salt: SALT
-        });
-        console2.log("Legacy Governance:", governance);
-        console2.log("Sender (Governance owner):", owner);
-        console2.log("Operation id:", vm.toString(IGovernance(governance).hashOperation(operation)));
-
-        string memory network = block.chainid == 1 ? "mainnet" : "sepolia";
-        require(block.chainid == 1 || block.chainid == 11155111, "unsupported L1");
-        json = string.concat(
-            "[\n",
-            _simulatorTx(
-                "Governance.scheduleTransparent(governance stages 0-2, delay 0)",
-                network,
-                owner,
-                governance,
-                abi.encodeCall(IGovernance.scheduleTransparent, (operation, 0)),
-                false
-            ),
-            _simulatorTx(
-                "Governance.execute(governance stages 0-2)",
-                network,
-                owner,
-                governance,
-                abi.encodeCall(IGovernance.execute, (operation)),
-                true
-            ),
-            "]\n"
-        );
-    }
-
-    function _simulatorTx(
-        string memory _description,
-        string memory _network,
-        address _from,
-        address _to,
-        bytes memory _data,
-        bool _last
-    ) internal pure returns (string memory) {
-        return
-            string.concat(
-                "  {\n",
-                '    "description": "',
-                _description,
-                '",\n    "network": "',
-                _network,
-                '",\n    "from": "',
-                vm.toString(_from),
-                '",\n    "to": "',
-                vm.toString(_to),
-                '",\n    "data": "',
-                vm.toString(_data),
-                '"\n',
-                _last ? "  }\n" : "  },\n"
-            );
     }
 
     /// @dev Copies `_from` into `_into` starting at `_at`; returns the next free index.
