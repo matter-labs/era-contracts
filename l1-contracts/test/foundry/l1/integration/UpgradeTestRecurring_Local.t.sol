@@ -1025,7 +1025,11 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             _before.ctmCurrentRelease,
             "the release pointer must not move"
         );
-        assertEq(IGetters(_upgradedChainDiamond).getProtocolVersion(), _before.chainProtocolVersion, "no chain version may move");
+        assertEq(
+            IGetters(_upgradedChainDiamond).getProtocolVersion(),
+            _before.chainProtocolVersion,
+            "no chain version may move"
+        );
         assertEq(
             IChainTypeManager(inputs.ctm).protocolVersionDeadline(_before.ctmProtocolVersion),
             _before.departingVersionDeadline,
@@ -1041,7 +1045,11 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             _before.pendingL2UpgradeTxHash,
             "a pending L2 upgrade must survive untouched"
         );
-        assertEq(address(IGetters(_upgradedChainDiamond).getVerifier()), _before.chainVerifier, "the verifier is untouched");
+        assertEq(
+            address(IGetters(_upgradedChainDiamond).getVerifier()),
+            _before.chainVerifier,
+            "the verifier is untouched"
+        );
     }
 
     function _prefix(string memory _value, uint256 _length) private pure returns (string memory) {

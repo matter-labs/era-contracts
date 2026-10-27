@@ -135,7 +135,11 @@ abstract contract PreviousReleaseFixture is Test {
         vm.prank(IOwnable(notifier).owner());
         IOwnable(notifier).transferOwnership(_release.ctmChainAdmin);
         IChainAdminOwnable.Call[] memory accept = new IChainAdminOwnable.Call[](1);
-        accept[0] = IChainAdminOwnable.Call({target: notifier, value: 0, data: abi.encodeCall(IOwnable.acceptOwnership, ())});
+        accept[0] = IChainAdminOwnable.Call({
+            target: notifier,
+            value: 0,
+            data: abi.encodeCall(IOwnable.acceptOwnership, ())
+        });
         vm.prank(IOwnable(_release.ctmChainAdmin).owner());
         IChainAdminOwnable(_release.ctmChainAdmin).multicall(accept, true);
     }
@@ -147,7 +151,11 @@ abstract contract PreviousReleaseFixture is Test {
         vm.prank(IGetters(_chain.diamondProxy).getAdmin());
         IAdmin(_chain.diamondProxy).setPendingAdmin(chainAdmin);
         IChainAdminOwnable.Call[] memory accept = new IChainAdminOwnable.Call[](1);
-        accept[0] = IChainAdminOwnable.Call({target: _chain.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.acceptAdmin, ())});
+        accept[0] = IChainAdminOwnable.Call({
+            target: _chain.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.acceptAdmin, ())
+        });
         vm.prank(ANVIL_FIXTURE_DEPLOYER);
         IChainAdminOwnable(chainAdmin).multicall(accept, true);
     }

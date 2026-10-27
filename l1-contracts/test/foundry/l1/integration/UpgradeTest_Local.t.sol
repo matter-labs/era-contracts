@@ -361,7 +361,11 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
 
         // Protocol version bumps, on the CTM and on the chain that crossed via the legacy leg.
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
-        assertEq(IGetters(_upgradedChainDiamond).getProtocolVersion(), _expectedNewVersion, "the chain did not cross the edge");
+        assertEq(
+            IGetters(_upgradedChainDiamond).getProtocolVersion(),
+            _expectedNewVersion,
+            "the chain did not cross the edge"
+        );
 
         // The edge is one-shot and spent.
         assertTrue(bootstrap.bootstrapMigration().executed(), "migration must be spent");
@@ -433,10 +437,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         // The genesis engine is a release member like any other: the bootstrap replaces the
         // pre-v35 engine discovery reported, and the CTM serves the release's.
         (address releaseGenesisEngine, , ) = ICTMRelease(release).genesisParams();
-        assertTrue(
-            releaseGenesisEngine != genesisEngineBeforeUpgrade,
-            "the release must not keep the pre-v35 engine"
-        );
+        assertTrue(releaseGenesisEngine != genesisEngineBeforeUpgrade, "the release must not keep the pre-v35 engine");
         assertTrue(releaseGenesisEngine.code.length != 0, "the release's engine is deployed");
         assertEq(
             IChainTypeManager(ctm).l1GenesisUpgrade(),
@@ -623,7 +624,11 @@ contract UpgradeIntegrationTestLocalCTMOwnerCrossing is UpgradeIntegrationBootst
 
     function test_theCTMOwnerCrossesAPreV35ChainOverTheBootstrapEdge() public view {
         address release = IChainTypeManager(ctmUpgrade.getCTMAddress()).currentRelease();
-        assertEq(IGetters(_upgradedChainDiamond).getProtocolVersion(), _expectedNewVersion, "the chain crossed the edge");
+        assertEq(
+            IGetters(_upgradedChainDiamond).getProtocolVersion(),
+            _expectedNewVersion,
+            "the chain crossed the edge"
+        );
         assertEq(
             address(IGetters(_upgradedChainDiamond).getVerifier()),
             ICTMRelease(release).verifier(),
