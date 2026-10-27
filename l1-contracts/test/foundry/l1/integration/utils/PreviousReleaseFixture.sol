@@ -24,6 +24,11 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {
     ANVIL_FIXTURE_DEPLOYER,
@@ -69,6 +74,7 @@ abstract contract PreviousReleaseFixture is Test {
         address nullifier;
         address governance;
         address chainTypeManager;
+        address ctmChainAdmin;
     }
 
     struct FixtureChain {
@@ -108,6 +114,42 @@ abstract contract PreviousReleaseFixture is Test {
         release.nullifier = addresses.readAddress(".l1Addresses.l1NullifierProxy");
         release.governance = addresses.readAddress(".l1Addresses.governance");
         release.chainTypeManager = addresses.readAddress(".ctmAddresses.chainTypeManager");
+        release.ctmChainAdmin = addresses.readAddress(".ctmAddresses.chainAdmin");
+    }
+
+    /// @notice Gives the loaded ecosystem a production ecosystem's authority, which the anvil fixtures partly leave
+    ///         with their deployer: governance owns the core contracts, the CTM and the CTM's ProxyAdmin, and the CTM's
+    ///         ChainAdmin owns the ServerNotifier.
+    function _handAuthorityToGovernance(PreviousRelease memory _release) internal {
+        _transferTwoStep(_release.bridgehub, _release.governance);
+        _transferTwoStep(_release.sharedBridge, _release.governance);
+        _transferTwoStep(_release.nativeTokenVault, _release.governance);
+        _transferTwoStep(_release.nullifier, _release.governance);
+        _transferTwoStep(_release.chainTypeManager, _release.governance);
+
+        ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(_release.chainTypeManager));
+        vm.prank(ctmProxyAdmin.owner());
+        ctmProxyAdmin.transferOwnership(_release.governance);
+
+        address notifier = IChainTypeManager(_release.chainTypeManager).serverNotifierAddress();
+        vm.prank(IOwnable(notifier).owner());
+        IOwnable(notifier).transferOwnership(_release.ctmChainAdmin);
+        IChainAdminOwnable.Call[] memory accept = new IChainAdminOwnable.Call[](1);
+        accept[0] = IChainAdminOwnable.Call({target: notifier, value: 0, data: abi.encodeCall(IOwnable.acceptOwnership, ())});
+        vm.prank(IOwnable(_release.ctmChainAdmin).owner());
+        IChainAdminOwnable(_release.ctmChainAdmin).multicall(accept, true);
+    }
+
+    /// @notice Hands `_chain` to a new `ChainAdminOwnable` owned by the fixture's deployer, as production chains are
+    ///         administered through a ChainAdmin rather than an EOA.
+    function _installChainAdmin(FixtureChain memory _chain) internal returns (address chainAdmin) {
+        chainAdmin = address(new ChainAdminOwnable(ANVIL_FIXTURE_DEPLOYER, ANVIL_FIXTURE_DEPLOYER));
+        vm.prank(IGetters(_chain.diamondProxy).getAdmin());
+        IAdmin(_chain.diamondProxy).setPendingAdmin(chainAdmin);
+        IChainAdminOwnable.Call[] memory accept = new IChainAdminOwnable.Call[](1);
+        accept[0] = IChainAdminOwnable.Call({target: _chain.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.acceptAdmin, ())});
+        vm.prank(ANVIL_FIXTURE_DEPLOYER);
+        IChainAdminOwnable(chainAdmin).multicall(accept, true);
     }
 
     /// @notice The fixture chain `_chainId`, positioned at batch zero for {_settleBatch}.
@@ -292,6 +334,17 @@ abstract contract PreviousReleaseFixture is Test {
             }
         }
         assertEq(found, 1, "expected one BlockCommit");
+    }
+
+    function _transferTwoStep(address _target, address _newOwner) private {
+        address owner = IOwnable(_target).owner();
+        if (owner == _newOwner) {
+            return;
+        }
+        vm.prank(owner);
+        IOwnable(_target).transferOwnership(_newOwner);
+        vm.prank(_newOwner);
+        IOwnable(_target).acceptOwnership();
     }
 
     function _previousStateVersion() private view returns (string memory) {

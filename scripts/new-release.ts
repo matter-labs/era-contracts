@@ -34,7 +34,8 @@ import { join, relative } from "path";
 //      `CTMUpgrade_v<minor>`, generated as plain subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` for the
 //      release's own preparation to go into, unless the branch already carries them (a next edge prepared and
 //      tested ahead of the bump), in which case they are kept. The outgoing release's scripts are deleted, and
-//      protocol-ops' prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones.
+//      protocol-ops' prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones,
+//      the test together with the upgrade-env dir whose local input it reads.
 //
 // What it leaves to you (printed at the end): regenerating the new release's chain states, reviewing the
 // copied per-environment inputs, and removing or updating whatever still uses the outgoing release's scripts
@@ -275,7 +276,16 @@ function main(): void {
     return moved;
   };
   write(PROTOCOL_OPS_SCRIPTS_PATH, moveToNextScripts(PROTOCOL_OPS_SCRIPTS_PATH, nextScripts));
-  write(FULL_FLOW_TEST_PATH, moveToNextScripts(FULL_FLOW_TEST_PATH, fs.readFileSync(FULL_FLOW_TEST_PATH, "utf-8")));
+  const fullFlowTest = fs.readFileSync(FULL_FLOW_TEST_PATH, "utf-8");
+  if (!fullFlowTest.includes(`/${currentEnvDir}/`)) {
+    throw new Error(
+      `${repoPath(FULL_FLOW_TEST_PATH)} does not read ${currentEnvDir}: it must run the current release's input`
+    );
+  }
+  write(
+    FULL_FLOW_TEST_PATH,
+    moveToNextScripts(FULL_FLOW_TEST_PATH, fullFlowTest.split(`/${currentEnvDir}/`).join(`/${nextEnvDir}/`))
+  );
   changed.push(`delete ${repoPath(currentScriptsDir)}`);
   writes.push(() => fs.rmSync(currentScriptsDir, { recursive: true, force: true }));
   // Files the bump does not move that still name the deleted scripts. `git grep` exits 1 when nothing matches.

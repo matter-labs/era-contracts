@@ -44,7 +44,7 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
     using stdToml for string;
 
     /// @dev Inputs as in `UpgradeTestRecurring_Local.t.sol`.
-    string internal constant SAME_VERSION_INPUT = "/upgrade-envs/foundry-upgrade.toml";
+    string internal constant SAME_VERSION_INPUT = RELEASE_UPGRADE_INPUT;
     string internal constant NEXT_VERSION_INPUT = "/upgrade-envs/foundry-upgrade-recurring.toml";
     bytes32 internal constant HOP_SALT = keccak256("emergency-hop");
 
@@ -62,13 +62,10 @@ contract RegistryUpgradeAsEmergencyTest is UpgradeIntegrationBootstrapFixture, E
         _deployEmergencyGovernance(safeOwner.addr);
         dryRun = new VerifyEmergencyUpgrade();
 
-        string memory root = vm.projectRoot();
-        string memory deployL1 = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
-        string memory deployCTM = vm.readFile(string.concat(root, CTM_INPUT));
-        bridgehub = deployL1.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        bridgehub = previousRelease.bridgehub;
         ctm = ctmUpgrade.getCTMAddress();
-        rollupDAManager = deployCTM.readAddress("$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr");
-        governance = deployL1.readAddress("$.deployed_addresses.governance_addr");
+        rollupDAManager = ctmUpgrade.getAddresses().daAddresses.daContracts.rollupDAManager;
+        governance = previousRelease.governance;
         eip7702Checker = ctmUpgrade.getAddresses().admin.eip7702Checker;
         coreExecutor = address(coreUpgrade.getCoreUpgradeExecutor());
         ctmExecutor = IOwnable(ctm).owner();

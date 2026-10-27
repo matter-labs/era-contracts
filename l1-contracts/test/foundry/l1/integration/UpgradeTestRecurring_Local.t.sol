@@ -238,9 +238,9 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixture {
     using stdToml for string;
 
-    /// @dev The upgrade input whose `latest_protocol_version` EQUALS the version the bootstrap
-    ///      left live: what an infrastructure-only hop must be given.
-    string internal constant SAME_VERSION_INPUT = "/upgrade-envs/foundry-upgrade.toml";
+    /// @dev The upgrade input whose target EQUALS the version the bootstrap left live (the genesis
+    ///      version, as it names none): what an infrastructure-only hop must be given.
+    string internal constant SAME_VERSION_INPUT = RELEASE_UPGRADE_INPUT;
     /// @dev The upgrade input naming the next minor: what a chain-release hop is given.
     string internal constant NEXT_VERSION_INPUT = "/upgrade-envs/foundry-upgrade-recurring.toml";
     /// @dev The upgrade input one minor past {NEXT_VERSION_INPUT}: a hop departing from the version
@@ -290,14 +290,11 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
     function setUp() public override {
         super.setUp();
 
-        string memory root = vm.projectRoot();
-        string memory deployL1 = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
-        string memory deployCTM = vm.readFile(string.concat(root, CTM_INPUT));
         inputs = HopInputs({
-            bridgehub: deployL1.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr"),
+            bridgehub: previousRelease.bridgehub,
             ctm: ctmUpgrade.getCTMAddress(),
-            rollupDAManager: deployCTM.readAddress("$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"),
-            governance: deployL1.readAddress("$.deployed_addresses.governance_addr"),
+            rollupDAManager: ctmUpgrade.getAddresses().daAddresses.daContracts.rollupDAManager,
+            governance: previousRelease.governance,
             // Carried forward from the previous prepare's output, as the runbook requires: a fresh
             // checker changes the Mailbox's immutable and drags a facet cut behind it.
             eip7702Checker: ctmUpgrade.getAddresses().admin.eip7702Checker
@@ -472,27 +469,27 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
         IValidatorTimelock.ValidatorRotationParams memory upgraderOnly;
         upgraderOnly.rotateUpgraderRole = true;
         address serverNotifier = IChainTypeManager(inputs.ctm).serverNotifierAddress();
-        address chainAdmin = IGetters(_eraDiamond).getAdmin();
+        address chainAdmin = IGetters(_upgradedChainDiamond).getAdmin();
         Call[] memory adminCalls = new Call[](2);
         adminCalls[0] = Call({
             target: validatorTimelockProxy,
             value: 0,
-            data: abi.encodeCall(IValidatorTimelock.addValidatorRoles, (_eraDiamond, upgrader, upgraderOnly))
+            data: abi.encodeCall(IValidatorTimelock.addValidatorRoles, (_upgradedChainDiamond, upgrader, upgraderOnly))
         });
         adminCalls[1] = Call({
             target: serverNotifier,
             value: 0,
-            data: abi.encodeCall(IServerNotifier.setUpgradeTimestamp, (eraZKChainId, block.timestamp))
+            data: abi.encodeCall(IServerNotifier.setUpgradeTimestamp, (chainId, block.timestamp))
         });
         vm.prank(IOwnable(chainAdmin).owner());
         IChainAdminMulticall(chainAdmin).multicall(adminCalls, true);
 
         vm.prank(upgrader);
-        IValidatorTimelock(validatorTimelockProxy).upgradeChainFromVersion(_eraDiamond, liveVersion);
+        IValidatorTimelock(validatorTimelockProxy).upgradeChainFromVersion(_upgradedChainDiamond, liveVersion);
 
-        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _nextVersion(), "the chain crossed the edge");
+        assertEq(IGetters(_upgradedChainDiamond).getProtocolVersion(), _nextVersion(), "the chain crossed the edge");
         assertEq(
-            address(IGetters(_eraDiamond).getVerifier()),
+            address(IGetters(_upgradedChainDiamond).getVerifier()),
             ICTMRelease(ICTMTransition(hop.preparedTransition()).newRelease()).verifier(),
             "the chain runs the new release's verifier"
         );
@@ -1010,11 +1007,11 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
         uint256 liveVersion = IChainTypeManager(inputs.ctm).protocolVersion();
         state.ctmProtocolVersion = liveVersion;
         state.ctmCurrentRelease = IChainTypeManager(inputs.ctm).currentRelease();
-        state.chainProtocolVersion = IGetters(_eraDiamond).getProtocolVersion();
+        state.chainProtocolVersion = IGetters(_upgradedChainDiamond).getProtocolVersion();
         state.departingVersionDeadline = IChainTypeManager(inputs.ctm).protocolVersionDeadline(liveVersion);
         state.committedTransitionForDepartingVersion = IChainTypeManager(inputs.ctm).upgradeTransition(liveVersion);
-        state.pendingL2UpgradeTxHash = IGetters(_eraDiamond).getL2SystemContractsUpgradeTxHash();
-        state.chainVerifier = address(IGetters(_eraDiamond).getVerifier());
+        state.pendingL2UpgradeTxHash = IGetters(_upgradedChainDiamond).getL2SystemContractsUpgradeTxHash();
+        state.chainVerifier = address(IGetters(_upgradedChainDiamond).getVerifier());
     }
 
     function _assertChainFacingUnchanged(ChainFacingState memory _before) internal view {
@@ -1028,7 +1025,7 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             _before.ctmCurrentRelease,
             "the release pointer must not move"
         );
-        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _before.chainProtocolVersion, "no chain version may move");
+        assertEq(IGetters(_upgradedChainDiamond).getProtocolVersion(), _before.chainProtocolVersion, "no chain version may move");
         assertEq(
             IChainTypeManager(inputs.ctm).protocolVersionDeadline(_before.ctmProtocolVersion),
             _before.departingVersionDeadline,
@@ -1040,11 +1037,11 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             "no transition may be committed"
         );
         assertEq(
-            IGetters(_eraDiamond).getL2SystemContractsUpgradeTxHash(),
+            IGetters(_upgradedChainDiamond).getL2SystemContractsUpgradeTxHash(),
             _before.pendingL2UpgradeTxHash,
             "a pending L2 upgrade must survive untouched"
         );
-        assertEq(address(IGetters(_eraDiamond).getVerifier()), _before.chainVerifier, "the verifier is untouched");
+        assertEq(address(IGetters(_upgradedChainDiamond).getVerifier()), _before.chainVerifier, "the verifier is untouched");
     }
 
     function _prefix(string memory _value, uint256 _length) private pure returns (string memory) {

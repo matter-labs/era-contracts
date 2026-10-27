@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// solhint-disable no-console, gas-custom-errors
-
-import {console2 as console} from "forge-std/Script.sol";
+// solhint-disable gas-custom-errors
 
 import {CTMUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
 import {CoreUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
@@ -15,10 +13,10 @@ import {
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
-import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
+import {PreviousReleaseFixture} from "./utils/PreviousReleaseFixture.sol";
+import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
+import {V0_34_ZKSYNC_OS_GENESIS_ROOT} from "../../TestConstants.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -27,16 +25,10 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {LegacyTestAdminFacet} from "contracts/dev-contracts/test/LegacyTestAdminFacet.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IAdminWithCut} from "../../../../deploy-scripts/utils/UpgradeChainCall.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ChainRouting} from "test-utils/ChainRouting.sol";
@@ -50,27 +42,9 @@ import {CTMRelease} from "contracts/upgrades/registry/objects/CTMRelease.sol";
 import {ContractsBytecodesLib} from "../../../../deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 import {CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {L1InteropFeeManager} from "contracts/core/interop-fee/L1InteropFeeManager.sol";
-import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-
-/// @notice Stands in for the genesis engine a pre-v35 CTM runs: its only entrypoint is the
-///         six-argument `genesisUpgrade` the pre-v35 Admin facet called, not the argument-less one
-///         the v35 Admin facet delegatecalls. A release that kept it would make every chain
-///         creation after the bootstrap revert.
-contract LegacyGenesisEngineForLocalTest {
-    function genesisUpgrade(
-        address, // _l1GenesisUpgrade
-        uint256, // _chainId
-        uint256, // _protocolVersion
-        address, // _l1CtmDeployerAddress
-        bytes calldata, // _fixedForceDeploymentsData
-        bytes[] calldata // _factoryDeps
-    ) external pure returns (bytes32) {
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
-}
 
 /// @notice Test-only v35 CTM upgrade with the same MemoryOOG mocks as the v32 local harness
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
@@ -94,47 +68,6 @@ contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
     function authorL2Side() internal override returns (AuthoredL2Side memory) {
         return DefaultCTMUpgrade.authorL2Side();
     }
-
-    /// @notice Makes discovery report `_legacyEngine` as the CTM's live genesis engine.
-    /// @dev The fixture's CTM is deployed from CURRENT sources, so its real live engine already has
-    ///      the v35 entrypoint and a prepare that kept it would pass unnoticed. A production
-    ///      bootstrap departs from a pre-v35 CTM whose engine does not (see
-    ///      {LegacyGenesisEngineForLocalTest}); this substitutes only what discovery reports, so
-    ///      the prepare runs unchanged against that starting point.
-    function simulateLegacyGenesisEngine(address _legacyEngine) external {
-        ctmAddresses.stateTransition.genesisUpgrade = _legacyEngine;
-    }
-}
-
-/// @notice The v35 core prepare against the local fixture, whose ecosystem was deployed from the
-///         current sources: it reuses nothing, standing in for the v0.34.0 build a production
-///         bootstrap departs from, so the edge carries the ecosystem leg it carries in production.
-contract CoreUpgradeForLocalTest is CoreUpgrade_v35 {
-    function _canReuseEcosystemImplementation(string memory, address) internal pure override returns (bool) {
-        return false;
-    }
-}
-
-/// @notice Chain leg of the bootstrap edge: the local baseline chain runs the CURRENT
-///         (cut-READING) Admin facet, but the bootstrap commits the legacy cut-taking edge —
-///         `upgradeTransition` stays zero for the departing version. The harness pre-installs
-///         `LegacyTestAdminFacet` (the same dance the anvil bootstrap stage does), so the chain
-///         crosses by HANDING the committed cut through the legacy 3-arg entrypoint, exactly
-///         like production pre-v35 chains will.
-contract ChainUpgradeForLocalTest is DefaultChainUpgrade {
-    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public override {
-        bytes memory callData = abi.encodeCall(
-            IAdminWithCut.upgradeChainFromVersion,
-            (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
-        );
-        DeployScriptUtils.adminExecute(
-            IZKChain(config.chainDiamondProxyAddress).getAdmin(),
-            address(0),
-            config.chainDiamondProxyAddress,
-            callData,
-            0
-        );
-    }
 }
 
 /// @notice Chain leg of the bootstrap edge for a chain whose admin does not act: the CTM owner
@@ -150,36 +83,37 @@ contract ChainUpgradeByCTMOwnerForLocalTest is DefaultChainUpgrade {
 }
 
 /// @notice The fixture the v35 BOOTSTRAP edge leaves behind, built through the real prepare
-///         pipeline: a fresh ecosystem + Era chain at the baseline version, `CTMUpgrade_v35`
-///         deploying the executor + `RegistryBootstrapMigration`, and the one governance bundle
-///         `RegistryBootstrapSequence` derives (the notifier accept, the ecosystem handover and core
-///         leg, nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes the
-///         executor's accept — and the completion check) performing the whole edge.
+///         pipeline over the previous release's frozen L1 state (see {PreviousReleaseFixture}):
+///         `CTMUpgrade_v35` deploying the executor + `RegistryBootstrapMigration`, the one governance
+///         bundle `RegistryBootstrapSequence` derives (the notifier accept, the ecosystem handover and
+///         core leg, nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes
+///         the executor's accept — and the completion check) performing the whole edge, and an
+///         L1-settled chain of that release crossing it through its own pre-v35 Admin facet.
 /// @dev Abstract so the post-bootstrap state can be reused: it is the only in-forge fixture whose
 ///      ecosystem is registry-driven, which is what a RECURRING prepare needs to run against (see
 ///      `UpgradeTestRecurring_Local.t.sol`). Heavy execution + event assertions run in
 ///      `setUp -> internalTest()` (RAM constraint).
 abstract contract UpgradeIntegrationBootstrapFixture is
     UpgradeIntegrationTestBase,
-    L1ContractDeployer,
-    ZKChainDeployer,
-    TokenDeployer,
+    PreviousReleaseFixture,
     RegistryPostState
 {
     using stdToml for string;
 
-    /// @dev The pre-v35 genesis engine discovery reports as live (see
-    ///      `CTMUpgradeForLocalTest.simulateLegacyGenesisEngine`).
-    address internal legacyGenesisEngine;
+    /// @dev The release's own local upgrade input, which protocol-ops' default prepare reads: it names no
+    ///      target version, so the edge goes to the genesis version. Moved by `yarn new-release`.
+    string internal constant RELEASE_UPGRADE_INPUT = "/upgrade-envs/v0.35.0-upgrade-system/local.toml";
 
-    /// @dev The CTM's interop fee manager before the edge, holding a prepaid balance of
-    ///      `INTEROP_FEE_DEPOSIT` for the Era chain.
-    address internal interopFeeManagerBeforeUpgrade;
+    /// @dev The previous release's L1-settled chain that crosses the edge.
+    uint256 internal constant UPGRADED_CHAIN_ID = 10;
 
-    uint256 internal constant INTEROP_FEE_DEPOSIT = 1 ether;
+    PreviousRelease internal previousRelease;
+
+    /// @dev The genesis engine the previous release's CTM ran before the edge.
+    address internal genesisEngineBeforeUpgrade;
 
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
-        return new CoreUpgradeForLocalTest();
+        return new CoreUpgrade_v35();
     }
 
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
@@ -187,151 +121,47 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     }
 
     function createChainUpgrade() internal virtual override returns (DefaultChainUpgrade) {
-        return new ChainUpgradeForLocalTest();
+        return new DefaultChainUpgrade();
     }
 
-    /// @notice Bump the CTM's new protocol version from the upgrade input TOML so the local
-    ///         baseline fixture exercises a real version transition.
-    function afterInitHook() internal override {
-        string memory root = vm.projectRoot();
-        string memory upgradeToml = vm.readFile(string.concat(root, ECOSYSTEM_UPGRADE_INPUT));
-        uint256 newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
-        ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
-
-        legacyGenesisEngine = address(new LegacyGenesisEngineForLocalTest());
-        CTMUpgradeForLocalTest(address(ctmUpgrade)).simulateLegacyGenesisEngine(legacyGenesisEngine);
-    }
-
-    /// @dev Installs the pre-v35 cut-taking entrypoint on the baseline chain through the CTM
-    ///      owner's `executeUpgrade` — the production path for owner-forced cuts — BEFORE the
-    ///      CTM is handed to the migration. See {ChainUpgradeForLocalTest}.
-    function _installLegacyCutTakingFacet() private {
-        LegacyTestAdminFacet legacyFacet = new LegacyTestAdminFacet();
-        bytes4[] memory selectors = new bytes4[](1);
-        selectors[0] = LegacyTestAdminFacet.upgradeChainFromVersion.selector;
-        Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](1);
-        cuts[0] = Diamond.FacetCut({
-            facet: address(legacyFacet),
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: selectors
-        });
-        Diamond.DiamondCutData memory addCut = Diamond.DiamondCutData({
-            facetCuts: cuts,
-            initAddress: address(0),
-            initCalldata: hex""
-        });
-
-        address ctm = ctmUpgrade.getCTMAddress();
-        vm.prank(Ownable(ctm).owner());
-        IChainTypeManager(ctm).executeUpgrade(chainId, addCut);
-    }
-
-    /// @dev A fresh ecosystem is born in the registry model (`DeployL1CoreContracts` / `DeployCTM`); the
-    ///      bootstrap departs from one that is not. Governance takes the authority back out through the
-    ///      executors' own `forward` — real calls, the only way out the model leaves — into the pre-v35
-    ///      production shape: the CTM and both ProxyAdmins governance's (the CTM domain keeps its OWN
-    ///      ProxyAdmin, which the bootstrap requires), and the ServerNotifier under its own ProxyAdmin,
-    ///      owned by the CTM's ChainAdmin, so the bootstrap's one-time handover runs. The fresh executors
-    ///      are left behind unused: the bootstrap prepare deploys its own.
-    function _revertToPreRegistryAuthority() private {
-        address ctm = address(addresses.chainTypeManager);
-        address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
-        address chainAdmin = ctmAddresses.chainAdmin;
-        address governance = IOwnable(upgradeExecutors.ctmExecutor).owner();
-        ProxyAdmin ctmProxyAdmin = ProxyAdmin(DeployScriptUtils.getProxyAdminAddress(ctm));
-        ProxyAdmin notifierAdmin = new ProxyAdmin();
-        notifierAdmin.transferOwnership(chainAdmin);
-
-        Call[] memory ctmDomain = new Call[](4);
-        ctmDomain[0] = Call({target: ctm, value: 0, data: abi.encodeCall(Ownable.transferOwnership, (governance))});
-        ctmDomain[1] = Call({
-            target: address(ctmProxyAdmin),
-            value: 0,
-            data: abi.encodeCall(
-                ProxyAdmin.changeProxyAdmin,
-                (ITransparentUpgradeableProxy(payable(notifier)), address(notifierAdmin))
-            )
-        });
-        ctmDomain[2] = Call({
-            target: notifier,
-            value: 0,
-            data: abi.encodeCall(Ownable.transferOwnership, (chainAdmin))
-        });
-        ctmDomain[3] = Call({
-            target: address(ctmProxyAdmin),
-            value: 0,
-            data: abi.encodeCall(Ownable.transferOwnership, (governance))
-        });
-        vm.prank(governance);
-        CTMUpgradeExecutor(payable(upgradeExecutors.ctmExecutor)).forward(ctmDomain);
-        vm.prank(governance);
-        IOwnable(ctm).acceptOwnership();
-        Call[] memory acceptNotifier = new Call[](1);
-        acceptNotifier[0] = Call({target: notifier, value: 0, data: abi.encodeCall(IOwnable.acceptOwnership, ())});
-        vm.prank(Ownable(chainAdmin).owner());
-        IChainAdminMulticall(chainAdmin).multicall(acceptNotifier, true);
-
-        Call[] memory ecosystem = new Call[](1);
-        ecosystem[0] = Call({
-            target: ecosystemAddresses.shared.transparentProxyAdmin,
-            value: 0,
-            data: abi.encodeCall(Ownable.transferOwnership, (governance))
-        });
-        vm.prank(governance);
-        CoreUpgradeExecutor(payable(upgradeExecutors.coreExecutor)).forward(ecosystem);
-
-        assertEq(IOwnable(ctm).owner(), governance, "pre-v35: governance owns the CTM");
-        assertEq(ctmProxyAdmin.owner(), governance, "pre-v35: governance owns the CTM-domain ProxyAdmin");
-        assertEq(
-            ProxyAdmin(ecosystemAddresses.shared.transparentProxyAdmin).owner(),
-            governance,
-            "pre-v35: governance owns the ecosystem ProxyAdmin"
-        );
-        assertEq(IOwnable(notifier).owner(), chainAdmin, "pre-v35: the ChainAdmin owns the notifier");
-        assertEq(DeployScriptUtils.getProxyAdminAddress(notifier), address(notifierAdmin), "under its own admin");
+    function _ecosystemUpgradeParams() internal view override returns (EcosystemUpgradeParams memory) {
+        return
+            EcosystemUpgradeParams({
+                bridgehubProxyAddress: previousRelease.bridgehub,
+                ctmProxy: previousRelease.chainTypeManager,
+                // Resolved from the CTM, as protocol-ops does when the env input names none.
+                rollupDAManager: address(0),
+                create2FactorySalt: UPGRADE_CREATE2_FACTORY_SALT,
+                upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
+                ecosystemOutputPath: ECOSYSTEM_OUTPUT,
+                governance: previousRelease.governance,
+                // Dummy asset ID is fine for these tests — fixed-ZK-fee bundles are not exercised.
+                zkTokenAssetId: bytes32(uint256(1))
+            });
     }
 
     function setUp() public virtual {
-        console.log("setUp: Starting");
-        _deployL1Contracts();
-        _deployTokens();
-        _registerNewTokens(tokens);
+        previousRelease = _loadPreviousRelease();
+        FixtureChain memory chain = _fixtureChain(UPGRADED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+        _prepareSettlement(chain);
+        _settleBatch(chain);
+        _installChainAdmin(chain);
+        _handAuthorityToGovernance(previousRelease);
+        chainId = UPGRADED_CHAIN_ID;
+        genesisEngineBeforeUpgrade = IChainTypeManager(previousRelease.chainTypeManager).l1GenesisUpgrade();
 
-        _deployEra();
-        chainId = eraZKChainId;
-        acceptPendingAdmin();
-
-        _revertToPreRegistryAuthority();
-        console.log("setUp: authority taken back into the pre-v35 shape");
-
-        ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
-        ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
+        ECOSYSTEM_UPGRADE_INPUT = RELEASE_UPGRADE_INPUT;
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-v35-core-out.toml";
-        CTM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml";
         CTM_OUTPUT = "/script-out/foundry-upgrade/local-v35-ctm.toml";
         CORE_OUTPUT = "/script-out/foundry-upgrade/local-v35-core.toml";
-        console.log("setUp: Paths configured");
-        // Prepaid interop fees must survive the upgrade, asserted in `test_bootstrapUpgrade_Local`.
-        interopFeeManagerBeforeUpgrade = addresses.chainTypeManager.L1_INTEROP_FEE_MANAGER();
-        IL1InteropFeeManager(interopFeeManagerBeforeUpgrade).deposit{value: INTEROP_FEE_DEPOSIT}(
-            eraZKChainId,
-            ETH_TOKEN_ADDRESS,
-            INTEROP_FEE_DEPOSIT
-        );
         setupUpgrade();
-        console.log("setUp: Upgrade setup complete");
-
-        _installLegacyCutTakingFacet();
-        console.log("setUp: Legacy cut-taking facet installed");
 
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
-        bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
-        _expectedBaseTokenAssetId = eraBaseTokenAssetId;
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
+        bytes32 baseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(chainId);
+        _expectedBaseTokenAssetId = baseTokenAssetId;
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(baseTokenAssetId));
 
         internalTest();
-        console.log("setUp: Internal test complete");
     }
 }
 
@@ -450,12 +280,6 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     ///         creation code and the recorded constructor arguments, under the recorded salt through
     ///         the deterministic factory, land exactly at the member — the derivation
     ///         `protocol-ops ecosystem verify-bootstrap` performs (`member_construction`).
-    /// @dev This fixture's CTM is deployed from the current sources, so the prepare reuses every
-    ///      member it was born with (same code, same arguments) and records none for them; they are
-    ///      skipped here. protocol-ops exempts only the verifiers the chains run at a bootstrap, so
-    ///      it would refuse those reused members as unrecorded: a real bootstrap departs from a
-    ///      pre-registry CTM built from earlier sources and redeploys every other member. This test
-    ///      checks the records, not that exemption rule.
     function test_bootstrapMembersAreReproducibleFromTheirRecords() public view {
         CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
         string memory root = vm.projectRoot();
@@ -466,15 +290,8 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         BootstrapManifest memory manifest = bootstrap.bootstrapMigration().getManifest();
         ReleaseManifest memory release = CTMRelease(manifest.currentRelease).getManifest();
 
-        ReleaseManifest memory born = CTMRelease(ctmAddresses.stateTransition.currentRelease).getManifest();
-
         uint256 facets = release.genesisFacets.length;
-        uint256 recordedFacets = 0;
         for (uint256 i = 0; i < facets; ++i) {
-            if (_namedBy(born, release.genesisFacets[i].facet)) {
-                continue;
-            }
-            ++recordedFacets;
             (string memory name, bytes memory args) = _recordedMember(
                 ctmOutput,
                 ctmSalt,
@@ -494,12 +311,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
                 assertTrue(isTestnet, "MailboxFacet is built for the env's testnet verifier");
             }
         }
-        assertGt(recordedFacets, 0, "the edge deploys facets of its own");
-        if (!_namedBy(born, release.diamondInit)) {
-            _recordedMember(ctmOutput, ctmSalt, release.diamondInit);
-        }
-        // Discovery reports a legacy engine (see `simulateLegacyGenesisEngine`), so the prepare
-        // always deploys the genesis upgrade.
+        _recordedMember(ctmOutput, ctmSalt, release.diamondInit);
         _recordedMember(ctmOutput, ctmSalt, release.genesisUpgrade);
         _recordedMember(ctmOutput, ctmSalt, manifest.upgradeEngine);
         // The prepare deploys the composer either way; this L1-only fixture's plan names none.
@@ -517,20 +329,6 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
                 _recordedMember(coreOutput, coreSalt, coreRows[i].implNew);
             }
         }
-    }
-
-    /// @dev Whether `_release` names `_member` as a facet, its `DiamondInit`, genesis upgrade or verifier.
-    function _namedBy(ReleaseManifest memory _release, address _member) private pure returns (bool) {
-        if (_member == _release.diamondInit || _member == _release.genesisUpgrade || _member == _release.verifier) {
-            return true;
-        }
-        uint256 length = _release.genesisFacets.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (_release.genesisFacets[i].facet == _member) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /// @dev The `[member_deployments]` record of `_member` in `_output`, re-derived: returns the
@@ -563,7 +361,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
 
         // Protocol version bumps, on the CTM and on the chain that crossed via the legacy leg.
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
-        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Era chain not upgraded");
+        assertEq(IGetters(_upgradedChainDiamond).getProtocolVersion(), _expectedNewVersion, "the chain did not cross the edge");
 
         // The edge is one-shot and spent.
         assertTrue(bootstrap.bootstrapMigration().executed(), "migration must be spent");
@@ -606,7 +404,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "the init names the pinned migration"
         );
         L2CanonicalTransaction memory l2Tx = bootstrap.bootstrapMigration().l2UpgradeTx(
-            IGetters(_eraDiamond).getChainId()
+            IGetters(_upgradedChainDiamond).getChainId()
         );
         assertEq(
             keccak256(abi.encode(l2Tx)),
@@ -614,17 +412,17 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             "an L1-only edge composes the all-zero L2 transaction"
         );
         assertEq(
-            address(IGetters(_eraDiamond).getVerifier()),
+            address(IGetters(_upgradedChainDiamond).getVerifier()),
             ICTMRelease(release).verifier(),
             "the chain runs the pinned release's verifier"
         );
         assertEq(
-            IGetters(_eraDiamond).getL2SystemContractsUpgradeTxHash(),
+            IGetters(_upgradedChainDiamond).getL2SystemContractsUpgradeTxHash(),
             bytes32(0),
             "no L2 protocol upgrade transaction on an L1-only edge"
         );
         assertTrue(
-            ChainRouting.matchesRelease(ICTMRelease(release), _eraDiamond),
+            ChainRouting.matchesRelease(ICTMRelease(release), _upgradedChainDiamond),
             "the bootstrap engine reinstalled exactly the release's routing"
         );
 
@@ -635,7 +433,10 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         // The genesis engine is a release member like any other: the bootstrap replaces the
         // pre-v35 engine discovery reported, and the CTM serves the release's.
         (address releaseGenesisEngine, , ) = ICTMRelease(release).genesisParams();
-        assertTrue(releaseGenesisEngine != legacyGenesisEngine, "the release must not keep the pre-v35 engine");
+        assertTrue(
+            releaseGenesisEngine != genesisEngineBeforeUpgrade,
+            "the release must not keep the pre-v35 engine"
+        );
         assertTrue(releaseGenesisEngine.code.length != 0, "the release's engine is deployed");
         assertEq(
             IChainTypeManager(ctm).l1GenesisUpgrade(),
@@ -670,7 +471,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         );
 
         _assertBootstrapJoinsTheRegistryModel(bootstrap, ctm, bridgehub, executor);
-        _assertInteropFeeManagerKept(ctm, bridgehub);
+        _assertInteropFeeManagerDeployed(ctm, bridgehub);
         _assertBackfillWindowOpened(bridgehub);
     }
 
@@ -680,31 +481,21 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(
             address(IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault())
         );
-        assertTrue(nativeTokenVault.chainBalanceBackfillPending(eraZKChainId), "pre-upgrade chain not pending");
+        assertTrue(nativeTokenVault.chainBalanceBackfillPending(chainId), "pre-upgrade chain not pending");
         assertFalse(nativeTokenVault.chainBalanceBackfillPending(NEW_CHAIN_ID), "new chain pending");
     }
 
-    /// @dev The upgraded CTM keeps the interop fee manager it had, with the chains' prepaid
-    ///      balances; the manager ships switched off, owned by governance and behind the CTM's
-    ///      ProxyAdmin.
-    function _assertInteropFeeManagerKept(address _ctm, address _bridgehub) private view {
+    /// @dev The previous release's CTM has no interop fee manager: the edge deploys one, switched off, owned by
+    ///      governance and behind the CTM's ProxyAdmin, and builds the new CTM implementation over it.
+    function _assertInteropFeeManagerDeployed(address _ctm, address _bridgehub) private view {
         L1InteropFeeManager interopFeeManager = L1InteropFeeManager(
             ctmUpgrade.getAddresses().stateTransition.proxies.interopFeeManager
         );
-        assertEq(
-            address(interopFeeManager),
-            interopFeeManagerBeforeUpgrade,
-            "Upgrade replaced the interop fee manager"
-        );
+        assertTrue(address(interopFeeManager).code.length != 0, "Upgrade deployed no interop fee manager");
         assertEq(
             IChainTypeManager(_ctm).L1_INTEROP_FEE_MANAGER(),
             address(interopFeeManager),
             "CTM points at another interop fee manager"
-        );
-        assertEq(
-            interopFeeManager.chainBalance(eraZKChainId, ETH_TOKEN_ADDRESS),
-            INTEROP_FEE_DEPOSIT,
-            "Prepaid interop fees lost"
         );
         address governance = ctmUpgrade.getAddresses().admin.governance;
         assertEq(interopFeeManager.owner(), governance, "Interop fee manager not owned by governance");
@@ -832,14 +623,14 @@ contract UpgradeIntegrationTestLocalCTMOwnerCrossing is UpgradeIntegrationBootst
 
     function test_theCTMOwnerCrossesAPreV35ChainOverTheBootstrapEdge() public view {
         address release = IChainTypeManager(ctmUpgrade.getCTMAddress()).currentRelease();
-        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "the chain crossed the edge");
+        assertEq(IGetters(_upgradedChainDiamond).getProtocolVersion(), _expectedNewVersion, "the chain crossed the edge");
         assertEq(
-            address(IGetters(_eraDiamond).getVerifier()),
+            address(IGetters(_upgradedChainDiamond).getVerifier()),
             ICTMRelease(release).verifier(),
             "the chain runs the pinned release's verifier"
         );
         assertTrue(
-            ChainRouting.matchesRelease(ICTMRelease(release), _eraDiamond),
+            ChainRouting.matchesRelease(ICTMRelease(release), _upgradedChainDiamond),
             "the bootstrap engine reinstalled exactly the release's routing"
         );
     }

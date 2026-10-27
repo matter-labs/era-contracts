@@ -5,8 +5,10 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ChainCreationParamsLib} from "deploy-scripts/ctm/ChainCreationParamsLib.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {ANVIL_FIXTURE_DEPLOYER} from "../../TestConstants.sol";
 import {PreviousReleaseFixture} from "./utils/PreviousReleaseFixture.sol";
 import {V0_34_ZKSYNC_OS_GENESIS_ROOT} from "../../TestConstants.sol";
 
@@ -57,6 +59,37 @@ contract PreviousReleaseFixtureTest is PreviousReleaseFixture {
         _settleBatch(chain);
 
         assertEq(IGetters(chain.diamondProxy).getTotalBatchesExecuted(), 2, "second batch not executed");
+    }
+
+    function test_handsTheEcosystemToGovernanceAndTheChainToAChainAdmin() public {
+        PreviousRelease memory release = _loadPreviousRelease();
+        FixtureChain memory chain = _fixtureChain(L1_SETTLED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+
+        address chainAdmin = _installChainAdmin(chain);
+        _handAuthorityToGovernance(release);
+
+        assertEq(IGetters(chain.diamondProxy).getAdmin(), chainAdmin, "chain not under its ChainAdmin");
+        assertEq(IGetters(chain.diamondProxy).getPendingAdmin(), address(0), "chain admin left pending");
+        assertEq(IOwnable(chainAdmin).owner(), ANVIL_FIXTURE_DEPLOYER, "ChainAdmin not the operator's");
+        address[5] memory governed = [
+            release.bridgehub,
+            release.sharedBridge,
+            release.nativeTokenVault,
+            release.nullifier,
+            release.chainTypeManager
+        ];
+        for (uint256 i = 0; i < governed.length; ++i) {
+            assertEq(IOwnable(governed[i]).owner(), release.governance, "not owned by governance");
+            assertEq(IOwnable(governed[i]).pendingOwner(), address(0), "ownership left pending");
+        }
+        assertEq(
+            IOwnable(Utils.getProxyAdminAddress(release.chainTypeManager)).owner(),
+            release.governance,
+            "CTM ProxyAdmin not owned by governance"
+        );
+        address notifier = IChainTypeManager(release.chainTypeManager).serverNotifierAddress();
+        assertEq(IOwnable(notifier).owner(), release.ctmChainAdmin, "notifier not owned by the CTM's ChainAdmin");
+        assertEq(IOwnable(notifier).pendingOwner(), address(0), "notifier ownership left pending");
     }
 
     function test_RevertWhen_GenesisRootIsNotTheChainsBatchZero() public {
