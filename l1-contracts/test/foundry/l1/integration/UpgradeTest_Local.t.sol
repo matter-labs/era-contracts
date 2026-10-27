@@ -22,6 +22,7 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -112,6 +113,10 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     /// @dev The genesis engine the previous release's CTM ran before the edge.
     address internal genesisEngineBeforeUpgrade;
 
+    /// @dev The upgraded chain's RollupDAManager before the edge, which the prepare builds the new
+    ///      AdminFacet over.
+    address internal rollupDAManagerBeforeUpgrade;
+
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
         return new CoreUpgrade_v35();
     }
@@ -129,8 +134,9 @@ abstract contract UpgradeIntegrationBootstrapFixture is
             EcosystemUpgradeParams({
                 bridgehubProxyAddress: previousRelease.bridgehub,
                 ctmProxy: previousRelease.chainTypeManager,
-                // Resolved from the CTM, as protocol-ops does when the env input names none.
-                rollupDAManager: address(0),
+                // The env input names none, so protocol-ops resolves it from a chain on the CTM; the
+                // prepare's CTM discovery leaves it zero.
+                rollupDAManager: rollupDAManagerBeforeUpgrade,
                 create2FactorySalt: UPGRADE_CREATE2_FACTORY_SALT,
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,
@@ -149,6 +155,7 @@ abstract contract UpgradeIntegrationBootstrapFixture is
         _handAuthorityToGovernance(previousRelease);
         chainId = UPGRADED_CHAIN_ID;
         genesisEngineBeforeUpgrade = IChainTypeManager(previousRelease.chainTypeManager).l1GenesisUpgrade();
+        rollupDAManagerBeforeUpgrade = IAdmin(chain.diamondProxy).getRollupDAManager();
 
         ECOSYSTEM_UPGRADE_INPUT = RELEASE_UPGRADE_INPUT;
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-v35-core-out.toml";
@@ -301,6 +308,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
             if (keccak256(bytes(name)) == keccak256("AdminFacet")) {
                 (uint256 l1ChainId, address rollupDAManager) = abi.decode(args, (uint256, address));
                 assertEq(l1ChainId, block.chainid, "AdminFacet is built for this L1");
+                assertNotEq(rollupDAManager, address(0), "AdminFacet is built over a RollupDAManager");
                 assertEq(
                     rollupDAManager,
                     ctmUpgrade.getAddresses().daAddresses.daContracts.rollupDAManager,
@@ -428,6 +436,11 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertTrue(
             ChainRouting.matchesRelease(ICTMRelease(release), _upgradedChainDiamond),
             "the bootstrap engine reinstalled exactly the release's routing"
+        );
+        assertEq(
+            IAdmin(_upgradedChainDiamond).getRollupDAManager(),
+            rollupDAManagerBeforeUpgrade,
+            "the chain keeps its RollupDAManager across the edge"
         );
 
         // The genesis release is pinned as `currentRelease` (re-pointed to the release this
