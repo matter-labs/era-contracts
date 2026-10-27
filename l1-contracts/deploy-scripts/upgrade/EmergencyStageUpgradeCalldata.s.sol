@@ -9,6 +9,7 @@ import {
 } from "../utils/Utils.sol";
 import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol";
 import {IEmergencyUpgrageBoard} from "../interfaces/IEmergencyUpgrageBoard.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Script, console2} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -21,14 +22,6 @@ interface ISafeMsg {
     function getMessageHash(bytes memory _message) external view returns (bytes32);
     function getOwners() external view returns (address[] memory);
     function getThreshold() external view returns (uint256);
-}
-
-interface IOwnableT {
-    function owner() external view returns (address);
-}
-
-interface IEmergencyUpgradeBoardHandlerT {
-    function PROTOCOL_UPGRADE_HANDLER() external view returns (address);
 }
 
 /// @notice Emits ALL calldata to execute an emergency upgrade through an ecosystem's Emergency Upgrade
@@ -162,16 +155,13 @@ contract EmergencyStageUpgradeCalldata is Script {
                 keccak256(bytes(PUH_GOVERNANCE_KIND)),
             "env is not governed by a ProtocolUpgradeHandler"
         );
-        board.handler = IOwnableT(toml.readAddress("$.core_contracts.bridgehub_proxy_addr")).owner();
+        board.handler = IOwnable(toml.readAddress("$.core_contracts.bridgehub_proxy_addr")).owner();
         IProtocolUpgradeHandler handler = IProtocolUpgradeHandler(board.handler);
         board.board = handler.emergencyUpgradeBoard();
         board.guardians = handler.guardians();
         board.securityCouncil = handler.securityCouncil();
         IEmergencyUpgrageBoard emergencyBoard = IEmergencyUpgrageBoard(board.board);
-        require(
-            IEmergencyUpgradeBoardHandlerT(board.board).PROTOCOL_UPGRADE_HANDLER() == board.handler,
-            "board serves another handler"
-        );
+        require(emergencyBoard.PROTOCOL_UPGRADE_HANDLER() == board.handler, "board serves another handler");
         require(emergencyBoard.GUARDIANS() == board.guardians, "board and handler name different Guardians");
         require(
             emergencyBoard.SECURITY_COUNCIL() == board.securityCouncil,
