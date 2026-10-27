@@ -204,8 +204,8 @@ prepare = "forge-script"
 script = "deploy-scripts/upgrade/v33/CTMUpgrade_v33.s.sol:CTMUpgrade_v33"
 signature = "prepare(string,string)"
 args = ["/upgrade-envs/v0.33.0-compiler/{env}.toml", "/upgrade-envs/v0.33.0-compiler/output/{env}/ecosystem.toml"]
-verify_fork = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse.sh"]
-verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse.sh", "--published-only"]
+verify_fork = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh"]
+verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--published-only"]
 "#;
 
     #[test]
