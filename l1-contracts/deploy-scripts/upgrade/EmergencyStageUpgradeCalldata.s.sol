@@ -50,8 +50,7 @@ interface IEmergencyUpgradeBoardHandlerT {
 ///   ... --sig 'emergencyUpgradeAllStages(string,string,string)' <permanent values> <ecosystem.toml> <out.json>
 ///
 /// The older entry points target stage: `runStage0()` / `runStage1()` / `runStage2()` for the v31 interopB
-/// stage upgrade (run stage 1 >= 1200s after stage 0, the GovernanceUpgradeTimer delay) and
-/// `runV33CompilerStage()` for the v0.33.0 compiler upgrade. They only print.
+/// stage upgrade (run stage 1 >= 1200s after stage 0, the GovernanceUpgradeTimer delay). They only print.
 contract EmergencyStageUpgradeCalldata is Script {
     using stdToml for string;
 
@@ -61,8 +60,6 @@ contract EmergencyStageUpgradeCalldata is Script {
     /// @notice Stage's permanent values, for the stage-only entry points.
     string constant STAGE_PERMANENT_VALUES = "/upgrade-envs/permanent-values/stage.toml";
     string constant TOML = "/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml";
-    /// @notice The v0.33.0 compiler-only stage upgrade (`upgrade-envs/v0.33.0-compiler/`).
-    string constant V33_COMPILER_TOML = "/upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml";
     bytes32 constant SALT = bytes32(0);
     /// @notice `core_contracts.governance_kind` of an env whose bridgehub is owned by a ProtocolUpgradeHandler.
     string constant PUH_GOVERNANCE_KIND = "puh";
@@ -97,14 +94,6 @@ contract EmergencyStageUpgradeCalldata is Script {
 
     function runStage2() external view {
         _emit(2);
-    }
-
-    /// @notice The v0.33.0 compiler-only stage upgrade as ONE emergency proposal: stages 0, 1 and 2
-    /// in order (pauseMigration; setNewVersionUpgrade + setChainCreationParams; unpauseMigration).
-    /// It has no upgrade timer between stages, so executing them atomically is equivalent and needs
-    /// one round of approvals instead of three.
-    function runV33CompilerStage() external view {
-        _emitForCalls(_loadAllStages(V33_COMPILER_TOML), "V0.33.0 COMPILER (STAGES 0-2)");
     }
 
     /// @notice Governance stages 0, 1 and 2 of `_ecosystemToml` as ONE emergency proposal on the ecosystem of
