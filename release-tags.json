@@ -1,0 +1,113 @@
+{
+  "legacyTags": [
+    "v0.27.0",
+    "v0.28.0",
+    "v0.28.1",
+    "v0.29.0-rc0",
+    "v0.29.0-rc1",
+    "v0.29.1-rc1",
+    "v0.29.2",
+    "v0.33.0",
+    "v31-mainnet",
+    "zkos-0.29.0",
+    "zkos-v0.28.0",
+    "zkos-v0.29.1",
+    "zkos-v0.29.2",
+    "zkos-v0.29.3",
+    "zkos-v0.29.4",
+    "zkos-v0.29.5",
+    "zkos-v0.29.5-tmp1",
+    "zkos-v0.29.6",
+    "zkos-v0.29.7",
+    "zkos-v0.29.8",
+    "zkos-v0.29.9",
+    "zkos-v0.29.10",
+    "zkos-v0.29.11",
+    "zkos-v0.30.0",
+    "zkos-v0.30.1",
+    "zkos-v0.30.2"
+  ],
+  "tags": [
+    {
+      "name": "v0.33.2",
+      "commit": "0efa1dd07c556fe9dc43923a7c856167c0d3a558",
+      "branch": "release/v0.33.0-atomic-interop",
+      "genesis": { "era": "0.33.0", "zksync-os": "0.33.2" }
+    }
+  ],
+  "deployments": [
+    {
+      "name": "mainnet Era CTM",
+      "l1": "mainnet",
+      "flavour": "era",
+      "bridgehub": "0x303a465B659cBB0ab36eE643eA362c509EEb5213",
+      "ctm": "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C",
+      "protocolVersion": "0.30.1",
+      "chains": [324]
+    },
+    {
+      "name": "mainnet ZKsync OS CTM",
+      "l1": "mainnet",
+      "flavour": "zksync-os",
+      "bridgehub": "0x303a465B659cBB0ab36eE643eA362c509EEb5213",
+      "ctm": "0x1adF137F59949c9081157D5de1e002D1C992071F",
+      "protocolVersion": "0.30.1",
+      "chains": []
+    },
+    {
+      "name": "ADI mainnet ZKsync OS CTM",
+      "l1": "mainnet",
+      "flavour": "zksync-os",
+      "bridgehub": "0x7a38c18a229Ef8a0AE7104Ba272A46280f2d59Cb",
+      "ctm": "0x08A1D2962fC29AA46e869A1E7561112cc1026EfA",
+      "protocolVersion": "0.30.2",
+      "chains": [36900]
+    },
+    {
+      "name": "stage Era CTM",
+      "l1": "sepolia",
+      "flavour": "era",
+      "bridgehub": "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE",
+      "ctm": "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b",
+      "protocolVersion": "0.34.0",
+      "chains": [499]
+    },
+    {
+      "name": "stage ZKsync OS CTM",
+      "l1": "sepolia",
+      "flavour": "zksync-os",
+      "bridgehub": "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE",
+      "ctm": "0x73Bee414c6e006525F3CcEedf6d8004C0370502e",
+      "protocolVersion": "0.31.1",
+      "chains": []
+    },
+    {
+      "name": "testnet Era CTM",
+      "l1": "sepolia",
+      "flavour": "era",
+      "bridgehub": "0xc4FD2580C3487bba18D63f50301020132342fdbD",
+      "ctm": "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864",
+      "protocolVersion": "0.31.0",
+      "chains": [301]
+    },
+    {
+      "name": "testnet ZKsync OS CTM",
+      "l1": "sepolia",
+      "flavour": "zksync-os",
+      "bridgehub": "0xc4FD2580C3487bba18D63f50301020132342fdbD",
+      "ctm": "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5",
+      "protocolVersion": "0.33.2",
+      "tag": "v0.33.2",
+      "chains": []
+    },
+    {
+      "name": "testnet3 Era CTM",
+      "l1": "sepolia",
+      "flavour": "era",
+      "bridgehub": "0xF49C690785b9fE5261d786237348A66896e2F477",
+      "ctm": "0x4d058d138F477c4b97B3D762f923811b20220078",
+      "protocolVersion": "0.33.0",
+      "chains": [312]
+    }
+  ]
+}

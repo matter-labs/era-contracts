@@ -1,0 +1,51 @@
+name: Check release tags and deployments
+
+# Checks release-tags.json against the repository's tags and the live L1 deployments.
+# The policy it enforces is in docs/release-tags.md.
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "release-tags.json"
+      - "l1-contracts/scripts/check-release-tags.ts"
+      - ".github/workflows/check-release-tags.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          # All branches and tags: tags are checked against the release/* branches.
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Check release tags and deployments
+        working-directory: l1-contracts
+        env:
+          L1_RPC_URL_MAINNET: ${{ secrets.L1_RPC_URL_MAINNET }}
+          L1_RPC_URL_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
+        # Pull requests from forks get no secrets; there the on-chain part is reported as skipped.
+        run: yarn check-release-tags ${{ github.event_name != 'pull_request' && '--require-onchain' || '' }}
+
+      - name: Notify Slack on failure
+        if: ${{ failure() && github.event_name == 'schedule' }}
+        uses: matter-labs/zksync-ci-common/.github/actions/slack-notify-release@0a6a75b4b9710cc51af2207e81a0a4df98bc8a5b # v1
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_RELEASES }}
+          context: "Release tags or deployments do not match release-tags.json"
