@@ -431,9 +431,18 @@ async fn check_deployments(
         verifier.PLONK_VERIFIER().call().await?,
         expected.verifier_plonk,
     );
+    // Only the testnet verifier declares `IS_TESTNET_VERIFIER`, and the production one reverts on
+    // it: look for the selector in the dispatcher before calling.
+    let verifier_code = provider
+        .get_code_at(expected.verifier)
+        .await
+        .with_context(|| format!("eth_getCode({:#x})", expected.verifier))?;
+    let selector = IVerifierOnlyVerifier::IS_TESTNET_VERIFIERCall::SELECTOR;
+    let is_testnet_verifier = verifier_code.windows(selector.len()).any(|w| w == selector)
+        && verifier.IS_TESTNET_VERIFIER().call().await?;
     report.check(
         "verifier flavour (testnet_verifier)",
-        verifier.IS_TESTNET_VERIFIER().call().await?,
+        is_testnet_verifier,
         expected.testnet_verifier,
     );
     let validator = IVerifierOnlyStageValidator::new(expected.stage_validator, provider.clone());
