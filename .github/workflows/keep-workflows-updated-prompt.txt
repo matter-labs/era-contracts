@@ -33,8 +33,8 @@ Mapping (workflow -> protocol-ops command):
 
 Conventions:
 - Calldata workflows share: environment, protocol_ops_tag, l1_rpc_url
-- environment choices are the permanent-values presets (stage, testnet,
-  mainnet, adi); workflows that sign or broadcast with our deployer keys take
-  only ours (stage, testnet, mainnet)
+- environment is a free string naming a permanent-values preset the image
+  holds (stage, testnet, mainnet or a partner's); workflows that sign or
+  broadcast with our deployer keys take only ours (stage, testnet, mainnet)
 - Artifact names:
   - per-chain workflows: safe-bundles-{operation}-{chain_id}-{environment}
