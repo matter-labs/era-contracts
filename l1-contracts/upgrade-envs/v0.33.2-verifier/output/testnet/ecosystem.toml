@@ -66,7 +66,7 @@ contracts = [
     "UpgradeStageValidator",
     "GovernanceUpgradeTimer",
 ]
-deployer = "0x04Ac70EA1c1581c17a7fDe5e05feC7bBa351567f"
+deployer = "0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7"
 
 [chain_upgrades.1913]
 chain = "0x36bC396a55f386d06E43683b77707B9999C7EFac"
