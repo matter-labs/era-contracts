@@ -51,9 +51,10 @@ pub const BUNDLE_METADATA_FILE: &str = "bundle-metadata.json";
 const MANIFEST_FILE: &str = "prepare/manifest.json";
 /// Generation outputs a bundle must carry, besides the `prepare/*.safe.json` files the manifest names.
 const REQUIRED_BUNDLE_FILES: [&str; 2] = [MANIFEST_FILE, "ecosystem.toml"];
+/// The L1 deployments' `forge verify-contract` commands, which the deploy workflow replays on Etherscan.
+const EXTRA_VERIFICATION_LOGS: &str = "extra-verification-logs.txt";
 /// Etherscan verification command logs; `gw-verification-logs.txt` only exists on gateway-enabled envs.
-const OPTIONAL_BUNDLE_FILES: [&str; 2] =
-    ["extra-verification-logs.txt", "gw-verification-logs.txt"];
+const OPTIONAL_BUNDLE_FILES: [&str; 2] = [EXTRA_VERIFICATION_LOGS, "gw-verification-logs.txt"];
 /// The per-env real-network broadcast log, committed under `output/<env>/` and read by PUVT.
 /// A run's own log carries the same basename inside the bundle work dir.
 const TRANSACTIONS_LOG: &str = "transactions.txt";
@@ -935,6 +936,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
                 &rpc_url,
                 args.deployer_address,
                 &output_dir.join("prepare"),
+                &output_dir.join(EXTRA_VERIFICATION_LOGS),
             )
             .await?;
             anyhow::ensure!(
