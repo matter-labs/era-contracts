@@ -1,6 +1,6 @@
 # How the generate / replay / deploy pipeline handles this upgrade
 # (protocol-ops/src/common/upgrade_descriptor.rs). One forge script prepares it; its L1 transactions
-# are the CREATE2 deployments and the publication of the L2 factory deps into stage's BytecodesSupplier.
+# are the CREATE2 deployments and the publication of the L2 factory deps into the CTM's BytecodesSupplier.
 prepare = "forge-script"
 script = "deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol:CTMUpgrade_v34Era"
 signature = "prepare(string,string)"

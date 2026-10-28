@@ -38,7 +38,9 @@ new_protocol_version = 146028888064  # v0.34.0
 governance_upgrade_timer_initial_delay = 172800
 
 # ServerNotifier / ChainAdmin upgrade timestamp for chain 324. Placeholder (2026-11-11 00:00 UTC) for the
-# fork test only: set to the fork's time + 7 days there, and to the chosen real date at generation.
+# fork test only: the script requires it to be in the future, so it serves fork-mainnet-zip18.sh runs started
+# before about 2026-11-08 16:00 UTC (the replay adds 200,000 s); later, set it to the fork's time + 7 days. Set
+# the chosen real date at generation.
 upgrade_timestamp = 1794355200
 
 # CREATE2 salt for every deployment. Fresh for this generation; rotate it on every regeneration.

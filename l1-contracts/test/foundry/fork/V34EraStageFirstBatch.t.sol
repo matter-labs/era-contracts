@@ -72,7 +72,7 @@ contract V34EraStageFirstBatchForkTest is Test {
         if (prevBatch.length == 0) {
             vm.skip(true, "run from rehearse.sh");
         }
-        assertEq(block.chainid, vm.envUint("L1_CHAIN_ID"), "not a Sepolia fork");
+        assertEq(block.chainid, vm.envUint("L1_CHAIN_ID"), "not a fork of the environment's L1");
 
         chain = IZKChain(vm.envAddress("DIAMOND"));
         validatorTimelock = ValidatorTimelock(vm.envAddress("VT"));

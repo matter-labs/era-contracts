@@ -169,8 +169,8 @@ the environment's L1. It checks:
   stage's calls in order, by target and selector;
 - the upgrade cut, `ProposedUpgrade`, the L2 transaction (fields, the 31 force deployments, the exact
   factory-dep set) and the new creation parameters;
-- then on the fork, as the real senders: the ServerNotifier upgrade; with the timer, its parameters, stage 1
-  reverting with `DeadlineNotYetPassed` before the delay, an emulated unfreeze (migrations unpaused) and the
+- then on the fork, as the real senders: the ServerNotifier upgrade; with the timer, its parameters, stage 1's
+  `checkDeadline` reverting with `DeadlineNotYetPassed` before the delay, an emulated unfreeze (migrations unpaused) and the
   delay fast-forwarded; stage 0 and the CTM proxy upgrade (CTM state unchanged, `initialize` reverts on
   proxy and implementation); stages 1 and 2 (version, verifier and its VKs, cut hash, creation hashes, batch
   zero, migrations unpaused, no pending owner); the reference chain's timestamp (the

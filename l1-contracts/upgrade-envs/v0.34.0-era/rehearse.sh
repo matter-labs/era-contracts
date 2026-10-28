@@ -291,7 +291,7 @@ fi
 [ "$NOCODE" = "0" ] || { echo "REHEARSAL FAILED: deployed contracts without code"; exit 1; }
 chk "bytecodes_supplier = the CTM's" "$BS" "$SUPPLIER"
 
-# The rest funds accounts and sends as the real owners: Anvil forks of Sepolia only.
+# The rest funds accounts and sends as the real owners: Anvil forks of the environment's L1 only.
 CLIENT=$(cast rpc web3_clientVersion --rpc-url "$RPC" | tr -d '"')
 case "$CLIENT" in anvil*) ;; *) echo "REHEARSAL FAILED: refusing to send to $CLIENT, not Anvil"; exit 1 ;; esac
 [ "$(cast chain-id --rpc-url "$RPC")" = "$L1_CHAIN_ID" ] || { echo "REHEARSAL FAILED: not a fork of chain $L1_CHAIN_ID"; exit 1; }
@@ -986,7 +986,8 @@ first_batches() {
   # Only the calldata of the tx that executed it has the full stored info. Before START_BLOCK, Anvil asks upstream.
   topic0=$(cast keccak 'BlockExecution(uint256,bytes32,bytes32)')
   for window in 5000 50000; do
-    from=$((START_BLOCK > window ? START_BLOCK - window : 0))
+    # window blocks up to START_BLOCK inclusive: public RPCs cap a log search at 50,000 blocks.
+    from=$((START_BLOCK > window ? START_BLOCK - window + 1 : 0))
     cast logs --rpc-url "$RPC" --address "$DIAMOND" --from-block "$from" --to-block "$START_BLOCK" --json \
       "$topic0" "$(cast to-uint256 "$executed")" > "$S/execution_logs.json" 2> "$S/execution_logs.err" \
       || { fail "first v34 batches: cast logs failed: $(head -c 300 "$S/execution_logs.err")"; return; }
@@ -1060,7 +1061,9 @@ sys.exit(0 if passed == len(results) == int(sys.argv[2]) else 1)
 PYFORGE
 }
 case "$FIRST_BATCH_TEST" in
-  1) first_batches ;;
+  # A reference chain that couldn't upgrade (a pending L2 upgrade) has no v34 batches to test.
+  1) if [ "$REF_UPGRADES" = "1" ]; then first_batches; else
+       echo "  SKIP first v34 batches (chain $CHAIN_ID not upgraded: pending L2 upgrade)"; SKIPPED=$((SKIPPED + 1)); fi ;;
   0) echo "  SKIP first v34 batches (set FIRST_BATCH_TEST=1)"; SKIPPED=$((SKIPPED + 1)) ;;
   *) fail "FIRST_BATCH_TEST must be 0 or 1, got '$FIRST_BATCH_TEST'" ;;
 esac
