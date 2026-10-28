@@ -64,11 +64,12 @@ const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
 /// replay can run next to a rehearsal of the same env.
-const ENV_ANVIL_PORTS: [(&str, u16); 4] = [
+const ENV_ANVIL_PORTS: [(&str, u16); 5] = [
     ("stage", 29_545),
     ("testnet", 29_547),
     ("mainnet", 29_549),
     ("adi", 29_551),
+    ("testnet3", 29_553),
 ];
 const REPLAY_PORT_OFFSET: u16 = 1;
 const ANVIL_GAS_PRICE_WEI: u64 = 1_000_000_000;
@@ -1387,10 +1388,11 @@ mod tests {
     /// `[contracts]`, or a CTM array that resolves to nothing).
     #[test]
     fn every_committed_env_config_loads() {
-        for env in ["stage", "testnet", "mainnet", "adi"] {
-            let Ok(cfg) = EnvConfig::load(env) else {
-                return; // no checkout around the test binary
-            };
+        if crate::common::paths::resolve_l1_contracts_path().is_err() {
+            return; // no checkout around the test binary
+        }
+        for env in ["stage", "testnet", "mainnet", "adi", "testnet3"] {
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("{env}: {e:#}"));
             assert_ne!(cfg.bridgehub(), Address::ZERO, "{env}: bridgehub is unset");
             assert!(
                 !cfg.ctms().is_empty(),
