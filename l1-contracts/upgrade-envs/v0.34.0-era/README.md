@@ -100,6 +100,9 @@ takes the CTM from v0.30.1 to v0.33.0; re-read them on live mainnet once it has 
 - **Fork test:** on a mainnet fork with ZIP-18 replayed, chain 324 still has ZIP-18's L2 upgrade pending,
   so its v34 upgrade reverts with `PreviousUpgradeNotFinalized`; its after-upgrade checks run on the test
   chain instead. Chain 324's own v34 upgrade is first tested once ZIP-18 has executed.
+  `L1_FORK_URL=<mainnet rpc> ./fork-mainnet-zip18.sh` builds that fork and leaves its Anvil running for
+  `protocol_ops ecosystem rehearse-upgrade --env mainnet --fork-url http://127.0.0.1:8645` and
+  `replay-bundle`; it is test-only and goes once ZIP-18 is live.
 - Chain 324 has no `UPGRADER_ROLE` holder: grant it through the Safe before using the server path.
 
 ## Executing it
@@ -140,6 +143,7 @@ For each chain, after stage 1 and once the ServerNotifier timestamp has passed:
   - `[test_upgrade_calls]`: for the transaction simulator. `test_create_chain_era` creates chain 555 as the
     bridgehub admin; `test_upgrade_chain_era` is the reference chain's upgrade call.
 - `rehearse.sh`: the fork checks (below).
+- `fork-mainnet-zip18.sh`: test-only, a mainnet fork with ZIP-18 replayed (see mainnet above).
 - `upgrade.toml`: tells the shared generate and deploy workflows how to prepare and check this upgrade.
   Its `[execution]` table writes `output/stage/emergency-upgrade-board.json`, which the generate workflow
   replays and renders as `output/stage/EXECUTE.md`.
