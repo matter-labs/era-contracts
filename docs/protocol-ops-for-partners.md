@@ -13,7 +13,10 @@ config, tell us: it ships in a new image. `docker inspect --format '{{json .Conf
 
 - `org.opencontainers.image.revision`: the era-contracts commit it was built from. An image without
   it was not released by `build-docker`, so don't use it (images before v0.35.0 have none: ask us).
-- `io.matter-labs.protocol-ops.tested-with`: the zksync-os-integration-tests run the release cites.
+- `io.matter-labs.protocol-ops.tested-with`: the zksync-os-integration-tests run that passed with
+  that commit (`build-docker` checks it before pushing).
+- `io.matter-labs.protocol-ops.zk-governance-commit`: the zk-governance commit it holds for a
+  governance redeploy.
 
 ## A chain operation
 

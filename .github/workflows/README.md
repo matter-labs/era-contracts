@@ -10,13 +10,15 @@ Nothing is compiled per run: the image is what gets released and tested.
 1. Merge the PRs that change the upgrade's scripts and inputs (`l1-contracts/upgrade-envs/<upgrade>/`,
    `AllContractsHashes.json`, the chain states).
 2. Test that commit with zksync-os-integration-tests: in a PR there, point `protocol_ops` and
-   `zksync_os_genesis_gen` in its `Cargo.toml` at the commit (`rev = "<commit>"`). That PR's CI run is
-   the one the release cites.
+   `zksync_os_genesis_gen` in its `Cargo.toml` at the commit (`rev = "<commit>"`). That PR's passed
+   `integration-tests.yaml` run is the one the release cites.
 3. Release the image:
-   `gh workflow run build-docker.yaml --ref <release branch> -f ref=<commit> -f tested_with_integration_tests=true -f integration_tests_run_url=<that run>`.
-   `--ref` picks the copy of the workflow that runs, so use the release branch's. It refuses to push
-   without the two inputs. Before pushing, it checks the image's contract build against its
-   `AllContractsHashes.json`, runs the generate, handoff and deploy commands through
+   `gh workflow run build-docker.yaml --ref <release branch> -f ref=<commit> -f integration_tests_run_id=<that run's id>`,
+   plus `-f zk_governance_commit=<sha>` when the governance redeploy needs a zk-governance commit other
+   than the Dockerfile's `ZK_GOVERNANCE_COMMIT`. `--ref` picks the copy of the workflow that runs, so
+   use the release branch's. It refuses to push unless that run passed and its `Cargo.lock` pins its
+   era-contracts crates at the commit. Before pushing, it checks the image's contract build against
+   its `AllContractsHashes.json`, runs the generate, handoff and deploy commands through
    `protocol-ops.sh --tag` against the anvil-interop fixture (the previous release's chain states),
    then the governance calls and a partner's chain commands (`set-upgrade-timestamp`,
    `add-validator`) with `docker run`, as the partner guide does (`.github/tests/release-flow.sh`).
