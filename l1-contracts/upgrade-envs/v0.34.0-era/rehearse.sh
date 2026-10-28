@@ -653,7 +653,7 @@ if E["DEPLOY_FFLONK"] == "True":
 if E["TIMER_DELAY"]:
     # DefaultCTMUpgrade.getCreationCalldata: delay, 2 weeks of extension, governance and owner both the PUH.
     expected["GovernanceUpgradeTimer"] = ("deployed_addresses", "l1_governance_upgrade_timer",
-                                          enc("uint256,uint256,address,address", E["TIMER_DELAY"], 14 * 24 * 3600, E["PUH"], E["PUH"]))
+                                          enc("uint256,uint256,address,address", E["TIMER_DELAY"], str(14 * 24 * 3600), E["PUH"], E["PUH"]))
     expected["UpgradeStageValidator"] = ("deployed_addresses", "upgrade_stage_validator", enc("address,uint256", E["CTM"], E["NEW"]))
 print(f"     expected deployments: {len(expected)} (11, plus EraVerifierFflonk if deployed, plus the timer and validator)")
 publish = {cast("sig", "publishEraBytecodes(bytes[])"), cast("sig", "publishEraBytecode(bytes)")}
@@ -772,7 +772,7 @@ echo "== Stage 0 and the CTM proxy upgrade, sent as the CTM owner (PUH)"
 while read -r target value data; do send "$PUH" "$target" "$data" "stage 0 ${data:0:10} -> $target"; done < "$S/stage0.txt"
 chk "migrations paused" "$(call "$CAH" 'migrationPaused()(bool)')" "true"
 if [ -n "$TIMER_DELAY" ]; then
-  STARTED=$(cast block latest timestamp --rpc-url "$RPC")
+  STARTED=$(cast block latest --field timestamp --rpc-url "$RPC")
   chk "timer deadline = stage 0's block time + delay" "$(call "$TIMER" 'deadline()(uint256)' | first)" "$((STARTED + TIMER_DELAY))"
   reverts "stage 1 before the delay: checkDeadline reverts with DeadlineNotYetPassed" "$PUH" "$TIMER" \
     "$(cast calldata 'checkDeadline()')" 'DeadlineNotYetPassed()'
