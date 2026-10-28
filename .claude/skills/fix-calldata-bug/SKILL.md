@@ -116,22 +116,17 @@ on-chain write, so confirm before broadcasting. Verify with
 2. Emit the sim from the committed inputs:
    `governance-toml-to-simulator --env <env> --out ../transaction-simulator/transactions/<dated>.json`
    (auto-uses the pulled `ecosystem.toml` + `sim-inputs/manifest.json`).
-3. **No-unlabelled-calls gate.** Every call must have a curated description —
-   `grep -c '\[unlabelled\]' <emitted .json>` must be **0**. Any code change that
-   adds/reorders calls (new governance calls, a redeployed contract, new selectors)
-   will surface as `[unlabelled] …` fallbacks. For each, add a `[[entries]]` block to
-   `upgrade-envs/<ver>/sim-descriptions.toml` keyed by `(target, selector)` + a
-   discriminator if that pair repeats (`arg0_address`=word0, `l2_contract`=word3,
-   `second_bridge_address`=word7, or `inner_target`/`inner_selector` for
-   multicall/schedule/execute wrappers), then **re-emit** and re-check. Commit the
-   `sim-descriptions.toml` change to the era-contracts branch.
+3. **Descriptions.** protocol-ops writes every description from the calldata and the
+   artifact's addresses (`protocol-ops/src/common/call_description.rs`). The emit fails on a
+   call to a function outside `KNOWN_FUNCTIONS` in `protocol-ops/src/common/calldata.rs`: add
+   it there (and an action in `call_description.rs` if its plain `Contract.fn(args)` reading is
+   not enough), then **re-emit**.
 4. **Rehearse-passes gate.** `yarn --cwd ../transaction-simulator simulate --file <…>`
    must reach **`✅ All simulations succeed!`** — every tx ✔, none ❌. A clean _emit_
-   (0 unlabelled) is necessary but **not** sufficient; the sim must actually execute.
+   is necessary but **not** sufficient; the sim must actually execute.
    This run also rewrites `decoded-calldata/<file>.json` (a _derived_ artifact — the
-   emit in step 2 only writes `transactions/`), so after adding labels in step 3 re-run
-   `simulate` and re-check `grep -c '\[unlabelled\]'` on **both** files (a stale decode
-   reads as "still unlabelled"). Common failure → cause:
+   emit in step 2 only writes `transactions/`), so re-run `simulate` after any re-emit.
+   Common failure → cause:
    - `ERC1967InvalidImplementation(addr)` (`0x4c9c8ce3`) on a proxy `upgrade*` /
      `EOA with non-empty calldata` on a CREATE2 target → **Phase 2b not done**: that
      address isn't deployed on Sepolia. `cast code <addr>` returns `0x`. Broadcast the
@@ -149,10 +144,10 @@ on-chain write, so confirm before broadcasting. Verify with
      **hardcoded expected governance addresses** are stale. A regen that redeploys the
      governance set (new bytecode and/or salt) moves those addresses, so update them in
      the transaction-simulator's `scripts/constants.ts` (the per-env `guardians` etc.) to
-     the values in the regenerated `ecosystem.toml` `[puh_guardians]`, then re-run. Like
-     `sim-descriptions.toml`, this is a tx-sim-side artifact that must track the regen.
+     the values in the regenerated `ecosystem.toml` `[puh_guardians]`, then re-run. This is a
+     tx-sim-side artifact that must track the regen.
 5. Commit + push the sim JSON to the transaction-simulator repo — **only** after the
-   no-unlabelled gate is clean **and** the rehearsal prints `✅ All simulations succeed!`.
+   rehearsal prints `✅ All simulations succeed!`.
    A reverting sim must never be pushed (CI runs this exact rehearsal).
 
 ## Agent coordination: git is the only channel
@@ -183,9 +178,6 @@ git plus a human relay of turn-taking:
   artifacts on macOS for commit, and don't edit code on the VPS (it would diverge from
   the reviewed local commit).
 - **`cargo build`, not `cargo check`**, before any regen — and re-verify with `strings`.
-- **Zero `[unlabelled]` calls** in the emitted sim (and the decoded file after a rehearsal)
-  before pushing it — `grep -c '\[unlabelled\]'` must be `0`. New/reordered calls need
-  matching `sim-descriptions.toml` entries.
 - **Keep PUVT in lockstep** with the deploy scripts; a deploy-side change with no
   matching verification change fails phase-1 PUVT (that's the point — let it catch you
   locally before the VPS run).

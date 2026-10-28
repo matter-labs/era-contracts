@@ -1,0 +1,34 @@
+l1_chain_id = 11155111
+# stage3: the atomic-interop ZKsync OS stage ecosystem deployed from release/v0.33.0-atomic-interop on
+# 2026-08-27 (AGENTS.md "stage3"). Not `stage.toml`, the older stage ecosystem (bridgehub 0x236D1c3F…)
+# owned by the stage ProtocolUpgradeHandler.
+#
+# Read from Sepolia on 2026-10-16. Its only CTM is ZKsync OS; chains 2727, 2728, 2729, 27271, 27272, 27273.
+testnet_verifier = true
+
+[permanent_contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+
+[core_contracts]
+bridgehub_proxy_addr = "0xb9415d43C7753cCeBaa1ac05c8BabA36159ab13F"
+# `bridgehub.owner()`, the CTM's and the ChainAssetHandler's `owner()` are the legacy `Governance`
+# below, itself owned by the EOA 0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5 (`minDelay() == 0`).
+governance_kind = "legacy"
+
+[ctm_contracts]
+ctm_proxy_addr = "0x94d8784d719181EA00f58ab4a85333959FFA5a79"
+
+[[ctm_contracts.ctms]]
+proxy = "0x94d8784d719181EA00f58ab4a85333959FFA5a79"
+is_zk_sync_os = true
+
+[[ownable_proxies]]
+# Legacy `Governance.sol`: owns the bridgehub, the CTM and the ChainAssetHandler. Its owner sends
+# `scheduleTransparent(op, 0)` then `execute(op)`.
+addr = "0xFF657F253C0FbdE6A7DeCdc958F4153C1179D3aa"
+kind = "legacy_governance"
+
+[[ownable_proxies]]
+# `ChainAdminOwnable`, the bridgehub's and the CTM's `admin()`; owned by the same EOA.
+addr = "0xa95BaE85Fd551603f9ddAfD1827aC11fab6971C0"
+kind = "oz_chain_admin"

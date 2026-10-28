@@ -1,0 +1,45 @@
+# v0.33.2 verifier-only upgrade of the ZKsync OS testnet ecosystem — input for
+# deploy-scripts/upgrade/verifier-only/ZKsyncOSVerifierOnlyUpgrade.s.sol (see that script's doc).
+#
+# The public ZKsync OS testnet on Sepolia (`upgrade-envs/permanent-values/testnet.toml`). Its CTMs and the
+# ChainAssetHandler are owned by the ProtocolUpgradeHandler 0x803e5E7a…, so governance runs through the
+# Emergency Upgrade Board (output/testnet/execution.json). Only the ZKsync OS CTM is upgraded:
+# the EraVM CTM (0x3Cc81628…, chain 301) has its own verifier and is not touched.
+#
+# The target version (0.33.2) and its VK hash come from configs/genesis/zksync-os/latest.json;
+# the script refuses to run if the deployed verifier's VK differs from it.
+
+bridgehub = "0xc4FD2580C3487bba18D63f50301020132342fdbD"
+# ZKsync OS ChainTypeManager proxy (`isZKsyncOS() == true`).
+ctm = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
+
+# v0.33.0. The CTM never took v0.33.1, and a verifier-only upgrade may skip patch versions.
+old_protocol_version = 0x2100000000
+
+# Block of the CTM's last NewChainCreationParams event (tx 0xa35b9e77…), the v33 upgrade's
+# setChainCreationParams. That call ran before setNewVersionUpgrade, so the CTM recorded the block under
+# v0.31.1 and newChainCreationParamsBlock(v0.33.0) is 0. The script checks the event against the CTM's hashes.
+chain_creation_params_block = 11667464
+
+# The bridgehub's first chain (8022832) is still on v0.29, which AddressIntrospector would take to mean the
+# whole ecosystem predates v32 (it then reads no `defaultUpgrade`). The ZKsync OS CTM is on v0.33.0.
+pre_v32_introspection = false
+
+# The owner is a ProtocolUpgradeHandler, not a `Governance`: no scheduleTransparent / execute calldata.
+owner_is_governance = false
+
+# Testnet runs the testnet verifier flavour (mock proofs accepted), like the verifier it replaces.
+testnet_verifier = true
+
+# The GovernanceUpgradeTimer's INITIAL_DELAY. Nothing on L2 changes, so stage 1 may follow stage 0
+# immediately, which is also what lets stages 0-2 run as one emergency proposal.
+governance_upgrade_timer_initial_delay = 0
+
+# Fresh for this upgrade, distinct from stage's: a repeated (salt, initcode) pair resolves to an already
+# deployed contract. Rotate before any regen that must deploy anew:
+#   python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
+create2_factory_salt = "0x0750419e7853b4218863380935d7d1b8ed72e12a1df6800574898286705f6587"
+
+# Every chain on the ZKsync OS CTM that is on v0.33.0. 1401 is still on v0.31.1 and the others on
+# v0.29/v0.30; a cut keyed to v0.33.0 cannot apply to them.
+chain_ids = [1913, 4221, 42111, 88288, 579029, 8022833, 8022834]

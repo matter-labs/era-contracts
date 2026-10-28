@@ -5,9 +5,9 @@ use std::collections::BTreeSet;
 
 use alloy::primitives::{keccak256, Address, U256};
 
-use super::decode::{self, InnerCall, WrapperKind, INLINE_CALLDATA_MAX_BYTES};
 use super::load::network_name;
 use super::{Runbook, RunbookTx, SourceKind};
+use crate::common::calldata::{self as decode, InnerCall, WrapperKind, INLINE_CALLDATA_MAX_BYTES};
 
 /// Wrapped calls listed inline in a sentence; more become a numbered list.
 const MAX_INLINE_CALLS: usize = 4;
@@ -196,7 +196,41 @@ fn sender_bullet(runbook: &Runbook, sections: &[Section]) -> String {
 
 fn order_bullet(runbook: &Runbook) -> String {
     let count = runbook.txs.len();
+    // The 1-based numbers of the executeEmergencyUpgrade txs, one per proposal.
+    let executes: Vec<usize> = runbook
+        .txs
+        .iter()
+        .enumerate()
+        .filter(|(_, tx)| {
+            runbook
+                .emergency()
+                .is_some_and(|(board, _, _)| tx.to == board)
+        })
+        .map(|(i, _)| i + 1)
+        .collect();
     match runbook.emergency() {
+        Some(_) if count > 1 && executes.len() > 1 => {
+            let mut start = 0;
+            let proposals: Vec<String> = executes
+                .iter()
+                .map(|&execute| {
+                    let text = format!(
+                        "{} approve, tx {execute} executes",
+                        tx_range(start, execute - 1)
+                    );
+                    start = execute;
+                    text
+                })
+                .collect();
+            format!(
+                "- **Order:** {} emergency proposals, one after the other: {}. Within each, the \
+                 approvals put the proposal hash on each member Safe and the last tx executes it on \
+                 the Emergency Upgrade Board; it reverts if any approval is missing. Wait for each tx \
+                 to be mined before sending the next.",
+                executes.len(),
+                proposals.join("; ")
+            )
+        }
         Some(_) if count > 1 => format!(
             "- **Order:** {} approve the proposal hash on each member Safe; tx {count} executes the \
              upgrade on the Emergency Upgrade Board. Wait for each tx to be mined before sending \
