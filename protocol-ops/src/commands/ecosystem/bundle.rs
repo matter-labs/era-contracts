@@ -13,7 +13,8 @@
 //!   "checks" mean comes from `upgrade-envs/<upgrade>/upgrade.toml`: v31 is
 //!   `upgrade-prepare-all` + PUVT, a `forge-script` upgrade runs one script and its own checks.
 //!   A `forge-script` upgrade with an `[execution]` script also gets `EXECUTE.md`, the
-//!   runbook of the txs whoever executes sends by hand, checked on the same fork.
+//!   runbook of the txs whoever executes sends by hand, checked on the same fork, in each
+//!   env the script applies to.
 //! - `replay-bundle` (CONSUME): rehearse a packed bundle on a fresh fork, broadcast the
 //!   deployer's bundles for real, or only run PUVT against an already-upgraded chain.
 //! - `verify-bundle`: the integrity check on its own.
@@ -41,7 +42,7 @@ use crate::common::env_config::{
 use crate::common::ethereum::get_provider;
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
-use crate::common::upgrade_descriptor::{ExecutionScript, ForgeScriptUpgrade, UpgradeDescriptor};
+use crate::common::upgrade_descriptor::{ExecutionScript, UpgradeDescriptor};
 use crate::common::{logger, paths};
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
@@ -973,20 +974,26 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     )
     .await?;
     broadcast_impersonated(&rpc_url, &paths).await?;
-    if let UpgradeDescriptor::ForgeScript(ForgeScriptUpgrade {
-        execution: Some(execution),
-        ..
-    }) = &descriptor
-    {
-        write_execution_runbook(
-            &args.upgrade,
-            execution,
-            &env_cfg,
-            &rpc_url,
-            &output_dir,
-            forked_at_block,
-        )
-        .await?;
+    if let UpgradeDescriptor::ForgeScript(upgrade) = &descriptor {
+        match upgrade.execution_for(&env_cfg.env) {
+            Some(execution) => {
+                write_execution_runbook(
+                    &args.upgrade,
+                    execution,
+                    &env_cfg,
+                    &rpc_url,
+                    &output_dir,
+                    forked_at_block,
+                )
+                .await?
+            }
+            None if upgrade.execution.is_some() => logger::info(format!(
+                "[execution] does not list env {}: no {}",
+                env_cfg.env,
+                execution_runbook::RUNBOOK_FILE
+            )),
+            None => {}
+        }
     }
     check_upgrade(
         &descriptor,
