@@ -15,6 +15,8 @@ chain_asset_handler = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"
 rollup_da_manager = "0x5af0d94e50b271005AF1687e363FD104771EAe9d"
 # EIP_7702_CHECKER of chain 499's live MailboxFacet (internal immutable, read from its code).
 eip7702_checker = "0x961821b7aa9236008ead6b39ec0b035b91e72c22"
+# Reuse the live FFLONK verifier: its key is the genesis fflonk_snark_wrapper_vk_hash.
+deploy_verifier_fflonk = false
 # FFLONK_VERIFIER() of the v0.33.0 verifier; reused as the multi-proof verifier's Boojum verifier.
 verifier_fflonk = "0x09D55E0f09e8f493C58331f0B827189c2EdAA838"
 # initAddress of the CTM's current creation cut; reused for new chains.
@@ -27,6 +29,9 @@ testnet_verifier = true
 
 old_protocol_version = 141733920768  # v0.33.0
 new_protocol_version = 146028888064  # v0.34.0
+
+# No governance_upgrade_timer_initial_delay: stage ran v34 as one emergency proposal without a timer
+# (executed 2026-10-22).
 
 # ServerNotifier / ChainAdmin upgrade timestamp: 1 = as soon as the node sees it (0 reverts).
 upgrade_timestamp = 1
