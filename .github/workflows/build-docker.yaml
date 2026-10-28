@@ -7,7 +7,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, draft-v31, "draft/**", "release/**"]
+    branches: [main, "draft**", "release**"]
     # ready_for_review: the release flow below skips drafts.
     types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
