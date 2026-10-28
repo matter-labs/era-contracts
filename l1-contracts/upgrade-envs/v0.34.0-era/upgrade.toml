@@ -1,0 +1,28 @@
+# How the generate / replay / deploy pipeline handles this upgrade
+# (protocol-ops/src/common/upgrade_descriptor.rs). One forge script prepares it; its L1 transactions
+# are the CREATE2 deployments and the publication of the L2 factory deps into stage's BytecodesSupplier.
+prepare = "forge-script"
+script = "deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol:CTMUpgrade_v34Era"
+signature = "prepare(string,string)"
+args = [
+  "/upgrade-envs/v0.34.0-era/{env}.toml",
+  "/upgrade-envs/v0.34.0-era/output/{env}/ecosystem.toml",
+]
+# On the fork the bundle was replayed on: CREATE2 provenance, the ServerNotifier upgrade, governance
+# stages, chain 499's timestamp, drain and upgrade, a test chain, L1 assertions.
+verify_fork = ["bash", "upgrade-envs/v0.34.0-era/rehearse-stage.sh"]
+# Read-only against the real chain: every factory dep is published and every deployed contract has code.
+verify_chain = ["bash", "upgrade-envs/v0.34.0-era/rehearse-stage.sh", "--published-only"]
+
+# How whoever executes sends the governance stages: one emergency proposal through the env's
+# Emergency Upgrade Board, from the owner of its member Safes. Run read-only on the generation fork
+# after the deploy bundle; the pipeline replays the txs there and renders EXECUTE.md from them.
+[execution]
+script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+signature = "emergencyUpgradeAllStages(string,string,string)"
+args = [
+  "/upgrade-envs/permanent-values/{env}.toml",
+  "/upgrade-envs/v0.34.0-era/output/{env}/ecosystem.toml",
+  "/upgrade-envs/v0.34.0-era/output/{env}/emergency-upgrade-board.json",
+]
+output = "emergency-upgrade-board.json"

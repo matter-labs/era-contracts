@@ -38,4 +38,12 @@ library UpgradeHelperLib {
     function getUpgradeTxType(bool _isZKsyncOS) internal pure returns (uint256) {
         return _isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
     }
+
+    function factoryDepHashes(L2CanonicalTransaction memory _tx) internal pure returns (bytes32[] memory hashes) {
+        uint256 count = _tx.factoryDeps.length;
+        hashes = new bytes32[](count);
+        for (uint256 i = 0; i < count; ++i) {
+            hashes[i] = bytes32(_tx.factoryDeps[i]);
+        }
+    }
 }
