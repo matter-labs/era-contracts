@@ -4,10 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment = basename of upgrade-envs/permanent-values/<env>.toml (read by protocol_ops --env)"
+        description: "A preset the image holds, upgrade-envs/permanent-values/<env>.toml: stage, testnet, mainnet or a partner's (protocol_ops --env)"
         required: true
-        type: choice
-        options: [stage, testnet, mainnet, adi]
+        type: string
       protocol_ops_tag:
         description: "protocol-ops image released by build-docker.yaml: sha256:<digest>, or a tag"
         required: true

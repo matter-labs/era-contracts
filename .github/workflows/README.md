@@ -69,8 +69,9 @@ transfers between machines.
 ## Conventions
 
 - **Calldata workflows** share: `environment`, `protocol_ops_tag`, `l1_rpc_url`
-- **`environment`** is a preset: `l1-contracts/upgrade-envs/permanent-values/<env>.toml` (`stage`,
-  `testnet`, `mainnet`, `adi`), passed as `--env <env>`; it gives the bridgehub and the L1 chain id.
+- **`environment`** is a preset the image holds: `l1-contracts/upgrade-envs/permanent-values/<env>.toml`
+  (`stage`, `testnet`, `mainnet` or a partner's), passed as `--env <env>`; it gives the bridgehub and
+  the L1 chain id. It is a free string, so a new partner preset needs no workflow change.
   Chain workflows take the chain as `chain_id` (`--chain-id`).
 - **Integration-test-only** env vars (e.g. `L1_DIAMOND_CUT_DATA`) are NOT workflow inputs
 - **v30-only** overrides are marked `[v30 only]` in descriptions and `TODO(v30-removal)` in code
