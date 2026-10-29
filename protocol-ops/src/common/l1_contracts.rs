@@ -38,10 +38,10 @@ pub async fn resolve_ctm_proxy(
     ensure_nonzero(ctm, &format!("bridgehub.chainTypeManager({chain_id})"))
 }
 
-/// Discover the ZKsync OS CTM from L1, without requiring an existing chain ID: the one CTM whose
-/// `isZKsyncOS()` is true among the registered chains' CTMs, else among the CTMs the bridgehub's
-/// `ChainTypeManagerAdded` events name (an ecosystem whose OS CTM has no chain yet). Fails when
-/// there is no such CTM or more than one.
+/// Discover the ZKsync OS CTM from L1, without requiring an existing chain ID: the one CTM the
+/// bridgehub still registers whose `isZKsyncOS()` is true, among the CTMs of its chains, else among
+/// the CTMs its `ChainTypeManagerAdded` events name (an ecosystem whose OS CTM has no chain yet).
+/// Fails when there is no such CTM or more than one.
 pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
     use alloy::primitives::keccak256;
     use alloy::providers::Provider;
@@ -53,7 +53,7 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
         .into_iter()
         .map(|(ctm, _)| ctm)
         .collect();
-    let mut os_ctms = zksync_os_ctms(&p, chain_ctms).await?;
+    let mut os_ctms = zksync_os_ctms(&p, bridgehub, chain_ctms).await?;
     if os_ctms.is_empty() {
         // event ChainTypeManagerAdded(address indexed chainTypeManager)
         let filter = Filter::new()
@@ -72,7 +72,7 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
                 added.push(ctm);
             }
         }
-        os_ctms = zksync_os_ctms(&p, added).await?;
+        os_ctms = zksync_os_ctms(&p, bridgehub, added).await?;
     }
     match os_ctms.as_slice() {
         [ctm] => Ok(*ctm),
@@ -84,11 +84,25 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
     }
 }
 
-/// The `ctms` whose `isZKsyncOS()` is true. Pre-v31 CTMs (the EraVM ones among them) lack the
+/// The `ctms` the bridgehub still registers whose `isZKsyncOS()` is true: a removed CTM keeps its
+/// chains and its `ChainTypeManagerAdded` event. Pre-v31 CTMs (the EraVM ones among them) lack the
 /// getter, so a revert or an empty return counts as not ZKsync OS; any other error is returned.
-async fn zksync_os_ctms(p: &AlloyProvider, ctms: Vec<Address>) -> anyhow::Result<Vec<Address>> {
+async fn zksync_os_ctms(
+    p: &AlloyProvider,
+    bridgehub: Address,
+    ctms: Vec<Address>,
+) -> anyhow::Result<Vec<Address>> {
+    let bh = BridgehubAbi::new(bridgehub, p);
     let mut out = Vec::new();
     for ctm in ctms {
+        let registered = bh
+            .chainTypeManagerIsRegistered(ctm)
+            .call()
+            .await
+            .with_context(|| format!("bridgehub.chainTypeManagerIsRegistered({ctm:#x})"))?;
+        if !registered {
+            continue;
+        }
         match IChainTypeManagerAbi::new(ctm, p).isZKsyncOS().call().await {
             Ok(true) => out.push(ctm),
             Ok(false) | Err(alloy::contract::Error::ZeroData(..)) => {}
