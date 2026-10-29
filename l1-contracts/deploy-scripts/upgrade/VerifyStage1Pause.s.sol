@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {EmergencyStageUpgradeCalldata} from "./EmergencyStageUpgradeCalldata.s.sol";
+import {EmergencyUpgradeCalldata} from "./EmergencyUpgradeCalldata.s.sol";
 import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol";
 import {console2} from "forge-std/Script.sol";
 
@@ -10,7 +10,7 @@ import {console2} from "forge-std/Script.sol";
 /// directly, bypassing the board's signature check (which would otherwise need fresh approvals for the
 /// new 24-call proposal). If the old 23-call proposal would revert with MigrationsNotPaused() but this
 /// passes, the pauseMigration fix is confirmed.
-contract VerifyStage1Pause is EmergencyStageUpgradeCalldata {
+contract VerifyStage1Pause is EmergencyUpgradeCalldata {
     function verify() external {
         IProtocolUpgradeHandler.Call[] memory calls = _loadCalls(1); // includes prepended pauseMigration
         address board = PUH.emergencyUpgradeBoard();
