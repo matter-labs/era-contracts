@@ -6,11 +6,11 @@ bit for L1→L2 transactions (new bootloader), a 15M gas cap on user L1→L2 tra
 
 One script and one `upgrade.toml` serve every environment; `<env>.toml` holds what differs.
 
-| Environment                   | Status                                                                                                                                                                                              |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| stage (Sepolia, chain 499)    | Executed 2026-10-22. `output/stage/` comes from generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988) (commit `fa8deea33`, Sepolia fork block 11955011) |
-| testnet3 (Sepolia, chain 312) | Inputs ready; not generated yet                                                                                                                                                                     |
-| mainnet (chain 324)           | Inputs from ZIP-18's output; fork-tested on a ZIP-18 replay only. Generated once ZIP-18 has executed                                                                                                |
+| Environment                   | Status                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| stage (Sepolia, chain 499)    | Executed 2026-10-22. `output/stage/` comes from generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988) (commit `fa8deea33`, Sepolia fork block 11955011)                                                                                                                                                |
+| testnet3 (Sepolia, chain 312) | Deployer bundle deployed 2026-10-29 by deploy run [40849834276](https://github.com/matter-labs/era-contracts/actions/runs/40849834276); governance not executed. `output/testnet3/` comes from generate run [40845992865](https://github.com/matter-labs/era-contracts/actions/runs/40845992865) (commit `46c688e02`, Sepolia fork block 12018509) |
+| mainnet (chain 324)           | Inputs from ZIP-18's output; fork-tested on a ZIP-18 replay only. Generated once ZIP-18 has executed                                                                                                                                                                                                                                               |
 
 ## What the upgrade does
 
