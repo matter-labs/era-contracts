@@ -2,8 +2,8 @@
  * The release flow (.github/workflows/README.md#release-flow): the ecosystem-upgrade workflows'
  * protocol-ops commands, the governance calls and a partner's chain commands, on the previous release's
  * frozen L1 (`upgradeSourceStateVersion`) through the `anvil-interop` env. With PROTOCOL_OPS_TAG set
- * (build-docker.yaml; Linux, for the host network), every command runs in that image, the chain commands by `docker run` as
- * docs/protocol-ops-for-partners.md runs them; else from this checkout.
+ * (build-docker.yaml; Linux, for the host network), every command runs in that image, the chain commands
+ * by `docker run` as docs/protocol-ops-for-partners.md runs them; else from this checkout.
  *
  * Unlike `runPipelineUpgradeScenario`, it runs the env's committed configs, the only ones an image holds.
  * Not `chain upgrade`: the fixture's chains still have the previous upgrade's L2 transaction pending.
@@ -34,7 +34,7 @@ const anvilInteropDir = path.resolve(__dirname, "../..");
 const contractsRootDir = path.resolve(anvilInteropDir, "../../..");
 const upgradeEnvsDir = path.join(contractsRootDir, "l1-contracts", "upgrade-envs");
 
-/** A command line's arguments; its values contain no whitespace. */
+/** A command line's arguments, split on whitespace, so a long command can wrap; no value contains any. */
 const words = (command: string) => command.trim().split(/\s+/);
 
 export async function runReleaseFlow(): Promise<void> {
@@ -55,8 +55,9 @@ export async function runReleaseFlow(): Promise<void> {
     .pop()!;
   // Relative to the checkout: in the image, the upgrade's output directory is mounted at the same place.
   const out = `l1-contracts/upgrade-envs/${upgrade}/output/${ENV}`;
-  // The fixture values no later command holds the env to: protocol-ops gives a CTM the release input has no
-  // salt for a random one, and compares the ZK asset id only with the env itself.
+  // The env must name the fixture. Most stale values make a later command fail, but not these two: for a CTM
+  // without a salt in the release input protocol-ops picks a random one, and it checks the ZK asset id only
+  // against the env itself.
   const preset = parseToml(fs.readFileSync(path.join(upgradeEnvsDir, "permanent-values", `${ENV}.toml`), "utf8"));
   const input = parseToml(fs.readFileSync(path.join(upgradeEnvsDir, upgrade, `${ENV}.toml`), "utf8"));
   const saltedCtms = Object.keys(input.create2_factory_salts ?? {}).map((ctm) => ctm.toLowerCase());
@@ -74,6 +75,7 @@ export async function runReleaseFlow(): Promise<void> {
   const result = path.join(work, "result");
   fs.mkdirSync(bundle);
   fs.mkdirSync(result);
+  // A protocol-ops command through protocol-ops.sh, in the image when a tag is set, with both mounted.
   const po = (command: string) =>
     runProtocolOps([...(tag ? ["--tag", tag] : []), ...words(command)], {
       EXTRA_MOUNTS: `${bundle}:${bundle}:ro ${result}:${result}`,
