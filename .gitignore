@@ -74,7 +74,7 @@ l1-contracts/upgrade-envs/**/output/**/deploy-bundle/
 # Replay state (`protocol_ops ecosystem replay-bundle`): executed.json and the receipts
 # of a real broadcast. Kept out of the bundle directory, which is the handoff artifact.
 l1-contracts/upgrade-envs/**/output/**/replay/
-# What .github/tests/release-flow.sh generates for the anvil-interop fixture.
+# What the release flow (`yarn test:release-flow` in l1-contracts/test/anvil-interop) generates.
 l1-contracts/upgrade-envs/**/output/anvil-interop/
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 !l1-contracts/script-out/.gitkeep

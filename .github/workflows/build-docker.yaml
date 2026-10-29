@@ -160,10 +160,30 @@ jobs:
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         uses: ./.github/actions/install-foundry
 
+      - name: Use Node.js
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 20
+          cache: yarn
+
+      # The harness's ABIs and the ChainAdmin it deploys come from the image's own build.
+      - name: Set up the release flow
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+        run: |
+          yarn install --frozen-lockfile
+          yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
+          container="$(docker create "$IMAGE")"
+          docker cp "$container:/contracts/l1-contracts/out" l1-contracts/out
+          docker rm "$container" >/dev/null
+
       - name: Run the release flow in the image
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         timeout-minutes: 30
-        run: PROTOCOL_OPS_TAG="$IMAGE_TAG" bash .github/tests/release-flow.sh
+        working-directory: l1-contracts/test/anvil-interop
+        env:
+          PROTOCOL_OPS_TAG: ${{ env.IMAGE_TAG }}
+        run: yarn test:release-flow
 
       - name: Login to GitHub Container Registry
         if: github.event_name == 'workflow_dispatch'

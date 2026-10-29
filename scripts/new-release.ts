@@ -310,7 +310,7 @@ Still to do:
     tests have no states for ${nextStateVersion}; the upgrade test already runs ${anvilConfig.stateVersion} -> ${nextStateVersion}.
   - Review the per-environment inputs copied into ${nextEnvDir}/ (owner, era_chain_id and addresses carry over).
   - Point upgrade-envs/permanent-values/anvil-interop.toml and ${nextEnvDir}/anvil-interop.toml (owner) at the
-    new upgrade source's chain-states/${anvilConfig.stateVersion}/addresses.json (.github/tests/release-flow.sh).${
+    new upgrade source's chain-states/${anvilConfig.stateVersion}/addresses.json (the release flow, yarn test:release-flow in l1-contracts/test/anvil-interop).${
       stillUsingOutgoing.length > 0
         ? `
   - Remove or update what still names ${repoPath(currentScriptsDir)}/: tests built on those scripts go (the

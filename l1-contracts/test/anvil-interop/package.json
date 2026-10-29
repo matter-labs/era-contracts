@@ -10,6 +10,7 @@
     "deploy:test-token": "ts-node src/helpers/deploy-test-token.ts",
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
     "test:upgrade": "ts-node run-upgrade-test.ts",
+    "test:release-flow": "ts-node run-release-flow-test.ts",
     "test:upgrade-recurring": "ts-node run-recurring-upgrade-test.ts",
     "regen:registry-manifest": "REGEN_REGISTRIES=1 ts-node run-recurring-upgrade-test.ts",
     "test:unit": "ts-node test/unit/run-all.ts",

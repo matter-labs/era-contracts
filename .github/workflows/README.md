@@ -21,7 +21,7 @@ Nothing is compiled per run: the image is what gets released and tested.
    its `AllContractsHashes.json`, runs the generate, handoff and deploy commands through
    `protocol-ops.sh --tag` against the anvil-interop fixture (the previous release's chain states),
    then the governance calls and a partner's chain commands (`set-upgrade-timestamp`,
-   `add-validator`) with `docker run`, as the partner guide does (`.github/tests/release-flow.sh`).
+   `add-validator`) with `docker run`, as the partner guide does (`yarn test:release-flow` in `l1-contracts/test/anvil-interop`).
    The run summary gives the digest.
 4. Pass `protocol_ops_tag=sha256:<digest>` to `generate-ecosystem-upgrade-calldata`, the chain
    workflows and `execute-deployer-safe-bundles`; `deploy-ecosystem-upgrade` runs the image its

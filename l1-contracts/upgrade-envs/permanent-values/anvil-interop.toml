@@ -1,7 +1,7 @@
 # Permanent values of the anvil-interop fixture the current release upgrades from
 # (`l1-contracts/test/anvil-interop/chain-states/<upgradeSourceStateVersion>/addresses.json`), for
-# .github/tests/release-flow.sh. When `yarn new-release` moves the fixture, copy the new one's
-# addresses here.
+# the release flow (`yarn test:release-flow` in l1-contracts/test/anvil-interop). When
+# `yarn new-release` moves the fixture, copy the new one's addresses here.
 l1_chain_id = 31337
 
 zk_token_asset_id = "0x29531b98baea905c89e9dcf602fc1ec219c72187989e76331e5fa3bf89c0b124"

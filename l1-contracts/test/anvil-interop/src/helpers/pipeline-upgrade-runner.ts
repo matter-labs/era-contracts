@@ -806,7 +806,7 @@ async function deployFromCreationBytecode(signer: ethers.Wallet, name: ContractN
 
 // ── L1 ownership & admin setup ───────────────────────────────────────
 
-async function transferL1Ownership(
+export async function transferL1Ownership(
   provider: ethers.providers.JsonRpcProvider,
   defaultSigner: ethers.Wallet,
   l1Addresses: {
@@ -864,7 +864,7 @@ async function normalizeProxyAdminOwnerToEoa(
   await provider.send("anvil_stopImpersonatingAccount", [owner]);
 }
 
-async function deployChainAdmins(
+export async function deployChainAdmins(
   provider: ethers.providers.JsonRpcProvider,
   defaultSigner: ethers.Wallet,
   chains: Array<{ chainId: number; diamondProxy: string }>
@@ -906,7 +906,7 @@ async function deployChainAdmins(
 
 type UpgradeHarnessInputs = ReturnType<typeof prepareUpgradeHarnessInputs>;
 
-function runProtocolOps(args: string[], extraEnv?: Record<string, string>): void {
+export function runProtocolOps(args: string[], extraEnv?: Record<string, string>): void {
   const result = spawnSync("./protocol-ops.sh", args, {
     cwd: contractsRootDir,
     stdio: "inherit",
@@ -1027,7 +1027,11 @@ function safeBundlesInDir(dir: string): Array<{ file: string; target: string }> 
     .map((file) => ({ file: path.join(dir, file), target: ANVIL_DEFAULT_ACCOUNT_ADDR }));
 }
 
-async function executeSafeBundles(outDir: string, rpcUrl: string, phase: "prepare" | "governance"): Promise<void> {
+export async function executeSafeBundles(
+  outDir: string,
+  rpcUrl: string,
+  phase: "prepare" | "governance" | "chain-operation"
+): Promise<void> {
   if (!fs.existsSync(outDir)) {
     throw new Error(`Protocol-ops output directory does not exist: ${outDir}`);
   }
