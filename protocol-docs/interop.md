@@ -44,7 +44,7 @@ A single call within a bundle:
 
 ### Statuses
 
-- `BundleStatus`: `Unreceived` → `Verified` → (`FullyExecuted` | `Unbundled`), but `Verified` is not a required stop: execution accepts `Unreceived` **or** `Verified` (`_requireExecutable`), so a bundle that proves inclusion inline goes straight `Unreceived` → `FullyExecuted`. `unbundleBundle` accepts `Verified` **or** `Unbundled`, so it may be called repeatedly — `Unbundled` is not terminal, and replay is prevented per call via `CallStatus`, not by capping the number of unbundle calls.
+- `BundleStatus`: `Unreceived` → `Verified` → (`FullyExecuted` | `Unbundled` | `Expired`, see {protocol-docs/atomicity/expiry.md}), but `Verified` is not a required stop: execution accepts `Unreceived` **or** `Verified` (`_requireExecutable`), so a bundle that proves inclusion inline goes straight `Unreceived` → `FullyExecuted`. `unbundleBundle` accepts `Verified` **or** `Unbundled`, so it may be called repeatedly — `Unbundled` is not terminal, and replay is prevented per call via `CallStatus`, not by capping the number of unbundle calls.
 - `CallStatus` (per call, used by unbundling): `Unprocessed`, `Executed`, `Cancelled`.
 
 ### Identifiers and hashes

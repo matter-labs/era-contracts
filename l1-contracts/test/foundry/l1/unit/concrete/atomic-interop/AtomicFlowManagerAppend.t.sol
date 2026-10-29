@@ -175,12 +175,12 @@ contract AtomicFlowManagerAppendTest is AtomicPredeployFixture {
         assertEq(ATOMIC_FLOW_PREIMAGE_VERSION, bytes1(0x01), "v1 preimage version literal must be pinned");
     }
 
-    /// @notice `append` rejects a preimage whose `version` the manager does not support (0x02 here),
+    /// @notice `append` rejects a preimage whose `version` the manager does not support (0x03 here),
     /// so it can never commit a leg. See {ATOMIC_FLOW_PREIMAGE_VERSION}.
     function test_append_RevertWhen_FlowPreimageVersionMismatch() public {
         bytes32 localLeg = keccak256("local leg");
         AtomicFlowPreimage memory preimage = _twoLegPreimage(localLeg, keccak256("remote leg"));
-        bytes1 unknownVersion = 0x02;
+        bytes1 unknownVersion = 0x03;
         preimage.version = unknownVersion;
 
         vm.expectRevert(

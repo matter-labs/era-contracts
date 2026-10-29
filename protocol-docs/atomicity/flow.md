@@ -22,11 +22,12 @@ All defined in `atomic-interop/IAtomicInterop.sol` unless noted.
 ### The preimage `version`
 
 `AtomicFlowPreimage.version` is a `bytes1` format tag, following the same convention as
-`INTEROP_BUNDLE_VERSION` / `INTEROP_CALL_VERSION`. The only value the manager accepts today is
-`ATOMIC_FLOW_PREIMAGE_VERSION` (`0x01`); anything else reverts with `ManagerFlowPreimageVersionMismatch`.
+`INTEROP_BUNDLE_VERSION` / `INTEROP_CALL_VERSION`. The manager accepts `ATOMIC_FLOW_PREIMAGE_VERSION` (`0x01`) and
+`ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION` (`0x02`, a single-leg flow that can expire:
+{protocol-docs/atomicity/expiry.md}); anything else reverts with `ManagerFlowPreimageVersionMismatch`.
 Because `version` is a hashed field, a preimage of one version can never collide with — or be
-reinterpreted under the rules of — another. A new value is introduced whenever the field set or its
-canonicalization changes, and introducing one does not retire the old: the manager is expected to accept
+reinterpreted under the rules of — another. A new value is introduced whenever the field set, its
+canonicalization or the rules a flow is validated under change, and introducing one does not retire the old: the manager is expected to accept
 every live version on **all** paths (append, finalize, refund), so flows sent under a prior version stay
 finalizable and refundable while in flight.
 
@@ -129,14 +130,16 @@ recorded at `initL2`.
 
 ### Entry points
 
-| Function                                          | Caller            | Effect                                                                                    |
-| ------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
-| `append(bundleHash, lowNullifierIndex, preimage)` | `InteropCenter`   | Validate + commit a leg (step 1). `Unset -> Committed`.                                   |
-| `requireFlowFinalized(bundleHash, finality)`      | `InteropHandler`  | `view`. Prove every leg committed in time (step 3). No state change.                      |
-| `authorizeRefund(flow, missingLegIndex, absence)` | anyone            | Prove a leg absent past the deadline; flip this chain's `Committed` legs `-> Revertable`. |
-| `claimRefund(flowId, bundle)`                     | anyone            | Reverse a `Revertable` leg's burn; `-> Reverted`. See recovery.md.                        |
-| `legState(flowId, bundleHash)`                    | anyone            | `view` accessor.                                                                          |
-| `initL2(l1ChainId)`                               | `ComplexUpgrader` | One-time genesis wiring: records `L1_CHAIN_ID`. Rejects a zero id and a second call.      |
+| Function                                                | Caller            | Effect                                                                                    |
+| ------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------------- |
+| `append(bundleHash, lowNullifierIndex, preimage)`       | `InteropCenter`   | Validate + commit a leg (step 1). `Unset -> Committed`.                                   |
+| `requireFlowFinalized(bundleHash, finality)`            | `InteropHandler`  | `view`. Prove every leg committed in time (step 3). No state change.                      |
+| `authorizeRefund(flow, missingLegIndex, absence)`       | anyone            | Prove a leg absent past the deadline; flip this chain's `Committed` legs `-> Revertable`. |
+| `claimRefund(flowId, bundle)`                           | anyone            | Reverse a `Revertable` leg's burn; `-> Reverted`. See recovery.md.                        |
+| `recordExpiry(bundleHash, finality, lowNullifierIndex)` | `InteropHandler`  | Destination: record an expirable leg's expiry in the IMT. See expiry.md.                  |
+| `authorizeExpiryRefund(flow, bundle, expiry)`           | anyone            | Source: prove the destination's expiry; `Committed -> Revertable`. See expiry.md.         |
+| `legState(flowId, bundleHash)`                          | anyone            | `view` accessor.                                                                          |
+| `initL2(l1ChainId)`                                     | `ComplexUpgrader` | One-time genesis wiring: records `L1_CHAIN_ID`. Rejects a zero id and a second call.      |
 
 `append` and `requireFlowFinalized` are gated to the canonical `InteropCenter` / `InteropHandler`
 addresses (`onlyInteropCenter` / `onlyInteropHandler`, reverting `ManagerNotInteropCenter` /
@@ -149,7 +152,8 @@ flow forward, and neither can do anything a proof does not authorize.
 
 `Unset -> Committed` at send. On the happy path `Committed` is terminal in the manager — destination
 execution is tracked by the `InteropHandler`'s own `bundleStatus`, exactly as for a normal interop
-bundle, not here. On timeout, `Committed -> Revertable` (`authorizeRefund`) `-> Reverted` (`claimRefund`).
+bundle, not here. On timeout, `Committed -> Revertable` (`authorizeRefund`) `-> Reverted` (`claimRefund`). An
+expirable leg also becomes `Revertable` when its destination expires it (`authorizeExpiryRefund`).
 `claimRefund` requires `Revertable` and flips to `Reverted` **before** any external call (CEI), so a
 reentrant claim hits the state check and cannot double-refund; the manager needs no reentrancy guard
 because it never holds funds.

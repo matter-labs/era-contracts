@@ -12,7 +12,8 @@ release. The proof-level soundness/completeness arguments live in
   destination _may_ execute), or a leg is proven absent past it (so committed legs _may_ be refunded) —
   never both. This follows from the mutual exclusivity of the finality and timeout conditions
   ({protocol-docs/atomicity/proofs.md#soundness}), and it is the guarantee the protocol actually
-  enforces.
+  enforces. A single-leg flow that opts into expiry is the exception: it can be finalized and then refunded,
+  and what stays exclusive is executing and refunding its leg ({protocol-docs/atomicity/expiry.md#guarantee}).
 
   This is deliberately weaker than "every destination call executes". The atomicity gate governs
   **whether execution is permitted**, not whether it happens: `requireFlowFinalized` proves all legs

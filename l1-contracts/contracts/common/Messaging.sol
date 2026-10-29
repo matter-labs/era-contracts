@@ -280,11 +280,14 @@ struct InteropBundle {
 /// @param Verified Bundle inclusion proof accepted, but not processed.
 /// @param FullyExecuted All calls in the bundle have been executed atomically via executeBundle.
 /// @param Unbundled Bundle was processed via unbundling flow.
+/// @param Expired The bundle's single-leg flow expired; it never executes and its source may refund it.
+/// See {protocol-docs/atomicity/expiry.md}.
 enum BundleStatus {
     Unreceived,
     Verified,
     FullyExecuted,
-    Unbundled
+    Unbundled,
+    Expired
 }
 
 /// @dev Inclusion proof for a cross-chain message payload (bundle) coming from L2→L1.

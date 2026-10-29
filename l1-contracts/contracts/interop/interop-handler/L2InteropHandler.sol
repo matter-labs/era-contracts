@@ -91,6 +91,24 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
         _markVerified(bundleHash);
     }
 
+    /// @inheritdoc IL2InteropHandler
+    function expireAtomicBundle(
+        bytes calldata _bundle,
+        AtomicFinalityProof calldata _finality,
+        uint256 _lowNullifierIndex
+    ) external override {
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
+
+        _requireExecutable(bundleHash, status);
+        // As in {executeAtomicBundle}, the source chain is authenticated by the finality proof, not here.
+        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
+
+        bundleStatus[bundleHash] = BundleStatus.Expired;
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).recordExpiry(bundleHash, _finality, _lowNullifierIndex);
+
+        emit BundleExpired(bundleHash);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     receiveMessage dispatch hooks
     //////////////////////////////////////////////////////////////*/

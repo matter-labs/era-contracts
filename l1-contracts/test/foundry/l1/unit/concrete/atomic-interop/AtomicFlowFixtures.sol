@@ -8,10 +8,13 @@ import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitm
 import {
     AtomicFlowPreimage,
     ATOMIC_COMMIT_LEAF_TAG,
+    ATOMIC_EXPIRY_LEAF_TAG,
+    ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION,
     ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {BundleAttributes} from "contracts/common/Messaging.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+import {ChainFeature} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -27,6 +30,10 @@ import {
 library AtomicFlowFixtures {
     function commitValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _bundleHash)));
+    }
+
+    function expiryValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encode(ATOMIC_EXPIRY_LEAF_TAG, _flowId, _bundleHash)));
     }
 
     function flowId(AtomicFlowPreimage memory _preimage) internal pure returns (bytes32) {
@@ -68,6 +75,21 @@ library AtomicFlowFixtures {
         preimage.legSourceChainIds = _legSourceChainIds;
     }
 
+    /// @dev A single-leg flow that opts into expiry ({protocol-docs/atomicity/expiry.md}).
+    function expirablePreimage(
+        bytes32 _leg,
+        uint256 _sourceChainId,
+        uint64 _deadline,
+        uint256 _settlementLayerChainId
+    ) internal pure returns (AtomicFlowPreimage memory preimage) {
+        bytes32[] memory legs = new bytes32[](1);
+        legs[0] = _leg;
+        uint256[] memory chains = new uint256[](1);
+        chains[0] = _sourceChainId;
+        preimage = nLegPreimage(legs, chains, _deadline, _settlementLayerChainId);
+        preimage.version = ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION;
+    }
+
     function noBundleAttributes() internal pure returns (BundleAttributes memory) {
         return
             BundleAttributes({
@@ -105,5 +127,15 @@ abstract contract AtomicPredeployFixture is Test {
     /// isolate the manager from the whitelist, which `L2Bridgehub` and `ChainRegistrationSender` own.
     function _setLegSourceAllowed(uint256 _chainId, bool _allowed) internal {
         vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.isPeerAllowed, (_chainId)), abi.encode(_allowed));
+    }
+
+    /// @dev Stubs this chain's `ExpirableTransfers` feature, which the manager's `append` reads for an expirable flow:
+    /// these suites isolate the manager from the feature, which `L2Bridgehub` and `ChainRegistrationSender` own.
+    function _setExpirableTransfersEnabled(bool _enabled) internal {
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IL2Bridgehub.isChainFeatureEnabled, (ChainFeature.ExpirableTransfers)),
+            abi.encode(_enabled)
+        );
     }
 }
