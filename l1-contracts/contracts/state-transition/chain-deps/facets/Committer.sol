@@ -6,6 +6,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {ISelfDescribingFacet} from "../../chain-interfaces/ISelfDescribingFacet.sol";
 import {
     COMMIT_TIMESTAMP_APPROXIMATION_DELTA,
+    L1_ANCHOR_RECORD_INTERVAL,
     MAINNET_CHAIN_ID,
     MAINNET_COMMIT_TIMESTAMP_NOT_OLDER,
     TESTNET_COMMIT_TIMESTAMP_NOT_OLDER
@@ -16,6 +17,8 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
+import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
+import {IL1MessageRoot} from "../../../core/message-root/IL1MessageRoot.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
@@ -86,6 +89,24 @@ contract CommitterFacet is ZKChainBase, ICommitter, ISelfDescribingFacet {
             revert InvalidProtocolVersion();
         }
         _commitBatchesSharedBridge(_processFrom, _processTo, _commitData);
+        _recordL1Anchor();
+    }
+
+    /// @notice Records an L1 block hash for a chain with interop enabled to import as its L1SLOAD anchor, checking at
+    /// most once per `L1_ANCHOR_RECORD_INTERVAL`. See {protocol-docs/l1sload.md#anchors}.
+    /// @dev Only on L1: a settlement layer's message root keeps no anchor record.
+    function _recordL1Anchor() internal {
+        if (
+            L1_CHAIN_ID != block.chainid || block.timestamp < s.lastL1AnchorCheckTimestamp + L1_ANCHOR_RECORD_INTERVAL
+        ) {
+            return;
+        }
+        s.lastL1AnchorCheckTimestamp = block.timestamp;
+        IL1MessageRoot messageRoot = IL1MessageRoot(address(IBridgehubBase(s.bridgehub).messageRoot()));
+        if (messageRoot.isInteropEnabled(s.chainId)) {
+            // slither-disable-next-line unused-return
+            messageRoot.recordL1BlockHash();
+        }
     }
 
     function _commitBatchesSharedBridge(uint256 _processFrom, uint256 _processTo, bytes calldata _commitData) internal {

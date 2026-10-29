@@ -49,6 +49,8 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandlerBase, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {InteropChainCannotMigrate} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -209,6 +211,19 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         // Deposits paused on the migrating chain
         uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratingChain), pausedDepositsTimestampSlot));
         assertTrue(pausedDepositsTimestamp != 0, "Deposits should be paused after initiating migration");
+    }
+
+    /// @dev See {protocol-docs/l1sload.md#settling-on-l1}.
+    function test_revertWhen_interopChainMovesToGateway() public {
+        _setUpGatewayWithFilterer();
+        IL1MessageRoot messageRoot = IL1MessageRoot(address(addresses.bridgehub.messageRoot()));
+        vm.prank(addresses.bridgehubOwnerAddress);
+        messageRoot.enableInterop(migratingChainId, false);
+
+        vm.expectRevert(abi.encodeWithSelector(InteropChainCannotMigrate.selector, migratingChainId));
+        gatewayScript.migrateChainToGateway(migratingChainId);
+
+        assertEq(addresses.bridgehub.settlementLayer(migratingChainId), block.chainid);
     }
 
     function testFuzz_filteringUpdateRevertsAfterMigration(bool _oldEnabled, bool _newEnabled) public {

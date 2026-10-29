@@ -17,6 +17,7 @@ import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
+import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
@@ -24,7 +25,11 @@ import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ChainAssetHandler} from "./IL2ChainAssetHandler.sol";
-import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    ChainNotReadyForMigration,
+    InteropChainCannotMigrate,
+    ZKChainNotRegistered
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {
     MigrationIntervalNotSet,
@@ -203,6 +208,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
         require(isReadyForMigration(_chainId), ChainNotReadyForMigration(_chainId));
+        // See {protocol-docs/l1sload.md#settling-on-l1}.
+        require(!IL1MessageRoot(address(messageRoot)).isInteropEnabled(_chainId), InteropChainCannotMigrate(_chainId));
         isMigrationInProgress[_chainId] = true;
     }
 

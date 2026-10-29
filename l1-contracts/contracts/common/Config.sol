@@ -39,6 +39,32 @@ uint256 constant INTEROP_POOL_CHAIN_ID = uint256(keccak256("interop.pool")) - 1;
 /// @dev ERC-1967 storage slot of a proxy's admin.
 bytes32 constant ERC1967_ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
 
+/// @dev Interop-root "chain id" under which L1SLOAD anchors are imported. No chain can have it, since the Bridgehub
+/// caps chain IDs at `type(uint48).max`. See {protocol-docs/l1sload.md#anchors}.
+uint256 constant L1_BLOCK_HASH_IMPORT_ID = uint256(keccak256("zksync.l1-block-hash-import")) - 1;
+
+/// @dev Minimum L1 time between two anchors a chain's commits record. See {protocol-docs/l1sload.md#anchors}.
+uint256 constant L1_ANCHOR_RECORD_INTERVAL = 5 minutes;
+
+/// @dev Maximum age, in L2 block time, of an anchor the L1SLOAD precompile reads at.
+/// See {protocol-docs/l1sload.md#freshness}.
+uint256 constant L1SLOAD_MAX_ANCHOR_AGE = 1 hours;
+
+/// @dev `L2InteropRootStorage` slot of the anchor's L1 block hash. ZKsync OS reads it.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_HASH_SLOT = keccak256("zksync-os.l1sload.anchor.block-hash");
+
+/// @dev `L2InteropRootStorage` slot of the anchor's L1 block number.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT = keccak256("zksync-os.l1sload.anchor.block-number");
+
+/// @dev `L2InteropRootStorage` slot of the L1 time the anchor was recorded at. ZKsync OS reads it.
+bytes32 constant L1SLOAD_ANCHOR_TIMESTAMP_SLOT = keccak256("zksync-os.l1sload.anchor.timestamp");
+
+/// @dev Maximum number of storage keys one L1SLOAD precompile call reads.
+uint256 constant L1SLOAD_MAX_KEYS = 5;
+
+/// @dev Gas `L1Reads` forwards to one L1SLOAD precompile call. See {protocol-docs/l1sload.md#reading-l1-state}.
+uint256 constant L1SLOAD_CALL_GAS = 50_000;
+
 /// @dev Pubdata capacity of a blob: 4096 field elements with 31 bytes of data each.
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 

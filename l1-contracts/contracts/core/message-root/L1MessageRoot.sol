@@ -17,6 +17,7 @@ import {IOwnable} from "../../common/interfaces/IOwnable.sol";
 import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE} from "../../common/Config.sol";
 import {NotMultiProofMode, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {StoredInteropRoot} from "../../common/Messaging.sol";
 import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
@@ -47,6 +48,10 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
 
     /// @notice Whether governance enabled interop for the chain. See {protocol-docs/interop-gating.md}.
     mapping(uint256 chainId => bool enabled) internal interopEnabled;
+
+    /// @notice The L1 block hashes recorded for L1SLOAD anchors, with the time they were recorded at.
+    /// See {protocol-docs/l1sload.md#anchors}.
+    mapping(uint256 blockNumber => StoredInteropRoot) internal recordedL1BlockHashes;
 
     /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
@@ -91,6 +96,22 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @inheritdoc IL1MessageRoot
     function isInteropEnabled(uint256 _chainId) external view returns (bool) {
         return interopEnabled[_chainId];
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function recordL1BlockHash() external returns (uint256 blockNumber, bytes32 blockHash) {
+        blockNumber = block.number - 1;
+        blockHash = blockhash(blockNumber);
+        if (recordedL1BlockHashes[blockNumber].timestamp != 0) {
+            return (blockNumber, blockHash);
+        }
+        recordedL1BlockHashes[blockNumber] = StoredInteropRoot({root: blockHash, timestamp: block.timestamp});
+        emit L1BlockHashRecorded(blockNumber, blockHash, block.timestamp);
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function recordedL1BlockHash(uint256 _blockNumber) external view returns (StoredInteropRoot memory) {
+        return recordedL1BlockHashes[_blockNumber];
     }
 
     function _proveL2LeafInclusionOnSettlementLayer(

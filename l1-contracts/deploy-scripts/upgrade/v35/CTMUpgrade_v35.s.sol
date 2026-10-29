@@ -16,16 +16,11 @@ import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProx
 import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 import {BootstrapAction} from "contracts/upgrades/registry/bootstrap/IRegistryBootstrapSequence.sol";
 import {RegistryBootstrapSequence} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapSequence.sol";
-import {AuthoredL2Plan, BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
-import {
-    CTM_CONTRACT_COUNT,
-    CTMContract,
-    L2EcosystemContract
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {BootstrapManifest, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
+import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
-import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -56,10 +51,6 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     /// @notice The object the edge's governance bundle is READ from. Deployed over the migration
     ///         and the core prepare's inventory; nothing about the bundle is authored here.
     RegistryBootstrapSequence public bootstrapSequence;
-
-    /// @notice The delegate-calldata composer the bootstrap manifest pins: the CODE that
-    ///         defines what `L2DefaultUpgrade` is called with.
-    address public l2DelegateComposer;
 
     /// @dev How {deployRegistryBootstrap} constructed the CTM executor, for the output record.
     CTMExecutorDeployment internal ctmExecutorDeployment;
@@ -179,16 +170,8 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     ///         deployments come from the genesis release the manifest names, on-chain.
     /// @dev Virtual so bytecode-light test harnesses can substitute an L1-only edge: the real side
     ///      reads the `L2DefaultUpgrade` artifact and every built-in's.
-    function authorL2Side() internal virtual override returns (AuthoredL2Side memory side) {
-        require(l2DelegateComposer != address(0), "L2 delegate composer not deployed");
-        side.plan = AuthoredL2Plan({
-            delegateBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2DefaultUpgrade.sol", "L2DefaultUpgrade"),
-            extraBytecodeInfos: new bytes[](0),
-            delegateComposer: l2DelegateComposer
-        });
-        L2EcosystemContract[] memory delegateArtifact = new L2EcosystemContract[](1);
-        delegateArtifact[0] = L2EcosystemContract.L2DefaultUpgrade;
-        side.factoryDependencies = CoreOnGatewayHelper.getFullListOfFactoryDependencies(delegateArtifact);
+    function authorL2Side() internal virtual override returns (AuthoredL2Side memory) {
+        return standardL2Side();
     }
 
     function deployNewCTMContracts() public virtual override {
@@ -203,7 +186,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         super.deployNewCTMContracts();
 
         // The composer the L2 side names (see `authorL2Side`), deployed before that side is prepared.
-        l2DelegateComposer = deploySimpleContract("L2DefaultDelegateCalldataComposer");
+        deployL2DelegateComposer();
 
         // The new ChainTypeManager implementation (per VM), the bootstrap manifest's CTM row.
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(CTMContract.ChainTypeManager);
@@ -278,13 +261,6 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
                 "RegistryBootstrapSequence"
             )
         );
-    }
-
-    function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "L2DefaultDelegateCalldataComposer")) {
-            return abi.encode();
-        }
-        return super.getCreationCalldata(contractName);
     }
 
     function _bootstrapManifest(
