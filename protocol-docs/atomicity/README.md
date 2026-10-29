@@ -136,6 +136,8 @@ only possible indirect call sender (`IndirectCallOnlyToAssetRouter`, see
   3-hop chain-batch-root leaf path, `l1Timestamp`).
 - `l1-contracts/test/anvil-interop/test/hardhat/13-imt-atomic-swap.spec.ts` — the anvil-interop
   atomic-swap spec (the atomic built-ins are predeployed in the harness chain states, as genesis would).
+- `l1-contracts/test/anvil-interop/test/hardhat/16-interop-expiry.spec.ts` — an expirable transfer that
+  can't execute, expired on its destination and refunded on its source ([expiry.md](./expiry.md)).
 
 In production, the IMT proofs are served by the zksync-os-server `zks_getImtInclusionProof` /
 `zks_getImtLowNullifierIndex` RPCs (a Rust port of the engine above), paired with the settlement proof
