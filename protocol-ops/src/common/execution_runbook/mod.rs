@@ -122,6 +122,7 @@ pub fn env_names(env_cfg: &EnvConfig) -> BTreeMap<Address, String> {
         let name = match proxy.kind {
             OwnableProxyKind::LegacyGovernance => "legacy Governance",
             OwnableProxyKind::OzChainAdmin => "ChainAdmin",
+            OwnableProxyKind::Safe => "Safe",
         };
         names.insert(proxy.addr, name.to_string());
     }
