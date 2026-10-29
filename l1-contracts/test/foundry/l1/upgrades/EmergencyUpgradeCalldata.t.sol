@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {EmergencyStageUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol";
+import {EmergencyUpgradeCalldata} from "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol";
 import {IProtocolUpgradeHandler} from "deploy-scripts/interfaces/IProtocolUpgradeHandler.sol";
 import {IEmergencyUpgrageBoard} from "deploy-scripts/interfaces/IEmergencyUpgrageBoard.sol";
 import {EIP712Utils} from "deploy-scripts/utils/EIP712Utils.sol";
@@ -86,7 +86,7 @@ contract SafeStandIn {
     }
 }
 
-contract EmergencyStageUpgradeCalldataTest is Test {
+contract EmergencyUpgradeCalldataTest is Test {
     uint256 constant GUARDIANS_MEMBERS = 3;
     uint256 constant GUARDIANS_THRESHOLD = 2;
     uint256 constant COUNCIL_MEMBERS = 4;
@@ -102,7 +102,7 @@ contract EmergencyStageUpgradeCalldataTest is Test {
     string ecosystemToml;
     string outputJson;
 
-    EmergencyStageUpgradeCalldata script;
+    EmergencyUpgradeCalldata script;
     address owner = makeAddr("owner");
     address stranger = makeAddr("stranger");
 
@@ -120,7 +120,7 @@ contract EmergencyStageUpgradeCalldataTest is Test {
     IProtocolUpgradeHandler.Call[] stage2;
 
     function setUp() public {
-        script = new EmergencyStageUpgradeCalldata();
+        script = new EmergencyUpgradeCalldata();
 
         for (uint256 i = 0; i < GUARDIANS_MEMBERS; ++i) {
             guardianSafes.push(_safeOf(owner));

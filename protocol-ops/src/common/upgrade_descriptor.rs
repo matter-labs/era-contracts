@@ -245,7 +245,7 @@ verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--pu
 
     const EXECUTION: &str = r#"
 [execution]
-script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
+script = "deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol:EmergencyUpgradeCalldata"
 signature = "emergencyUpgradeAllStages(string,string,string)"
 args = ["/upgrade-envs/permanent-values/{env}.toml", "/upgrade-envs/v0.33.0-compiler/output/{env}/ecosystem.toml", "/upgrade-envs/v0.33.0-compiler/output/{env}/emergency-upgrade-board.json"]
 output = "emergency-upgrade-board.json"
