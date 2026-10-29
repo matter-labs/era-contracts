@@ -16,8 +16,9 @@
 #
 # The Anvil is left running, so that `protocol_ops ecosystem rehearse-upgrade --env mainnet --fork-url
 # http://127.0.0.1:$PORT` and `replay-bundle` can fork it, both with ALLOW_PENDING_L2_UPGRADE=1 (324's pending
-# upgrade, see the README). Send nothing else to it until they have finished, and stop it with the kill command
-# printed at the end. Their forks use 29_549 and 29_550, so PORT must differ.
+# upgrade) and with mainnet.toml's upgrade_timestamp set locally to the value printed at the end (the committed
+# 0 fails the v34 script); see the README. Send nothing else to it until they have finished, and stop it with
+# the kill command printed at the end. Their forks use 29_549 and 29_550, so PORT must differ.
 #
 # Needs: foundry (anvil, cast), python3 >= 3.11 (tomllib), git (reads ZIP-18's output at tag zip-18).
 # Usage: L1_FORK_URL=<mainnet rpc> [FORK_BLOCK=<n>] [PORT=8645] ./fork-mainnet-zip18.sh
@@ -52,6 +53,8 @@ finish() {
   echo
   if [ "$FAILED" = "0" ]; then
     echo "ZIP-18 REPLAYED on $RPC (anvil PID $ANVIL_PID). Stop it with: kill $ANVIL_PID"
+    echo "For the v34 fork test, set upgrade_timestamp = $V34_TS in mainnet.toml (the fork's time + 7 days;"\
+      "don't commit it)"
   else
     kill "$ANVIL_PID" 2>/dev/null
     echo "ZIP-18 REPLAY FAILED ($FAILED); anvil stopped"
@@ -217,4 +220,8 @@ PENDING=$(call "$DIAMOND" 'getL2SystemContractsUpgradeTxHash()(bytes32)')
   || fail "chain 324 has no pending L2 upgrade"
 read -r COMMITTED EXECUTED <<< "$(counts)"
 chk "chain 324 drained (committed = executed)" "$COMMITTED" "$EXECUTED"
+# mainnet.toml commits upgrade_timestamp = 0, which the v34 script rejects. The fork test needs a date after its
+# fork's time; 7 days leaves room for starting it later.
+NOW=$(cast block latest --field timestamp --rpc-url "$RPC")
+case "$NOW" in '' | *[!0-9]*) fail "the fork's time is unreadable: ${NOW:-no answer}" ;; *) V34_TS=$((NOW + 7 * 24 * 3600)) ;; esac
 finish

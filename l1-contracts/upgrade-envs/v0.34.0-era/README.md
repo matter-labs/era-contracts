@@ -95,14 +95,19 @@ takes the CTM from v0.30.1 to v0.33.0; re-read them on live mainnet once it has 
 
 - **Verifier:** `EraMultiProofVerifier` over ZIP-18's FFLONK verifier. ZIP-18's v0.33.0 verifier is an
   `EraDualVerifier`, which has no `IS_TESTNET_VERIFIER()`; the script identifies it by its codehash
-  (`old_verifier_codehash`). The upgrade timestamp must be a real future date.
+  (`old_verifier_codehash`).
+- **Upgrade timestamp:** a real future date, which the script requires without a testnet verifier.
+  `mainnet.toml` commits 0, which the script rejects, so no generation carries a date nobody chose:
+  commit the chosen date with the generation.
 - **Governance:** one Tally proposal per stage, with the 48-hour timer between stages 0 and 1.
 - **Fork test:** on a mainnet fork with ZIP-18 replayed, chain 324 still has ZIP-18's L2 upgrade pending,
   so its v34 upgrade reverts with `PreviousUpgradeNotFinalized`; its after-upgrade checks run on the test
   chain instead. Chain 324's own v34 upgrade is first tested once ZIP-18 has executed.
   `fork-mainnet-zip18.sh` is test-only and goes once ZIP-18 is live. Steps:
   1. `L1_FORK_URL=<mainnet rpc> ./fork-mainnet-zip18.sh` builds that fork and leaves its Anvil running.
-  2. `ALLOW_PENDING_L2_UPGRADE=1 protocol_ops ecosystem rehearse-upgrade --upgrade v0.34.0-era --env mainnet --fork-url http://127.0.0.1:8645 --deployer-address <any EOA>`,
+  2. Set `upgrade_timestamp` in `mainnet.toml` to the value it prints (the fork's time + 7 days), and
+     don't commit it.
+  3. `ALLOW_PENDING_L2_UPGRADE=1 protocol_ops ecosystem rehearse-upgrade --upgrade v0.34.0-era --env mainnet --fork-url http://127.0.0.1:8645 --deployer-address <any EOA>`,
      then `replay-bundle` with the same variable. Without it `rehearse.sh` fails on the pending upgrade, as
      a real generation must.
 - Chain 324 has no `UPGRADER_ROLE` holder: grant it through the Safe before using the server path.
