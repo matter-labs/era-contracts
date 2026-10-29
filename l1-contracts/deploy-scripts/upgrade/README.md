@@ -12,7 +12,11 @@ review from the [root README review guide](../../../README.md#reviewing-registry
 The Forge scripts in this directory are not run with `forge script` directly in a rollout:
 `protocol_ops` (see [protocol-ops/README.md](../../../protocol-ops/README.md)) invokes their entry
 points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `chain upgrade` and
-`chain set-upgrade-timestamp` go through `AdminFunctions.s.sol`.
+`chain set-upgrade-timestamp` go through `AdminFunctions.s.sol`. In a rollout `protocol_ops` runs in
+the released image, from the root of a checkout of its commit (`./protocol-ops.sh --tag sha256:<digest>`,
+as below; [release flow](../../../.github/workflows/README.md#release-flow)). File arguments are then
+paths in the image: the image's own files, `l1-contracts/script-out/` and each upgrade's `output/`
+(the wrapper mounts those from the checkout), or what `EXTRA_MOUNTS` mounts.
 
 ## Layout
 
@@ -52,7 +56,7 @@ be carried forward from the previous prepare's output: `[contracts] eip7702_chec
 ## 2. Prepare and compose
 
 ```sh
-cargo run -p protocol_ops -- ecosystem upgrade-prepare-all \
+./protocol-ops.sh --tag sha256:<digest> ecosystem upgrade-prepare-all \
   --env <env> --l1-rpc-url <rpc> --deployer-address <EOA>
 ```
 
@@ -117,7 +121,7 @@ merger's extras; the bootstrap edge declares its whole one-time edge this way.
 ## 4. Verify
 
 ```sh
-cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
+./protocol-ops.sh --tag sha256:<digest> ecosystem verify-bootstrap \
   --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x... \
   --env <env> \
   --executor-record <the bootstrap package, or the ecosystem/ctm init outputs, that deployed the executors> \
@@ -153,13 +157,13 @@ after Glamsterdam single deploys exceed it on their own (their state gas is outs
 `upgrade-broadcast` accounts for:
 
 ```sh
-cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manifest.json --l1-rpc-url <rpc> --key 0x<addr>=0x<key>
+./protocol-ops.sh --tag sha256:<digest> ecosystem upgrade-broadcast --manifest <out>/manifest.json --l1-rpc-url <rpc> --key 0x<addr>=0x<key>
 ```
 
 ## 6. Governance
 
 ```sh
-cargo run -p protocol_ops -- ecosystem upgrade-governance --env <env> --l1-rpc-url <rpc>
+./protocol-ops.sh --tag sha256:<digest> ecosystem upgrade-governance --env <env> --l1-rpc-url <rpc>
 ```
 
 replays the governance bundle of `<env-out>/ecosystem.toml` on a fork as governance, fails unless

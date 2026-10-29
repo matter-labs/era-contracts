@@ -41,14 +41,14 @@ pub struct ChainInitArgs {
     #[clap(long, help_heading = "Input")]
     pub execute_operator: Option<Address>,
 
-    /// Bridgehub proxy address
-    #[clap(long, help_heading = "Input")]
-    pub bridgehub: Address,
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub topology: crate::common::EcosystemArgs,
 
-    /// CTM proxy address. Optional: discovered from L1 when omitted. Pass it for
-    /// the first chain on a fresh ecosystem, where discovery has to fall back to
-    /// scanning `ChainTypeManagerAdded` from block 0 and hosted RPCs cap the
-    /// `eth_getLogs` range.
+    /// CTM proxy address. Optional: the ZKsync OS CTM is discovered from L1 when omitted. Pass
+    /// it for the first chain on a fresh ecosystem, where discovery has to fall back to
+    /// scanning `ChainTypeManagerAdded` from block 0 and hosted RPCs cap the `eth_getLogs`
+    /// range.
     #[clap(long, help_heading = "Input")]
     pub ctm_proxy: Option<Address>,
 
@@ -106,6 +106,7 @@ pub struct ChainInitArgs {
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
+    let bridgehub = args.topology.resolve()?;
     let (price_ratio_num, price_ratio_den) = parse_ratio(&args.base_token_price_ratio)?;
 
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -115,7 +116,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     let ctm_proxy = match args.ctm_proxy {
         Some(ctm) => ctm,
-        None => crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, args.bridgehub)
+        None => crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, bridgehub)
             .await
             .context("Failed to discover CTM proxy from L1")?,
     };
@@ -141,7 +142,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     let input = ChainInitInput {
         ctm_proxy,
-        bridgehub: args.bridgehub,
+        bridgehub,
         l1_da_validator: args.l1_da_validator,
         chain_params,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,

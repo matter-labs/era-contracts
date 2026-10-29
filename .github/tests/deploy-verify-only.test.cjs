@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { readFileSync, writeFileSync, mkdtempSync, mkdirSync, existsSync, rmSync } = require("node:fs");
+const { readFileSync, writeFileSync, mkdtempSync, existsSync, rmSync } = require("node:fs");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { spawnSync } = require("node:child_process");
@@ -33,22 +33,28 @@ function runVerification(log, key = "test-placeholder") {
   const directory = mkdtempSync(join(tmpdir(), "verify-only-test-"));
   try {
     if (log !== null) writeFileSync(join(directory, "extra-verification-logs.txt"), log);
-    mkdirSync(join(directory, "l1-contracts"));
-    // Isolate orchestration from Etherscan/Foundry: no network or signing in these tests.
-    const mock = `forge() {
-      printf '%s|%s\\n' "$(basename "$PWD")" "$*" >> "$DEPLOY_BUNDLE_DIR/calls"
+    // Isolate orchestration from Etherscan, Foundry and docker: no network or signing in these tests.
+    writeFileSync(
+      join(directory, "protocol-ops.sh"),
+      `printf '%s\\n' "$*" >> "$DEPLOY_BUNDLE_DIR/calls"
       if [[ "$*" == *flaky* ]] && [ ! -f "$DEPLOY_BUNDLE_DIR/retried" ]; then
         touch "$DEPLOY_BUNDLE_DIR/retried"
-        return 1
+        exit 1
       fi
       [[ "$*" != *bad* ]]
-    }
-    sleep() { :; }
-    `;
-    const result = spawnSync("bash", ["-c", mock + verification.run], {
+      `
+    );
+    const result = spawnSync("bash", ["-c", "sleep() { :; }\n" + verification.run], {
       encoding: "utf8",
-      cwd: join(directory, "l1-contracts"),
-      env: { ...process.env, ETHERSCAN_API_KEY: key, ETHERSCAN_CHAIN: "mainnet", DEPLOY_BUNDLE_DIR: directory },
+      cwd: directory,
+      env: {
+        ...process.env,
+        ETHERSCAN_API_KEY: key,
+        ETHERSCAN_CHAIN: "mainnet",
+        DEPLOY_BUNDLE_DIR: directory,
+        GITHUB_WORKSPACE: directory,
+        BUNDLE_IMAGE: "sha256:image",
+      },
     });
     const calls = join(directory, "calls");
     return { ...result, calls: existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n") : [] };
@@ -72,7 +78,7 @@ test("a verification failure fails the step without skipping remaining contracts
   assert.equal(result.calls.filter((call) => call.includes("good")).length, 1);
 });
 
-test("DA contracts verify from l1-contracts without changing recorded constructor arguments", () => {
+test("DA contracts verify without changing recorded constructor arguments", () => {
   const result = runVerification(
     "forge verify-contract first EIP7702Checker\n" +
       "forge verify-contract second RollupL1DAValidator --constructor-args 0x1234\n" +
@@ -80,9 +86,9 @@ test("DA contracts verify from l1-contracts without changing recorded constructo
   );
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(result.calls, [
-    "l1-contracts|verify-contract first EIP7702Checker --chain mainnet --watch --retries 8 --delay 20",
-    "l1-contracts|verify-contract second RollupL1DAValidator --constructor-args 0x1234 --chain mainnet --watch --retries 8 --delay 20",
-    "l1-contracts|verify-contract third CommitterFacet --constructor-args 0x5678 --chain mainnet --watch --retries 8 --delay 20",
+    "--tag sha256:image forge verify-contract first EIP7702Checker --chain mainnet --watch --retries 8 --delay 20",
+    "--tag sha256:image forge verify-contract second RollupL1DAValidator --constructor-args 0x1234 --chain mainnet --watch --retries 8 --delay 20",
+    "--tag sha256:image forge verify-contract third CommitterFacet --constructor-args 0x5678 --chain mainnet --watch --retries 8 --delay 20",
   ]);
 });
 

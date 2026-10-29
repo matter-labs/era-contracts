@@ -1,13 +1,12 @@
-# v31 ecosystem upgrade: generate → deploy
+# Ecosystem upgrade: generate → deploy
 
-> **Scope.** Written for the v31 rollout from the `draft-v31` line, and its paths name that
-> release's upgrade directory. On the v35 line the same two steps run the release's upgrade: the
-> generate workflow defaults to `upgrade = v0.35.0-upgrade-system` (only that directory may use
-> `prepare = "prepare-all"`) and outputs land under `upgrade-envs/v0.35.0-upgrade-system/output/<env>/`.
-> The v31 line's verifier (PUVT, `ecosystem verify-upgrade`) does not exist on this line; the check
+> **Scope.** First written for the v31 rollout from the `draft-v31` line; the `adi` notes come from
+> it. On the v35 line the generate workflow defaults to `upgrade = v0.35.0-upgrade-system` (only
+> that directory may use `prepare = "prepare-all"`) and outputs land under
+> `upgrade-envs/v0.35.0-upgrade-system/output/<env>/`. The v31 line's verifier (PUVT, `ecosystem verify-upgrade`) does not exist on this line; the check
 > here is `ecosystem verify-bootstrap`, the registry verifier, as step 3 describes.
 
-The v31 ecosystem upgrade is produced and shipped in **two steps**, each runnable
+An ecosystem upgrade is produced and shipped in **two steps**, each runnable
 locally and in CI:
 
 1. **Generate the calldata** — deploy nothing; on a fork, compute the upgrade
@@ -16,15 +15,16 @@ locally and in CI:
 2. **Deploy** — broadcast the deployer bundles to a real L1, producing
    `transactions.txt`, then verify the deployed contracts on Etherscan.
 
-The same `protocol_ops` binary drives both locally and in CI — CI is only a
-wrapper around the commands below.
+Both run in a released `ghcr.io/matter-labs/protocol-ops` image
+([release flow](../.github/workflows/README.md#release-flow)), locally and in CI
+alike — CI is only a wrapper around the commands below.
 
 **Step 1 output is a handoff, not a recipe.** Solidity output is not byte-stable
 across build environments (the default foundry profile embeds path-dependent CBOR
 metadata), so the bytecode — and therefore every CREATE2 address and all the
-governance calldata — belongs to the machine that compiled it. Re-running step 1
-somewhere else does not "reproduce" the addresses; it produces a different,
-equally valid upgrade. What travels is the **deploy bundle**: the deployer
+governance calldata — belongs to the build that compiled it, the released image's.
+Re-running step 1 with another build does not "reproduce" the addresses; it
+produces a different, equally valid upgrade. What travels is the **deploy bundle**: the deployer
 transactions carry the CREATE2 init code verbatim, so whoever broadcasts them
 deploys that exact bytecode at the addresses the reviewed `ecosystem.toml` names,
 without compiling anything. See
@@ -51,6 +51,15 @@ against the on-chain result before governance signs (step 3).
 
 ---
 
+## Running the image
+
+The local commands below run the image too. `./protocol-ops.sh --tag <tag>` (or
+`--tag sha256:<digest>`) pulls it; `EXTRA_MOUNTS="<host-dir>:<container-dir>"` mounts anything else.
+Run them from a checkout of the image's commit: the wrapper mounts each upgrade's `output/` from it,
+so outputs land in the checkout. Everything else, configs included, is the image's.
+
+---
+
 ## Step 1 — generate the calldata
 
 **What it does.** Forks L1, runs `upgrade-prepare-all` (deploys every new
@@ -58,7 +67,7 @@ ecosystem contract _on the fork_ to compute deterministic CREATE2 addresses),
 replays the prepare bundles, runs `verify-bootstrap`, and emits the git-portable calldata set.
 Nothing touches real L1 — the deployer is impersonated.
 
-**Outputs** (under `l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/`):
+**Outputs** (under `l1-contracts/upgrade-envs/<upgrade>/output/<env>/`):
 
 | Artifact                                        | Purpose                                                            |
 | ----------------------------------------------- | ------------------------------------------------------------------ |
@@ -72,43 +81,44 @@ Nothing touches real L1 — the deployer is impersonated.
 **Locally:**
 
 ```bash
+# The released protocol-ops image
+TAG=sha256:<digest>
 # 1a) fork + prepare + verify-bootstrap (writes ecosystem.toml + prepare/ + extra-verification-logs.txt)
-export PATH="$PWD/foundry-zksync:$PATH"          # foundry-zksync v0.1.5
-yarn && yarn da build:foundry && yarn l1 build:foundry
-cd protocol-ops && cargo build --release && cd ..
-ZK_GOVERNANCE_DIR=<zk-governance checkout> \
-  ./protocol-ops/target/release/protocol_ops ecosystem rehearse-upgrade --env mainnet \
-    --fork-url <l1-rpc> --deployer-address <deployer-eoa> \
-    --zk-governance-commit 9b06a16159cd58add109f25598e79731450d1772
+./protocol-ops.sh --tag "$TAG" ecosystem rehearse-upgrade --env mainnet \
+  --fork-url <l1-rpc> --deployer-address <deployer-eoa>
 
 # 1b) emit the sim-inputs + transaction-simulator.json
-OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
-./protocol-ops/target/release/protocol_ops ecosystem governance-toml-to-simulator \
+# The output of rehearse-upgrade (its default upgrade)
+OUT=l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/mainnet
+./protocol-ops.sh --tag "$TAG" ecosystem governance-toml-to-simulator \
   --env mainnet --include-manifest "$OUT/prepare/manifest.json" \
   --camp-a-signers <deployer-eoa> --emit-sim-inputs "$OUT/sim-inputs"
-./protocol-ops/target/release/protocol_ops ecosystem governance-toml-to-simulator \
+./protocol-ops.sh --tag "$TAG" ecosystem governance-toml-to-simulator \
   --env mainnet --out "$OUT/transaction-simulator.json"
 ```
 
-**In CI:** run the **`Ecosystem Upgrade Calldata: Regenerate + Verify (v31)`**
-workflow (`generate-ecosystem-upgrade-calldata.yaml`). It does 1a + 1b and
-uploads two artifacts: `ecosystem-upgrade-calldata-<env>` (the review set) and
+**In CI:** run the **`Ecosystem Upgrade Calldata: Regenerate + Verify`**
+workflow (`generate-ecosystem-upgrade-calldata.yaml`) with `protocol_ops_tag` = the
+released image. It does 1a + 1b in that image and uploads two artifacts:
+`ecosystem-upgrade-calldata-<env>` (the review set) and
 `ecosystem-upgrade-deploy-inputs-<env>` (the deploy bundle for step 2 / for a
 local deploy + verify). Its second job, `verify-bundle-handoff`, then re-deploys
-and re-verifies that bundle from scratch with nothing but the artifact and a
-contract build of the commit it names (the verifier needs the creation code),
-which is the standing proof that the artifact is self-sufficient.
+and re-verifies that bundle from scratch with only the bundle and the image it
+names (by digest; the image holds the contract build the verifier reads), which is
+the standing proof that the artifact is self-sufficient.
 
 ### Which ecosystems this runs for
 
 `environment` is just the basename of a config pair — `permanent-values/<env>.toml`
-plus `v0.31.0-interopB/<env>.toml` — and the L1 to fork is read from that env's
+plus `<upgrade>/<env>.toml` — and the L1 to fork is read from that env's
 `l1_chain_id` (`1` → mainnet, `11155111` → Sepolia). Adding an ecosystem therefore
 needs no workflow edit: commit the config pair, add its anvil port to
-`ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork. The
+`ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork, and
+release an image with them. The
 verifier takes its reviewer inputs from the env config (the upgrade input's `owner_address` and
 CREATE2 salts, the permanent values' `zk_token_asset_id`), so the env must declare them.
-Committed today: `stage`, `testnet`, `mainnet`, `adi`. The check must pass for both the
+Committed for `v0.35.0-upgrade-system`: `stage`, `testnet`, `mainnet` (`adi` has only its permanent
+values). The check must pass for both the
 generate job and the independent bundle-handoff verification job.
 
 `adi` is the first standalone ecosystem in this list: single-chain, ZKsync-OS, on L1
@@ -162,45 +172,39 @@ recorded in `deploy-executed.json`. Both files are loaded and extended on a
 retry, so a later failure cannot erase the record of earlier transactions. The
 journal is the operational record of the broadcast; the verifier does not read it.
 
-**Locally** (real signing — needs the deployer key):
+**Locally** (real signing — needs the deployer key): broadcast with `replay-bundle --key`, which
+checks the bundle's digests, deployer and chain id before it signs
+([Deploying + verifying from a deploy bundle](#deploying--verifying-from-a-deploy-bundle)). Then
+verify on Etherscan — replay the logged `forge verify-contract` commands VERBATIM, in the image (its
+artifacts are the deployed ones). Step 1 already wrote the exact `--constructor-args <hex>` for every
+contract (from the CREATE2 init code it deployed), so nothing is guessed:
 
 ```bash
-OUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/mainnet
-DEPLOYER_ADDR=$(cast wallet address --private-key "$DEPLOYER_KEY")
-
-# Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
-# deployment's journal. Keep it out of $OUT: the committed $OUT/transactions.txt
-# also holds earlier broadcasts.
-./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
-  --manifest "$OUT/prepare/manifest.json" \
-  --l1-rpc-url <l1-rpc> \
-  --key "${DEPLOYER_ADDR}=${DEPLOYER_KEY}" \
-  --skip-unkeyed \
-  --max-gas-price-gwei 500 \
-  --out ./deploy-result/deploy-executed.json
-
-# Verify on Etherscan — replay the logged forge verify-contract commands VERBATIM.
-# Step 1 already wrote the exact `--constructor-args <hex>` for every contract
-# (from the CREATE2 init code it deployed), so nothing is guessed.
-cd l1-contracts
-export ETHERSCAN_API_KEY   # forge reads it from the env
-grep 'forge verify-contract' \
-    "upgrade-envs/v0.31.0-interopB/output/mainnet/extra-verification-logs.txt" | sort -u |
-  while IFS= read -r cmd; do
-    cmd="forge verify-contract${cmd#*forge verify-contract}"
-    eval "$cmd --chain mainnet --watch --retries 8 --delay 20" || true
-  done
+BUNDLE=<unpacked-bundle-dir>
+# protocol_ops_image.digest in bundle-metadata.json, after the @
+TAG=sha256:<digest>
+# CHAIN is the explorer of the bundle L1; protocol-ops.sh passes ETHERSCAN_API_KEY into the image
+CHAIN="$(jq -r '.l1.chain_id | if . == 1 then "mainnet" elif . == 11155111 then "sepolia" else error("no explorer") end' "$BUNDLE/bundle-metadata.json")" &&
+  export CHAIN ETHERSCAN_API_KEY &&
+  grep 'forge verify-contract' "$BUNDLE/extra-verification-logs.txt" |
+  sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u |
+  xargs -L1 sh -c './protocol-ops.sh --tag "$0" "$@" --chain "$CHAIN" --watch --retries 8 --delay 20' "$TAG"
 ```
 
-**In CI:** run the **`Ecosystem Upgrade: Deploy + Verify (v31)`** workflow
+`xargs` exits non-zero if any verification failed; re-run it for those.
+
+**In CI:** run the **`Ecosystem Upgrade: Deploy + Verify`** workflow
 (`deploy-ecosystem-upgrade.yaml`) with `generate_run_id` = the step-1 run to pull
 the deploy bundle from. It uploads `transactions.txt` as
 `ecosystem-upgrade-deploy-result-<env>`. The selected generation run must be a
 successful manual run of `generate-ecosystem-upgrade-calldata.yaml`, and its
 `verify-bundle-handoff` job must have succeeded. The downloaded bundle's strict
-metadata must also identify that exact run, commit, and environment; diagnostic
-artifacts from failed generation runs and metadata-free legacy bundles are
-rejected before any secret is selected.
+metadata must also identify that exact run and environment, and name the image it
+was generated in (`protocol_ops_image.digest`): the job pulls that digest, checks
+that the image was built from the bundle's `contracts_commit`, checks that commit
+out, and runs every command, broadcast and Etherscan verify included, in that image.
+Diagnostic artifacts from failed generation runs and bundles without an image
+digest are rejected before any secret is selected.
 
 Which L1 it signs against comes from the bundle's `bundle-metadata.json`
 (`l1.chain_id`), **not** from the `environment` name: chain ID `1` uses
@@ -213,8 +217,8 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 
 > A single deployer bundle can revert mid-way (e.g. RPC 429). The broadcast is
 > idempotent, so retry it with the same journal — already-deployed /
-> already-transferred txs are skipped and it resumes. Locally, reuse the same
-> `--out` path. In CI, dispatch a new deploy run with `resume_deploy_run_id` set
+> already-transferred txs are skipped and it resumes. Locally, re-run the same
+> `replay-bundle --key` from the same checkout (its journal is `output/<env>/replay/`). In CI, dispatch a new deploy run with `resume_deploy_run_id` set
 > to the failed deploy run; the workflow validates and restores that run's
 > partial result artifact before broadcasting. Do not use GitHub's plain
 > “re-run failed jobs” button, which cannot add the resume input.
@@ -240,15 +244,16 @@ having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
 ## Step 3 — verify the deployment (`verify-bootstrap`)
 
 Run it after step 2 and before governance signs: it is a pre-execution check. It
-needs the contracts built from the commit `bundle-metadata.json` names, because it
-re-derives every object from the reviewed creation code in `l1-contracts/out` and
-holds that build against the commit's `AllContractsHashes.json`:
+runs in the image `bundle-metadata.json` names, from a checkout of the commit it
+names: it re-derives every object from the reviewed creation code in the image's
+`l1-contracts/out` and holds that build against the image's `AllContractsHashes.json`:
 
 ```bash
-yarn && yarn da build:foundry && yarn l1 build:foundry
-cd protocol-ops && cargo build --release && cd ..
-./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
-  --bundle <unpacked-bundle-dir> --rpc <l1-rpc> --verify-only
+# protocol_ops_image.digest in bundle-metadata.json, after the @
+TAG=sha256:<digest>
+export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle:ro"
+./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
+  --bundle /contracts/bundle --rpc <l1-rpc> --verify-only
 ```
 
 `replay-bundle` runs `ecosystem verify-bootstrap` on the bundle's `ecosystem.toml`
@@ -271,13 +276,13 @@ A generation run packs `output/<env>/deploy-bundle/` (uploaded by CI as
 `ecosystem-upgrade-deploy-inputs-<env>`). It is the unit of handoff between the
 machine that compiled the upgrade and whoever deploys or audits it:
 
-| File                          | Why it is in there                                                                                                     |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `prepare/manifest.json`       | the bundles, in execution order, each with its signer (`target`)                                                       |
-| `prepare/*.safe.json`         | the calls themselves — `to`/`value`/`data`, CREATE2 init code included                                                 |
-| `ecosystem.toml`              | the resulting addresses + the governance bundle's calldata                                                             |
-| `bundle-metadata.json`        | provenance (commit, hashes digest, fork block, deployer, toolchain) plus the SHA-256 of every other file in the bundle |
-| `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included                                                            |
+| File                          | Why it is in there                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `prepare/manifest.json`       | the bundles, in execution order, each with its signer (`target`)                                                                     |
+| `prepare/*.safe.json`         | the calls themselves — `to`/`value`/`data`, CREATE2 init code included                                                               |
+| `ecosystem.toml`              | the resulting addresses + the governance bundle's calldata                                                                           |
+| `bundle-metadata.json`        | provenance (commit, image digest, hashes digest, fork block, deployer, toolchain) plus the SHA-256 of every other file in the bundle |
+| `extra-verification-logs.txt` | `forge verify-contract` commands, constructor args included                                                                          |
 
 **The broadcasting EOA must be the bundle's `deployer_address`.** The deployer is
 not just the fork-rehearsal signer: the prepare passes it as the initial owner of
@@ -294,44 +299,43 @@ Both the replay command and the deploy workflow verify every file digest in the
 metadata, and that every bundle file the manifest names is covered, before sending
 any transaction.
 
-**Check out and build the commit `bundle-metadata.json` names.** `verify-bootstrap`
-re-derives every object from the local build's creation code, holds that build
-against the committed `AllContractsHashes.json` and identifies deployed code
-against the same file; from a different commit the deployments are not recognised
-and the verdict is meaningless. `replay-bundle` compares the file's hash with the
-bundle's and exits on a mismatch.
+**Run the image `bundle-metadata.json` names, from a checkout of its commit.**
+`verify-bootstrap` re-derives every object from the creation code of the image's
+contract build, holds that build against the image's `AllContractsHashes.json` and
+identifies deployed code against the same file; in any other image the deployments
+are not recognised and the verdict is meaningless. `replay-bundle` compares the
+file's hash with the bundle's and exits on a mismatch. The image is
+`protocol_ops_image.digest` (`--tag sha256:<digest>`); the checkout of
+`contracts_commit` supplies `protocol-ops.sh`.
 
 **Rehearse the deploy and verify it — no regeneration:**
 
 ```bash
-yarn && yarn da build:foundry && yarn l1 build:foundry   # the verifier reads l1-contracts/out
-cd protocol-ops && cargo build --release && cd ..
-./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
-  --bundle <unpacked-bundle-dir> --fork-url <l1-rpc>
+# protocol_ops_image.digest in bundle-metadata.json, after the @
+TAG=sha256:<digest>
+export EXTRA_MOUNTS="$PWD/<unpacked-bundle-dir>:/contracts/bundle:ro"
+./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
+  --bundle /contracts/bundle --fork-url <l1-rpc>
 ```
 
 That forks L1 at the bundle's recorded height, funds every bundle signer, replays
 all the manifest's bundles under impersonation and runs `ecosystem verify-bootstrap`
 against the result.
 
-Variants:
+To broadcast the deployer bundles for real, then verify (`--verify-only` in place of `--key` verifies a
+chain the bundle was already broadcast to, as in step 3):
 
 ```bash
-# verify a chain the bundle was already broadcast to (no replay)
-./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
-  --bundle <dir> --rpc <l1-rpc> --verify-only
-
-# broadcast the deployer bundles for real, then verify
-./protocol-ops/target/release/protocol_ops ecosystem replay-bundle \
-  --bundle <dir> --rpc <l1-rpc> --key "$DEPLOYER_KEY"
+./protocol-ops.sh --tag "$TAG" ecosystem replay-bundle \
+  --bundle /contracts/bundle --rpc <l1-rpc> --key "$DEPLOYER_KEY"
 ```
 
 `--key` signs only the deployer's bundles (`--skip-unkeyed`); the governance
 ceremony bundles stay for their multisig. Same broadcast path, and same
 idempotency, as step 2 above. `replay-bundle` writes its own state (`executed.json`
 and the receipts in `transactions.txt`) to
-`l1-contracts/upgrade-envs/v0.31.0-interopB/output/<env>/replay/`, never into the
-bundle directory.
+`l1-contracts/upgrade-envs/<upgrade>/output/<env>/replay/` in the checkout, never into
+the bundle directory.
 
 Both `--rpc` modes first read `eth_chainId` and require it to equal the bundle's
 recorded `l1.chain_id`, and refuse to continue otherwise. That check matters most

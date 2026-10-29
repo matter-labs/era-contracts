@@ -1,20 +1,25 @@
 All calldata-generation composite scripts have been retired. Each generate-*
 workflow invokes `protocol_ops` via `protocol-ops.sh --tag <docker-tag>`
 (the wrapper forwards all remaining args verbatim to `protocol_ops` unless
-the first post-flag word is `forge` or `cast`). Most workflows pass
-`--ecosystem /contracts/env/ecosystem.yaml --chain <name> …` explicitly.
+the first post-flag word is `forge` or `cast`), i.e. inside a released
+protocol-ops image; nothing is compiled per run. Workflows pass the topology
+as `--env <environment>` (a preset in
+l1-contracts/upgrade-envs/permanent-values/) and the chain as
+`--chain-id <chain_id>`.
 
 When modifying a workflow:
 
 1. Check that every required `protocol-ops` flag has a matching workflow input
-   (or is sourced from an auto-resolved L1 value — e.g. bridgehub is read from
-   ecosystem.yaml by the chain-init workflow via `yq`).
+   (or is sourced from the environment preset through `--env`).
 2. Integration-test-only overrides (e.g. `--l1-diamond-cut-data`) must NOT be
    exposed as workflow inputs — CI operators target real chains where those
    values auto-resolve from L1.
 3. `[v30 only]` workflow inputs are annotated as such in their description and
    correspond to `TODO(v30-removal)` flags in protocol-ops.
 4. Verify the workflow name matches the protocol-ops subcommand's purpose.
+5. Keep the release flow in .github/workflows/README.md true: the image
+   `build-docker` releases (after its gate and release flow) is what every
+   calldata workflow runs.
 
 Mapping (workflow -> protocol-ops command):
 
@@ -23,12 +28,13 @@ Mapping (workflow -> protocol-ops command):
   generate-chain-set-upgrade-timestamp-calldata  <-> chain set-upgrade-timestamp
   generate-chain-add-validator-calldata          <-> chain add-validator
   generate-chain-remove-validator-calldata       <-> chain remove-validator
-  generate-upgrade-calldata-prepare              <-> ecosystem upgrade-prepare
-  generate-upgrade-calldata-governance           <-> ecosystem upgrade-governance (stages 0+1+2)
+  generate-ecosystem-upgrade-calldata            <-> ecosystem rehearse-upgrade
+  deploy-ecosystem-upgrade                       <-> ecosystem verify-bundle + upgrade-broadcast
 
 Conventions:
-- All workflows share: environment, protocol_ops_tag, l1_rpc_url
+- Calldata workflows share: environment, protocol_ops_tag, l1_rpc_url
+- environment is a free string naming a permanent-values preset the image
+  holds (stage, testnet, mainnet or a partner's); workflows that sign or
+  broadcast with our deployer keys take only ours (stage, testnet, mainnet)
 - Artifact names:
-  - per-chain workflows: safe-bundles-{operation}-{chain_name}-{environment}
-  - ecosystem-wide workflows (upgrade-prepare / upgrade-governance):
-    safe-bundles-{operation}-{environment}  (no chain_name)
+  - per-chain workflows: safe-bundles-{operation}-{chain_id}-{environment}
