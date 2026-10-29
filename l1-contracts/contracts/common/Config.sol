@@ -39,6 +39,35 @@ uint256 constant INTEROP_POOL_CHAIN_ID = uint256(keccak256("interop.pool")) - 1;
 /// @dev ERC-1967 storage slot of a proxy's admin.
 bytes32 constant ERC1967_ADMIN_SLOT = bytes32(uint256(keccak256("eip1967.proxy.admin")) - 1);
 
+/// @dev Interop-root "chain id" under which L1 block-hash anchors are imported. See {protocol-docs/l1sload.md#anchors}.
+uint256 constant L1_BLOCK_HASH_IMPORT_ID = uint256(keccak256("zksync.l1-block-hash-import")) - 1;
+
+/// @dev Maximum age, in L2 block time, of the L1 anchor that L2 contracts read gating state at.
+/// See {protocol-docs/l1sload.md#freshness}.
+uint256 constant L1_ANCHOR_MAX_LAG = 1 hours;
+
+/// @dev `L2InteropRootStorage` slot that ZKsync OS reads the L1SLOAD anchor block hash from.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_HASH_SLOT = keccak256("zksync-os.l1sload.anchor.block-hash");
+
+/// @dev `L2InteropRootStorage` slot of the L1SLOAD anchor block number.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT = keccak256("zksync-os.l1sload.anchor.block-number");
+
+/// @dev `L2InteropRootStorage` slot of the L1 time the L1SLOAD anchor was recorded at.
+bytes32 constant L1SLOAD_ANCHOR_TIMESTAMP_SLOT = keccak256("zksync-os.l1sload.anchor.timestamp");
+
+/// @dev Maximum number of storage keys one L1SLOAD precompile call reads.
+uint256 constant L1SLOAD_MAX_KEYS = 5;
+
+// Storage slots of the L1 variables that L2 contracts read with L1SLOAD. They are an L2-facing ABI that an L1 upgrade
+// must keep, see {protocol-docs/l1sload.md#reading-l1-state}.
+
+/// @dev Slot of `ChainRegistrationSender.interopPeerAllowed`.
+uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT = 152;
+/// @dev Slot of `ChainRegistrationSender.interopSuspended`.
+uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_SUSPENDED_SLOT = 153;
+/// @dev Slot of `ChainRegistrationSender.interopBaseTokenAssetId`.
+uint256 constant CHAIN_REGISTRATION_SENDER_INTEROP_BASE_TOKEN_ASSET_ID_SLOT = 154;
+
 /// @dev Pubdata capacity of a blob: 4096 field elements with 31 bytes of data each.
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 

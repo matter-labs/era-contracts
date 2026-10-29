@@ -400,6 +400,7 @@ async function runSingleProcess(
     const stateDir = runner.getChainStatesDir();
     console.log(`\nFound pre-generated chain states at ${stateDir}`);
     await timedAsync("load chain states (coverage mode)", () => runner.loadChainStates(anvilManager, stateDir));
+    await timedAsync("refresh the interop chains' L1 anchors", () => runner.syncInteropL1Reads());
   } else {
     console.log("\nNo pre-generated chain states found, running full deployment...");
     await timedAsync("full deployment + test tokens + wrapped-ZK seeding", () =>

@@ -13,10 +13,12 @@ uint256 constant TEST_CHAIN_ID = 9;
 // Shared with ZKsync OS public_input.rs golden-vector tests; see {protocol-docs/chain-config.md}.
 uint256 constant GOLDEN_CHAIN_ID = 37;
 bytes32 constant BATCH_OUTPUT_HASH_GOLDEN = 0x3fa2b6bcbfde24e4aa05b9d48bb04bd3f183713bdd31889f976c74ff7694c1ab;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN = 0x080b613ec5a9df68d47b8008f89e814a87d2b13fc3a3fa5752c44677ad58b8a3;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY = 0xa078b769783cbdc3cb68c5f68bd3e330668d78f369bf95c1f6b019e3aaf41b50;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY = 0x500121afefb9942d2cbc7b7b689bbcc4054777c8eccc4a46eeb1d9a3626a6b78;
-bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS = 0x5364213bf06d28ee488265c45060455d09ad9d76bfbb329c8dfb9befccf19512;
+// Since v36 the chain config hash has seven words (`l1sload_enabled` is the seventh).
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN = 0x19c9f44479b3849265ebc58630ad42452ce077aa081af2c5a6ca9e2bb288288c;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_FILTERING_ONLY = 0x8bfa5df0c8871c96fff5322b35d14553bcf4917b8cfef1e4d02e41ba3e6e508d;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_LARGE_CONTRACTS_ONLY = 0xeec156b2928698ac0946c50216c8c745c5b4a2cb24b992688336d491a3024fbd;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS = 0x52217554538e20800b58fce27525e2abd540af67864fc13fe72bdc6a1f0e3cf7;
+bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_L1SLOAD_ONLY = 0x1321e994bbfec787b02d5435de7811d5a3a5e2367af6770a4741f326fc54551d;
 // Batch output hashes of `_goldenInteropFeeBatch(7)` / `(0)` in ZKsyncOSPublicInput.t.sol, shared with ZKsync OS
 // public_input.rs `batch_output_hash_commits_to_interop_fee_units_last`; see {protocol-docs/interop-fee.md}.
 bytes32 constant BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7 = 0x82cf2f4e531d92c0cf48eb93b02a24791907cbfe3b92362df3519e8a0c62fb7b;

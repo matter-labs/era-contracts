@@ -44,6 +44,10 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
     reason: "spec 01 reads the allowed interop peers via its ABI",
   },
   {
+    contractPath: "contracts/dev-contracts/MockL1SloadPrecompile.sol",
+    reason: "the L2s serve L1SLOAD reads with it; the harness feeds it the L1 slots at each anchor",
+  },
+  {
     contractPath: "lib/openzeppelin-contracts-v4/contracts/proxy/transparent/ProxyAdmin.sol",
     reason: "spec 14 reads the owner of the CTM's ProxyAdmin, which must also own the interop fee manager",
   },

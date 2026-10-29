@@ -12,6 +12,9 @@ import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsy
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 contract AdminTest is UtilsCallMockerTest {
     IAdmin internal adminFacet;
@@ -75,6 +78,13 @@ contract AdminTest is UtilsCallMockerTest {
         address diamondProxy = Utils.makeDiamondProxy(diamondRouting(), address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
+
+        // An upgrade engine turns L1SLOAD on for an interop chain ({protocol-docs/l1sload.md#upgrade-from-v35}); this
+        // chain runs on L1 without interop.
+        address messageRoot = makeAddr("messageRoot");
+        vm.mockCall(address(dummyBridgehub), abi.encodeCall(IBridgehubBase.messageRoot, ()), abi.encode(messageRoot));
+        vm.mockCall(messageRoot, abi.encodeCall(IMessageRootBase.L1_CHAIN_ID, ()), abi.encode(block.chainid));
+        vm.mockCall(messageRoot, abi.encodeWithSelector(IL1MessageRoot.isInteropEnabled.selector), abi.encode(false));
     }
 
     // add this to be excluded from coverage report

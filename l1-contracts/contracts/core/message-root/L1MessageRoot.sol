@@ -6,8 +6,10 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 import {
+    ChainPredatesL1Sload,
     InteropAlreadyEnabled,
     InvalidSettlementLayerForBatch,
+    L1SloadNotEnabled,
     LocallyNoChainsAtGenesis,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
@@ -17,6 +19,7 @@ import {IOwnable} from "../../common/interfaces/IOwnable.sol";
 import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE} from "../../common/Config.sol";
 import {NotMultiProofMode, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {StoredInteropRoot} from "../../common/Messaging.sol";
 import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
@@ -48,6 +51,10 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @notice Whether governance enabled interop for the chain. See {protocol-docs/interop-gating.md}.
     mapping(uint256 chainId => bool enabled) internal interopEnabled;
 
+    /// @notice The L1 block hashes recorded for L1SLOAD anchors, with the time they were recorded.
+    /// See {protocol-docs/l1sload.md#anchors}.
+    mapping(uint256 blockNumber => StoredInteropRoot) internal recordedL1BlockHashes;
+
     /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _chainAssetHandler Address of the chain asset handler.
@@ -78,6 +85,12 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
             address(IL1AssetRouter(address(IBridgehubBase(BRIDGE_HUB).assetRouter())).nativeTokenVault())
         );
         require(!nativeTokenVault.chainBalanceBackfillPending(_chainId), ChainBalanceBackfillPending(_chainId));
+        // See {protocol-docs/l1sload.md#chain-config-flag}. A chain on pre-v36 facets routes no flag getter.
+        require(
+            IGetters(zkChain).facetAddress(IGetters.isZKsyncOSL1SloadEnabled.selector) != address(0),
+            ChainPredatesL1Sload(_chainId)
+        );
+        require(IGetters(zkChain).isZKsyncOSL1SloadEnabled(), L1SloadNotEnabled(_chainId));
         if (_requireSecondProofSystem) {
             require(IGetters(zkChain).isSecondProofSystemRequired(), SecondProofSystemNotRequired(_chainId));
             uint256 proofMode = IGetters(zkChain).getProofMode();
@@ -91,6 +104,22 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @inheritdoc IL1MessageRoot
     function isInteropEnabled(uint256 _chainId) external view returns (bool) {
         return interopEnabled[_chainId];
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function recordL1BlockHash() external returns (uint256 blockNumber, bytes32 blockHash) {
+        blockNumber = block.number - 1;
+        blockHash = blockhash(blockNumber);
+        if (recordedL1BlockHashes[blockNumber].timestamp != 0) {
+            return (blockNumber, blockHash);
+        }
+        recordedL1BlockHashes[blockNumber] = StoredInteropRoot({root: blockHash, timestamp: block.timestamp});
+        emit L1BlockHashRecorded(blockNumber, blockHash, block.timestamp);
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function recordedL1BlockHash(uint256 _blockNumber) external view returns (StoredInteropRoot memory) {
+        return recordedL1BlockHashes[_blockNumber];
     }
 
     function _proveL2LeafInclusionOnSettlementLayer(

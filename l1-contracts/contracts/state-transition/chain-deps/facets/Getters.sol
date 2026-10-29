@@ -242,6 +242,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     }
 
     /// @inheritdoc IGetters
+    function isZKsyncOSL1SloadEnabled() external view returns (bool) {
+        return s.zksyncOSL1SloadEnabled;
+    }
+
+    /// @inheritdoc IGetters
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
@@ -358,7 +363,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
     ///      (see `Utils.getAllSelectors`), in ascending selector order. Guarded against drift by
     ///      FacetSelfDescription.t.sol and `yarn l1 facet-selectors --check`.
     function selectors() public pure returns (bytes4[] memory result) {
-        uint32[55] memory list = [
+        uint32[56] memory list = [
             // getPubdataPricingMode()
             uint32(0x06d49e5b),
             // getPriorityTxMaxGasLimit()
@@ -459,6 +464,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters, ISelfDescribingF
             uint32(0xe81e0ba1),
             // baseTokenGasPriceMultiplierNominator()
             uint32(0xea6c029c),
+            // isZKsyncOSL1SloadEnabled()
+            uint32(0xecfbb07b),
             // getTotalBatchesVerified()
             uint32(0xef3f0bae),
             // getPriorityTreeStartIndex()

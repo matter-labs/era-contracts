@@ -5,19 +5,17 @@ pragma solidity ^0.8.20;
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {DestinationChainNotAllowed, DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
-import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_INTEROP_CENTER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
+import {L1SloadMockUtils} from "../../unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 
 /// @title L2InteropDestinationChainRegressionTestAbstract
 /// @notice Regression tests for the unregistered destination chain check (PR #1811)
 abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTestUtils {
-    // An unregistered chain ID (no baseTokenAssetId set)
+    // A chain no admin allowed on L1, so it has no base token snapshot.
     uint256 internal constant UNREGISTERED_CHAIN_ID = 999999;
 
     function setUp() public virtual override {
@@ -27,13 +25,6 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
     /// @notice Test that sending to an unregistered destination chain reverts
     /// @dev This is the main regression test - ensures the fix properly rejects unregistered chains
     function test_regression_sendToUnregisteredChainReverts() public {
-        // Mock the bridgehub to return bytes32(0) for the unregistered chain's baseTokenAssetId
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (UNREGISTERED_CHAIN_ID)),
-            abi.encode(bytes32(0))
-        );
-
         // Build a simple interop call to the unregistered chain
         bytes[] memory callAttributes = new bytes[](0);
 
@@ -56,20 +47,15 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         );
     }
 
-    /// @notice A chain registered without being allowed, as the retired consent-free registration did,
-    /// can't be sent to.
+    /// @notice A chain registered for interop, i.e. allowed by some other chain's admin on L1, that this chain's
+    /// admin didn't allow can't be sent to.
     function test_sendToRegisteredButNotAllowedChainReverts() public {
-        bytes32 legacyBaseTokenAssetId = bytes32(uint256(0xABCDEF));
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.allowInteropPeer(UNREGISTERED_CHAIN_ID, legacyBaseTokenAssetId);
-        // Mock: only storage written before the upgrade holds a chain that is registered but not allowed, since
-        // the retired registration is gone. The anvil upgrade test sends over such a pair end to end.
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IL2Bridgehub.isPeerAllowed, (UNREGISTERED_CHAIN_ID)),
-            abi.encode(false)
+        L1SloadMockUtils.setInteropBaseTokenAssetId(
+            _l1ChainRegistrationSender(),
+            UNREGISTERED_CHAIN_ID,
+            bytes32(uint256(0xABCDEF))
         );
-        assertEq(l2Bridgehub.baseTokenAssetId(UNREGISTERED_CHAIN_ID), legacyBaseTokenAssetId);
+        assertNotEq(l2Bridgehub.interopBaseTokenAssetId(UNREGISTERED_CHAIN_ID), bytes32(0));
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = InteropCallStarter({
@@ -92,13 +78,6 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
     /// @dev Ensures the check happens before any value handling
     function test_regression_sendWithValueToUnregisteredChainReverts() public {
         uint256 interopCallValue = 1 ether;
-
-        // Mock the bridgehub to return bytes32(0) for the unregistered chain
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (UNREGISTERED_CHAIN_ID)),
-            abi.encode(bytes32(0))
-        );
 
         // Build a call with interopCallValue
         bytes[] memory callAttributes = new bytes[](1);
@@ -128,7 +107,7 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
     /// @notice Test that sending to a registered chain still works
     /// @dev Ensures the fix doesn't break normal operation
     function test_regression_sendToRegisteredChainWorks() public {
-        // destinationChainId from parent class has a registered baseTokenAssetId
+        // destinationChainId from parent class is allowed both ways on L1
         bytes[] memory callAttributes = new bytes[](0);
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
@@ -176,11 +155,6 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
 
         // Now try to send to unregistered chain - should fail.
         // Use a fresh salt so the call reaches the destination check rather than the unique-salt guard.
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (UNREGISTERED_CHAIN_ID)),
-            abi.encode(bytes32(0))
-        );
         bytes[] memory bundleAttributes2 = new bytes[](2);
         bundleAttributes2[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
         bundleAttributes2[1] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (bytes32(uint256(1))));
@@ -203,13 +177,6 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
         // Skip L1_CHAIN_ID - an L1 destination is the withdrawal path and is validated via the call
         // attributes rather than the destination registry, so it never reverts with DestinationChainNotRegistered.
         vm.assume(randomChainId != L1_CHAIN_ID);
-
-        // Mock the bridgehub to return bytes32(0) for this random chain
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (randomChainId)),
-            abi.encode(bytes32(0))
-        );
 
         bytes[] memory callAttributes = new bytes[](0);
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);

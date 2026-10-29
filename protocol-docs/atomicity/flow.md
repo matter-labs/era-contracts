@@ -75,7 +75,8 @@ lowNullifierIndex, preimage)`. `append`:
    bundle-hash prediction invalidated by an encoding change — reverts the whole send, burn included,
    rather than committing a leg under a `flowId` that could neither finalize nor be refunded.
 5. **Requires every _other_ leg to declare a Bridgehub-registered source chain**
-   (`L2_BRIDGEHUB.baseTokenAssetId(chainId) != 0`). Registration guarantees MessageRoot presence,
+   (`L2Bridgehub.interopBaseTokenAssetId(chainId) != 0`, the L1 snapshot,
+   {protocol-docs/l1sload.md#the-base-token-snapshot}). Registration guarantees MessageRoot presence,
    without which the leg could never be proven committed _or_ absent and the flow would be stranded (see
    {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}). This also rejects L1 as a
    declared leg source (L1 is never a registered interop chain).

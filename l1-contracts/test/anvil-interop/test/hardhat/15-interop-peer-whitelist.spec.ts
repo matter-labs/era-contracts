@@ -35,9 +35,11 @@ const TOKEN_AMOUNT_MAX = ethers.utils.parseUnits("10", 18);
 /**
  * 15 - Interop peer whitelist
  *
- * Governance removes an allowed pair from one side, and the chain's admin allows it again, see
- * {protocol-docs/interop-gating.md#interop-peer-whitelist}. The tests run in order: each starts from the state the
- * previous one left.
+ * Governance removes an allowed pair from one side, which stops both directions from sending and holds the bundles
+ * in flight, and the chain's admin allows it again, see
+ * {protocol-docs/interop-gating.md#interop-peer-whitelist}. The chains read the whitelist from L1 at their anchor, so
+ * each L1 change is followed by a new anchor ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}). The tests
+ * run in order: each starts from the state the previous one left.
  *
  * Topology: interopChainIds[0] removes interopChainIds[1]; the peer's own side stays allowed.
  */
@@ -55,7 +57,8 @@ describe("15 - Interop peer whitelist", function () {
   let chainBridgehub: ethers.Contract;
   let peerBridgehub: ethers.Contract;
   let recipient: string;
-  /** The peer's bundle the chain rejects while the peer is removed, and executes once it is allowed again. */
+  /** The peer's bundle, sent before the removal, that the chain rejects while the peer is removed and executes once
+   * it is allowed again. */
   let heldMessage: InteropSendResult;
 
   before(async () => {
@@ -70,7 +73,11 @@ describe("15 - Interop peer whitelist", function () {
     [chainId, peerChainId] = interopChainIds;
 
     const l1RpcUrl = getL1RpcUrl(state);
-    registrar = new InteropChainRegistrar(l1RpcUrl, state.l1Addresses);
+    registrar = new InteropChainRegistrar(
+      l1RpcUrl,
+      state.l1Addresses,
+      new Map(interopChainIds.map((id) => [id, getL2RpcUrl(state, id)]))
+    );
     sender = new ethers.Contract(
       state.l1Addresses.chainRegistrationSender,
       getAbi("ChainRegistrationSender"),
@@ -84,15 +91,18 @@ describe("15 - Interop peer whitelist", function () {
   });
 
   it("governance removes an allowed peer from the chain's side only", async () => {
-    await registrar.deregisterInteropPair(
-      chainId,
-      peerChainId,
-      getChainDiamondProxy(state.chainAddresses!, chainId),
-      chainProvider
-    );
+    heldMessage = await sendInteropMessage({
+      sourceProvider: peerProvider,
+      recipient: encodeEvmChainAddress(recipient, chainId),
+      payload: "0x",
+      attributes: [],
+      value: await getInteropProtocolFee(peerProvider),
+    });
+
+    await registrar.deregisterInteropPair(chainId, peerChainId, chainProvider);
 
     expect(await sender.interopPeerAllowed(peerChainId, chainId), "the peer's side on L1").to.be.true;
-    expect(await peerBridgehub.isPeerAllowed(chainId), "the peer's side on its L2Bridgehub").to.be.true;
+    expect(await peerBridgehub.isPeerAllowed(chainId), "the peer's side, as the peer reads it").to.be.true;
   });
 
   it("rejects transfers from the chain to the removed peer", async () => {
@@ -109,7 +119,8 @@ describe("15 - Interop peer whitelist", function () {
           logger: (line: string) => console.log(`[interop] ${line}`),
         }),
       "transfer to a removed peer",
-      customError("InteropCenter", "DestinationChainNotRegistered(uint256)", [peerChainId]),
+      // The peer stays registered: its base token snapshot is never deleted.
+      customError("InteropCenter", "DestinationChainNotAllowed(uint256)", [peerChainId]),
       chainProvider
     );
 
@@ -122,15 +133,22 @@ describe("15 - Interop peer whitelist", function () {
     );
   });
 
-  it("lets the peer still send to the chain, whose receive filter rejects the bundle", async () => {
-    // Only the peer's own side gates the send ({protocol-docs/interop-gating.md#receive-filter}).
-    heldMessage = await sendInteropMessage({
-      sourceProvider: peerProvider,
-      recipient: encodeEvmChainAddress(recipient, chainId),
-      payload: "0x",
-      attributes: [],
-      value: await getInteropProtocolFee(peerProvider),
-    });
+  it("stops the peer from sending to the chain, whose receive filter rejects the peer's bundle in flight", async () => {
+    // Sending needs both sides ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}), so the peer's side alone
+    // doesn't let it send.
+    await expectRevert(
+      async () =>
+        sendInteropMessage({
+          sourceProvider: peerProvider,
+          recipient: encodeEvmChainAddress(recipient, chainId),
+          payload: "0x",
+          attributes: [],
+          value: await getInteropProtocolFee(peerProvider),
+        }),
+      "send from the removed peer",
+      customError("InteropCenter", "DestinationChainNotAllowed(uint256)", [chainId]),
+      peerProvider
+    );
 
     expect(await chainBridgehub.isPeerAllowed(peerChainId), "the flag the chain's receive filter reads").to.be.false;
     await expectRevert(

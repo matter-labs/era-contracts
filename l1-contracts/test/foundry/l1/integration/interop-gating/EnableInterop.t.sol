@@ -4,10 +4,14 @@ pragma solidity 0.8.28;
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProofSystem, ZKSYNC_OS_PLONK_VERIFICATION_TYPE} from "contracts/common/Config.sol";
 import {NotMultiProofMode, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {L1SloadRequiredByInterop} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {
+    ChainPredatesL1Sload,
     InteropAlreadyEnabled,
+    L1SloadNotEnabled,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
@@ -28,6 +32,54 @@ contract EnableInteropTest is InteropGatingDeployer {
         chainId = zkChainIds[0];
         chain = getZKChainAddress(chainId);
         governance = addresses.bridgehubOwnerAddress;
+        _enableL1Sload(chainId);
+    }
+
+    /// @notice A chain must read L1 with L1SLOAD before it can be enabled: interop gating depends on it.
+    /// See {protocol-docs/l1sload.md#chain-config-flag}.
+    function test_enableInterop_revertWhen_l1SloadNotEnabled() public {
+        uint256 otherChainId = zkChainIds[1];
+        _permanentlyRequireSecondProofSystem(otherChainId);
+        assertFalse(IGetters(getZKChainAddress(otherChainId)).isZKsyncOSL1SloadEnabled());
+
+        _expectEnableInteropRevert(
+            governance,
+            otherChainId,
+            abi.encodeWithSelector(L1SloadNotEnabled.selector, otherChainId)
+        );
+    }
+
+    /// @notice Once interop is enabled, the chain can't turn L1SLOAD off: its gating reads would stop.
+    function test_l1SloadCantBeDisabledWhileInteropEnabled() public {
+        _enableInterop(chainId);
+
+        vm.prank(_chainAdmin(chainId));
+        vm.expectRevert(abi.encodeWithSelector(L1SloadRequiredByInterop.selector, chainId));
+        IAdmin(chain).setZKsyncOSL1SloadEnabled(false);
+
+        assertTrue(IGetters(chain).isZKsyncOSL1SloadEnabled());
+        assertTrue(messageRoot.isInteropEnabled(chainId));
+    }
+
+    /// @dev The CTM cuts the L1SLOAD getter out of the chain's diamond, leaving it routed as a v35 diamond is.
+    /// See {protocol-docs/l1sload.md#upgrade-window}.
+    function test_enableInterop_revertWhen_diamondPredatesL1Sload() public {
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = IGetters.isZKsyncOSL1SloadEnabled.selector;
+        Diamond.FacetCut[] memory cuts = new Diamond.FacetCut[](1);
+        cuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: false,
+            selectors: selectors
+        });
+        vm.prank(IGetters(chain).getChainTypeManager());
+        IAdmin(chain).executeUpgrade(
+            Diamond.DiamondCutData({facetCuts: cuts, initAddress: address(0), initCalldata: ""})
+        );
+        assertEq(IGetters(chain).facetAddress(IGetters.isZKsyncOSL1SloadEnabled.selector), address(0));
+
+        _expectEnableInteropRevert(governance, chainId, abi.encodeWithSelector(ChainPredatesL1Sload.selector, chainId));
     }
 
     function test_enableInterop() public {

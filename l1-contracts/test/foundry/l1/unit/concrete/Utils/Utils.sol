@@ -182,6 +182,25 @@ library Utils {
         bool _largeContractsEnabled
     ) internal pure returns (bytes32) {
         return
+            chainConfigHash({
+                _chainId: _chainId,
+                _maxTxGasLimit: _maxTxGasLimit,
+                _pubdataContent: _pubdataContent,
+                _filteringEnabled: _filteringEnabled,
+                _largeContractsEnabled: _largeContractsEnabled,
+                _l1SloadEnabled: false
+            });
+    }
+
+    function chainConfigHash(
+        uint256 _chainId,
+        uint64 _maxTxGasLimit,
+        PubdataContent _pubdataContent,
+        bool _filteringEnabled,
+        bool _largeContractsEnabled,
+        bool _l1SloadEnabled
+    ) internal pure returns (bytes32) {
+        return
             keccak256(
                 abi.encodePacked(
                     _chainId,
@@ -189,7 +208,8 @@ library Utils {
                     uint256(_maxTxGasLimit),
                     uint256(_pubdataContent),
                     uint256(_filteringEnabled ? 1 : 0),
-                    uint256(_largeContractsEnabled ? 1 : 0)
+                    uint256(_largeContractsEnabled ? 1 : 0),
+                    uint256(_l1SloadEnabled ? 1 : 0)
                 )
             );
     }

@@ -201,19 +201,20 @@ Live environment variables:
 
 ## Test Specs
 
-| Spec                         | What it tests                                                                                                                                                                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `01-deployment-verification` | L1 core contracts wired together, CTM registered, all 5 L2 chains registered on L1 with chain ID + CTM, interop enabled and peers allowed for exactly the interop chains, exact predeploy runtimes, test token decimals/supply |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal, and an L1-native ERC20 round trip, on chain 10 (direct L1 settlement), net flow assertions                                                                                         |
-| `03-interop-transfer`        | Interop transfers between the interop chains; routes involving a chain without interop revert                                                                                                                                  |
-| `04-gateway-setup`           | GW chain contracts deployed, the GW-settled chain registered on GW L2Bridgehub, GW designated as settlement layer on L1                                                                                                        |
-| `05-gateway-bridge`          | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 13 (via GW)                                                                                                                                                                |
-| `07-interop-bundles`         | Direct, indirect, and mixed bundles; fees, replay protection, and execution-address checks                                                                                                                                     |
-| `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                                                                                          |
-| `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                                                                                  |
-| `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                                                                                           |
-| `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                                                                                            |
-| `15-interop-peer-whitelist`  | Governance removes an allowed peer from one side: that chain can't send to the peer and its receive filter rejects the peer's bundle; once the admin allows the peer again, both directions work and the held bundle executes  |
+| Spec                         | What it tests                                                                                                                                                                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `01-deployment-verification` | L1 core contracts wired together, CTM registered, all 5 L2 chains registered on L1 with chain ID + CTM, interop enabled and peers allowed for exactly the interop chains, exact predeploy runtimes, test token decimals/supply                    |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal, and an L1-native ERC20 round trip, on chain 10 (direct L1 settlement), net flow assertions                                                                                                            |
+| `03-interop-transfer`        | Interop transfers between the interop chains; routes involving a chain without interop revert                                                                                                                                                     |
+| `04-gateway-setup`           | GW chain contracts deployed, the GW-settled chain registered on GW L2Bridgehub, GW designated as settlement layer on L1                                                                                                                           |
+| `05-gateway-bridge`          | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 13 (via GW)                                                                                                                                                                                   |
+| `07-interop-bundles`         | Direct, indirect, and mixed bundles; fees, replay protection, and execution-address checks                                                                                                                                                        |
+| `08-interop-messages`        | Base-token and ERC20 messages across ETH and custom-base-token chains                                                                                                                                                                             |
+| `09-interop-unbundle`        | Bundle verification and recovery of calls that cannot execute                                                                                                                                                                                     |
+| `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                                                                                                              |
+| `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                                                                                                               |
+| `15-interop-peer-whitelist`  | Governance removes an allowed peer from one side: neither chain can send to the other and the chain's receive filter rejects the peer's bundle in flight; once the admin allows the peer again, both directions work and the held bundle executes |
+| `16-interop-suspension`      | Governance suspends a chain on L1: once its peer reads L1 at a newer anchor, transfers to it, sends from it and its pending bundle are refused; resuming restores the pair and the held bundle executes                                           |
 
 ## Coverage
 
@@ -369,7 +370,9 @@ test/anvil-interop/
 │   ├── 08-interop-messages.spec.ts
 │   ├── 09-interop-unbundle.spec.ts
 │   ├── 13-imt-atomic-swap.spec.ts
-│   └── 14-interop-fee-units.spec.ts
+│   ├── 14-interop-fee-units.spec.ts
+│   ├── 15-interop-peer-whitelist.spec.ts
+│   └── 16-interop-suspension.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 
@@ -387,12 +390,13 @@ test/anvil-interop/
 Source of truth for the Anvil predeploy layout lives in
 `src/core/predeploys.ts` via `PREDEPLOY_SYSTEM_CONTRACTS`.
 
-| Mock                        | Address   | Replaces              | Difference                                           |
-| --------------------------- | --------- | --------------------- | ---------------------------------------------------- |
-| `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true`                       |
-| `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1Messenger still emits events           |
-| `MockMintBaseTokenHook`     | `0x7100`  | MINT_BASE_TOKEN_HOOK  | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
-| `DummyL1MessageRoot`        | L1        | L1MessageRoot         | All proof verification returns `true`                |
+| Mock                        | Address   | Replaces              | Difference                                                                                           |
+| --------------------------- | --------- | --------------------- | ---------------------------------------------------------------------------------------------------- |
+| `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true`                                                                       |
+| `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1Messenger still emits events                                                           |
+| `MockMintBaseTokenHook`     | `0x7100`  | MINT_BASE_TOKEN_HOOK  | No-op; L2BaseToken pre-funded via `anvil_setBalance`                                                 |
+| `MockL1SloadPrecompile`     | `0x101`   | L1SLOAD precompile    | Serves L1 slots the harness copies from the L1 at each anchor (`src/helpers/l1-reads.ts`), no proofs |
+| `DummyL1MessageRoot`        | L1        | L1MessageRoot         | All proof verification returns `true`                                                                |
 
 Real contracts used: `SystemContext` at `0x800b`, `L1Messenger` at `0x8008`, `L2BaseToken` at `0x800a`, all other L2 system contracts at their production addresses.
 

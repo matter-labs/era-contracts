@@ -146,15 +146,15 @@ contract AtomicFlowManager is IAtomicFlowManager {
             );
         }
 
-        // Every other leg must declare a Bridgehub-registered source chain: registration guarantees
-        // MessageRoot presence, without which the leg could never be proven committed OR absent and the
-        // whole flow would be stranded. See {protocol-docs/atomicity/security.md#timeout-protocol-preconditions}.
+        // Every other leg must declare a source chain registered for interop, which implies MessageRoot presence.
+        // See {protocol-docs/atomicity/security.md#timeout-protocol-preconditions} and
+        // {protocol-docs/l1sload.md#the-base-token-snapshot}.
         for (uint256 i = 0; i < n; ++i) {
             uint256 legSourceChainId = _flowPreimage.legSourceChainIds[i];
             if (legSourceChainId == block.chainid) {
                 continue;
             }
-            if (L2_BRIDGEHUB.baseTokenAssetId(legSourceChainId) == bytes32(0)) {
+            if (IL2Bridgehub(address(L2_BRIDGEHUB)).interopBaseTokenAssetId(legSourceChainId) == bytes32(0)) {
                 revert ManagerLegSourceChainNotRegistered(legSourceChainId);
             }
         }

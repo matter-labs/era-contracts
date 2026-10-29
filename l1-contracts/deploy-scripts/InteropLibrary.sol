@@ -10,6 +10,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "contracts/atomic-interop/IAtomicInterop.sol";
@@ -91,7 +92,8 @@ library InteropLibrary {
         address recipient,
         uint256 amount
     ) internal view returns (InteropCallStarter memory call) {
-        bytes32 destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(destination);
+        // Peers' base tokens are read from L1, not from the L2 Bridgehub's `baseTokenAssetId`.
+        (, bytes32 destinationBaseTokenAssetId) = IL2Bridgehub(address(L2_BRIDGEHUB)).interopSendTarget(destination);
         bytes32 thisChainBaseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
         bool indirectCall = destinationBaseTokenAssetId != thisChainBaseTokenAssetId;
 

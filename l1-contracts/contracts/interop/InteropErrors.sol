@@ -55,6 +55,8 @@ error InteropToSelfNotSupported();
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
+// 0x209a6e49
+error L1AnchorNotNewer(uint256 blockNumber, uint256 anchorBlockNumber);
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x6a430157

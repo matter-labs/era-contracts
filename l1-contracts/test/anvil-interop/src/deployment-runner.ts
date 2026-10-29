@@ -19,7 +19,16 @@ import type {
   L2ChainInfo,
   PriorityRequestData,
 } from "./core/types";
-import { getChainDiamondProxy, getChainIdsByRole, getInteropChainIds, timeIt, createProvider } from "./core/utils";
+import {
+  getChainDiamondProxy,
+  getChainIdsByRole,
+  getInteropChainIds,
+  getL1RpcUrl,
+  getL2RpcUrl,
+  timeIt,
+  createProvider,
+} from "./core/utils";
+import { syncL1Reads } from "./helpers/l1-reads";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
 import { getInteropSourceAddress, getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
@@ -621,20 +630,24 @@ export class DeploymentRunner {
   ): Promise<void> {
     console.log("\n=== Step 5: Enable Interop and Allow Peers ===\n");
 
-    const registrar = new InteropChainRegistrar(l1RpcUrl, l1Addresses);
     const interopChainIds = getInteropChainIds(chainConfigs);
     const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
+    const interopRpcUrls = new Map<number, string>();
+    for (const chainId of interopChainIds) {
+      const rpcUrl = l2RpcUrlsByChainId.get(chainId);
+      if (!rpcUrl) {
+        throw new Error(`L2 chain ${chainId} not found`);
+      }
+      interopRpcUrls.set(chainId, rpcUrl);
+    }
+    const registrar = new InteropChainRegistrar(l1RpcUrl, l1Addresses, interopRpcUrls);
     const diamondProxy = (chainId: number) => getChainDiamondProxy(chainAddresses, chainId);
 
     // Allowing a peer requires interop to be enabled on both chains, so every chain is enabled first.
     for (const chainId of interopChainIds) {
       await registrar.enableInterop(chainId, diamondProxy(chainId));
     }
-    for (const chainId of interopChainIds) {
-      const rpcUrl = l2RpcUrlsByChainId.get(chainId);
-      if (!rpcUrl) {
-        throw new Error(`L2 chain ${chainId} not found`);
-      }
+    for (const [chainId, rpcUrl] of interopRpcUrls) {
       const l2Provider = createProvider(rpcUrl);
       for (const peerChainId of interopChainIds.filter((id) => id !== chainId)) {
         await registrar.allowInteropPeer(chainId, peerChainId, diamondProxy(chainId), l2Provider);
@@ -759,6 +772,24 @@ export class DeploymentRunner {
     console.log("\n=== Chain States Loaded ===\n");
 
     return { chains: chainInfo, l1Addresses, ctmAddresses, chainAddresses };
+  }
+
+  /**
+   * The interop chains import a new anchor and read L1 at it, as their server would. Loaded chain states hold anchors
+   * as old as the states, which gating reads refuse once past `L1_ANCHOR_MAX_LAG` ({protocol-docs/l1sload.md#freshness}).
+   */
+  async syncInteropL1Reads(): Promise<void> {
+    const state = this.loadState();
+    if (!state.chains || !state.l1Addresses) {
+      throw new Error("Deployment state incomplete: no chains or L1 addresses to sync L1 reads for");
+    }
+    const chainIds = getInteropChainIds(state.chains.config);
+    await syncL1Reads({
+      l1Provider: createProvider(getL1RpcUrl(state)),
+      l1Addresses: state.l1Addresses,
+      chainIds,
+      l2Providers: new Map(chainIds.map((chainId) => [chainId, createProvider(getL2RpcUrl(state, chainId))])),
+    });
   }
 
   /** Resolve the chain-states directory for the current protocol version. */

@@ -101,6 +101,7 @@ const ARTIFACTS = {
   MockContractDeployer: "MockContractDeployer.sol/MockContractDeployer.json",
   FixedDelegateCalldataComposer: "FixedDelegateCalldataComposer.sol/FixedDelegateCalldataComposer.json",
   MockL1MessengerHook: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
+  MockL1SloadPrecompile: "MockL1SloadPrecompile.sol/MockL1SloadPrecompile.json",
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",

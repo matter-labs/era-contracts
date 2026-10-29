@@ -39,6 +39,19 @@ export const L2_BASE_TOKEN_HOLDER_ADDR = "0x000000000000000000000000000000000001
 export const L2_REMOVED_GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010";
 export const L2_INTEROP_COMMITMENT_TREE_ADDR = "0x0000000000000000000000000000000000010012";
 export const L2_ATOMIC_FLOW_MANAGER_ADDR = "0x0000000000000000000000000000000000010014";
+// L1SLOAD_PRECOMPILE_ADDRESS in L2ContractAddresses.sol. Anvil L2s run MockL1SloadPrecompile there; see
+// src/helpers/l1-reads.ts and {protocol-docs/l1sload.md#reading-l1-state}.
+export const L1SLOAD_PRECOMPILE_ADDR = "0x0000000000000000000000000000000000000101";
+// From Config.sol: the interop-root chain id L1 block-hash anchors are imported under, see
+// {protocol-docs/l1sload.md#anchors}.
+export const L1_BLOCK_HASH_IMPORT_ID = BigNumber.from(
+  utils.keccak256(utils.toUtf8Bytes("zksync.l1-block-hash-import"))
+).sub(1);
+// From Config.sol: the `ChainRegistrationSender` mapping slots chains read with L1SLOAD.
+export const CHAIN_REGISTRATION_SENDER_INTEROP_PEER_ALLOWED_SLOT = 152;
+export const CHAIN_REGISTRATION_SENDER_INTEROP_SUSPENDED_SLOT = 153;
+export const CHAIN_REGISTRATION_SENDER_INTEROP_BASE_TOKEN_ASSET_ID_SLOT = 154;
+
 // ZK-VM system hook addresses: SYSTEM_HOOKS_OFFSET (0x7000) + offset
 export const L1_MESSENGER_HOOK_ADDR = "0x0000000000000000000000000000000000007001";
 export const MINT_BASE_TOKEN_HOOK_ADDR = "0x0000000000000000000000000000000000007100";

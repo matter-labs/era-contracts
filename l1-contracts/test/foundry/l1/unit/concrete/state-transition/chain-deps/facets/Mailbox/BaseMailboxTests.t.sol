@@ -14,7 +14,7 @@ import {
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
-import {BaseTokenGasPriceDenominatorNotSet, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, Unauthorized, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {LogFinder} from "test-utils/LogFinder.sol";
@@ -111,7 +111,7 @@ contract MailboxBaseTests is MailboxTest {
 
     function test_serviceTransactionUsesProtocolGasCeiling() public {
         // Isolate mailbox admission from Bridgehub's service-sender configuration.
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.chainRegistrationSender, ()), abi.encode(address(this)));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.chainAssetHandler, ()), abi.encode(address(this)));
         address target = makeAddr("serviceTarget");
         bytes memory data = hex"12345678";
 
@@ -122,6 +122,21 @@ contract MailboxBaseTests is MailboxTest {
         assertEq(transaction.from, uint256(uint160(SERVICE_TRANSACTION_SENDER)));
         assertEq(transaction.to, uint256(uint160(target)));
         assertEq(transaction.data, data);
+    }
+
+    /// @dev Only the chain asset handler sends service transactions; the `ChainRegistrationSender` no longer pushes
+    /// interop registrations ({protocol-docs/l1sload.md#interop-gating-through-l1-reads}).
+    function testFuzz_serviceTransaction_revertWhen_notTheChainAssetHandler(address _caller) public {
+        address chainAssetHandler = makeAddr("chainAssetHandler");
+        vm.assume(_caller != chainAssetHandler);
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.chainAssetHandler, ()), abi.encode(chainAssetHandler));
+        uint256 totalPriorityTxsBefore = gettersFacet.getTotalPriorityTxs();
+
+        vm.prank(_caller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, _caller));
+        mailboxFacet.requestL2ServiceTransaction(makeAddr("serviceTarget"), hex"12345678");
+
+        assertEq(gettersFacet.getTotalPriorityTxs(), totalPriorityTxsBefore);
     }
 
     function test_gatewayRelayUsesProtocolGasCeiling() public {

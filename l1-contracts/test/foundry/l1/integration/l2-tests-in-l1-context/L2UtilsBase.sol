@@ -39,7 +39,7 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
 import {InteropAttributeParser} from "../../../../../contracts/interop/InteropAttributeParser.sol";
-import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
+import {L2InteropRootStorage} from "../../../../../contracts/interop/L2InteropRootStorage.sol";
 
 import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2InteropHandler} from "../../../../../contracts/interop/interop-handler/L2InteropHandler.sol";
@@ -115,7 +115,8 @@ library L2UtilsBase {
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
             address l2InteropAttributeParser = address(new InteropAttributeParser());
             vm.etch(L2_INTEROP_ATTRIBUTE_PARSER_ADDR, l2InteropAttributeParser.code);
-            address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
+            // The real contract: suites import the L1SLOAD anchor through its bootloader entry point.
+            address l2MessageRootStorage = address(new L2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
             // The Dev variant re-enables chain migrations (disabled in production for v33, see
             // `CHAIN_MIGRATIONS_ENABLED` in `Config.sol`) so the L2 migration machinery stays covered.

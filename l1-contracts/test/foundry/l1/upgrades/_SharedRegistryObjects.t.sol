@@ -14,6 +14,8 @@ import {IL2DefaultUpgrade} from "contracts/upgrades/IL2DefaultUpgrade.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -72,6 +74,7 @@ abstract contract RegistryObjectsFixture is Test {
     L2DefaultDelegateCalldataComposer internal defaultComposer;
     address internal mockAssetRouter = makeAddr("mockAssetRouter");
     address internal mockNativeTokenVault = makeAddr("mockNativeTokenVault");
+    address internal mockMessageRoot = makeAddr("mockMessageRoot");
     address internal ctmDeployerStub = makeAddr("ctmDeployer");
     address internal erc20OriginToken = makeAddr("erc20OriginToken");
     TestnetERC20Token internal erc20LocalToken;
@@ -131,6 +134,15 @@ abstract contract RegistryObjectsFixture is Test {
     /// @dev Mocks the ecosystem behind `_bridgehub` for the two fixture chains (see {defaultComposer}).
     function _mockEcosystemForComposer(address _bridgehub, address _ctmDeployer) internal {
         vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.l1CtmDeployer, ()), abi.encode(_ctmDeployer));
+        // The engine turns L1SLOAD on for an interop chain ({protocol-docs/l1sload.md#upgrade-from-v35}); the fixture
+        // chains run on L1 without interop unless a test says otherwise.
+        vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.messageRoot, ()), abi.encode(mockMessageRoot));
+        vm.mockCall(mockMessageRoot, abi.encodeCall(IMessageRootBase.L1_CHAIN_ID, ()), abi.encode(block.chainid));
+        vm.mockCall(
+            mockMessageRoot,
+            abi.encodeWithSelector(IL1MessageRoot.isInteropEnabled.selector),
+            abi.encode(false)
+        );
         vm.mockCall(_bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(mockAssetRouter));
         vm.mockCall(
             mockAssetRouter,

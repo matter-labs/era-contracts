@@ -7,7 +7,7 @@ The committer checks it against the current on-chain runtime configuration befor
 
 The batch proof public input commits to the runtime configuration through
 `chain_config_hash`. Solidity's `ZKChainBase._getZKsyncOSChainConfigHash()` and ZKsync OS's `ChainConfig::hash`
-hash the following six 32-byte big-endian words, in order:
+hash the following seven 32-byte big-endian words, in order:
 
 1. Chain ID.
 2. FRI proof verification enabled (always zero on the settlement layer).
@@ -15,15 +15,17 @@ hash the following six 32-byte big-endian words, in order:
 4. Pubdata content (`FULL_PUBDATA = 0`, `LOGS_ONLY = 1`).
 5. L1 transaction filtering enabled (`false = 0`, `true = 1`).
 6. Large contracts enabled (`false = 0`, `true = 1`).
+7. L1SLOAD enabled (`false = 0`, `true = 1`), from v36 ([L1SLOAD](#l1sload)).
 
-Both boolean words are included even when disabled. The sixth word changes the
-hash from the previous five-word encoding, so the contracts and ZKsync OS runtime
-must be upgraded together with this field order. The Solidity public-input tests
+The boolean words are included even when disabled. The sixth word changed the
+hash from the previous five-word encoding, and the seventh from the six-word one, so the contracts and ZKsync OS
+runtime must be upgraded together with this field order. The Solidity public-input tests
 pin the shared default and flag-combination vectors from ZKsync OS's
 [`public_input.rs`](https://github.com/matter-labs/zksync-os-private/blob/ca730149b70ceb296dd2c4158823e152c90ae92b/basic_bootloader/src/bootloader/block_flow/zk/post_tx_op/public_input.rs).
 The batch output now ends with the interop fee units word ([interop-fee.md](./interop-fee.md)),
 so the pinned values differ from that revision; they match the paired ZKsync OS change.
-The vectors with exactly one flag enabled detect swaps of the boolean words.
+The v36 vectors match the paired ZKsync OS change that adds `l1sload_enabled`. The vectors with exactly one
+flag enabled detect swaps of the boolean words.
 Batch-proving tests explicitly cover all four combinations.
 
 The stored batch commitment is the full, untruncated public-input hash:
@@ -119,9 +121,15 @@ defines both sizes. See the runtime's
 for the unchanged gas pricing and resource budgets. Disabling the option restricts
 subsequent deployments; already deployed large contracts remain callable.
 
+## L1SLOAD
+
+The `L1SLOAD` precompile ({protocol-docs/l1sload.md}) is disabled by default, including for existing chains. The chain
+admin turns it on with `setZKsyncOSL1SloadEnabled`, on L1 only (`NotL1`). It is tied to interop
+({protocol-docs/l1sload.md#chain-config-flag}).
+
 ## Configuration updates
 
-The filtering, large-contracts, and maximum-transaction-gas setters require the
+The filtering, large-contracts, L1SLOAD and maximum-transaction-gas setters require the
 chain admin on the active settlement layer. Validators and the chain type manager
 do not have direct permission to call them unless they are also the chain admin.
 
@@ -130,7 +138,7 @@ This existing admin guard is retained even though proof verification now uses th
 batch commitment. Operators must drain the committed batch queue and
 coordinate the runtime's configuration with the admin transaction before committing
 new batches. Successful updates emit `NewZKsyncOSL1TxFiltering`,
-`NewZKsyncOSLargeContracts`, or `NewZKsyncOSMaxTxGasLimit`, respectively, with the
+`NewZKsyncOSLargeContracts`, `NewZKsyncOSL1Sload`, or `NewZKsyncOSMaxTxGasLimit`, respectively, with the
 old and new values.
 
 ### Pending priority requests

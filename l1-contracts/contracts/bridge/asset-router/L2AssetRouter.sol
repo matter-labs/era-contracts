@@ -75,6 +75,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
     }
 
+    /// @inheritdoc AssetRouterBase
+    /// @dev Interop peers' base tokens are read from L1, see {protocol-docs/l1sload.md#the-base-token-snapshot}.
+    /// L1 is not an interop peer, so withdrawals keep the local Bridgehub entry.
+    function _destinationBaseTokenAssetId(uint256 _chainId) internal view override returns (bytes32) {
+        if (_chainId == L1_CHAIN_ID) {
+            return _getBridgehub().baseTokenAssetId(_chainId);
+        }
+        return IL2Bridgehub(L2_BRIDGEHUB_ADDR).interopBaseTokenAssetId(_chainId);
+    }
+
     /// @notice Returns the native token vault address. Virtual for private interop override.
     function _getNativeTokenVaultAddr() internal view virtual returns (address) {
         return L2_NATIVE_TOKEN_VAULT_ADDR;

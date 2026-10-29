@@ -22,7 +22,7 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
-import {ETH_TOKEN_ADDRESS, PRIORITY_TX_MAX_GAS_LIMIT, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {L2_ATOMIC_FLOW_MANAGER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 
@@ -52,6 +52,7 @@ import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {L1SloadMockUtils} from "foundry-test/l1/unit/concrete/Interop/L1Sload/L1SloadMockUtils.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
@@ -188,10 +189,18 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(uint256(1)))
         );
-        // Allow the harness destination in the L2 Bridgehub's interop registry through the production entry point;
-        // every other chain id reads as unregistered (bytes32(0)).
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.allowInteropPeer(INTEROP_DESTINATION_CHAIN_ID, baseTokenAssetId);
+        // This chain and the harness destination allowed each other on L1, which the L2 reads with L1SLOAD; every
+        // other chain id reads as unregistered (no base token snapshot). The chain imports an anchor first: without
+        // one every read fails closed.
+        L1SloadMockUtils.installMock();
+        L1SloadMockUtils.importAnchor(1, keccak256("l2 harness anchor"), 1);
+        L1SloadMockUtils.allowInteropPair(
+            _l1ChainRegistrationSender(),
+            block.chainid,
+            baseTokenAssetId,
+            INTEROP_DESTINATION_CHAIN_ID,
+            baseTokenAssetId
+        );
 
         // Fund L2InteropHandler with ETH so it can send value with receiveMessage calls
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1000 ether);
@@ -225,6 +234,11 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
             abi.encode(IERC7786Recipient.receiveMessage.selector)
         );
+    }
+
+    /// @dev The L1 `ChainRegistrationSender` whose state the L2 Bridgehub reads.
+    function _l1ChainRegistrationSender() internal view returns (address) {
+        return l2Bridgehub.l1ChainRegistrationSender();
     }
 
     function getExampleChainCommitment() internal {

@@ -5,13 +5,14 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
-import {EmptyAssetId, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {L1View} from "../../common/l2-helpers/L1View.sol";
+import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,18 +40,8 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
-    /// @inheritdoc IL2Bridgehub
-    mapping(uint256 chainId => bool) public isPeerAllowed;
-
-    modifier onlyChainRegistrationSender() {
-        if (
-            /// Note on the L2 the chainRegistrationSender is aliased.
-            msg.sender != chainRegistrationSender && msg.sender != SERVICE_TRANSACTION_SENDER
-        ) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
+    /// @dev Formerly the `isPeerAllowed` whitelist pushed from L1. Unused; kept for the storage layout.
+    mapping(uint256 chainId => bool) private __DEPRECATED_isPeerAllowed;
 
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
@@ -92,16 +83,24 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     }
 
     /// @inheritdoc IL2Bridgehub
-    function allowInteropPeer(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
-        require(_baseTokenAssetId != bytes32(0), EmptyAssetId());
-        baseTokenAssetId[_chainId] = _baseTokenAssetId;
-        isPeerAllowed[_chainId] = true;
+    function l1ChainRegistrationSender() public view returns (address) {
+        return AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender);
     }
 
     /// @inheritdoc IL2Bridgehub
-    function deregisterChainForInterop(uint256 _chainId) external onlyChainRegistrationSender {
-        delete baseTokenAssetId[_chainId];
-        delete isPeerAllowed[_chainId];
+    function isPeerAllowed(uint256 _chainId) external view returns (bool) {
+        return L1View.isReceiveAllowed(l1ChainRegistrationSender(), block.chainid, _chainId);
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function interopSendTarget(uint256 _chainId) external view returns (bool allowed, bytes32 peerBaseTokenAssetId) {
+        // slither-disable-next-line unused-return
+        return L1View.sendTarget(l1ChainRegistrationSender(), block.chainid, _chainId);
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function interopBaseTokenAssetId(uint256 _chainId) external view returns (bytes32) {
+        return L1View.baseTokenAssetId(l1ChainRegistrationSender(), _chainId);
     }
 
     /*//////////////////////////////////////////////////////////////
