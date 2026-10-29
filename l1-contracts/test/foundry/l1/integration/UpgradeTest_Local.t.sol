@@ -16,7 +16,6 @@ import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {PreviousReleaseFixture} from "./utils/PreviousReleaseFixture.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
-import {V0_34_ZKSYNC_OS_GENESIS_ROOT} from "../../TestConstants.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {stdToml} from "forge-std/StdToml.sol";
@@ -148,7 +147,7 @@ abstract contract UpgradeIntegrationBootstrapFixture is
 
     function setUp() public virtual {
         previousRelease = _loadPreviousRelease();
-        FixtureChain memory chain = _fixtureChain(previousRelease, UPGRADED_CHAIN_ID, V0_34_ZKSYNC_OS_GENESIS_ROOT);
+        FixtureChain memory chain = _fixtureChain(previousRelease, UPGRADED_CHAIN_ID);
         _prepareSettlement(chain);
         _settleBatch(chain);
         _installChainAdmin(chain);

@@ -26,9 +26,6 @@ bytes32 constant BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0 = 0xafe723d2b10a24
 // account that deployed them and still owns them, operates their chains and admins them.
 uint256 constant ANVIL_FIXTURE_L1_CHAIN_ID = 31337;
 address constant ANVIL_FIXTURE_DEPLOYER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
-// `genesis_root` of configs/genesis/zksync-os/latest.json on draft/v0.34.0, which the chains of the frozen v0.34.0
-// chain states were created from (mirrors `V0_34_ZKSYNC_OS_GENESIS_ROOT` in anvil-interop's const.ts).
-bytes32 constant V0_34_ZKSYNC_OS_GENESIS_ROOT = 0x3ff401323b3f14c4b0d098138892ff1571208e2387b95cd5d987319cf06e9f59;
 // Commit encoding 5 is the one releases before v0.35 decode; v0.35 moved to 6 (`BatchDecoder`).
 uint8 constant BATCH_COMMIT_ENCODING_V5 = 5;
 uint32 constant BATCH_COMMIT_ENCODING_V6_FIRST_MINOR = 35;

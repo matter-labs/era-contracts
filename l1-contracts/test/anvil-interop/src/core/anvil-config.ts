@@ -3,6 +3,7 @@ import * as path from "path";
 
 const DEFAULT_ANVIL_CONFIG_PATH = path.resolve(__dirname, "../../config/anvil-config.json");
 const STATE_VERSION_PATTERN = /^v\d+\.\d+\.\d+$/;
+const BYTES32_PATTERN = /^0x[0-9a-fA-F]{64}$/;
 
 /**
  * A chain-states folder name from `config/anvil-config.json`, validated as `v<major>.<minor>.<patch>` (so it
@@ -20,6 +21,19 @@ export function readStateVersion(
   const value = cfg[key];
   if (typeof value !== "string" || !STATE_VERSION_PATTERN.test(value)) {
     throw new Error(`${key} in ${configPath} must match v<major>.<minor>.<patch>`);
+  }
+  return value;
+}
+
+/**
+ * `upgradeSourceGenesisRoot` from `config/anvil-config.json`: the `genesis_root` the chains of the
+ * `upgradeSourceStateVersion` states were created from. Their legacy CTM keeps only the hash of batch zero, not
+ * its fields. `yarn new-release` moves it together with `upgradeSourceStateVersion`.
+ */
+export function readUpgradeSourceGenesisRoot(configPath: string = DEFAULT_ANVIL_CONFIG_PATH): string {
+  const value = (JSON.parse(fs.readFileSync(configPath, "utf-8")) as Record<string, unknown>).upgradeSourceGenesisRoot;
+  if (typeof value !== "string" || !BYTES32_PATTERN.test(value)) {
+    throw new Error(`upgradeSourceGenesisRoot in ${configPath} must be a 0x-prefixed bytes32`);
   }
   return value;
 }

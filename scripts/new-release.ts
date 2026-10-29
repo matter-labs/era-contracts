@@ -29,7 +29,8 @@ import { join, relative } from "path";
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
 //   4. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
 //      `upgradeSourceStateVersion` the upgrade test starts from (frozen from `--previous-release-ref` when
-//      given), `stateVersion` moves to the new release, and the previous source chain states are deleted.
+//      given), with the `genesis_root` its chains were created from as `upgradeSourceGenesisRoot`,
+//      `stateVersion` moves to the new release, and the previous source chain states are deleted.
 //   5. `l1-contracts/deploy-scripts/upgrade/v<minor>/`: the new release's `CoreUpgrade_v<minor>` and
 //      `CTMUpgrade_v<minor>`, generated as plain subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` for the
 //      release's own preparation to go into, unless the branch already carries them (a next edge prepared and
@@ -203,10 +204,18 @@ function main(): void {
   const anvilConfig = JSON.parse(fs.readFileSync(ANVIL_CONFIG_PATH, "utf-8")) as {
     stateVersion: string;
     upgradeSourceStateVersion: string;
+    upgradeSourceGenesisRoot: string;
   };
   const outgoingSource = anvilConfig.upgradeSourceStateVersion;
   const nextStateVersion = versionString(next);
   const frozenSourceDir = join(CHAIN_STATES_DIR, anvilConfig.stateVersion);
+  const sourceGenesis = previousReleaseRef
+    ? git(["show", `${previousReleaseRef}:${repoPath(GENESIS_PATH)}`]).toString()
+    : genesis;
+  const sourceGenesisRoot = (JSON.parse(sourceGenesis) as { genesis_root?: string }).genesis_root;
+  if (!sourceGenesisRoot) {
+    throw new Error(`no genesis_root in ${previousReleaseRef ?? "the local"} ${repoPath(GENESIS_PATH)}`);
+  }
   if (previousReleaseRef) {
     const refConfig = JSON.parse(git(["show", `${previousReleaseRef}:${repoPath(ANVIL_CONFIG_PATH)}`]).toString()) as {
       stateVersion: string;
@@ -241,6 +250,7 @@ function main(): void {
     ...anvilConfig,
     stateVersion: nextStateVersion,
     upgradeSourceStateVersion: anvilConfig.stateVersion,
+    upgradeSourceGenesisRoot: sourceGenesisRoot,
   };
   write(ANVIL_CONFIG_PATH, `${JSON.stringify(rotated, null, 2)}\n`);
   if (outgoingSource !== anvilConfig.stateVersion) {

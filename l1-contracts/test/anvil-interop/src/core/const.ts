@@ -242,7 +242,3 @@ export const PUBLIC_INPUT_SHIFT = 32;
 
 // L2DACommitmentScheme.EMPTY_NO_DA, from Config.sol.
 export const L2_DA_COMMITMENT_SCHEME_EMPTY_NO_DA = 1;
-// `genesis_root` of configs/genesis/zksync-os/latest.json on draft/v0.34.0, which the chains of the frozen
-// v0.34.0 chain states were created from. Their legacy CTM keeps only the hash of batch zero, not its fields.
-// `yarn new-release` does not move it: it changes together with run-upgrade-test.ts's `v35-*.toml` templates.
-export const V0_34_ZKSYNC_OS_GENESIS_ROOT = "0x3ff401323b3f14c4b0d098138892ff1571208e2387b95cd5d987319cf06e9f59";

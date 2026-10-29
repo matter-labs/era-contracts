@@ -15,4 +15,5 @@ Two kinds of directories live here, with OPPOSITE maintenance rules. Both names 
   and validated by the `state-generation-check` CI job.
 
 When the next release starts, `yarn new-release` freezes the then-current `stateVersion` as the new
-`upgradeSourceStateVersion`, deletes the outgoing source, and moves `stateVersion` on.
+`upgradeSourceStateVersion`, records the genesis root its chains were created from as
+`upgradeSourceGenesisRoot`, deletes the outgoing source, and moves `stateVersion` on.

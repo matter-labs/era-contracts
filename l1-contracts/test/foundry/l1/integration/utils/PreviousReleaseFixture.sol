@@ -67,6 +67,8 @@ abstract contract PreviousReleaseFixture is Test {
 
     struct PreviousRelease {
         string stateVersion;
+        /// @dev `upgradeSourceGenesisRoot`, the genesis root the release's chains were created from.
+        bytes32 genesisRoot;
         address bridgehub;
         address sharedBridge;
         address nativeTokenVault;
@@ -89,6 +91,7 @@ abstract contract PreviousReleaseFixture is Test {
         string memory root = vm.projectRoot();
         string memory anvilConfig = vm.readFile(string.concat(root, ANVIL_INTEROP_DIR, "/config/anvil-config.json"));
         release.stateVersion = anvilConfig.readString(".upgradeSourceStateVersion");
+        release.genesisRoot = anvilConfig.readBytes32(".upgradeSourceGenesisRoot");
 
         string[] memory convert = new string[](4);
         convert[0] = "node";
@@ -159,14 +162,13 @@ abstract contract PreviousReleaseFixture is Test {
         IChainAdminOwnable(chainAdmin).multicall(accept, true);
     }
 
-    /// @notice The fixture chain `_chainId`, positioned at batch zero for {_settleBatch}.
+    /// @notice The fixture chain `_chainId`, positioned at batch zero for {_settleBatch}. Batch zero is rebuilt from
+    ///         the release's genesis root and checked against the chain's stored hash, since a pre-registry CTM keeps
+    ///         only that hash.
     /// @param _release The release {_loadPreviousRelease} loaded.
-    /// @param _genesisBatchHash The genesis root of the release the chain was created from. Batch zero is rebuilt
-    ///        from it and checked against the chain's stored hash, since a pre-registry CTM keeps only that hash.
     function _fixtureChain(
         PreviousRelease memory _release,
-        uint256 _chainId,
-        bytes32 _genesisBatchHash
+        uint256 _chainId
     ) internal view returns (FixtureChain memory chain) {
         string memory addresses = vm.readFile(
             string.concat(
@@ -189,7 +191,7 @@ abstract contract PreviousReleaseFixture is Test {
 
         chain.lastBatch = IExecutor.StoredBatchInfo({
             batchNumber: 0,
-            batchHash: _genesisBatchHash,
+            batchHash: _release.genesisRoot,
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
