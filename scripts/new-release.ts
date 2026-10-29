@@ -29,12 +29,14 @@ import { join, relative } from "path";
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
 //   4. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
 //      `upgradeSourceStateVersion` the upgrade test starts from (frozen from `--previous-release-ref` when
-//      given), `stateVersion` moves to the new release, and the previous source chain states are deleted.
+//      given), with the `genesis_root` its chains were created from as `upgradeSourceGenesisRoot`,
+//      `stateVersion` moves to the new release, and the previous source chain states are deleted.
 //   5. `l1-contracts/deploy-scripts/upgrade/v<minor>/`: the new release's `CoreUpgrade_v<minor>` and
 //      `CTMUpgrade_v<minor>`, generated as plain subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` for the
 //      release's own preparation to go into, unless the branch already carries them (a next edge prepared and
 //      tested ahead of the bump), in which case they are kept. The outgoing release's scripts are deleted, and
-//      protocol-ops' prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones.
+//      protocol-ops' prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones,
+//      the test together with the upgrade-env dir whose local input it reads.
 //
 // What it leaves to you (printed at the end): regenerating the new release's chain states, reviewing the
 // copied per-environment inputs, and removing or updating whatever still uses the outgoing release's scripts
@@ -202,10 +204,18 @@ function main(): void {
   const anvilConfig = JSON.parse(fs.readFileSync(ANVIL_CONFIG_PATH, "utf-8")) as {
     stateVersion: string;
     upgradeSourceStateVersion: string;
+    upgradeSourceGenesisRoot: string;
   };
   const outgoingSource = anvilConfig.upgradeSourceStateVersion;
   const nextStateVersion = versionString(next);
   const frozenSourceDir = join(CHAIN_STATES_DIR, anvilConfig.stateVersion);
+  const sourceGenesis = previousReleaseRef
+    ? git(["show", `${previousReleaseRef}:${repoPath(GENESIS_PATH)}`]).toString()
+    : genesis;
+  const sourceGenesisRoot = (JSON.parse(sourceGenesis) as { genesis_root?: string }).genesis_root;
+  if (!sourceGenesisRoot) {
+    throw new Error(`no genesis_root in ${previousReleaseRef ?? "the local"} ${repoPath(GENESIS_PATH)}`);
+  }
   if (previousReleaseRef) {
     const refConfig = JSON.parse(git(["show", `${previousReleaseRef}:${repoPath(ANVIL_CONFIG_PATH)}`]).toString()) as {
       stateVersion: string;
@@ -240,6 +250,7 @@ function main(): void {
     ...anvilConfig,
     stateVersion: nextStateVersion,
     upgradeSourceStateVersion: anvilConfig.stateVersion,
+    upgradeSourceGenesisRoot: sourceGenesisRoot,
   };
   write(ANVIL_CONFIG_PATH, `${JSON.stringify(rotated, null, 2)}\n`);
   if (outgoingSource !== anvilConfig.stateVersion) {
@@ -275,7 +286,16 @@ function main(): void {
     return moved;
   };
   write(PROTOCOL_OPS_SCRIPTS_PATH, moveToNextScripts(PROTOCOL_OPS_SCRIPTS_PATH, nextScripts));
-  write(FULL_FLOW_TEST_PATH, moveToNextScripts(FULL_FLOW_TEST_PATH, fs.readFileSync(FULL_FLOW_TEST_PATH, "utf-8")));
+  const fullFlowTest = fs.readFileSync(FULL_FLOW_TEST_PATH, "utf-8");
+  if (!fullFlowTest.includes(`/${currentEnvDir}/`)) {
+    throw new Error(
+      `${repoPath(FULL_FLOW_TEST_PATH)} does not read ${currentEnvDir}: it must run the current release's input`
+    );
+  }
+  write(
+    FULL_FLOW_TEST_PATH,
+    moveToNextScripts(FULL_FLOW_TEST_PATH, fullFlowTest.split(`/${currentEnvDir}/`).join(`/${nextEnvDir}/`))
+  );
   changed.push(`delete ${repoPath(currentScriptsDir)}`);
   writes.push(() => fs.rmSync(currentScriptsDir, { recursive: true, force: true }));
   // Files the bump does not move that still name the deleted scripts. `git grep` exits 1 when nothing matches.

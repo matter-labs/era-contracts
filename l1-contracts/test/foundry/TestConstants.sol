@@ -21,3 +21,11 @@ bytes32 constant PUBLIC_INPUT_HASH_GOLDEN_BOTH_FLAGS = 0x5364213bf06d28ee488265c
 // public_input.rs `batch_output_hash_commits_to_interop_fee_units_last`; see {protocol-docs/interop-fee.md}.
 bytes32 constant BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_7 = 0x82cf2f4e531d92c0cf48eb93b02a24791907cbfe3b92362df3519e8a0c62fb7b;
 bytes32 constant BATCH_OUTPUT_HASH_GOLDEN_INTEROP_FEE_UNITS_0 = 0xafe723d2b10a24d8e3c16572229996f1b43e2d9d9fbb5a6b3a0b32b1c8408be1;
+
+// The anvil-interop fixture ecosystems (`test/anvil-interop/chain-states/`): their L1 chain id and the default anvil
+// account that deployed them and still owns them, operates their chains and admins them.
+uint256 constant ANVIL_FIXTURE_L1_CHAIN_ID = 31337;
+address constant ANVIL_FIXTURE_DEPLOYER = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+// Commit encoding 5 is the one releases before v0.35 decode; v0.35 moved to 6 (`BatchDecoder`).
+uint8 constant BATCH_COMMIT_ENCODING_V5 = 5;
+uint32 constant BATCH_COMMIT_ENCODING_V6_FIRST_MINOR = 35;

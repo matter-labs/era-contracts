@@ -41,18 +41,14 @@ abstract contract UpgradeIntegrationTestBase is Test {
     DefaultChainUpgrade internal chainUpgrade;
 
     /// @notice Per-test fixed paths for the deploy outputs the upgrade scripts read.
-    string public ECOSYSTEM_INPUT = "file_1.toml";
     string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
-    string public CTM_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     string public CORE_OUTPUT = "/script-out/foundry-upgrade/upgrade-core.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
-    string public CHAIN_INPUT;
-    string public CHAIN_OUTPUT;
 
     // Snapshots populated by `internalTest` for state-level asserts in concrete test bodies.
     uint256 internal _expectedNewVersion;
-    address internal _eraDiamond;
+    address internal _upgradedChainDiamond;
     address internal _newChainDiamond;
     bytes32 internal _expectedUpgradeCutHash;
     address internal _expectedNewVerifier;
@@ -67,12 +63,8 @@ abstract contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade = createCTMUpgrade();
 
         console.log("setupUpgrade: Reading deployment outputs");
-        string memory root = vm.projectRoot();
-        vm.createDir(string.concat(root, "/script-out/foundry-upgrade"), true);
-        string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
-        string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
-
-        EcosystemUpgradeParams memory params = _readEcosystemParams(outputDeployL1Toml, outputDeployCTMToml);
+        vm.createDir(string.concat(vm.projectRoot(), "/script-out/foundry-upgrade"), true);
+        EcosystemUpgradeParams memory params = _ecosystemUpgradeParams();
 
         console.log("setupUpgrade: Initializing core upgrade");
         coreUpgrade.initializeWithArgs(
@@ -190,17 +182,16 @@ abstract contract UpgradeIntegrationTestBase is Test {
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         address ctm = ctmUpgrade.getCTMAddress();
-        bool pausedBefore = IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm);
 
         console.log("Executing CTM admin calls through the current operational owner");
         executeCTMAdminCalls();
 
         console.log("Executing the governance bundle (core + CTM merged)!");
         governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeCalls);
-        assertEq(
+        // The previous release's ChainAssetHandler has no pause to read before the edge.
+        assertFalse(
             IChainAssetHandlerBase(chainAssetHandler).migrationPausedFor(ctm),
-            pausedBefore,
-            "the upgrade neither takes nor lifts a migration pause"
+            "the upgrade takes no migration pause"
         );
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
@@ -292,7 +283,7 @@ abstract contract UpgradeIntegrationTestBase is Test {
 
         // ---- Snapshot primitives for state-level asserts in the test body ----
         _expectedNewVersion = ctmUpgrade.getNewProtocolVersion();
-        _eraDiamond = IBridgehubBase(bridgehub).getZKChain(chainId);
+        _upgradedChainDiamond = IBridgehubBase(bridgehub).getZKChain(chainId);
         _newChainDiamond = IBridgehubBase(bridgehub).getZKChain(NEW_CHAIN_ID);
 
         // NewZKChain: both fields are indexed. Cross-check the emitted diamond against the registered one.
@@ -355,32 +346,8 @@ abstract contract UpgradeIntegrationTestBase is Test {
         require(ownerAdmin != address(0), "CTM admin owner has zero owner");
     }
 
-    function _readEcosystemParams(
-        string memory outputDeployL1Toml,
-        string memory outputDeployCTMToml
-    ) private view returns (EcosystemUpgradeParams memory) {
-        address bridgehubProxy = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        address ctmProxy = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-        );
-        address rollupDAManager = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
-        );
-        address governance = outputDeployL1Toml.readAddress("$.deployed_addresses.governance_addr");
-
-        return
-            EcosystemUpgradeParams({
-                bridgehubProxyAddress: bridgehubProxy,
-                ctmProxy: ctmProxy,
-                rollupDAManager: rollupDAManager,
-                create2FactorySalt: UPGRADE_CREATE2_FACTORY_SALT,
-                upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
-                ecosystemOutputPath: ECOSYSTEM_OUTPUT,
-                governance: governance,
-                // Dummy asset ID is fine for these tests — fixed-ZK-fee bundles are not exercised.
-                zkTokenAssetId: bytes32(uint256(1))
-            });
-    }
+    /// @notice What protocol-ops passes the core and CTM prepares for the fixture's ecosystem.
+    function _ecosystemUpgradeParams() internal view virtual returns (EcosystemUpgradeParams memory);
 
     /// @dev This is a contract that is used for additional visibility of transactions
     /// that the decentralized governance should do.
