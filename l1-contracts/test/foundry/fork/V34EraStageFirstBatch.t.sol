@@ -31,12 +31,13 @@ import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/Priorit
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
 /// @title V34EraStageFirstBatchForkTest
-/// @notice Chain 499's first v34 batches on stage's L1 state: the upgrade batch commits on the last v33 batch,
-/// proves and executes, the next batch chains on it, and what an operator could get wrong at the boundary reverts.
-/// @dev Runs only from `upgrade-envs/v0.34.0-era/rehearse-stage.sh`, forked from its Anvil fork after chain 499's
-/// upgrade. The script exports the stage facts and `V34_PREV_BATCH`, the last v33 batch's stored info decoded from
-/// its execute transaction. The batches are synthetic: nothing runs on L2, and stage's testnet verifier accepts the
-/// empty proof, so this does not exercise public inputs or verification keys.
+/// @notice A chain's first v34 batches on its L1 state (stage's 499, testnet3's 312): the upgrade batch commits on
+/// the last v33 batch, proves and executes, the next batch chains on it, and what an operator could get wrong at the
+/// boundary reverts.
+/// @dev Runs only from `upgrade-envs/v0.34.0-era/rehearse.sh`, forked from its Anvil fork after the chain's
+/// upgrade. The script exports the environment's facts and `V34_PREV_BATCH`, the last v33 batch's stored info
+/// decoded from its execute transaction. The batches are synthetic: nothing runs on L2, and the testnet verifier
+/// accepts the empty proof, so this does not exercise public inputs or verification keys.
 contract V34EraStageFirstBatchForkTest is Test {
     // Synthetic batch contents: L1 only needs them to be non-zero and consistent.
     bytes32 internal constant STATE_DIFF_HASH = keccak256("v34 fork test: state diff hash");
@@ -54,8 +55,10 @@ contract V34EraStageFirstBatchForkTest is Test {
     ValidatorTimelock internal validatorTimelock;
     IMessageRootBase internal messageRoot;
     uint256 internal chainId;
-    /// @dev An EOA holding chain 499's committer, prover and executor roles.
-    address internal validator;
+    /// @dev An EOA holding the chain's committer role.
+    address internal committer;
+    /// @dev An EOA holding the chain's prover and executor roles. Chain 312's is not its committer.
+    address internal prover;
     uint32 internal executionDelay;
     uint256 internal daCommitmentScheme;
     bytes32 internal upgradeTxHash;
@@ -67,9 +70,9 @@ contract V34EraStageFirstBatchForkTest is Test {
     function setUp() public {
         bytes memory prevBatch = vm.envOr("V34_PREV_BATCH", bytes(""));
         if (prevBatch.length == 0) {
-            vm.skip(true, "run from rehearse-stage.sh");
+            vm.skip(true, "run from rehearse.sh");
         }
-        assertEq(block.chainid, vm.envUint("L1_CHAIN_ID"), "not a Sepolia fork");
+        assertEq(block.chainid, vm.envUint("L1_CHAIN_ID"), "not a fork of the environment's L1");
 
         chain = IZKChain(vm.envAddress("DIAMOND"));
         validatorTimelock = ValidatorTimelock(vm.envAddress("VT"));
@@ -99,7 +102,8 @@ contract V34EraStageFirstBatchForkTest is Test {
 
         (, L2DACommitmentScheme scheme) = chain.getDAValidatorPair();
         daCommitmentScheme = uint256(scheme);
-        validator = _findValidator();
+        committer = _findEoa(validatorTimelock.COMMITTER_ROLE(), bytes32(0));
+        prover = _findEoa(validatorTimelock.PROVER_ROLE(), validatorTimelock.EXECUTOR_ROLE());
         executionDelay = validatorTimelock.executionDelay();
     }
 
@@ -195,7 +199,7 @@ contract V34EraStageFirstBatchForkTest is Test {
         IExecutor.StoredBatchInfo memory prev = lastV33Batch;
         bytes memory data = bytes.concat(bytes1(V33_ENCODING_VERSION), abi.encode(prev, batches));
         vm.expectRevert(abi.encodeWithSelector(UnsupportedCommitBatchEncoding.selector, V33_ENCODING_VERSION));
-        vm.prank(validator);
+        vm.prank(committer);
         validatorTimelock.commitBatchesSharedBridge(address(chain), upgradeBatchNumber, upgradeBatchNumber, data);
     }
 
@@ -268,7 +272,7 @@ contract V34EraStageFirstBatchForkTest is Test {
         );
     }
 
-    /// @dev Commits as the validator and returns the batch as the chain stored it; the commitments come from the
+    /// @dev Commits as the committer and returns the batch as the chain stored it; the commitments come from the
     /// commit's events.
     function _commit(
         IExecutor.StoredBatchInfo memory _prev,
@@ -308,7 +312,7 @@ contract V34EraStageFirstBatchForkTest is Test {
         CommitBatchInfo[] memory batches = new CommitBatchInfo[](1);
         batches[0] = _info;
         (uint256 from, uint256 to, bytes memory data) = Utils.encodeCommitBatchesData(_prev, batches);
-        vm.prank(validator);
+        vm.prank(committer);
         validatorTimelock.commitBatchesSharedBridge(address(chain), from, to, data);
     }
 
@@ -320,7 +324,7 @@ contract V34EraStageFirstBatchForkTest is Test {
         IExecutor.StoredBatchInfo[] memory batches = new IExecutor.StoredBatchInfo[](1);
         batches[0] = _batchInfo;
         (uint256 from, uint256 to, bytes memory data) = Utils.encodeProveBatchesData(_prev, batches, _proof);
-        vm.prank(validator);
+        vm.prank(prover);
         validatorTimelock.proveBatchesSharedBridge(address(chain), from, to, data);
     }
 
@@ -331,28 +335,24 @@ contract V34EraStageFirstBatchForkTest is Test {
         PriorityOpsBatchInfo[] memory priorityOps = new PriorityOpsBatchInfo[](1);
         (uint256 from, uint256 to, bytes memory data) = Utils.encodeExecuteBatchesDataZeroLogs(batches, priorityOps);
         vm.warp(block.timestamp + executionDelay);
-        vm.prank(validator);
+        vm.prank(prover);
         validatorTimelock.executeBatchesSharedBridge(address(chain), from, to, data);
     }
 
-    /// @dev The first EOA allowed to commit, prove and execute for the chain. The live timelock predates
-    /// per-chain execution delays, so only the global one is read.
-    function _findValidator() internal view returns (address) {
-        bytes32 committerRole = validatorTimelock.COMMITTER_ROLE();
-        bytes32 proverRole = validatorTimelock.PROVER_ROLE();
-        bytes32 executorRole = validatorTimelock.EXECUTOR_ROLE();
-        uint256 count = validatorTimelock.getRoleMemberCount(address(chain), committerRole);
+    /// @dev The first EOA holding `_role` for the chain, and `_alsoRole` too unless it is zero. The live timelock
+    /// predates per-chain execution delays, so only the global one is read.
+    function _findEoa(bytes32 _role, bytes32 _alsoRole) internal view returns (address) {
+        uint256 count = validatorTimelock.getRoleMemberCount(address(chain), _role);
         for (uint256 i = 0; i < count; ++i) {
-            address member = validatorTimelock.getRoleMember(address(chain), committerRole, i);
+            address member = validatorTimelock.getRoleMember(address(chain), _role, i);
             if (
                 member.code.length == 0 &&
-                validatorTimelock.hasRole(address(chain), proverRole, member) &&
-                validatorTimelock.hasRole(address(chain), executorRole, member)
+                (_alsoRole == bytes32(0) || validatorTimelock.hasRole(address(chain), _alsoRole, member))
             ) {
                 return member;
             }
         }
-        revert("no EOA holds chain 499's committer, prover and executor roles");
+        revert("no EOA holds the validator roles");
     }
 
     /// @dev Log 5: the L2 rollup DA validator's output for this calldata DA input.
