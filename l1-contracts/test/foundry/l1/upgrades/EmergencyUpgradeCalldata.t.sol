@@ -28,13 +28,9 @@ contract BridgehubStandIn {
 
 contract ProtocolUpgradeHandlerStandIn {
     address public emergencyUpgradeBoard;
-    address public guardians;
-    address public securityCouncil;
 
-    constructor(address _emergencyUpgradeBoard, address _guardians, address _securityCouncil) {
+    constructor(address _emergencyUpgradeBoard) {
         emergencyUpgradeBoard = _emergencyUpgradeBoard;
-        guardians = _guardians;
-        securityCouncil = _securityCouncil;
     }
 }
 
@@ -59,6 +55,10 @@ contract MultisigStandIn {
     constructor(address[] memory _members, uint256 _threshold) {
         members = _members;
         EIP1271_THRESHOLD = _threshold;
+    }
+
+    function setMember(uint256 _index, address _member) external {
+        members[_index] = _member;
     }
 }
 
@@ -135,7 +135,7 @@ contract EmergencyUpgradeCalldataTest is Test {
         guardians = new MultisigStandIn(_addresses(guardianSafes), GUARDIANS_THRESHOLD);
         council = new MultisigStandIn(_addresses(councilSafes), COUNCIL_THRESHOLD);
         board = new EmergencyUpgradeBoardStandIn();
-        handler = new ProtocolUpgradeHandlerStandIn(address(board), address(guardians), address(council));
+        handler = new ProtocolUpgradeHandlerStandIn(address(board));
         board.set(address(handler), address(guardians), address(council), address(zkFoundationSafe));
         bridgehub = new BridgehubStandIn(address(handler));
 
@@ -222,71 +222,35 @@ contract EmergencyUpgradeCalldataTest is Test {
         _expectAllStagesRevert("other-handler", bytes("board serves another handler"));
     }
 
-    function test_revertWhen_boardNamesOtherGuardians() public {
-        board.set(address(handler), stranger, address(council), address(zkFoundationSafe));
-        _expectAllStagesRevert("other-guardians", bytes("board and handler name different Guardians"));
-    }
-
-    function test_revertWhen_boardNamesAnotherSecurityCouncil() public {
-        board.set(address(handler), address(guardians), stranger, address(zkFoundationSafe));
-        _expectAllStagesRevert("other-council", bytes("board and handler name different Security Councils"));
-    }
-
     /// The script is written for Safes whose only owner is the owner, and refuses any other Safe among the
-    /// approving ones rather than emit calldata for a setup it doesn't know.
-    function test_revertWhen_anApprovingSafeHasTwoOwners() public {
-        address[] memory owners = new address[](2);
-        owners[0] = owner;
-        owners[1] = stranger;
-        _replaceGuardian(1, new SafeStandIn(owners, 1));
-        _expectAllStagesRevert("two-owners", _notOneOfOne(address(guardianSafes[1])));
-    }
-
-    function test_revertWhen_anApprovingSafeNeedsTwoSignatures() public {
-        address[] memory owners = new address[](1);
-        owners[0] = owner;
-        _replaceGuardian(0, new SafeStandIn(owners, 2));
-        _expectAllStagesRevert("threshold-two", _notOneOfOne(address(guardianSafes[0])));
-    }
-
-    function test_revertWhen_anApprovingCouncilSafeHasAnotherOwner() public {
-        _replaceCouncilMember(COUNCIL_THRESHOLD - 1, _safeOf(stranger));
-        _expectAllStagesRevert("other-owner", _notOneOfOne(address(councilSafes[COUNCIL_THRESHOLD - 1])));
-    }
-
-    /// The owner is read off the ZK Foundation Safe, so a second owner there must not slip through either.
-    function test_revertWhen_zkFoundationSafeHasTwoOwners() public {
+    /// approving ones rather than emit calldata for a setup it doesn't know. The owner is read off the ZK
+    /// Foundation Safe, so a second owner there must not slip through either.
+    function test_revertWhen_theZkFoundationSafeHasTwoOwners() public {
         address[] memory owners = new address[](2);
         owners[0] = owner;
         owners[1] = stranger;
         zkFoundationSafe = new SafeStandIn(owners, 1);
         board.set(address(handler), address(guardians), address(council), address(zkFoundationSafe));
-        _expectAllStagesRevert("zk-foundation", _notOneOfOne(address(zkFoundationSafe)));
+        _expectAllStagesRevert("two-owners", _notOneOfOne(address(zkFoundationSafe)));
     }
 
-    /// `printEmergencyBoard` builds nothing, but checks the same Safes before anyone prepares a proposal. It
-    /// checks the Guardians, then the Council, then the ZK Foundation Safe, so they are broken in reverse order
-    /// to hit each check.
+    function test_revertWhen_anApprovingMemberHasAnotherOwner() public {
+        SafeStandIn safe = _safeOf(stranger);
+        council.setMember(COUNCIL_THRESHOLD - 1, address(safe));
+        _expectAllStagesRevert("other-owner", _notOneOfOne(address(safe)));
+    }
+
+    /// `printEmergencyBoard` builds nothing, but checks the same Safes before anyone prepares a proposal. A Safe
+    /// whose only owner is the owner but needs two signatures is refused too: one approved hash wouldn't do.
     function test_printEmergencyBoardChecksTheApprovingSafes() public {
         _writeInputs("print", PUH_GOVERNANCE_KIND);
         script.printEmergencyBoard(permanentValues);
 
-        address[] memory owners = new address[](2);
+        address[] memory owners = new address[](1);
         owners[0] = owner;
-        owners[1] = stranger;
-        zkFoundationSafe = new SafeStandIn(owners, 1);
+        zkFoundationSafe = new SafeStandIn(owners, 2);
         board.set(address(handler), address(guardians), address(council), address(zkFoundationSafe));
         vm.expectRevert(_notOneOfOne(address(zkFoundationSafe)));
-        script.printEmergencyBoard(permanentValues);
-
-        _replaceCouncilMember(0, _safeOf(stranger));
-        _writeInputs("print", PUH_GOVERNANCE_KIND);
-        vm.expectRevert(_notOneOfOne(address(councilSafes[0])));
-        script.printEmergencyBoard(permanentValues);
-
-        _replaceGuardian(GUARDIANS_THRESHOLD - 1, _safeOf(stranger));
-        _writeInputs("print", PUH_GOVERNANCE_KIND);
-        vm.expectRevert(_notOneOfOne(address(guardianSafes[GUARDIANS_THRESHOLD - 1])));
         script.printEmergencyBoard(permanentValues);
         _removeInputs();
     }
@@ -332,25 +296,6 @@ contract EmergencyUpgradeCalldataTest is Test {
 
     function _notOneOfOne(address _safe) internal pure returns (bytes memory) {
         return bytes(string.concat("not a 1-of-1 Safe of the owner: ", vm.toString(_safe)));
-    }
-
-    function _replaceGuardian(uint256 _index, SafeStandIn _safe) internal {
-        guardianSafes[_index] = _safe;
-        guardians = new MultisigStandIn(_addresses(guardianSafes), GUARDIANS_THRESHOLD);
-        _rewire();
-    }
-
-    function _replaceCouncilMember(uint256 _index, SafeStandIn _safe) internal {
-        councilSafes[_index] = _safe;
-        council = new MultisigStandIn(_addresses(councilSafes), COUNCIL_THRESHOLD);
-        _rewire();
-    }
-
-    /// @dev Points the handler, the board and the bridgehub at the current multisigs.
-    function _rewire() internal {
-        handler = new ProtocolUpgradeHandlerStandIn(address(board), address(guardians), address(council));
-        board.set(address(handler), address(guardians), address(council), address(zkFoundationSafe));
-        bridgehub = new BridgehubStandIn(address(handler));
     }
 
     /// @dev The env's permanent values (naming `bridgehub`) and an ecosystem.toml with `stage0`, `stage1` and

@@ -36,8 +36,9 @@ interface ISafeMsg {
 ///
 /// Which ecosystem: the env's permanent values (`upgrade-envs/permanent-values/<env>.toml`) name its
 /// bridgehub, whose owner is the ProtocolUpgradeHandler. The handler names the Emergency Upgrade Board,
-/// the Guardians and the Security Council; the board names the ZK Foundation Safe, whose owner is the
-/// owner of every member Safe. Nothing is specific to one env:
+/// and the board names the Guardians, the Security Council and the ZK Foundation Safe it checks signatures
+/// against (immutables, unlike the handler's own `guardians()` / `securityCouncil()`). The owner of the ZK
+/// Foundation Safe is the owner of every member Safe. Nothing is specific to one env:
 ///   forge script deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol:EmergencyUpgradeCalldata \
 ///     --sig 'printEmergencyBoard(string)' /upgrade-envs/permanent-values/testnet.toml --rpc-url $SEPOLIA_RPC
 ///   ... --sig 'emergencyUpgradeAllStages(string,string,string)' <permanent values> <ecosystem.toml> <out.json>
@@ -156,17 +157,11 @@ contract EmergencyUpgradeCalldata is Script {
             "env is not governed by a ProtocolUpgradeHandler"
         );
         board.handler = IOwnable(toml.readAddress("$.core_contracts.bridgehub_proxy_addr")).owner();
-        IProtocolUpgradeHandler handler = IProtocolUpgradeHandler(board.handler);
-        board.board = handler.emergencyUpgradeBoard();
-        board.guardians = handler.guardians();
-        board.securityCouncil = handler.securityCouncil();
+        board.board = IProtocolUpgradeHandler(board.handler).emergencyUpgradeBoard();
         IEmergencyUpgrageBoard emergencyBoard = IEmergencyUpgrageBoard(board.board);
         require(emergencyBoard.PROTOCOL_UPGRADE_HANDLER() == board.handler, "board serves another handler");
-        require(emergencyBoard.GUARDIANS() == board.guardians, "board and handler name different Guardians");
-        require(
-            emergencyBoard.SECURITY_COUNCIL() == board.securityCouncil,
-            "board and handler name different Security Councils"
-        );
+        board.guardians = emergencyBoard.GUARDIANS();
+        board.securityCouncil = emergencyBoard.SECURITY_COUNCIL();
         board.zkFoundationSafe = emergencyBoard.ZK_FOUNDATION_SAFE();
         board.owner = ISafeMsg(board.zkFoundationSafe).getOwners()[0];
     }
