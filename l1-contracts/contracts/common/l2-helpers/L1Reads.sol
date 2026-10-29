@@ -17,6 +17,7 @@ library L1Reads {
     /// @return blockHash Its hash.
     /// @return timestamp The L1 time it was recorded at.
     function anchor() internal view returns (uint256 blockNumber, bytes32 blockHash, uint256 timestamp) {
+        // slither-disable-next-line unused-return
         return L2_INTEROP_ROOT_STORAGE.l1Anchor();
     }
 

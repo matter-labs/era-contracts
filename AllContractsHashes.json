@@ -650,9 +650,9 @@
   {
     "contractName": "l1-contracts/L1Reads",
     "evmBytecodePath": "/l1-contracts/out/L1Reads.sol/L1Reads.json",
-    "evmBytecodeHash": "0x85526a416d280395c4d20c1624777945bad225f553cc7f2c9799dd9da62d1668",
-    "evmDeployedBytecodeHash": "0xb4351f61d91dd15433b6262bbfcc3445ffa33de45144bacb1e17e08cfc788564",
-    "evmDeployedBytecodeBlakeHash": "0x03ef23edad2107fb98c31df6b3fab82830847a0cd4de1a98f25b69f7340fc88b",
+    "evmBytecodeHash": "0x99a544bd8ed4521fdf2d9b0a009481971d2289487d89956781e3f62c09bddd64",
+    "evmDeployedBytecodeHash": "0x545d769277b8d20d3bc6f3a63702156d4ed838a1bb59c12a3a6e2243dd9a3faf",
+    "evmDeployedBytecodeBlakeHash": "0x11fc981cecae09d8aac03939a99543e01a2a7b3a2f1a75b446acc921fb3812e8",
     "evmDeployedBytecodeLength": 85
   },
   {
