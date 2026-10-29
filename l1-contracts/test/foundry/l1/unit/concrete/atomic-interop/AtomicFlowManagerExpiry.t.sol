@@ -338,14 +338,14 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
 
     function test_append_RevertWhen_ExpirableFlowHasTwoLegs() public {
         bytes32 leg = keccak256("local leg");
-        (AtomicFlowPreimage memory preimage, , ) = AtomicFlowFixtures.twoLegPreimage(
-            leg,
-            block.chainid,
-            keccak256("other leg"),
-            REMOTE_CHAIN,
-            DEADLINE,
-            SETTLEMENT_LAYER_CHAIN_ID
-        );
+        (AtomicFlowPreimage memory preimage, , ) = AtomicFlowFixtures.twoLegPreimage({
+            _legA: leg,
+            _chainA: block.chainid,
+            _legB: keccak256("other leg"),
+            _chainB: REMOTE_CHAIN,
+            _deadline: DEADLINE,
+            _settlementLayerChainId: SETTLEMENT_LAYER_CHAIN_ID
+        });
         preimage.version = ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION;
 
         vm.expectRevert(abi.encodeWithSelector(ManagerExpirableFlowNotSingleLeg.selector, 2));
