@@ -18,6 +18,8 @@ error ChainBalanceBackfillPending(uint256 chainId);
 error ChainBalanceExceeded(uint256 chainId, bytes32 assetId, uint256 totalWithdrawn, uint256 limit);
 // 0x066f53b1
 error EmptyToken();
+// 0x459d6720
+error InteropDepositChainNotOnL1(uint256 chainId);
 // 0xabd51c42
 error InteropWithdrawalNonZeroValue(uint256 value);
 // 0x1c55230b

@@ -220,13 +220,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAto
     }
 
     /// @inheritdoc AssetRouterBase
-    /// @dev Interop is only initiated on L2s, so the source may not be L1; the sender must be this same
-    /// router (identical address on every ZK chain). See {protocol-docs/bridging.md#finalization-destination-side}.
+    /// @dev From L1 the sender must be the L1 asset router (an interop deposit); from an L2, this same router
+    /// (identical address on every ZK chain). See {protocol-docs/bridging.md#finalization-destination-side}.
     function _isValidInteropSender(
         uint256 _senderChainId,
         address _senderAddress
     ) internal view override returns (bool) {
-        return _senderChainId != L1_CHAIN_ID && _senderAddress == address(this);
+        if (_senderChainId == L1_CHAIN_ID) {
+            return _senderAddress == address(L1_ASSET_ROUTER);
+        }
+        return _senderAddress == address(this);
     }
 
     /*//////////////////////////////////////////////////////////////

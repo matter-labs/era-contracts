@@ -332,12 +332,15 @@ contract AtomicFlowManager is IAtomicFlowManager {
         }
     }
 
-    /// @notice Reverts unless this chain accepts interop from `_legSourceChainId`: the chain itself, or a peer
-    /// its admin allowed. See {protocol-docs/interop-gating.md#receive-filter}.
+    /// @notice Reverts unless this chain accepts interop from `_legSourceChainId`: the chain itself, L1, or a peer
+    /// its admin allowed. L1 commits its own legs, with no prover to trust, so every chain accepts them (interop
+    /// deposits). See {protocol-docs/interop-gating.md#receive-filter}.
     /// @param _legSourceChainId The source chain of a leg whose proof this chain is about to accept.
     function _checkLegSourceAllowed(uint256 _legSourceChainId) internal view {
         if (
-            _legSourceChainId != block.chainid && !IL2Bridgehub(address(L2_BRIDGEHUB)).isPeerAllowed(_legSourceChainId)
+            _legSourceChainId != block.chainid &&
+            _legSourceChainId != L1_CHAIN_ID &&
+            !IL2Bridgehub(address(L2_BRIDGEHUB)).isPeerAllowed(_legSourceChainId)
         ) {
             revert ManagerLegSourceChainNotAllowed(_legSourceChainId);
         }

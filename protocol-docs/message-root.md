@@ -57,6 +57,23 @@ Two entry points exist on `MessageRootBase`, both restricted to the chain's own 
 
 Only v33 executors call the v33 entry point, so the interop trees contain v33-format roots exclusively — a non-empty chain tree implies the chain uses the current chain-batch-root format. On both L1 and Gateway the executor appends the committed `l2LogsTreeRoot` via `addChainBatchRootV32` (`ExecutorFacet._appendMessageRoot`); on Gateway that value is already the chain batch root (it commits to an empty multichain batch root), so the paths are identical and no per-batch log reconstruction or balance accounting is performed.
 
+## L1's own batches
+
+Index 0 of the shared tree belongs to the chain the MessageRoot is deployed on. On L1 it carries L1's own
+commitment tree: every atomic leg sourced on L1 (an interop deposit, see
+{protocol-docs/interop.md#l1---l2-deposits}) is committed by `L1MessageRoot.commitL1Leg` and settles at once
+as a batch of L1 under `chainId = block.chainid`:
+
+- the chain batch root is `ChainBatchRootTree.compute(0, 0, imtBegin, imtEnd)` (no logs, no multichain root);
+- it is recorded and pushed through the same `_recordChainBatchRoot` / `_pushChainBatchRoot` as a chain's
+  batch, so it gets a batch leaf with its `l1Timestamp`, a new chain root, a new shared root and a
+  `historicalRoots` entry;
+- the first leg seeds the tree and pushes L1's genesis batch (`genesisChainBatchRoot`) as batch 0.
+
+Proofs for an L1 leg have the ordinary shape, with `chainId` and the settlement-layer chain id both L1.
+`l1CommitmentTreeRoot`, `l1CommitmentTreeLeafCount`, `l1CommitmentTreeLeafAt` and
+`l1CommitmentTreeMerklePath` serve proof builders, and `L1LegCommitted` logs each inserted value.
+
 ## Chain batch root (ZKsync OS)
 
 For a ZKsync OS chain, the chain batch root — the value committed as the batch's `l2LogsTreeRoot` — is itself a fixed height-3 (8-leaf) keccak256 Merkle tree, mirrored bit-for-bit by `ChainBatchRootTree` (Solidity) and `compute_chain_batch_root` (zksync-os bootloader):

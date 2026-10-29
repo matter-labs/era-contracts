@@ -6,6 +6,10 @@ This document is the single source of truth for the protocol-level behaviour of 
 
 Interop is ZKsync's mechanism for sending messages and value between chains in the ecosystem. The `InteropCenter` (an L2 contract) is the primary entry point for communication between chains connected to interop, facilitating interactions between end users and bridges. As of v31 the `InteropCenter` is only deployed on L2s, not on L1. Interop was **not activated in v31**; the contracts here target v33+ and are expected to run on ZKsync OS chains only (the EraVM bootloader does not support the timestamp-carrying interop-root import entry points).
 
+L1 sends one kind of bundle: an asset deposit through `L1AssetRouter.depositViaInterop`, a one-leg
+atomic flow proven on the destination like an L2 -> L2 leg (see [L1 -> L2 deposits](#l1---l2-deposits)). The
+priority-queue deposit path remains alongside it.
+
 The lifecycle of an interop interaction is:
 
 1. **Prepare** — for L2 -> L2, preview every leg's bundle hash and construct the shared atomic-flow
@@ -125,7 +129,7 @@ configuration.
 
 ## Restrictions
 
-- **No interop initiation on L1**: bundles can only be initiated on an L2 (`CannotInitiateInteropOnL1`). The `InteropCenter` never runs on L1.
+- **No general interop initiation on L1**: the `InteropCenter` never runs on L1 (`CannotInitiateInteropOnL1`). The one bundle L1 sends is an asset deposit, built by `L1AssetRouter.depositViaInterop` (see [L1 -> L2 deposits](#l1---l2-deposits)).
 - **No interop to self** (`InteropToSelfNotSupported`): a chain can end up registered for interop on its own Bridgehub, and a self-destination bundle would burn value into an unsupported self-bridging accounting path.
 - **`sendMessage` is strictly L2→L2** (`NotL2ToL2`); the L2→L1 path goes through `sendBundle` as a single-call bundle.
 - **L1 destinations are restricted to single-call asset withdrawals** (for this release):
@@ -256,6 +260,37 @@ An atomic bundle is a leg of an **atomic interop flow** (L2↔L2 only), marked w
 - **Atomic verification**: `verifyAtomicBundle(bundle, AtomicFinalityProof)` runs the same atomicity gate without executing the calls, marking the bundle `Verified` and enabling the verify→unbundle flow. `executeAtomicBundle` therefore accepts a bundle that is already `Verified` and **skips** the gate in that case (it was checked at verify time) — the accepted statuses are `Unreceived` and `Verified`, not `Unreceived` alone. Note this is what makes an atomic bundle partially executable: once `Verified`, individual calls can be executed or `Cancelled` via [`unbundleBundle`](#unbundling-unbundlebundle), so the atomicity gate governs whether execution is _permitted_, not that every call runs (see {protocol-docs/atomicity/security.md#guarantees}).
 - **Settlement layer**: the IMT proofs are authenticated against the imported interop root, but atomic interop is **L1-only in this release**: `AtomicFlowManager` rejects any flow whose `settlementLayerChainId` is not the L1 chain id (`ManagerSettlementLayerNotL1`) on send, finality and refund alike (see {protocol-docs/atomicity/security.md#trust-assumptions}).
 - **Timeouts**: if a flow misses its deadline, recovery is best-effort via `AtomicFlowManager._recoverBundle` / `IAtomicRecoverable.recoverAtomicCall`. This is why _indirect_ calls may not carry `interopCallValue` (see [Restrictions](#restrictions)) — recovery returns value to `InteropCall.from`, the asset router for an indirect call, never the payer; direct calls may carry value and are refunded through `bridgehubRecoverBaseToken`. L1 destinations are banned because L1 has no atomic execution, so the only outcome would be a timeout refund, while L2→L1 withdrawal accounting must stay append-only and never revertable.
+
+## L1 -> L2 deposits
+
+A deposit can travel the same way as an L2 -> L2 transfer instead of as a priority transaction: L1 is one
+more source chain of atomic legs, and the deposit is a flow with a single leg.
+
+- **Send (L1).** `L1AssetRouter.depositViaInterop(chainId, assetId, transferData, lowNullifierIndex)`
+  takes the tokens through the asset handler's `bridgeBurn`, exactly as the two-bridges deposit does, and
+  builds an `InteropBundle` with one call from the L1 asset router to the destination's L2 asset router
+  (`finalizeDeposit`, zero value). Execution is permissionless; the unbundler is the depositor pinned to L1
+  (`InteropCenter`'s default); the salt is the router's `interopDepositNonce`. The flow preimage has the one
+  leg, sourced on L1, with `deadline = block.timestamp` and L1 as the settlement layer. The destination must
+  settle on L1 (`InteropDepositChainNotOnL1`), and its base token is not supported (`AssetIdNotSupported`),
+  as on the two-bridges path. The [asset handler restriction](./interop-gating.md#asset-handler-restriction)
+  applies, and the deposit counts in the chain's balance cap like any other.
+  `InteropDepositCommitted` carries the bundle and the preimage for executors.
+- **Commit and settle (L1).** `L1MessageRoot.commitL1Leg` (L1 asset router only) inserts the leg's commit
+  value into L1's commitment tree and settles it at once as a batch of L1 in L1's own chain tree, the
+  shared-tree slot index 0 reserved for the chain the MessageRoot is deployed on. The batch's chain batch
+  root has the ZKsync OS shape, with the tree's root before and after the insert as leaves 2 and 3, so
+  `begin(N) == end(N-1)` holds for L1 too. The first leg seeds the tree and L1's genesis batch, as
+  `seedGenesisRoot` does for a new chain. See {protocol-docs/message-root.md#l1s-own-batches}.
+- **Import and execute (L2).** The new shared root reaches the destination through the ordinary
+  interop-root import. Anyone executes the bundle with `executeAtomicBundle`: the finality proof
+  authenticates L1's end IMT root against the imported root (`sourceChainId` = L1), and `t = deadline`.
+  The L2 asset router accepts an interop message from L1 only from the L1 asset router, and the
+  [receive filter](./interop-gating.md#receive-filter) accepts legs from L1 without a whitelist entry: L1
+  commits its own legs and can't be a peer.
+
+Nothing else on the L2 changes. A deposit can never time out (its only leg is committed
+when the flow is created), so the refund path does not apply to it.
 
 ## Initialization and versioning notes
 

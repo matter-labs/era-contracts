@@ -8,6 +8,7 @@ import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 import {
     InteropAlreadyEnabled,
     InvalidSettlementLayerForBatch,
+    OnlyL1AssetRouter,
     LocallyNoChainsAtGenesis,
     SecondProofSystemNotRequired,
     ZKChainNotRegistered
@@ -21,11 +22,15 @@ import {IL1ChainAssetHandler} from "../chain-asset-handler/IL1ChainAssetHandler.
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {ChainBalanceBackfillPending} from "../../bridge/L1BridgeContractErrors.sol";
+import {IndexedMerkleTree, IMT, IMTLeaf} from "../../common/libraries/IndexedMerkleTree.sol";
+import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
+    using IndexedMerkleTree for IMT;
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     address public immutable BRIDGE_HUB;
 
@@ -47,6 +52,12 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
 
     /// @notice Whether governance enabled interop for the chain. See {protocol-docs/interop-gating.md}.
     mapping(uint256 chainId => bool enabled) internal interopEnabled;
+
+    /// @notice L1's own interop commitment tree: one commit value per atomic-flow leg sourced on L1 (an interop
+    /// deposit). It is to L1 what `L2InteropCommitmentTree` is to a ZKsync OS chain, and this contract plays the
+    /// bootloader's part: each leg settles as its own batch of L1 in L1's chain tree (shared-tree index 0).
+    /// See {protocol-docs/interop.md#l1---l2-deposits}.
+    IMT internal l1CommitmentTree;
 
     /// @dev This contract is expected to be used as a proxy implementation on L1.
     /// @param _bridgehub Address of the Bridgehub.
@@ -91,6 +102,53 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     /// @inheritdoc IL1MessageRoot
     function isInteropEnabled(uint256 _chainId) external view returns (bool) {
         return interopEnabled[_chainId];
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function commitL1Leg(uint256 _commitValue, uint256 _lowNullifierIndex) external returns (uint256 batchNumber) {
+        address l1AssetRouter = address(IBridgehubBase(BRIDGE_HUB).assetRouter());
+        require(msg.sender == l1AssetRouter, OnlyL1AssetRouter(msg.sender, l1AssetRouter));
+
+        uint256 l1ChainId = block.chainid;
+        if (l1CommitmentTree.tree._leafNumber == 0) {
+            // The first L1 leg seeds the tree and L1's genesis batch, as `seedGenesisRoot` does for a new chain,
+            // so L1 has a batch leaf in the shared root like every other source chain.
+            l1CommitmentTree.setup();
+            bytes32 genesisChainBatchRoot = ChainBatchRootTree.genesisChainBatchRoot();
+            chainBatchRoots[l1ChainId][0] = genesisChainBatchRoot;
+            _pushChainBatchRoot(l1ChainId, 0, genesisChainBatchRoot);
+        }
+
+        // The batch's chain batch root carries the tree before and after the insert, as a ZKsync OS batch does.
+        bytes32 imtBegin = l1CommitmentTree.root();
+        (uint256 leafIndex, bytes32 imtEnd) = l1CommitmentTree.insert(_commitValue, _lowNullifierIndex);
+        bytes32 chainBatchRoot = ChainBatchRootTree.compute(bytes32(0), bytes32(0), imtBegin, imtEnd);
+
+        batchNumber = currentChainBatchNumber[l1ChainId] + 1;
+        _recordChainBatchRoot(l1ChainId, batchNumber, chainBatchRoot);
+        _pushChainBatchRoot(l1ChainId, batchNumber, chainBatchRoot);
+
+        emit L1LegCommitted(batchNumber, leafIndex, _commitValue);
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function l1CommitmentTreeRoot() external view returns (bytes32) {
+        return l1CommitmentTree.root();
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function l1CommitmentTreeLeafCount() external view returns (uint256) {
+        return l1CommitmentTree.tree._leafNumber;
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function l1CommitmentTreeLeafAt(uint256 _index) external view returns (IMTLeaf memory) {
+        return l1CommitmentTree.leaves[_index];
+    }
+
+    /// @inheritdoc IL1MessageRoot
+    function l1CommitmentTreeMerklePath(uint256 _index) external view returns (bytes32[] memory) {
+        return l1CommitmentTree.merklePath(_index);
     }
 
     function _proveL2LeafInclusionOnSettlementLayer(

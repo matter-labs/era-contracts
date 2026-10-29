@@ -18,10 +18,11 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {AssetHandlerNotAllowed, NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
+import {AssetHandlerNotAllowed, InteropDepositChainNotOnL1, NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {
     AddressAlreadySet,
     AssetDeploymentTrackerNotSet,
+    AssetIdNotSupported,
     NonEmptyMsgValue,
     Unauthorized,
     ZeroAddress
@@ -33,7 +34,19 @@ import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {TxStatus} from "../../common/Messaging.sol";
+import {
+    BundleAttributes,
+    INTEROP_BUNDLE_VERSION,
+    INTEROP_CALL_VERSION,
+    InteropBundle,
+    InteropCall,
+    TxStatus
+} from "../../common/Messaging.sol";
+import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
+import {AtomicFlowPreimage, ATOMIC_FLOW_PREIMAGE_VERSION} from "../../atomic-interop/IAtomicInterop.sol";
+import {AtomicInteropProof} from "../../atomic-interop/libraries/AtomicInteropProof.sol";
+import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -65,6 +78,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @dev Address of the L1 interop handler that finalizes L2 -> L1 withdrawals.
     address public l1InteropHandler;
+
+    /// @notice The number of deposits sent through interop; each one's bundle salt.
+    uint256 public interopDepositNonce;
 
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
@@ -238,6 +254,96 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 _data: _data,
                 _nativeTokenVault: address(nativeTokenVault)
             });
+    }
+
+    /// @inheritdoc IL1AssetRouter
+    function depositViaInterop(
+        uint256 _chainId,
+        bytes32 _assetId,
+        bytes calldata _transferData,
+        uint256 _lowNullifierIndex
+    ) external payable override nonReentrant whenNotPaused returns (bytes32 bundleHash) {
+        // The destination proves the leg against an imported L1 interop root, so it must settle on L1.
+        require(BRIDGE_HUB.settlementLayer(_chainId) == block.chainid, InteropDepositChainNotOnL1(_chainId));
+        bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
+        // As on the two-bridges path, the destination's base token is not an asset-router deposit.
+        require(baseTokenAssetId != _assetId, AssetIdNotSupported(_assetId));
+        _checkAssetHandlerAllowed(_chainId, _assetId);
+
+        bytes memory bridgeMintCalldata = _burn({
+            _chainId: _chainId,
+            _nextMsgValue: 0,
+            _assetId: _assetId,
+            _originalCaller: msg.sender,
+            _transferData: _transferData,
+            _passValue: true,
+            _nativeTokenVault: address(nativeTokenVault)
+        });
+        InteropBundle memory bundle = _interopDepositBundle(
+            _chainId,
+            baseTokenAssetId,
+            getDepositCalldata(msg.sender, _assetId, bridgeMintCalldata)
+        );
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(abi.encode(bundle));
+
+        // A deposit is an atomic flow with a single leg, sourced on L1, final in the batch of L1 that commits it.
+        bytes32[] memory legBundleHashes = new bytes32[](1);
+        legBundleHashes[0] = bundleHash;
+        uint256[] memory legSourceChainIds = new uint256[](1);
+        legSourceChainIds[0] = block.chainid;
+        AtomicFlowPreimage memory flowPreimage = AtomicFlowPreimage({
+            version: ATOMIC_FLOW_PREIMAGE_VERSION,
+            deadline: uint64(block.timestamp),
+            settlementLayerChainId: block.chainid,
+            legBundleHashes: legBundleHashes,
+            legSourceChainIds: legSourceChainIds
+        });
+        bytes32 flowId = keccak256(abi.encode(flowPreimage));
+
+        uint256 l1BatchNumber = IL1MessageRoot(address(BRIDGE_HUB.messageRoot())).commitL1Leg(
+            AtomicInteropProof.commitValue(flowId, bundleHash),
+            _lowNullifierIndex
+        );
+
+        emit InteropDepositCommitted(_chainId, bundleHash, l1BatchNumber, flowPreimage, bundle);
+    }
+
+    /// @notice Builds an interop deposit's bundle: one call from this router to the destination's asset router.
+    /// @param _chainId The destination chain.
+    /// @param _baseTokenAssetId The destination's base token asset id.
+    /// @param _depositCalldata The `finalizeDeposit` call for the destination's asset router.
+    function _interopDepositBundle(
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId,
+        bytes memory _depositCalldata
+    ) internal returns (InteropBundle memory bundle) {
+        bytes32 salt = bytes32(interopDepositNonce++);
+        InteropCall[] memory calls = new InteropCall[](1);
+        calls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            to: _l2AssetRouterAddress(_chainId),
+            from: address(this),
+            value: 0,
+            data: _depositCalldata
+        });
+        bundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: block.chainid,
+            destinationChainId: _chainId,
+            destinationBaseTokenAssetId: _baseTokenAssetId,
+            // The same salt scheme as `InteropCenter`, with the nonce as the depositor's salt.
+            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, salt)),
+            calls: calls,
+            bundleAttributes: BundleAttributes({
+                // Anyone may execute a deposit on the destination.
+                executionAddress: "",
+                // `InteropCenter`'s default: the sender, pinned to the source chain.
+                unbundlerAddress: InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+                useFixedFee: false,
+                salt: salt
+            })
+        });
     }
 
     /// @inheritdoc IL1CrossChainSender

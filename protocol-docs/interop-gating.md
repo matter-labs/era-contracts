@@ -178,8 +178,9 @@ withdrawn or claimed back while the chain stays disabled (see [Other limitations
 
 ## Receive filter
 
-A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.isPeerAllowed(S)` holds. C's
-`AtomicFlowManager` reverts with `ManagerLegSourceChainNotAllowed` otherwise:
+A source chain S is **allowed** for a chain C if S is C, if S is L1, or if C's `L2Bridgehub.isPeerAllowed(S)` holds.
+L1 commits its own legs ([L1 -> L2 deposits](interop.md#l1---l2-deposits)), with no prover to trust, so every chain
+accepts them. C's `AtomicFlowManager` reverts with `ManagerLegSourceChainNotAllowed` otherwise:
 
 - **Finality** (`requireFlowFinalized`, {protocol-docs/atomicity/flow.md#3-finalize--requireflowfinalized}) needs
   every leg's source to be allowed.

@@ -74,6 +74,8 @@ error OnlyChain(address msgSender, address zkChainAddress);
 error OnlyChainAssetHandler(address sender, address chainAssetHandler);
 // 0xec76af13
 error OnlyGateway();
+// 0xd13a8838
+error OnlyL1AssetRouter(address sender, address l1AssetRouter);
 // 0x8d14ca84
 error OnlyL1();
 // 0xb78dbaa7
