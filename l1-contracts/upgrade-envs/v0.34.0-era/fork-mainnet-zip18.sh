@@ -15,8 +15,9 @@
 # ZIP-18's test transactions are not replayed: they create chain 555, v34's test chain.
 #
 # The Anvil is left running, so that `protocol_ops ecosystem rehearse-upgrade --env mainnet --fork-url
-# http://127.0.0.1:$PORT` and `replay-bundle` can fork it. Send nothing else to it until they have finished, and
-# stop it with the kill command printed at the end. Their forks use 29_549 and 29_550, so PORT must differ.
+# http://127.0.0.1:$PORT` and `replay-bundle` can fork it, both with ALLOW_PENDING_L2_UPGRADE=1 (324's pending
+# upgrade, see the README). Send nothing else to it until they have finished, and stop it with the kill command
+# printed at the end. Their forks use 29_549 and 29_550, so PORT must differ.
 #
 # Needs: foundry (anvil, cast), python3 >= 3.11 (tomllib), git (reads ZIP-18's output at tag zip-18).
 # Usage: L1_FORK_URL=<mainnet rpc> [FORK_BLOCK=<n>] [PORT=8645] ./fork-mainnet-zip18.sh

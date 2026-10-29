@@ -14,7 +14,8 @@
 #      behaviour: the 15M cap on user L1->L2 transactions (before and after the upgrade), the chain's first v34
 #      batches committed, proved and executed (test/foundry/fork/V34EraStageFirstBatch.t.sol, in forge's
 #      memory), and the proof-system switches. A reference chain with a pending L2 upgrade (mainnet's 324 right
-#      after ZIP-18) can't upgrade yet: its after-upgrade checks move to the test chain.
+#      after ZIP-18) can't upgrade yet: its after-upgrade checks move to the test chain, which passes only with
+#      ALLOW_PENDING_L2_UPGRADE=1 (the ZIP-18 replay fork; protocol_ops passes its environment through).
 #
 # Needs: foundry (cast/anvil; forge for step 1 and the first-batch test), python3 >= 3.11 (tomllib), and for
 # step 1 the Linux CI build artifacts in {system,l1,l2}-contracts/zkout and l1-contracts/out (macOS zksolc
@@ -921,9 +922,15 @@ sys.exit(0 if live == new == {os.environ["CAH"].lower(), os.environ["EIP7702_CHE
 PYIMMUTABLES
 
 # A reference chain with a pending L2 upgrade (mainnet's 324 right after ZIP-18, until its first v0.33.0 batch
-# executes) can't take v34 yet: its after-upgrade checks move to the test chain.
+# executes) can't take v34 yet: its after-upgrade checks move to the test chain. Its own upgrade then goes
+# untested, so that is a failure unless ALLOW_PENDING_L2_UPGRADE=1 (the ZIP-18 replay fork).
 REF_UPGRADES=1
-[ "$PENDING_L2_UPGRADE" = "0x0000000000000000000000000000000000000000000000000000000000000000" ] || REF_UPGRADES=0
+if [ "$PENDING_L2_UPGRADE" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]; then
+  REF_UPGRADES=0
+  [ "${ALLOW_PENDING_L2_UPGRADE:-0}" = "1" ] || fail "chain $CHAIN_ID has a pending L2 upgrade" \
+    "(${PENDING_L2_UPGRADE:-unreadable}), so its v34 upgrade can't be rehearsed; wait until it is finalized" \
+    "(ALLOW_PENDING_L2_UPGRADE=1 accepts the test chain's checks instead: ZIP-18 replay only)"
+fi
 
 # A fresh address with no code: well-known dev-key addresses can carry EIP-7702 code on Sepolia.
 DEPOSITOR=0x5995a0003D4AbbF54CbD8C6B4DC3A83C1Ea5912B

@@ -100,9 +100,11 @@ takes the CTM from v0.30.1 to v0.33.0; re-read them on live mainnet once it has 
 - **Fork test:** on a mainnet fork with ZIP-18 replayed, chain 324 still has ZIP-18's L2 upgrade pending,
   so its v34 upgrade reverts with `PreviousUpgradeNotFinalized`; its after-upgrade checks run on the test
   chain instead. Chain 324's own v34 upgrade is first tested once ZIP-18 has executed.
-  `L1_FORK_URL=<mainnet rpc> ./fork-mainnet-zip18.sh` builds that fork and leaves its Anvil running for
-  `protocol_ops ecosystem rehearse-upgrade --env mainnet --fork-url http://127.0.0.1:8645` and
-  `replay-bundle`; it is test-only and goes once ZIP-18 is live.
+  `fork-mainnet-zip18.sh` is test-only and goes once ZIP-18 is live. Steps:
+  1. `L1_FORK_URL=<mainnet rpc> ./fork-mainnet-zip18.sh` builds that fork and leaves its Anvil running.
+  2. `ALLOW_PENDING_L2_UPGRADE=1 protocol_ops ecosystem rehearse-upgrade --upgrade v0.34.0-era --env mainnet --fork-url http://127.0.0.1:8645 --deployer-address <any EOA>`,
+     then `replay-bundle` with the same variable. Without it `rehearse.sh` fails on the pending upgrade, as
+     a real generation must.
 - Chain 324 has no `UPGRADER_ROLE` holder: grant it through the Safe before using the server path.
 
 ## Executing it
@@ -197,7 +199,8 @@ the environment's L1. It checks:
 
 If the reference chain has a pending L2 upgrade (mainnet's 324 right after ZIP-18), its upgrade must revert
 with `PreviousUpgradeNotFinalized`; the after-upgrade cap checks and the proof-system switches run on the
-test chain, and the summary line counts them as moved.
+test chain, and the summary line counts them as moved. That leaves the reference chain's own upgrade
+untested, so the run fails unless `ALLOW_PENDING_L2_UPGRADE=1` is set (the ZIP-18 replay only).
 
 Not covered: the L2 side, that is, the L2 upgrade transaction's execution and a new chain's genesis
 transaction; real batches and proofs.
