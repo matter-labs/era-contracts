@@ -34,7 +34,11 @@ FAILED=0
 python3 -c 'import tomllib' 2>/dev/null || { echo "FAILED: needs python3 >= 3.11 (tomllib)"; exit 1; }
 
 fail() { echo "  FAIL $*"; FAILED=$((FAILED + 1)); }
-chk() { [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo "  OK   $1" || fail "$1: expected $3, got $2"; }
+# chk LABEL GOT EXPECTED — an empty EXPECTED is a failed read, never a match.
+chk() {
+  [ -n "$3" ] || { fail "$1: no expected value (failed read), got ${2:-nothing}"; return; }
+  [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo "  OK   $1" || fail "$1: expected $3, got $2"
+}
 call() { cast call "$@" --rpc-url "$RPC"; }
 first() { awk '{print $1}'; }
 # send FROM TO DATA LABEL — impersonated; stops the run on a failed transaction, since later steps build on it.

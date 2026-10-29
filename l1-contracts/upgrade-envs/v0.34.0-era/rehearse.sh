@@ -64,7 +64,12 @@ export OUT S HERE WT
 fail() { echo "  FAIL $*"; FAILED=$((FAILED + 1)); }
 # While MOVING=1, every check counts as moved to the test chain (see the reference chain's upgrade in step 5).
 moved() { [ "${MOVING:-0}" = "1" ] && MOVED=$((MOVED + 1)); return 0; }
-chk() { moved; [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo "  OK   $1" || fail "$1: expected $3, got $2"; }
+# chk LABEL GOT EXPECTED — an empty EXPECTED is a failed read (e.g. a before-snapshot), never a match.
+chk() {
+  moved
+  [ -n "$3" ] || { fail "$1: no expected value (failed read), got ${2:-nothing}"; return; }
+  [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo "  OK   $1" || fail "$1: expected $3, got $2"
+}
 call() { cast call "$@" --rpc-url "$RPC"; }
 first() { awk '{print $1}'; }
 
