@@ -1,0 +1,41 @@
+{
+  "executionRepo": "matter-labs/era-contracts-private",
+  "upstreamRepo": "matter-labs/era-contracts",
+  "dispatchers": ["kelemeno", "StanislavBreadless", "vladbochok"],
+  "approverTeam": "protocol-upgrade-approvers",
+  "environments": {
+    "stage": {
+      "network": "sepolia",
+      "githubEnvironment": "eoa-upgrade-stage"
+    },
+    "testnet": {
+      "network": "sepolia",
+      "githubEnvironment": "eoa-upgrade-testnet"
+    }
+  },
+  "networks": {
+    "sepolia": {
+      "chainId": 11155111,
+      "rpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
+      "explorerTxUrl": "https://sepolia.etherscan.io/tx/",
+      "secondaryRpcUrl": "https://sepolia.gateway.tenderly.co",
+      "maxPriorityFeePerGasWei": "5000000000",
+      "maxFeePerGasWei": "100000000000",
+      "maxRunFeeWei": "500000000000000000"
+    }
+  },
+  "foundry": {
+    "version": "v1.5.1",
+    "linuxAmd64Url": "https://github.com/foundry-rs/foundry/releases/download/v1.5.1/foundry_v1.5.1_linux_amd64.tar.gz",
+    "linuxAmd64Sha256": "73640b01bd9ed29fdb4965085099371f8cf0dbbec3e2086cf54564efc4dcfe88"
+  },
+  "execution": {
+    "allowNonZeroValue": false,
+    "gasLimitBufferPercent": 20,
+    "maxTxGasLimit": 16777216,
+    "baseFeeMultiplier": 2,
+    "receiptTimeoutSeconds": 900,
+    "receiptPollSeconds": 4,
+    "rpcAgreementRetries": 5
+  }
+}

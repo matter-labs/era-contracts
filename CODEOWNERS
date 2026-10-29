@@ -3,3 +3,6 @@ l1-contracts/deploy-scripts @Deniallugo
 l1-contracts/deploy-script-config-template @Deniallugo
 .solhint.json @nikitastupin-matterlabs
 .solhintignore @nikitastupin-matterlabs
+.github/workflows/execute-eoa-upgrade.yaml @vladbochok @StanislavBreadless @kelemeno
+.github/workflows/eoa-upgrade-executor-tests.yaml @vladbochok @StanislavBreadless @kelemeno
+tools/eoa-upgrade-executor/ @vladbochok @StanislavBreadless @kelemeno
