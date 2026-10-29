@@ -196,6 +196,30 @@ chain's batches are as provable as any other. The filter has to cover refunds to
 broken prover could forge "present" toward one chain and "absent" toward another, so that one chain finalizes the
 flow while another refunds it, and a leg is paid twice.
 
+## Chain features
+
+Some protocol features are opt-in per chain, so that the ecosystem knows which chains use them and can change or
+remove a feature that turns out not to be needed. `ChainRegistrationSender` keeps, per chain and per `ChainFeature`:
+
+- `isChainFeatureApproved`, set by the owner or the Bridgehub admin with `setChainFeatureApproved`. Revoking the
+  approval also disables the feature.
+- `isChainFeatureEnabled`, set by the chain's admin with `setChainFeatureEnabled`. Enabling needs the approval
+  (`ChainFeatureNotApproved`); disabling doesn't.
+
+Each change of `isChainFeatureEnabled` is also sent to the chain's own `L2Bridgehub` as a service transaction
+(`setChainFeatureEnabled`), where the chain's contracts read it with `L2Bridgehub.isChainFeatureEnabled`. A chain
+only ever reads its own features, so nothing is sent to other chains. A feature gates only what the chain itself
+does; a chain never has to know whether its peers enabled one.
+
+The service transaction fails on a chain whose L2 doesn't have `setChainFeatureEnabled` yet, leaving the feature
+off on L2 while L1 shows it enabled. Enable a feature only after the chain's upgrade; calling `setChainFeatureEnabled`
+again sends the value again. Approve a feature only for a chain whose protocol version supports it; this is checked
+offchain.
+
+| Feature              | Gates                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------ |
+| `ExpirableTransfers` | Sending a single-leg flow that can expire ({protocol-docs/atomicity/expiry.md#opting-in}). |
+
 ## Governance procedure
 
 ### Legacy registrations

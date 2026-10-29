@@ -12,6 +12,7 @@ import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {ChainFeature} from "../chain-registration/IChainRegistrationSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -41,6 +42,9 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
 
     /// @inheritdoc IL2Bridgehub
     mapping(uint256 chainId => bool) public isPeerAllowed;
+
+    /// @inheritdoc IL2Bridgehub
+    mapping(ChainFeature feature => bool enabled) public isChainFeatureEnabled;
 
     modifier onlyChainRegistrationSender() {
         if (
@@ -102,6 +106,11 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     function deregisterChainForInterop(uint256 _chainId) external onlyChainRegistrationSender {
         delete baseTokenAssetId[_chainId];
         delete isPeerAllowed[_chainId];
+    }
+
+    /// @inheritdoc IL2Bridgehub
+    function setChainFeatureEnabled(ChainFeature _feature, bool _enabled) external onlyChainRegistrationSender {
+        isChainFeatureEnabled[_feature] = _enabled;
     }
 
     /*//////////////////////////////////////////////////////////////
