@@ -7,7 +7,8 @@
 #   2. replays ZIP-18's Safe bundles 02 (ServerNotifier upgrades) and 04 (the ZKsync OS timer's handover to
 #      the PUH) as the Safe;
 #   3. sends ZIP-18's governance stages 0/1/2 as the PUH, with 200,000 s between stages 0 and 1 (both
-#      timers);
+#      timers), then registers ETH in the L1AssetTracker: v31's permissionless legacy-token registration, which
+#      follows ZIP-18 and which deposits need;
 #   4. drains chain 324 through the ValidatorTimelock and upgrades it to v0.33.0 with ZIP-18's chain call,
 #      sent by the Safe through the ChainAdmin;
 #   5. checks the CTM and chain 324 are where v34's mainnet.toml expects them.
@@ -130,6 +131,7 @@ with open(f"{S}/zip18.env", "w") as f:
         "OLD": z["ctms"]["era"]["contracts_config"]["old_protocol_version"],
         "NEW": z["ctms"]["era"]["contracts_config"]["new_protocol_version"],
         "BOARD": z["zk_governance"]["new_emergency_upgrade_board"],
+        "ASSET_TRACKER": z["core"]["upgrade_addresses"]["bridgehub"]["l1_asset_tracker_proxy_addr"],
     }.items():
         f.write(f"{k}={v}\n")
 PYZIP18
@@ -170,6 +172,14 @@ for n in 1 2; do
   while read -r to value data; do send "$PUH" "$to" "$data" "stage $n ${data:0:10} -> $to"; done < "$S/stage$n.txt"
 done
 
+BRIDGEHUB=$(call "$CTM" 'BRIDGE_HUB()(address)')
+ETH_ASSET=$(call "$BRIDGEHUB" 'baseTokenAssetId(uint256)(bytes32)' 324)
+if [ "$(call "$ASSET_TRACKER" 'isAssetRegistered(bytes32)(bool)' "$ETH_ASSET")" = "false" ]; then
+  send "$SAFE" "$ASSET_TRACKER" "$(cast calldata 'registerLegacyToken(bytes32)' "$ETH_ASSET")" \
+    "registerLegacyToken(ETH $ETH_ASSET) (permissionless; sent by the Safe)"
+fi
+chk "ETH registered in the L1AssetTracker" "$(call "$ASSET_TRACKER" 'isAssetRegistered(bytes32)(bool)' "$ETH_ASSET")" true
+
 echo "== 4. Chain 324: drain, then ZIP-18's upgrade, sent by the Safe through the ChainAdmin"
 counts() { echo "$(call "$DIAMOND" 'getTotalBatchesCommitted()(uint256)' | first) $(call "$DIAMOND" 'getTotalBatchesExecuted()(uint256)' | first)"; }
 read -r COMMITTED EXECUTED <<< "$(counts)"
@@ -192,7 +202,7 @@ chk "CTM initialCutHash = keccak(ZIP-18's diamond_cut_data)" "$(call "$CTM" 'ini
 chk "CTM initialForceDeploymentHash = keccak(abi.encode(ZIP-18's force_deployments_data))" \
   "$(call "$CTM" 'initialForceDeploymentHash()(bytes32)')" 0x5a7a068cf085071451bc01005aebf994e7931ee14abf216b732e6d49c6225e54
 chk "CTM L1_BYTECODES_SUPPLIER = ZIP-18's" "$(call "$CTM" 'L1_BYTECODES_SUPPLIER()(address)')" "$SUPPLIER"
-chk "migrations unpaused" "$(call "$(call "$(call "$CTM" 'BRIDGE_HUB()(address)')" 'chainAssetHandler()(address)')" 'migrationPaused()(bool)')" false
+chk "migrations unpaused" "$(call "$(call "$BRIDGEHUB" 'chainAssetHandler()(address)')" 'migrationPaused()(bool)')" false
 chk "PUH emergencyUpgradeBoard = ZIP-18's new board" "$(call "$PUH" 'emergencyUpgradeBoard()(address)')" "$BOARD"
 chk "chain 324 protocol version = v0.33.0" "$(call "$DIAMOND" 'getProtocolVersion()(uint256)' | first)" "$NEW"
 chk "chain 324 verifier = ZIP-18's" "$(call "$DIAMOND" 'getVerifier()(address)')" "$VERIFIER"

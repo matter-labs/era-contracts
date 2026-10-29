@@ -833,8 +833,8 @@ logs = [l for l in json.load(open(sys.argv[1]))["logs"] if l["address"].lower() 
 sys.exit(0 if len(logs) == 1 and [int(t, 16) for t in logs[0]["topics"][1:]] == [int(os.environ["CHAIN_ID"]), int(os.environ["OLD"])]
          and int(logs[0]["data"], 16) == int(os.environ["TS"]) else 1)
 PYLOG
-chk "ServerNotifier protocolVersionToUpgradeTimestamp($CHAIN_ID, v0.33.0)" "$(call "$SN" 'protocolVersionToUpgradeTimestamp(uint256,uint256)(uint256)' "$CHAIN_ID" "$OLD")" "$TS"
-chk "ChainAdmin protocolVersionToUpgradeTimestamp(v0.34.0)" "$(call "$CHAIN_ADMIN" 'protocolVersionToUpgradeTimestamp(uint256)(uint256)' "$NEW")" "$TS"
+chk "ServerNotifier protocolVersionToUpgradeTimestamp($CHAIN_ID, v0.33.0)" "$(call "$SN" 'protocolVersionToUpgradeTimestamp(uint256,uint256)(uint256)' "$CHAIN_ID" "$OLD" | first)" "$TS"
+chk "ChainAdmin protocolVersionToUpgradeTimestamp(v0.34.0)" "$(call "$CHAIN_ADMIN" 'protocolVersionToUpgradeTimestamp(uint256)(uint256)' "$NEW" | first)" "$TS"
 
 echo "== Negative: chain $CHAIN_ID's upgrade reverts while batches are in flight"
 counts() { echo "$(call "$DIAMOND" 'getTotalBatchesCommitted()(uint256)' | first) $(call "$DIAMOND" 'getTotalBatchesVerified()(uint256)' | first) $(call "$DIAMOND" 'getTotalBatchesExecuted()(uint256)' | first)"; }
@@ -1118,6 +1118,12 @@ if [ "$REF_UPGRADES" = "1" ]; then
 elif [ "$NEW_CHAIN" != "0x0000000000000000000000000000000000000000" ]; then
   echo "== Moved to test chain $TEST_CHAIN_ID: the cap on v34 and the proof-system switches"
   MOVING=1
+  # Before a new chain takes deposits, its admin sets a base-token price and unpauses deposits (the CTM creates
+  # chains with deposits paused, ChainTypeManagerBase._deployNewChain).
+  send "$ECO_ADMIN_OWNER" "$ECO_ADMIN" \
+    "$(cast calldata "$MULTICALL" "[($NEW_CHAIN,0,$(cast calldata 'setTokenMultiplier(uint128,uint128)' 1 1)),($NEW_CHAIN,0,$(cast calldata 'unpauseDeposits()'))]" true)" \
+    "test chain: its admin sets the base-token price multiplier to 1/1 and unpauses deposits"
+  chk "test chain: deposits not paused" "$(call "$NEW_CHAIN" 'depositsPaused()(bool)')" false
   cap_after "test chain:" "$TEST_CHAIN_ID" "$NEW_CHAIN"
   # Its admin is the bridgehub admin (an Ownable ChainAdmin), which the ServerNotifier also accepts.
   proof_switches "test chain $TEST_CHAIN_ID" "$TEST_CHAIN_ID" "$NEW_CHAIN" "$ECO_ADMIN" "$ECO_ADMIN_OWNER"
