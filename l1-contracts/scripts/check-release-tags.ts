@@ -26,7 +26,7 @@ const RELEASE_BRANCH_PREFIX = "release/";
 const RELEASE_TAG_PATTERN = /^(v\d|era-v\d|zkos-v?\d|zip-\d)/;
 // `v<version>` releases the ZKsync OS CTM, `era-v<version>` the Era CTM.
 const VERSION_TAG_PATTERN = /^(era-)?v(\d+\.\d+\.\d+)$/;
-// `zip-<n>` marks the commit whose calldata a governance proposal executed.
+// `zip-<n>` marks the commit that produced governance proposal ZIP-<n>'s calldata.
 const PROPOSAL_TAG_PATTERN = /^zip-\d+$/;
 
 const FLAVOURS = ["era", "zksync-os"] as const;
@@ -194,9 +194,11 @@ async function checkDeployments(_manifest: Manifest, _requireOnchain: boolean) {
 }
 
 async function checkOnchain(_deployment: Deployment, _label: string, _provider: ethers.providers.Provider) {
+  // Only a mainnet CTM's version drift fails the run: the Sepolia CTMs move with every stage and testnet upgrade.
+  const drift = _deployment.l1 == "mainnet" ? errors : warnings;
   const ctmVersion = await semver(new ethers.Contract(_deployment.ctm, SEMVER_ABI, _provider));
   if (ctmVersion != _deployment.protocolVersion) {
-    errors.push(`${_label}: CTM is at ${ctmVersion}, release-tags.json says ${_deployment.protocolVersion}`);
+    drift.push(`${_label}: CTM is at ${ctmVersion}, release-tags.json says ${_deployment.protocolVersion}`);
   }
 
   const bridgehub = new ethers.Contract(_deployment.bridgehub, BRIDGEHUB_ABI, _provider);
@@ -208,8 +210,9 @@ async function checkOnchain(_deployment: Deployment, _label: string, _provider: 
     }
     const diamond = new ethers.Contract(await bridgehub.getZKChain(chainId), SEMVER_ABI, _provider);
     const chainVersion = await semver(diamond);
+    // A chain upgrades after its CTM, so a chain that lags is reported but does not fail the run.
     if (chainVersion != _deployment.protocolVersion) {
-      errors.push(
+      warnings.push(
         `${_label}: chain ${chainId} is at ${chainVersion}, release-tags.json says ${_deployment.protocolVersion}`
       );
     }

@@ -25,6 +25,8 @@ Push the `zip-<n>` tag when governance proposal ZIP-`n` is submitted, on the com
 proposal executes, push the version tags of the CTMs it upgraded on the same commit. Every tag is pushed by hand, after
 the go-ahead from the release owner.
 
+A pushed tag is never moved. If a proposal is resubmitted with new calldata, tag the new proposal's number.
+
 The tagged commit must be on a `release/*` branch. That branch keeps the deployed bytecode: contract fixes go to the next
 release, not to the tagged branch.
 
@@ -42,14 +44,17 @@ Every tag that looks like a release tag (`v`, `era-v`, `zkos-`, `zkos-v` or `zip
 
 For each deployment in `deployments`:
 
-- the CTM's `getSemverProtocolVersion()` equals `protocolVersion`;
-- each listed chain is registered under that CTM and its diamond is at `protocolVersion`;
+- the CTM's `getSemverProtocolVersion()` equals `protocolVersion`. On Sepolia a mismatch is a warning: stage and
+  testnet upgrade often;
+- each listed chain is registered under that CTM. A chain whose diamond is not at `protocolVersion` is a warning: a
+  chain upgrades after its CTM;
 - if `tag` is set, the tag's genesis for the deployment's flavour equals `protocolVersion`. A deployment without a tag
   is reported as a warning.
 
 ## Keeping the manifest current
 
-The daily check fails while a release tag is missing from `tags`, and once a CTM moves to a new version.
+The daily check fails while a release tag is missing from `tags`, and once a mainnet CTM moves to a new version. A
+Sepolia CTM that moves is a warning until its entry is updated.
 
 - After pushing a `zip-<n>` tag, add it under `tags`.
 - After an upgrade executes, push the version tag on the commit that produced the executed calldata (for a governance
@@ -57,9 +62,11 @@ The daily check fails while a release tag is missing from `tags`, and once a CTM
 
 Open a PR with the change. The workflow runs on it, and the on-chain part runs too when the PR is not from a fork.
 
-Run the check locally with:
+Run the check locally with the command below. It reads the local tags and the `origin/release/*` branches, so fetch
+them first.
 
 ```bash
 cd l1-contracts
+git fetch origin --tags --prune
 L1_RPC_URL_MAINNET=<rpc> L1_RPC_URL_SEPOLIA=<rpc> yarn check-release-tags --require-onchain
 ```
