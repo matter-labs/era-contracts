@@ -17,16 +17,26 @@ error ManagerCommittedBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId, uint256 declaredSourceChainId);
 // 0x6a8bdfa0
 error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
+// 0x882b8530
+error ManagerExpirableFlowNotSingleLeg(uint256 legs);
+// 0xf1356db3
+error ManagerExpirableTransfersNotEnabled();
 // 0x44906526
 error ManagerFlowDeadlinePassed(uint64 deadline, uint256 latestImportedRootTimestamp);
 // 0xf8585117
 error ManagerFlowIdMismatch(bytes32 expected, bytes32 computed);
+// 0x4e7f8398
+error ManagerFlowNotExpirable(bytes32 flowId, bytes1 version);
+// 0x1fc2b5e6
+error ManagerFlowNotExpiredYet(uint256 expiresAfter, uint256 latestImportedRootTimestamp);
 // 0x1f6b4d47
 error ManagerFlowPreimageVersionMismatch(bytes1 expected, bytes1 actual);
 // 0xb5e6e3fc
 error ManagerL1ChainIdZero();
 // 0x3a62d7e3
 error ManagerLegAlreadyCommitted(bytes32 flowId, bytes32 bundleHash);
+// 0xf4ed63cf
+error ManagerLegNotCommitted(bytes32 flowId, bytes32 bundleHash, LegState actual);
 // 0x83562707
 error ManagerLegNotRevertable(bytes32 flowId, bytes32 bundleHash, LegState actual);
 // 0xe1a77fd3

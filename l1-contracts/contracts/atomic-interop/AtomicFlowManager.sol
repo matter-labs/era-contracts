@@ -12,6 +12,8 @@ import {
     ImtProof,
     AtomicFinalityProof,
     ATOMIC_FLOW_PREIMAGE_VERSION,
+    ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION,
+    ATOMIC_FLOW_EXPIRY_DELAY,
     MAX_ATOMIC_FLOW_LEGS
 } from "./IAtomicInterop.sol";
 import {InteropBundle, InteropCall} from "../common/Messaging.sol";
@@ -26,15 +28,21 @@ import {
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
+import {ChainFeature} from "../core/chain-registration/IChainRegistrationSender.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerL1ChainIdZero,
     ManagerNotInteropCenter,
     ManagerNotInteropHandler,
     ManagerLegAlreadyCommitted,
+    ManagerLegNotCommitted,
     ManagerLegNotRevertable,
+    ManagerExpirableFlowNotSingleLeg,
+    ManagerExpirableTransfersNotEnabled,
     ManagerFlowDeadlinePassed,
     ManagerFlowIdMismatch,
+    ManagerFlowNotExpirable,
+    ManagerFlowNotExpiredYet,
     ManagerFlowPreimageVersionMismatch,
     ManagerBundleHashesNotSorted,
     ManagerCommittedBundleNotInFlow,
@@ -108,6 +116,12 @@ contract AtomicFlowManager is IAtomicFlowManager {
     ) external onlyInteropCenter {
         bytes32 flowId = _validateAndComputeFlowId(_flowPreimage);
         _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
+        if (_flowPreimage.version == ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION) {
+            require(
+                IL2Bridgehub(address(L2_BRIDGEHUB)).isChainFeatureEnabled(ChainFeature.ExpirableTransfers),
+                ManagerExpirableTransfersNotEnabled()
+            );
+        }
 
         // Reject a leg of a flow whose deadline has verifiably passed: an imported settlement-layer
         // root created after the deadline is exactly what `authorizeRefund` needs, so committing now
@@ -170,6 +184,9 @@ contract AtomicFlowManager is IAtomicFlowManager {
         (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
 
         emit FlowCommitted(flowId, _bundleHash, _flowPreimage.deadline, index);
+        if (_flowPreimage.version == ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION) {
+            emit ExpirableFlowCommitted(flowId, _bundleHash);
+        }
     }
 
     /// @inheritdoc IAtomicFlowManager
@@ -177,6 +194,81 @@ contract AtomicFlowManager is IAtomicFlowManager {
         bytes32 _executingBundleHash,
         AtomicFinalityProof calldata _finality
     ) external view onlyInteropHandler {
+        _requireFlowFinalized(_executingBundleHash, _finality);
+    }
+
+    /// @inheritdoc IAtomicFlowManager
+    function recordExpiry(
+        bytes32 _bundleHash,
+        AtomicFinalityProof calldata _finality,
+        uint256 _lowNullifierIndex
+    ) external onlyInteropHandler {
+        AtomicFlowPreimage calldata preimage = _finality.flow.preimage;
+        bytes32 flowId = _finality.flow.flowId;
+        if (preimage.version != ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION) {
+            revert ManagerFlowNotExpirable(flowId, preimage.version);
+        }
+
+        uint256 expiresAfter = uint256(preimage.deadline) + ATOMIC_FLOW_EXPIRY_DELAY;
+        uint256 latestImportedRootTimestamp = L2_INTEROP_ROOT_STORAGE.latestInteropRootTimestamp(
+            preimage.settlementLayerChainId
+        );
+        if (latestImportedRootTimestamp <= expiresAfter) {
+            revert ManagerFlowNotExpiredYet(expiresAfter, latestImportedRootTimestamp);
+        }
+
+        _requireFlowFinalized(_bundleHash, _finality);
+
+        uint256 value = AtomicInteropProof.expiryValue(flowId, _bundleHash);
+        // slither-disable-next-line unused-return
+        (uint256 index, ) = IL2InteropCommitmentTree(commitmentTree()).insert(value, _lowNullifierIndex);
+
+        emit FlowExpired(flowId, _bundleHash, index);
+    }
+
+    /// @inheritdoc IAtomicFlowManager
+    function authorizeExpiryRefund(
+        AtomicFlow calldata _flow,
+        bytes calldata _bundle,
+        ImtProof calldata _expiry
+    ) external {
+        _checkFlowId(_flow);
+        AtomicFlowPreimage calldata preimage = _flow.preimage;
+        _checkSettlementLayerIsL1(preimage.settlementLayerChainId);
+        if (preimage.version != ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION) {
+            revert ManagerFlowNotExpirable(_flow.flowId, preimage.version);
+        }
+
+        // An expirable flow has exactly one leg (see {_validateAndComputeFlowId}).
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_bundle);
+        if (bundleHash != preimage.legBundleHashes[0]) {
+            revert ManagerCommittedBundleNotInFlow(_flow.flowId, bundleHash);
+        }
+        LegState s = _state[_flow.flowId][bundleHash];
+        if (s != LegState.Committed) {
+            revert ManagerLegNotCommitted(_flow.flowId, bundleHash, s);
+        }
+
+        // Bind the proof to the leg's destination, which this chain must accept like any proof source.
+        uint256 destinationChainId = abi.decode(_bundle, (InteropBundle)).destinationChainId;
+        if (_expiry.sourceChainId != destinationChainId) {
+            revert ProofSourceChainMismatch(destinationChainId, _expiry.sourceChainId);
+        }
+        _checkLegSourceAllowed(destinationChainId);
+        // No deadline bound: the expiry always settles after the deadline.
+        AtomicInteropProof.verifyInclusion(
+            _expiry,
+            AtomicInteropProof.expiryValue(_flow.flowId, bundleHash),
+            type(uint64).max,
+            preimage.settlementLayerChainId
+        );
+
+        _state[_flow.flowId][bundleHash] = LegState.Revertable;
+        emit FlowExpiryRefundAuthorized(_flow.flowId, bundleHash);
+    }
+
+    /// @dev See {requireFlowFinalized}.
+    function _requireFlowFinalized(bytes32 _executingBundleHash, AtomicFinalityProof calldata _finality) internal view {
         AtomicFlow calldata flow = _finality.flow;
         AtomicFlowPreimage calldata preimage = flow.preimage;
         _checkFlowId(flow);
@@ -358,10 +450,14 @@ contract AtomicFlowManager is IAtomicFlowManager {
     /// chain in it enable a wrong-chain refund), so only its length is checked.
     /// Shared by the send path (`append`) and `_checkFlowId`, so canonicalization cannot drift.
     function _validateAndComputeFlowId(AtomicFlowPreimage calldata _preimage) internal pure returns (bytes32) {
-        if (_preimage.version != ATOMIC_FLOW_PREIMAGE_VERSION) {
+        uint256 n = _preimage.legBundleHashes.length;
+        if (_preimage.version == ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION) {
+            if (n != 1) {
+                revert ManagerExpirableFlowNotSingleLeg(n);
+            }
+        } else if (_preimage.version != ATOMIC_FLOW_PREIMAGE_VERSION) {
             revert ManagerFlowPreimageVersionMismatch(ATOMIC_FLOW_PREIMAGE_VERSION, _preimage.version);
         }
-        uint256 n = _preimage.legBundleHashes.length;
         // See {MAX_ATOMIC_FLOW_LEGS}: appending a leg is cheap, but finalization verifies one Merkle
         // proof per leg, so the leg count must stay bounded.
         if (n > MAX_ATOMIC_FLOW_LEGS) {

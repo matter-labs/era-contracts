@@ -28,6 +28,7 @@ with an engineer-facing summary and defers the rigorous arguments to clearly-mar
 | [flow.md](./flow.md)         | End-to-end lifecycle, the shared data structures, and the `AtomicFlowManager` state machine              | engineers             |
 | [proofs.md](./proofs.md)     | The proof system: the two authenticated clocks, finality, the timeout branches, soundness & completeness | auditors              |
 | [recovery.md](./recovery.md) | The timeout/refund path and its best-effort recovery semantics                                           | engineers + auditors  |
+| [expiry.md](./expiry.md)     | Expiry of single-leg flows that can't execute, and their refund                                          | engineers + auditors  |
 | [security.md](./security.md) | Guarantees, non-guarantees, on-chain preconditions, trust assumptions, edge cases                        | auditors              |
 
 The atomic protocol's **integration** with the surrounding stack is documented where that stack lives,
@@ -72,7 +73,8 @@ interop-side send wiring.
    the manager, that **every** leg was committed in its source chain's IMT before the deadline; only
    then do the bundle's calls execute.
 4. **Timeout / refund.** If a leg never commits in time, a single absence proof authorizes refunds; each
-   committed leg reverses its own burn best-effort.
+   committed leg reverses its own burn best-effort. A single-leg flow that opted in can instead expire on its
+   destination and be refunded the same way ([expiry.md](./expiry.md)).
 
 Steps 1 and 3–4 are detailed in [flow.md](./flow.md); the proof mechanics of steps 3–4 in
 [proofs.md](./proofs.md); the refund in [recovery.md](./recovery.md); step 2's channel in
