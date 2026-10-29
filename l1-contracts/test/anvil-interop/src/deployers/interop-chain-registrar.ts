@@ -119,6 +119,37 @@ export class InteropChainRegistrar {
     console.log(`   ✅ Chain ${chainId}: chain ${peerChainId} deregistered`);
   }
 
+  /**
+   * The owner approves `feature` for `chainId` and the chain's admin enables it, which pushes it to the chain's
+   * L2 Bridgehub, see {protocol-docs/interop-gating.md#chain-features}.
+   */
+  async enableChainFeature(
+    chainId: number,
+    feature: number,
+    diamondProxy: string,
+    l2Provider: providers.JsonRpcProvider
+  ): Promise<void> {
+    const sender = new ethers.Contract(
+      this.l1Addresses.chainRegistrationSender,
+      getAbi("ChainRegistrationSender"),
+      this.l1Wallet
+    );
+    const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), l2Provider);
+
+    await this.requireChainAdmin(new ethers.Contract(diamondProxy, getAbi("IZKChain"), this.l1Wallet));
+    await (await sender.setChainFeatureApproved(chainId, feature, true)).wait();
+    const l1Receipt = await (await sender.setChainFeatureEnabled(chainId, feature, true)).wait();
+    await relayPriorityRequestsToChain(l1Receipt, diamondProxy, l2Provider);
+
+    if (
+      !(await sender.isChainFeatureEnabled(chainId, feature)) ||
+      !(await l2Bridgehub.isChainFeatureEnabled(feature))
+    ) {
+      throw new Error(`Chain feature ${feature} is not enabled for chain ${chainId} on L1 and its L2 Bridgehub`);
+    }
+    console.log(`   ✅ Chain ${chainId}: chain feature ${feature} enabled`);
+  }
+
   private async requireChainAdmin(zkChain: ethers.Contract): Promise<void> {
     const admin: string = await zkChain.getAdmin();
     if (admin !== this.l1Wallet.address) {
