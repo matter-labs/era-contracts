@@ -24,3 +24,6 @@ l1-contracts/upgrade-envs/**/output/**/protocol-ops/**/manifest.json
 # bundles, manifests. Same reasoning as above: re-formatting breaks downstream
 # replay/diff.
 l1-contracts/test/anvil-interop/outputs/
+
+# ZKIP-lite PoC: experimental, outside the protocol contracts
+zkip-poc

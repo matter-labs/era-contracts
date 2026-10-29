@@ -1,0 +1,6 @@
+work/
+circuits/target/
+circuits/*/Prover_*.toml
+contracts/out/
+contracts/cache/
+prover/__pycache__/
