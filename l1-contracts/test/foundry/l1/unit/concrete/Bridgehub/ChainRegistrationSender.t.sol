@@ -11,7 +11,7 @@ import {
 } from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+import {ChainFeature, IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -450,4 +450,60 @@ contract ChainRegistrationSenderUnitTest is Test {
 
     // add this to be excluded from coverage report
     function test() internal virtual {}
+
+    /*//////////////////////////////////////////////////////////////
+                            Chain features
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev The chain-feature push to `CHAIN_ID`'s L2 Bridgehub.
+    function _expectFeaturePush(bool _enabled) internal {
+        vm.expectCall(
+            chain,
+            abi.encodeCall(
+                IMailbox.requestL2ServiceTransaction,
+                (
+                    L2_BRIDGEHUB_ADDR,
+                    abi.encodeCall(IL2Bridgehub.setChainFeatureEnabled, (ChainFeature.ExpirableTransfers, _enabled))
+                )
+            )
+        );
+    }
+
+    function _mockBridgehubAdmin(address _admin) internal {
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.admin, ()), abi.encode(_admin));
+    }
+
+    function test_setChainFeatureEnabled_byOwnerOrBridgehubAdmin() public {
+        address ecosystemAdmin = makeAddr("ecosystemAdmin");
+        _mockBridgehubAdmin(ecosystemAdmin);
+
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.ChainFeatureSet(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+        _expectFeaturePush(true);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+        assertTrue(sender.isChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers));
+        assertFalse(sender.isChainFeatureEnabled(PEER_CHAIN_ID, ChainFeature.ExpirableTransfers));
+
+        vm.expectEmit(true, true, false, true, address(sender));
+        emit IChainRegistrationSender.ChainFeatureSet(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
+        _expectFeaturePush(false);
+        vm.prank(ecosystemAdmin);
+        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
+        assertFalse(sender.isChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers));
+    }
+
+    /// @notice A chain's admin can't enable a feature for its chain: the ecosystem decides which chains use it.
+    function test_setChainFeatureEnabled_revertWhen_chainAdmin() public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        vm.prank(chainAdmin);
+        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+    }
+
+    function test_setChainFeatureEnabled_revertWhen_chainNotRegistered() public {
+        vm.expectRevert(ZKChainNotRegistered.selector);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(UNREGISTERED_CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+    }
 }
