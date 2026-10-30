@@ -1,7 +1,7 @@
 # Expiry of single-leg flows
 
-A single-leg flow, such as a plain transfer, commits its only leg at send. Its leg can never be proven absent, so
-the timeout refund ({protocol-docs/atomicity/recovery.md}) never applies to it. If executing the leg on the
+A single-leg flow, such as a plain transfer, commits its only leg at send. Once that leg has settled by the deadline,
+it can never be proven absent, so the timeout refund ({protocol-docs/atomicity/recovery.md}) no longer applies to it. If executing the leg on the
 destination always reverts, the value collected at send is never minted there and never returned. Typical causes:
 
 - the destination token refuses the recipient (frozen, no longer allowlisted);
