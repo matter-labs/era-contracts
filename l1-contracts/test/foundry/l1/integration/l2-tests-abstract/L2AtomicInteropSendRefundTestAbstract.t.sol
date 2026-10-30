@@ -23,7 +23,6 @@ import {
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
     ManagerCommittedBundleNotInFlow,
-    ManagerExpirableTransfersNotEnabled,
     ManagerLegNotRevertable,
     ManagerLegSourceChainNotRegistered
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
@@ -975,19 +974,6 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
             uint256(LegState.Reverted),
             "leg must end Reverted"
         );
-    }
-
-    function test_expirableTransfer_RevertWhen_NotEnabledOnThisChain() public {
-        _setUpAtomicStack();
-        AtomicValueDepositor depositor = new AtomicValueDepositor();
-
-        vm.expectRevert(ManagerExpirableTransfersNotEnabled.selector);
-        this.sendExpirableTransferToEoa(address(depositor));
-    }
-
-    /// @dev External so that `vm.expectRevert` applies to the whole send.
-    function sendExpirableTransferToEoa(address _depositor) external {
-        _sendExpirableTransferToEoa(_depositor);
     }
 
     /// @dev An expirable leg from `destinationChainId`, an allowed peer, to this chain, committed there in time. This

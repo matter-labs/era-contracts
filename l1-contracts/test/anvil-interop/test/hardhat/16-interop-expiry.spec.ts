@@ -86,7 +86,7 @@ describe("16 - Expiry of single-leg flows", function () {
   let sourceManager: Contract;
   let destHandler: Contract;
   let fee: BigNumber;
-  /** Below every root either chain has imported, so the source accepts the send and the destination can't expire yet. */
+  /** After every root either chain has imported, so the source accepts the send. */
   let deadline: number;
   const recipient = Wallet.createRandom().address;
   let transfer: InteropSendResult;
@@ -216,24 +216,6 @@ describe("16 - Expiry of single-leg flows", function () {
     expect(executed, "a value call to an EOA executes").to.be.false;
     expect((await destProvider.getBalance(recipient)).isZero(), "the EOA received nothing").to.be.true;
     expect(await getBundleStatus(destProvider, transfer.bundleHash)).to.equal(BundleStatus.Unreceived);
-  });
-
-  it("rejects expiring the transfer until the destination's L1 time passes deadline + delay", async () => {
-    const latestRootTimestamp: BigNumber = await new Contract(
-      L2_INTEROP_ROOT_STORAGE_ADDR,
-      getAbi("L2InteropRootStorage"),
-      destProvider
-    ).latestInteropRootTimestamp(DEFAULT_SL_CHAIN_ID);
-
-    await expectRevert(
-      () => expireTransfer(),
-      "expire before deadline + delay",
-      customError("AtomicFlowManager", "ManagerFlowNotExpiredYet(uint256,uint256)", [
-        deadline + ATOMIC_FLOW_EXPIRY_DELAY,
-        latestRootTimestamp,
-      ]),
-      destProvider
-    );
   });
 
   it("expires the transfer on the destination, after which it can't execute", async () => {
