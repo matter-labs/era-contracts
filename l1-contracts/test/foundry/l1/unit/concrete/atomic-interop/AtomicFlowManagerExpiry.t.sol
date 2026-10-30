@@ -191,16 +191,24 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
                     Source: authorizeExpiryRefund
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Commits a leg from this chain to `REMOTE_CHAIN` through the production `append`.
-    function _commitOutgoingLeg(bytes1 _version) internal returns (AtomicFlow memory flow, bytes memory bundle) {
+    /// @dev A single-leg `_version` flow from this chain to `REMOTE_CHAIN`, and its leg's bundle.
+    function _outgoingLeg(
+        bytes1 _version
+    ) internal view returns (AtomicFlowPreimage memory preimage, bytes memory bundle) {
         bundle = _bundleBytes(block.chainid, REMOTE_CHAIN);
-        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.expirablePreimage(
+        preimage = AtomicFlowFixtures.expirablePreimage(
             keccak256(bundle),
             block.chainid,
             DEADLINE,
             SETTLEMENT_LAYER_CHAIN_ID
         );
         preimage.version = _version;
+    }
+
+    /// @dev Commits a leg from this chain to `REMOTE_CHAIN` through the production `append`.
+    function _commitOutgoingLeg(bytes1 _version) internal returns (AtomicFlow memory flow, bytes memory bundle) {
+        AtomicFlowPreimage memory preimage;
+        (preimage, bundle) = _outgoingLeg(_version);
         flow = AtomicFlow({flowId: AtomicFlowFixtures.flowId(preimage), preimage: preimage});
         vm.prank(L2_INTEROP_CENTER_ADDR);
         manager.append(keccak256(bundle), 0, preimage);
@@ -307,12 +315,8 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
     //////////////////////////////////////////////////////////////*/
 
     function test_append_expirableFlowEmitsExpirableFlowCommitted() public {
-        bytes memory bundle = _bundleBytes(block.chainid, REMOTE_CHAIN);
-        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.expirablePreimage(
-            keccak256(bundle),
-            block.chainid,
-            DEADLINE,
-            SETTLEMENT_LAYER_CHAIN_ID
+        (AtomicFlowPreimage memory preimage, bytes memory bundle) = _outgoingLeg(
+            ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION
         );
 
         vm.expectEmit(true, true, true, true, address(manager));
@@ -323,12 +327,8 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
 
     function test_append_RevertWhen_ExpirableTransfersNotEnabled() public {
         _setExpirableTransfersEnabled(false);
-        bytes memory bundle = _bundleBytes(block.chainid, REMOTE_CHAIN);
-        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.expirablePreimage(
-            keccak256(bundle),
-            block.chainid,
-            DEADLINE,
-            SETTLEMENT_LAYER_CHAIN_ID
+        (AtomicFlowPreimage memory preimage, bytes memory bundle) = _outgoingLeg(
+            ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION
         );
 
         vm.expectRevert(ManagerExpirableTransfersNotEnabled.selector);
