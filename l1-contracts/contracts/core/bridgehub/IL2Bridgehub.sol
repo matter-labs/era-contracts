@@ -4,12 +4,6 @@ pragma solidity ^0.8.21;
 
 import {IBridgehubBase} from "./IBridgehubBase.sol";
 
-/// @notice A protocol feature a chain uses only once the owner or the Bridgehub admin enabled it for the chain.
-/// See {protocol-docs/interop-gating.md#chain-features}.
-enum ChainFeature {
-    ExpirableTransfers
-}
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L2-specific Bridgehub functionality
@@ -37,14 +31,4 @@ interface IL2Bridgehub is IBridgehubBase {
     /// @notice Whether interop with the chain is allowed, see {protocol-docs/interop-gating.md#interop-peer-whitelist}.
     /// @param _chainId The chain id of the peer chain.
     function isPeerAllowed(uint256 _chainId) external view returns (bool);
-
-    /// @notice Whether `_feature` is enabled for this chain, as last pushed from L1.
-    /// See {protocol-docs/interop-gating.md#chain-features}.
-    function isChainFeatureEnabled(ChainFeature _feature) external view returns (bool);
-
-    /// @notice Records whether `_feature` is enabled for this chain. Called by the L1 `ChainRegistrationSender`.
-    /// See {protocol-docs/interop-gating.md#chain-features}.
-    /// @param _feature The feature.
-    /// @param _enabled Whether the feature is enabled.
-    function setChainFeatureEnabled(ChainFeature _feature, bool _enabled) external;
 }

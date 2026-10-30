@@ -214,7 +214,7 @@ Live environment variables:
 | `13-imt-atomic-swap`         | IMT-backed atomic swaps, timeout refunds, and invalid-flow rejection                                                                                                                                                           |
 | `14-interop-fee-units`       | Interop fee units: L2->L2 calls counted on the source only, withdrawals never; L1 fee manager ships off, prepaid balance round trip                                                                                            |
 | `15-interop-peer-whitelist`  | Governance removes an allowed peer from one side: that chain can't send to the peer and its receive filter rejects the peer's bundle; once the admin allows the peer again, both directions work and the held bundle executes  |
-| `16-interop-expiry`          | An expirable transfer to an EOA can't execute on its destination; once the source chain enabled the feature through L1, the destination expires it and the source refunds the sender                                           |
+| `16-interop-expiry`          | An expirable transfer to an EOA can't execute on its destination; the destination expires it and the source refunds the sender                                                                                                 |
 
 ## Coverage
 

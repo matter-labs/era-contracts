@@ -2,12 +2,10 @@ import { expect } from "chai";
 import type { BigNumber } from "ethers";
 import { Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { InteropChainRegistrar } from "../../src/deployers/interop-chain-registrar";
 import { getAbi } from "../../src/core/contracts";
 import { getInteropSourcePrivateKey, getInteropUnbundlerPrivateKey } from "../../src/core/accounts";
 import {
   BundleStatus,
-  ChainFeature,
   DEFAULT_TX_GAS_LIMIT,
   INTEROP_CENTER_ADDR,
   L2_ATOMIC_FLOW_MANAGER_ADDR,
@@ -16,15 +14,9 @@ import {
   L2_INTEROP_ROOT_STORAGE_ADDR,
   LegState,
 } from "../../src/core/const";
-import {
-  createProvider,
-  getChainDiamondProxy,
-  getInteropChainIds,
-  getL1RpcUrl,
-  getL2RpcUrl,
-} from "../../src/core/utils";
+import { createProvider, getInteropChainIds, getL2RpcUrl } from "../../src/core/utils";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
-import { customError, expectBalanceDelta, expectRevert } from "../../src/helpers/balance-helpers";
+import { expectBalanceDelta } from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
   ensureSettlementInteropRoot,
@@ -75,7 +67,6 @@ describe("16 - Expiry of single-leg flows", function () {
   let destChainId: number;
   let sourceProvider: ethers.providers.JsonRpcProvider;
   let destProvider: ethers.providers.JsonRpcProvider;
-  let registrar: InteropChainRegistrar;
   let sourceManager: Contract;
   let destHandler: Contract;
   let fee: BigNumber;
@@ -86,7 +77,7 @@ describe("16 - Expiry of single-leg flows", function () {
 
   before(async () => {
     state = runner.loadState();
-    if (!state.chains || !state.l1Addresses || !state.chainAddresses) {
+    if (!state.chains) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
     const interopChainIds = getInteropChainIds(state.chains.config);
@@ -95,7 +86,6 @@ describe("16 - Expiry of single-leg flows", function () {
     }
     [sourceChainId, destChainId] = interopChainIds;
 
-    registrar = new InteropChainRegistrar(getL1RpcUrl(state), state.l1Addresses);
     sourceProvider = createProvider(getL2RpcUrl(state, sourceChainId));
     destProvider = createProvider(getL2RpcUrl(state, destChainId));
     sourceManager = new Contract(
@@ -153,24 +143,6 @@ describe("16 - Expiry of single-leg flows", function () {
       value: fee.add(TRANSFER_AMOUNT),
     });
   }
-
-  it("rejects an expirable transfer while the source chain hasn't enabled the feature", async () => {
-    await expectRevert(
-      () => sendExpirableTransfer(),
-      "expirable transfer without the feature",
-      customError("AtomicFlowManager", "ManagerExpirableTransfersNotEnabled()", []),
-      sourceProvider
-    );
-  });
-
-  it("enables the feature for the source chain through L1", async () => {
-    await registrar.enableChainFeature(
-      sourceChainId,
-      ChainFeature.ExpirableTransfers,
-      getChainDiamondProxy(state.chainAddresses!, sourceChainId),
-      sourceProvider
-    );
-  });
 
   it("sends an expirable transfer to an EOA, which can't execute on the destination", async () => {
     transfer = await sendExpirableTransfer();

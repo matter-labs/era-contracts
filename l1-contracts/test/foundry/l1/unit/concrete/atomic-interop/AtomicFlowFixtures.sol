@@ -14,7 +14,6 @@ import {
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {BundleAttributes} from "contracts/common/Messaging.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
-import {ChainFeature} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -127,15 +126,5 @@ abstract contract AtomicPredeployFixture is Test {
     /// isolate the manager from the whitelist, which `L2Bridgehub` and `ChainRegistrationSender` own.
     function _setLegSourceAllowed(uint256 _chainId, bool _allowed) internal {
         vm.mockCall(L2_BRIDGEHUB_ADDR, abi.encodeCall(IL2Bridgehub.isPeerAllowed, (_chainId)), abi.encode(_allowed));
-    }
-
-    /// @dev Stubs this chain's `ExpirableTransfers` feature, which the manager's `append` reads for an expirable flow:
-    /// these suites isolate the manager from the feature, which `L2Bridgehub` and `ChainRegistrationSender` own.
-    function _setExpirableTransfersEnabled(bool _enabled) internal {
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeCall(IL2Bridgehub.isChainFeatureEnabled, (ChainFeature.ExpirableTransfers)),
-            abi.encode(_enabled)
-        );
     }
 }
