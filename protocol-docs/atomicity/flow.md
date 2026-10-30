@@ -144,8 +144,8 @@ recorded at `initL2`.
 | `legState(flowId, bundleHash)`                          | anyone            | `view` accessor.                                                                          |
 | `initL2(l1ChainId)`                                     | `ComplexUpgrader` | One-time genesis wiring: records `L1_CHAIN_ID`. Rejects a zero id and a second call.      |
 
-`append` and `requireFlowFinalized` are gated to the canonical `InteropCenter` / `InteropHandler`
-addresses (`onlyInteropCenter` / `onlyInteropHandler`, reverting `ManagerNotInteropCenter` /
+`append` is gated to the canonical `InteropCenter`, and `requireFlowFinalized` and `recordExpiry` to the
+canonical `InteropHandler` (`onlyInteropCenter` / `onlyInteropHandler`, reverting `ManagerNotInteropCenter` /
 `ManagerNotInteropHandler`); both addresses come from the `interopCenter()` / `interopHandler()` constant
 getters, so there is nothing to configure. `initL2` is `onlyUpgrader`. `authorizeRefund` and
 `claimRefund` are permissionless — they are pure proof-and-effect functions; anyone may push a timed-out

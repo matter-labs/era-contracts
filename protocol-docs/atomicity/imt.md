@@ -2,8 +2,9 @@
 
 Each chain owns one **append-only Indexed Merkle Tree (IMT)**, the `L2InteropCommitmentTree`, a genesis
 built-in at `0x10012`. It is the ledger of every atomic-flow leg that chain has ever committed: one
-`commitValue` leaf per leg. Everything the finality and timeout proofs assert reduces to "this value is
-present in / absent from this chain's IMT at this batch" (see {protocol-docs/atomicity/proofs.md}).
+`commitValue` leaf per leg, plus one `expiryValue` leaf per incoming leg it expired
+({protocol-docs/atomicity/expiry.md}). Everything the finality and timeout proofs assert reduces to "this
+value is present in / absent from this chain's IMT at this batch" (see {protocol-docs/atomicity/proofs.md}).
 
 The **generic** indexed-Merkle-tree data structure — the `{value, nextIndex, nextValue}` leaf, the
 low-nullifier non-membership technique, and the hashing rules — is documented once in
@@ -48,8 +49,9 @@ A thin, access-controlled wrapper over one `IMT` in storage:
 
 - `insert(_value, _lowNullifierIndex)` — **appender-gated**: only the `AtomicFlowManager` (the
   `appender()` getter, a canonical fixed address) may insert, otherwise `CommitmentTreeNotAppender`.
-  This is the sole mutator; the manager calls it from `append` with the leg's `commitValue` and the
-  caller-supplied low-nullifier hint. Besides mutating the tree it publishes the leaf for DA and emits
+  This is the sole mutator; the manager calls it from `append` with the leg's `commitValue`, and from
+  `recordExpiry` with an expired leg's `expiryValue`, each with the caller-supplied low-nullifier hint.
+  Besides mutating the tree it publishes the leaf for DA and emits
   `RootUpdated` (see [below](#the-root-is-read-from-storage-never-published)).
 - `root()`, `leafCount()`, `leafAt(_index)`, `merklePath(_index)` — read-only accessors used by the
   off-chain proof engine and tests to build inclusion / non-inclusion proofs. `leafCount()` counts the
