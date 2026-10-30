@@ -29,7 +29,7 @@ use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
-use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
+use crate::common::external_actions::{Accounted, DeclaredCalls, ExternalAction};
 use crate::common::forge::scripts::{
     ADMIN_FUNCTIONS_INVOCATION, CURRENT_CORE_UPGRADE_SCRIPT_PATH, CURRENT_CTM_UPGRADE_SCRIPT_PATH,
     CURRENT_UPGRADE_LOCAL_INPUT_PATH, UPGRADE_CORE_OUTPUT_PATH,
@@ -216,25 +216,10 @@ fn check_bundle_provenance(
     use crate::common::governance_calls::decode_calls;
     let calls =
         decode_calls(&gov.calls).with_context(|| format!("{source}: decode governance calls"))?;
-    let for_phase: Vec<&ExternalAction> = declared
-        .iter()
-        .filter(|a| a.phase == GOVERNANCE_PHASE)
-        .collect();
-    // Matched one-for-one rather than by set membership, so a bundle cannot carry a declared call
-    // twice over while a second declaration goes unemitted.
-    let mut claimed = vec![false; for_phase.len()];
-    let mut order = Vec::with_capacity(calls.len());
-    for call in &calls {
-        let matched = for_phase
-            .iter()
-            .enumerate()
-            .position(|(i, action)| !claimed[i] && action.is_call(call));
-        match matched {
-            Some(i) => {
-                claimed[i] = true;
-                order.push(i);
-            }
-            None => anyhow::bail!(
+    let account = DeclaredCalls::match_calls(&calls, declared);
+    for (call, accounted) in calls.iter().zip(&account.calls) {
+        if !matches!(accounted, Accounted::Declared(_)) {
+            anyhow::bail!(
                 "{source}: the governance bundle carries a call no declared external action \
                  accounts for — target {:#x}, value {}, selector 0x{}. Every emitted call must be \
                  a declared action (see ExternalActionsLib); the executor legs are derived by the \
@@ -242,19 +227,19 @@ fn check_bundle_provenance(
                 call.target,
                 call.value,
                 hex::encode(&call.data[..call.data.len().min(4)])
-            ),
+            );
         }
     }
-    if let Some(i) = claimed.iter().position(|c| !c) {
+    if let Some(&i) = account.unclaimed.first() {
         anyhow::bail!(
             "{source}: declares a governance external action it never emits — {}",
-            for_phase[i].describe()
+            account.actions[i].describe()
         );
     }
     // The verifier holds the merged bundle's external actions to their declared order, so a
     // prepare that emits them in another one is refused here rather than there.
     anyhow::ensure!(
-        order.windows(2).all(|pair| pair[0] < pair[1]),
+        account.in_order,
         "{source}: emits its declared governance external actions in another order than it \
          declares them"
     );
@@ -450,7 +435,7 @@ pub async fn replay_governance_calls(
         )
         .await
         .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
-        expect_applied(&runner.rpc_url, toml_path, governance_addr)
+        expect_applied(&runner.rpc_url, toml_path, governance_addr, bridgehub)
             .await
             .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
     }
@@ -458,12 +443,14 @@ pub async fn replay_governance_calls(
 }
 
 /// When `governance_toml` is a registry package, holds the fork state after its bundle against
-/// everything the package must have left ([`applied::verify_applied`]); any unmet expectation
-/// fails. A TOML that is not a registry package is left alone.
+/// everything the package must have left ([`applied::verify_applied`]), its core rows' slots
+/// discovered through `bridgehub`; any unmet expectation fails. A TOML that is not a registry
+/// package is left alone.
 async fn expect_applied(
     rpc_url: &str,
     governance_toml: &Path,
     governance: Address,
+    bridgehub: Address,
 ) -> anyhow::Result<()> {
     let Some(package) = RegistryPackage::load_if_registry(governance_toml)? else {
         logger::info(format!(
@@ -475,7 +462,7 @@ async fn expect_applied(
     logger::step("Checking the state the bundle left");
     let provider = crate::common::ethereum::get_provider(rpc_url)?;
     let mut result = VerificationResult::default();
-    applied::verify_applied(&provider, &package, governance, &mut result).await;
+    applied::verify_applied(&provider, &package, governance, bridgehub, &mut result).await;
     result
         .ensure_success()
         .context("the replayed bundle executed but did not leave the state its package describes")
@@ -1589,6 +1576,7 @@ pub fn run_execution_script(
 mod tests {
     use super::*;
     use crate::common::env_config::GovernanceKind;
+    use crate::common::external_actions::GOVERNANCE_PHASE;
 
     /// A PUH-governed env is not by itself a reason to replace its governance set: only the
     /// release's own declaration is. Every recurring preparation used to take the first for the
@@ -2040,6 +2028,15 @@ mod tests {
             let is_declared = declared.iter().any(|a| a.is_call(c));
             assert_eq!(is_declared, !(2..5).contains(&i), "call {i}");
         }
+        // The calls beside the legs ARE the declarations, one for one and in declared order: the
+        // rule the verifier holds every package kind to.
+        let beside_the_legs: Vec<&GovernanceCall> = bundle
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !(2..5).contains(i))
+            .map(|(_, call)| call)
+            .collect();
+        assert!(DeclaredCalls::match_calls(beside_the_legs, &declared).is_exact());
         assert!(doc.get("operation").is_none());
     }
 
@@ -2091,7 +2088,7 @@ mod tests {
             ),
         )
         .unwrap();
-        expect_applied(UNREACHABLE, &plain, Address::ZERO)
+        expect_applied(UNREACHABLE, &plain, Address::ZERO, Address::ZERO)
             .await
             .expect("a TOML that is no registry package is not read back");
 
@@ -2103,7 +2100,7 @@ mod tests {
         .unwrap();
         let package = dir.path().join("ecosystem.toml");
         fs::write(&package, toml::to_string(&doc).unwrap()).unwrap();
-        let err = expect_applied(UNREACHABLE, &package, Address::ZERO)
+        let err = expect_applied(UNREACHABLE, &package, Address::ZERO, Address::ZERO)
             .await
             .expect_err("an unreadable post-state is not a landed one");
         assert!(
@@ -2173,6 +2170,9 @@ mod tests {
         .unwrap();
         let bundle = merged_bundle(&doc);
         assert_eq!(targets_and_data(&bundle), targets_and_data(&[extra, ctm]));
+        // With no leg, the whole bundle IS the declarations, in declared order.
+        let declared: Vec<ExternalAction> = doc["external_actions"].clone().try_into().unwrap();
+        assert!(DeclaredCalls::match_calls(&bundle, &declared).is_exact());
     }
 }
 

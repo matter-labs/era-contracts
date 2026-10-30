@@ -688,6 +688,27 @@ mod tests {
         assert!(envs > 0, "no permanent values in {}", dir.display());
     }
 
+    /// Every env declares a non-zero `bridgehub_proxy_addr`: it is the reviewed Bridgehub every
+    /// registry package verified with `--env` is bound to (`registry::ecosystem_binding`).
+    #[test]
+    fn every_env_declares_a_bridgehub() {
+        let dir = resolve_l1_contracts_path()
+            .unwrap()
+            .join(PERMANENT_VALUES_DIR);
+        let mut envs = 0;
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+            let env = path.file_stem().unwrap().to_str().unwrap();
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
+            assert_ne!(cfg.bridgehub(), Address::ZERO, "{env}");
+            envs += 1;
+        }
+        assert!(envs > 0, "no permanent values in {}", dir.display());
+    }
+
     /// The `local` env pins the ZK token a prepare on a local L1 without `--env` pins
     /// (`L1Network::Localhost`), so a package prepared on anvil verifies with `--env local`.
     #[test]

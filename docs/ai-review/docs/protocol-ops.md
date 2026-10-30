@@ -97,8 +97,15 @@ from calldata:
   an expectation all fail. What this cannot cover: the values in a CARRIED-OVER member's immutable
   slots, accepted by the review that installed it (none for a release `ctm init` deployed), and
   the `initialize` calldata of a proxy the package introduces.
+- **Ecosystem binding** (`ecosystem_binding.rs`) — every package kind is verified against one
+  reviewed Bridgehub, the env's `bridgehub_proxy_addr` or `--expected-bridgehub` (a run with
+  neither is refused). It is the only ecosystem root: the package's `bridgehub_proxy_addr` must be
+  it, every CTM the package drives must be registered on it and answer it as its `BRIDGE_HUB()`,
+  the core executor's `PROXY_ADMIN` must be its EIP-1967 admin and the CTM executor's
+  `CTM_PROXY_ADMIN` the CTM proxy's. Every lookup below that names "the Bridgehub" goes through
+  it; a value the package supplies is a cross-check, never a root.
 - **Inventory slots** (`rows.rs`) — every participating proxy row names the proxy of its slot
-  (`L1EcosystemContract` / `CTMContract` member `i`), discovered on chain through the Bridgehub and
+  (`L1EcosystemContract` / `CTMContract` member `i`), discovered on chain through the reviewed Bridgehub and
   the getters it links (asset router, nullifier, NTV, message root, CTM deployment tracker, chain
   asset handler, chain registration sender, interop handler) or through the CTM (itself, its
   validator timelock, bytecodes supplier, permissionless validator, server notifier), and its
@@ -109,7 +116,7 @@ from calldata:
   immutables, which code identity masks, are held by value against the live CTM, else the
   inventory row of their slot, else a proxy the package introduces that runs the reviewed
   `TransparentUpgradeableProxy` with the CTM-domain ProxyAdmin in its EIP-1967 admin slot and the
-  slot's reviewed contract behind it (`BRIDGE_HUB` has no fallback) — through its getters, and
+  slot's reviewed contract behind it (`BRIDGE_HUB` falls back to the reviewed Bridgehub) — through its getters, and
   again through its construction record (its `_bridgehub` against the reviewed Bridgehub), as is
   every `implNew` (member construction above).
 - **Bound authority** — the domain executors the legs run through (the CTM executor's immutable
@@ -117,9 +124,14 @@ from calldata:
   core executor's against the ecosystem `ProxyAdmin`), the CTM and both ProxyAdmins, and the
   governance owner the whole lifecycle answers to, with no ownership nomination outstanding on any
   of them; for a bootstrap also the owner of the CTM's Bridgehub, which the CTM takes chain freezes
-  from too. The reviewed owner is what the executors' current ownership is checked against, so for
-  an upgrade package `--expected-governance-owner` is not optional: without it that ownership is
-  unverifiable, which is an error.
+  from too. With a CTM leg or at the bootstrap, the CTM's ValidatorTimelock must stay governance's:
+  owned by it with no nomination, or nominating it with the bundle carrying governance's declared
+  `acceptOwnership()` on it. Held by the owner of a legacy `Governance.sol` governance (as
+  `ecosystem init` leaves it) it is a warning, as at the merge-base; a carried `acceptOwnership()`
+  on a timelock that has not nominated governance is an error, because it reverts the bundle. The
+  reviewed owner is what the executors' current ownership is checked
+  against, so for an upgrade package `--expected-governance-owner` is not optional: without it that
+  ownership is unverifiable, which is an error.
 - **Departing state** — the version and release edge against live, and every proxy row's
   `expectedOldImpl` against the implementation actually live behind that proxy, read through the
   domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. For a bootstrap, every
@@ -128,7 +140,7 @@ from calldata:
 - **Genesis** — on the upgrade and bootstrap paths, a release's genesis batch hash against the
   reviewed commit's genesis config (`configs/genesis/zksync-os/latest.json`), its index against
   zero, and every field of its force-deployments data against an independent expectation: the L1
-  chain id, the live Bridgehub's asset router, chain cap and (aliased) chain-registration sender,
+  chain id, the reviewed Bridgehub's asset router, chain cap and (aliased) chain-registration sender,
   the aliased reviewed governance, the reviewed ZK token asset id (the `zk_token_asset_id` of the
   `--env` permanent values; without `--env` the run stops), zero for the legacy fields, and the
   release's own table for the bytecode fields; the package's `force_deployments_data` remains a
@@ -150,21 +162,31 @@ reviewed order?** For an upgrade that is the whole of it (`verify_upgrade_calls`
 re-encoded here from the reviewed executor and object, and the run — core, then CTM
 infrastructure, then CTM transition, each only when present — must appear exactly once,
 contiguous and in that order. With no coordinator on chain, the order the bundle states is the
-order the domains apply in; the one governance execution keeps them atomic. Every other call must
-be a declared governance external action, matched one for one and in declared order, and none may
+order the domains apply in; the one governance execution keeps them atomic. No other call may
 reach the upgrade's authorities (the executors, the objects, the CTM, either ProxyAdmin) whether
-declared or not. The legs' INTERNAL calls are deliberately not re-derived — the executors derive
+declared or not. This rule, in every package kind, reads each call's direct target: a call nested
+inside another (a multicall, or any contract that forwards calls) carries only its wrapper's
+authority as far as the check sees, so a declared wrapper's inner calls are the reviewer's to read.
+The legs' INTERNAL calls are deliberately not re-derived — the executors derive
 them on chain from the same pinned objects, and a second derivation in the tool would be a second
 implementation to keep in sync.
 
 A bootstrap edge is the exception, because its executors do not yet hold their domains: governance
 executes a LIST of ordinary calls that `RegistryBootstrapSequence.actions()` derives, so the
-submitted bundle must END with exactly that list, and only declared calls outside the edge's
-authorities (the merge's extras) may precede it. The list's last call is `validateApplied()` on the
-migration, so a bootstrap that does not complete reverts the whole bundle. That list comparison is
-transitional scaffolding for the
+submitted bundle must END with exactly that list, and only calls outside the edge's authorities
+(the merge's extras) may precede it. The merge's CTM `acceptOwnership()` reaches the CTM, an
+authority, so a bootstrap cannot be verified while the CTM has a nomination outstanding: a CTM
+nomination to governance is accepted in an earlier governance execution, before the bootstrap is
+prepared. The list's last call is `validateApplied()` on the migration, so a bootstrap that does not
+complete reverts the whole bundle. That list comparison is transitional scaffolding for the
 bootstrap alone, and nothing new should be built on it. A replacement's bundle carries one
 `forward` to the CTM's executor and nothing else that reaches the CTM or its executor.
+
+For every kind, the calls other than the executor legs ARE the package's governance-phase
+declarations — one for one, in declared order, every declaration present (`declared_calls.rs`, the
+same matcher the merge's `check_bundle_provenance` uses); the bootstrap's derived run and a
+replacement's `forward` are declared like any other call. A declared call an authority rule refuses
+reports twice: the call, and the declaration it leaves uncarried.
 
 It deliberately does NOT re-derive facet cuts, L2 transactions or proposals — those come from the
 audited on-chain derivation. Of the objects' own `validate()` it calls only the arriving
@@ -198,8 +220,10 @@ when the package loads.
 **Did the bundle land?** is not this verifier's question but `ecosystem upgrade-governance`'s: it
 replays the bundle on a fork and fails unless the fork is left in the state the package describes
 (`registry/applied.rs`): the CTM's version, release and committed transition, the CTM domain and the
-notifier held by the CTM executor, both executors owned by governance, no nomination outstanding,
-every row's proxy at its `implNew`. On chain, the bootstrap's `validateApplied()` and
+notifier held by the CTM executor, the ValidatorTimelock owned by governance, both executors owned
+by governance, no nomination outstanding, every row's proxy at its `implNew` and every core row in
+the slot whose proxy the replay's Bridgehub names, and a replacement's deadline change (a cleared
+override falling back to the committed transition's pin). On chain, the bootstrap's `validateApplied()` and
 `applyCTMUpgrade`'s check of its own commit assert part of it in the same transaction.
 
 ## What protocol-ops is

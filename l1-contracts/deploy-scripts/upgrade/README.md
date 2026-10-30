@@ -82,10 +82,15 @@ On one anvil fork of L1, in this order:
    owner (`UpgradeFull::run_ctm_admin_steps`; see the
    [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
 5. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
-   PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it.
+   PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it, and the deployer plan
+   check refuses such a release until it learns the redeploy's salt and artifacts
+   ([Deployer signing](../../../docs/upgrade-operations.md#deployer-signing)).
 6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
-   governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
-   `acceptOwnership` normalization) → the core prepare's declared calls → the executor legs,
+   governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring, and while a
+   CTM predates the bootstrap, the `acceptOwnership()` of that CTM or its `ValidatorTimelock` when
+   governance is the pending owner; a package carrying the CTM's does not verify, so a CTM
+   nomination is accepted in an earlier governance execution) → the core prepare's declared calls →
+   the executor legs,
    derived from the `[registry]` objects and executors the prepares reported, one contiguous run in
    canonical order (`applyL1Upgrade(core_transition_addr)`,
    `applyInfrastructureUpgrade(ctm_infrastructure_transition_addr)`,
@@ -156,6 +161,23 @@ after Glamsterdam single deploys exceed it on their own (their state gas is outs
 cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manifest.json --l1-rpc-url <rpc> --key 0x<addr>=0x<key>
 ```
 
+`upgrade-broadcast` checks nothing it signs: run the deployer plan check first
+([what it admits](../../../docs/upgrade-operations.md#deployer-signing)). For a deploy bundle, sign
+with `replay-bundle` instead, which refuses a checkout other than the bundle's clean
+`contracts_commit`, then runs the check, then broadcasts:
+
+```sh
+cargo run -p protocol_ops -- ecosystem replay-bundle --bundle <bundle> --rpc <rpc> --key 0x<key>
+```
+
+For a prepare output that is not packed into a bundle, run the check against the env's reviewed
+inputs before the `upgrade-broadcast` above:
+
+```sh
+cargo run -p protocol_ops -- ecosystem check-deployer-plan --manifest <out>/manifest.json \
+  --ecosystem-toml <env-out>/ecosystem.toml --deployer 0x<addr> --env <env> --l1-rpc-url <rpc>
+```
+
 ## 6. Governance
 
 ```sh
@@ -204,7 +226,8 @@ Gotchas:
   governance calls. They must land before the proposal.
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the
-  handler names when the calldata is emitted.
+  handler names when the calldata is emitted. The deployer plan check refuses such a release for
+  now (step 5).
 
 Companions:
 
@@ -243,11 +266,37 @@ after v35, the restriction's default admin sets it for the new one
 (`setRequiredRoleForCall(chainAddress, 0x03129ad9, role)`); until then only the default admin can
 send the crossing.
 
-Server and monitoring consumers must read the final transaction through
-`transition.l2UpgradeTx(bridgehub, chainId)` or `bootstrap.l2UpgradeTx(chainId)`. These views
-use the same chain-context composition as execution; there is no
-`getL2UpgradeTxData(bridgehub, chainId, zksyncOS, data)`, so its external consumers must be updated
-and verified before rollout.
+**Node pre-flight.** A node follows a registry-driven or bootstrap edge as
+[Node integration](../../../protocol-docs/node-upgrade-integration.md) requires; a zksync-os-server
+release without it stops on the chain's first `UpgradeTimestampUpdated` of such an edge. Before any
+`chain set-upgrade-timestamp` of the bootstrap edge or a later one, confirm that every node of every
+chain that will cross runs a server release that meets that page, and schedule a chain only once
+all of its nodes do. Monitoring reads the final transaction through the same views
+(`transition.l2UpgradeTx(bridgehub, chainId)`, `bootstrap.l2UpgradeTx(chainId)`); there is no
+`getL2UpgradeTxData`.
+
+**After a transition replacement.** `replaceUpgradeTransition` changes what a chain departing that
+version crosses
+([replacing a committed transition](../../../protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition)).
+Before it executes, check that no chain still on that version has a schedule
+(`ServerNotifier.protocolVersionToUpgradeTimestamp(chainId, oldVersion)`) that has already passed:
+its nodes may have executed the replaced edge's L2 transaction, which is not the one its crossing
+would record. After it executes, the admin of every chain that had scheduled that departure re-runs
+`chain set-upgrade-timestamp`; nodes resolve the edge at execution
+([requirement 4](../../../protocol-docs/node-upgrade-integration.md#requirements)).
+
+**DA during a crossing.** `chain upgrade` leaves the chain's DA setup as it is unless
+`--da-mode <mode> --l1-da-validator <address>` names the one it moves to, set in the same multicall;
+`--l2-da-commitment-scheme` overrides the scheme the mode derives and is refused without
+`--da-mode`. The bundle sets the pubdata content only when the mode changes it, so a permanent rollup
+can move its pair in the same multicall. From v33 on, `chain upgrade` refuses to prepare a crossing
+after which the chain (with what the bundle sets, and its live DA pair and `getPubdataContent()` for
+the rest) commits full pubdata and delivers nothing, which does not prove; commits full pubdata
+through an L1 DA validator that does not check its delivery; commits the log region and delivers
+nothing L1 checks, unless `--acknowledge-unrecommended-noda` is passed; or commits full pubdata
+while priced as a validium. A blobs or calldata scheme is checked only through a pair the chain's
+`RollupDAManager` allows; `pubdata-keccak256` takes any external DA validator on trust, but not a
+rollup one or the no-DA validator the chain runs today.
 
 ## Preparing the scripts for a new upgrade
 

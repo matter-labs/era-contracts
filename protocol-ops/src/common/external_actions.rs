@@ -17,7 +17,8 @@
 //!
 //! Carrying the call itself rather than a rendering of it is what lets the merge check provenance
 //! by identity (see `check_bundle_provenance`): every call of the governance bundle must BE one of
-//! the governance phase's declared actions. The one-line renderings reviewers read are produced by
+//! the governance phase's declared actions, one for one and in declared order ([`DeclaredCalls`],
+//! which the verifier holds every registry package kind to as well). The one-line renderings reviewers read are produced by
 //! [`ExternalAction::describe`] at the point of display.
 
 use alloy::primitives::{Address, Bytes, U256};
@@ -74,6 +75,84 @@ impl ExternalAction {
             alloy::hex::encode(selector),
             self.authority,
         )
+    }
+}
+
+/// How one bundle call stands against the governance-phase declarations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Accounted {
+    /// The call IS the declaration at this index of [`DeclaredCalls::actions`].
+    Declared(usize),
+    /// The call is a declared action, but every declaration of it already accounts for an
+    /// earlier call.
+    Repeat,
+    /// No governance-phase declaration is this call.
+    Undeclared,
+}
+
+/// Bundle calls held against the governance-phase declarations one for one: each call claims
+/// the first unclaimed declaration it IS ([`ExternalAction::is_call`]). The calls are exactly the
+/// declarations, in declared order, iff [`Self::is_exact`] — the shape
+/// `ExternalActionsLib.callsForPhase` emits.
+#[derive(Debug)]
+pub struct DeclaredCalls<'a> {
+    /// The governance-phase declarations, in declared order.
+    pub actions: Vec<&'a ExternalAction>,
+    /// One entry per call, in the order the calls were given.
+    pub calls: Vec<Accounted>,
+    /// Indices into `actions` that no call claimed.
+    pub unclaimed: Vec<usize>,
+    /// Whether the claimed declarations appear in declared order.
+    pub in_order: bool,
+}
+
+impl<'a> DeclaredCalls<'a> {
+    /// Accounts for `calls`, in order, against the governance-phase actions of `declared`.
+    pub fn match_calls<'c>(
+        calls: impl IntoIterator<Item = &'c GovernanceCall>,
+        declared: &'a [ExternalAction],
+    ) -> Self {
+        let actions: Vec<&ExternalAction> = declared
+            .iter()
+            .filter(|action| action.phase == GOVERNANCE_PHASE)
+            .collect();
+        let mut claimed = vec![false; actions.len()];
+        let mut last: Option<usize> = None;
+        let mut in_order = true;
+        let calls = calls
+            .into_iter()
+            .map(|call| {
+                match (0..actions.len()).find(|&i| !claimed[i] && actions[i].is_call(call)) {
+                    Some(i) => {
+                        claimed[i] = true;
+                        if last.is_some_and(|previous| previous > i) {
+                            in_order = false;
+                        }
+                        last = Some(i);
+                        Accounted::Declared(i)
+                    }
+                    None if actions.iter().any(|action| action.is_call(call)) => Accounted::Repeat,
+                    None => Accounted::Undeclared,
+                }
+            })
+            .collect();
+        let unclaimed = (0..actions.len()).filter(|&i| !claimed[i]).collect();
+        Self {
+            actions,
+            calls,
+            unclaimed,
+            in_order,
+        }
+    }
+
+    /// The calls ARE the governance-phase declarations, one for one and in declared order.
+    pub fn is_exact(&self) -> bool {
+        self.in_order
+            && self.unclaimed.is_empty()
+            && self
+                .calls
+                .iter()
+                .all(|account| matches!(account, Accounted::Declared(_)))
     }
 }
 
@@ -164,5 +243,94 @@ mod tests {
         assert!(!action.is_call(&call(0x11, 1, &[0xab])));
         assert!(!action.is_call(&call(0x11, 2, &[0xaa])));
         assert!(!action.is_call(&call(0x12, 1, &[0xaa])));
+    }
+
+    fn decl(calls: &[GovernanceCall]) -> Vec<ExternalAction> {
+        calls
+            .iter()
+            .map(|c| ExternalAction::governance("l", "a", c))
+            .collect()
+    }
+
+    #[test]
+    fn identical_declarations_are_claimed_in_turn() {
+        let a = call(0x11, 0, &[0xaa]);
+        let declared = decl(&[a.clone(), a.clone()]);
+        assert!(DeclaredCalls::match_calls([&a, &a], &declared).is_exact());
+        let one = DeclaredCalls::match_calls([&a], &declared);
+        assert_eq!(one.unclaimed, vec![1]);
+        let three = DeclaredCalls::match_calls([&a, &a, &a], &declared);
+        assert_eq!(three.calls[2], Accounted::Repeat);
+    }
+
+    #[test]
+    fn a_repeat_is_told_apart_from_an_undeclared_call() {
+        let (a, b) = (call(0x11, 0, &[0xaa]), call(0x22, 0, &[0xbb]));
+        let declared = decl(std::slice::from_ref(&a));
+        let account = DeclaredCalls::match_calls([&a, &a, &b], &declared);
+        assert_eq!(
+            account.calls,
+            vec![
+                Accounted::Declared(0),
+                Accounted::Repeat,
+                Accounted::Undeclared
+            ]
+        );
+    }
+
+    #[test]
+    fn a_repeated_value_transfer_is_a_repeat() {
+        let pay = call(0x33, 1_000, &[]);
+        let declared = decl(std::slice::from_ref(&pay));
+        let account = DeclaredCalls::match_calls([&pay, &pay], &declared);
+        assert!(!account.is_exact());
+        assert_eq!(account.calls[1], Accounted::Repeat);
+    }
+
+    #[test]
+    fn interleaved_duplicates_out_of_order_are_caught() {
+        let (a, b) = (call(0x11, 0, &[0xaa]), call(0x22, 0, &[0xbb]));
+        let declared = decl(&[a.clone(), b.clone(), a.clone()]);
+        let account = DeclaredCalls::match_calls([&a, &a, &b], &declared);
+        assert!(account.unclaimed.is_empty());
+        assert!(!account.in_order);
+    }
+
+    #[test]
+    fn an_admin_declaration_accounts_for_nothing() {
+        let a = call(0x11, 0, &[0xaa]);
+        let mut declared = decl(std::slice::from_ref(&a));
+        declared[0].phase = "admin".to_string();
+        let account = DeclaredCalls::match_calls([&a], &declared);
+        assert_eq!(account.calls, vec![Accounted::Undeclared]);
+        assert!(account.actions.is_empty());
+    }
+
+    /// Exhaustively, over every pair of sequences of up to four calls from a two-call alphabet:
+    /// the account is exact iff the calls ARE the declarations, in order.
+    #[test]
+    fn exact_iff_the_calls_are_the_declarations_in_order() {
+        let alphabet = [call(0x11, 0, &[0xaa]), call(0x11, 1, &[0xaa])];
+        let sequences: Vec<Vec<GovernanceCall>> = (0..=4usize)
+            .flat_map(|len| {
+                let alphabet = alphabet.clone();
+                (0..(1usize << len)).map(move |mask| {
+                    (0..len)
+                        .map(|bit| alphabet[(mask >> bit) & 1].clone())
+                        .collect()
+                })
+            })
+            .collect();
+        for declared in &sequences {
+            let declarations = decl(declared);
+            for calls in &sequences {
+                let account = DeclaredCalls::match_calls(calls, &declarations);
+                let equal = calls.len() == declared.len()
+                    && calls.iter().zip(declared).all(|(c, d)| {
+                        c.target == d.target && c.value == d.value && c.data == d.data
+                    });
+                assert_eq!(account.is_exact(), equal, "{declared:?} vs {calls:?}");
+            }
+        }
     }
 }

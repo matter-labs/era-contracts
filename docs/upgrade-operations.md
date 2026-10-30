@@ -109,3 +109,78 @@ reaches it through `forward`. No upgrade path sets or requires either. Where the
 migrations ban applies
 ([chain lifecycle](../protocol-docs/chain-lifecycle.md#v33-chain-migrations-are-explicitly-disabled)),
 a migration is refused before either pause is consulted.
+
+## Deployer signing
+
+The deployer EOA signs the prepare's deployer Safe files (`upgrade-broadcast`). Neither the bundle's
+digests (`verify-bundle`) nor `verify-bootstrap`, which reads deployed objects, constrain that
+transaction list, so `protocol_ops ecosystem check-deployer-plan` holds it to the deploy checkout
+and to L1 before the key is used. Every call of a bundle whose signer is the deployer must send no
+value and be either
+
+- a CREATE2 deployment through the env's `create2_factory_addr` (the deterministic deployment
+  proxy), under the env's `[contracts] create2_factory_salt` or a `[create2_factory_salts]` entry,
+  whose address and init code are reviewed-build creation code plus: a `[member_deployments]`
+  record's constructor arguments; an `[upgrade_executors]` record's (initial owner = the env's
+  `owner_address`, and a CTM executor's CTM one of the env's); an exact ABI encoding of the
+  constructor's parameters for an object a `[registry]` key names; the bootstrap sequence's (the
+  package's migration and core transition); or, for a `TransparentUpgradeableProxy` the package
+  names, a recorded implementation and the ecosystem `ProxyAdmin` or a CTM's `ProxyAdmin` on L1; or
+- a call on the reviewed allowlist (`ALLOWLIST` in
+  `protocol-ops/src/commands/ecosystem/deployer_plan.rs`), every entry taken from the v35 bootstrap
+  prepare's deployer bundle:
+
+| call                                        | target (package)                                                                                          | constraint                                                                                 | emitted by                                                     |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `transferOwnership(address)`                | the CTM, its `ValidatorTimelock`, its `ProxyAdmin` (its EIP-1967 admin on L1), the ecosystem `ProxyAdmin` | new owner is the env's `owner_address`                                                     | `ensureCtmsAndProxyAdminsOwnedByGovernance`, deployer as owner |
+| `publishEVMBytecodes(bytes[])`              | the CTM's `bytecodes_supplier_addr`, which must be its `L1_BYTECODES_SUPPLIER()` on L1                    | none: publishing is permissionless                                                         | `BytecodePublisher` in the CTM prepare                         |
+| `multicall((address,uint256,bytes)[],bool)` | `[ctm_admin_calls] chain_admin`                                                                           | requires success; every call sends no value and is one of the two rows below               | the ServerNotifier handover through a ChainAdmin               |
+| `transferOwnership(address)`                | an `admin`-phase `[[external_actions]]` target                                                            | exactly that declared call, nominating the CTM executor this plan deploys                  | the ServerNotifier handover, deployer as owner                 |
+| `changeProxyAdmin(address,address)`         | an `admin`-phase `[[external_actions]]` target                                                            | exactly that declared call, to the `ProxyAdmin` that administers that executor's CTM on L1 | the ServerNotifier handover, deployer as owner                 |
+
+A role that belongs to a CTM (the CTM, its `ValidatorTimelock`, `ProxyAdmin`, `BytecodesSupplier`
+and `ctm_admin_calls` ChainAdmin) counts only in a `[ctms.<key>]` table whose
+`chain_type_manager_proxy` is one of the env's `[[ctm_contracts.ctms]]`; a table naming such a role
+without a CTM is refused. The CTMs' `ProxyAdmin`, `BytecodesSupplier` and `ValidatorTimelock`
+(`validatorTimelockPostV29()`), and the ecosystem `ProxyAdmin` (the EIP-1967 admin of the env's
+`bridgehub_proxy_addr`), are read over `--l1-rpc-url`
+(`replay-bundle` passes its `--rpc`, or in a rehearsal the fork it replays on), never taken from the
+bundle. Without `--env` or `--bundle`, the package's own CTMs and Bridgehub stand in for the env's.
+
+A refusal names the call's index, Safe file, target, selector and value. A prepare that needs
+another call extends the allowlist in review. The package's other addresses and records come from
+the bundle; the salts, factory, governance owner, CTM list and creation code come from the
+checkout. Constructor arguments, a proxy's initializer and published bytecode are not judged here:
+`verify-bootstrap` holds what they build before governance signs.
+
+For a bundle (`--bundle`, and `replay-bundle`), the reviewed inputs are those of the upgrade the
+bundle names: `prepare-all` is the release's own directory, and a `forge-script` upgrade whose
+deployer signs anything declares its salts and owner in its own `upgrade-envs/<upgrade>/<env>.toml`
+and records its deployments in `[member_deployments]` like a prepare does; nothing is skipped by
+upgrade kind. The env's `l1_chain_id` must equal the bundle's `l1.chain_id` and the RPC's chain id.
+A bundle in which the deployer signs nothing passes. A release input declaring
+`redeploy_zk_governance = true` is refused: the PUH/Guardians redeploy deploys under its own salt
+from zk-governance artifacts, which the check does not know yet. Signing (`replay-bundle --key`, and
+`check-deployer-plan --bundle`, which the deploy workflow runs) also requires this checkout to be
+the bundle's `contracts_commit` with no change to the contract sources and reviewed inputs the
+generation tracks, a bundle not marked `contracts_worktree_dirty`, and the build to be read from
+this checkout.
+
+It runs in the generate workflow's `verify-bundle-handoff` job and in every `replay-bundle` except
+`--verify-only`; the deploy workflow runs it after selecting the L1 RPC and before the step that
+reads the deployer key, and refuses to run on a commit other than the bundle's `contracts_commit`.
+The anvil upgrade test runs it on every prepare it replays. `upgrade-broadcast` and
+`dev execute-safe` check nothing: sign a bundle with `replay-bundle --key`, or run the check first.
+
+**Proposal (not configured): a protected environment for the deploy job.** Anyone with write access
+can dispatch `deploy-ecosystem-upgrade.yaml` from any ref, and that ref's code runs with
+`DEPLOYER_PRIVATE_KEY_*`: the job declares no `environment:`. Move the deployer keys and L1 RPC
+secrets from repository to environment secrets of one environment per L1 (`deploy-sepolia`,
+`deploy-mainnet`), each with a deployment branch policy admitting only protected branches (`main`,
+`release/*`, `draft/*`) and required reviewers (two for mainnet), and set `environment:` on the job
+from the bundle's `l1.chain_id`, resolved in a preceding job that holds no secret. A run then waits
+for a reviewer, and code from an unprotected ref never reaches a key; since a deploy must check out
+the generation commit, the generation has to run from a protected branch too. The move also cuts
+off `execute-deployer-safe-bundles.yaml`, which reads `DEPLOYER_PRIVATE_KEY_SEPOLIA` and
+`DEPLOYER_PRIVATE_KEY_MAINNET` for any run's artifact with no plan, provenance or commit check;
+until then it must not sign upgrade bundles.

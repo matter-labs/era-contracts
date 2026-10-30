@@ -34,6 +34,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
+use crate::commands::ecosystem::deployer_plan;
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_bootstrap::{self, VerifyBootstrapArgs};
 use crate::common::anvil::{send_impersonated_tx, set_balance};
@@ -48,7 +49,7 @@ use crate::common::{logger, paths};
 
 pub const DEPLOY_BUNDLE_SCHEMA: &str = "zksync-ecosystem-upgrade-deploy-bundle/1";
 pub const BUNDLE_METADATA_FILE: &str = "bundle-metadata.json";
-const MANIFEST_FILE: &str = "prepare/manifest.json";
+pub(crate) const MANIFEST_FILE: &str = "prepare/manifest.json";
 /// Generation outputs a bundle must carry, besides the `prepare/*.safe.json` files the manifest names.
 const REQUIRED_BUNDLE_FILES: [&str; 2] = [MANIFEST_FILE, "ecosystem.toml"];
 /// Etherscan verification command logs; `gw-verification-logs.txt` only exists on gateway-enabled envs.
@@ -95,7 +96,7 @@ const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
 ];
 
 /// [`CONTRACT_SOURCE_PATHSPECS`] plus the upgrade's own input TOMLs.
-fn contract_source_pathspecs(upgrade: &str) -> Vec<String> {
+pub(crate) fn contract_source_pathspecs(upgrade: &str) -> Vec<String> {
     let mut pathspecs: Vec<String> = CONTRACT_SOURCE_PATHSPECS
         .iter()
         .map(|s| s.to_string())
@@ -1071,6 +1072,11 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
         local_hashes,
         metadata.contracts_commit
     );
+    // A rehearsal checks its plan on the fork it replays on (below).
+    if let ReplayMode::Broadcast { rpc_url, .. } = &mode {
+        deployer_plan::require_checkout_at(&paths::contracts_root(), &metadata)?;
+        deployer_plan::check_bundle(&bundle_dir, &metadata, rpc_url).await?;
+    }
     // Replay state goes next to the env's other outputs, never into the bundle (the handoff artifact).
     let paths = BundlePaths {
         manifest: bundle_dir.join(MANIFEST_FILE),
@@ -1110,6 +1116,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 metadata.l1.forked_at_block,
             )?;
             let rpc_url = anvil.endpoint();
+            deployer_plan::check_bundle(&bundle_dir, &metadata, &rpc_url).await?;
             fund_signers(&descriptor, &rpc_url, &env_cfg, deployer, &paths).await?;
             broadcast_impersonated(&rpc_url, &paths).await?;
             check_upgrade(
