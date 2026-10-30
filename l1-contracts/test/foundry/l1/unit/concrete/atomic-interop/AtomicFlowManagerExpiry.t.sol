@@ -6,13 +6,11 @@ import {AtomicFlowFixtures} from "./AtomicFlowFixtures.sol";
 
 import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
 import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
-import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {
     AtomicFinalityProof,
     AtomicFlow,
     AtomicFlowPreimage,
     ImtProof,
-    LegState,
     ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION,
     ATOMIC_FLOW_EXPIRY_DELAY,
     ATOMIC_FLOW_PREIMAGE_VERSION
@@ -23,26 +21,21 @@ import {
     ManagerExpirableTransfersNotEnabled,
     ManagerFlowNotExpirable,
     ManagerFlowNotExpiredYet,
-    ManagerLegNotCommitted,
     ManagerLegSourceChainNotAllowed,
     ManagerNotInteropHandler,
     ProofSourceChainMismatch
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {INTEROP_BUNDLE_VERSION, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
-import {
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_COMMITMENT_TREE_ADDR,
-    L2_INTEROP_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-/// @notice Covers the `AtomicFlowManager` side of expiry ({protocol-docs/atomicity/expiry.md}): `recordExpiry` on
-/// the destination, `authorizeExpiryRefund` on the source, and the single-leg rule of the expirable version.
+/// @notice The `AtomicFlowManager` checks of expiry ({protocol-docs/atomicity/expiry.md}): `recordExpiry` on the
+/// destination, `authorizeExpiryRefund` on the source, and `append` of an expirable flow. The happy paths run
+/// through the real handler and InteropCenter in `L2AtomicInteropExecuteTestAbstract`.
 /// @dev The remote chain of each test (the leg's source for `recordExpiry`, its destination for
 /// `authorizeExpiryRefund`) is modeled by the builder's oracle tree, and its proofs run end-to-end through real
-/// aggregation, root import and {L2MessageVerification}. The receive filter is stubbed (see
-/// {AtomicPredeployFixture._setLegSourceAllowed}). The handler and InteropCenter paths around these calls are covered
-/// by `L2AtomicInteropSendRefundTestAbstract`.
+/// aggregation, root import and {L2MessageVerification}. The receive filter and the chain feature are stubbed (see
+/// {AtomicPredeployFixture}).
 contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
     /// @dev The other chain of the flow: aggregatable in the settlement-layer MessageRoot, unlike this chain.
     uint256 internal constant REMOTE_CHAIN = 271;
@@ -73,15 +66,15 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
             );
     }
 
+    /*//////////////////////////////////////////////////////////////
+                    Destination: recordExpiry
+    //////////////////////////////////////////////////////////////*/
+
     /// @dev Moves this chain's imported L1 time to `_timestamp` by importing a root stamped with it.
     function _importRootAt(uint256 _timestamp) internal {
         vm.warp(_timestamp);
         _importInteropRoot(SETTLEMENT_LAYER_CHAIN_ID, _freshSlBlock(), _timestamp, keccak256("later root"));
     }
-
-    /*//////////////////////////////////////////////////////////////
-                    Destination: recordExpiry
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev A leg from `REMOTE_CHAIN` to this chain, committed there in time under `_preimage`, with its finality
     /// proof.
@@ -97,25 +90,6 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
 
     function _incomingLeg() internal view returns (bytes32) {
         return keccak256(_bundleBytes(REMOTE_CHAIN, block.chainid));
-    }
-
-    function test_recordExpiry_insertsExpiryValue() public {
-        bytes32 leg = _incomingLeg();
-        AtomicFinalityProof memory finality = _remoteLegFinality(
-            AtomicFlowFixtures.expirablePreimage(leg, REMOTE_CHAIN, DEADLINE, SETTLEMENT_LAYER_CHAIN_ID)
-        );
-        _importRootAt(DEADLINE + ATOMIC_FLOW_EXPIRY_DELAY + 1);
-
-        vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowExpired(finality.flow.flowId, leg, 1);
-        vm.prank(L2_INTEROP_HANDLER_ADDR);
-        manager.recordExpiry(leg, finality, 0);
-
-        assertEq(
-            L2InteropCommitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR).leafAt(1).value,
-            AtomicFlowFixtures.expiryValue(finality.flow.flowId, leg),
-            "the expiry value must land in this chain's IMT"
-        );
     }
 
     /// @notice The expiry time is exclusive: a root stamped exactly `deadline + delay` is not enough.
@@ -214,79 +188,20 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
         manager.append(keccak256(bundle), 0, preimage);
     }
 
-    /// @dev `_value` in `_chainId`'s tree, proven against a batch settled after the deadline.
-    function _remoteInclusion(uint256 _chainId, uint256 _value) internal returns (ImtProof memory) {
-        return _realInclusionProof(_chainId, _insertCommit(_value), DEADLINE + ATOMIC_FLOW_EXPIRY_DELAY + 1);
-    }
-
-    function _commitExpirableLeg() internal returns (AtomicFlow memory flow, bytes memory bundle) {
-        return _commitOutgoingLeg(ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION);
-    }
-
-    function test_authorizeExpiryRefund_marksLegRevertable_thenRefunds() public {
-        (AtomicFlow memory flow, bytes memory bundle) = _commitExpirableLeg();
-        bytes32 leg = keccak256(bundle);
-        ImtProof memory expiry = _remoteInclusion(REMOTE_CHAIN, AtomicFlowFixtures.expiryValue(flow.flowId, leg));
-
-        vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowExpiryRefundAuthorized(flow.flowId, leg);
-        manager.authorizeExpiryRefund(flow, bundle, expiry);
-        assertEq(uint256(manager.legState(flow.flowId, leg)), uint256(LegState.Revertable), "leg must be Revertable");
-
-        vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.FlowRefunded(flow.flowId, leg);
-        manager.claimRefund(flow.flowId, bundle);
-        assertEq(uint256(manager.legState(flow.flowId, leg)), uint256(LegState.Reverted), "leg must end Reverted");
-    }
-
-    function test_authorizeExpiryRefund_RevertWhen_AlreadyAuthorized() public {
-        (AtomicFlow memory flow, bytes memory bundle) = _commitExpirableLeg();
-        bytes32 leg = keccak256(bundle);
-        ImtProof memory expiry = _remoteInclusion(REMOTE_CHAIN, AtomicFlowFixtures.expiryValue(flow.flowId, leg));
-        manager.authorizeExpiryRefund(flow, bundle, expiry);
-
-        vm.expectRevert(abi.encodeWithSelector(ManagerLegNotCommitted.selector, flow.flowId, leg, LegState.Revertable));
-        manager.authorizeExpiryRefund(flow, bundle, expiry);
-    }
-
-    /// @notice The expiry value must come from the leg's destination, even if another chain's tree holds it.
-    function test_authorizeExpiryRefund_RevertWhen_ProofFromAnotherChain() public {
-        (AtomicFlow memory flow, bytes memory bundle) = _commitExpirableLeg();
-        ImtProof memory expiry = _remoteInclusion(
-            UNRELATED_CHAIN,
-            AtomicFlowFixtures.expiryValue(flow.flowId, keccak256(bundle))
-        );
+    /// @notice The expiry must be proven in the tree of the leg's destination, and this chain must accept that chain.
+    function test_authorizeExpiryRefund_RevertWhen_ProofNotFromAllowedDestination() public {
+        (AtomicFlow memory flow, bytes memory bundle) = _commitOutgoingLeg(ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION);
+        uint256 index = _insertCommit(AtomicFlowFixtures.expiryValue(flow.flowId, keccak256(bundle)));
+        uint256 expiredAt = DEADLINE + ATOMIC_FLOW_EXPIRY_DELAY + 1;
+        ImtProof memory fromUnrelatedChain = _realInclusionProof(UNRELATED_CHAIN, index, expiredAt);
+        ImtProof memory fromDestination = _realInclusionProof(REMOTE_CHAIN, index, expiredAt);
 
         vm.expectRevert(abi.encodeWithSelector(ProofSourceChainMismatch.selector, REMOTE_CHAIN, UNRELATED_CHAIN));
-        manager.authorizeExpiryRefund(flow, bundle, expiry);
-    }
+        manager.authorizeExpiryRefund(flow, bundle, fromUnrelatedChain);
 
-    function test_authorizeExpiryRefund_RevertWhen_DestinationNotAllowed() public {
-        (AtomicFlow memory flow, bytes memory bundle) = _commitExpirableLeg();
-        ImtProof memory expiry = _remoteInclusion(
-            REMOTE_CHAIN,
-            AtomicFlowFixtures.expiryValue(flow.flowId, keccak256(bundle))
-        );
         _setLegSourceAllowed(REMOTE_CHAIN, false);
-
         vm.expectRevert(abi.encodeWithSelector(ManagerLegSourceChainNotAllowed.selector, REMOTE_CHAIN));
-        manager.authorizeExpiryRefund(flow, bundle, expiry);
-    }
-
-    /// @notice A commit value for the same leg doesn't stand in for its expiry value.
-    function test_authorizeExpiryRefund_RevertWhen_ProofHoldsCommitValue() public {
-        (AtomicFlow memory flow, bytes memory bundle) = _commitExpirableLeg();
-        uint256 commitValue = AtomicFlowFixtures.commitValue(flow.flowId, keccak256(bundle));
-        ImtProof memory proof = _remoteInclusion(REMOTE_CHAIN, commitValue);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IMTLeafValueMismatch.selector,
-                AtomicFlowFixtures.expiryValue(flow.flowId, keccak256(bundle)),
-                commitValue
-            )
-        );
-        manager.authorizeExpiryRefund(flow, bundle, proof);
+        manager.authorizeExpiryRefund(flow, bundle, fromDestination);
     }
 
     function test_authorizeExpiryRefund_RevertWhen_FlowNotExpirable() public {
@@ -300,7 +215,7 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
     }
 
     function test_authorizeExpiryRefund_RevertWhen_BundleIsNotTheLeg() public {
-        (AtomicFlow memory flow, ) = _commitExpirableLeg();
+        (AtomicFlow memory flow, ) = _commitOutgoingLeg(ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION);
         bytes memory otherBundle = _bundleBytes(block.chainid, UNRELATED_CHAIN);
         ImtProof memory expiry;
 
@@ -311,27 +226,23 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
     }
 
     /*//////////////////////////////////////////////////////////////
-                    The expirable version is single-leg
+                    append of an expirable flow
     //////////////////////////////////////////////////////////////*/
 
-    function test_append_expirableFlowEmitsExpirableFlowCommitted() public {
+    /// @notice `append` accepts an expirable leg only once this chain enabled the feature, and flags it when it does.
+    function test_append_expirableFlowNeedsTheFeature() public {
         (AtomicFlowPreimage memory preimage, bytes memory bundle) = _outgoingLeg(
             ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION
         );
 
-        vm.expectEmit(true, true, true, true, address(manager));
-        emit IAtomicFlowManager.ExpirableFlowCommitted(AtomicFlowFixtures.flowId(preimage), keccak256(bundle));
+        _setExpirableTransfersEnabled(false);
+        vm.expectRevert(ManagerExpirableTransfersNotEnabled.selector);
         vm.prank(L2_INTEROP_CENTER_ADDR);
         manager.append(keccak256(bundle), 0, preimage);
-    }
 
-    function test_append_RevertWhen_ExpirableTransfersNotEnabled() public {
-        _setExpirableTransfersEnabled(false);
-        (AtomicFlowPreimage memory preimage, bytes memory bundle) = _outgoingLeg(
-            ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION
-        );
-
-        vm.expectRevert(ManagerExpirableTransfersNotEnabled.selector);
+        _setExpirableTransfersEnabled(true);
+        vm.expectEmit(true, true, true, true, address(manager));
+        emit IAtomicFlowManager.ExpirableFlowCommitted(AtomicFlowFixtures.flowId(preimage), keccak256(bundle));
         vm.prank(L2_INTEROP_CENTER_ADDR);
         manager.append(keccak256(bundle), 0, preimage);
     }

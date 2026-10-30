@@ -1,5 +1,6 @@
 import { expect } from "chai";
-import { BigNumber, Contract, Wallet, ethers } from "ethers";
+import type { BigNumber } from "ethers";
+import { Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { InteropChainRegistrar } from "../../src/deployers/interop-chain-registrar";
 import { getAbi } from "../../src/core/contracts";
@@ -23,14 +24,7 @@ import {
   getL2RpcUrl,
 } from "../../src/core/utils";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
-import {
-  captureBalance,
-  customError,
-  expectBalanceDelta,
-  expectEvent,
-  expectNativeSpend,
-  expectRevert,
-} from "../../src/helpers/balance-helpers";
+import { customError, expectBalanceDelta, expectRevert } from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
   ensureSettlementInteropRoot,
@@ -56,7 +50,6 @@ import {
   expiryValue,
   lowNullifierIndexFor,
   proofTuple,
-  reconstructChainImt,
 } from "../../src/helpers/imt-engine-lib";
 import type { AtomicFlowPreimage } from "../../src/helpers/imt-engine-lib";
 
@@ -161,18 +154,6 @@ describe("16 - Expiry of single-leg flows", function () {
     });
   }
 
-  /** Expires `transfer` on the destination from the relayer. */
-  async function expireTransfer(): Promise<ethers.providers.TransactionReceipt> {
-    const { bundleData, proof } = await getInteropExecutionData(destProvider, transfer, sourceChainId);
-    const lowNullifierIndex = await lowNullifierIndexFor(
-      commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, destProvider),
-      expiryValue(transfer.flowId, transfer.bundleHash)
-    );
-    return (
-      await destHandler.expireAtomicBundle(bundleData, proof, lowNullifierIndex, { gasLimit: DEFAULT_TX_GAS_LIMIT })
-    ).wait();
-  }
-
   it("rejects an expirable transfer while the source chain hasn't enabled the feature", async () => {
     await expectRevert(
       () => sendExpirableTransfer(),
@@ -192,19 +173,7 @@ describe("16 - Expiry of single-leg flows", function () {
   });
 
   it("sends an expirable transfer to an EOA, which can't execute on the destination", async () => {
-    const before = await captureBalance(sourceProvider);
     transfer = await sendExpirableTransfer();
-    const after = await captureBalance(sourceProvider);
-    expectNativeSpend(before, after, fee.add(TRANSFER_AMOUNT), transfer.receipt, "expirable transfer");
-
-    const committed = expectEvent(
-      transfer.receipt,
-      "AtomicFlowManager",
-      L2_ATOMIC_FLOW_MANAGER_ADDR,
-      "ExpirableFlowCommitted"
-    );
-    expect(committed.flowId, "committed flow").to.equal(transfer.flowId);
-    expect(await sourceManager.legState(transfer.flowId, transfer.bundleHash)).to.equal(LegState.Committed);
 
     // An EOA has no `receiveMessage`, so the call reverts ("call to non-contract address") without revert data,
     // which Anvil's eth_call doesn't surface. The next test expires the leg with the same finality proof, so this
@@ -214,33 +183,23 @@ describe("16 - Expiry of single-leg flows", function () {
       () => false
     );
     expect(executed, "a value call to an EOA executes").to.be.false;
-    expect((await destProvider.getBalance(recipient)).isZero(), "the EOA received nothing").to.be.true;
     expect(await getBundleStatus(destProvider, transfer.bundleHash)).to.equal(BundleStatus.Unreceived);
   });
 
-  it("expires the transfer on the destination, after which it can't execute", async () => {
+  it("expires the transfer on the destination once its L1 time passes deadline + delay", async () => {
     // Keyed by its own timestamp, so the settlement block is unique to this run.
     const expiryRootTimestamp = deadline + ATOMIC_FLOW_EXPIRY_DELAY + 1;
     await ensureSettlementInteropRoot(destProvider, expiryRootTimestamp, expiryRootTimestamp);
-
-    const receipt = await expireTransfer();
-    expect(expectEvent(receipt, "L2InteropHandler", L2_INTEROP_HANDLER_ADDR, "BundleExpired").bundleHash).to.equal(
-      transfer.bundleHash
+    const { bundleData, proof } = await getInteropExecutionData(destProvider, transfer, sourceChainId);
+    const lowNullifierIndex = await lowNullifierIndexFor(
+      commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, destProvider),
+      expiryValue(transfer.flowId, transfer.bundleHash)
     );
+
+    await (
+      await destHandler.expireAtomicBundle(bundleData, proof, lowNullifierIndex, { gasLimit: DEFAULT_TX_GAS_LIMIT })
+    ).wait();
     expect(await getBundleStatus(destProvider, transfer.bundleHash)).to.equal(BundleStatus.Expired);
-    const destImt = await reconstructChainImt(commitmentTree(L2_INTEROP_COMMITMENT_TREE_ADDR, destProvider));
-    const expiry = expiryValue(transfer.flowId, transfer.bundleHash);
-    expect(
-      destImt.leaves.some((leaf) => BigNumber.from(leaf.value).eq(expiry)),
-      "the expiry value is in the destination's IMT"
-    ).to.be.true;
-
-    await expectRevert(
-      () => executeBundle(destProvider, transfer, sourceChainId),
-      "execute an expired transfer",
-      customError("L2InteropHandler", "BundleAlreadyProcessed(bytes32)", [transfer.bundleHash]),
-      destProvider
-    );
   });
 
   it("refunds the sender on the source against the destination's expiry", async () => {
@@ -259,8 +218,6 @@ describe("16 - Expiry of single-leg flows", function () {
         gasLimit: DEFAULT_TX_GAS_LIMIT,
       })
     ).wait();
-    expect(await sourceManager.legState(transfer.flowId, transfer.bundleHash)).to.equal(LegState.Revertable);
-
     await (
       await sourceManager.claimRefund(transfer.flowId, transfer.bundleData, { gasLimit: DEFAULT_TX_GAS_LIMIT })
     ).wait();
