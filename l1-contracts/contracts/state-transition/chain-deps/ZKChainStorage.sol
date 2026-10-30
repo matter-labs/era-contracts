@@ -302,4 +302,8 @@ struct ZKChainStorage {
     /// See {protocol-docs/interop-gating.md#second-proof-system-requirement}.
     /// @dev STORAGE SLOT: 70
     bool secondProofSystemRequired;
+    /// @dev The L1 time a commit last checked whether to record an L1SLOAD anchor.
+    /// See {protocol-docs/l1sload.md#anchors}.
+    /// @dev STORAGE SLOT: 71
+    uint256 lastL1AnchorCheckTimestamp;
 }

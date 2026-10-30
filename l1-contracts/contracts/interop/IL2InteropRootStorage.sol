@@ -13,6 +13,9 @@ import {StoredInteropRoot} from "../common/Messaging.sol";
 interface IL2InteropRootStorage {
     event InteropRootAdded(uint256 indexed chainId, uint256 indexed blockNumber, uint256 timestamp, bytes32[] sides);
 
+    /// @notice The L1SLOAD anchor moved to an L1 block. See {protocol-docs/l1sload.md#anchors}.
+    event L1AnchorImported(uint256 indexed blockNumber, bytes32 blockHash, uint256 timestamp);
+
     /// @notice Returns the imported message root and its creation timestamp (the
     /// `(blockOrBatchNumber, root, timestamp)` tuple) for a chain ID and block or batch number.
     /// @dev A zero timestamp only ever means "nothing imported at this key"; see
@@ -25,4 +28,10 @@ interface IL2InteropRootStorage {
     /// imported, the returned value is `>= T` forever, so it is an authenticated lower bound on the
     /// referenced chain's clock as observed by this chain.
     function latestInteropRootTimestamp(uint256 chainId) external view returns (uint256);
+
+    /// @notice Returns the L1SLOAD anchor; all zero before the first anchor import. See {protocol-docs/l1sload.md#anchors}.
+    /// @return blockNumber The L1 block the precompile reads at.
+    /// @return blockHash Its hash.
+    /// @return timestamp The L1 time it was recorded at.
+    function l1Anchor() external view returns (uint256 blockNumber, bytes32 blockHash, uint256 timestamp);
 }

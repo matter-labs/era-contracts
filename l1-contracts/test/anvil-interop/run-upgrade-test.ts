@@ -57,9 +57,10 @@ runPipelineUpgradeScenario({
       expectsEmptyFacetDelta: true,
     },
     // Then an ordinary MINOR upgrade on top of the patch (the v36 edge): one fresh ecosystem
-    // implementation pinned in a Core-domain ProxyUpgradeTransition, and a transition. Its only change is on
-    // the ecosystem side, so every CTM release member is untouched: the prepare must reuse each of
-    // them rather than redeploy the facet set, publishing a copy of the live release one minor up.
+    // implementation pinned in a Core-domain ProxyUpgradeTransition, and a transition. The ecosystem
+    // runs the current sources, so every CTM release member is untouched: the prepare must reuse each of
+    // them rather than redeploy the facet set, publishing a copy of the live release one minor up. Its
+    // L2 leg is v36's standard one, which runs `L2DefaultUpgrade`.
     {
       label: "recurring",
       upgradeInputTemplatePath: "test/anvil-interop/config/recurring-upgrade.toml",
@@ -68,6 +69,7 @@ runPipelineUpgradeScenario({
       ctmScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v36.sol:CTMUpgradeForTests_v36",
       expectsReusedReleaseMembers: true,
       expectsFreshMessageRoot: true,
+      carriesL2Upgrade: true,
     },
   ],
 })

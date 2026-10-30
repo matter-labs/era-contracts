@@ -12,6 +12,8 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ICommitter, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -268,6 +270,10 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         // hash differ from the mocker defaults, so they are overridden explicitly.
         mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), baseTokenAssetId);
         mockChainTypeManagerVerifier(_verifier);
+        // A commit asks the message root whether to record an L1SLOAD anchor; the chains here have no interop.
+        address messageRoot = makeAddr("messageRoot");
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.messageRoot, ()), abi.encode(messageRoot));
+        vm.mockCall(messageRoot, abi.encodeWithSelector(IL1MessageRoot.isInteropEnabled.selector), abi.encode(false));
         vm.mockCall(
             chainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.validatorTimelockPostV29.selector),

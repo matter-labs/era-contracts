@@ -146,6 +146,9 @@ address constant L2_ATOMIC_FLOW_MANAGER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET
 /// calls it at this fixed address. Holds no state and has no initializer.
 address constant L2_INTEROP_ATTRIBUTE_PARSER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x15);
 
+/// @dev The ZKsync OS L1SLOAD precompile. See {protocol-docs/l1sload.md#reading-l1-state}.
+address constant L1SLOAD_PRECOMPILE_ADDR = address(0x101);
+
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts
 ////////////////////////////////////////////////////////////

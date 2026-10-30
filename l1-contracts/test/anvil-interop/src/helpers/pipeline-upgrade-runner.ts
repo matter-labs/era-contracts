@@ -205,6 +205,8 @@ export type RecurringUpgradeHop = {
   keepsPendingL2Upgrade?: boolean;
   /** Assert this hop re-pointed the MessageRoot proxy at a freshly deployed implementation. */
   expectsFreshMessageRoot?: boolean;
+  /** Assert this hop recorded an L2 upgrade transaction on every chain; otherwise it must be an L1-only edge. */
+  carriesL2Upgrade?: boolean;
 };
 
 // ── Main entry point ─────────────────────────────────────────────────
@@ -789,6 +791,10 @@ async function runRecurringHop(
           throw new Error(
             `chain ${chain.chainId}: the patch changed the pending L2 upgrade transaction (${before} -> ${recorded})`
           );
+        }
+      } else if (hop.carriesL2Upgrade) {
+        if (recorded === ethers.constants.HashZero) {
+          throw new Error(`chain ${chain.chainId}: hop ${hop.label} recorded no L2 upgrade transaction`);
         }
       } else if (recorded !== ethers.constants.HashZero) {
         throw new Error(

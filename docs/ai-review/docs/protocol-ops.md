@@ -32,9 +32,9 @@ artifacts rather than reconstructed from a CREATE2 deployment history.
 > Pre-registry calldata packages are verified by the `ecosystem verify-upgrade` of the release
 > branches that shipped them, not here. A registry-driven upgrade is reviewed the same way for
 > every release, so a release does NOT get a verifier module of its own: `v36` needs no code here —
-> its prepare is `CTMUpgrade_v36 is DefaultCTMUpgrade {}`, an ordinary upgrade, and the upgrade
-> path verifies it as one. If a future release ever seems to need version-specific handling, it
-> belongs as an INPUT to the general path, not as a new module.
+> its prepare (`CTMUpgrade_v36`) only declares its changed members and the standard L2 side, an
+> ordinary upgrade, and the upgrade path verifies it as one. If a future release ever seems to need
+> version-specific handling, it belongs as an INPUT to the general path, not as a new module.
 
 It answers two questions and keeps them apart.
 

@@ -65,6 +65,10 @@ interface IMessageRootBase is IMessageVerification {
 
     function BRIDGE_HUB() external view returns (address);
 
+    /// @notice The chain id of L1, which differs from `block.chainid` on a settlement layer.
+    // solhint-disable-next-line func-name-mixedcase
+    function L1_CHAIN_ID() external view returns (uint256);
+
     /// @notice Registers a chain: seeds an empty chain tree and pushes its chain-id leaf into the
     /// shared tree. Callable by the Bridgehub or the chain asset handler.
     /// @param _chainId The ID of the chain that is being added to the message root.

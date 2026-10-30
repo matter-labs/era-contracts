@@ -248,8 +248,14 @@ error InvalidThreshold(uint256 max, uint256 got);
 error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
+// 0x3db32765
+error L1AnchorStale(uint256 anchorTimestamp, uint256 blockTimestamp);
 // 0xb55a753d
 error L1OnlyEdgeChangesL2State();
+// 0xdad4d761
+error L1SloadFailed(address l1Contract);
+// 0x26def6b2
+error L1SloadInvalidKeyCount(uint256 keyCount);
 // 0xb0966e4f
 error L2BytecodeInfoLength(uint256 actual, uint256 expected);
 // 0xb07238db

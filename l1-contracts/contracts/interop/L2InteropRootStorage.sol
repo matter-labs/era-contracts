@@ -2,7 +2,15 @@
 
 pragma solidity 0.8.28;
 
+import {StorageSlot} from "@openzeppelin/contracts-v4/utils/StorageSlot.sol";
+
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L1_BLOCK_HASH_IMPORT_ID,
+    L1SLOAD_ANCHOR_BLOCK_HASH_SLOT,
+    L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT,
+    L1SLOAD_ANCHOR_TIMESTAMP_SLOT
+} from "contracts/common/Config.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IL2InteropRootStorage} from "./IL2InteropRootStorage.sol";
 import {InteropRootAlreadyExists, InteropRootTimestampIsZero, SidesLengthNotOne} from "./InteropErrors.sol";
@@ -34,6 +42,13 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
     /// @inheritdoc IL2InteropRootStorage
     /// @dev Appended after `storedInteropRoots`, so the v31 layout note above is unaffected.
     mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
+
+    /// @inheritdoc IL2InteropRootStorage
+    function l1Anchor() external view returns (uint256 blockNumber, bytes32 blockHash, uint256 timestamp) {
+        blockNumber = StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT).value;
+        blockHash = StorageSlot.getBytes32Slot(L1SLOAD_ANCHOR_BLOCK_HASH_SLOT).value;
+        timestamp = StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_TIMESTAMP_SLOT).value;
+    }
 
     /// @inheritdoc IL2InteropRootStorage
     function interopRoots(
@@ -86,6 +101,14 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
             revert InteropRootTimestampIsZero();
         }
 
+        if (chainId == L1_BLOCK_HASH_IMPORT_ID) {
+            _importL1Anchor(blockOrBatchNumber, sides[0], timestamp);
+            // ZKsync OS adds the root to the batch's dependency roots from this event, so it is emitted for every
+            // anchor import. See {protocol-docs/l1sload.md#anchors}.
+            emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
+            return;
+        }
+
         if (storedInteropRoots[chainId][blockOrBatchNumber].root != bytes32(0)) {
             revert InteropRootAlreadyExists();
         }
@@ -100,5 +123,24 @@ contract L2InteropRootStorage is IL2InteropRootStorage {
         }
 
         emit InteropRootAdded(chainId, blockOrBatchNumber, timestamp, sides);
+    }
+
+    /// @notice Moves the L1SLOAD anchor to an imported L1 block if it is newer than the current one, and does nothing
+    /// otherwise. See {protocol-docs/l1sload.md#anchors}.
+    /// @dev The slots are fixed because ZKsync OS reads them.
+    /// @param _blockNumber The L1 block number.
+    /// @param _blockHash The L1 block hash.
+    /// @param _timestamp The L1 time the block hash was recorded at.
+    function _importL1Anchor(uint256 _blockNumber, bytes32 _blockHash, uint256 _timestamp) private {
+        StorageSlot.Uint256Slot storage anchorBlockNumber = StorageSlot.getUint256Slot(
+            L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT
+        );
+        if (_blockNumber <= anchorBlockNumber.value) {
+            return;
+        }
+        anchorBlockNumber.value = _blockNumber;
+        StorageSlot.getBytes32Slot(L1SLOAD_ANCHOR_BLOCK_HASH_SLOT).value = _blockHash;
+        StorageSlot.getUint256Slot(L1SLOAD_ANCHOR_TIMESTAMP_SLOT).value = _timestamp;
+        emit L1AnchorImported(_blockNumber, _blockHash, _timestamp);
     }
 }

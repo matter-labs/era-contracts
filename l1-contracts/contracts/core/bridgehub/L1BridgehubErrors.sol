@@ -28,6 +28,8 @@ error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 error IncorrectSender(address prevMsgSender, address chainAdmin);
 // 0xd107dab8
 error InteropAlreadyEnabled(uint256 chainId);
+// 0x69d13b5f
+error InteropChainCannotMigrate(uint256 chainId);
 // 0x13b3ef48
 error InteropNotEnabled(uint256 chainId);
 // 0x927cf466

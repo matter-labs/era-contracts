@@ -301,6 +301,11 @@
   },
   {
     "type": "error",
+    "name": "L1AnchorNotSupportedOnGateway",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MerkleIndexOrHeightMismatch",
     "inputs": []
   },
