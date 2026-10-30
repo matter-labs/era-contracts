@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {ChainFeature, IChainRegistrationSender} from "./IChainRegistrationSender.sol";
+import {IChainRegistrationSender} from "./IChainRegistrationSender.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
@@ -26,7 +26,7 @@ import {
     NoEthAllowed,
     ZKChainNotRegistered
 } from "../bridgehub/L1BridgehubErrors.sol";
-import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
+import {ChainFeature, IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @dev The encoding version of `bridgehubDeposit` data that re-sends the registration of an allowed pair.
 /// The retired version `0x01` registered any pair without consent.
@@ -102,7 +102,7 @@ contract ChainRegistrationSender is
         require(zkChain != address(0), ZKChainNotRegistered());
 
         isChainFeatureEnabled[_chainId][_feature] = _enabled;
-        emit ChainFeatureEnabled(_chainId, _feature, _enabled);
+        emit ChainFeatureSet(_chainId, _feature, _enabled);
 
         // slither-disable-next-line unused-return
         IMailbox(zkChain).requestL2ServiceTransaction(

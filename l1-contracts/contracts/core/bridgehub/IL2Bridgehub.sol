@@ -3,7 +3,12 @@
 pragma solidity ^0.8.21;
 
 import {IBridgehubBase} from "./IBridgehubBase.sol";
-import {ChainFeature} from "../chain-registration/IChainRegistrationSender.sol";
+
+/// @notice A protocol feature a chain uses only once the owner or the Bridgehub admin enabled it for the chain.
+/// See {protocol-docs/interop-gating.md#chain-features}.
+enum ChainFeature {
+    ExpirableTransfers
+}
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

@@ -9,9 +9,9 @@ import {
     CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION,
     ChainRegistrationSender
 } from "contracts/core/chain-registration/ChainRegistrationSender.sol";
-import {ChainFeature, IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
+import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
 import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+import {ChainFeature, IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -478,7 +478,7 @@ contract ChainRegistrationSenderUnitTest is Test {
         _mockBridgehubAdmin(ecosystemAdmin);
 
         vm.expectEmit(true, true, false, true, address(sender));
-        emit IChainRegistrationSender.ChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+        emit IChainRegistrationSender.ChainFeatureSet(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
         _expectFeaturePush(true);
         vm.prank(owner);
         sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
@@ -486,7 +486,7 @@ contract ChainRegistrationSenderUnitTest is Test {
         assertFalse(sender.isChainFeatureEnabled(PEER_CHAIN_ID, ChainFeature.ExpirableTransfers));
 
         vm.expectEmit(true, true, false, true, address(sender));
-        emit IChainRegistrationSender.ChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
+        emit IChainRegistrationSender.ChainFeatureSet(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
         _expectFeaturePush(false);
         vm.prank(ecosystemAdmin);
         sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, false);

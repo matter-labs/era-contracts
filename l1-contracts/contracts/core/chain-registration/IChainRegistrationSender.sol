@@ -2,11 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-/// @notice A protocol feature a chain uses only once the owner or the Bridgehub admin enabled it for the chain.
-/// See {protocol-docs/interop-gating.md#chain-features}.
-enum ChainFeature {
-    ExpirableTransfers
-}
+import {ChainFeature} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -18,7 +14,7 @@ interface IChainRegistrationSender {
     event InteropPairDeregistered(uint256 indexed chainRegisteredOn, uint256 indexed chainId);
 
     /// @notice `feature` was enabled or disabled for `chainId`.
-    event ChainFeatureEnabled(uint256 indexed chainId, ChainFeature indexed feature, bool enabled);
+    event ChainFeatureSet(uint256 indexed chainId, ChainFeature indexed feature, bool enabled);
 
     function initialize(address _owner) external;
 

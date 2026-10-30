@@ -27,8 +27,7 @@ import {
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
-import {IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
-import {ChainFeature} from "../core/chain-registration/IChainRegistrationSender.sol";
+import {ChainFeature, IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerL1ChainIdZero,
@@ -62,7 +61,7 @@ import {RecoverToL1NotSupported, Unauthorized} from "../common/L1ContractErrors.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IAtomicFlowManager}. Coordinates atomic interop flows on this chain (send-side commit,
-/// finality gate, timeout refund); it never custodies funds. See {protocol-docs/atomicity/flow.md#the-atomicflowmanager};
+/// finality gate, timeout refund, expiry); it never custodies funds. See {protocol-docs/atomicity/flow.md#the-atomicflowmanager};
 /// the exact finalization/timeout conditions live in the {AtomicInteropProof} library header.
 contract AtomicFlowManager is IAtomicFlowManager {
     /// @dev (flowId, bundleHash) => source-leg state on this chain.
