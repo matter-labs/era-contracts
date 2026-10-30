@@ -20,7 +20,6 @@ import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses
 import {TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
 import {Unauthorized, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
 import {
-    ChainFeatureNotApproved,
     ChainHasNoBatchesInMessageRoot,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
@@ -470,78 +469,41 @@ contract ChainRegistrationSenderUnitTest is Test {
         );
     }
 
-    function _approveExpirableTransfers(address _approver) internal {
-        vm.prank(_approver);
-        sender.setChainFeatureApproved(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+    function _mockBridgehubAdmin(address _admin) internal {
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.admin, ()), abi.encode(_admin));
     }
 
-    function test_setChainFeatureApproved_byOwnerOrBridgehubAdmin() public {
+    function test_setChainFeatureEnabled_byOwnerOrBridgehubAdmin() public {
         address ecosystemAdmin = makeAddr("ecosystemAdmin");
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.admin, ()), abi.encode(ecosystemAdmin));
-
-        vm.expectEmit(true, true, false, true, address(sender));
-        emit IChainRegistrationSender.ChainFeatureApproved(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
-        _approveExpirableTransfers(ecosystemAdmin);
-        assertTrue(sender.isChainFeatureApproved(CHAIN_ID, ChainFeature.ExpirableTransfers));
-
-        vm.prank(owner);
-        sender.setChainFeatureApproved(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
-        assertFalse(sender.isChainFeatureApproved(CHAIN_ID, ChainFeature.ExpirableTransfers));
-    }
-
-    function test_setChainFeatureApproved_revertWhen_chainAdmin() public {
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.admin, ()), abi.encode(makeAddr("ecosystemAdmin")));
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
-        _approveExpirableTransfers(chainAdmin);
-    }
-
-    function test_setChainFeatureEnabled_afterApproval() public {
-        _approveExpirableTransfers(owner);
+        _mockBridgehubAdmin(ecosystemAdmin);
 
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.ChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
         _expectFeaturePush(true);
-        vm.prank(chainAdmin);
-        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
-
-        assertTrue(sender.isChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers));
-        assertFalse(sender.isChainFeatureEnabled(PEER_CHAIN_ID, ChainFeature.ExpirableTransfers));
-    }
-
-    function test_setChainFeatureEnabled_revertWhen_notApproved() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(ChainFeatureNotApproved.selector, CHAIN_ID, ChainFeature.ExpirableTransfers)
-        );
-        vm.prank(chainAdmin);
-        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
-    }
-
-    function test_setChainFeatureEnabled_revertWhen_notChainAdmin() public {
-        _approveExpirableTransfers(owner);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, owner));
         vm.prank(owner);
         sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
-    }
-
-    /// @notice Disabling doesn't need the approval, so a chain can always turn a feature off.
-    function test_setChainFeatureEnabled_disableWithoutApproval() public {
-        _expectFeaturePush(false);
-        vm.prank(chainAdmin);
-        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
-        assertFalse(sender.isChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers));
-    }
-
-    function test_setChainFeatureApproved_revokingDisables() public {
-        _approveExpirableTransfers(owner);
-        vm.prank(chainAdmin);
-        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+        assertTrue(sender.isChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers));
+        assertFalse(sender.isChainFeatureEnabled(PEER_CHAIN_ID, ChainFeature.ExpirableTransfers));
 
         vm.expectEmit(true, true, false, true, address(sender));
         emit IChainRegistrationSender.ChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
         _expectFeaturePush(false);
-        vm.prank(owner);
-        sender.setChainFeatureApproved(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
-
+        vm.prank(ecosystemAdmin);
+        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, false);
         assertFalse(sender.isChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers));
+    }
+
+    /// @notice A chain's admin can't enable a feature for its chain: the ecosystem decides which chains use it.
+    function test_setChainFeatureEnabled_revertWhen_chainAdmin() public {
+        _mockBridgehubAdmin(makeAddr("ecosystemAdmin"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        vm.prank(chainAdmin);
+        sender.setChainFeatureEnabled(CHAIN_ID, ChainFeature.ExpirableTransfers, true);
+    }
+
+    function test_setChainFeatureEnabled_revertWhen_chainNotRegistered() public {
+        vm.expectRevert(ZKChainNotRegistered.selector);
+        vm.prank(owner);
+        sender.setChainFeatureEnabled(UNREGISTERED_CHAIN_ID, ChainFeature.ExpirableTransfers, true);
     }
 }

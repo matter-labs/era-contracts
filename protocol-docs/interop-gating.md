@@ -201,12 +201,9 @@ flow while another refunds it, and a leg is paid twice.
 ## Chain features
 
 Some protocol features are opt-in per chain, so that the ecosystem knows which chains use them and can change or
-remove a feature that turns out not to be needed. `ChainRegistrationSender` keeps, per chain and per `ChainFeature`:
-
-- `isChainFeatureApproved`, set by the owner or the Bridgehub admin with `setChainFeatureApproved`. Revoking the
-  approval also disables the feature.
-- `isChainFeatureEnabled`, set by the chain's admin with `setChainFeatureEnabled`. Enabling needs the approval
-  (`ChainFeatureNotApproved`); disabling doesn't.
+remove a feature that turns out not to be needed. `ChainRegistrationSender` keeps `isChainFeatureEnabled` per chain
+and per `ChainFeature`. Only the owner or the Bridgehub admin sets it, with `setChainFeatureEnabled`; a chain that
+wants a feature asks for it offchain, as for enabling interop.
 
 Each change of `isChainFeatureEnabled` is also sent to the chain's own `L2Bridgehub` as a service transaction
 (`setChainFeatureEnabled`), where the chain's contracts read it with `L2Bridgehub.isChainFeatureEnabled`. A chain
@@ -214,9 +211,8 @@ only ever reads its own features, so nothing is sent to other chains. A feature 
 does; a chain never has to know whether its peers enabled one.
 
 The service transaction fails on a chain whose L2 doesn't have `setChainFeatureEnabled` yet, leaving the feature
-off on L2 while L1 shows it enabled. Enable a feature only after the chain's upgrade; calling `setChainFeatureEnabled`
-again sends the value again. Approve a feature only for a chain whose protocol version supports it; this is checked
-offchain.
+off on L2 while L1 shows it enabled. So enable a feature only once the chain's upgrade to a protocol version that
+supports it has executed; this is checked offchain. Calling `setChainFeatureEnabled` again sends the value again.
 
 | Feature              | Gates                                                                                      |
 | -------------------- | ------------------------------------------------------------------------------------------ |
