@@ -189,6 +189,11 @@ export enum BundleStatus {
   Unbundled = 3,
 }
 
+/** Mirror of `ChainFeature` in contracts/core/bridgehub/IL2Bridgehub.sol. */
+export enum ChainFeature {
+  ExpirableTransfers = 0,
+}
+
 export enum CallStatus {
   Unprocessed = 0,
   Executed = 1,
