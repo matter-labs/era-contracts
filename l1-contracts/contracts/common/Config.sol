@@ -50,14 +50,23 @@ uint256 constant L1_ANCHOR_RECORD_INTERVAL = 5 minutes;
 /// See {protocol-docs/l1sload.md#freshness}.
 uint256 constant L1SLOAD_MAX_ANCHOR_AGE = 1 hours;
 
-/// @dev `L2InteropRootStorage` slot of the anchor's L1 block hash. ZKsync OS reads it.
-bytes32 constant L1SLOAD_ANCHOR_BLOCK_HASH_SLOT = keccak256("zksync-os.l1sload.anchor.block-hash");
+/// @dev `L2InteropRootStorage` slot of the L1SLOAD anchor's L1 block hash,
+/// `bytes32(uint256(keccak256("zksync.l2-interop-root-storage.l1-anchor-block-hash")) - 1)` (checked by
+/// `test_l1AnchorSlots_constantsMatchDerivation`).
+/// Consensus-critical: the ZKsync OS L1SLOAD hook reads it. See {protocol-docs/l1sload.md#anchors}.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_HASH_SLOT = 0x63370f65078f826b2144025ba09a60a45b5814084eadbc71787c9c79b6c1f7a3;
 
-/// @dev `L2InteropRootStorage` slot of the anchor's L1 block number.
-bytes32 constant L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT = keccak256("zksync-os.l1sload.anchor.block-number");
+/// @dev `L2InteropRootStorage` slot of the L1SLOAD anchor's L1 block number,
+/// `bytes32(uint256(keccak256("zksync.l2-interop-root-storage.l1-anchor-block-number")) - 1)` (checked by
+/// `test_l1AnchorSlots_constantsMatchDerivation`).
+/// Read only by contracts: ZKsync OS doesn't use it. See {protocol-docs/l1sload.md#anchors}.
+bytes32 constant L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT = 0xce92db13fd95ae0dd69670a9b2862185816980f063936eafe2497c6669856484;
 
-/// @dev `L2InteropRootStorage` slot of the L1 time the anchor was recorded at. ZKsync OS reads it.
-bytes32 constant L1SLOAD_ANCHOR_TIMESTAMP_SLOT = keccak256("zksync-os.l1sload.anchor.timestamp");
+/// @dev `L2InteropRootStorage` slot of the L1 time the L1SLOAD anchor was recorded at,
+/// `bytes32(uint256(keccak256("zksync.l2-interop-root-storage.l1-anchor-timestamp")) - 1)` (checked by
+/// `test_l1AnchorSlots_constantsMatchDerivation`).
+/// Consensus-critical: the ZKsync OS L1SLOAD hook reads it. See {protocol-docs/l1sload.md#freshness}.
+bytes32 constant L1SLOAD_ANCHOR_TIMESTAMP_SLOT = 0xbe4436bed4a00d191ed9467d42ae2249ec43b96cba07da38708cc17cfb02ae52;
 
 /// @dev Maximum number of storage keys one L1SLOAD precompile call reads.
 uint256 constant L1SLOAD_MAX_KEYS = 5;

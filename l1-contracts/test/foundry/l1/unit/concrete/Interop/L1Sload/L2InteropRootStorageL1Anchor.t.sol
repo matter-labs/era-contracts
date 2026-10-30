@@ -10,6 +10,7 @@ import {InteropRoot} from "contracts/common/Messaging.sol";
 import {
     L1_BLOCK_HASH_IMPORT_ID,
     L1SLOAD_ANCHOR_BLOCK_HASH_SLOT,
+    L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT,
     L1SLOAD_ANCHOR_TIMESTAMP_SLOT
 } from "contracts/common/Config.sol";
 import {MessageRootIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -25,10 +26,20 @@ contract L2InteropRootStorageL1AnchorTest is Test {
         L1SloadMockUtils.install();
     }
 
-    /// @dev ZKsync OS reads these slots directly, so they must not move.
-    function test_anchorSlotsMatchTheOS() public pure {
-        assertEq(L1SLOAD_ANCHOR_BLOCK_HASH_SLOT, 0x142c4a6779611c44dc597e02ef1171577327f02356cebd6f373cfaa886831283);
-        assertEq(L1SLOAD_ANCHOR_TIMESTAMP_SLOT, 0x840528b13813a4d88e7572e39ead87b5d3a2ef4d72fc74665e1c19c022e232ce);
+    /// @dev ZKsync OS reads the block hash and timestamp slots directly, so they must not move.
+    function test_l1AnchorSlots_constantsMatchDerivation() public pure {
+        assertEq(
+            L1SLOAD_ANCHOR_BLOCK_HASH_SLOT,
+            bytes32(uint256(keccak256("zksync.l2-interop-root-storage.l1-anchor-block-hash")) - 1)
+        );
+        assertEq(
+            L1SLOAD_ANCHOR_BLOCK_NUMBER_SLOT,
+            bytes32(uint256(keccak256("zksync.l2-interop-root-storage.l1-anchor-block-number")) - 1)
+        );
+        assertEq(
+            L1SLOAD_ANCHOR_TIMESTAMP_SLOT,
+            bytes32(uint256(keccak256("zksync.l2-interop-root-storage.l1-anchor-timestamp")) - 1)
+        );
     }
 
     /// @dev The import moves the anchor and emits both events; nothing is stored as a message root.

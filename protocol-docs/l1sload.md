@@ -20,10 +20,11 @@ state transition.
 - **Import on L2.** The server imports an anchor as an interop root with the reserved id
   `L1_BLOCK_HASH_IMPORT_ID = uint256(keccak256("zksync.l1-block-hash-import")) - 1` (above the Bridgehub's `uint48`
   chain-id cap), the L1 block number, `sides = [blockHash]` and the recorded timestamp. `L2InteropRootStorage` moves
-  the anchor only to a newer block: it writes the block number, hash and timestamp to the fixed
-  `keccak256("zksync-os.l1sload.anchor.*")` slots that ZKsync OS reads, and emits `L1AnchorImported`. An import that
-  isn't newer leaves the anchor as it is, so an anchor import never reverts. An anchor is not stored as a message root,
-  so it can't prove a message.
+  the anchor only to a newer block: it writes the block number, hash and timestamp to the fixed slots
+  `bytes32(uint256(keccak256("zksync.l2-interop-root-storage.l1-anchor-<field>")) - 1)` (`L1SLOAD_ANCHOR_*_SLOT`),
+  and emits `L1AnchorImported`. ZKsync OS reads the hash and timestamp slots, so they are consensus-critical; the
+  block number is read only by contracts. An import that isn't newer leaves the anchor as it is, so an anchor import
+  never reverts. An anchor is not stored as a message root, so it can't prove a message.
 - **Dependency roots.** Every anchor import, newer or not, emits `InteropRootAdded`. ZKsync OS adds the root to the
   batch's dependency-roots rolling hash from that event, and the server sends the execute call every root the
   import transaction carried, so the two agree and every imported anchor is checked on L1.
