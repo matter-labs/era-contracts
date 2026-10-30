@@ -925,11 +925,6 @@
   },
   {
     "type": "error",
-    "name": "ManagerExpirableTransfersNotEnabled",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ManagerFlowDeadlinePassed",
     "inputs": [
       {
