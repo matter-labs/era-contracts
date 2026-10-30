@@ -185,6 +185,8 @@ A source chain S is **allowed** for a chain C if S is C, or if C's `L2Bridgehub.
   every leg's source to be allowed.
 - **Refunds** (`authorizeRefund`, {protocol-docs/atomicity/recovery.md#authorizerefund--claimrefund}) need the
   missing leg's source to be allowed.
+- **Expiry** (`expireAtomicBundle`, {protocol-docs/atomicity/expiry.md#expiry-on-the-destination}) needs the leg's
+  source to be allowed, even for a bundle verified before the source was removed, since it re-checks finality.
 - **Expiry refunds** (`authorizeExpiryRefund`, {protocol-docs/atomicity/expiry.md#refund-on-the-source}) need the
   leg's destination to be allowed, since its tree holds the expiry.
 
