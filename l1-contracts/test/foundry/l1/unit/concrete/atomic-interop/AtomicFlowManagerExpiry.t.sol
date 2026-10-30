@@ -18,7 +18,6 @@ import {
 import {
     ManagerCommittedBundleNotInFlow,
     ManagerExpirableFlowNotSingleLeg,
-    ManagerExpirableTransfersNotEnabled,
     ManagerFlowNotExpirable,
     ManagerFlowNotExpiredYet,
     ManagerLegSourceChainNotAllowed,
@@ -34,8 +33,7 @@ import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/
 /// through the real handler and InteropCenter in `L2AtomicInteropExecuteTestAbstract`.
 /// @dev The remote chain of each test (the leg's source for `recordExpiry`, its destination for
 /// `authorizeExpiryRefund`) is modeled by the builder's oracle tree, and its proofs run end-to-end through real
-/// aggregation, root import and {L2MessageVerification}. The receive filter and the chain feature are stubbed (see
-/// {AtomicPredeployFixture}).
+/// aggregation, root import and {L2MessageVerification}. The receive filter is stubbed (see {AtomicPredeployFixture}).
 contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
     /// @dev The other chain of the flow: aggregatable in the settlement-layer MessageRoot, unlike this chain.
     uint256 internal constant REMOTE_CHAIN = 271;
@@ -48,7 +46,6 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
         (manager, ) = _deployAtomicPredeploys(SETTLEMENT_LAYER_CHAIN_ID, true);
         _setUpAtomicFixtures();
         _setLegSourceAllowed(REMOTE_CHAIN, true);
-        _setExpirableTransfersEnabled(true);
     }
 
     function _bundleBytes(uint256 _sourceChainId, uint256 _destinationChainId) internal pure returns (bytes memory) {
@@ -229,18 +226,11 @@ contract AtomicFlowManagerExpiryTest is AtomicInteropProofBuilder {
                     append of an expirable flow
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice `append` accepts an expirable leg only once this chain enabled the feature, and flags it when it does.
-    function test_append_expirableFlowNeedsTheFeature() public {
+    function test_append_expirableFlowEmitsExpirableFlowCommitted() public {
         (AtomicFlowPreimage memory preimage, bytes memory bundle) = _outgoingLeg(
             ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION
         );
 
-        _setExpirableTransfersEnabled(false);
-        vm.expectRevert(ManagerExpirableTransfersNotEnabled.selector);
-        vm.prank(L2_INTEROP_CENTER_ADDR);
-        manager.append(keccak256(bundle), 0, preimage);
-
-        _setExpirableTransfersEnabled(true);
         vm.expectEmit(true, true, true, true, address(manager));
         emit IAtomicFlowManager.ExpirableFlowCommitted(AtomicFlowFixtures.flowId(preimage), keccak256(bundle));
         vm.prank(L2_INTEROP_CENTER_ADDR);

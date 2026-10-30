@@ -19,8 +19,6 @@ error ManagerCommittedLegSourceChainMismatch(bytes32 flowId, uint256 thisChainId
 error ManagerExecutingBundleNotInFlow(bytes32 flowId, bytes32 bundleHash);
 // 0x882b8530
 error ManagerExpirableFlowNotSingleLeg(uint256 legs);
-// 0xf1356db3
-error ManagerExpirableTransfersNotEnabled();
 // 0x44906526
 error ManagerFlowDeadlinePassed(uint64 deadline, uint256 latestImportedRootTimestamp);
 // 0xf8585117

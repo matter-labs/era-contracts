@@ -14,19 +14,11 @@ another may already have executed would break atomicity.
 
 ## Opting in
 
-- **Per flow.** A flow opts in with preimage version `ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION` (`0x02`). The field
-  set is the same as version `0x01`, so the `AtomicFinalityProof` ABI and every selector taking it are unchanged.
-  Version `0x02` requires exactly one leg (`ManagerExpirableFlowNotSingleLeg`), checked in
-  `_validateAndComputeFlowId` so that append, finalize, expiry and refund agree
-  ({protocol-docs/atomicity/flow.md#the-preimage-version}). Committing such a leg also emits
-  `ExpirableFlowCommitted`, so that the feature's use can be counted.
-- **Per source chain.** `append` accepts a version `0x02` leg only if the source chain enabled the
-  `ExpirableTransfers` chain feature ({protocol-docs/interop-gating.md#chain-features}),
-  `ManagerExpirableTransfersNotEnabled` otherwise. The destination needs no feature. A destination whose contracts
-  don't support version `0x02` yet rejects the leg without changing any state; once it upgrades, the same finality
-  proof still verifies (imported roots are never pruned), and the leg executes or expires as usual.
-- **Nothing else reads the feature.** Executing, expiring and refunding a version `0x02` leg work whatever the
-  feature says later, so disabling it never strands a leg already in flight.
+A flow opts in with preimage version `ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION` (`0x02`). The field set is the same
+as version `0x01`, so the `AtomicFinalityProof` ABI and every selector taking it are unchanged. Version `0x02`
+requires exactly one leg (`ManagerExpirableFlowNotSingleLeg`), checked in `_validateAndComputeFlowId` so that append,
+finalize, expiry and refund agree ({protocol-docs/atomicity/flow.md#the-preimage-version}). Committing such a leg
+also emits `ExpirableFlowCommitted`, so that the feature's use can be counted.
 
 ## Expiry on the destination
 

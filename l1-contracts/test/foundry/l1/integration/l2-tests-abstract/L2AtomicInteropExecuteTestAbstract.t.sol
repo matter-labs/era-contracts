@@ -14,7 +14,6 @@ import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {IL2InteropHandler} from "contracts/interop/interop-handler/IL2InteropHandler.sol";
-import {ChainFeature} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {
     AtomicFinalityProof,
     AtomicFlow,
@@ -460,13 +459,9 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
                     Expiry of single-leg flows
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Phase 1 of an expirable flow ({protocol-docs/atomicity/expiry.md}): enables the feature for this chain,
-    /// through the service transaction the L1 `ChainRegistrationSender` sends, then sends a single-leg flow with one
+    /// @dev Phase 1 of an expirable flow ({protocol-docs/atomicity/expiry.md}): sends a single-leg flow with one
     /// call to `_to`. Returns the leg's finality proof, settled in time.
     function _sendExpirableLeg(address _to) internal returns (AtomicFinalityProof memory finality) {
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2Bridgehub.setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
-
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(_to),

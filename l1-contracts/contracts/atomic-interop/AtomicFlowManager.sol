@@ -27,7 +27,7 @@ import {
     L2_INTEROP_HANDLER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BRIDGEHUB, L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractInterfaces.sol";
-import {ChainFeature, IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
+import {IL2Bridgehub} from "../core/bridgehub/IL2Bridgehub.sol";
 import {
     ManagerAlreadyInitialized,
     ManagerL1ChainIdZero,
@@ -37,7 +37,6 @@ import {
     ManagerLegNotCommitted,
     ManagerLegNotRevertable,
     ManagerExpirableFlowNotSingleLeg,
-    ManagerExpirableTransfersNotEnabled,
     ManagerFlowDeadlinePassed,
     ManagerFlowIdMismatch,
     ManagerFlowNotExpirable,
@@ -115,12 +114,6 @@ contract AtomicFlowManager is IAtomicFlowManager {
     ) external onlyInteropCenter {
         bytes32 flowId = _validateAndComputeFlowId(_flowPreimage);
         _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
-        if (
-            _flowPreimage.version == ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION &&
-            !IL2Bridgehub(address(L2_BRIDGEHUB)).isChainFeatureEnabled(ChainFeature.ExpirableTransfers)
-        ) {
-            revert ManagerExpirableTransfersNotEnabled();
-        }
 
         // Reject a leg of a flow whose deadline has verifiably passed: an imported settlement-layer
         // root created after the deadline is exactly what `authorizeRefund` needs, so committing now

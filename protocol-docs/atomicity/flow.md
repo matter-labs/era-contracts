@@ -65,8 +65,7 @@ lowNullifierIndex, preimage)`. `append`:
    (`ManagerTooManyLegs` — appending is cheap, but finalization verifies one Merkle proof per leg),
    `legBundleHashes` strictly ascending, `legSourceChainIds` length matching.
 2. **Requires L1 settlement** (`_checkSettlementLayerIsL1`) — this release anchors proofs only on the L1
-   message root (see {protocol-docs/atomicity/security.md#trust-assumptions}). A version `0x02` leg also needs
-   this chain's `ExpirableTransfers` feature ({protocol-docs/atomicity/expiry.md#opting-in}).
+   message root (see {protocol-docs/atomicity/security.md#trust-assumptions}).
 3. **Rejects flows whose deadline verifiably passed** (`ManagerFlowDeadlinePassed`): if a
    settlement-layer root with creation timestamp `> deadline` has been imported on this chain (tracked
    as a monotone maximum by `L2InteropRootStorage.latestInteropRootTimestamp`), the flow can already be
