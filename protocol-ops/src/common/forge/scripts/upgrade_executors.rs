@@ -5,8 +5,8 @@
 //! (`ecosystem verify-package --executor-record`).
 //!
 //! ```toml
-//! [upgrade_executors.core_executor]   # DeployL1CoreContracts, CoreUpgrade_v35
-//! [upgrade_executors.ctm_executor]    # DeployCTM, CTMUpgrade_v35
+//! [upgrade_executors.core_executor]   # DeployL1CoreContracts (and v35's bootstrap CoreUpgrade_v35)
+//! [upgrade_executors.ctm_executor]    # DeployCTM (and v35's bootstrap CTMUpgrade_v35)
 //! ```
 
 use alloy::primitives::{Address, B256};

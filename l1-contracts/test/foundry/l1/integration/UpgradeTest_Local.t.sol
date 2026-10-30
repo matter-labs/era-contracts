@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 // solhint-disable gas-custom-errors
 
-import {CTMUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol";
-import {CoreUpgrade_v35} from "../../../../deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol";
+import {CTMUpgrade_v36} from "../../../../deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol";
+import {CoreUpgrade_v36} from "../../../../deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {
     AuthoredL2Side,
@@ -50,7 +50,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 ///         (the heavy JSON/zkout reads live on the shared base). The bootstrap flow itself —
 ///         the migration deploy, the one governance bundle, the legacy cut-taking commit — runs
 ///         UNMOCKED: that is what this file exists to test.
-contract CTMUpgradeForLocalTest is CTMUpgrade_v35 {
+contract CTMUpgradeForLocalTest is CTMUpgrade_v36 {
     /// @dev Same MemoryOOG avoidance: the real builder reads every L2 contract's bytecode.
     ///      Correct length, empty rows — and no shell, since no row sits behind one.
     function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
@@ -84,7 +84,7 @@ contract ChainUpgradeByCTMOwnerForLocalTest is DefaultChainUpgrade {
 
 /// @notice The fixture the v35 BOOTSTRAP edge leaves behind, built through the real prepare
 ///         pipeline over the previous release's frozen L1 state (see {PreviousReleaseFixture}):
-///         `CTMUpgrade_v35` deploying the executor + `RegistryBootstrapMigration`, the one governance
+///         `CTMUpgrade_v36` deploying the executor + `RegistryBootstrapMigration`, the one governance
 ///         bundle `RegistryBootstrapSequence` derives (the notifier accept, the ecosystem handover and
 ///         core leg, nominate the CTM, hand over its ProxyAdmin, `migrate()` — which itself completes
 ///         the executor's accept — and the completion check) performing the whole edge, and an
@@ -102,7 +102,7 @@ abstract contract UpgradeIntegrationBootstrapFixture is
 
     /// @dev The release's own local upgrade input, which protocol-ops' default prepare reads: it names no
     ///      target version, so the edge goes to the genesis version. Moved by `yarn new-release`.
-    string internal constant RELEASE_UPGRADE_INPUT = "/upgrade-envs/v0.35.0-upgrade-system/local.toml";
+    string internal constant RELEASE_UPGRADE_INPUT = "/upgrade-envs/v0.36.0-v36/local.toml";
 
     /// @dev The previous release's L1-settled chain that crosses the edge.
     uint256 internal constant UPGRADED_CHAIN_ID = 10;
@@ -117,7 +117,7 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     address internal rollupDAManagerBeforeUpgrade;
 
     function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
-        return new CoreUpgrade_v35();
+        return new CoreUpgrade_v36();
     }
 
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {

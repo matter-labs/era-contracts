@@ -29,11 +29,9 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
 - `v36/` — the v35 -> v36 edge, the first registry-driven release and the template for the next
   one: `CoreUpgrade_v36` replaces one ecosystem implementation (`L1MessageRoot`); `CTMUpgrade_v36`
   overrides nothing.
-- `v35/` — the v34 -> v35 bootstrap edge: `CoreUpgrade_v35` also deploys the
-  `CoreUpgradeExecutor`; `CTMUpgrade_v35` deploys the `CTMUpgradeExecutor`, the
-  `RegistryBootstrapMigration` (naming both executors) and the `RegistryBootstrapSequence` over the
-  migration and the core transition, and declares every call of the one-time edge by reading it off
-  that sequence.
+- The v34 -> v35 bootstrap edge (`v35/`: `CoreUpgrade_v35` deploying the `CoreUpgradeExecutor`,
+  `CTMUpgrade_v35` the `CTMUpgradeExecutor`, the `RegistryBootstrapMigration` and the
+  `RegistryBootstrapSequence`) was retired with the v36 bump; it lives on `draft/v0.35.0`.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 - `EmergencyUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
   emergency upgrade ("Emergency execution" below).
@@ -43,7 +41,7 @@ Other one-off scripts of shipped upgrades live on their release branches, not he
 ## 1. Inputs
 
 Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (see
-`upgrade-envs/v0.35.0-upgrade-system/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
+`upgrade-envs/v0.36.0-v36/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
 Keep inputs minimal — the prepare reads the departing version, the live implementations, the
 CTM's owner and the ecosystem `ProxyAdmin`'s owner from L1. One input cannot be derived and must
 be carried forward from the previous prepare's output: `[contracts] eip7702_checker`

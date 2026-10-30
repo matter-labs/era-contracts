@@ -1,0 +1,3 @@
+# Upgrade input for the zksync-os-integration-test environment on the v36 release. See protocol-ops/README.md "Environment inputs".
+
+era_chain_id = 6565

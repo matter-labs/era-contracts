@@ -165,7 +165,7 @@ Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol"** or **`CTMUpgrade_v35.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
+- **"Script not found: deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol"** or **`CTMUpgrade_v36.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 
