@@ -14,7 +14,7 @@
 //! | release | `l2SystemProxyBytecodeInfo` | the bytecode info of [`SYSTEM_PROXY_SHELL`] |
 //! | transition | `upgradeEngine` | [`TRANSITION_ENGINES`] |
 //! | bootstrap migration | `upgradeEngine` | [`BOOTSTRAP_ENGINES`] |
-//! | transition, bootstrap migration | `l2Plan.delegateComposer` | the composer [`DELEGATE_COMPOSERS`] pairs with the plan's delegate, required whenever the plan names one |
+//! | transition, bootstrap migration | `l2Plan.delegateComposer` | the composer [`DELEGATE_COMPOSERS`] pairs with the plan's delegate |
 //! | transition, bootstrap migration | `l2Plan.delegateBytecodeInfo` | the bytecode info of one of [`L2_DELEGATES`] |
 //! | transition, bootstrap migration | each `l2Plan.extraBytecodeInfos` entry | the bytecode info of a reviewed contract |
 //! | proxy upgrade transition (either domain), bootstrap migration | each row's `implNew` | the contract of the row's slot ([`super::rows`]) |
@@ -88,10 +88,8 @@ pub(crate) const TRANSITION_ENGINES: &[&str] = &["DefaultUpgrade"];
 /// The engine the bootstrap migration pins (`CTMUpgrade_v35.deployUsedUpgradeContract`).
 pub(crate) const BOOTSTRAP_ENGINES: &[&str] = &["BootstrapUpgrade"];
 /// Each L2 upgrade delegate an authored L2 plan may name, with the `IL2DelegateCalldataComposer`
-/// that composes its calldata. A plan naming a delegate must name its composer: without one,
-/// `L2PlanLib.build` composes empty delegate calldata, which `L2DefaultUpgrade` has no fallback
-/// for, so `L2ComplexUpgrader`'s delegatecall reverts and the L2 upgrade transaction cannot
-/// execute on any chain.
+/// that composes its calldata. A plan naming a delegate without a composer cannot be constructed
+/// (`L2PlanLib.build` reverts with `L2PlanDelegateNeedsComposer`).
 pub(crate) const DELEGATE_COMPOSERS: &[(&str, &str)] =
     &[("L2DefaultUpgrade", "L2DefaultDelegateCalldataComposer")];
 /// The L2 upgrade delegates an authored L2 plan may name.
@@ -638,15 +636,6 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
             plan.delegateComposer,
             composers,
             "the prepare deploys the composer its plan names",
-        ));
-    } else if !plan.delegateBytecodeInfo.is_empty() {
-        result.report_error(&format!(
-            "{label}: l2Plan names a delegate ({}) but no delegateComposer: `L2PlanLib.build` \
-             would compose empty delegate calldata, which the delegate does not answer, so \
-             `L2ComplexUpgrader`'s delegatecall reverts and the L2 upgrade transaction cannot \
-             execute on any chain. The plan must name {}",
-            delegate.unwrap_or("an unidentified bytecode"),
-            composers.join(" or ")
         ));
     }
     for (member_label, address, admitted, new_because) in named {
@@ -1939,24 +1928,6 @@ mod tests {
             assert!(L2_DELEGATES.contains(delegate), "{delegate}");
             assert!(COMPOSERS.contains(composer), "{composer}");
         }
-    }
-
-    /// A plan naming a delegate but no composer composes empty delegate calldata, which
-    /// `L2DefaultUpgrade` reverts on: the L2 upgrade transaction could never execute. Only the
-    /// engine is read.
-    #[tokio::test]
-    async fn a_delegate_without_a_composer_fails() {
-        let result = run_engine(
-            &[DEFAULT_UPGRADE_RUNTIME],
-            TRANSITION_ENGINES,
-            &plan(Address::ZERO, encoded(DELEGATE_INFO), Vec::new()),
-        )
-        .await;
-        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
-        assert!(
-            result.has_error("l2Plan names a delegate (L2DefaultUpgrade) but no delegateComposer")
-        );
-        assert!(result.has_error("must name L2DefaultDelegateCalldataComposer"));
     }
 
     /// The `L2DefaultUpgrade` delegate takes its calldata from the reviewed default composer

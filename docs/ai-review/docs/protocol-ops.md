@@ -71,9 +71,7 @@ from calldata:
   role: a release's genesis facets (one of the six facets), `DiamondInit`, `L1GenesisUpgrade`, its
   verifier (a top-level verifier) and every sub-verifier the verifier names through its
   `*_VERIFIER()` getters; a transition's engine `DefaultUpgrade`, the bootstrap migration's
-  `BootstrapUpgrade`, an L2 plan's `L2DefaultDelegateCalldataComposer` (required whenever the plan
-  names a delegate: `L2DefaultUpgrade` has no fallback for the empty calldata a plan without a
-  composer composes, so its L2 upgrade transaction could never execute). The one exception is the
+  `BootstrapUpgrade`, an L2 plan's `L2DefaultDelegateCalldataComposer`. The one exception is the
   verifier already in force where the upgrade departs from (the departing release's, or the one the
   CTM's chains run for the bootstrap), which a release carries over without redeploying and an
   earlier build may have produced. `ZiskVerifier`'s snarkJS Plonk backend is outside the

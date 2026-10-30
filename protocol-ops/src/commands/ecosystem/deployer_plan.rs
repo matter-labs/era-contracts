@@ -17,9 +17,9 @@
 //!   and with that entry's argument constraint.
 //!
 //! A role that belongs to one CTM is taken only from that CTM's `[ctms.<key>]` table, and the CTM
-//! must be one the env declares. The CTM's ProxyAdmin and BytecodesSupplier are also read from L1
-//! ([`CtmFacts`]) before anything is signed, as is the ecosystem ProxyAdmin (the EIP-1967 admin of
-//! the env's Bridgehub), so a bundle cannot name its own.
+//! must be one the env declares. The CTM's ProxyAdmin, BytecodesSupplier and ValidatorTimelock are
+//! also read from L1 ([`CtmFacts`]) before anything is signed, as is the ecosystem ProxyAdmin (the
+//! EIP-1967 admin of the env's Bridgehub), so a bundle cannot name its own.
 //!
 //! What it does not establish: the package's other addresses and records come from the bundle.
 //! The constructor arguments, a proxy's initializer and a published bytecode are not judged here;
@@ -602,6 +602,8 @@ pub(crate) struct CtmFacts {
     pub(crate) proxy_admin: Address,
     /// `L1_BYTECODES_SUPPLIER()`, where the CTM reads published bytecode.
     pub(crate) bytecodes_supplier: Address,
+    /// `validatorTimelockPostV29()`, the CTM's ValidatorTimelock.
+    pub(crate) validator_timelock: Address,
 }
 
 /// The reviewed inputs the plan is held against, from the deploy checkout's env config, the
@@ -741,6 +743,10 @@ impl PlanChecker<'_> {
             Role::BytecodesSupplier => {
                 (|facts| facts.bytecodes_supplier, "L1_BYTECODES_SUPPLIER()")
             }
+            Role::ValidatorTimelock => (
+                |facts| facts.validator_timelock,
+                "validatorTimelockPostV29()",
+            ),
             _ => return Ok(()),
         };
         let ctm = holder
@@ -1368,16 +1374,23 @@ pub(crate) async fn read_ctm_facts<P: Provider>(
     let mut facts = BTreeMap::new();
     for &ctm in ctms {
         let proxy_admin = read_proxy_admin(provider, ctm).await?;
-        let bytecodes_supplier = CtmView::new(ctm, provider)
+        let view = CtmView::new(ctm, provider);
+        let bytecodes_supplier = view
             .L1_BYTECODES_SUPPLIER()
             .call()
             .await
             .with_context(|| format!("read L1_BYTECODES_SUPPLIER() of the CTM {ctm}"))?;
+        let validator_timelock = view
+            .validatorTimelockPostV29()
+            .call()
+            .await
+            .with_context(|| format!("read validatorTimelockPostV29() of the CTM {ctm}"))?;
         facts.insert(
             ctm,
             CtmFacts {
                 proxy_admin,
                 bytecodes_supplier,
+                validator_timelock,
             },
         );
     }
@@ -1623,8 +1636,8 @@ pub struct CheckDeployerPlanArgs {
     /// `contracts_commit` with clean contract sources.
     #[clap(long, conflicts_with_all = ["manifest", "ecosystem_toml", "deployer", "env", "contract_hashes"])]
     pub bundle: Option<PathBuf>,
-    /// The L1 the plan would be signed for: each CTM's ProxyAdmin and BytecodesSupplier, and the
-    /// Bridgehub's ProxyAdmin, are read from it.
+    /// The L1 the plan would be signed for: each CTM's ProxyAdmin, BytecodesSupplier and
+    /// ValidatorTimelock, and the Bridgehub's ProxyAdmin, are read from it.
     #[clap(long)]
     pub l1_rpc_url: String,
     /// A prepare output's `manifest.json` (instead of `--bundle`).
@@ -1726,6 +1739,7 @@ mod tests {
     const GOVERNANCE: Address = Address::repeat_byte(0x60);
     const DEPLOYER: Address = Address::repeat_byte(0xD0);
     const SUPPLIER: Address = Address::repeat_byte(0xB5);
+    const VALIDATOR_TIMELOCK: Address = Address::repeat_byte(0x7C);
     const CTM: Address = Address::repeat_byte(0xC7);
     const CTM_PROXY_ADMIN: Address = Address::repeat_byte(0xCA);
     const ECOSYSTEM_PROXY_ADMIN: Address = Address::repeat_byte(0xEA);
@@ -1865,6 +1879,7 @@ ctm_proxy_admin = "{executor_admin}"
 [ctms.zksync_os.state_transition]
 chain_type_manager_proxy = "{CTM}"
 bytecodes_supplier_addr = "{SUPPLIER}"
+validator_timelock_addr = "{VALIDATOR_TIMELOCK}"
 
 [ctms.zksync_os.deployed_addresses]
 transparent_proxy_admin = "{CTM_PROXY_ADMIN}"
@@ -1907,12 +1922,13 @@ data = "{nominate}"
         PackageView::from_toml(&toml::from_str(toml).unwrap(), "test.toml").unwrap()
     }
 
-    /// What L1 says about [`CTM`]: it is administered by [`CTM_PROXY_ADMIN`] and reads published
-    /// bytecode from [`SUPPLIER`].
+    /// What L1 says about [`CTM`]: it is administered by [`CTM_PROXY_ADMIN`], reads published
+    /// bytecode from [`SUPPLIER`] and runs [`VALIDATOR_TIMELOCK`].
     fn live_ctm() -> CtmFacts {
         CtmFacts {
             proxy_admin: CTM_PROXY_ADMIN,
             bytecodes_supplier: SUPPLIER,
+            validator_timelock: VALIDATOR_TIMELOCK,
         }
     }
 
@@ -2287,7 +2303,8 @@ data = "{nominate}"
     }
 
     /// A CTM's roles count only in a `[ctms.<key>]` table that names its CTM; a table naming them
-    /// without one is refused, and the supplier and ProxyAdmin are also held to L1.
+    /// without one is refused, and the supplier, ProxyAdmin and ValidatorTimelock are also held to
+    /// L1.
     #[test]
     fn ctm_roles_come_only_from_a_ctm_table_and_agree_with_l1() {
         let orphan = format!(
@@ -2359,6 +2376,30 @@ data = "{nominate}"
                 ))),
             "{:#?}",
             verdict.refused
+        );
+
+        // The ValidatorTimelock is handed to governance only while it is the CTM's on L1.
+        let mut plan = clean_plan();
+        plan.push((VALIDATOR_TIMELOCK, U256::ZERO, handover_to(GOVERNANCE)));
+        let verdict = check_plan(&build(), &package(), &inputs(), &calls(plan.clone()));
+        assert!(verdict.refused.is_empty(), "{:#?}", verdict.refused);
+        let mut replaced = inputs();
+        replaced.ctm_facts.insert(
+            CTM,
+            CtmFacts {
+                validator_timelock: STRANGER,
+                ..live_ctm()
+            },
+        );
+        let verdict = check_plan(&build(), &package(), &replaced, &calls(plan));
+        assert_eq!(verdict.refused.len(), 1, "{:#?}", verdict.refused);
+        assert!(
+            verdict.refused[0].contains(&format!(
+                "{VALIDATOR_TIMELOCK} is not the validatorTimelockPostV29() of the CTM {CTM} on \
+                 L1, which is {STRANGER}"
+            )),
+            "{}",
+            verdict.refused[0]
         );
     }
 
@@ -2568,14 +2609,16 @@ data = "{nominate}"
         );
     }
 
-    /// The CTM facts are the CTM proxy's EIP-1967 admin slot and its `L1_BYTECODES_SUPPLIER()`.
+    /// The CTM facts are the CTM proxy's EIP-1967 admin slot, its `L1_BYTECODES_SUPPLIER()` and its
+    /// `validatorTimelockPostV29()`.
     #[tokio::test]
-    async fn ctm_facts_are_read_from_the_admin_slot_and_the_supplier_getter() {
+    async fn ctm_facts_are_read_from_the_admin_slot_and_the_ctm_getters() {
         use alloy::providers::ProviderBuilder;
         use alloy::transports::mock::Asserter;
         let asserter = Asserter::new();
         asserter.push_success(&CTM_PROXY_ADMIN.into_word());
         asserter.push_success(&Bytes::from(SUPPLIER.abi_encode()));
+        asserter.push_success(&Bytes::from(VALIDATOR_TIMELOCK.abi_encode()));
         let provider = ProviderBuilder::new().connect_mocked_client(asserter);
         let facts = read_ctm_facts(&provider, &[CTM].into()).await.unwrap();
         assert_eq!(facts, [(CTM, live_ctm())].into());

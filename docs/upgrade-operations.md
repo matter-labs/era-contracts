@@ -141,8 +141,9 @@ value and be either
 A role that belongs to a CTM (the CTM, its `ValidatorTimelock`, `ProxyAdmin`, `BytecodesSupplier`
 and `ctm_admin_calls` ChainAdmin) counts only in a `[ctms.<key>]` table whose
 `chain_type_manager_proxy` is one of the env's `[[ctm_contracts.ctms]]`; a table naming such a role
-without a CTM is refused. The CTMs' `ProxyAdmin` and `BytecodesSupplier`, and the ecosystem
-`ProxyAdmin` (the EIP-1967 admin of the env's `bridgehub_proxy_addr`), are read over `--l1-rpc-url`
+without a CTM is refused. The CTMs' `ProxyAdmin`, `BytecodesSupplier` and `ValidatorTimelock`
+(`validatorTimelockPostV29()`), and the ecosystem `ProxyAdmin` (the EIP-1967 admin of the env's
+`bridgehub_proxy_addr`), are read over `--l1-rpc-url`
 (`replay-bundle` passes its `--rpc`, or in a rehearsal the fork it replays on), never taken from the
 bundle. Without `--env` or `--bundle`, the package's own CTMs and Bridgehub stand in for the env's.
 
