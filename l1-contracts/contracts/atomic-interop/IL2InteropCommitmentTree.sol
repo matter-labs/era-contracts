@@ -5,7 +5,7 @@ import {IMTLeaf} from "../common/libraries/IndexedMerkleTree.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain append-only **Indexed Merkle Tree** of atomic-interop commit values, supporting
+/// @notice Per-chain append-only **Indexed Merkle Tree** of atomic-interop commit and expiry values, supporting
 /// O(log n) proofs of both membership and non-membership. The tree never publishes its root: the
 /// ZKsync OS bootloader snapshots it at every batch boundary into the chain batch root, which
 /// consuming chains authenticate via {AtomicInteropProof}. Each inserted leaf is reported to
@@ -18,7 +18,7 @@ interface IL2InteropCommitmentTree {
     event RootUpdated(uint256 indexed leafIndex, bytes32 root);
 
     /// @notice Insert `_value` into the indexed tree. Callable only by the configured appender.
-    /// @param _value The value to insert (a domain-tagged commit value, never 0).
+    /// @param _value The value to insert (a domain-tagged commit or expiry value, never 0).
     /// @param _lowNullifierIndex Index of the existing leaf `L` with `L.value < _value` and
     /// (`L.nextValue == 0` or `_value < L.nextValue`). The caller (or the IMT engine) computes it
     /// from the current leaf set.
