@@ -7,18 +7,18 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
-import {UpgradeIntegrationBootstrapFixture} from "../UpgradeTest_Local.t.sol";
+import {UpgradeIntegrationReleaseFixture} from "../UpgradeTest_Local.t.sol";
 import {ProtocolUpgradeHandlerFreezeDouble} from "./_EmergencyGovernanceDoubles.sol";
 
-/// @notice The Security Council's chain freeze against the ecosystem the v35 bootstrap leaves
+/// @notice The Security Council's chain freeze against the ecosystem the release edge leaves
 ///         behind: the CTM is owned by its `CTMUpgradeExecutor`, and the `ProtocolUpgradeHandler`
 ///         reaches its chains as the Bridgehub's owner
 ///         ({protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain}).
 /// @dev The handler is a double because zk-governance is not vendored here: it restates the
-///      handler's per-chain freeze and unfreeze calls. The bootstrap, the Bridgehub, the CTM and the
+///      handler's per-chain freeze and unfreeze calls. The upgrade, the Bridgehub, the CTM and the
 ///      chains are real. As in production, the handler owns the CTM executor; whether it owns the
 ///      Bridgehub is what each test sets.
-contract SecurityCouncilFreezeTest is UpgradeIntegrationBootstrapFixture {
+contract SecurityCouncilFreezeTest is UpgradeIntegrationReleaseFixture {
     address internal bridgehub;
     address internal ctm;
     address internal ctmExecutor;
@@ -33,7 +33,7 @@ contract SecurityCouncilFreezeTest is UpgradeIntegrationBootstrapFixture {
         _handToTheHandler(ctmExecutor);
 
         assertEq(IOwnable(ctmExecutor).owner(), address(handler), "the handler governs the CTM executor");
-        assertTrue(IOwnable(ctm).owner() != address(handler), "the bootstrap left the CTM with its executor");
+        assertTrue(IOwnable(ctm).owner() != address(handler), "the upgrade left the CTM with its executor");
         assertGt(_chainsOnTheCTM().length, 0, "fixture: the CTM has chains");
     }
 
@@ -72,7 +72,7 @@ contract SecurityCouncilFreezeTest is UpgradeIntegrationBootstrapFixture {
 
     /// @notice The soft/hard freeze and the unfreeze (and the unfreeze that opens an emergency
     ///         upgrade) reach every chain of the executor-owned CTM.
-    function test_theHandlerFreezesAndUnfreezesEveryChainOfTheBootstrappedCTM() public {
+    function test_theHandlerFreezesAndUnfreezesEveryChainOfTheExecutorOwnedCTM() public {
         _handToTheHandler(bridgehub);
         address[] memory diamonds = _chainsOnTheCTM();
         _assertFrozen(diamonds, false, "nothing is frozen before");

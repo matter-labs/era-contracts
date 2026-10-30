@@ -29,11 +29,9 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
 - `v36/` — the v35 -> v36 edge, the first registry-driven release and the template for the next
   one: `CoreUpgrade_v36` replaces one ecosystem implementation (`L1MessageRoot`); `CTMUpgrade_v36`
   overrides nothing.
-- `v35/` — the v34 -> v35 bootstrap edge: `CoreUpgrade_v35` also deploys the
-  `CoreUpgradeExecutor`; `CTMUpgrade_v35` deploys the `CTMUpgradeExecutor`, the
-  `RegistryBootstrapMigration` (naming both executors) and the `RegistryBootstrapSequence` over the
-  migration and the core transition, and declares every call of the one-time edge by reading it off
-  that sequence.
+- The v34 -> v35 bootstrap edge (`v35/`: `CoreUpgrade_v35` deploying the `CoreUpgradeExecutor`,
+  `CTMUpgrade_v35` the `CTMUpgradeExecutor`, the `RegistryBootstrapMigration` and the
+  `RegistryBootstrapSequence`) was retired with the v36 bump; it lives on `draft/v0.35.0`.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 - `EmergencyUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
   emergency upgrade ("Emergency execution" below).
@@ -43,7 +41,7 @@ Other one-off scripts of shipped upgrades live on their release branches, not he
 ## 1. Inputs
 
 Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (see
-`upgrade-envs/v0.35.0-upgrade-system/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
+`upgrade-envs/v0.36.0-v36/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
 Keep inputs minimal — the prepare reads the departing version, the live implementations, the
 CTM's owner and the ecosystem `ProxyAdmin`'s owner from L1. One input cannot be derived and must
 be carried forward from the previous prepare's output: `[contracts] eip7702_checker`
@@ -291,20 +289,25 @@ genesis generator, so that upgraded and freshly created chains match
 
 ## Testing an upgrade end to end
 
-- `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the bootstrap edge through the real
-  prepare pipeline, in-forge, including the chain crossing via the legacy cut-taking leg.
+- `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the release's edge through the real
+  prepare pipeline, in-forge, over the previous release's frozen L1 state, including a chain crossing.
 - `test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol` — RECURRING prepares on the
   ecosystem that fixture leaves behind: the infrastructure-only, chain-release, mixed and
   three-leg shapes preparation can emit, each run as its ordered bundle, and the ones it must
   refuse (an upgrade that changes nothing, either version/kind contradiction, an orphaned
   deployment on either domain).
-- `test/anvil-interop/run-upgrade-test.ts` — the bootstrap driven end to end by
-  protocol-ops against the frozen departing-version chain states, then two registry-driven hops
-  on the same chains: a same-minor verifier patch (run with the bootstrap's L2 transaction still
-  pending, required to derive no facet cut) and the v36 minor hop (required to reuse every live
-  release member). Each hop's merged artifact is verified and asserted to carry its executor legs
-  as one contiguous run in canonical order, and one transaction must emit every leg's domain event,
-  in order.
+
+  These and the other Foundry suites that load the previous release's states run with
+  `yarn test:foundry:previous-release`, built like those states (`FOUNDRY_PROFILE=anvil-interop`,
+  no CBOR metadata), since a prepare decides reuse by comparing code; `yarn test:foundry` leaves
+  them out. So they hold a release to declaring every contract whose code it changes, not the
+  contracts that differ in metadata alone.
+
+- `test/anvil-interop/run-upgrade-test.ts` — the release's edge driven end to end by protocol-ops
+  against the frozen departing-version chain states, then a same-minor patch on the same
+  chains (required to derive no facet cut). Each hop's merged artifact is verified and asserted to
+  carry its executor legs as one contiguous run in canonical order, and one transaction must emit
+  every leg's domain event, in order.
 - `test/anvil-interop/run-recurring-upgrade-test.ts` — the registry-driven hop with objects
   deployed by the harness itself.
 - `test/foundry/l1/unit/concrete/Upgrades/registry/` — the bundle-execution (all legs in one

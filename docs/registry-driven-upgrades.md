@@ -939,8 +939,8 @@ deploys it and declares the whole edge; the core prepare of this edge declares n
 merge — which orders the core prepare's calls ahead of the CTM's and derives no executor leg for a
 bootstrap — therefore carries the object's sequence unchanged and contiguous.
 
-`UpgradeTest_Local.t.sol` and the anvil pipeline drive the whole edge through the real prepares,
-and `RegistryBootstrapSequence.t.sol` pins the derived bundle.
+On `draft/v0.35.0`, `UpgradeTest_Local.t.sol` and the anvil pipeline drive the whole edge through
+the real prepares; `RegistryBootstrapSequence.t.sol` pins the derived bundle.
 
 ## Deployment determinism
 

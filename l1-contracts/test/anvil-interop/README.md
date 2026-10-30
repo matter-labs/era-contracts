@@ -70,21 +70,27 @@ against those artifacts and skips the reference build.
 
 ```bash
 cd l1-contracts/test/anvil-interop
-yarn test:upgrade             # the v35 bootstrap via protocol-ops on the frozen v0.34.0 states, then two registry-driven hops
+yarn test:upgrade             # the release's edge via protocol-ops on the frozen previous-release states, then a patch hop
 yarn test:upgrade-recurring   # the recurring registry-driven hop on the current-genesis states
 ```
 
-`yarn test:upgrade` reviews each package the way governance would before replaying it:
+`yarn test:upgrade` needs `l1-contracts` built with `FOUNDRY_PROFILE=anvil-interop`, like the
+states it departs from: a prepare decides reuse by comparing code, and only a build without CBOR
+metadata compares unchanged code as unchanged.
+
+It reviews each package the way governance would before replaying it:
 `protocol-ops ecosystem verify-package` against the live anvil L1, with `--env local`, the
-fixture's Bridgehub as `--expected-bridgehub` (`local` names another ecosystem's), the fixture's
-governance as `--expected-governance-owner` and, for the hops, the bootstrap package as
-`--executor-record`. It holds the deployments against the hashes of the build it deployed from
+fixture's Bridgehub as `--expected-bridgehub` and its ZK token's asset id as
+`--expected-zk-token-asset-id` (`local` names another ecosystem's), the fixture's governance as
+`--expected-governance-owner` and the fixture's executors' construction record as
+`--executor-record`: the states keep the deployment's contracts but not its outputs, so the harness
+writes that record from the deployment's config, and the review re-derives each executor from it.
+It holds the deployments against the hashes of the build it deployed from
 (`scripts/calculate-hashes.ts --output`, passed as `--contract-hashes`), because the committed
 `AllContractsHashes.json` is regenerated last. Beyond a report without errors, the harness requires
 every construction record the package carries to be consulted (each deployment of these prepares is
-a member the package installs) and, for the bootstrap, the freeze-authority check. Every prepare
-deploys under a salt of its own, as production rotates its salt per release, so the recurring hop's
-`L1MessageRoot` row really applies.
+a member the package installs). Every prepare deploys under a salt of its own, as production
+rotates its salt per release, so a row that replaces an implementation really applies.
 
 The pipeline caps each replayed L1 prepare/governance transaction at EIP-7825's 16,777,216 gas
 limit and logs its phase, bundle, index, target, hash and gas usage. Per-chain L1 upgrade calls

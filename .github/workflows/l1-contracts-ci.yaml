@@ -161,6 +161,35 @@ jobs:
       #   working-directory: ./l1-contracts
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
+  # The upgrade tests that depart from the previous release's frozen anvil states. They compile like
+  # those states (FOUNDRY_PROFILE=anvil-interop), so they build on their own instead of restoring the
+  # build job's artifacts.
+  test-foundry-previous-release:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run tests
+        working-directory: ./l1-contracts
+        run: yarn test:foundry:previous-release
+
   check-verifier-generator-l1:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -238,6 +267,13 @@ jobs:
         if: hashFiles('da-contracts/foundry.toml') != ''
         working-directory: da-contracts
         run: yarn build:foundry
+
+      # A base revision's `UpgradeTestFresh_Local` writes into script-out/foundry-upgrade/ without
+      # creating it: the release fixture's setUp did, and coverage no longer runs that fixture. Drop
+      # this step once no coverage base can predate the test creating it.
+      - name: Create the upgrade tests' output directory (base revisions)
+        if: matrix.kind == 'base'
+        run: mkdir -p script-out/foundry-upgrade
 
       # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
       # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.

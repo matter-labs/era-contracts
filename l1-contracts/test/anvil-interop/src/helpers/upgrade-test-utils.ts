@@ -475,3 +475,54 @@ export async function assertLegsApplied(
   }
   return { rows, swaps };
 }
+
+/** The CTM's ServerNotifier, read live. */
+export type ServerNotifierState = {
+  notifier: string;
+  admin: string;
+  implementation: string;
+  owner: string;
+  pendingOwner: string;
+  chainTypeManager: string;
+};
+
+export async function readServerNotifierState(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  ctmAddr: string
+): Promise<ServerNotifierState> {
+  const ctm = new ethers.Contract(ctmAddr, getAbi("IChainTypeManager"), l1Provider);
+  const notifierAddr: string = await ctm.serverNotifierAddress();
+  const notifier = new ethers.Contract(notifierAddr, getAbi("ServerNotifier"), l1Provider);
+  return {
+    notifier: notifierAddr,
+    admin: await readProxyAdmin(l1Provider, notifierAddr),
+    implementation: await readProxyImplementation(l1Provider, notifierAddr),
+    owner: await notifier.owner(),
+    pendingOwner: await notifier.pendingOwner(),
+    chainTypeManager: await notifier.chainTypeManager(),
+  };
+}
+
+/** Throws unless every field `expected` names matches the live notifier; returns the live state. */
+export async function assertServerNotifierState(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  ctmAddr: string,
+  expected: Partial<Omit<ServerNotifierState, "notifier">>,
+  label: string
+): Promise<ServerNotifierState> {
+  const state = await readServerNotifierState(l1Provider, ctmAddr);
+  const fields = Object.entries(expected) as Array<[keyof Omit<ServerNotifierState, "notifier">, string]>;
+  const mismatches = fields
+    .filter(([field, value]) => state[field].toLowerCase() !== value.toLowerCase())
+    .map(([field, value]) => `  ${field}: live ${state[field]}, expected ${value}`);
+  if (mismatches.length > 0) {
+    throw new Error(`ServerNotifier ${state.notifier}: ${label}\n${mismatches.join("\n")}`);
+  }
+  console.log(`  ✓ ServerNotifier ${label} (${fields.map(([field]) => field).join(", ")})`);
+  return state;
+}
+
+/**
+ * Cross the bootstrap edge on each chain through the legacy handed-cut entrypoint, as the
+ * chain's own admin — the production shape for pre-v35 chains.
+ */

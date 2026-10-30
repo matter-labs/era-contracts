@@ -550,7 +550,8 @@ pub(crate) fn expect_canonical_construction(
 
 /// The constructor arguments of the lifecycle objects, ABI-encoded exactly as the deploying run
 /// passes them (`abi.encode(...)` of the constructor's parameter list, in `DeployL1CoreContracts` /
-/// `DeployCTM` / `CoreUpgrade_v35` / `CTMUpgrade_v35` / `DefaultCTMUpgrade.getCreationCalldata`).
+/// `DeployCTM` / `DefaultCTMUpgrade.getCreationCalldata`, and v35's bootstrap `CoreUpgrade_v35` /
+/// `CTMUpgrade_v35`).
 ///
 /// Every value is a REVIEWED one — the manifest's, the package's or the reviewer's — never a
 /// read off the object: an object answers with whatever it was built from, so a check that took
