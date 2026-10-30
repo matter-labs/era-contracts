@@ -1049,9 +1049,12 @@ abstract contract L2AtomicInteropSendRefundTestAbstract is L2InteropTestUtils, A
         L2_INTEROP_HANDLER.executeAtomicBundle(bundleBytes, finality);
 
         _passExpiryTime();
+        uint256 feeUnitsBefore = l2InteropCenter.interopFeeUnits();
         vm.expectEmit(true, true, true, true, L2_INTEROP_HANDLER_ADDR);
         emit IL2InteropHandler.BundleExpired(bundleHash);
         L2_INTEROP_HANDLER.expireAtomicBundle(bundleBytes, finality, 0);
+        // Expiring sends nothing, so it adds no interop fee units ({protocol-docs/interop-fee.md}).
+        assertEq(l2InteropCenter.interopFeeUnits(), feeUnitsBefore, "expiry must not count interop fee units");
 
         assertEq(uint256(L2_INTEROP_HANDLER.bundleStatus(bundleHash)), uint256(BundleStatus.Expired));
         assertEq(
