@@ -233,8 +233,12 @@ The server uses contracts in two ways: **prebuilt** bootloaders per VM in `etc/m
   - stage: `0xd669494442609879b209CcA8eba2BdC904D2E69D`, owner of the 12 member Safes behind the Emergency Upgrade Board
     (`approveHash` on each, then `executeEmergencyUpgrade`);
   - testnet2 (the customer ZKsync OS testnets): `0xD64e136566a9E04eb05B30184fF577F52682D182`, same emergency path;
-  - testnet3 (EraVM) and stage3: `0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b` and
-    `0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`, through a legacy `Governance` (`scheduleTransparent` + `execute`);
+  - testnet3 (EraVM): `0xeC6A5c568A59C0858ed6680A6862d64aA2DA8D4b`, owner of the member Safes behind the Emergency
+    Upgrade Board of its ProtocolUpgradeHandler (since 2026-10) and of the ChainAdmins of chains 312 and 300300.
+    Upgrades take the PUH's normal path (an L2 vote on chain 312, then `startUpgrade` and `execute` on L1); the
+    Board is for emergencies;
+  - stage3: `0xd2d5391421f98A0086F4143D2EA0337a31Ca89E5`, through a legacy `Governance` (`scheduleTransparent` +
+    `execute`);
   - chain upgrades are a ChainAdmin `multicall` from that ChainAdmin's owner.
 - **Parked.** A two-person-approval executor for these governance/owner transactions, keeping keys in GitHub secrets,
   exists but is parked (era-contracts #2540, Linear EVM-1731): security vetoed GitHub-held keys for customer testnets.
