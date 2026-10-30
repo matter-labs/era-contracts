@@ -206,7 +206,9 @@ describe("16 - Expiry of single-leg flows", function () {
     expect(committed.flowId, "committed flow").to.equal(transfer.flowId);
     expect(await sourceManager.legState(transfer.flowId, transfer.bundleHash)).to.equal(LegState.Committed);
 
-    // An EOA has no `receiveMessage`, so the call reverts ("call to non-contract address") without revert data.
+    // An EOA has no `receiveMessage`, so the call reverts ("call to non-contract address") without revert data,
+    // which Anvil's eth_call doesn't surface. The next test expires the leg with the same finality proof, so this
+    // rejection isn't a proof or receive-filter failure.
     const executed = await executeBundle(destProvider, transfer, sourceChainId).then(
       () => true,
       () => false

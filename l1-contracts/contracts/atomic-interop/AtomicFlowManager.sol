@@ -116,11 +116,11 @@ contract AtomicFlowManager is IAtomicFlowManager {
     ) external onlyInteropCenter {
         bytes32 flowId = _validateAndComputeFlowId(_flowPreimage);
         _checkSettlementLayerIsL1(_flowPreimage.settlementLayerChainId);
-        if (_flowPreimage.version == ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION) {
-            require(
-                IL2Bridgehub(address(L2_BRIDGEHUB)).isChainFeatureEnabled(ChainFeature.ExpirableTransfers),
-                ManagerExpirableTransfersNotEnabled()
-            );
+        if (
+            _flowPreimage.version == ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION &&
+            !IL2Bridgehub(address(L2_BRIDGEHUB)).isChainFeatureEnabled(ChainFeature.ExpirableTransfers)
+        ) {
+            revert ManagerExpirableTransfersNotEnabled();
         }
 
         // Reject a leg of a flow whose deadline has verifiably passed: an imported settlement-layer
