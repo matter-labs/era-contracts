@@ -60,11 +60,13 @@ publishing the bundle to L1, `InteropCenter` calls `AtomicFlowManager.append(bun
 lowNullifierIndex, preimage)`. `append`:
 
 1. **Recomputes and validates `flowId`** from the preimage (`_validateAndComputeFlowId`): `version`
-   manager-supported (`ManagerFlowPreimageVersionMismatch`), at most `MAX_ATOMIC_FLOW_LEGS` (8) legs
+   manager-supported (`ManagerFlowPreimageVersionMismatch`; a version `0x02` flow has exactly one leg,
+   `ManagerExpirableFlowNotSingleLeg`), at most `MAX_ATOMIC_FLOW_LEGS` (8) legs
    (`ManagerTooManyLegs` — appending is cheap, but finalization verifies one Merkle proof per leg),
    `legBundleHashes` strictly ascending, `legSourceChainIds` length matching.
 2. **Requires L1 settlement** (`_checkSettlementLayerIsL1`) — this release anchors proofs only on the L1
-   message root (see {protocol-docs/atomicity/security.md#trust-assumptions}).
+   message root (see {protocol-docs/atomicity/security.md#trust-assumptions}). A version `0x02` leg also needs
+   this chain's `ExpirableTransfers` feature ({protocol-docs/atomicity/expiry.md#opting-in}).
 3. **Rejects flows whose deadline verifiably passed** (`ManagerFlowDeadlinePassed`): if a
    settlement-layer root with creation timestamp `> deadline` has been imported on this chain (tracked
    as a monotone maximum by `L2InteropRootStorage.latestInteropRootTimestamp`), the flow can already be
@@ -83,7 +85,8 @@ lowNullifierIndex, preimage)`. `append`:
 6. **Marks the leg `Committed`** — rejecting a re-commit of the same `(flowId, bundleHash)` with
    `ManagerLegAlreadyCommitted` — and then, effects before interaction, **inserts** the leg's
    `commitValue` into this chain's `L2InteropCommitmentTree`, emitting
-   `FlowCommitted(flowId, bundleHash, deadline, leafIndex)`. The tree additionally mirrors the inserted
+   `FlowCommitted(flowId, bundleHash, deadline, leafIndex)`, plus `ExpirableFlowCommitted` for a version `0x02`
+   flow. The tree additionally mirrors the inserted
    value into an L2->L1 log for data availability (see {protocol-docs/atomicity/imt.md} and
    {protocol-docs/atomicity/security.md#data-availability}).
 

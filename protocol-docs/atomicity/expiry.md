@@ -43,8 +43,8 @@ bundle hash in a made-up version `0x02` preimage with an earlier deadline and ex
 source never committed, leaving it neither executable nor refundable. So the proof is checked even when the bundle
 is already `Verified`.
 
-The handler marks the bundle `Expired` and emits `BundleExpired`. The `AtomicFlowManager` then inserts the leg's
-expiry value into this chain's commitment tree and emits `FlowExpired`:
+The handler marks the bundle `Expired`, has the `AtomicFlowManager` insert the leg's expiry value into this chain's
+commitment tree (`FlowExpired`), and emits `BundleExpired`:
 
 ```
 expiryValue = uint256(keccak256(abi.encode(ATOMIC_EXPIRY_LEAF_TAG, flowId, bundleHash)))
