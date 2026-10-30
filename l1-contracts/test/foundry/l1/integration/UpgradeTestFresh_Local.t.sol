@@ -83,14 +83,14 @@ contract FreshTransitionReplacement is DefaultTransitionReplacement {
 contract CoreUpgradeNoLegForFresh is DefaultCoreUpgrade {}
 
 /// @notice A FRESH ecosystem — `DeployL1CoreContracts` + `DeployCTM` + `RegisterCTM` + governance's accepts,
-///         no bootstrap — is born in the registry model: it runs a registry-driven v35 -> v36 upgrade
+///         no bootstrap — is born in the registry model: it runs a registry-driven v36 -> v37 upgrade
 ///         directly through the executors the deployment created, and a committed transition of it can be
 ///         repaired through the replacement prepare (`DefaultTransitionReplacement`). See "Replacing a
 ///         committed transition" in {protocol-docs/ecosystem-upgrade-coordination.md}.
 contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
     using stdToml for string;
 
-    /// @dev Names v36 as the target: one minor past the fresh ecosystem's genesis version.
+    /// @dev Names v37 as the target: one minor past the fresh ecosystem's genesis version.
     string internal constant HOP_INPUT = "/upgrade-envs/foundry-upgrade.toml";
     bytes32 internal constant HOP_SALT = keccak256("fresh-ecosystem-hop");
     /// @dev A replacement prepared under its own salt deploys its own engine, which is what makes it a
@@ -156,7 +156,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         );
     }
 
-    /// @notice The replacement prepare deploys a replacement for the committed v35 -> v36 transition and
+    /// @notice The replacement prepare deploys a replacement for the committed v36 -> v37 transition and
     ///         emits ONE governance call; executed, it repairs the departure for a chain that has not crossed
     ///         it yet — the replaced object stops working at once and the chain crosses with the replacement.
     function test_replacementPrepare_repairsTheCommittedTransitionForALaggingChain() public {

@@ -139,12 +139,12 @@ Commit the regenerated `chain-states/` files alongside the contract change. CI n
 Two runners cover the two shapes of upgrade, and CI runs each as its own job in
 `anvil-interop-ci.yaml`.
 
-`run-upgrade-test.ts` is the **bootstrap** edge: it drives protocol-ops's split
-flow (`ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged
-governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade`
-per chain), which installs the registry objects and hands ecosystem authority to the
-executors. It then chains follow-up hops through the same tooling to prove the installed
-model keeps working: a same-minor verifier patch, then a subsequent minor upgrade.
+`run-upgrade-test.ts` is the **release** edge: it drives protocol-ops's split flow
+(`ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance
+calls, `ecosystem verify-package`, `ecosystem upgrade-governance` to replay the bundle, then each
+chain crossing) over the previous release's frozen states, then a same-minor patch through
+the same tooling. It needs `l1-contracts` built with `FOUNDRY_PROFILE=anvil-interop`, like those
+states.
 
 `run-recurring-upgrade-test.ts` is the **steady-state** edge, driven at the object level
 rather than through the governance-calldata scripts. `REGEN_REGISTRIES=1` regenerates its

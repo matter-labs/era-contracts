@@ -36,8 +36,8 @@ const ARTIFACTS = {
   ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
   IProxyUpgradeTransition: "IProxyUpgradeTransition.sol/IProxyUpgradeTransition.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
-  BootstrapUpgrade: "BootstrapUpgrade.sol/BootstrapUpgrade.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
+  EIP7702Checker: "EIP7702Checker.sol/EIP7702Checker.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
   MultiProofVerifier: "MultiProofVerifier.sol/MultiProofVerifier.json",
   MultiProofTestnetVerifier: "MultiProofTestnetVerifier.sol/MultiProofTestnetVerifier.json",
@@ -52,10 +52,6 @@ const ARTIFACTS = {
   CTMTransition: "CTMTransition.sol/CTMTransition.json",
   ProxyUpgradeTransition: "ProxyUpgradeTransition.sol/ProxyUpgradeTransition.json",
   ServerNotifier: "ServerNotifier.sol/ServerNotifier.json",
-  // Bootstrap edge (see bootstrap-upgrade-stage.ts): the one-time entry into the registry-driven
-  // model, plus the legacy cut-taking entrypoint a fixture may need installed.
-  RegistryBootstrapMigration: "RegistryBootstrapMigration.sol/RegistryBootstrapMigration.json",
-  LegacyTestAdminFacet: "LegacyTestAdminFacet.sol/LegacyTestAdminFacet.json",
   BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",

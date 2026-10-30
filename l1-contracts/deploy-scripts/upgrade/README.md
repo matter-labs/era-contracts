@@ -289,20 +289,25 @@ genesis generator, so that upgraded and freshly created chains match
 
 ## Testing an upgrade end to end
 
-- `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the bootstrap edge through the real
-  prepare pipeline, in-forge, including the chain crossing via the legacy cut-taking leg.
+- `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the release's edge through the real
+  prepare pipeline, in-forge, over the previous release's frozen L1 state, including a chain crossing.
 - `test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol` — RECURRING prepares on the
   ecosystem that fixture leaves behind: the infrastructure-only, chain-release, mixed and
   three-leg shapes preparation can emit, each run as its ordered bundle, and the ones it must
   refuse (an upgrade that changes nothing, either version/kind contradiction, an orphaned
   deployment on either domain).
-- `test/anvil-interop/run-upgrade-test.ts` — the bootstrap driven end to end by
-  protocol-ops against the frozen departing-version chain states, then two registry-driven hops
-  on the same chains: a same-minor verifier patch (run with the bootstrap's L2 transaction still
-  pending, required to derive no facet cut) and the v36 minor hop (required to reuse every live
-  release member). Each hop's merged artifact is verified and asserted to carry its executor legs
-  as one contiguous run in canonical order, and one transaction must emit every leg's domain event,
-  in order.
+
+  These and the other Foundry suites that load the previous release's states run with
+  `yarn test:foundry:previous-release`, built like those states (`FOUNDRY_PROFILE=anvil-interop`,
+  no CBOR metadata), since a prepare decides reuse by comparing code; `yarn test:foundry` leaves
+  them out. So they hold a release to declaring every contract whose code it changes, not the
+  contracts that differ in metadata alone.
+
+- `test/anvil-interop/run-upgrade-test.ts` — the release's edge driven end to end by protocol-ops
+  against the frozen departing-version chain states, then a same-minor patch on the same
+  chains (required to derive no facet cut). Each hop's merged artifact is verified and asserted to
+  carry its executor legs as one contiguous run in canonical order, and one transaction must emit
+  every leg's domain event, in order.
 - `test/anvil-interop/run-recurring-upgrade-test.ts` — the registry-driven hop with objects
   deployed by the harness itself.
 - `test/foundry/l1/unit/concrete/Upgrades/registry/` — the bundle-execution (all legs in one

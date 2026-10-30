@@ -66,12 +66,12 @@ import {
   releaseInitArgs,
   transitionInitArgs,
 } from "./registry-manifest";
-import { assertServerNotifierState } from "./bootstrap-upgrade-stage";
 import { l1GasOverrides } from "./l1-transaction-gas";
 import type { ExpectedCall, UpgradeLeg } from "./governance-bundle";
 import type { ChainRole } from "../core/types";
 import { BatchSettler } from "./batch-settlement";
 import {
+  assertServerNotifierState,
   assertCtmTransitionApplied,
   assertLegsApplied,
   discoverDomainExecutors,

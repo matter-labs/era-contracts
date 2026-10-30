@@ -161,6 +161,35 @@ jobs:
       #   working-directory: ./l1-contracts
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
+  # The upgrade tests that depart from the previous release's frozen anvil states. They compile like
+  # those states (FOUNDRY_PROFILE=anvil-interop), so they build on their own instead of restoring the
+  # build job's artifacts.
+  test-foundry-previous-release:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
+
+      - name: Install Foundry
+        uses: ./.github/actions/install-foundry
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run tests
+        working-directory: ./l1-contracts
+        run: yarn test:foundry:previous-release
+
   check-verifier-generator-l1:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

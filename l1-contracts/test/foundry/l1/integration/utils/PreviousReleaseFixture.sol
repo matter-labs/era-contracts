@@ -25,7 +25,6 @@ import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/Priorit
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {Utils as TestUtils} from "../../unit/concrete/Utils/Utils.sol";
 
@@ -75,7 +74,11 @@ abstract contract PreviousReleaseFixture is Test {
         address nullifier;
         address governance;
         address chainTypeManager;
-        address ctmChainAdmin;
+        /// @dev The asset id the release's fixed force deployments carry.
+        bytes32 zkTokenAssetId;
+        /// @dev The CTM's EIP-7702 checker, which `addresses.json` does not record. A prepare must carry it forward,
+        ///      as the Mailbox pins it as an immutable.
+        address eip7702Checker;
     }
 
     struct FixtureChain {
@@ -85,9 +88,17 @@ abstract contract PreviousReleaseFixture is Test {
     }
 
     string internal constant ANVIL_INTEROP_DIR = "/test/anvil-interop";
+    string internal constant ANVIL_INTEROP_PROFILE = "anvil-interop";
 
     /// @notice Loads the previous release's L1 state into this test's EVM.
     function _loadPreviousRelease() internal returns (PreviousRelease memory release) {
+        // The states are built without CBOR metadata, and upgrade prepares decide reuse by comparing code, so only a
+        // build without it sees unchanged code as unchanged.
+        require(
+            keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("")))) == keccak256(bytes(ANVIL_INTEROP_PROFILE)),
+            "the previous release's states are built with FOUNDRY_PROFILE=anvil-interop: run these tests with "
+            "`yarn test:foundry:previous-release`"
+        );
         string memory root = vm.projectRoot();
         string memory anvilConfig = vm.readFile(string.concat(root, ANVIL_INTEROP_DIR, "/config/anvil-config.json"));
         release.stateVersion = anvilConfig.readString(".upgradeSourceStateVersion");
@@ -116,34 +127,30 @@ abstract contract PreviousReleaseFixture is Test {
         release.nullifier = addresses.readAddress(".l1Addresses.l1NullifierProxy");
         release.governance = addresses.readAddress(".l1Addresses.governance");
         release.chainTypeManager = addresses.readAddress(".ctmAddresses.chainTypeManager");
-        release.ctmChainAdmin = addresses.readAddress(".ctmAddresses.chainAdmin");
+        release.zkTokenAssetId = addresses.readBytes32(".zkToken.assetId");
+
+        // Argument-less, so CREATE2 places it from the deployment's salt alone.
+        string memory permanentValues = vm.readFile(
+            string.concat(root, ANVIL_INTEROP_DIR, "/config/permanent-values.toml")
+        );
+        release.eip7702Checker = Utils.canonicalCreate2Address(
+            vm.parseTomlBytes32(permanentValues, "$.permanent_contracts.create2_factory_salt"),
+            vm.getCode("EIP7702Checker.sol:EIP7702Checker"),
+            ""
+        );
+        require(release.eip7702Checker.code.length != 0, "no EIP-7702 checker where the fixture deployed it");
     }
 
     /// @notice Gives the loaded ecosystem a production ecosystem's authority, which the anvil fixtures partly leave
-    ///         with their deployer: governance owns the core contracts, the CTM and the CTM's ProxyAdmin, and the CTM's
-    ///         ChainAdmin owns the ServerNotifier.
+    ///         with their deployer: governance owns the core contracts and both upgrade executors, the owner of the
+    ///         ecosystem ProxyAdmin and the owner of the CTM.
     function _handAuthorityToGovernance(PreviousRelease memory _release) internal {
         _transferTwoStep(_release.bridgehub, _release.governance);
         _transferTwoStep(_release.sharedBridge, _release.governance);
         _transferTwoStep(_release.nativeTokenVault, _release.governance);
         _transferTwoStep(_release.nullifier, _release.governance);
-        _transferTwoStep(_release.chainTypeManager, _release.governance);
-
-        ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(_release.chainTypeManager));
-        vm.prank(ctmProxyAdmin.owner());
-        ctmProxyAdmin.transferOwnership(_release.governance);
-
-        address notifier = IChainTypeManager(_release.chainTypeManager).serverNotifierAddress();
-        vm.prank(IOwnable(notifier).owner());
-        IOwnable(notifier).transferOwnership(_release.ctmChainAdmin);
-        IChainAdminOwnable.Call[] memory accept = new IChainAdminOwnable.Call[](1);
-        accept[0] = IChainAdminOwnable.Call({
-            target: notifier,
-            value: 0,
-            data: abi.encodeCall(IOwnable.acceptOwnership, ())
-        });
-        vm.prank(IOwnable(_release.ctmChainAdmin).owner());
-        IChainAdminOwnable(_release.ctmChainAdmin).multicall(accept, true);
+        _transferTwoStep(IOwnable(Utils.getProxyAdminAddress(_release.bridgehub)).owner(), _release.governance);
+        _transferTwoStep(IOwnable(_release.chainTypeManager).owner(), _release.governance);
     }
 
     /// @notice Hands `_chain` to a new `ChainAdminOwnable` owned by the fixture's deployer, as production chains are
@@ -163,8 +170,8 @@ abstract contract PreviousReleaseFixture is Test {
     }
 
     /// @notice The fixture chain `_chainId`, positioned at batch zero for {_settleBatch}. Batch zero is rebuilt from
-    ///         the release's genesis root and checked against the chain's stored hash, since a pre-registry CTM keeps
-    ///         only that hash.
+    ///         the release's genesis root and checked against the chain's stored hash, since the chain keeps only that
+    ///         hash.
     /// @param _release The release {_loadPreviousRelease} loaded.
     function _fixtureChain(
         PreviousRelease memory _release,

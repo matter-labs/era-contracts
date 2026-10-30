@@ -93,7 +93,7 @@ is therefore an ordinary one, never the bootstrap edge. Owner operations on its 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
 Historical preparations must select the matching scripts and input explicitly. The anvil upgrade test
 `l1-contracts/test/anvil-interop/run-upgrade-test.ts` passes its test subclasses of these scripts explicitly, for
-the bootstrap edge and the recurring hops after it (`run-recurring-upgrade-test.ts` drives a registry-driven hop on
+the release edge's core side and the patch hop after it (`run-recurring-upgrade-test.ts` drives a registry-driven hop on
 a fresh ecosystem's own executors without protocol-ops). See
 [the activation requirements](../protocol-docs/chain-config.md#activation).
 

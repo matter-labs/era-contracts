@@ -24,6 +24,10 @@ import {LogFinder} from "./utils/LogFinder.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ICoreUpgradeExecutor} from "contracts/upgrades/registry/executors/ICoreUpgradeExecutor.sol";
+import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
 
 abstract contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
@@ -183,8 +187,10 @@ abstract contract UpgradeIntegrationTestBase is Test {
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
         address ctm = ctmUpgrade.getCTMAddress();
 
-        console.log("Executing CTM admin calls through the current operational owner");
-        executeCTMAdminCalls();
+        if (_ctmAdminCalls.length != 0) {
+            console.log("Executing CTM admin calls through the current operational owner");
+            executeCTMAdminCalls();
+        }
 
         console.log("Executing the governance bundle (core + CTM merged)!");
         governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeCalls);
@@ -199,10 +205,11 @@ abstract contract UpgradeIntegrationTestBase is Test {
         // Capture the bundle's events for assertion below.
         Vm.Log[] memory ecosystemLogs = vm.getRecordedLogs();
 
-        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(
-            ecosystemLogs,
-            ctmUpgrade.getCTMAddress()
-        );
+        // A v35+ chain reads its cut from its ChainTypeManager, and a registry-driven edge logs none.
+        Diamond.DiamondCutData memory diamondCutData;
+        if (UpgradeChainCall.requiresCut(ctmUpgrade.getOldProtocolVersion())) {
+            diamondCutData = GetDiamondCutData.getDiamondCutDataFromRecordedLogs(ecosystemLogs, ctm);
+        }
 
         // Hook for test-specific setup before chain upgrade
         beforeChainUpgrade();
@@ -297,18 +304,59 @@ abstract contract UpgradeIntegrationTestBase is Test {
         // so it was tested in e2e local environment.
     }
 
-    /// @dev Merges the core and CTM prepares' governance calls into one bundle, core first — what
-    ///      the protocol-ops merge does with the per-script TOMLs.
+    /// @dev The one governance bundle the protocol-ops merge writes from the per-script TOMLs
+    ///      (`upgrade.rs::write_merged_ecosystem_toml`): the core prepare's calls, the executor legs derived from
+    ///      the objects the prepares report, then the CTM prepare's calls.
     function _mergeCoreAndCTMGovernanceCalls() internal returns (Call[] memory calls) {
-        Call[][] memory parts = new Call[][](2);
+        Call[][] memory parts = new Call[][](3);
         parts[0] = coreUpgrade.prepareDefaultGovernanceCalls();
-        parts[1] = ctmUpgrade.prepareDefaultGovernanceCalls();
+        parts[2] = ctmUpgrade.prepareDefaultGovernanceCalls();
+        parts[1] = _executorLegs();
         calls = UpgradeUtils.mergeCallsArray(parts);
+    }
+
+    /// @dev The executor legs, in canonical order: the core leg, the CTM infrastructure leg, then the commit, each
+    ///      only when its object was prepared.
+    function _executorLegs() private view returns (Call[] memory legs) {
+        string memory ctmOutput = vm.readFile(string.concat(vm.projectRoot(), CTM_OUTPUT));
+        address coreTransition = address(coreUpgrade.coreTransition());
+        address infrastructure = ctmOutput.readAddress("$.registry.ctm_infrastructure_transition_addr");
+        address transition = ctmOutput.readAddress("$.registry.ctm_transition_addr");
+        address ctmExecutor = ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr");
+        legs = new Call[](
+            (coreTransition != address(0) ? 1 : 0) +
+                (infrastructure != address(0) ? 1 : 0) +
+                (transition != address(0) ? 1 : 0)
+        );
+        uint256 next = 0;
+        if (coreTransition != address(0)) {
+            legs[next++] = Call({
+                target: address(coreUpgrade.getCoreUpgradeExecutor()),
+                value: 0,
+                data: abi.encodeCall(ICoreUpgradeExecutor.applyL1Upgrade, (IProxyUpgradeTransition(coreTransition)))
+            });
+        }
+        if (infrastructure != address(0)) {
+            legs[next++] = Call({
+                target: ctmExecutor,
+                value: 0,
+                data: abi.encodeCall(
+                    ICTMUpgradeExecutor.applyInfrastructureUpgrade,
+                    (IProxyUpgradeTransition(infrastructure))
+                )
+            });
+        }
+        if (transition != address(0)) {
+            legs[next++] = Call({
+                target: ctmExecutor,
+                value: 0,
+                data: abi.encodeCall(ICTMUpgradeExecutor.applyCTMUpgrade, (ICTMTransition(transition)))
+            });
+        }
     }
 
     function executeCTMAdminCalls() internal virtual {
         require(_ctmAdminCallsPrepared, "CTM admin calls not prepared");
-        require(_ctmAdminCalls.length != 0, "CTM admin calls are empty");
         // Match the generated bundle: the ProxyAdmin's owner executes the whole
         // batch, including acceptOwnership as the ServerNotifier's pending owner.
         // Selecting each target's current owner breaks two-step ownership transfers.
