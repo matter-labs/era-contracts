@@ -268,6 +268,13 @@ jobs:
         working-directory: da-contracts
         run: yarn build:foundry
 
+      # A base revision's `UpgradeTestFresh_Local` writes into script-out/foundry-upgrade/ without
+      # creating it: the release fixture's setUp did, and coverage no longer runs that fixture. Drop
+      # this step once no coverage base can predate the test creating it.
+      - name: Create the upgrade tests' output directory (base revisions)
+        if: matrix.kind == 'base'
+        run: mkdir -p script-out/foundry-upgrade
+
       # `forge coverage` runs the suite itself, and the `test-foundry` job already gates
       # on the full (unfiltered) `yarn test:foundry`, so there is no separate test run here.
       # Apply the same Foundry filters even when the PR changes coverage:foundry.

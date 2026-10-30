@@ -104,6 +104,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
     address internal eraChainAdmin;
 
     function setUp() public {
+        vm.createDir(string.concat(vm.projectRoot(), "/script-out/foundry-upgrade"), true);
         _deployL1Contracts();
         _deployEra();
         acceptPendingAdmin();
