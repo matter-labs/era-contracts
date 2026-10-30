@@ -145,7 +145,7 @@ test("the deployer plan is checked against the checkout before any step reads th
     /protocol_ops ecosystem check-deployer-plan \\\s+--bundle "\$DEPLOY_BUNDLE_DIR" \\\s+--l1-rpc-url "\$L1_RPC_URL"/
   );
   assert.equal(check.env, undefined);
-  // It reads the CTMs' ProxyAdmin and BytecodesSupplier over the RPC selected before it.
+  // It reads its L1 facts (the CTMs' ProxyAdmin, BytecodesSupplier, ...) over the RPC selected before it.
   assert.ok(
     stepIndex("Select + mask the L1 RPC (L1 from the bundle)") <
       stepIndex("Check the deployer plan against this checkout")

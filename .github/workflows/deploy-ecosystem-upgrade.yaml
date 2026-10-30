@@ -17,8 +17,9 @@ name: "Ecosystem Upgrade: Deploy + Verify"
 # The run must check out the commit the bundle was generated from, with clean
 # contract sources, and before any key is loaded `protocol_ops ecosystem
 # check-deployer-plan` holds every call the deployer would sign to this
-# checkout's build, the env's reviewed inputs and the CTMs' ProxyAdmin and
-# BytecodesSupplier on L1. What it admits, and the protected-environment
+# checkout's build, the env's reviewed inputs and what L1 says (the CTMs'
+# ProxyAdmin, BytecodesSupplier and ValidatorTimelock, the Bridgehub's
+# ProxyAdmin). What it admits, and the protected-environment
 # proposal for this job: `docs/upgrade-operations.md` ("Deployer signing").
 #
 # What gets broadcast: ONLY the deployer's (Camp-A) bundles — the ones whose
@@ -430,8 +431,9 @@ jobs:
       # key is loaded: no value, CREATE2 deployments only of the reviewed build
       # under the env's declared salts, any other call only from the reviewed
       # allowlist (protocol-ops/src/commands/ecosystem/deployer_plan.rs). It reads
-      # the CTMs' ProxyAdmin and BytecodesSupplier from L1, and refuses unless this
-      # checkout is the bundle's commit with clean contract sources.
+      # the CTMs' ProxyAdmin, BytecodesSupplier and ValidatorTimelock and the
+      # Bridgehub's ProxyAdmin from L1, and refuses unless this checkout is the
+      # bundle's commit with clean contract sources.
       - name: Check the deployer plan against this checkout
         if: ${{ !inputs.verify_only }}
         run: |
