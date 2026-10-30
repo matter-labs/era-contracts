@@ -524,25 +524,6 @@
   },
   {
     "type": "function",
-    "name": "isChainFeatureEnabled",
-    "inputs": [
-      {
-        "name": "feature",
-        "type": "uint8",
-        "internalType": "enum ChainFeature"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "enabled",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "isPeerAllowed",
     "inputs": [
       {
@@ -768,24 +749,6 @@
         "name": "_assetAddress",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setChainFeatureEnabled",
-    "inputs": [
-      {
-        "name": "_feature",
-        "type": "uint8",
-        "internalType": "enum ChainFeature"
-      },
-      {
-        "name": "_enabled",
-        "type": "bool",
-        "internalType": "bool"
       }
     ],
     "outputs": [],
