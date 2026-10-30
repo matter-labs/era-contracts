@@ -18,7 +18,6 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {
-    ChainFeatureNotApproved,
     ChainHasNoBatchesInMessageRoot,
     InteropNotEnabled,
     InteropPeerAlreadyAllowed,
@@ -51,9 +50,6 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IChainRegistrationSender
     mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
-
-    /// @inheritdoc IChainRegistrationSender
-    mapping(uint256 chainId => mapping(ChainFeature feature => bool approved)) public isChainFeatureApproved;
 
     /// @inheritdoc IChainRegistrationSender
     mapping(uint256 chainId => mapping(ChainFeature feature => bool enabled)) public isChainFeatureEnabled;
@@ -100,41 +96,16 @@ contract ChainRegistrationSender is
     }
 
     /// @inheritdoc IChainRegistrationSender
-    function setChainFeatureApproved(uint256 _chainId, ChainFeature _feature, bool _approved) external nonReentrant {
-        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
-        isChainFeatureApproved[_chainId][_feature] = _approved;
-        emit ChainFeatureApproved(_chainId, _feature, _approved);
-
-        if (!_approved && isChainFeatureEnabled[_chainId][_feature]) {
-            _setChainFeatureEnabled(BRIDGE_HUB.getZKChain(_chainId), _chainId, _feature, false);
-        }
-    }
-
-    /// @inheritdoc IChainRegistrationSender
     function setChainFeatureEnabled(uint256 _chainId, ChainFeature _feature, bool _enabled) external nonReentrant {
+        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         require(zkChain != address(0), ZKChainNotRegistered());
-        require(msg.sender == IGetters(zkChain).getAdmin(), Unauthorized(msg.sender));
-        require(!_enabled || isChainFeatureApproved[_chainId][_feature], ChainFeatureNotApproved(_chainId, _feature));
-        _setChainFeatureEnabled(zkChain, _chainId, _feature, _enabled);
-    }
 
-    /// @notice Records `_enabled` for `_feature` of `_chainId` and pushes it to the chain's L2 Bridgehub.
-    /// @param _zkChain The chain's diamond proxy.
-    /// @param _chainId The chain.
-    /// @param _feature The feature.
-    /// @param _enabled Whether the feature is enabled.
-    function _setChainFeatureEnabled(
-        address _zkChain,
-        uint256 _chainId,
-        ChainFeature _feature,
-        bool _enabled
-    ) internal {
         isChainFeatureEnabled[_chainId][_feature] = _enabled;
         emit ChainFeatureEnabled(_chainId, _feature, _enabled);
 
         // slither-disable-next-line unused-return
-        IMailbox(_zkChain).requestL2ServiceTransaction(
+        IMailbox(zkChain).requestL2ServiceTransaction(
             L2_BRIDGEHUB_ADDR,
             abi.encodeCall(IL2Bridgehub.setChainFeatureEnabled, (_feature, _enabled))
         );

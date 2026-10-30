@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.21;
 
-import {ChainFeature} from "../chain-registration/IChainRegistrationSender.sol";
-
 // 0x587df426
 error AlreadyCurrentSL(uint256 blockChainId);
 // 0xd506f12c
@@ -18,8 +16,6 @@ error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
-// 0x2f4292ea
-error ChainFeatureNotApproved(uint256 chainId, ChainFeature feature);
 // 0xc21d238a
 error ChainHasNoBatchesInMessageRoot(uint256 chainId);
 // 0xf8d5f418

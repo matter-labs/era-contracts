@@ -120,8 +120,8 @@ export class InteropChainRegistrar {
   }
 
   /**
-   * The owner approves `feature` for `chainId` and the chain's admin enables it, which pushes it to the chain's
-   * L2 Bridgehub, see {protocol-docs/interop-gating.md#chain-features}.
+   * The owner enables `feature` for `chainId`, which pushes it to the chain's L2 Bridgehub, see
+   * {protocol-docs/interop-gating.md#chain-features}.
    */
   async enableChainFeature(
     chainId: number,
@@ -136,8 +136,10 @@ export class InteropChainRegistrar {
     );
     const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), l2Provider);
 
-    await this.requireChainAdmin(new ethers.Contract(diamondProxy, getAbi("IZKChain"), this.l1Wallet));
-    await (await sender.setChainFeatureApproved(chainId, feature, true)).wait();
+    const owner: string = await sender.owner();
+    if (owner !== this.l1Wallet.address) {
+      throw new Error(`ChainRegistrationSender owner is ${owner}, not the default Anvil account`);
+    }
     const l1Receipt = await (await sender.setChainFeatureEnabled(chainId, feature, true)).wait();
     await relayPriorityRequestsToChain(l1Receipt, diamondProxy, l2Provider);
 
