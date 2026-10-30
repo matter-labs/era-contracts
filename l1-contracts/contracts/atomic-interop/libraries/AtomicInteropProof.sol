@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {IndexedMerkleTree} from "../../common/libraries/IndexedMerkleTree.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
-import {ImtProof, ATOMIC_COMMIT_LEAF_TAG} from "../IAtomicInterop.sol";
+import {ImtProof, ATOMIC_COMMIT_LEAF_TAG, ATOMIC_EXPIRY_LEAF_TAG} from "../IAtomicInterop.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {ChainBatchRootTree} from "../../common/libraries/ChainBatchRootTree.sol";
 import {L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION} from "../../common/l2-helpers/L2ContractInterfaces.sol";
@@ -33,6 +33,12 @@ library AtomicInteropProof {
     /// @notice The value inserted into a chain's IMT when a flow leg is committed.
     function commitValue(bytes32 _flowId, bytes32 _specHash) internal pure returns (uint256) {
         return uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, _flowId, _specHash)));
+    }
+
+    /// @notice The value a destination inserts into its IMT when it expires a leg.
+    /// See {protocol-docs/atomicity/expiry.md}.
+    function expiryValue(bytes32 _flowId, bytes32 _bundleHash) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encode(ATOMIC_EXPIRY_LEAF_TAG, _flowId, _bundleHash)));
     }
 
     /// @notice Verifies `_commitValue` is present in `_proof.sourceChainId`'s batch-END IMT root as of

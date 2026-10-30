@@ -187,6 +187,15 @@ export enum BundleStatus {
   Verified = 1,
   FullyExecuted = 2,
   Unbundled = 3,
+  Expired = 4,
+}
+
+/** Mirror of `LegState` in contracts/atomic-interop/IAtomicInterop.sol. */
+export enum LegState {
+  Unset = 0,
+  Committed = 1,
+  Revertable = 2,
+  Reverted = 3,
 }
 
 export enum CallStatus {

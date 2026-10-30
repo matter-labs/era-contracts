@@ -7,15 +7,20 @@ import {AtomicFlowFixtures} from "../../unit/concrete/atomic-interop/AtomicFlowF
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {AtomicInteropProofBuilder} from "../../unit/concrete/atomic-interop/AtomicInteropProofBuilder.sol";
 
+import {AtomicFlowManager} from "contracts/atomic-interop/AtomicFlowManager.sol";
+import {IAtomicFlowManager} from "contracts/atomic-interop/IAtomicFlowManager.sol";
 import {L2InteropCommitmentTree} from "contracts/atomic-interop/L2InteropCommitmentTree.sol";
 import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.sol";
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
+import {IL2InteropHandler} from "contracts/interop/interop-handler/IL2InteropHandler.sol";
 import {
     AtomicFinalityProof,
     AtomicFlow,
     AtomicFlowPreimage,
     ImtProof,
+    LegState,
+    ATOMIC_FLOW_EXPIRY_DELAY,
     ATOMIC_FLOW_PREIMAGE_VERSION
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {
@@ -24,12 +29,16 @@ import {
     WrongDestinationChainId
 } from "contracts/interop/InteropErrors.sol";
 import {IMTLeafValueMismatch} from "contracts/common/L1ContractErrors.sol";
-import {ManagerLegSourceChainNotAllowed} from "contracts/atomic-interop/AtomicInteropErrors.sol";
+import {
+    ManagerLegNotCommitted,
+    ManagerLegSourceChainNotAllowed
+} from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {BundleStatus, CallStatus, InteropBundle, InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_INTEROP_COMMITMENT_TREE_ADDR,
     L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -444,5 +453,122 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
             _l1Timestamp: DEADLINE - 1
         });
         _importInteropRoot(L1_CHAIN_ID, slBlock, DEADLINE - 1, aggregatedRoot);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Expiry of single-leg flows
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Phase 1 of an expirable flow ({protocol-docs/atomicity/expiry.md}): sends a single-leg flow with one
+    /// call to `_to`. Returns the leg's finality proof, settled in time.
+    function _sendExpirableLeg(address _to) internal returns (AtomicFinalityProof memory finality) {
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        calls[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(_to),
+            data: "",
+            callAttributes: new bytes[](0)
+        });
+        bytes[] memory attrs = new bytes[](2);
+        attrs[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (keccak256("expirable leg")));
+        bytes[] memory predictionAttrs = new bytes[](1);
+        predictionAttrs[0] = attrs[0];
+        AtomicFlowPreimage memory preimage = AtomicFlowFixtures.expirablePreimage(
+            _predictBundleHashWithAttrs(calls, predictionAttrs),
+            block.chainid,
+            DEADLINE,
+            L1_CHAIN_ID
+        );
+        attrs[1] = abi.encodeCall(IERC7786Attributes.atomicBundle, (preimage, 0));
+        ectxPreimage = preimage;
+        ectx.flowId = AtomicFlowFixtures.flowId(preimage);
+
+        vm.recordLogs();
+        ectx.bundleHash = l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(destinationChainId),
+            calls,
+            attrs
+        );
+        (, , InteropBundle memory sentBundle) = abi.decode(
+            extractFirstBundleFromLogs(vm.getRecordedLogs()),
+            (bytes32, bytes32, InteropBundle)
+        );
+        ectxBundleBytes = abi.encode(sentBundle);
+
+        finality.flow = AtomicFlow({flowId: ectx.flowId, preimage: preimage});
+        finality.proofs = new ImtProof[](1);
+        finality.proofs[0] = _canonicalTreeInclusionProof(block.chainid, LOCAL_BATCH_NUMBER, 1, DEADLINE - 1);
+    }
+
+    /// @dev Imports an L1 root stamped after the expiry time of the flows sent here.
+    function _passExpiryTime() internal {
+        uint256 expiryTime = DEADLINE + ATOMIC_FLOW_EXPIRY_DELAY + 1;
+        vm.warp(expiryTime);
+        _importInteropRoot(L1_CHAIN_ID, _freshSlBlock(), expiryTime, keccak256("root after expiry"));
+    }
+
+    /// @notice {protocol-docs/atomicity/expiry.md} end to end: a leg that can't execute (its call targets an EOA)
+    /// expires on the destination, and the expiry value the destination inserted proves the refund on the source.
+    function test_expirableLeg_unexecutable_expiresThenRefunds() public {
+        _setUpAtomicStack();
+        AtomicFinalityProof memory finality = _sendExpirableLeg(makeAddr("EOA"));
+        uint256 sourceChainId = block.chainid;
+        L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        AtomicFlowManager manager = AtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR);
+
+        vm.chainId(destinationChainId);
+        // An EOA has no `receiveMessage`, so the call reverts without data.
+        vm.expectRevert(bytes(""));
+        handler.executeAtomicBundle(ectxBundleBytes, finality);
+
+        _passExpiryTime();
+        // The tree holds its head (index 0) and the leg's commit value (index 1), so the expiry value lands at index
+        // 2, after whichever of the two is its predecessor.
+        bool afterCommit = AtomicFlowFixtures.expiryValue(ectx.flowId, ectx.bundleHash) >
+            AtomicFlowFixtures.commitValue(ectx.flowId, ectx.bundleHash);
+        uint256 feeUnitsBefore = l2InteropCenter.interopFeeUnits();
+        vm.expectEmit(true, true, true, true, L2_ATOMIC_FLOW_MANAGER_ADDR);
+        emit IAtomicFlowManager.FlowExpired(ectx.flowId, ectx.bundleHash, 2);
+        vm.expectEmit(true, true, true, true, L2_INTEROP_HANDLER_ADDR);
+        emit IL2InteropHandler.BundleExpired(ectx.bundleHash);
+        handler.expireAtomicBundle(ectxBundleBytes, finality, afterCommit ? 1 : 0);
+        // Expiring sends nothing, so it adds no interop fee units ({protocol-docs/interop-fee.md}).
+        assertEq(l2InteropCenter.interopFeeUnits(), feeUnitsBefore, "expiry must not count interop fee units");
+        assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.Expired));
+        vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
+        handler.executeAtomicBundle(ectxBundleBytes, finality);
+
+        vm.chainId(sourceChainId);
+        ImtProof memory expiry = _canonicalTreeInclusionProof(
+            destinationChainId,
+            REMOTE_BATCH_NUMBER,
+            2,
+            block.timestamp
+        );
+        vm.expectEmit(true, true, true, true, L2_ATOMIC_FLOW_MANAGER_ADDR);
+        emit IAtomicFlowManager.FlowExpiryRefundAuthorized(ectx.flowId, ectx.bundleHash);
+        manager.authorizeExpiryRefund(finality.flow, ectxBundleBytes, expiry);
+        manager.claimRefund(ectx.flowId, ectxBundleBytes);
+        assertEq(uint256(manager.legState(ectx.flowId, ectx.bundleHash)), uint256(LegState.Reverted));
+
+        // A refunded leg is no longer `Committed`, so the same expiry can't authorize a second refund.
+        vm.expectRevert(
+            abi.encodeWithSelector(ManagerLegNotCommitted.selector, ectx.flowId, ectx.bundleHash, LegState.Reverted)
+        );
+        manager.authorizeExpiryRefund(finality.flow, ectxBundleBytes, expiry);
+    }
+
+    /// @notice Expiry becoming possible doesn't stop execution, and an executed leg can't expire.
+    function test_expirableLeg_executesUntilExpired() public {
+        _setUpAtomicStack();
+        AtomicFinalityProof memory finality = _sendExpirableLeg(interopTargetContract);
+        L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        vm.chainId(destinationChainId);
+        _passExpiryTime();
+
+        handler.executeAtomicBundle(ectxBundleBytes, finality);
+        assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.FullyExecuted));
+
+        vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
+        handler.expireAtomicBundle(ectxBundleBytes, finality, 0);
     }
 }
