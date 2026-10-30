@@ -14,7 +14,7 @@ import {
 } from "contracts/atomic-interop/IAtomicInterop.sol";
 import {BundleAttributes} from "contracts/common/Messaging.sol";
 import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
-import {ChainFeature} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
+import {ChainFeature} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {
     L2_ATOMIC_FLOW_MANAGER_ADDR,
     L2_BRIDGEHUB_ADDR,

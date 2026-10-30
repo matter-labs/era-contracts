@@ -14,7 +14,7 @@ import {ChainBatchRootTree} from "contracts/common/libraries/ChainBatchRootTree.
 import {L2InteropHandler} from "contracts/interop/interop-handler/L2InteropHandler.sol";
 import {IInteropHandlerBase} from "contracts/interop/interop-handler/IInteropHandlerBase.sol";
 import {IL2InteropHandler} from "contracts/interop/interop-handler/IL2InteropHandler.sol";
-import {ChainFeature} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
+import {ChainFeature} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {
     AtomicFinalityProof,
     AtomicFlow,

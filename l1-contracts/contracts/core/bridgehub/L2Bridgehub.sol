@@ -8,11 +8,10 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {EmptyAssetId, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
-import {IL2Bridgehub} from "./IL2Bridgehub.sol";
+import {ChainFeature, IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {ChainFeature} from "../chain-registration/IChainRegistrationSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

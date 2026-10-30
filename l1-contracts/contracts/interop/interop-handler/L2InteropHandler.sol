@@ -15,7 +15,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 /// @title L2InteropHandler
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev L2 system contract that serves as the entry-point for executing, verifying and unbundling interop bundles.
+/// @dev L2 system contract that serves as the entry-point for executing, verifying, unbundling and expiring interop bundles.
 /// The generic bundle logic lives in `InteropHandlerBase`; this contract wires in the L2 system-contract
 /// behaviour and the **atomic** execution model: L2->L2 interop is proven via the AtomicFlowManager's IMT
 /// (`AtomicFinalityProof`), not via L1 message inclusion (public L2->L2 interop was removed).
