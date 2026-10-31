@@ -521,8 +521,3 @@ export async function assertServerNotifierState(
   console.log(`  ✓ ServerNotifier ${label} (${fields.map(([field]) => field).join(", ")})`);
   return state;
 }
-
-/**
- * Cross the bootstrap edge on each chain through the legacy handed-cut entrypoint, as the
- * chain's own admin — the production shape for pre-v35 chains.
- */

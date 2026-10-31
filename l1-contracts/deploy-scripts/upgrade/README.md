@@ -279,7 +279,7 @@ successful prepare from the output alone.
 
 A release whose L2 built-ins change must also author the L2
 side (`authorL2Side`: delegate/extra bytecode infos, the pinned composer and the bytecode
-artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v35` shows the shape) because the release-pair derivation puts the
+artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v35` on `draft/v0.35.0` shows the shape) because the release-pair derivation puts the
 changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the
 executor legs is a `declareExternalAction`.
 

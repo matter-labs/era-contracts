@@ -39,7 +39,7 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, `v0.35.0`, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, `v0.36.0`, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
 The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
@@ -324,8 +324,8 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 ```
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
-├── run-upgrade-test.ts            # Default upgrade (the v35 bootstrap) + the patch and v36 hops, via protocol-ops
-├── run-recurring-upgrade-test.ts  # Registry-driven v35 -> v36 hop through the executors the deployment created
+├── run-upgrade-test.ts            # The release upgrade (v35 -> v36) + a patch hop, via protocol-ops
+├── run-recurring-upgrade-test.ts  # Registry-driven minor hop (current -> next) through the executors the deployment created
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
@@ -335,8 +335,8 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
-│   ├── v0.34.0/                   # FROZEN previous-release snapshots (`upgradeSourceStateVersion`)
-│   └── v0.35.0/                   # Current-source Anvil state snapshots (`stateVersion`, regenerated)
+│   ├── v0.35.0/                   # FROZEN previous-release snapshots (`upgradeSourceStateVersion`)
+│   └── v0.36.0/                   # Current-source Anvil state snapshots (`stateVersion`, regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
 │       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
@@ -426,7 +426,7 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **Empty settled batches**: no server runs on the anvil chains, so the fixture chains never settled a batch and still carry their genesis upgrade tx, which blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before upgrading, the upgrade runners commit, prove and execute one empty batch on each target chain through the CTM's `ValidatorTimelock` (`src/helpers/batch-settlement.ts`), proven with the testnet verifier's mock proof and committed against a `ValidiumL1DAValidator` pair the harness sets, as the fixture chains have none. The executed batch clears the upgrade tx hash, as a server's batch carrying it would. The bootstrap scenario settles one again before each follow-up hop that must not inherit the previous hop's pending L2 upgrade.
+- **Empty settled batches**: no server runs on the anvil chains, so the fixture chains never settled a batch and still carry their genesis upgrade tx, which blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before upgrading, the upgrade runners commit, prove and execute one empty batch on each target chain through the CTM's `ValidatorTimelock` (`src/helpers/batch-settlement.ts`), proven with the testnet verifier's mock proof and committed against a `ValidiumL1DAValidator` pair the harness sets, as the fixture chains have none. The executed batch clears the upgrade tx hash, as a server's batch carrying it would. `yarn test:upgrade` settles one again before each follow-up hop that must not inherit the previous hop's pending L2 upgrade.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
 - **Temporary upgrade inputs**: the upgrade harness copies the scenario's config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
