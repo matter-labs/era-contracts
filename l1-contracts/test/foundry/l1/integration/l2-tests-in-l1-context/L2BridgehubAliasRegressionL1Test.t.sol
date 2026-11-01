@@ -204,6 +204,17 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
         assertFalse(l2Bridgehub.isChainFeatureEnabled(ChainFeature.ExpirableTransfers));
     }
 
+    /// @notice The service transaction `ChainRegistrationSender` requests arrives from `SERVICE_TRANSACTION_SENDER`.
+    function test_setChainFeatureEnabled_byServiceTransactionSender() public {
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
+
+        assertTrue(
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).isChainFeatureEnabled(ChainFeature.ExpirableTransfers),
+            "service sender must enable the feature"
+        );
+    }
+
     function test_setChainFeatureEnabled_revertWhen_notChainRegistrationSender() public {
         vm.prank(l1ChainRegistrationSender);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, l1ChainRegistrationSender));

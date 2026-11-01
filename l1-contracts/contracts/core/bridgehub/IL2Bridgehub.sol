@@ -6,6 +6,7 @@ import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 /// @notice A protocol feature a chain uses only once the owner or the Bridgehub admin enabled it for the chain.
 /// See {protocol-docs/interop-gating.md#chain-features}.
+/// @dev APPEND-ONLY: the ordinals are stored on L1 and on L2.
 enum ChainFeature {
     ExpirableTransfers
 }

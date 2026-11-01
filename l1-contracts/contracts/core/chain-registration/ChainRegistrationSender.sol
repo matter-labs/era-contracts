@@ -35,7 +35,8 @@ bytes1 constant CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION = 0x02;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them, for the pairs
-/// the chain admins whitelisted. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+/// the chain admins whitelisted, and pushes each chain's features to its own L2 Bridgehub. See
+/// {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/interop-gating.md#chain-features}.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
