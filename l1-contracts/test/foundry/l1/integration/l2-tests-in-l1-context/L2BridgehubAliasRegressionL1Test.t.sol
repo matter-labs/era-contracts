@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
+import {ChainFeature} from "contracts/core/bridgehub/IL2Bridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {EmptyAssetId, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
@@ -186,5 +187,37 @@ contract L2BridgehubAliasRegressionL1Test is Test, SharedL2ContractL1Deployer {
 
         assertEq(L2Bridgehub(L2_BRIDGEHUB_ADDR).baseTokenAssetId(testChainId), testBaseTokenAssetId);
         assertTrue(L2Bridgehub(L2_BRIDGEHUB_ADDR).isPeerAllowed(testChainId));
+    }
+
+    /// @notice The L1 `ChainRegistrationSender` pushes a chain's features to its own L2 Bridgehub
+    /// ({protocol-docs/interop-gating.md#chain-features}); the aliased sender can set them and turn them off again.
+    function test_setChainFeatureEnabled_byAliasedSender() public {
+        L2Bridgehub l2Bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
+        assertFalse(l2Bridgehub.isChainFeatureEnabled(ChainFeature.ExpirableTransfers), "features start disabled");
+
+        vm.prank(aliasedChainRegistrationSender);
+        l2Bridgehub.setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
+        assertTrue(l2Bridgehub.isChainFeatureEnabled(ChainFeature.ExpirableTransfers));
+
+        vm.prank(aliasedChainRegistrationSender);
+        l2Bridgehub.setChainFeatureEnabled(ChainFeature.ExpirableTransfers, false);
+        assertFalse(l2Bridgehub.isChainFeatureEnabled(ChainFeature.ExpirableTransfers));
+    }
+
+    /// @notice The service transaction `ChainRegistrationSender` requests arrives from `SERVICE_TRANSACTION_SENDER`.
+    function test_setChainFeatureEnabled_byServiceTransactionSender() public {
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
+
+        assertTrue(
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).isChainFeatureEnabled(ChainFeature.ExpirableTransfers),
+            "service sender must enable the feature"
+        );
+    }
+
+    function test_setChainFeatureEnabled_revertWhen_notChainRegistrationSender() public {
+        vm.prank(l1ChainRegistrationSender);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, l1ChainRegistrationSender));
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainFeatureEnabled(ChainFeature.ExpirableTransfers, true);
     }
 }

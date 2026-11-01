@@ -26,7 +26,7 @@ import {
     NoEthAllowed,
     ZKChainNotRegistered
 } from "../bridgehub/L1BridgehubErrors.sol";
-import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
+import {ChainFeature, IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @dev The encoding version of `bridgehubDeposit` data that re-sends the registration of an allowed pair.
 /// The retired version `0x01` registered any pair without consent.
@@ -35,7 +35,8 @@ bytes1 constant CHAIN_REGISTRATION_SENDER_RESUBMISSION_ENCODING_VERSION = 0x02;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Registers chains on other chains' L2 Bridgehubs to enable interop between them, for the pairs
-/// the chain admins whitelisted. See {protocol-docs/interop-gating.md#interop-peer-whitelist}.
+/// the chain admins whitelisted, and pushes each chain's features to its own L2 Bridgehub. See
+/// {protocol-docs/interop-gating.md#interop-peer-whitelist} and {protocol-docs/interop-gating.md#chain-features}.
 contract ChainRegistrationSender is
     IChainRegistrationSender,
     IL1CrossChainSender,
@@ -50,6 +51,9 @@ contract ChainRegistrationSender is
 
     /// @inheritdoc IChainRegistrationSender
     mapping(uint256 chainId => mapping(uint256 peerChainId => bool allowed)) public interopPeerAllowed;
+
+    /// @inheritdoc IChainRegistrationSender
+    mapping(uint256 chainId => mapping(ChainFeature feature => bool enabled)) public isChainFeatureEnabled;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
@@ -90,6 +94,22 @@ contract ChainRegistrationSender is
 
         // slither-disable-next-line unused-return
         IMailbox(zkChain).requestL2ServiceTransaction(L2_BRIDGEHUB_ADDR, _getL2RegistrationCalldata(_peerChainId));
+    }
+
+    /// @inheritdoc IChainRegistrationSender
+    function setChainFeatureEnabled(uint256 _chainId, ChainFeature _feature, bool _enabled) external nonReentrant {
+        require(msg.sender == owner() || msg.sender == BRIDGE_HUB.admin(), Unauthorized(msg.sender));
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
+
+        isChainFeatureEnabled[_chainId][_feature] = _enabled;
+        emit ChainFeatureSet(_chainId, _feature, _enabled);
+
+        // slither-disable-next-line unused-return
+        IMailbox(zkChain).requestL2ServiceTransaction(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeCall(IL2Bridgehub.setChainFeatureEnabled, (_feature, _enabled))
+        );
     }
 
     /// @inheritdoc IChainRegistrationSender
