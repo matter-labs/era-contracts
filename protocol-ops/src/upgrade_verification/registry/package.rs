@@ -1619,9 +1619,10 @@ mod tests {
 
     // ───────────────────────── a release the tool has never heard of ─────────────────────────
     //
-    // `CTMUpgrade_v36 is DefaultCTMUpgrade {}` — an empty subclass. A v36 upgrade is an ORDINARY
-    // registry upgrade, so it must load through the general path with no v36 module, no v36
-    // branch and no v36 constant anywhere in this tree. The loader never learns a release name.
+    // `CTMUpgrade_v36 is DefaultCTMUpgrade` only declares its changed members and its L2 side. A v36
+    // upgrade is an ORDINARY registry upgrade, so it must load through the general path with no v36
+    // module, no v36 branch and no v36 constant anywhere in this tree. The loader never learns a
+    // release name.
 
     /// A release with no module of its own loads as an ordinary upgrade, and every summary field
     /// the verifier holds the CTM executor's immutables against is picked up.

@@ -26,12 +26,13 @@ runPipelineUpgradeScenario({
   hops: [
     // The release's own edge: the CTM side runs the release's script, as protocol-ops prepares it by default; the
     // core side adds the fixture's harness-only `L1ChainAssetHandler` and `L1MessageRoot` to what the release
-    // declares (see `CoreUpgradeForTests_v36`).
+    // declares (see `CoreUpgradeForTests_v36`). Its L2 leg is v36's standard one, which runs `L2DefaultUpgrade`.
     {
       label: "release",
       upgradeInputTemplatePath: "test/anvil-interop/config/release-upgrade.toml",
       expectedProtocolVersion: packProtocolVersion(genesis),
       coreScriptPath: "test/foundry/l1/integration/_EcosystemUpgradeForTests_v36.sol:CoreUpgradeForTests_v36",
+      carriesL2Upgrade: true,
     },
     // A same-minor PATCH: one fresh `DiamondInit`, published as a release that copies the live one except that member.
     // Its routing is identical on both edges, so it must derive no facet cut.
