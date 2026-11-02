@@ -33,6 +33,7 @@ import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
 import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {Utils} from "../../utils/Utils.sol";
+import {CoreExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
 
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
 ///         prepare: deploys every ecosystem implementation whose code differs from the live one
@@ -54,6 +55,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     /// @dev The governance/admin calls this prepare emits that the upgrade objects do not
     ///      describe (see {ExternalActionsLib}).
     ExternalActionsLib.Ledger internal externalActions;
+
+    /// @notice The successor `CoreUpgradeExecutor` this run deployed when the version replaces the
+    ///         ecosystem executor ({replacesCoreUpgradeExecutor}); zero otherwise.
+    CoreUpgradeExecutor public successorCoreUpgradeExecutor;
+
+    /// @dev How {deploySuccessorCoreUpgradeExecutor} constructed it, for the output record.
+    CoreExecutorDeployment internal successorExecutorDeployment;
 
     /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
     ReleaseMemberProbe internal implementationProbe;
@@ -106,7 +114,65 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     /// @notice The upgrade objects of the ecosystem side. The default deploys the core transition over the
     ///         implementations this run deployed; the bootstrap edge also deploys the executor.
     function deployEcosystemUpgradeObjects() public virtual {
+        if (!_liveCoreUpgradeExecutorRunsThisBuild()) {
+            require(
+                replacesCoreUpgradeExecutor(),
+                "the live CoreUpgradeExecutor differs from this build but this version does not declare its "
+                "replacement: override `replacesCoreUpgradeExecutor()`, or the local build differs from the one "
+                "that produced the live code"
+            );
+            deploySuccessorCoreUpgradeExecutor();
+        }
         deployCoreTransition();
+    }
+
+    /// @notice Whether this version's build changes `CoreUpgradeExecutor`, so that an ecosystem still
+    ///         on the previous executor gets a successor. The default declares no change.
+    /// @dev A successor is deployed only where the live executor's runtime code differs from this
+    ///      build's ({_liveCoreUpgradeExecutorRunsThisBuild}); an undeclared difference is refused.
+    ///      The run then reports the successor as `core_upgrade_executor_addr` (the core leg targets
+    ///      it) next to `core_predecessor_executor_addr`, and the merge derives the handover between
+    ///      the two ({ExecutorSuccessionLib.coreCalls}) and places it before the legs.
+    function replacesCoreUpgradeExecutor() internal view virtual returns (bool) {
+        return false;
+    }
+
+    /// @notice Whether the live executor already runs the `CoreUpgradeExecutor` this build deploys
+    ///         over the same constructor arguments (runtime codehash, immutables included; see
+    ///         {ReleaseMemberProbe}).
+    function _liveCoreUpgradeExecutorRunsThisBuild() internal virtual returns (bool) {
+        CoreUpgradeExecutor live = getPredecessorCoreUpgradeExecutor();
+        if (address(implementationProbe) == address(0)) {
+            // Plain CREATE, never broadcast: it lives only inside this run's simulation.
+            implementationProbe = new ReleaseMemberProbe();
+        }
+        bytes memory constructorArgs = abi.encode(live.owner(), live.PROXY_ADMIN());
+        return address(live).codehash == implementationProbe.codehashOf("CoreUpgradeExecutor", constructorArgs);
+    }
+
+    /// @notice Deploys the successor `CoreUpgradeExecutor`, bound to the same ecosystem
+    ///         `ProxyAdmin` and owned by the same governance as the live one.
+    /// @dev Rides the CREATE2 factory like every prepare deployment.
+    function deploySuccessorCoreUpgradeExecutor() public virtual {
+        CoreUpgradeExecutor predecessor = getPredecessorCoreUpgradeExecutor();
+        (, bytes32 salt) = getCreate2FactoryParams();
+        address governance = predecessor.owner();
+        address proxyAdmin = address(predecessor.PROXY_ADMIN());
+        successorCoreUpgradeExecutor = CoreUpgradeExecutor(
+            payable(
+                deployViaCreate2AndNotify(
+                    type(CoreUpgradeExecutor).creationCode,
+                    abi.encode(governance, ProxyAdmin(proxyAdmin)),
+                    "CoreUpgradeExecutor"
+                )
+            )
+        );
+        successorExecutorDeployment = CoreExecutorDeployment({
+            coreExecutor: address(successorCoreUpgradeExecutor),
+            create2Salt: salt,
+            initialOwner: governance,
+            proxyAdmin: proxyAdmin
+        });
     }
 
     /// @notice Deploys the write-once inventory of this upgrade's swaps — one source-checked row
@@ -427,10 +493,18 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return config.ownerAddress;
     }
 
-    /// @notice The ecosystem's `CoreUpgradeExecutor`: the owner of the shared ecosystem `ProxyAdmin`
-    ///         once the bootstrap edge has handed it over. The bootstrap prepare overrides this
-    ///         with the executor it deploys.
+    /// @notice The `CoreUpgradeExecutor` this upgrade's core leg targets: the successor this run
+    ///         deployed when the version replaces the executor, else the live one.
     function getCoreUpgradeExecutor() public view virtual returns (CoreUpgradeExecutor) {
+        if (address(successorCoreUpgradeExecutor) != address(0)) {
+            return successorCoreUpgradeExecutor;
+        }
+        return getPredecessorCoreUpgradeExecutor();
+    }
+
+    /// @notice The ecosystem's live `CoreUpgradeExecutor`: the owner of the shared ecosystem
+    ///         `ProxyAdmin`.
+    function getPredecessorCoreUpgradeExecutor() public view virtual returns (CoreUpgradeExecutor) {
         address admin = coreAddresses.shared.transparentProxyAdmin;
         require(admin != address(0), "ecosystem ProxyAdmin not discovered");
         address executor = ProxyAdmin(admin).owner();
@@ -499,7 +573,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     ///         {UpgradeExecutorsRecord}). A recurring prepare deploys none and records nothing.
     /// @return recorded Whether this run deployed any.
     /// @return json The serialized record.
-    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {}
+    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {
+        if (successorExecutorDeployment.coreExecutor == address(0)) {
+            return (false, "");
+        }
+        return (true, UpgradeExecutorsRecord.serializeCore(successorExecutorDeployment));
+    }
 
     function saveOutput(string memory outputPath) internal virtual {
         // Serialize bridgehub addresses
@@ -613,6 +692,15 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         vm.serializeString("root", "upgrade_addresses", deployedAddresses);
         // The objects the CTM prepare and reviewers take from this run.
         vm.serializeAddress("registry", "core_transition_addr", address(coreTransition));
+        // Nonzero only when this run replaces the executor: the merge hands the domain from it to
+        // `core_upgrade_executor_addr` before the legs.
+        vm.serializeAddress(
+            "registry",
+            "core_predecessor_executor_addr",
+            address(successorCoreUpgradeExecutor) == address(0)
+                ? address(0)
+                : address(getPredecessorCoreUpgradeExecutor())
+        );
         string memory registry = vm.serializeAddress(
             "registry",
             "core_upgrade_executor_addr",

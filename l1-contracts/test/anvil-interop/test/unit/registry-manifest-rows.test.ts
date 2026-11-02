@@ -27,6 +27,8 @@ const REGISTRY_TYPES_SOL = path.join(__dirname, "../../../../contracts/upgrades/
 
 // Distinct, recognizable addresses for the rows under test.
 const address = (n: number) => ethers.utils.getAddress(ethers.utils.hexZeroPad(ethers.utils.hexlify(n), 20));
+/** The engine every encoded transition pins in these tests. */
+const ENGINE = address(0xe9);
 
 /** `REGISTRY_TYPES_SOL` with its comments stripped. */
 function registryTypesSource(): string {
@@ -90,9 +92,10 @@ test("the domain tag is the ProxyUpgradeDomain member's index", () => {
 
 test("a core manifest encodes a Core-domain transition manifest, the row in its own slot", () => {
   const entry = { proxy: address(1), expectedOldImpl: address(2), implNew: address(3) };
-  const args = coreInitArgs({ core: { contracts: { L1MessageRoot: entry } } });
+  const args = coreInitArgs({ core: { contracts: { L1MessageRoot: entry } } }, ENGINE);
   assertTransitionManifestShape(args, "core init args");
   assert.equal(args.domain, proxyUpgradeDomain("Core"));
+  assert.equal(args.upgradeEngine, ENGINE, "the transition pins the engine it is given");
   assert.equal(args.proxyUpgrades.length, proxyUpgradeSlots("L1EcosystemContract", {}).length);
   const row = args.proxyUpgrades[proxyUpgradeSlotIndex("L1EcosystemContract", "L1MessageRoot")];
   assertRowShape(row, "core L1MessageRoot row");
@@ -101,9 +104,10 @@ test("a core manifest encodes a Core-domain transition manifest, the row in its 
 
 test("CTM infrastructure rows encode a CTM-domain transition manifest indexed by CTMContract", () => {
   const entry = { proxy: address(4), expectedOldImpl: address(5), implNew: address(6), callInitializeUpgrade: true };
-  const args = ctmInfrastructureInitArgs({ infrastructure: { contracts: { ServerNotifier: entry } } });
+  const args = ctmInfrastructureInitArgs({ infrastructure: { contracts: { ServerNotifier: entry } } }, ENGINE);
   assertTransitionManifestShape(args, "CTM infrastructure init args");
   assert.equal(args.domain, proxyUpgradeDomain("CTM"));
+  assert.equal(args.upgradeEngine, ENGINE, "the transition pins the engine it is given");
   assert.equal(args.proxyUpgrades.length, proxyUpgradeSlots("CTMContract", {}).length);
   args.proxyUpgrades.forEach((row: { implNew: string }, i: number) => {
     assertRowShape(row, `CTMContract[${i}]`);
@@ -116,10 +120,10 @@ test("CTM infrastructure rows encode a CTM-domain transition manifest indexed by
 
 test("a CTM entry without infrastructure rows encodes no object; an unknown member refuses", () => {
   // The CTM-domain object refuses an empty participating set, so there is nothing to deploy.
-  assert.equal(ctmInfrastructureInitArgs({ transition: {} }), undefined);
-  assert.equal(ctmInfrastructureInitArgs({ infrastructure: { contracts: {} } }), undefined);
+  assert.equal(ctmInfrastructureInitArgs({ transition: {} }, ENGINE), undefined);
+  assert.equal(ctmInfrastructureInitArgs({ infrastructure: { contracts: {} } }, ENGINE), undefined);
   assert.throws(
-    () => ctmInfrastructureInitArgs({ infrastructure: { contracts: { L1MessageRoot: { proxy: address(1) } } } }),
+    () => ctmInfrastructureInitArgs({ infrastructure: { contracts: { L1MessageRoot: { proxy: address(1) } } } }, ENGINE),
     /unknown CTMContract member "L1MessageRoot"/
   );
 });

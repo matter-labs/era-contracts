@@ -53,6 +53,7 @@ import {
 } from "contracts/upgrades/registry/RegistryTypes.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
+import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
 
 /// @notice The L2 side a version authors for its edge: the plan's authored input and the deployed
 ///         bytecodes to publish. The registry objects construct the L2 payload on-chain from what
@@ -86,6 +87,13 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
     ReleaseMemberProbe internal releaseMemberProbe;
+
+    /// @notice The successor `CTMUpgradeExecutor` this run deployed when the version replaces the
+    ///         CTM executor ({replacesCTMUpgradeExecutor}); zero otherwise.
+    CTMUpgradeExecutor public successorCTMUpgradeExecutor;
+
+    /// @dev How {deploySuccessorCTMUpgradeExecutor} constructed it, for the output record.
+    CTMExecutorDeployment internal successorExecutorDeployment;
 
     struct UpgradeDeployedAddresses {
         /// @dev The bootstrap edge's core executor input (`CTMUpgradeParams.ecosystemUpgradeExecutor`).
@@ -335,6 +343,15 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         bootstrap edge deploys its migration and its call sequence instead.
     function deployUpgradeObjects() public virtual {
         _requireDeclaredKindHolds();
+        if (!_liveCTMUpgradeExecutorRunsThisBuild()) {
+            require(
+                replacesCTMUpgradeExecutor(),
+                "the live CTMUpgradeExecutor differs from this build but this version does not declare its "
+                "replacement: override `replacesCTMUpgradeExecutor()`, or the local build differs from the one "
+                "that produced the live code"
+            );
+            deploySuccessorCTMUpgradeExecutor();
+        }
         if (upgradeKind() != UpgradeKind.InfrastructureOnly) {
             upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
             deployCTMTransition();
@@ -646,9 +663,70 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return _ctmProxyUpgradeRows();
     }
 
-    /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
-    ///         has handed the domain over. This upgrade's CTM legs are applied through it.
+    /// @notice Whether this version's build changes `CTMUpgradeExecutor`, so that a CTM still on the
+    ///         previous executor gets a successor. The default declares no change.
+    /// @dev A successor is deployed only where the live executor's runtime code differs from this
+    ///      build's ({_liveCTMUpgradeExecutorRunsThisBuild}); an undeclared difference is refused.
+    ///      The run then reports the successor as `ctm_upgrade_executor_addr` (the CTM legs target it)
+    ///      next to `ctm_predecessor_executor_addr`, and the merge derives the handover of the CTM, its
+    ///      `ProxyAdmin` and the ServerNotifier ({ExecutorSuccessionLib.ctmCalls}) and places it
+    ///      before the legs.
+    function replacesCTMUpgradeExecutor() internal view virtual returns (bool) {
+        return false;
+    }
+
+    /// @notice Whether the live executor already runs the `CTMUpgradeExecutor` this build deploys
+    ///         over the same constructor arguments (runtime codehash, immutables included; see
+    ///         {ReleaseMemberProbe}).
+    function _liveCTMUpgradeExecutorRunsThisBuild() internal virtual returns (bool) {
+        CTMUpgradeExecutor live = CTMUpgradeExecutor(payable(predecessorCTMUpgradeExecutor()));
+        if (address(releaseMemberProbe) == address(0)) {
+            // Plain CREATE, never broadcast: it lives only inside this run's simulation.
+            releaseMemberProbe = new ReleaseMemberProbe();
+        }
+        bytes memory constructorArgs = abi.encode(live.owner(), live.CHAIN_TYPE_MANAGER(), live.CTM_PROXY_ADMIN());
+        return address(live).codehash == releaseMemberProbe.codehashOf("CTMUpgradeExecutor", constructorArgs);
+    }
+
+    /// @notice Deploys the successor `CTMUpgradeExecutor`, bound to the same CTM and CTM-domain
+    ///         `ProxyAdmin` and owned by the same governance as the live one.
+    /// @dev Rides the CREATE2 factory like every prepare deployment.
+    function deploySuccessorCTMUpgradeExecutor() public virtual {
+        CTMUpgradeExecutor predecessor = CTMUpgradeExecutor(payable(predecessorCTMUpgradeExecutor()));
+        (, bytes32 salt) = getCreate2FactoryParams();
+        address governance = predecessor.owner();
+        address ctm = address(predecessor.CHAIN_TYPE_MANAGER());
+        address ctmProxyAdmin = address(predecessor.CTM_PROXY_ADMIN());
+        successorCTMUpgradeExecutor = CTMUpgradeExecutor(
+            payable(
+                deployViaCreate2AndNotify(
+                    type(CTMUpgradeExecutor).creationCode,
+                    abi.encode(governance, IChainTypeManager(ctm), ctmProxyAdmin),
+                    "CTMUpgradeExecutor"
+                )
+            )
+        );
+        successorExecutorDeployment = CTMExecutorDeployment({
+            ctmExecutor: address(successorCTMUpgradeExecutor),
+            create2Salt: salt,
+            initialOwner: governance,
+            chainTypeManager: ctm,
+            ctmProxyAdmin: ctmProxyAdmin
+        });
+    }
+
+    /// @notice The `CTMUpgradeExecutor` this upgrade's CTM legs target: the successor this run
+    ///         deployed when the version replaces the executor, else the live one.
     function boundCTMUpgradeExecutor() public view virtual returns (address) {
+        if (address(successorCTMUpgradeExecutor) != address(0)) {
+            return address(successorCTMUpgradeExecutor);
+        }
+        return predecessorCTMUpgradeExecutor();
+    }
+
+    /// @notice The CTM domain's live `CTMUpgradeExecutor`: the CTM's owner once the bootstrap edge
+    ///         has handed the domain over.
+    function predecessorCTMUpgradeExecutor() public view virtual returns (address) {
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address executor = IOwnable(ctm).owner();
         require(executor.code.length != 0, "CTM owner is not a contract: run the bootstrap edge first");
@@ -1095,6 +1173,13 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         );
         address bootstrapMigrationAddr = bootstrapMigrationAddress();
         vm.serializeAddress("registry", "bootstrap_migration_addr", bootstrapMigrationAddr);
+        // Nonzero only when this run replaces the executor: the merge hands the domain from it to
+        // `ctm_upgrade_executor_addr` before the legs.
+        vm.serializeAddress(
+            "registry",
+            "ctm_predecessor_executor_addr",
+            address(successorCTMUpgradeExecutor) == address(0) ? address(0) : predecessorCTMUpgradeExecutor()
+        );
         // The bound executor is named whenever it is known: after a bootstrap prepare deployed it,
         // or once the CTM's live owner is one. The merge derives this CTM's executor calls on it.
         bool executorKnown = upgradeAddresses.ctmTransition != address(0) ||
@@ -1123,7 +1208,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         {UpgradeExecutorsRecord}). A recurring prepare deploys none and records nothing.
     /// @return recorded Whether this run deployed one.
     /// @return json The serialized record.
-    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {}
+    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {
+        if (successorExecutorDeployment.ctmExecutor == address(0)) {
+            return (false, "");
+        }
+        return (true, UpgradeExecutorsRecord.serializeCTM(successorExecutorDeployment));
+    }
 
     function getCTMAddress() public view returns (address) {
         return newConfig.ctm;

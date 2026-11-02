@@ -27,6 +27,9 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
+import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
+import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {IProxyUpgradeTransition} from "contracts/upgrades/registry/objects/IProxyUpgradeTransition.sol";
@@ -210,6 +213,39 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
         }
     }
 
+    /// @notice The v35 executors cannot run a transition's pinned engine, so the edge hands both domains to
+    ///         successors in the same bundle: afterwards each successor holds everything its predecessor held,
+    ///         answers to the same governance, and the predecessors hold nothing.
+    function test_theEdgeHandsBothDomainsToSuccessorExecutors() public view {
+        string memory root = vm.projectRoot();
+        string memory coreOutput = vm.readFile(string.concat(root, CORE_OUTPUT));
+        string memory ctmOutput = vm.readFile(string.concat(root, CTM_OUTPUT));
+        address corePredecessor = coreOutput.readAddress("$.registry.core_predecessor_executor_addr");
+        address ctmPredecessor = ctmOutput.readAddress("$.registry.ctm_predecessor_executor_addr");
+        CoreUpgradeExecutor coreSuccessor = CoreUpgradeExecutor(
+            payable(coreOutput.readAddress("$.registry.core_upgrade_executor_addr"))
+        );
+        CTMUpgradeExecutor ctmSuccessor = CTMUpgradeExecutor(
+            payable(ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr"))
+        );
+        assertTrue(corePredecessor != address(0) && corePredecessor != address(coreSuccessor), "a core succession");
+        assertTrue(ctmPredecessor != address(0) && ctmPredecessor != address(ctmSuccessor), "a CTM succession");
+
+        assertEq(coreSuccessor.PROXY_ADMIN().owner(), address(coreSuccessor), "the ecosystem ProxyAdmin moved");
+        address ctm = ctmUpgrade.getCTMAddress();
+        assertEq(address(ctmSuccessor.CHAIN_TYPE_MANAGER()), ctm, "the successor is bound to the CTM");
+        assertEq(IOwnable(ctm).owner(), address(ctmSuccessor), "the CTM moved");
+        assertEq(ctmSuccessor.CTM_PROXY_ADMIN().owner(), address(ctmSuccessor), "the CTM ProxyAdmin moved");
+        address notifier = IChainTypeManager(ctm).serverNotifierAddress();
+        assertEq(IOwnable(notifier).owner(), address(ctmSuccessor), "the ServerNotifier moved");
+        assertEq(Ownable2Step(notifier).pendingOwner(), address(0), "no nomination left on the notifier");
+        assertEq(Ownable2Step(ctm).pendingOwner(), address(0), "no nomination left on the CTM");
+
+        assertEq(coreSuccessor.owner(), previousRelease.governance, "the core successor answers to governance");
+        assertEq(ctmSuccessor.owner(), previousRelease.governance, "the CTM successor answers to governance");
+        assertEq(IOwnable(corePredecessor).owner(), previousRelease.governance, "the predecessor is left as it was");
+    }
+
     /// @notice Every member the edge deploys carries a `[member_deployments]` record in the output of the leg that
     ///         deployed it, and re-derives from it, as `protocol-ops ecosystem verify-package` checks
     ///         (`member_construction`). A member the edge reuses is the departing release's and has no record.
@@ -252,6 +288,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
         _recordedMember(ctmOutput, ctmSalt, transition.upgradeEngine());
 
         if (address(coreUpgrade.coreTransition()) != address(0)) {
+            _recordedMember(coreOutput, coreSalt, coreUpgrade.coreTransition().upgradeEngine());
             ProxyUpgradeRow[] memory rows = coreUpgrade.coreTransition().rows();
             for (uint256 i = 0; i < rows.length; ++i) {
                 _recordedMember(coreOutput, coreSalt, rows[i].implNew);

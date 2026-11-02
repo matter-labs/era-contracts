@@ -1145,18 +1145,20 @@ async function deployUpgradeObjectsFromManifest(
   }
 
   const deployObject = async (
-    name: "CTMRelease" | "CTMTransition" | "ProxyUpgradeTransition",
-    manifestArg: unknown
+    name: "CTMRelease" | "CTMTransition" | "ProxyUpgradeTransition" | "DefaultProxyUpgradeEngine",
+    ...constructorArgs: unknown[]
   ): Promise<string> => {
     const factory = new ethers.ContractFactory(getAbi(name), getDeterministicCreationBytecode(name), deployer);
-    const contract = await factory.deploy(manifestArg);
+    const contract = await factory.deploy(...constructorArgs);
     await contract.deployed();
     return contract.address;
   };
 
   const release = await deployObject("CTMRelease", releaseInitArgs(manifest, ctm));
-  const coreTransition = await deployObject("ProxyUpgradeTransition", coreInitArgs(manifest));
-  const infrastructureArgs = ctmInfrastructureInitArgs(ctm);
+  // Both proxy upgrade transitions pin the default engine: the manifest declares no follow-up call.
+  const upgradeEngine = await deployObject("DefaultProxyUpgradeEngine");
+  const coreTransition = await deployObject("ProxyUpgradeTransition", coreInitArgs(manifest, upgradeEngine));
+  const infrastructureArgs = ctmInfrastructureInitArgs(ctm, upgradeEngine);
   const ctmInfrastructureTransition =
     infrastructureArgs === undefined ? undefined : await deployObject("ProxyUpgradeTransition", infrastructureArgs);
   return {
