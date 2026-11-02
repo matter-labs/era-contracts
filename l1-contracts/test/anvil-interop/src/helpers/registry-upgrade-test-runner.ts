@@ -132,6 +132,7 @@ const DETERMINISTIC_SOURCES = [
   "contracts/upgrades/registry/objects/CTMRelease.sol",
   "contracts/upgrades/registry/objects/CTMTransition.sol",
   "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol",
+  "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol",
 ];
 
 // Mirror L2GenesisForceDeploymentsHelper.generateRandomAddress: the delegate must be

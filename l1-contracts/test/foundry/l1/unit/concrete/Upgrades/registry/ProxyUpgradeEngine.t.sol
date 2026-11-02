@@ -149,8 +149,11 @@ contract ProxyMovingEngine is DefaultProxyUpgradeEngine {
 contract RevertingFollowUpEngine is DefaultProxyUpgradeEngine {
     error FollowUpFailed();
 
-    function _afterSwaps(ProxyUpgradeContext memory, ProxyUpgradeRow[] memory) internal pure override {
-        revert FollowUpFailed();
+    /// @dev Conditional only so that the base's postcondition call stays reachable (solc 5740).
+    function _afterSwaps(ProxyUpgradeContext memory _context, ProxyUpgradeRow[] memory) internal pure override {
+        if (_context.domain == ProxyUpgradeDomain.CTM) {
+            revert FollowUpFailed();
+        }
     }
 }
 

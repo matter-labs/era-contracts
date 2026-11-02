@@ -6,11 +6,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {IProxyUpgradeEngine} from "../engines/IProxyUpgradeEngine.sol";
 import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
-import {
-    DelegateCallFailed,
-    ProxyUpgradeDomainMismatch,
-    UpgradeEngineChangedExecutorOwnership
-} from "../../../common/L1ContractErrors.sol";
+import {ProxyUpgradeDomainMismatch, UpgradeEngineChangedExecutorOwnership} from "../../../common/L1ContractErrors.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {
@@ -67,9 +63,8 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
             abi.encodeCall(IProxyUpgradeEngine.executeUpgrade, (context, manifest.proxyUpgrades))
         );
         if (!success) {
-            if (returnData.length < 4) {
-                revert DelegateCallFailed(returnData);
-            }
+            // Bubbled verbatim, empty data included: a leg reverts exactly as its rows did when the
+            // executor applied them itself.
             assembly {
                 revert(add(returnData, 0x20), mload(returnData))
             }
