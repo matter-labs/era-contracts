@@ -50,12 +50,10 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
 ## Preparing an upgrade
 
-`ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v35` and `CTMUpgrade_v35`
-under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge onto registry-driven upgrades;
-`CTMUpgrade_v35` also deploys the `L1InteropFeeManager` proxy, see
-[the switch](../protocol-docs/interop-fee.md#the-switch)), using `upgrade-envs/v0.35.0-upgrade-system/local.toml` for a
-local upgrade. The recurring registry-driven edge, `CoreUpgrade_v36` and `CTMUpgrade_v36` under
-`l1-contracts/deploy-scripts/upgrade/v36/`, is selected with `--core-script-path` / `--ctm-script-path`.
+`ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v36` and `CTMUpgrade_v36`
+under `l1-contracts/deploy-scripts/upgrade/v36/` (the first recurring registry-driven edge), using
+`upgrade-envs/v0.36.0-v36/local.toml` for a local upgrade. Other scripts are selected with `--core-script-path` /
+`--ctm-script-path`.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 
@@ -95,7 +93,7 @@ is therefore an ordinary one, never the bootstrap edge. Owner operations on its 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
 Historical preparations must select the matching scripts and input explicitly. The anvil upgrade test
 `l1-contracts/test/anvil-interop/run-upgrade-test.ts` passes its test subclasses of these scripts explicitly, for
-the bootstrap edge and the recurring hops after it (`run-recurring-upgrade-test.ts` drives a registry-driven hop on
+the release edge's core side and the patch hop after it (`run-recurring-upgrade-test.ts` drives a registry-driven hop on
 a fresh ecosystem's own executors without protocol-ops). See
 [the activation requirements](../protocol-docs/chain-config.md#activation).
 

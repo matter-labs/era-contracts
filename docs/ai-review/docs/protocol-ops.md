@@ -14,7 +14,7 @@
 - `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, bytecodes supplier, validator timelock, etc.) — read live state directly from L1.
 - `protocol-ops/src/common/forge/scripts/mod.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes, and the `ScriptCall` table binding each typed call to its script.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
-- `l1-contracts/deploy-scripts/upgrade/v35/{CoreUpgrade_v35,CTMUpgrade_v35}.s.sol` — the bootstrap edge's prepares; `v36/` the first registry-driven release's.
+- `l1-contracts/deploy-scripts/upgrade/v36/{CoreUpgrade_v36,CTMUpgrade_v36}.s.sol` — the current release's prepares (the first recurring registry-driven edge; the v35 bootstrap edge's were retired with the v36 bump).
 - The core prepare deploys the Core-domain `ProxyUpgradeTransition`, the CTM prepare the CTM-domain one and/or the `CTMTransition`, and the merge derives the executor legs (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) from the objects and executors they report — there is no compose step. The merged package carries ONE governance bundle, `[governance_calls] calls`: the merge's extras (PUH/Guardians wiring, CTM `acceptOwnership()` normalization), the core prepare's declared calls, the derived legs in canonical order (none for a bootstrap or a replacement), then the CTM prepare's declared calls. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
 
 ## Verifying a package before it is signed

@@ -186,7 +186,6 @@ as protocol components. Existing preparation entrypoints are marked explicitly.
 flowchart TB
     OPS["protocol-ops · existing CLI"]
     PREP["CoreUpgrade_v36 / CTMUpgrade_v36<br/>new recurring prepare scripts"]
-    V35["CoreUpgrade_v35 / CTMUpgrade_v35<br/>existing scripts extended for bootstrap"]
     BASE["DefaultCoreUpgrade / DefaultCTMUpgrade<br/>existing prepare pipeline"]
     REPLACE["DefaultTransitionReplacement<br/>recovery preparation"]
     ACTIONS["ExternalActionsLib<br/>declared governance / admin actions"]
@@ -201,15 +200,12 @@ flowchart TB
     VERIFY["VerifyEmergencyUpgrade"]
     PACKAGE["Prepared governance package"]
     OPS --> PREP
-    OPS --> V35
     OPS --> REPLACE
     PREP --> BASE
-    V35 --> BASE
     REPLACE --> BASE
     BASE --> ACTIONS
     BASE --> PROBE
     BASE --> CACHE
-    V35 -->|"executor deployments"| RECORD
     CACHE --> BLAKE
     BASE --> PACKAGE
     OPS --> SIM

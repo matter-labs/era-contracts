@@ -1,0 +1,18 @@
+# Upgrade input for the stage environment on the v36 release. See protocol-ops/README.md "Environment inputs".
+
+era_chain_id = 270
+
+# `bridgehub.owner()`, the signer of the governance bundle.
+owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0xe492cb8997fa686bce2e1361156d9fc348b77da95b311b43d9236e9a7d34acf5"
+# Salt for legacy `Governance.sol` op ids, rotated so they do not collide with executed ones.
+legacy_gov_salt = "0x0ed700d544cb9e5a36460ead64c4f9750b3faa2a0c4500401815dc9073d345d5"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy: two CTM prepares deploying a contract with env-wide
+# constructor args need distinct salts.
+[create2_factory_salts]
+"0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b" = "0x9e1459aa2374b0969b4bb5abe92b1456dad54783adf24329ca3836e59b363672"
+"0x73bee414c6e006525f3cceedf6d8004c0370502e" = "0x11fef322d70b6d6d48c302665327837748382883169c4064804c857da70d0f8c"

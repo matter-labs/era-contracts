@@ -11,7 +11,7 @@
 //!
 //! An executor record sits wherever a run that deployed executors wrote its `[upgrade_executors]`
 //! table: at the root of a forge init output (`DeployL1CoreContracts`, `DeployCTM`), and under
-//! `[core]` / `[ctms.<key>]` of a merged prepare package (`CoreUpgrade_v35`, `CTMUpgrade_v35`). A
+//! `[core]` / `[ctms.<key>]` of a merged prepare package (v35's bootstrap `CoreUpgrade_v35`, `CTMUpgrade_v35`). A
 //! member record is a prepare's `[member_deployments]` table, found at the same three places.
 //! Records from several places merge into one set; two DIFFERENT records of the same object are
 //! refused, since the review cannot say which one describes the object it verifies.

@@ -1,0 +1,16 @@
+# Upgrade input for the mainnet environment on the v36 release. See protocol-ops/README.md "Environment inputs".
+
+era_chain_id = 324
+
+# `bridgehub.owner()`, the signer of the governance bundle.
+owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
+
+[contracts]
+# Rotated every release: CREATE2 returns the previously deployed contract if a salt is reused.
+create2_factory_salt = "0xc14d3c87bb2c9c8f8c9b982e9e49688be9664248f9b8955dbebf30be5f567d25"
+
+# Per-CTM CREATE2 salts, keyed by CTM proxy: two CTM prepares deploying a contract with env-wide
+# constructor args need distinct salts.
+[create2_factory_salts]
+"0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C" = "0x59449bd22b97e82ca9cb559ace8f3ff86d7044c84a0af091142c04fc461f2679"
+"0x1adf137f59949c9081157d5dE1e002D1c992071F" = "0x621ed68966a83a65465891954ccee3ecb69b75d4210b55804c91a6554905fac7"

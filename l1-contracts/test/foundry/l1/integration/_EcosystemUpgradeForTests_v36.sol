@@ -8,9 +8,8 @@ import {CTMUpgrade_v36} from "deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol";
 import {TrimmedUpgradeOutput} from "./_EcosystemUpgradeForTests.sol";
 import {MemberDeploymentsRecord} from "deploy-scripts/utils/MemberDeploymentsRecord.sol";
 
-/// @notice Memory-trimmed test variants of the v36 (first registry-driven) Core/CTM prepare
-///         scripts, driven by the anvil-interop pipeline upgrade runner through protocol-ops
-///         right after the v35 bootstrap hop (`--core-script-path` / `--ctm-script-path`).
+/// @notice Test variants of the v36 Core/CTM prepare scripts, driven by the anvil-interop pipeline upgrade runner
+///         through protocol-ops (`--core-script-path` / `--ctm-script-path`).
 
 /// @dev The target version comes from the upgrade input, and the output carries only what the runner and
 ///      the merger read.
@@ -72,16 +71,19 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
     }
 }
 
-/// @dev Core upgrade for the harness. The anvil ecosystem this hop runs on was bootstrapped from the
-///      current sources, so its `L1MessageRoot` already runs this build and the base pipeline would
-///      reuse it; the harness deploys the declared change anyway so the hop carries the ecosystem leg
-///      it exists to exercise.
+/// @dev Core upgrade for the release edge over the previous release's anvil states, whose `L1ChainAssetHandler` and
+///      `L1MessageRoot` proxies run harness variants (`L1ChainAssetHandlerDev`, `DummyL1MessageRoot`): no release
+///      build matches them, so the edge replaces them like declared changes, as the Foundry fixture's
+///      `CoreUpgradeForLocalTest` does.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgradeForTests_v36 is CoreUpgrade_v36 {
-    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
-        if (keccak256(bytes(_name)) == keccak256(bytes("L1MessageRoot"))) {
-            return false;
+    function changedEcosystemImplementations() internal view override returns (string[] memory names) {
+        string[] memory declared = super.changedEcosystemImplementations();
+        names = new string[](declared.length + 2);
+        for (uint256 i = 0; i < declared.length; ++i) {
+            names[i] = declared[i];
         }
-        return super._canReuseEcosystemImplementation(_name, _live);
+        names[declared.length] = "L1ChainAssetHandler";
+        names[declared.length + 1] = "L1MessageRoot";
     }
 }

@@ -339,7 +339,7 @@ ${stillUsingOutgoing.map((file) => `      ${file}`).join("\n")}`
   - Release-specific preparation (extra contracts, a per-chain initializer) goes into ${repoPath(nextScriptsDir)}/;
     protocol-ops and UpgradeTest_Local already run those scripts.
   - Run \`cd protocol-ops && cargo test\` and the upgrade tests (\`yarn ts-node run-upgrade-test.ts\` in
-    l1-contracts/test/anvil-interop, \`forge test --ffi --match-path 'test/foundry/l1/integration/UpgradeTest*'\`).`);
+    l1-contracts/test/anvil-interop, \`yarn test:foundry:previous-release\` in l1-contracts).`);
 }
 
 main();

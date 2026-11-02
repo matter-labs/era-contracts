@@ -57,7 +57,8 @@ Finished, and described where it now lives:
   L2 transaction and delegate-calldata composition are gone.
 - The equivalence evidence is field-level and independent: the bootstrap unit suite builds the
   expected proposal and transaction from the manifest inputs (`RegistryBootstrapMigration.t.sol`),
-  and `UpgradeTest_Local` decodes the cut the prepare shipped and reads it back field by field.
+  and on `draft/v0.35.0` `UpgradeTest_Local` decodes the cut the prepare shipped and reads it back
+  field by field.
 - `AdminFunctions.upgradeChainFromCTM` selects the cut-reading entrypoint first
   (`UpgradeChainCall.requiresCut`) and reconstructs a cut only for a pre-bootstrap chain.
   `DefaultChainUpgrade.executeUpgrade` is deleted (the chain's `executeUpgrade` is

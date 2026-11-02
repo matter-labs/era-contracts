@@ -283,7 +283,7 @@ impl<'a> UpgradeInner<'a> {
         // Per-CTM CREATE2 salt, so two CTMs prepared in one ecosystem never land a
         // contract with env-wide constant constructor args at the same address.
         // Named environments keep CREATE2 salts keyed by registered CTM
-        // (`upgrade-envs/v0.35.0-upgrade-system/<env>.toml [create2_salts.per_ctm]`);
+        // (`upgrade-envs/v0.36.0-v36/<env>.toml [create2_salts.per_ctm]`);
         // legacy local fixtures fall back to a fresh random salt.
         let create2_salt = inputs
             .create2_factory_salt_per_ctm

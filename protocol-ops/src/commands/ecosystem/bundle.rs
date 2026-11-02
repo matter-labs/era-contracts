@@ -633,6 +633,7 @@ fn package_verification_args(
         contract_hashes: None,
         env: Some(env_cfg.env.clone()),
         expected_bridgehub: None,
+        expected_zk_token_asset_id: None,
     })
 }
 

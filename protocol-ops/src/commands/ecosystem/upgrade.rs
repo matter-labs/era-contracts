@@ -643,6 +643,12 @@ pub struct UpgradePrepareAllArgs {
     /// `L1_BYTECODES_SUPPLIER()` immutable.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
+
+    /// The ZK token asset id the release's genesis force deployments pin, in place of the env's
+    /// `zk_token_asset_id` (or the local network's without `--env`). Only for an ecosystem the
+    /// env file does not describe — a harness's scratch L1, whose live release must keep its own.
+    #[clap(long)]
+    pub zk_token_asset_id: Option<B256>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -903,9 +909,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     }
 
     let bridgehub = args.topology.resolve()?;
-    let zk_token_asset_id = match env_cfg.as_ref() {
-        Some(cfg) => cfg.require_zk_token_asset_id()?,
-        None => {
+    let zk_token_asset_id = match (args.zk_token_asset_id, env_cfg.as_ref()) {
+        (Some(zk_token_asset_id), _) => zk_token_asset_id,
+        (None, Some(cfg)) => cfg.require_zk_token_asset_id()?,
+        (None, None) => {
             crate::types::L1Network::from_l1_rpc(&args.shared.l1_rpc_url)?.zk_token_asset_id()?
         }
     };
