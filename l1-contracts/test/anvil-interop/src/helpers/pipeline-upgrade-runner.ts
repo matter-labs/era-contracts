@@ -1060,7 +1060,6 @@ export function prepareUpgradeHarnessInputs(
   fs.writeFileSync(permanentValuesPath, permanentValues);
 
   let upgradeInput = fs.readFileSync(path.join(l1ContractsDir, hop.upgradeInputTemplatePath), "utf8");
-  upgradeInput = replaceTomlBareValue(upgradeInput, "era_chain_id", String(primaryChainId));
   upgradeInput = replaceTomlStringValue(upgradeInput, "bridgehub_proxy_address", state.l1Addresses.bridgehub);
   upgradeInput = replaceTomlStringValue(upgradeInput, "owner_address", state.l1Addresses.governance);
   upgradeInput = replaceTomlBareValue(upgradeInput, "sample_chain_id", String(primaryChainId));

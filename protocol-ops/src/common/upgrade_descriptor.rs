@@ -4,7 +4,7 @@
 //! Two kinds exist:
 //! - `prepare = "prepare-all"`: the release's flow, `upgrade-prepare-all` and then
 //!   `verify-bootstrap` (the registry verifier) on its output. Only the release's own upgrade
-//!   directory (`env_config::DEFAULT_UPGRADE`) can use it, since that is where those commands
+//!   directory (`env_config::default_upgrade`) can use it, since that is where those commands
 //!   read their inputs.
 //! - `prepare = "forge-script"`: one forge script, run on a fork as the deployer. Its
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
@@ -202,7 +202,7 @@ impl ForgeScriptUpgrade {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::env_config::DEFAULT_UPGRADE;
+    use crate::common::env_config::default_upgrade;
 
     const FORGE_SCRIPT: &str = r#"
 prepare = "forge-script"
@@ -338,8 +338,9 @@ output = "emergency-upgrade-board.json"
         if paths::resolve_l1_contracts_path().is_err() {
             return; // no checkout around the test binary
         }
-        let descriptor = UpgradeDescriptor::load(DEFAULT_UPGRADE)
-            .unwrap_or_else(|error| panic!("{DEFAULT_UPGRADE}: {error:#}"));
+        let upgrade = default_upgrade().unwrap();
+        let descriptor =
+            UpgradeDescriptor::load(upgrade).unwrap_or_else(|error| panic!("{upgrade}: {error:#}"));
         assert_eq!(descriptor, UpgradeDescriptor::PrepareAll {});
     }
 
