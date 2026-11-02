@@ -4,7 +4,6 @@ use alloy::primitives::{Address, B256};
 use alloy::signers::local::PrivateKeySigner;
 #[cfg(test)]
 use alloy::signers::local::{coins_bip39::English, MnemonicBuilder};
-use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -134,41 +133,6 @@ impl Wallet {
             .build()?;
         Ok(Self::new(signer))
     }
-
-    pub fn empty() -> Self {
-        Self {
-            address: Address::ZERO,
-            private_key: None,
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Wallets YAML schema (used by `apply` to load operator keys for each chain)
-// ---------------------------------------------------------------------------
-
-// Wallet's Debug impl redacts PrivateKeySigner automatically.
-#[derive(Debug, serde::Deserialize)]
-pub struct ChainWallets {
-    pub owner: Wallet,
-    pub operator_commit_sk: Wallet,
-    pub operator_prove_sk: Wallet,
-    pub operator_execute_sk: Wallet,
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub struct WalletsYaml {
-    #[allow(dead_code)]
-    pub ecosystem: serde_yaml::Value,
-    #[serde(flatten)]
-    pub chains: std::collections::BTreeMap<String, ChainWallets>,
-}
-
-pub fn load_wallets(path: &std::path::PathBuf) -> anyhow::Result<WalletsYaml> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("reading wallets file {}", path.display()))?;
-    serde_yaml::from_str(&content)
-        .with_context(|| format!("parsing wallets file {}", path.display()))
 }
 
 #[test]
