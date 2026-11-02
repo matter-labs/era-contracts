@@ -13,7 +13,8 @@
 //!   "checks" mean comes from `upgrade-envs/<upgrade>/upgrade.toml`: v31 is
 //!   `upgrade-prepare-all` + PUVT, a `forge-script` upgrade runs one script and its own checks.
 //!   A `forge-script` upgrade with an `[execution]` script also gets `EXECUTE.md`, the
-//!   runbook of the txs whoever executes sends by hand, checked on the same fork.
+//!   runbook of the txs whoever executes sends by hand, checked on the same fork, in each
+//!   env the script applies to.
 //! - `replay-bundle` (CONSUME): rehearse a packed bundle on a fresh fork, broadcast the
 //!   deployer's bundles for real, or only run PUVT against an already-upgraded chain.
 //! - `verify-bundle`: the integrity check on its own.
@@ -41,7 +42,7 @@ use crate::common::env_config::{
 use crate::common::ethereum::get_provider;
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
-use crate::common::upgrade_descriptor::{ExecutionScript, ForgeScriptUpgrade, UpgradeDescriptor};
+use crate::common::upgrade_descriptor::{ExecutionScript, UpgradeDescriptor};
 use crate::common::{logger, paths};
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
@@ -51,9 +52,10 @@ pub const BUNDLE_METADATA_FILE: &str = "bundle-metadata.json";
 const MANIFEST_FILE: &str = "prepare/manifest.json";
 /// Generation outputs a bundle must carry, besides the `prepare/*.safe.json` files the manifest names.
 const REQUIRED_BUNDLE_FILES: [&str; 2] = [MANIFEST_FILE, "ecosystem.toml"];
+/// The L1 deployments' `forge verify-contract` commands, which the deploy workflow replays on Etherscan.
+const EXTRA_VERIFICATION_LOGS: &str = "extra-verification-logs.txt";
 /// Etherscan verification command logs; `gw-verification-logs.txt` only exists on gateway-enabled envs.
-const OPTIONAL_BUNDLE_FILES: [&str; 2] =
-    ["extra-verification-logs.txt", "gw-verification-logs.txt"];
+const OPTIONAL_BUNDLE_FILES: [&str; 2] = [EXTRA_VERIFICATION_LOGS, "gw-verification-logs.txt"];
 /// The per-env real-network broadcast log, committed under `output/<env>/` and read by PUVT.
 /// A run's own log carries the same basename inside the bundle work dir.
 const TRANSACTIONS_LOG: &str = "transactions.txt";
@@ -63,11 +65,12 @@ const DEFAULT_ZK_GOVERNANCE_COMMIT: &str = "9b06a16159cd58add109f25598e79731450d
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
 /// replay can run next to a rehearsal of the same env.
-const ENV_ANVIL_PORTS: [(&str, u16); 4] = [
+const ENV_ANVIL_PORTS: [(&str, u16); 5] = [
     ("stage", 29_545),
     ("testnet", 29_547),
     ("mainnet", 29_549),
     ("adi", 29_551),
+    ("testnet3", 29_553),
 ];
 const REPLAY_PORT_OFFSET: u16 = 1;
 const ANVIL_GAS_PRICE_WEI: u64 = 1_000_000_000;
@@ -935,6 +938,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
                 &rpc_url,
                 args.deployer_address,
                 &output_dir.join("prepare"),
+                &output_dir.join(EXTRA_VERIFICATION_LOGS),
             )
             .await?;
             anyhow::ensure!(
@@ -970,20 +974,26 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     )
     .await?;
     broadcast_impersonated(&rpc_url, &paths).await?;
-    if let UpgradeDescriptor::ForgeScript(ForgeScriptUpgrade {
-        execution: Some(execution),
-        ..
-    }) = &descriptor
-    {
-        write_execution_runbook(
-            &args.upgrade,
-            execution,
-            &env_cfg,
-            &rpc_url,
-            &output_dir,
-            forked_at_block,
-        )
-        .await?;
+    if let UpgradeDescriptor::ForgeScript(upgrade) = &descriptor {
+        match upgrade.execution_for(&env_cfg.env) {
+            Some(execution) => {
+                write_execution_runbook(
+                    &args.upgrade,
+                    execution,
+                    &env_cfg,
+                    &rpc_url,
+                    &output_dir,
+                    forked_at_block,
+                )
+                .await?
+            }
+            None if upgrade.execution.is_some() => logger::info(format!(
+                "[execution] does not list env {}: no {}",
+                env_cfg.env,
+                execution_runbook::RUNBOOK_FILE
+            )),
+            None => {}
+        }
     }
     check_upgrade(
         &descriptor,
@@ -1385,10 +1395,11 @@ mod tests {
     /// `[contracts]`, or a CTM array that resolves to nothing).
     #[test]
     fn every_committed_env_config_loads() {
-        for env in ["stage", "testnet", "mainnet", "adi"] {
-            let Ok(cfg) = EnvConfig::load(env) else {
-                return; // no checkout around the test binary
-            };
+        if crate::common::paths::resolve_l1_contracts_path().is_err() {
+            return; // no checkout around the test binary
+        }
+        for env in ["stage", "testnet", "mainnet", "adi", "testnet3"] {
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("{env}: {e:#}"));
             assert_ne!(cfg.bridgehub(), Address::ZERO, "{env}: bridgehub is unset");
             assert!(
                 !cfg.ctms().is_empty(),

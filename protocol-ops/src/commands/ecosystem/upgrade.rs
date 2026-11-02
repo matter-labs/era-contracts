@@ -1444,7 +1444,9 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
 /// Prepare a `forge-script` upgrade (see `upgrade_descriptor`): run its entry point on
 /// `l1_rpc_url` as `deployer` and write the deployer's transactions as Safe bundles plus
 /// `manifest.json` under `out` — the packaging `upgrade-prepare-all` uses, so the deploy
-/// bundle, its replay and its broadcast are shared with v31.
+/// bundle, its replay and its broadcast are shared with v31. The `forge verify-contract`
+/// lines the script logs for its deployments go to `verification_logs`, which the deploy
+/// bundle carries for the Etherscan step.
 ///
 /// The script runs as a dry run: forge records the transactions without sending them, so
 /// the fork stays at its pre-upgrade state and the caller can replay the packed bundle on it.
@@ -1455,6 +1457,7 @@ pub async fn run_forge_script_prepare(
     l1_rpc_url: &str,
     deployer: Address,
     out: &Path,
+    verification_logs: &Path,
 ) -> anyhow::Result<()> {
     let shared = crate::common::SharedRunArgs {
         l1_rpc_url: l1_rpc_url.to_string(),
@@ -1478,6 +1481,7 @@ pub async fn run_forge_script_prepare(
     runner
         .run(script)
         .with_context(|| format!("failed to execute {}", upgrade.script))?;
+    runner.write_extra_verification_logs(verification_logs)?;
     crate::common::output::write_output_if_requested(
         &format!("ecosystem.prepare.{upgrade_name}"),
         &shared,
