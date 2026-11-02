@@ -397,7 +397,11 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
     function _infrastructure(ProxyUpgradeRow[] memory _rows) internal returns (ProxyUpgradeTransition) {
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: _rows, upgradeEngine: address(proxyUpgradeEngine)})
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.CTM,
+                    proxyUpgrades: _rows,
+                    upgradeEngine: address(proxyUpgradeEngine)
+                })
             );
     }
 

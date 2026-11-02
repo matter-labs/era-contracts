@@ -54,9 +54,14 @@ same bindings and owned by governance, through the predecessor's `forward`:
   predecessor in the same `forward`) and a `forward([notifier.acceptOwnership()])` complete the
   two-step handovers.
 
-Hand over before preparing the next upgrade: the prepares name the executor that holds each domain
-at prepare time (the ecosystem `ProxyAdmin`'s owner, the CTM's owner), and the merge derives the
-legs on it. A leg sent to an executor that no longer holds its domain reverts, and the whole
+A release that changes an executor's code does this inside its own upgrade: its prepare deploys
+the successor (it declares `replacesCoreUpgradeExecutor()` / `replacesCTMUpgradeExecutor()`; v36
+declares both, since the v35 executors cannot run a transition's pinned upgrade engine), reports it
+as the leg target next to `core_predecessor_executor_addr` / `ctm_predecessor_executor_addr`, and the
+merge places exactly these handover calls (`ExecutorSuccessionLib`) between the core prepare's calls
+and the legs. Outside such a release, hand over before preparing the next upgrade: the prepares
+name the executor that holds each domain at prepare time (the ecosystem `ProxyAdmin`'s owner, the
+CTM's owner), and the merge derives the legs on it. A leg sent to an executor that no longer holds its domain reverts, and the whole
 proposal with it. Package verification re-derives an executor from its `[upgrade_executors]`
 record, so the successor's deployment must leave one (see "Provenance and validation" in the
 architecture document).

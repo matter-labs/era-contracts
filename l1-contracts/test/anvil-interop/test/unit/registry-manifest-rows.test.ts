@@ -123,7 +123,8 @@ test("a CTM entry without infrastructure rows encodes no object; an unknown memb
   assert.equal(ctmInfrastructureInitArgs({ transition: {} }, ENGINE), undefined);
   assert.equal(ctmInfrastructureInitArgs({ infrastructure: { contracts: {} } }, ENGINE), undefined);
   assert.throws(
-    () => ctmInfrastructureInitArgs({ infrastructure: { contracts: { L1MessageRoot: { proxy: address(1) } } } }, ENGINE),
+    () =>
+      ctmInfrastructureInitArgs({ infrastructure: { contracts: { L1MessageRoot: { proxy: address(1) } } } }, ENGINE),
     /unknown CTMContract member "L1MessageRoot"/
   );
 });

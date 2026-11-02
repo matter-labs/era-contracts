@@ -137,6 +137,16 @@ from a getter the deployed contracts expose.
 
 ## Batch 3: move cross-contract follow-up work into audited execution
 
+**Status (EVM-1657):** the execution hook exists. Decided: DELEGATECALL from the domain executor
+into the `upgradeEngine` each `ProxyUpgradeTransition` pins, through the fixed
+`IProxyUpgradeEngine.executeUpgrade` selector with a context the executor builds from its own
+bindings; privilege = the executor's own authority; a release subclasses
+`DefaultProxyUpgradeEngine` and orders its work in `_beforeSwaps` / `_afterSwaps`, with
+`_checkPostconditions` failing the leg on skipped or wrong work. See
+[the pinned upgrade engine](registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine).
+v36 replaces both executors to get it. Governance-owned ecosystem wiring is still outside the
+executors' authority and stays a declared external action.
+
 Inventory all declared external actions and classify each by reason: bootstrap authorization,
 upgrade-specific wiring, governance self-upgrade, or Gateway operations.
 

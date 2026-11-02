@@ -83,7 +83,10 @@ contract TimelockWiringEngine is DefaultProxyUpgradeEngine {
         ctm.setValidatorTimelockPostV29(target);
     }
 
-    function _checkPostconditions(ProxyUpgradeContext memory _context, ProxyUpgradeRow[] memory) internal view override {
+    function _checkPostconditions(
+        ProxyUpgradeContext memory _context,
+        ProxyUpgradeRow[] memory
+    ) internal view override {
         address live = IChainTypeManager(_context.chainTypeManager).validatorTimelockPostV29();
         if (live != TimelockWiringEngine(_context.upgradeEngine).targetTimelock()) {
             revert TimelockNotWired(live);

@@ -60,9 +60,14 @@ On one anvil fork of L1, in this order:
 2. The core prepare (`noGovernancePrepare`): each ecosystem implementation reused when it already
    runs the code the current sources produce and redeployed only when the version declares it
    changed, then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
-   implementation). Output `[registry]`: `core_transition_addr` (zero when none) and
-   `core_upgrade_executor_addr` — the executor read from the live ecosystem `ProxyAdmin`'s owner,
-   or deployed by the v35 prepare.
+   implementation), pinning the `DefaultProxyUpgradeEngine` it deploys (`deployProxyUpgradeEngine()`
+   is the override point for a release engine with follow-up calls). When the live
+   `CoreUpgradeExecutor`'s runtime code differs from this build, the run deploys a successor
+   (refusing unless the version declares `replacesCoreUpgradeExecutor()`) and records it in
+   `[upgrade_executors]`. Output `[registry]`: `core_transition_addr` (zero when none),
+   `core_upgrade_executor_addr` — the successor, else the executor read from the live ecosystem
+   `ProxyAdmin`'s owner — and `core_predecessor_executor_addr` (the live executor when replaced,
+   else zero).
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
    reused when it already runs the code the current sources produce and redeployed only when the
    version names it in `changedReleaseMembers()`; the release itself is new on every version bump
@@ -74,8 +79,10 @@ On one anvil fork of L1, in this order:
    on-chain (the CTM's owner, bound to it); only the bootstrap prepare takes the core executor
    from the core prepare's output. Output `[registry]`: `ctm_transition_addr`,
    `ctm_infrastructure_transition_addr` (each zero when none), `ctm_release_addr`,
-   `bootstrap_migration_addr` (zero unless a bootstrap) and `ctm_upgrade_executor_addr` (nonzero
-   whenever one of those objects exists).
+   `bootstrap_migration_addr` (zero unless a bootstrap), `ctm_upgrade_executor_addr` (nonzero
+   whenever one of those objects exists) and `ctm_predecessor_executor_addr`. As on the core side,
+   the CTM-domain transition pins the engine, and a CTM executor whose code differs from this build
+   gets a successor (`replacesCTMUpgradeExecutor()`), which `ctm_upgrade_executor_addr` then names.
 4. The ServerNotifier handover calls (bootstrap only), executed on the fork as each target's live
    owner (`UpgradeFull::run_ctm_admin_steps`; see the
    [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
@@ -83,7 +90,10 @@ On one anvil fork of L1, in this order:
    PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it.
 6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
-   `acceptOwnership` normalization) → the core prepare's declared calls → the executor legs,
+   `acceptOwnership` normalization) → the core prepare's declared calls → the executor
+   succession, when a prepare reports a predecessor (the handover calls of
+   `ExecutorSuccessionLib`: core, then CTM; see the
+   [operations document](../../../docs/upgrade-operations.md#executor-succession)) → the executor legs,
    derived from the `[registry]` objects and executors the prepares reported, one contiguous run in
    canonical order (`applyL1Upgrade(core_transition_addr)`,
    `applyInfrastructureUpgrade(ctm_infrastructure_transition_addr)`,

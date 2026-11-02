@@ -241,7 +241,11 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         inventory[uint256(L1EcosystemContract.L1Bridgehub)] = _inventoryRow;
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: inventory, upgradeEngine: address(proxyUpgradeEngine)})
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.Core,
+                    proxyUpgrades: inventory,
+                    upgradeEngine: address(proxyUpgradeEngine)
+                })
             );
     }
 
@@ -253,7 +257,11 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         inventory[uint256(CTMContract.ValidatorTimelock)] = _inventoryRow;
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory, upgradeEngine: address(proxyUpgradeEngine)})
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.CTM,
+                    proxyUpgrades: inventory,
+                    upgradeEngine: address(proxyUpgradeEngine)
+                })
             );
     }
 

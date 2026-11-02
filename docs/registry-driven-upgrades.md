@@ -167,12 +167,12 @@ All are storage-backed, built once from a manifest they take in the constructor,
 `manifestHash = keccak256(abi.encode(manifest))`. The struct definitions and their field docs are
 in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
-| Contract                     | Holds                                                                                                                                                                                                                                                                                                                              |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                                              |
-| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                                          |
-| `ProxyUpgradeTransition`     | its `domain` and that domain's enum-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows: `Core` for the SHARED singletons (bridges, Bridgehub, MessageRoot, …), `CTM` for the CTM-domain proxies, incl. the CTM itself. One instance per changed domain per upgrade; an inventory with no participating row is rejected. |
-| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                                     |
+| Contract                     | Holds                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`                 | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                                                                                                                                   |
+| `CTMTransition`              | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                                                                                                                               |
+| `ProxyUpgradeTransition`     | its `domain` and that domain's enum-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows: `Core` for the SHARED singletons (bridges, Bridgehub, MessageRoot, …), `CTM` for the CTM-domain proxies, incl. the CTM itself. One instance per changed domain per upgrade; an inventory with no participating row is rejected. Also pins its `upgradeEngine` ([below](#follow-up-calls-the-pinned-upgrade-engine)). |
+| `RegistryBootstrapMigration` | one edge from a pre-registry CTM into this model — see [Bootstrap](#bootstrap)                                                                                                                                                                                                                                                                                                                                          |
 
 ### Enum-indexed proxy inventories
 
@@ -223,6 +223,40 @@ lives in the new implementation's own audited code — constants, or immutables 
 by the deployment governance reviewed. A manifest cannot route the init call to an arbitrary function or
 smuggle arguments into it; a wrong reinitialization value is a missing line in an audited contract
 diff, never a wrong byte in offchain-authored data.
+
+### Follow-up calls: the pinned upgrade engine
+
+A reinitializer reaches only its own proxy. Work BETWEEN contracts after a swap — re-pointing the
+CTM at a new contract, wiring the ServerNotifier, anything `setAddresses`-shaped — used to be a
+declared governance call, which a reviewer of contracts never sees. Every
+`ProxyUpgradeTransition` therefore pins an `upgradeEngine`, and the domain's executor applies the
+transition by DELEGATECALLING exactly `IProxyUpgradeEngine.executeUpgrade(context, inventory)` on
+it (`ProxyUpgradeExecutorBase`):
+
+- `DefaultProxyUpgradeEngine` applies the rows (`ProxyUpgradeRowLib.applyRows`, unchanged) between
+  three no-op hooks: `_beforeSwaps`, `_afterSwaps`, `_checkPostconditions`. Its `executeUpgrade` is
+  not virtual, so the order is fixed.
+- A release with follow-up work subclasses it and writes the calls as typed Solidity in the hooks.
+  The engine is a member like any other: deployed by the prepare (`deployProxyUpgradeEngine()`),
+  pinned in the manifest, reviewed with the release.
+- The context is the executor's own, built from its immutables: the transition, the engine, the
+  domain, the executor's `ProxyAdmin` and (CTM domain) its CTM. So the hooks act with exactly the
+  executor's authority — the CTM, the CTM-domain `ProxyAdmin` and the ServerNotifier for a CTM
+  executor, the ecosystem `ProxyAdmin` for the core executor. Owner methods of governance-owned
+  ecosystem contracts (Bridgehub, AssetRouter) are not reachable and stay declared external
+  actions.
+- Running in the executor's storage, an engine must not read or write storage; a release engine
+  keeps its configuration in its own storage and reads it through an external call to
+  `context.upgradeEngine`. After the engine returns, the executor requires its `owner` and
+  `pendingOwner` unchanged (`UpgradeEngineChangedExecutorOwnership`) and every row at its `implNew`
+  again, so a hook that moves a proxy is caught. Called directly, an engine reverts
+  (`ProxyUpgradeEngineAuthorityMismatch`): the `ProxyAdmin` it was handed is not its own.
+- A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
+  is therefore source-checked like a row: skip what is at its target, act on the reviewed source
+  state, revert on anything else; `_checkPostconditions` reads the result back, so a forgotten or
+  wrong follow-up fails the leg. Any revert rolls back the whole leg, swaps included.
+
+`ProxyUpgradeEngine.t.sol` holds the shape on the real CTM fixture.
 
 ### Supporting libraries
 

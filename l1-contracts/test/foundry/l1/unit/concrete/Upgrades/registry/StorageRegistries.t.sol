@@ -861,7 +861,8 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_aCtmInventoryChangesNothing() public {
         ProxyUpgradeTransitionManifest memory manifest = ProxyUpgradeTransitionManifest({
             domain: ProxyUpgradeDomain.CTM,
-            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT), upgradeEngine: address(proxyUpgradeEngine)
+            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
+            upgradeEngine: address(proxyUpgradeEngine)
         });
         vm.expectRevert(RegistryUnknownKey.selector);
         new ProxyUpgradeTransition(manifest);
@@ -888,7 +889,11 @@ contract StorageRegistriesTest is Test {
         }
         vm.assume(participating != 0);
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeTransition(
-            ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: slots, upgradeEngine: address(proxyUpgradeEngine)})
+            ProxyUpgradeTransitionManifest({
+                domain: ProxyUpgradeDomain.Core,
+                proxyUpgrades: slots,
+                upgradeEngine: address(proxyUpgradeEngine)
+            })
         ).rows();
         assertEq(rows.length, participating, "one row per participating slot");
         uint256 next = 0;
