@@ -29,8 +29,9 @@ import { join, relative } from "path";
 //      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
 //   4. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
 //      `upgradeSourceStateVersion` the upgrade test starts from (frozen from `--previous-release-ref` when
-//      given), with the `genesis_root` its chains were created from as `upgradeSourceGenesisRoot`,
-//      `stateVersion` moves to the new release, and the previous source chain states are deleted.
+//      given), with the `genesis_root` its chains were created from as `upgradeSourceGenesisRoot`, and the
+//      release's `AllContractsHashes.json` frozen next to its states. `stateVersion` moves to the new release,
+//      and the previous source chain states are deleted.
 //   5. `l1-contracts/deploy-scripts/upgrade/v<minor>/`: the new release's `CoreUpgrade_v<minor>` and
 //      `CTMUpgrade_v<minor>`, generated as plain subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` for the
 //      release's own preparation to go into, unless the branch already carries them (a next edge prepared and
@@ -48,6 +49,7 @@ const UPGRADE_ENVS_DIR = join(ROOT, "l1-contracts/upgrade-envs");
 const PROTOCOL_OPS_SCRIPTS_PATH = join(ROOT, "protocol-ops/src/common/forge/scripts/mod.rs");
 const ANVIL_CONFIG_PATH = join(ROOT, "l1-contracts/test/anvil-interop/config/anvil-config.json");
 const CHAIN_STATES_DIR = join(ROOT, "l1-contracts/test/anvil-interop/chain-states");
+const HASHES_PATH = join(ROOT, "AllContractsHashes.json");
 const UPGRADE_SCRIPTS_DIR = join(ROOT, "l1-contracts/deploy-scripts/upgrade");
 const FULL_FLOW_TEST_PATH = join(ROOT, "l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
 
@@ -246,6 +248,13 @@ function main(): void {
   } else if (!fs.existsSync(frozenSourceDir)) {
     throw new Error(`chain-states/${anvilConfig.stateVersion} is missing: it becomes the upgrade source`);
   }
+  // Built with metadata, like production: `ReleaseDeclaredChangesTest` compares the next release's hashes with it.
+  write(
+    join(frozenSourceDir, "AllContractsHashes.json"),
+    previousReleaseRef
+      ? git(["show", `${previousReleaseRef}:${repoPath(HASHES_PATH)}`]).toString()
+      : fs.readFileSync(HASHES_PATH, "utf-8")
+  );
   const rotated = {
     ...anvilConfig,
     stateVersion: nextStateVersion,
