@@ -145,8 +145,12 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             // Plain CREATE, never broadcast: it lives only inside this run's simulation.
             implementationProbe = new ReleaseMemberProbe();
         }
-        bytes memory constructorArgs = abi.encode(live.owner(), live.PROXY_ADMIN());
-        return address(live).codehash == implementationProbe.codehashOf("CoreUpgradeExecutor", constructorArgs);
+        // From the script's own creation code, as both the deployment and the successor below are.
+        bytes memory initCode = abi.encodePacked(
+            type(CoreUpgradeExecutor).creationCode,
+            abi.encode(live.owner(), live.PROXY_ADMIN())
+        );
+        return address(live).codehash == implementationProbe.codehashOfInitCode(initCode);
     }
 
     /// @notice Deploys the successor `CoreUpgradeExecutor`, bound to the same ecosystem

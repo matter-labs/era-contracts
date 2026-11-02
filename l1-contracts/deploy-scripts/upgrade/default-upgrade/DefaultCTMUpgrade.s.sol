@@ -654,8 +654,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             // Plain CREATE, never broadcast: it lives only inside this run's simulation.
             releaseMemberProbe = new ReleaseMemberProbe();
         }
-        bytes memory constructorArgs = abi.encode(live.owner(), live.CHAIN_TYPE_MANAGER(), live.CTM_PROXY_ADMIN());
-        return address(live).codehash == releaseMemberProbe.codehashOf("CTMUpgradeExecutor", constructorArgs);
+        // From the script's own creation code, as both the deployment and the successor below are.
+        bytes memory initCode = abi.encodePacked(
+            type(CTMUpgradeExecutor).creationCode,
+            abi.encode(live.owner(), live.CHAIN_TYPE_MANAGER(), live.CTM_PROXY_ADMIN())
+        );
+        return address(live).codehash == releaseMemberProbe.codehashOfInitCode(initCode);
     }
 
     /// @notice Deploys the successor `CTMUpgradeExecutor`, bound to the same CTM and CTM-domain
