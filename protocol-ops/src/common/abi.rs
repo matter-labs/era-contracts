@@ -326,6 +326,16 @@ pub mod ctm_ext {
 }
 pub use ctm_ext::IChainTypeManagerExt;
 
+pub mod bytecodes_supplier_publish {
+    alloy::sol!(
+        interface IBytecodesSupplierPublish {
+            function publishEraBytecode(bytes _bytecode);
+            function publishEraBytecodes(bytes[] _bytecodes);
+        }
+    );
+}
+pub use bytecodes_supplier_publish::IBytecodesSupplierPublish;
+
 pub mod testnet_verifier {
     alloy::sol!(
         #[sol(rpc)]

@@ -200,7 +200,7 @@ impl BytecodeVerifier {
         Self::from_contract_hashes(contract_hashes)
     }
 
-    pub(super) fn from_contract_hashes(contract_hashes: ContractHashes) -> Self {
+    pub(crate) fn from_contract_hashes(contract_hashes: ContractHashes) -> Self {
         let mut verifier = Self {
             init_bytecode_file_by_hash: HashMap::new(),
             deployed_bytecode_file_by_hash: HashMap::new(),

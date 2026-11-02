@@ -24,6 +24,7 @@ use crate::{
 
 pub mod broadcast;
 pub mod bundle;
+pub mod forge_checks;
 pub mod init;
 pub mod new_gateway_prepare;
 pub mod simulator;

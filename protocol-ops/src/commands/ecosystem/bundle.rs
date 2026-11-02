@@ -33,6 +33,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
+use crate::commands::ecosystem::forge_checks;
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_upgrade::{self, VerifyUpgradeArgs};
 use crate::common::anvil::{send_impersonated_tx, set_balance};
@@ -42,7 +43,7 @@ use crate::common::env_config::{
 use crate::common::ethereum::get_provider;
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
-use crate::common::upgrade_descriptor::{ExecutionScript, UpgradeDescriptor};
+use crate::common::upgrade_descriptor::{ExecutionScript, ForgeScriptUpgrade, UpgradeDescriptor};
 use crate::common::{logger, paths};
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
@@ -214,6 +215,23 @@ fn read_manifest(path: &Path) -> anyhow::Result<BundleManifest> {
         );
     }
     Ok(manifest)
+}
+
+/// The deployer transactions of every bundle the manifest names.
+fn deployer_transactions(manifest_path: &Path) -> anyhow::Result<Vec<forge_checks::DeployerTx>> {
+    #[derive(Deserialize)]
+    struct SafeFile {
+        transactions: Vec<forge_checks::DeployerTx>,
+    }
+    let dir = manifest_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("{} has no parent", manifest_path.display()))?;
+    let mut txs = Vec::new();
+    for bundle in read_manifest(manifest_path)?.bundles {
+        let file: SafeFile = crate::common::files::read_json_file(dir.join(&bundle.file))?;
+        txs.extend(file.transactions);
+    }
+    Ok(txs)
 }
 
 fn stays_inside_bundle(relative: &str) -> bool {
@@ -768,7 +786,10 @@ enum CheckTarget {
     Chain,
 }
 
-/// Check the upgrade's effects: PUVT for v31, the upgrade's declared command otherwise.
+/// Check the upgrade's effects: PUVT for v31; for a `forge-script` upgrade, its declared
+/// command and, with `builtin_checks`, the built-ins.
+///
+/// `fork_block`: the block the fork was taken at (fork target only).
 #[allow(clippy::too_many_arguments)]
 async fn check_upgrade(
     descriptor: &UpgradeDescriptor,
@@ -779,6 +800,7 @@ async fn check_upgrade(
     zk_governance_commit: &str,
     paths: &BundlePaths,
     transactions_log_override: Option<&Path>,
+    fork_block: Option<u64>,
 ) -> anyhow::Result<()> {
     match descriptor {
         UpgradeDescriptor::PrepareAll {} => {
@@ -793,13 +815,92 @@ async fn check_upgrade(
             .await
         }
         UpgradeDescriptor::ForgeScript(upgrade) => {
-            let command = match target {
-                CheckTarget::Fork => &upgrade.verify_fork,
-                CheckTarget::Chain => &upgrade.verify_chain,
-            };
-            run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml)
+            check_forge_script_upgrade(upgrade, target, env_cfg, rpc_url, paths, fork_block).await
         }
     }
+}
+
+/// Failures of a run's checkers. Every checker runs; the run then fails listing each failure.
+#[derive(Default)]
+struct CheckFailures(Vec<String>);
+
+impl CheckFailures {
+    fn record(&mut self, checker: &str, result: anyhow::Result<()>) {
+        if let Err(error) = result {
+            logger::error(format!("{checker} failed: {error:#}"));
+            self.0.push(format!("{checker}: {error:#}"));
+        }
+    }
+
+    fn finish(self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.0.is_empty(),
+            "{} check(s) failed:\n  - {}",
+            self.0.len(),
+            self.0.join("\n  - ")
+        );
+        Ok(())
+    }
+}
+
+/// On a real chain: the built-in publication check, then `verify_chain`. On a fork:
+/// `verify_fork`, then the built-in publication and provenance checks.
+async fn check_forge_script_upgrade(
+    upgrade: &ForgeScriptUpgrade,
+    target: CheckTarget,
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
+    paths: &BundlePaths,
+    fork_block: Option<u64>,
+) -> anyhow::Result<()> {
+    let mut failures = CheckFailures::default();
+    let run_command = |failures: &mut CheckFailures| {
+        let (name, command) = match target {
+            CheckTarget::Fork => ("verify_fork", &upgrade.verify_fork),
+            CheckTarget::Chain => ("verify_chain", &upgrade.verify_chain),
+        };
+        if let Some(command) = command {
+            let result = run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml);
+            failures.record(name, result);
+        }
+    };
+    if target == CheckTarget::Fork {
+        run_command(&mut failures);
+    }
+    if upgrade.builtin_checks {
+        logger::step("built-in checks");
+        match forge_checks::UpgradeOutput::read(&paths.ecosystem_toml) {
+            Ok(output) => {
+                let publication = forge_checks::check_publication(rpc_url, &output).await;
+                failures.record("publication", publication);
+                if target == CheckTarget::Fork {
+                    let provenance = async {
+                        let factory = env_cfg.create2_factory().ok_or_else(|| {
+                            anyhow::anyhow!("permanent values have no create2_factory_addr")
+                        })?;
+                        let fork_block = fork_block
+                            .ok_or_else(|| anyhow::anyhow!("no fork block for provenance"))?;
+                        let txs = deployer_transactions(&paths.manifest)?;
+                        forge_checks::check_provenance(
+                            rpc_url,
+                            &output,
+                            factory,
+                            &txs,
+                            fork_block,
+                            &paths.work_dir,
+                        )
+                        .await
+                    };
+                    failures.record("provenance", provenance.await);
+                }
+            }
+            Err(error) => failures.record("built-in checks", Err(error)),
+        }
+    }
+    if target == CheckTarget::Chain {
+        run_command(&mut failures);
+    }
+    failures.finish()
 }
 
 /// Run a `forge-script` upgrade's check command from `l1-contracts/`.
@@ -1004,6 +1105,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &args.zk_governance_commit,
         &paths,
         None,
+        Some(forked_at_block),
     )
     .await?;
     drop(anvil);
@@ -1192,6 +1294,11 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 metadata.l1.forked_at_block,
             )?;
             let rpc_url = anvil.endpoint();
+            // The bundle's `forked_at_block` may be absent; the fork's own height is certain.
+            let fork_block = get_provider(&rpc_url)?
+                .get_block_number()
+                .await
+                .context("eth_blockNumber")?;
             fund_signers(&descriptor, &rpc_url, &env_cfg, deployer, &paths).await?;
             broadcast_impersonated(&rpc_url, &paths).await?;
             check_upgrade(
@@ -1203,6 +1310,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 &zk_governance_commit,
                 &paths,
                 args.transactions_log.as_deref(),
+                Some(fork_block),
             )
             .await?;
             drop(anvil);
@@ -1232,6 +1340,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 &zk_governance_commit,
                 &paths,
                 args.transactions_log.as_deref(),
+                None,
             )
             .await?;
         }
@@ -1245,6 +1354,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 &zk_governance_commit,
                 &paths,
                 args.transactions_log.as_deref(),
+                None,
             )
             .await?;
         }
@@ -1530,6 +1640,23 @@ mod tests {
             ..base.clone()
         })
         .is_ok());
+    }
+
+    #[test]
+    fn every_failing_checker_is_reported() {
+        let mut failures = CheckFailures::default();
+        failures.record("verify_fork", Err(anyhow::anyhow!("exit status 1")));
+        failures.record("publication", Ok(()));
+        failures.record("provenance", Err(anyhow::anyhow!("unidentified init code")));
+        let message = failures.finish().unwrap_err().to_string();
+        assert!(message.starts_with("2 check(s) failed"), "{message}");
+        assert!(message.contains("verify_fork: exit status 1"), "{message}");
+        assert!(
+            message.contains("provenance: unidentified init code"),
+            "{message}"
+        );
+        assert!(!message.contains("publication"), "{message}");
+        assert!(CheckFailures::default().finish().is_ok());
     }
 
     // ─── chain-id preflight (P1) ────────────────────────────────────────────
