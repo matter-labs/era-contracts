@@ -59,6 +59,8 @@ const PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR: [u8; 4] = [0x96, 0x23, 0x60, 0x9d];
 const PUH_INITIALIZE_SELECTOR: [u8; 4] = [0xc0, 0xc5, 0x3b, 0x8b];
 /// `bridgehub.chainAssetHandler()` selector.
 const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87];
+/// `ProtocolUpgradeHandler.ERA_CHAIN_ID()` selector.
+const PUH_ERA_CHAIN_ID_SELECTOR: [u8; 4] = [0xef, 0x01, 0x1d, 0xff];
 
 /// Default well-known CREATE2 deployer (Arachnid). Deployed on Sepolia + mainnet.
 const DEFAULT_CREATE2_FACTORY: &str = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
@@ -138,16 +140,6 @@ pub async fn deploy_puh_guardians(
     deployer: &Wallet,
     inputs: &ZkGovernanceInputs<'_>,
 ) -> anyhow::Result<ZkGovernanceOutcome> {
-    // The current ProtocolUpgradeHandler proves messages from the Era chain, and Guardians
-    // sends L1-to-L2 requests to it, so their redeployment must preserve `ERA_CHAIN_ID`.
-    let era_chain_id = inputs
-        .env
-        .and_then(|cfg| cfg.era_chain_id())
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "--env's permanent values must supply era_chain_id for PUH/Guardians redeploy"
-            )
-        })?;
     let create2_factory = inputs
         .create2_factory_override
         .or_else(|| inputs.env.and_then(|c| c.create2_factory()))
@@ -201,6 +193,11 @@ pub async fn deploy_puh_guardians(
     // ── on-chain reads on the fork ───────────────────────────────────
     let puh_proxy = resolve_governance(&runner.rpc_url, inputs.bridgehub).await?;
     logger::info(format!("ProtocolUpgradeHandler proxy: {puh_proxy:#x}"));
+
+    // The current ProtocolUpgradeHandler proves messages from the Era chain, and Guardians
+    // sends L1-to-L2 requests to it, so their redeployment must preserve `ERA_CHAIN_ID`.
+    let era_chain_id = read_puh_era_chain_id(&runner.rpc_url, puh_proxy).await?;
+    logger::info(format!("PUH ERA_CHAIN_ID: {era_chain_id}"));
 
     let chain_asset_handler = match inputs.chain_asset_handler_override {
         Some(addr) => addr,
@@ -345,6 +342,26 @@ async fn resolve_chain_asset_handler(rpc: &str, bridgehub: Address) -> anyhow::R
         anyhow::bail!("bridgehub.chainAssetHandler() returned 0x0 — v31 prepare hasn't run yet");
     }
     Ok(addr)
+}
+
+async fn read_puh_era_chain_id(rpc: &str, puh_proxy: Address) -> anyhow::Result<u64> {
+    let provider = get_provider(rpc)?;
+    let result = provider
+        .call(
+            TransactionRequest::default()
+                .with_to(puh_proxy)
+                .with_input(PUH_ERA_CHAIN_ID_SELECTOR.to_vec()),
+        )
+        .await
+        .context("ProtocolUpgradeHandler.ERA_CHAIN_ID() call failed")?;
+    let era_chain_id = U256::abi_decode(&result)
+        .context("ProtocolUpgradeHandler.ERA_CHAIN_ID() returned malformed data")?;
+    let era_chain_id = u64::try_from(era_chain_id)
+        .context("ProtocolUpgradeHandler.ERA_CHAIN_ID() does not fit in u64")?;
+    if era_chain_id == 0 {
+        anyhow::bail!("ProtocolUpgradeHandler.ERA_CHAIN_ID() of {puh_proxy:#x} returned 0");
+    }
+    Ok(era_chain_id)
 }
 
 async fn read_eip1967_admin(rpc: &str, proxy: Address) -> anyhow::Result<Address> {

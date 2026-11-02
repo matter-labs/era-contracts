@@ -52,7 +52,7 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
 `ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v<minor>` and
 `CTMUpgrade_v<minor>` under `l1-contracts/deploy-scripts/upgrade/v<minor>/`, and to the release's `local.toml` for a
-local upgrade. The current release is the one `upgrade-envs/v<major>.<minor>.0-<name>/` of the version in
+local upgrade. The current release is the one `upgrade-envs/v<major>.<minor>.<patch>-<name>/` of the version in
 `configs/genesis/zksync-os/latest.json` (`current_release` in `src/common/forge/scripts/mod.rs`). Other scripts are
 selected with `--core-script-path` / `--ctm-script-path`.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
@@ -125,8 +125,7 @@ replays it like any other. Verify it with `verify-package` before it is signed (
 ## Environment inputs
 
 `--env <name>` reads `upgrade-envs/permanent-values/<name>.toml` and the release input
-`<release dir>/<name>.toml`. The permanent values identify the environment; among them is `era_chain_id`, the Era
-chain's id, which the PUH/Guardians redeploy keeps. A release input holds only what is read from it: `owner_address`
+`<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`
 and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
 `[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
 reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set). The old
