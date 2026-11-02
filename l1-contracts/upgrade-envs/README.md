@@ -17,15 +17,14 @@ upgrade-envs/
 `<release>` is the full release name (`v0.34.0-chain-config`); `<env>` is `stage`, `testnet`,
 `mainnet`, `local`, `foundry-upgrade` or `zksync-os-integration-test`. `protocol_ops --env <env>` reads
 `permanent-values/<env>.toml` together with `<release>/<env>.toml` of the current release, the one
-`v<major>.<minor>.0-<name>` of the version in `configs/genesis/zksync-os/latest.json` (`yarn new-release`
+`v<major>.<minor>.<patch>-<name>` of the version in `configs/genesis/zksync-os/latest.json` (`yarn new-release`
 bumps it and creates the next release's directory), and writes to
 `<release>/output/<env>/`. Both files must exist for an environment: the tooling refuses to fall
 back to `local` values.
 
 ### `permanent-values/<env>.toml`
 
-What identifies the environment: L1 chain id, the Era chain id (`era_chain_id`, which the
-PUH/Guardians redeploy keeps), Bridgehub, the registered CTMs with their VM type,
+What identifies the environment: L1 chain id, Bridgehub, the registered CTMs with their VM type,
 the governance kind (`puh` for a `ProtocolUpgradeHandler`, otherwise the legacy `Governance`),
 the testnet-verifier flag (`testnet_verifier`, true everywhere except mainnet; the prepare refuses
 to run without it), the ZK token asset id and owners that must be wrapped rather than

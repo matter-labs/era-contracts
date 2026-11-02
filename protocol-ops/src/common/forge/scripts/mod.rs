@@ -23,12 +23,12 @@ pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.s
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 
 /// The release `configs/genesis/zksync-os/latest.json` is at: its upgrade-env directory, the one
-/// `upgrade-envs/v<major>.<minor>.0-<name>/`, and its core and CTM upgrade scripts under
+/// `upgrade-envs/v<major>.<minor>.<patch>-<name>/`, and its core and CTM upgrade scripts under
 /// `deploy-scripts/upgrade/v<minor>/`. The prepare defaults and `--env` resolution (`EnvConfig`) follow it;
 /// another edge's scripts are selected with `--core-script-path` / `--ctm-script-path`.
 #[derive(Debug)]
 pub struct CurrentRelease {
-    /// The upgrade-env directory's name under `upgrade-envs/`, `v<major>.<minor>.0-<name>`.
+    /// The upgrade-env directory's name under `upgrade-envs/`, `v<major>.<minor>.<patch>-<name>`.
     pub upgrade: String,
     pub core_script_path: String,
     pub ctm_script_path: String,
@@ -76,8 +76,8 @@ fn read_current_release() -> anyhow::Result<CurrentRelease> {
                 )
             })
     };
-    let (major, minor) = (version("major")?, version("minor")?);
-    let prefix = format!("v{major}.{minor}.0-");
+    let (major, minor, patch) = (version("major")?, version("minor")?, version("patch")?);
+    let prefix = format!("v{major}.{minor}.{patch}-");
     let envs_dir = l1_contracts.join("upgrade-envs");
     let mut dirs = Vec::new();
     for entry in fs::read_dir(&envs_dir).with_context(|| format!("read {}", envs_dir.display()))? {
@@ -89,7 +89,7 @@ fn read_current_release() -> anyhow::Result<CurrentRelease> {
     }
     let [upgrade] = <[String; 1]>::try_from(dirs).map_err(|dirs| {
         anyhow::anyhow!(
-            "{} is at v{major}.{minor}, so {} must hold exactly one {prefix}<name> directory; found {dirs:?}",
+            "{} is at v{major}.{minor}.{patch}, so {} must hold exactly one {prefix}<name> directory; found {dirs:?}",
             genesis_path.display(),
             envs_dir.display()
         )
