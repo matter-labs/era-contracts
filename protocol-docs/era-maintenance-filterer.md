@@ -1,0 +1,101 @@
+# Era maintenance-mode transaction filterer
+
+`EraMaintenanceTransactionFilterer` implements the L1 side of the maintenance-mode limits for EraVM
+chains: deposits are limited to whitelisted tokens and capped amounts, and other L1→L2 transactions
+(priority operations) can be restricted to withdrawals. It plugs into the existing
+`ITransactionFilterer` hook of the Mailbox, so it needs no protocol upgrade, and the chain admin can
+reconfigure, replace or unset it with one transaction.
+
+Transactions sent directly on L2 never reach the L1 filterer. Restrictions on them, including the
+ban on new contract deployments, are applied by the sequencer and are out of scope here.
+
+## Deployment and ownership
+
+Each EraVM chain gets its own proxy, owned by its chain admin, whose `initialize(owner, chainId)`
+leaves it in the permissive configuration:
+
+- `callMode = ALLOW_ALL`;
+- the chain's base token uncapped (`depositCap = type(uint256).max`), so no transaction is blocked
+  on `mintValue`;
+- no other token accepted;
+- the withdrawal functions of the L2 base token (`withdraw`, `withdrawWithMessage`) and of the L2
+  asset router (`withdraw(bytes32,bytes)` and the legacy `withdraw(address,address,uint256)`)
+  registered for `WITHDRAWALS_ONLY` mode.
+
+Before setting the filterer on the chain, the admin whitelists the tokens that are already bridged
+(`setDepositCaps` with `type(uint256).max`), and adds the exemptions, legacy bridges and withdrawal
+functions the chain needs (see [Configuration checklist](#configuration-checklist)). Every later
+change is a single owner call that emits an event.
+
+## Rules
+
+`isTransactionAllowed` evaluates, in order:
+
+1. **Pointed whitelisted hash.** If `allowedTxHashes[getTxHash(sender, contractL2, l2Value, l2Calldata, refundRecipient)]`
+   is set, the transaction passes. `mintValue` is not hashed, because it includes the L1 base cost,
+   which depends on the gas price at submission. The filter is a `view` function, so an entry is not
+   consumed: the same transaction can be replayed until the admin removes it.
+2. **Exempt sender.** If `exempt[sender]`, the transaction passes.
+3. **Deposits through the Bridgehub.** If `sender` is the L1 asset router, the transaction is a
+   token deposit (see [Deposit decoding](#deposit-decoding)). It must target the L2 asset router
+   with `l2Value == 0`; any other message of the router (for example registering a custom asset
+   handler) is rejected. The depositor is decoded from the calldata, and:
+   - an exempt depositor passes;
+   - in `WITHDRAWALS_ONLY` mode the deposit is rejected;
+   - otherwise both the token amount and `mintValue` must be within their caps.
+4. **Deposits through a legacy bridge.** If `sender` is registered in `legacyBridges` and the
+   calldata calls the legacy `finalizeDeposit`, the transaction is checked like (3). Other calls of
+   the bridge are generic calls.
+5. **Generic calls.** `mintValue` must be within the base token cap. In `ALLOW_ALL` mode the call
+   then passes; in `WITHDRAWALS_ONLY` mode only calls to a `(contractL2, selector)` pair registered
+   in `withdrawalFunctions` pass, so users can still force a withdrawal from L1.
+
+A cap applies to a single deposit, and a cap of zero means the asset is not accepted. The cap of the
+base token bounds `mintValue`, i.e. all base token entering the chain through a non-exempt priority
+operation, fees included. Setting it to zero blocks every non-exempt, non-whitelisted transaction,
+including forced withdrawals, so in `WITHDRAWALS_ONLY` mode it must stay high enough to cover the
+fees of a withdrawal.
+
+## Deposit decoding
+
+Era's priority operations carry two `finalizeDeposit` encodings, and both are decoded:
+
+| Encoding                                                                                             | Selector     | Asset id                                                | Depositor                                                             |
+| ---------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- | --------------------------------------------------------------------- |
+| `finalizeDeposit(uint256 chainId, bytes32 assetId, bytes transferData)`                              | `0x9c884fd1` | from the calldata                                       | `originalCaller` of `DataEncoding.decodeBridgeMintData(transferData)` |
+| `finalizeDeposit(address l1Sender, address l2Receiver, address l1Token, uint256 amount, bytes data)` | `0xcfe7af7c` | `DataEncoding.encodeNTVAssetId(block.chainid, l1Token)` | `l1Sender`                                                            |
+
+The L1 asset router deployed for Era (v31) builds the legacy encoding for every L1-native token and
+the new one for the rest; later routers only build the new one. In the legacy encoding the trailing
+`data` holds token metadata, not transfer data, and the asset id is derived as the one of an
+L1-native NTV token.
+
+Custom bridges that call their L2 counterpart through the Mailbox with the same legacy ABI, such as
+the Lido bridge, are registered with `setLegacyBridge`. Their deposits are then capped by the
+derived asset id of the L1 token; leaving that cap at zero blocks their deposits while their
+withdrawals stay reachable through `withdrawalFunctions`.
+
+## Configuration checklist
+
+- **Tokens.** Every token to keep accepting, with its cap.
+- **Legacy shared bridge.** The legacy L2 shared bridge of the chain is not a built-in address, so
+  its `withdraw(address,address,uint256)` is registered with `setWithdrawalFunction`.
+- **Custom bridges.** Each custom bridge is registered with `setLegacyBridge`, and its L2
+  `withdraw` with `setWithdrawalFunction`.
+- **Third-party bridges and protocols.** Senders whose L1→L2 messages must keep working, such as
+  Across's HubPool (which settles relayer refunds through priority operations), are either
+  exempted or the restrictions that would affect them are enabled only after they close their
+  routes.
+
+## Design decisions
+
+- **Cap per deposit.** Per-account and per-time-window caps need extra state and accounting on
+  every deposit, while the goal is only to make funding the chain unattractive. A cap per deposit
+  can be bypassed by splitting a deposit into many small ones.
+- **Standalone filterer.** Hardcoding the restrictions in the Mailbox would make every change a
+  protocol upgrade and prevent reuse across EraVM chains.
+- **Factory dependencies.** The filterer does not see `factoryDeps`, so it cannot block priority
+  operations that publish bytecode. Blocking them would need a Mailbox change.
+- **Failure mode.** The filterer sits on every priority operation, so a bug could block deposits
+  and forced withdrawals. The logic is kept small, malformed deposit calldata reverts instead of
+  passing, and the admin can unset the filterer with one transaction.
