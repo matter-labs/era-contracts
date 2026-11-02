@@ -26,8 +26,9 @@ import {ProxyUpgradeEngineAuthorityMismatch} from "../../../common/L1ContractErr
 ///      {IProxyUpgradeEngine} for how a subclass keeps configuration).
 contract DefaultProxyUpgradeEngine is IProxyUpgradeEngine {
     /// @inheritdoc IProxyUpgradeEngine
-    /// @dev Runs only under the authority that owns `_context.proxyAdmin`, i.e. delegatecalled by
-    ///      its executor; a direct call has no authority to lend and reverts here.
+    /// @dev Refuses a caller that does not own `_context.proxyAdmin`, so a direct call naming a real
+    ///      `ProxyAdmin` fails early. It is not what makes a direct call harmless (a fake `ProxyAdmin`
+    ///      passes it): the engine holds no authority and no storage of its own to lend.
     function executeUpgrade(ProxyUpgradeContext calldata _context, ProxyUpgradeRow[] calldata _inventory) external {
         ProxyAdmin proxyAdmin = ProxyAdmin(_context.proxyAdmin);
         address proxyAdminOwner = proxyAdmin.owner();

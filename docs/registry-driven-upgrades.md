@@ -240,9 +240,12 @@ it (`ProxyUpgradeExecutorBase`):
 - Running in the executor's storage, an engine must not read or write storage; a release engine
   keeps its configuration in its own storage and reads it through an external call to
   `context.upgradeEngine`. After the engine returns, the executor requires its `owner` and
-  `pendingOwner` unchanged (`UpgradeEngineChangedExecutorOwnership`) and every row at its `implNew`
-  again, so a hook that moves a proxy is caught. Called directly, an engine reverts
-  (`ProxyUpgradeEngineAuthorityMismatch`): the `ProxyAdmin` it was handed is not its own.
+  `pendingOwner` unchanged (`UpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin`
+  and, for a CTM executor, the owner and pending owner of the CTM and its ServerNotifier unchanged
+  (`UpgradeEngineMovedDomainAuthority`: a hook cannot hand the domain away; a succession is a
+  `forward`), and every row at its `implNew` again, so a hook that moves a proxy is caught. Called
+  directly with a real `ProxyAdmin`, an engine reverts (`ProxyUpgradeEngineAuthorityMismatch`); a
+  direct call lends nothing anyway, as the engine holds no authority or storage of its own.
 - A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
   is therefore source-checked like a row: skip what is at its target, act on the reviewed source
   state, revert on anything else; `_checkPostconditions` reads the result back, so a forgotten or

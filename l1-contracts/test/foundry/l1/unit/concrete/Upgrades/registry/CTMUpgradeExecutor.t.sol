@@ -102,6 +102,10 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         ctmExecutor = new CTMUpgradeExecutor(governor, IChainTypeManager(address(chainContractAddress)), ctmProxyAdmin);
         ctmProxyAdmin.transferOwnership(address(ctmExecutor));
 
+        // The CTM domain holds a real ServerNotifier too.
+        _handARealServerNotifierTo(chainContractAddress, ctmExecutor, address(ctmProxyAdmin));
+        _assertNotifierHeldBy(IChainTypeManager(address(chainContractAddress)), address(ctmExecutor));
+
         // Handover through the fixed entrypoint — no escape hatch involved.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));

@@ -125,7 +125,7 @@ merger's extras.
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x... \
   --env <env> \
-  --executor-record <the ecosystem/ctm init outputs, or the v35 bootstrap package, that deployed the executors> \
+  --executor-record <the ecosystem/ctm init outputs, or the earlier package, that deployed the executors> \
   [--create2-salt <a salt the package does not record>]
 ```
 
@@ -137,7 +137,8 @@ decides from the package itself which kind it is: an upgrade driven through the 
 legs, or the replacement of a committed transition (prepared by `DefaultTransitionReplacement`). It
 checks every object's construction (the write-once objects from their manifests — under the salts each prepare leg records in its output
 (`create2_factory_salt`) — and the executors from the `[upgrade_executors]` record of the run that
-deployed them, without which an executor is unverified), that every object and every member it
+deployed them, without which an executor is unverified; a package that hands a domain to a successor
+carries the successor's record and sets aside a passed record of the predecessor), that every object and every member it
 names runs the reviewed build's code for its role, that every member the package newly installs
 re-derives from its `[member_deployments]` record with each constructor argument equal to the live or
 env value the prepare took it from (without a record it is unverified), that `ZiskVerifier`'s Plonk

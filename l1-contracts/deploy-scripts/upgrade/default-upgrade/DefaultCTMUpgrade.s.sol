@@ -1102,10 +1102,11 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             "ctm_predecessor_executor_addr",
             address(successorCTMUpgradeExecutor) == address(0) ? address(0) : predecessorCTMUpgradeExecutor()
         );
-        // The bound executor is named whenever this run deployed an object for it to apply. The
-        // merge derives this CTM's executor calls on it.
+        // The bound executor is named whenever this run deployed an object for it to apply or a
+        // successor for the domain to be handed to. The merge derives this CTM's executor calls on it.
         bool executorKnown = upgradeAddresses.ctmTransition != address(0) ||
-            upgradeAddresses.ctmInfrastructureTransition != address(0);
+            upgradeAddresses.ctmInfrastructureTransition != address(0) ||
+            address(successorCTMUpgradeExecutor) != address(0);
         string memory registry = vm.serializeAddress(
             "registry",
             "ctm_upgrade_executor_addr",

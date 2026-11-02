@@ -22,7 +22,7 @@
 One verifier, `ecosystem verify-bootstrap` (alias `verify-package`,
 `upgrade_verification/registry/`; the name predates the removal of the one-time bootstrap edge in
 v36, and its bootstrap path went with it). It decides from the package itself which kind it
-drives — an UPGRADE (one to three executor legs) or the REPLACEMENT of a committed transition (one `CTMUpgradeExecutor.forward([replaceUpgradeTransition(...)])`,
+drives — an UPGRADE (one to three executor legs, preceded by the executor succession calls when it replaces an executor) or the REPLACEMENT of a committed transition (one `CTMUpgradeExecutor.forward([replaceUpgradeTransition(...)])`,
 see "Replacing a committed transition" in `protocol-docs/ecosystem-upgrade-coordination.md`) — and
 refuses a package that is neither or mixes them rather than verifying it as the nearest
 match. It needs only the merged prepare TOML and an L1 RPC: the registry model moved the reviewable content off the
@@ -55,7 +55,9 @@ from calldata:
   deployed it (`ecosystem init`, `ctm init`, or the v35 bootstrap prepares on an ecosystem that
   crossed that retired edge) and read from the package or
   `--executor-record` — so one whose owner moved since still verifies. The record is mandatory: an
-  executor without one is unverified, which is an error.
+  executor without one is unverified, which is an error. A package that hands a domain to a
+  successor carries the successor's record, and a passed record of the predecessor is set aside
+  (`records::set_aside_predecessors`): the succession checks hold the predecessor to the live chain.
 - **Code identity** (`provenance.rs`) — the live code at an address against the reviewed build's
   deployed bytecode of each contract its role admits, byte for byte outside the artifact's
   immutable slots (`immutableReferences`), with the build's bytes held against the committed
@@ -141,9 +143,10 @@ from calldata:
 
 **Does the signed transaction invoke the reviewed upgrade, at the reviewed addresses, in the
 reviewed order?** For an upgrade that is the whole of it (`verify_upgrade_calls`): each leg is
-re-encoded here from the reviewed executor and object, and the run — core, then CTM
-infrastructure, then CTM transition, each only when present — must appear exactly once,
-contiguous and in that order. With no coordinator on chain, the order the bundle states is the
+re-encoded here from the reviewed executor and object, and the run — the executor succession
+calls when the upgrade replaces an executor (re-derived by `succession.rs` and held byte for byte),
+then core, then CTM infrastructure, then CTM transition, each only when present — must appear
+exactly once, contiguous and in that order. With no coordinator on chain, the order the bundle states is the
 order the domains apply in; the one governance execution keeps them atomic. Every other call must
 be a declared governance external action, matched one for one and in declared order, and none may
 reach the upgrade's authorities (the executors, the objects, the CTM, either ProxyAdmin) whether
@@ -164,7 +167,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --l1-rpc-url $L1_RPC \
   --expected-governance-owner 0x... \
   --env <env> \
-  --executor-record <the package or init output that deployed the executors> \
+  --executor-record <the ecosystem/ctm init outputs, or the earlier package, that deployed the executors> \
   --create2-salt 0x...
 ```
 
@@ -292,4 +295,4 @@ When reviewing a protocol-ops PR:
 4. **Does the new flow produce one Safe bundle per signer per phase?** If a single phase emits multiple bundles for the same signer, that's a sign the orchestration logic should be on one shared `ForgeRunner`.
 5. **Does the prepare phase rely on data only present in-memory across forge invocations?** If yes, either pass it via TOML written by the previous forge call or use CREATE2 determinism — don't fold separate phases back into one forge process to dodge the question.
 6. **Are addresses in the orchestration code resolved via `l1_contracts.rs` or via `script_params` consts?** Hardcoded addresses anywhere in protocol-ops are almost always wrong.
-7. **Does the new code reintroduce a monolithic prepare, or author governance calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v35/`, `v36/`) via `upgrade-prepare-all`; the merger copies bundles and authors nothing — the only calldata it produces is the executor legs, each a pure function of an (executor, object) pair the prepares report — and anything that is not an executor leg must be a declared external action.
+7. **Does the new code reintroduce a monolithic prepare, or author governance calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v35/`, `v36/`) via `upgrade-prepare-all`; the merger copies bundles and authors nothing — the only calldata it produces is the executor legs, each a pure function of an (executor, object) pair the prepares report, and the executor succession calls, a pure function of the (predecessor, successor) pairs — and anything else must be a declared external action.

@@ -9,6 +9,7 @@ import {
 } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Call} from "contracts/governance/Common.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {CTMUpgradeExecutorFixture} from "./CTMUpgradeExecutor.t.sol";
 import {ExecutionImplNew, ExecutionImplOld, ExecutionImplOther} from "./UpgradeBundleExecution.t.sol";
 import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
@@ -22,6 +23,7 @@ import {
     ProxyUpgradeRowMismatch,
     RegistryTargetHasNoCode,
     UpgradeEngineChangedExecutorOwnership,
+    UpgradeEngineMovedDomainAuthority,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {
@@ -142,6 +144,37 @@ contract ProxyMovingEngine is DefaultProxyUpgradeEngine {
             ProxyUpgradeRowLib.inventoryLength(_context.domain)
         );
         ProxyAdmin(_context.proxyAdmin).upgrade(ITransparentUpgradeableProxy(rows[0].proxy), OTHER_IMPL);
+    }
+}
+
+/// @dev What {DomainHandingEngine} hands away.
+enum HandedContract {
+    ProxyAdmin,
+    ChainTypeManager,
+    ServerNotifier
+}
+
+/// @notice A malicious engine: hands away part of the domain the executor lends it, the `ProxyAdmin`
+///         or (nominating a pending owner) the CTM or its ServerNotifier. The executor's own check
+///         must refuse it.
+contract DomainHandingEngine is DefaultProxyUpgradeEngine {
+    address public immutable NEW_HOLDER;
+    HandedContract public immutable HANDED;
+
+    constructor(address _newHolder, HandedContract _handed) {
+        NEW_HOLDER = _newHolder;
+        HANDED = _handed;
+    }
+
+    function _afterSwaps(ProxyUpgradeContext memory _context, ProxyUpgradeRow[] memory) internal override {
+        if (HANDED == HandedContract.ProxyAdmin) {
+            ProxyAdmin(_context.proxyAdmin).transferOwnership(NEW_HOLDER);
+        } else if (HANDED == HandedContract.ChainTypeManager) {
+            IOwnable(_context.chainTypeManager).transferOwnership(NEW_HOLDER);
+        } else {
+            address serverNotifier = IChainTypeManager(_context.chainTypeManager).serverNotifierAddress();
+            IOwnable(serverNotifier).transferOwnership(NEW_HOLDER);
+        }
     }
 }
 
@@ -358,6 +391,49 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(UpgradeEngineChangedExecutorOwnership.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(ctmExecutor.owner(), governor);
+    }
+
+    /// @notice An engine that hands the CTM's `ProxyAdmin` away is refused by the executor itself.
+    function test_revertWhen_theEngineHandsTheProxyAdminAway() public {
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ProxyAdmin));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(ctmProxyAdmin.owner(), address(ctmExecutor));
+    }
+
+    /// @notice An engine that nominates a new CTM owner is refused by the executor itself.
+    function test_revertWhen_theEngineNominatesANewCtmOwner() public {
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManager));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(IOwnable(address(chainContractAddress)).pendingOwner(), address(0));
+    }
+
+    /// @notice An engine that nominates a new owner for the CTM's ServerNotifier is refused by the
+    ///         executor itself.
+    function test_revertWhen_theEngineNominatesANewServerNotifierOwner() public {
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ServerNotifier));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        address serverNotifier = chainContractAddress.serverNotifierAddress();
+        assertEq(IOwnable(serverNotifier).owner(), address(ctmExecutor), "the executor holds the notifier");
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(IOwnable(serverNotifier).pendingOwner(), address(0));
+    }
+
+    /// @notice In the Core domain the executor holds the ecosystem `ProxyAdmin`, and keeps it.
+    function test_revertWhen_aCoreEngineHandsTheProxyAdminAway() public {
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ProxyAdmin));
+        IProxyUpgradeTransition t = _coreTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        coreExecutor.applyL1Upgrade(t);
+        assertEq(ecosystemProxyAdmin.owner(), address(coreExecutor));
     }
 
     /// @notice An engine that moves a row's proxy past its `implNew` is refused by the executor's own

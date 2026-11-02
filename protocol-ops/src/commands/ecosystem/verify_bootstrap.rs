@@ -47,12 +47,14 @@ pub struct VerifyBootstrapArgs {
     #[clap(long = "create2-salt")]
     pub create2_salts: Vec<B256>,
 
-    /// A file carrying `[upgrade_executors]` records, repeatable: the forge output of `ecosystem
-    /// init` / `ctm init` (`DeployL1CoreContracts`, `DeployCTM`). Each executor is re-derived
-    /// from the salt and ORIGINAL constructor arguments its record states, so one whose owner
-    /// moved since its deployment still verifies; an executor with no record is unverified — an
-    /// error. Adds to the records the package carries; two different records of one executor are
-    /// refused.
+    /// A file carrying `[upgrade_executors]` records, repeatable: the run that deployed the
+    /// executors the package's legs target — the forge output of `ecosystem init` / `ctm init`
+    /// (`DeployL1CoreContracts`, `DeployCTM`) or the package of an earlier upgrade. Each executor
+    /// is re-derived from the salt and ORIGINAL constructor arguments its record states, so one
+    /// whose owner moved since its deployment still verifies; an executor with no record is
+    /// unverified — an error. Adds to the records the package carries; two different records of
+    /// one executor are refused. A package that hands a domain to a successor carries the
+    /// successor's record, and a record of the predecessor it replaces is set aside.
     #[clap(long = "executor-record")]
     pub executor_records: Vec<PathBuf>,
 

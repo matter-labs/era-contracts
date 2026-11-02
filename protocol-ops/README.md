@@ -191,7 +191,9 @@ table the run that deployed it wrote (the `ecosystem init` / `ctm init` forge ou
 `script-out/output-deploy-l1.toml` / `output-deploy-ctm.toml`), passed with the repeatable `--executor-record`. The record's salt and ORIGINAL constructor
 arguments re-derive the address; its immutable bindings are still held against the package's values,
 and its initial owner is only reported — a fresh ecosystem constructs its executors for the deployer
-and nominates governance. An executor without a record is unverified, which is an error. The live
+and nominates governance. An executor without a record is unverified, which is an error. A package
+that hands a domain to a successor carries the successor's record, and a passed record of the
+predecessor it replaces is set aside. The live
 owner and pending owner are checked separately, against the reviewed governance. Each write-once object's live code is
 also compared with the reviewed build's deployed bytecode of its contract. Every release the package installs is
 held against the reviewed genesis: `genesisBatchHash` against the `genesis_root` of

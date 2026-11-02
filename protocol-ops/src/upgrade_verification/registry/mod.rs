@@ -154,12 +154,21 @@ pub(crate) async fn verify(
     let reviewed_env = ReviewedEnv::new(env_config.as_ref(), expected_bridgehub);
 
     let mut package = RegistryPackage::load(ecosystem_toml)?;
-    let held = match &mut package {
-        RegistryPackage::Upgrade(p) => &mut p.executor_records,
-        RegistryPackage::Replacement(p) => &mut p.executor_records,
+    let (held, succession) = match &mut package {
+        RegistryPackage::Upgrade(p) => (&mut p.executor_records, Some(&p.succession)),
+        RegistryPackage::Replacement(p) => (&mut p.executor_records, None),
     };
     for path in executor_records {
-        let records = records::load_record_file(path)?;
+        let mut records = records::load_record_file(path)?;
+        if let Some(succession) = succession {
+            for predecessor in records::set_aside_predecessors(&mut records, succession) {
+                result.print_info(&format!(
+                    "{}: the record of {predecessor} is set aside: the package hands its domain to \
+                     a successor, whose record the package carries",
+                    path.display()
+                ));
+            }
+        }
         records::merge_records(held, records, &path.display().to_string())?;
     }
 

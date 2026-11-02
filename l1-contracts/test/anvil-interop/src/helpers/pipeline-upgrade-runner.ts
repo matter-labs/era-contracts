@@ -484,13 +484,13 @@ async function runRecurringHop(
       }
     }
     const successionCalls = executorSuccessionCalls(successions);
-    // A replaced executor is held to the live chain, not re-derived; the package records its
-    // successor, so the review takes no other record for that domain (two records for one domain
-    // conflict). The carried-over records cover both domains, so a hop replaces both or neither.
+    // The carried-over records are passed as an operator passes the previous run's: on a
+    // succession they describe the predecessors, which the review sets aside for the successors'
+    // records the package carries. They cover both domains and the next hop takes this package's
+    // instead, so a hop replaces both or neither.
     if (successions.length !== 0 && successions.length !== 2) {
       throw new Error(`hop ${hop.label} replaces one domain executor; the harness carries records for both`);
     }
-    const recordsForReview = successions.length === 0 ? [ctx.executorRecords] : [];
     for (const leg of reportedLegs) {
       console.log(`  ${leg.kind.padEnd(18)} ${leg.object} via ${leg.executor}`);
     }
@@ -509,7 +509,7 @@ async function runRecurringHop(
       bridgehub: ctx.l1Addresses.bridgehub,
       zkTokenAssetId: ctx.zkTokenAssetId,
       reviewedBuildHashes: ctx.reviewedBuildHashes,
-      executorRecords: recordsForReview,
+      executorRecords: [ctx.executorRecords],
     });
 
     const rowSnapshots = await snapshotProxyUpgradeLegs(l1Provider, reportedLegs);

@@ -18,10 +18,13 @@
 
 use std::path::Path;
 
+use alloy::primitives::Address;
 use anyhow::Context;
 
 use crate::common::forge::scripts::member_deployments::{self, MemberDeployments};
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
+
+use super::succession::Successions;
 
 /// Every `table` in `root` — at the root, under `[core]` and under each `[ctms.<key>]` — with the
 /// location it sits at.
@@ -129,6 +132,31 @@ pub(crate) fn merge_records(
     Ok(())
 }
 
+/// Takes out of `records` (read from a reviewer's file) the record of each executor `succession`
+/// hands a domain FROM, and returns those addresses. Such a package carries its successor's
+/// record, and the predecessor's — in the init output or the previous package that deployed it —
+/// describes an executor no leg targets, so it is set aside instead of conflicting with the
+/// successor's; [`super::succession`] holds the predecessor to the live chain.
+pub(crate) fn set_aside_predecessors(
+    records: &mut UpgradeExecutorsRecord,
+    succession: &Successions,
+) -> Vec<Address> {
+    let mut set_aside = Vec::new();
+    if let Some(core) = &succession.core {
+        if records.core_executor.as_ref().map(|r| r.address) == Some(core.predecessor) {
+            records.core_executor = None;
+            set_aside.push(core.predecessor);
+        }
+    }
+    if let Some(ctm) = &succession.ctm {
+        if records.ctm_executor.as_ref().map(|r| r.address) == Some(ctm.predecessor) {
+            records.ctm_executor = None;
+            set_aside.push(ctm.predecessor);
+        }
+    }
+    set_aside
+}
+
 fn merge_one<T: PartialEq + std::fmt::Debug>(
     into: &mut Option<T>,
     next: Option<T>,
@@ -151,7 +179,9 @@ fn merge_one<T: PartialEq + std::fmt::Debug>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloy::primitives::{Address, B256};
+    use alloy::primitives::B256;
+
+    use super::super::succession::{ExecutorSuccession, SuccessionDomain};
 
     use crate::common::forge::scripts::upgrade_executors::{CoreExecutorRecord, CtmExecutorRecord};
 
@@ -284,6 +314,46 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("other.toml"), "{err}");
+    }
+
+    /// A succession package carries its successor's record; the predecessor's, passed from the run
+    /// that deployed it, is set aside rather than refused, and a record of any other executor stays.
+    #[test]
+    fn a_predecessor_record_is_set_aside() {
+        let mut records = parse(&format!(
+            "{}{}",
+            nested("upgrade_executors", &core_record_toml(0xA0)),
+            nested("upgrade_executors", &ctm_record_toml())
+        ))
+        .unwrap();
+        let succession = Successions {
+            core: Some(ExecutorSuccession {
+                predecessor: Address::repeat_byte(0xA0),
+                successor: Address::repeat_byte(0xA1),
+                domain: SuccessionDomain::Core {
+                    proxy_admin: Address::repeat_byte(0x04),
+                },
+            }),
+            ctm: None,
+        };
+        assert_eq!(
+            set_aside_predecessors(&mut records, &succession),
+            vec![Address::repeat_byte(0xA0)]
+        );
+        assert!(records.core_executor.is_none());
+        assert_eq!(
+            records.ctm_executor.map(|r| r.address),
+            Some(Address::repeat_byte(0xE0))
+        );
+
+        let mut held = parse(&nested("core.upgrade_executors", &core_record_toml(0xA1))).unwrap();
+        let mut predecessor = parse(&nested("upgrade_executors", &core_record_toml(0xA0))).unwrap();
+        set_aside_predecessors(&mut predecessor, &succession);
+        merge_records(&mut held, predecessor, "init.toml").unwrap();
+        assert_eq!(
+            held.core_executor.map(|r| r.address),
+            Some(Address::repeat_byte(0xA1))
+        );
     }
 
     /// A field the format does not know is a constructor argument the derivation would ignore.

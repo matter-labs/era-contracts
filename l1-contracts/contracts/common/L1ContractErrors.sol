@@ -502,6 +502,8 @@ error UnsupportedUpgradeType();
 error UpgradeBatchNumberIsNotZero();
 // 0xdf88c3de
 error UpgradeEngineChangedExecutorOwnership(address upgradeEngine);
+// 0xa03e26b3
+error UpgradeEngineMovedDomainAuthority(address upgradeEngine);
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145
