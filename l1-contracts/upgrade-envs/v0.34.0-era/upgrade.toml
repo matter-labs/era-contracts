@@ -3,8 +3,9 @@
 # are the CREATE2 deployments and the publication of the L2 factory deps into the CTM's BytecodesSupplier.
 prepare = "forge-script"
 script = "deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol:CTMUpgrade_v34Era"
-signature = "prepare(string,string)"
+signature = "prepare(string,string,string)"
 args = [
+  "/upgrade-envs/permanent-values/{env}.toml",
   "/upgrade-envs/v0.34.0-era/{env}.toml",
   "/upgrade-envs/v0.34.0-era/output/{env}/ecosystem.toml",
 ]
@@ -13,19 +14,3 @@ args = [
 verify_fork = ["bash", "upgrade-envs/v0.34.0-era/rehearse.sh"]
 # Read-only against the real chain: every factory dep is published and every deployed contract has code.
 verify_chain = ["bash", "upgrade-envs/v0.34.0-era/rehearse.sh", "--published-only"]
-
-# How whoever executes sends the governance stages: one emergency proposal through the env's
-# Emergency Upgrade Board, from the owner of its member Safes. Run read-only on the generation fork
-# after the deploy bundle; the pipeline replays the txs there and renders EXECUTE.md from them.
-# Stage only: testnet3 and mainnet deploy a governance timer, which an all-stages proposal can't pass,
-# and mainnet's Safes aren't 1-of-1.
-[execution]
-envs = ["stage"]
-script = "deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol:EmergencyStageUpgradeCalldata"
-signature = "emergencyUpgradeAllStages(string,string,string)"
-args = [
-  "/upgrade-envs/permanent-values/{env}.toml",
-  "/upgrade-envs/v0.34.0-era/output/{env}/ecosystem.toml",
-  "/upgrade-envs/v0.34.0-era/output/{env}/emergency-upgrade-board.json",
-]
-output = "emergency-upgrade-board.json"

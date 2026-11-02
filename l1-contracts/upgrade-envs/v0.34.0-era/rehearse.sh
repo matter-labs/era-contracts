@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Rehearse the v34 Era upgrade of one environment on an L1 fork and check the resulting L1 state. The
-# environment is UPGRADE_ENV (stage, testnet3, mainnet); every fact comes from its $UPGRADE_ENV.toml,
-# permanent-values/$UPGRADE_ENV.toml, the output and the chain.
+# environment is UPGRADE_ENV (testnet3, mainnet); every fact comes from its $UPGRADE_ENV.toml,
+# permanent-values/$UPGRADE_ENV.toml, the v34 genesis, the output and the chain.
 #   1. CTMUpgrade_v34Era.prepare — CREATE2 deployments and factory-dep publication (fork only), writes
 #      output/$UPGRADE_ENV/ecosystem.toml
 #   2. every factory dep of the L2 upgrade tx is published to the BytecodesSupplier
@@ -12,7 +12,7 @@
 #      (with the timer, after its delay), the reference chain's timestamp, its upgrade reverting while batches
 #      are in flight, the drain, the upgrade, a test chain, and the L1 state after each step; then v34's L1
 #      behaviour: the 15M cap on user L1->L2 transactions (before and after the upgrade), the chain's first v34
-#      batches committed, proved and executed (test/foundry/fork/V34EraStageFirstBatch.t.sol, in forge's
+#      batches committed, proved and executed (test/foundry/fork/V34EraFirstBatch.t.sol, in forge's
 #      memory), and the proof-system switches. A reference chain with a pending L2 upgrade (mainnet's 324 right
 #      after ZIP-18) can't upgrade yet: its after-upgrade checks move to the test chain, which passes only with
 #      ALLOW_PENDING_L2_UPGRADE=1 (the ZIP-18 replay fork; protocol_ops passes its environment through).
@@ -50,7 +50,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 WT=$(cd "$HERE/../.." && pwd)
 S=$(mktemp -d)
 PORT=${PORT:-8634}
-: "${UPGRADE_ENV:?set UPGRADE_ENV to the environment (stage, testnet3, mainnet)}"
+: "${UPGRADE_ENV:?set UPGRADE_ENV to the environment (testnet3, mainnet)}"
 [ -f "$HERE/$UPGRADE_ENV.toml" ] || { echo "REHEARSAL FAILED: no $HERE/$UPGRADE_ENV.toml"; exit 1; }
 OUT_REL=/upgrade-envs/v0.34.0-era/output/$UPGRADE_ENV/ecosystem.toml
 OUT=${ECOSYSTEM_TOML:-$WT$OUT_REL}
@@ -103,41 +103,28 @@ START_BLOCK=$(cast block-number --rpc-url "$RPC")
 export RPC
 
 # ---------------------------------------------------------------- the environment's facts
-# Inputs from $UPGRADE_ENV.toml and permanent-values (not its possibly stale CTM entries), the other addresses
-# from the chain before step 1 changes it. Each input the chain also holds is checked against it
-# (EIP7702_CHECKER in step 5, against the live MailboxFacet's code). --published-only needs none, and may run
-# after stage 1.
+# Inputs from $UPGRADE_ENV.toml, permanent-values and the genesis, the rest from the chain before step 1 changes
+# it. Each input the chain also holds is checked against it (EIP7702_CHECKER in step 5, against the live
+# MailboxFacet's code). --published-only needs none, and may run after stage 1.
 if [ "$PUBLISHED_ONLY" = "0" ]; then
-  python3 - "$HERE/$UPGRADE_ENV.toml" "$WT/upgrade-envs/permanent-values/$UPGRADE_ENV.toml" <<'PYINPUTS' \
-    > "$S/inputs.env" || { echo "REHEARSAL FAILED: cannot read the inputs"; exit 1; }
-import re, sys, tomllib
-env, permanent = (tomllib.load(open(p, "rb")) for p in sys.argv[1:])
+  python3 - "$HERE/$UPGRADE_ENV.toml" "$WT/upgrade-envs/permanent-values/$UPGRADE_ENV.toml" \
+    "$WT/../configs/genesis/era/latest.json" <<'PYINPUTS' > "$S/inputs.env" \
+    || { echo "REHEARSAL FAILED: cannot read the inputs"; exit 1; }
+import json, re, sys, tomllib
+env, permanent = (tomllib.load(open(p, "rb")) for p in sys.argv[1:3])
+semver = json.load(open(sys.argv[3]))["protocol_semantic_version"]
 (chain_id,) = env["chain_ids"]  # the checks cover one chain
+ctm = permanent["ctm_contracts"]["ctms"][0]  # the script's: the first CTM, which must be Era
+if ctm["is_zk_sync_os"]:
+    sys.exit("  permanent values: the first CTM is not Era")
 ADDRESS, NUMBER, WORD, BOOL = r"0x[0-9a-fA-F]{40}", r"[0-9]+", r"0x[0-9a-fA-F]{64}", r"True|False"
-# The script's rules for the optional inputs: a fresh FFLONK verifier xor a reused one; a production
-# verifier is identified by its codehash.
-deploy_fflonk, testnet = env["deploy_verifier_fflonk"], env["testnet_verifier"]
-if deploy_fflonk == ("verifier_fflonk" in env) or testnet == ("old_verifier_codehash" in env):
-    sys.exit("  inputs: verifier_fflonk / old_verifier_codehash don't match deploy_verifier_fflonk / testnet_verifier")
 for name, value, pattern in [
-    ("CTM", env["ctm"], ADDRESS),
-    ("SUPPLIER", env["bytecodes_supplier"], ADDRESS),
-    ("PERMISSIONLESS_VALIDATOR", env["permissionless_validator"], ADDRESS),
-    ("CAH", env["chain_asset_handler"], ADDRESS),
-    ("ROLLUP_DA_MANAGER", env["rollup_da_manager"], ADDRESS),
+    ("CTM", ctm["proxy"], ADDRESS),
     ("EIP7702_CHECKER", env["eip7702_checker"], ADDRESS),
-    ("DEPLOY_FFLONK", deploy_fflonk, BOOL),
-    # Reused: the input; deployed: empty here, the output's verifier_fflonk_addr (checked by provenance).
-    ("FFLONK", env.get("verifier_fflonk", ""), ADDRESS if not deploy_fflonk else ""),
     ("DIAMOND_INIT", env["diamond_init"], ADDRESS),
-    ("ERA_CHAIN_ID", env["era_chain_id"], NUMBER),
-    ("TESTNET", testnet, BOOL),
-    ("OLD_VERIFIER_CODEHASH", env.get("old_verifier_codehash", ""), WORD if not testnet else ""),
-    # Empty: no timer.
-    ("TIMER_DELAY", env.get("governance_upgrade_timer_initial_delay", ""),
-     NUMBER if "governance_upgrade_timer_initial_delay" in env else ""),
-    ("OLD", env["old_protocol_version"], NUMBER),
-    ("NEW", env["new_protocol_version"], NUMBER),
+    ("TESTNET", env["testnet_verifier"], BOOL),
+    ("TIMER_DELAY", env["governance_upgrade_timer_initial_delay"], NUMBER),
+    ("NEW", semver["major"] << 64 | semver["minor"] << 32 | semver["patch"], NUMBER),
     ("TS", env["upgrade_timestamp"], NUMBER),
     ("SALT", env["create2_factory_salt"], WORD),
     ("CHAIN_ID", chain_id, NUMBER),
@@ -169,7 +156,19 @@ PYINPUTS
     head -c 300 "$S/fact.err"
     exit 1
   }
+  # num NAME CAST_ARGS… — the same for a number.
+  num() {
+    local v
+    v=$(cast "${@:2}" --rpc-url "$RPC" 2> "$S/fact.err" | awk '{print $1}')
+    [[ $v =~ ^[0-9]+$ ]] && { export "$1=$v"; return; }
+    echo "REHEARSAL FAILED: $1 unreadable (${v:-no answer}): cast ${*:2}"
+    exit 1
+  }
   fact PUH call "$CTM" 'owner()(address)'
+  fact SUPPLIER call "$CTM" 'L1_BYTECODES_SUPPLIER()(address)'
+  fact PERMISSIONLESS_VALIDATOR call "$CTM" 'PERMISSIONLESS_VALIDATOR()(address)'
+  fact CAH call "$BRIDGEHUB" 'chainAssetHandler()(address)'
+  num OLD call "$CTM" 'protocolVersion()(uint256)'
   fact CTM_PROXY_ADMIN admin "$CTM"
   fact SN call "$CTM" 'serverNotifierAddress()(address)'
   fact SN_PROXY_ADMIN admin "$SN"
@@ -185,36 +184,24 @@ PYINPUTS
   fact CHAIN_ADMIN_OWNER call "$CHAIN_ADMIN" 'owner()(address)'
   fact OLD_VERIFIER call "$CTM" 'protocolVersionVerifier(uint256)(address)' "$OLD"
   fact LIVE_ADMIN_FACET call "$DIAMOND" 'facetAddress(bytes4)(address)' "$(cast sig 'acceptAdmin()')"
+  fact ROLLUP_DA_MANAGER call "$LIVE_ADMIN_FACET" 'ROLLUP_DA_MANAGER()(address)'
+  num ERA_CHAIN_ID call "$L1_ASSET_ROUTER" 'ERA_CHAIN_ID()(uint256)'
 
   echo "== The inputs against the chain"
   chk "l1_chain_id = the RPC's chain id" "$(cast chain-id --rpc-url "$RPC")" "$L1_CHAIN_ID"
   chk "ctm = the bridgehub's chainTypeManager($CHAIN_ID)" \
     "$(call "$BRIDGEHUB" 'chainTypeManager(uint256)(address)' "$CHAIN_ID")" "$CTM"
   chk "bridgehub_proxy_addr = the CTM's BRIDGE_HUB()" "$(call "$CTM" 'BRIDGE_HUB()(address)')" "$BRIDGEHUB"
-  chk "old_protocol_version = the CTM's protocolVersion()" "$(call "$CTM" 'protocolVersion()(uint256)' | first)" "$OLD"
-  chk "bytecodes_supplier = the CTM's L1_BYTECODES_SUPPLIER()" \
-    "$(call "$CTM" 'L1_BYTECODES_SUPPLIER()(address)')" "$SUPPLIER"
-  chk "permissionless_validator = the CTM's PERMISSIONLESS_VALIDATOR()" \
-    "$(call "$CTM" 'PERMISSIONLESS_VALIDATOR()(address)')" "$PERMISSIONLESS_VALIDATOR"
-  chk "chain_asset_handler = the bridgehub's chainAssetHandler()" \
-    "$(call "$BRIDGEHUB" 'chainAssetHandler()(address)')" "$CAH"
-  if [ "$DEPLOY_FFLONK" = "True" ]; then
-    echo "     deploy_verifier_fflonk: the old verifier's FFLONK_VERIFIER() $(call "$OLD_VERIFIER" 'FFLONK_VERIFIER()(address)') is not reused"
-  else
-    chk "verifier_fflonk = FFLONK_VERIFIER() of the old version's verifier" \
-      "$(call "$OLD_VERIFIER" 'FFLONK_VERIFIER()(address)')" "$FFLONK"
-  fi
   if [ "$TESTNET" = "True" ]; then
-    chk "the old version's verifier is a testnet one" "$(call "$OLD_VERIFIER" 'IS_TESTNET_VERIFIER()(bool)')" "true"
+    chk "the old version's verifier is a testnet one" "$(call "$OLD_VERIFIER" 'IS_TESTNET_VERIFIER()(bool)')" true
+  elif v=$(call "$OLD_VERIFIER" 'IS_TESTNET_VERIFIER()(bool)' 2> "$S/testnet.err"); then
+    chk "the old version's verifier is not a testnet one" "$v" false
   else
-    # EraDualVerifier has no IS_TESTNET_VERIFIER(): identified by its code.
-    chk "old_verifier_codehash = the old version's verifier's codehash" \
-      "$(cast keccak "$(cast code "$OLD_VERIFIER" --rpc-url "$RPC")")" "$OLD_VERIFIER_CODEHASH"
+    # A production EraDualVerifier has no IS_TESTNET_VERIFIER(): the call must revert, not fail to reach the RPC.
+    grep -qi revert "$S/testnet.err" && [ "$(cast code "$OLD_VERIFIER" --rpc-url "$RPC")" != 0x ] \
+      && echo "  OK   the old version's verifier has no IS_TESTNET_VERIFIER() (production)" \
+      || fail "the old version's verifier: $(head -c 200 "$S/testnet.err")"
   fi
-  chk "rollup_da_manager = ROLLUP_DA_MANAGER() of chain $CHAIN_ID's AdminFacet" \
-    "$(call "$LIVE_ADMIN_FACET" 'ROLLUP_DA_MANAGER()(address)')" "$ROLLUP_DA_MANAGER"
-  chk "era_chain_id = the asset router's ERA_CHAIN_ID()" \
-    "$(call "$L1_ASSET_ROUTER" 'ERA_CHAIN_ID()(uint256)' | first)" "$ERA_CHAIN_ID"
   chk "current_chain_creation_params_event_data: its cut hashes to the CTM's initialCutHash()" \
     "$(cast keccak "$STORED_CUT")" "$(call "$CTM" 'initialCutHash()(bytes32)')"
   chk "diamond_init = that cut's initAddress" "$STORED_CUT_INIT" "$DIAMOND_INIT"
@@ -241,7 +228,8 @@ else
   touch "$S/before-prepare"
   cd "$WT"
   forge script deploy-scripts/upgrade/v34-era/CTMUpgrade_v34Era.s.sol:CTMUpgrade_v34Era \
-    --sig 'prepare(string,string)' "/upgrade-envs/v0.34.0-era/$UPGRADE_ENV.toml" "$OUT_REL" \
+    --sig 'prepare(string,string,string)' "/upgrade-envs/permanent-values/$UPGRADE_ENV.toml" \
+    "/upgrade-envs/v0.34.0-era/$UPGRADE_ENV.toml" "$OUT_REL" \
     --rpc-url "$RPC" --broadcast --unlocked --sender "$DEPLOYER" --legacy --slow --ffi \
     > "$S/v34_prepare.log" 2>&1
   PREPARE_EXIT=$?
@@ -273,15 +261,13 @@ while read -r h; do
 done < "$S/v34_factory_deps.txt"
 echo "L2 upgrade tx factory deps: $N, unpublished: $UNPUB (supplier $BS)"
 # Each deployed one is the CREATE2 address of a reviewed init code (step 4 checks that on the fork), so code
-# there can only be that contract. The FFLONK verifier is deployed (testnet3) or reused; either way it must have
-# code. The timer and stage validator exist only where the output lists them.
+# there can only be that contract.
 DEPLOYED_KEYS=(state_transition.admin_facet_addr state_transition.getters_facet_addr
   state_transition.mailbox_facet_addr state_transition.executor_facet_addr state_transition.migrator_facet_addr
   state_transition.committer_facet_addr state_transition.airbender_verifier_addr state_transition.verifier_addr
   state_transition.verifier_fflonk_addr state_transition.default_upgrade_addr
-  state_transition.chain_type_manager_implementation_addr state_transition.server_notifier_implementation_addr)
-python3 -c "import tomllib; tomllib.load(open('$OUT','rb'))['deployed_addresses']['l1_governance_upgrade_timer']" 2>/dev/null \
-  && DEPLOYED_KEYS+=(deployed_addresses.l1_governance_upgrade_timer deployed_addresses.upgrade_stage_validator)
+  state_transition.chain_type_manager_implementation_addr state_transition.server_notifier_implementation_addr
+  deployed_addresses.l1_governance_upgrade_timer deployed_addresses.upgrade_stage_validator)
 NOCODE=0
 for k in "${DEPLOYED_KEYS[@]}"; do
   a=$(toml_get "$k") || a=
@@ -389,17 +375,11 @@ print("== Reused addresses in the output")
 reused = {"diamond_init_addr": "DIAMOND_INIT", "genesis_upgrade_addr": "GENESIS_UPGRADE",
           "chain_type_manager_proxy": "CTM", "bytecodes_supplier_addr": "SUPPLIER",
           "permissionless_validator_addr": "PERMISSIONLESS_VALIDATOR", "eip7702_checker_addr": "EIP7702_CHECKER"}
-if E["DEPLOY_FFLONK"] == "False":
-    reused["verifier_fflonk_addr"] = "FFLONK"
 check("state_transition: reused addresses = the live ones", [st[k] for k in reused], [E[v] for v in reused.values()])
-# The Boojum verifier the new verifier must point at: the reused one, or the deployed one (step 4 checks its
-# provenance).
+# The Boojum verifier the new verifier must point at, deployed (step 4 checks its provenance).
 fflonk = st["verifier_fflonk_addr"]
 da = eco["deployed_addresses"]
-timer_on = E["TIMER_DELAY"] != ""
-check("deployed_addresses lists the timer and the stage validator exactly when the input has a delay",
-      ["l1_governance_upgrade_timer" in da, "upgrade_stage_validator" in da], [timer_on, timer_on])
-timer, validator = da.get("l1_governance_upgrade_timer", ZERO), da.get("upgrade_stage_validator", ZERO)
+timer, validator = da["l1_governance_upgrade_timer"], da["upgrade_stage_validator"]
 check("deployed_addresses: CTM ProxyAdmin, ServerNotifier proxy, RollupDAManager",
       [da["transparent_proxy_admin"], da["server_notifier_proxy_addr"], da["l1_rollup_da_manager"]],
       [E["CTM_PROXY_ADMIN"], E["SN"], E["ROLLUP_DA_MANAGER"]])
@@ -417,9 +397,6 @@ check("EVM emulator hash = genesis", p[3], evm)
 check("verifier and verifierParams zero", [p[4], p[5]], [ZERO, ["0x" + "00" * 32] * 3])
 check("l1ContractsUpgradeCalldata, postUpgradeCalldata empty; upgradeTimestamp 0", [p[6], p[7], I(p[8])], ["0x", "0x", 0])
 check("newProtocolVersion = v0.34.0", I(p[9]), I(E["NEW"]))
-semver = genesis["protocol_semantic_version"]
-check("new_protocol_version = the genesis's protocol_semantic_version", I(E["NEW"]),
-      semver["major"] << 64 | semver["minor"] << 32 | semver["patch"])
 check("tx: type 254, from 0x8007, to 0x8006, gas 72M, 800 per pubdata, no fees or paymaster, nonce 34, value 0",
       [I(x) for x in tx[:10]], [254, 0x8007, 0x8006, 72_000_000, 800, 0, 0, 0, I(E["NEW"]) >> 32, 0])
 check("tx reserved, signature, paymasterInput, reservedDynamic empty", [[I(x) for x in tx[10]], tx[12], tx[14], tx[15]], [[0] * 4, "0x", "0x", "0x"])
@@ -482,7 +459,7 @@ check("creation cut initCalldata = InitializeDataNewChain(genesis hashes)", crea
 check("creation cut facets = the upgrade cut's Adds", creation_cut[0], adds)
 d = dec(FDD, params[6])
 alias = lambda a: "0x%040x" % ((int(a, 16) + 0x1111000000000000000000000000000000001111) % (1 << 160))
-# The chain limit is 100 on stage, testnet3 and mainnet.
+# The chain limit is 100 on testnet3 and mainnet.
 check("force deployments: l1ChainId, eraChainId, l1AssetRouter, alias(PUH), chain limit",
       [I(d[0]), I(d[1]), d[2], d[4], I(d[5])], [I(E["L1_CHAIN_ID"]), I(E["ERA_CHAIN_ID"]), E["L1_ASSET_ROUTER"], alias(E["PUH"]), 100])
 check("force deployments: l2TokenProxyBytecodeHash = BeaconProxy", d[3], zk["l1-contracts/BeaconProxy"])
@@ -508,9 +485,9 @@ T = {"start": (timer, sig("startTimer()")), "deadline": (timer, sig("checkDeadli
      "paused": (validator, sig("checkMigrationsPaused()")), "present": (validator, sig("checkProtocolUpgradePresence()")),
      "unpaused": (validator, sig("checkMigrationsUnpaused()"))}
 shapes = {
-    0: [PAUSE] + ([T["start"]] if timer_on else []),
-    1: ([PAUSE, T["deadline"], T["paused"]] if timer_on else []) + [UPGRADE_CTM, SET_NEW_VERSION, SET_CREATION],
-    2: [UNPAUSE] + ([T["present"], T["unpaused"]] if timer_on else []),
+    0: [PAUSE, T["start"]],
+    1: [PAUSE, T["deadline"], T["paused"], UPGRADE_CTM, SET_NEW_VERSION, SET_CREATION],
+    2: [UNPAUSE, T["present"], T["unpaused"]],
 }
 names = {PAUSE: "pauseMigration", UNPAUSE: "unpauseMigration", UPGRADE_CTM: "ProxyAdmin.upgrade",
          SET_NEW_VERSION: "setNewVersionUpgrade", SET_CREATION: "setChainCreationParams", T["start"]: "startTimer",
@@ -524,10 +501,8 @@ def find(n, call):
     found = [c for c in stages[n] if [c[0].lower(), c[2][:10]] == [call[0].lower(), call[1]]]
     return found[0][2] if len(found) == 1 else "(not exactly once)"
 
-for n, call in [(0, PAUSE), (1, PAUSE), (2, UNPAUSE)] + ([(0, T["start"]), (1, T["deadline"]), (1, T["paused"]),
-                                                       (2, T["present"]), (2, T["unpaused"])] if timer_on else []):
-    if n == 1 and call == PAUSE and not timer_on:
-        continue
+for n, call in [(0, PAUSE), (1, PAUSE), (2, UNPAUSE), (0, T["start"]), (1, T["deadline"]), (1, T["paused"]),
+                (2, T["present"]), (2, T["unpaused"])]:
     check(f"stage {n} {names[call]}: no arguments", find(n, call), call[1])
 check("stage 1 ProxyAdmin.upgrade(CTM, new implementation)", find(1, UPGRADE_CTM),
       calldata("upgrade(address,address)", E["CTM"], st["chain_type_manager_implementation_addr"]))
@@ -635,9 +610,9 @@ else:
     raise SystemExit("  FAIL no deployer transactions: no prepare/manifest.json next to ECOSYSTEM_TOML and no broadcast log")
 print(f"     {len(txs)} deployer transactions from {source}")
 
-# Constructor arguments, from the environment's facts; the verifier's are the FFLONK verifier (reused, or deployed
-# and checked here) and the Plonk verifier's own CREATE2 address, itself checked here. The testnet flag picks the
-# Mailbox and Migrator time windows and the verifier contract.
+# Constructor arguments, from the environment's facts; the verifier's are the FFLONK and Plonk verifiers' own
+# CREATE2 addresses, themselves checked here. The testnet flag picks the Mailbox and Migrator time windows and the
+# verifier contract.
 enc = lambda types, *v: cast("abi-encode", f"f({types})", *v)[2:]
 testnet = E["TESTNET"].lower()
 verifier_name = "EraMultiProofTestnetVerifier" if testnet == "true" else "EraMultiProofVerifier"
@@ -653,15 +628,13 @@ expected = {
     "EraSettlementLayerV34Upgrade": ("state_transition", "default_upgrade_addr", ""),
     "EraChainTypeManager": ("state_transition", "chain_type_manager_implementation_addr", enc("address,address,address,address", E["BRIDGEHUB"], E["INTEROP_CENTER"], E["SUPPLIER"], E["PERMISSIONLESS_VALIDATOR"])),
     "ServerNotifier": ("state_transition", "server_notifier_implementation_addr", ""),
-}
-if E["DEPLOY_FFLONK"] == "True":
-    expected["EraVerifierFflonk"] = ("state_transition", "verifier_fflonk_addr", "")
-if E["TIMER_DELAY"]:
+    "EraVerifierFflonk": ("state_transition", "verifier_fflonk_addr", ""),
     # DefaultCTMUpgrade.getCreationCalldata: delay, 2 weeks of extension, governance and owner both the PUH.
-    expected["GovernanceUpgradeTimer"] = ("deployed_addresses", "l1_governance_upgrade_timer",
-                                          enc("uint256,uint256,address,address", E["TIMER_DELAY"], str(14 * 24 * 3600), E["PUH"], E["PUH"]))
-    expected["UpgradeStageValidator"] = ("deployed_addresses", "upgrade_stage_validator", enc("address,uint256", E["CTM"], E["NEW"]))
-print(f"     expected deployments: {len(expected)} (11, plus EraVerifierFflonk if deployed, plus the timer and validator)")
+    "GovernanceUpgradeTimer": ("deployed_addresses", "l1_governance_upgrade_timer",
+                               enc("uint256,uint256,address,address", E["TIMER_DELAY"], str(14 * 24 * 3600), E["PUH"], E["PUH"])),
+    "UpgradeStageValidator": ("deployed_addresses", "upgrade_stage_validator", enc("address,uint256", E["CTM"], E["NEW"])),
+}
+print(f"     expected deployments: {len(expected)}")
 publish = {cast("sig", "publishEraBytecodes(bytes[])"), cast("sig", "publishEraBytecode(bytes)")}
 matched, published = {}, 0
 for to, data, value in txs:
@@ -763,31 +736,27 @@ chk "ServerNotifier chainTypeManager unchanged" "$(call "$SN" 'chainTypeManager(
 reverts "ServerNotifier proxy: initialize reverts" "$PUH" "$SN" "$(cast calldata 'initialize(address)' "$PUH")"
 reverts "ServerNotifier implementation: initialize reverts" "$PUH" "$NEW_SN_IMPL" "$(cast calldata 'initialize(address)' "$PUH")"
 
-if [ -n "$TIMER_DELAY" ]; then
-  echo "== The governance timer and stage validator, as deployed"
-  chk "timer INITIAL_DELAY = governance_upgrade_timer_initial_delay" "$(call "$TIMER" 'INITIAL_DELAY()(uint256)' | first)" "$TIMER_DELAY"
-  chk "timer MAX_ADDITIONAL_DELAY = 2 weeks" "$(call "$TIMER" 'MAX_ADDITIONAL_DELAY()(uint256)' | first)" 1209600
-  chk "timer TIMER_GOVERNANCE = the PUH (sends the stages)" "$(call "$TIMER" 'TIMER_GOVERNANCE()(address)')" "$PUH"
-  chk "timer owner = the PUH" "$(call "$TIMER" 'owner()(address)')" "$PUH"
-  chk "timer not started" "$(call "$TIMER" 'deadline()(uint256)' | first)" 0
-  chk "stage validator CHAIN_TYPE_MANAGER = the CTM" "$(call "$STAGE_VALIDATOR" 'CHAIN_TYPE_MANAGER()(address)')" "$CTM"
-  chk "stage validator NEW_PROTOCOL_VERSION = v0.34.0" "$(call "$STAGE_VALIDATOR" 'NEW_PROTOCOL_VERSION()(uint256)' | first)" "$NEW"
-fi
+echo "== The governance timer and stage validator, as deployed"
+chk "timer INITIAL_DELAY = governance_upgrade_timer_initial_delay" "$(call "$TIMER" 'INITIAL_DELAY()(uint256)' | first)" "$TIMER_DELAY"
+chk "timer MAX_ADDITIONAL_DELAY = 2 weeks" "$(call "$TIMER" 'MAX_ADDITIONAL_DELAY()(uint256)' | first)" 1209600
+chk "timer TIMER_GOVERNANCE = the PUH (sends the stages)" "$(call "$TIMER" 'TIMER_GOVERNANCE()(address)')" "$PUH"
+chk "timer owner = the PUH" "$(call "$TIMER" 'owner()(address)')" "$PUH"
+chk "timer not started" "$(call "$TIMER" 'deadline()(uint256)' | first)" 0
+chk "stage validator CHAIN_TYPE_MANAGER = the CTM" "$(call "$STAGE_VALIDATOR" 'CHAIN_TYPE_MANAGER()(address)')" "$CTM"
+chk "stage validator NEW_PROTOCOL_VERSION = v0.34.0" "$(call "$STAGE_VALIDATOR" 'NEW_PROTOCOL_VERSION()(uint256)' | first)" "$NEW"
 
 echo "== Stage 0 and the CTM proxy upgrade, sent as the CTM owner (PUH)"
 while read -r target value data; do send "$PUH" "$target" "$data" "stage 0 ${data:0:10} -> $target"; done < "$S/stage0.txt"
 chk "migrations paused" "$(call "$CAH" 'migrationPaused()(bool)')" "true"
-if [ -n "$TIMER_DELAY" ]; then
-  STARTED=$(cast block latest --field timestamp --rpc-url "$RPC")
-  chk "timer deadline = stage 0's block time + delay" "$(call "$TIMER" 'deadline()(uint256)' | first)" "$((STARTED + TIMER_DELAY))"
-  reverts "stage 1 before the delay: checkDeadline reverts with DeadlineNotYetPassed" "$PUH" "$TIMER" \
-    "$(cast calldata 'checkDeadline()')" 'DeadlineNotYetPassed()'
-  # An emergency execution unfreezes before a proposal's calls, which unpauses migrations; stage 1's leading
-  # re-pause must restore it.
-  send "$PUH" "$CAH" "$(cast calldata 'unpauseMigration()')" "unpauseMigration() as the PUH (emulates an unfreeze)"
-  cast rpc evm_increaseTime "$TIMER_DELAY" --rpc-url "$RPC" >/dev/null && cast rpc evm_mine --rpc-url "$RPC" >/dev/null
-  echo "     advanced the fork's time by $TIMER_DELAY s"
-fi
+STARTED=$(cast block latest --field timestamp --rpc-url "$RPC")
+chk "timer deadline = stage 0's block time + delay" "$(call "$TIMER" 'deadline()(uint256)' | first)" "$((STARTED + TIMER_DELAY))"
+reverts "stage 1 before the delay: checkDeadline reverts with DeadlineNotYetPassed" "$PUH" "$TIMER" \
+  "$(cast calldata 'checkDeadline()')" 'DeadlineNotYetPassed()'
+# An emergency execution unfreezes before a proposal's calls, which unpauses migrations; stage 1's leading
+# re-pause must restore it.
+send "$PUH" "$CAH" "$(cast calldata 'unpauseMigration()')" "unpauseMigration() as the PUH (emulates an unfreeze)"
+cast rpc evm_increaseTime "$TIMER_DELAY" --rpc-url "$RPC" >/dev/null && cast rpc evm_mine --rpc-url "$RPC" >/dev/null
+echo "     advanced the fork's time by $TIMER_DELAY s"
 # Stage 1 up to and including the CTM proxy upgrade, then the CTM's state on the new implementation.
 head -n "$S1_UPGRADE_INDEX" "$S/stage1.txt" > "$S/stage1_before.txt"
 while read -r target value data; do send "$PUH" "$target" "$data" "stage 1 ${data:0:10} -> $target"; done < "$S/stage1_before.txt"
@@ -983,7 +952,7 @@ else
 fi
 
 echo "== Chain $CHAIN_ID's first v34 batches, committed, proved and executed in forge's fork of this fork"
-FIRST_BATCH_TESTS=8 # the test_ functions in V34EraStageFirstBatch.t.sol
+FIRST_BATCH_TESTS=2 # the test_ functions in V34EraFirstBatch.t.sol
 # first_batches — the last v33 batch's stored info from its execute tx, then the fork test. Stops at the first failure.
 first_batches() {
   local committed verified executed topic0 window from n=0 h prev want out_dir wt_dir lc_out lc_wt
@@ -1053,7 +1022,7 @@ PYPREV
   esac
   echo "     forge test, build in $out_dir"
   (cd "$WT" && V34_PREV_BATCH="$prev" forge test --fork-url "$RPC" --no-storage-caching \
-    --match-path test/foundry/fork/V34EraStageFirstBatch.t.sol --out "$out_dir/out" --cache-path "$out_dir/cache" \
+    --match-path test/foundry/fork/V34EraFirstBatch.t.sol --out "$out_dir/out" --cache-path "$out_dir/cache" \
     --json > "$S/first_batch.json" 2> "$S/first_batch.err")
   # Every test must pass: a skipped or missing one fails too.
   python3 - "$S/first_batch.json" "$FIRST_BATCH_TESTS" <<'PYFORGE' && echo "  OK   first v34 batches: all $FIRST_BATCH_TESTS fork tests passed" \

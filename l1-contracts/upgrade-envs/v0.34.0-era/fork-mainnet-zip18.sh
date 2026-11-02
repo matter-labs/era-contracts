@@ -11,7 +11,7 @@
 #      follows ZIP-18 and which deposits need;
 #   4. drains chain 324 through the ValidatorTimelock and upgrades it to v0.33.0 with ZIP-18's chain call,
 #      sent by the Safe through the ChainAdmin;
-#   5. checks the CTM and chain 324 are where v34's mainnet.toml expects them.
+#   5. checks the CTM and chain 324 are where v34 expects them.
 # ZIP-18's test transactions are not replayed: they create chain 555, v34's test chain.
 #
 # The Anvil is left running, so that `protocol_ops ecosystem rehearse-upgrade --env mainnet --fork-url
@@ -202,7 +202,7 @@ fi
 send "$SAFE" "$CHAIN_ADMIN" "$(cast calldata 'multicall((address,uint256,bytes)[],bool)' "[($DIAMOND,0,$UPGRADE_DATA)]" true)" \
   "ChainAdmin multicall(ZIP-18's upgradeChainFromVersion for 324)"
 
-echo "== 5. Where v34's mainnet.toml expects the fork"
+echo "== 5. Where v34 expects the fork"
 chk "CTM protocolVersion = v0.33.0" "$(call "$CTM" 'protocolVersion()(uint256)' | first)" "$NEW"
 chk "CTM protocolVersionVerifier(v0.33.0) = ZIP-18's verifier" "$(call "$CTM" 'protocolVersionVerifier(uint256)(address)' "$NEW")" "$VERIFIER"
 chk "CTM initialCutHash = keccak(ZIP-18's diamond_cut_data)" "$(call "$CTM" 'initialCutHash()(bytes32)')" \

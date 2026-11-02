@@ -4,13 +4,14 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::AdminFunctionsAbi;
-use crate::common::addresses::ZERO_ADDRESS;
+use crate::common::addresses::{VALIDATOR_TIMELOCK_UPGRADER_ROLE, ZERO_ADDRESS};
 use crate::common::logger;
 use crate::common::SharedRunArgs;
 
-/// Shared args for add-validator / remove-validator.
+/// Shared args for add-validator / remove-validator / grant-upgrader.
 ///
-/// Runs `AdminFunctions.s.sol::updateValidator` in the simulation + Safe-bundle
+/// Runs `AdminFunctions.s.sol::updateValidator` (`grantValidatorTimelockRole` for
+/// grant-upgrader) in the simulation + Safe-bundle
 /// emission mode that every other admin-action command in protocol-ops uses.
 /// No `--private-key` on this command. It emits a Safe Transaction Builder JSON
 /// bundle via `--out`. The ops engineer (or the integration test harness)
@@ -30,7 +31,7 @@ pub struct ChainValidatorArgs {
     /// Use `ZERO_ADDRESS` for Ownable ChainAdmin.
     #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
-    /// Validator address to add/remove
+    /// Validator address to add/remove, or the account to grant `UPGRADER_ROLE`
     #[clap(long)]
     pub validator_address: Address,
 
@@ -39,15 +40,27 @@ pub struct ChainValidatorArgs {
     pub shared: SharedRunArgs,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum Action {
+    Add,
+    Remove,
+    /// Only `UPGRADER_ROLE`, which the node needs for `ValidatorTimelock.upgradeChainFromVersion`.
+    GrantUpgrader,
+}
+
 pub async fn run_add(args: ChainValidatorArgs) -> anyhow::Result<()> {
-    run_update(args, true).await
+    run_update(args, Action::Add).await
 }
 
 pub async fn run_remove(args: ChainValidatorArgs) -> anyhow::Result<()> {
-    run_update(args, false).await
+    run_update(args, Action::Remove).await
 }
 
-async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
+pub async fn run_grant_upgrader(args: ChainValidatorArgs) -> anyhow::Result<()> {
+    run_update(args, Action::GrantUpgrader).await
+}
+
+async fn run_update(args: ChainValidatorArgs, action: Action) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = crate::common::forge::ForgeRunner::new(&args.shared)?;
 
@@ -70,10 +83,12 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     .await
     .context("resolving validator timelock from L1")?;
 
-    let action = if add { "Adding" } else { "Removing" };
-    logger::step(format!(
-        "{action} validator via AdminFunctions.s.sol::updateValidator (simulation)"
-    ));
+    let (verb, command) = match action {
+        Action::Add => ("Adding validator", "chain.add-validator"),
+        Action::Remove => ("Removing validator", "chain.remove-validator"),
+        Action::GrantUpgrader => ("Granting UPGRADER_ROLE", "chain.grant-upgrader"),
+    };
+    logger::step(format!("{verb} via AdminFunctions.s.sol (simulation)"));
     logger::info(format!("Chain admin: {:#x}", admin_address));
     logger::info(format!(
         "Access control restriction: {:#x}",
@@ -84,26 +99,33 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     logger::info(format!("Validator address: {:#x}", args.validator_address));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
-    let script = runner
-        .script_call(AdminFunctionsAbi::updateValidatorCall {
+    let script = match action {
+        Action::GrantUpgrader => {
+            runner.script_call(AdminFunctionsAbi::grantValidatorTimelockRoleCall {
+                _bridgehub: bridgehub,
+                _chainId: U256::from(chain_id),
+                _adminAddr: admin_address,
+                _accessControlRestriction: args.access_control_restriction,
+                _validatorTimelock: validator_timelock,
+                _role: VALIDATOR_TIMELOCK_UPGRADER_ROLE,
+                _account: args.validator_address,
+            })
+        }
+        _ => runner.script_call(AdminFunctionsAbi::updateValidatorCall {
             _adminAddr: admin_address,
             _accessControlRestriction: args.access_control_restriction,
             _validatorTimelock: validator_timelock,
             _chainId: U256::from(chain_id),
             _validatorAddress: args.validator_address,
-            _addValidator: add,
-        })
-        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
-        .with_wallet(&sender);
+            _addValidator: action == Action::Add,
+        }),
+    }
+    .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+    .with_wallet(&sender);
     runner
         .run(script)
-        .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
+        .with_context(|| format!("Failed: {verb}"))?;
 
-    let command = if add {
-        "chain.add-validator"
-    } else {
-        "chain.remove-validator"
-    };
     crate::common::output::write_output_if_requested(
         command,
         &args.shared,
@@ -114,17 +136,12 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
             "validator_timelock": format!("{:#x}", validator_timelock),
             "chain_id": chain_id,
             "validator_address": format!("{:#x}", args.validator_address),
-            "add_validator": add,
+            "add_validator": action == Action::Add,
         }),
         &serde_json::json!({}),
     )
     .await?;
 
-    let verb = if add {
-        "add prepared"
-    } else {
-        "remove prepared"
-    };
-    logger::success(format!("Validator {verb}"));
+    logger::success(format!("{verb}: prepared"));
     Ok(())
 }

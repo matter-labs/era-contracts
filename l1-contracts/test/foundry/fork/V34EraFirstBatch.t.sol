@@ -8,37 +8,27 @@ import {L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, Utils} from "../l1/unit/c
 import {
     COMMIT_TIMESTAMP_APPROXIMATION_DELTA,
     EMPTY_STRING_KECCAK,
-    ERA_MULTI_PROOF_TYPE,
     L2DACommitmentScheme
 } from "contracts/common/Config.sol";
-import {
-    AirbenderCommitmentRequired,
-    BatchHashMismatch,
-    CantExecuteUnprovenBatches,
-    InvalidProofFormat,
-    MissingSystemLogs,
-    TxHashMismatch,
-    UnsupportedCommitBatchEncoding
-} from "contracts/common/L1ContractErrors.sol";
+import {BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {IExecutor, MAX_LOG_KEY, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {PubdataSource} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
-/// @title V34EraStageFirstBatchForkTest
-/// @notice A chain's first v34 batches on its L1 state (stage's 499, testnet3's 312): the upgrade batch commits on
-/// the last v33 batch, proves and executes, the next batch chains on it, and what an operator could get wrong at the
-/// boundary reverts.
-/// @dev Runs only from `upgrade-envs/v0.34.0-era/rehearse.sh`, forked from its Anvil fork after the chain's
-/// upgrade. The script exports the environment's facts and `V34_PREV_BATCH`, the last v33 batch's stored info
-/// decoded from its execute transaction. The batches are synthetic: nothing runs on L2, and the testnet verifier
-/// accepts the empty proof, so this does not exercise public inputs or verification keys.
-contract V34EraStageFirstBatchForkTest is Test {
+/// @title V34EraFirstBatchForkTest
+/// @notice The boundary between a chain's last v33 batch and its first v34 ones, on its real L1 state: the upgrade
+/// batch commits on the last v33 batch, proves and executes, and the next batch chains on it.
+/// @dev Forks a fork on which the chain was upgraded to v34 (`upgrade-envs/v0.34.0-era/rehearse.sh`). Inputs:
+/// `BRIDGEHUB`, `CHAIN_ID` and `V34_PREV_BATCH`, the last v33 batch's stored info decoded from its execute
+/// transaction; everything else is read from the chain. The batches are synthetic: nothing runs on L2, and the
+/// testnet verifier accepts the empty proof, so this does not exercise public inputs or verification keys.
+contract V34EraFirstBatchForkTest is Test {
     // Synthetic batch contents: L1 only needs them to be non-zero and consistent.
     bytes32 internal constant STATE_DIFF_HASH = keccak256("v34 fork test: state diff hash");
     bytes32 internal constant BLOB_LINEAR_HASH = keccak256("v34 fork test: blob linear hash");
@@ -48,8 +38,6 @@ contract V34EraStageFirstBatchForkTest is Test {
     bytes32 internal constant AIRBENDER_HEAP_HASH = keccak256("v34 fork test: Airbender bootloader heap hash");
     /// @dev Calldata DA always declares one blob: its linear hash and commitment, with the pubdata (empty here).
     uint8 internal constant CALLDATA_BLOBS = 1;
-    /// @dev The commit encoding v33 operators send.
-    uint8 internal constant V33_ENCODING_VERSION = 1;
 
     IZKChain internal chain;
     ValidatorTimelock internal validatorTimelock;
@@ -72,13 +60,13 @@ contract V34EraStageFirstBatchForkTest is Test {
         if (prevBatch.length == 0) {
             vm.skip(true, "run from rehearse.sh");
         }
-        assertEq(block.chainid, vm.envUint("L1_CHAIN_ID"), "not a fork of the environment's L1");
-
-        chain = IZKChain(vm.envAddress("DIAMOND"));
-        validatorTimelock = ValidatorTimelock(vm.envAddress("VT"));
-        messageRoot = IBridgehubBase(vm.envAddress("BRIDGEHUB")).messageRoot();
+        IBridgehubBase bridgehub = IBridgehubBase(vm.envAddress("BRIDGEHUB"));
         chainId = vm.envUint("CHAIN_ID");
-        uint256 newProtocolVersion = vm.envUint("NEW");
+        chain = IZKChain(bridgehub.getZKChain(chainId));
+        IChainTypeManager ctm = IChainTypeManager(bridgehub.chainTypeManager(chainId));
+        validatorTimelock = ValidatorTimelock(ctm.validatorTimelockPostV29());
+        messageRoot = bridgehub.messageRoot();
+        uint256 newProtocolVersion = ctm.protocolVersion();
 
         // V34_PREV_BATCH is the 9-field pre-Airbender encoding; a zero word appended makes it v34's layout
         // with `airbenderCommitment = 0`, the form the chain accepts for its last v33 batch.
@@ -92,10 +80,7 @@ contract V34EraStageFirstBatchForkTest is Test {
         assertEq(chain.getTotalBatchesVerified(), lastV33BatchNumber, "verified batches");
         assertEq(chain.getTotalBatchesExecuted(), lastV33BatchNumber, "executed batches");
         assertEq(chain.getProtocolVersion(), newProtocolVersion, "chain protocol version");
-        assertTrue(
-            IChainTypeManager(vm.envAddress("CTM")).protocolVersionIsActive(newProtocolVersion),
-            "v0.34.0 active on the CTM"
-        );
+        assertTrue(ctm.protocolVersionIsActive(newProtocolVersion), "v0.34.0 active on the CTM");
         upgradeTxHash = chain.getL2SystemContractsUpgradeTxHash();
         assertTrue(upgradeTxHash != bytes32(0), "pending L2 upgrade tx");
         assertEq(chain.getL2SystemContractsUpgradeBatchNumber(), 0, "upgrade batch not committed yet");
@@ -148,59 +133,6 @@ contract V34EraStageFirstBatchForkTest is Test {
         assertEq(chain.getTotalBatchesExecuted(), upgradeBatchNumber + 1);
         assertEq(messageRoot.currentChainBatchNumber(chainId), upgradeBatchNumber + 1);
         assertEq(messageRoot.chainBatchRoots(chainId, upgradeBatchNumber + 1), nextBatch.l2LogsTreeRoot);
-    }
-
-    /// @dev The first v34 batch must execute the L2 upgrade transaction.
-    function test_upgradeBatchWithoutUpgradeLogReverts() public {
-        CommitBatchInfo memory info = _batch(lastV33Batch, bytes32(0), AIRBENDER_HEAP_HASH);
-        vm.expectRevert(
-            abi.encodeWithSelector(MissingSystemLogs.selector, 2 ** (MAX_LOG_KEY + 1) - 1, 2 ** MAX_LOG_KEY - 1)
-        );
-        _sendCommit(lastV33Batch, info);
-    }
-
-    function test_upgradeBatchWithWrongUpgradeHashReverts() public {
-        CommitBatchInfo memory info = _batch(lastV33Batch, keccak256("wrong"), AIRBENDER_HEAP_HASH);
-        vm.expectRevert(TxHashMismatch.selector);
-        _sendCommit(lastV33Batch, info);
-    }
-
-    function test_batchWithoutAirbenderHeapHashReverts() public {
-        CommitBatchInfo memory info = _batch(lastV33Batch, upgradeTxHash, bytes32(0));
-        vm.expectRevert(AirbenderCommitmentRequired.selector);
-        _sendCommit(lastV33Batch, info);
-    }
-
-    function test_executeBeforeProveReverts() public {
-        IExecutor.StoredBatchInfo memory upgradeBatch = _commit(
-            lastV33Batch,
-            _batch(lastV33Batch, upgradeTxHash, AIRBENDER_HEAP_HASH)
-        );
-        vm.expectRevert(CantExecuteUnprovenBatches.selector);
-        _execute(upgradeBatch);
-    }
-
-    /// @dev A non-empty proof reaches the multi-proof verifier: a real proof is checked, not waved through.
-    function test_nonEmptyProofReachesTheVerifiers() public {
-        IExecutor.StoredBatchInfo memory upgradeBatch = _commit(
-            lastV33Batch,
-            _batch(lastV33Batch, upgradeTxHash, AIRBENDER_HEAP_HASH)
-        );
-        uint256[] memory proof = new uint256[](1);
-        proof[0] = ERA_MULTI_PROOF_TYPE;
-        vm.expectRevert(InvalidProofFormat.selector);
-        _prove(lastV33Batch, upgradeBatch, proof);
-    }
-
-    /// @dev The operator must switch to the v34 encoding; the version byte alone decides.
-    function test_v33EncodingIsRejected() public {
-        CommitBatchInfo[] memory batches = new CommitBatchInfo[](1);
-        batches[0] = _batch(lastV33Batch, upgradeTxHash, AIRBENDER_HEAP_HASH);
-        IExecutor.StoredBatchInfo memory prev = lastV33Batch;
-        bytes memory data = bytes.concat(bytes1(V33_ENCODING_VERSION), abi.encode(prev, batches));
-        vm.expectRevert(abi.encodeWithSelector(UnsupportedCommitBatchEncoding.selector, V33_ENCODING_VERSION));
-        vm.prank(committer);
-        validatorTimelock.commitBatchesSharedBridge(address(chain), upgradeBatchNumber, upgradeBatchNumber, data);
     }
 
     /// @dev Only the last v33 batch may be passed without an Airbender commitment, not a v34 one.

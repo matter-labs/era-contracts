@@ -11,24 +11,16 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
+import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
-import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
 import {Utils} from "../../utils/Utils.sol";
@@ -43,30 +35,15 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 /// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0. From then on every batch needs a Boojum and an
 /// Airbender proof; the release also ships the force-fail bootloader, the 15M user L1->L2 gas cap and an EVM
 /// emulator fix.
-/// @dev Deploys, through CREATE2 with the input's salt: the six facets, `AirbenderVerifierPlonk`, the
-/// multi-proof verifier over an `EraVerifierFflonk` and the new `AirbenderVerifierPlonk`,
-/// `EraSettlementLayerV34Upgrade`, and new `EraChainTypeManager` and `ServerNotifier` implementations. The
-/// `EraVerifierFflonk` is the live one, or a fresh one with `deploy_verifier_fflonk` (testnet3, whose live one
-/// has a non-genesis key). With `governance_upgrade_timer_initial_delay`, also a `GovernanceUpgradeTimer` and an
-/// `UpgradeStageValidator`. Everything else is reused, so the base helpers that would redeploy it
-/// (`deployStateTransitionDiamondFacets`, `deployVerifiers`, v31's `deployNewCTMContracts`) are not called.
-/// Constructor values come from the input, checked against live state where a getter exists.
-/// `initializeWithArgs` is not used: by default, a pre-v31 first chain on the bridgehub (stage's 270) puts its
-/// introspection in v29 mode, which zeroes values this upgrade needs.
+/// @dev Initialized by `initializeWithArgs` from the env's permanent values; the rest is introspected from the CTM
+/// or read from the v34 genesis. Deploys, through CREATE2 with the input's salt: the six facets, a fresh
+/// `EraVerifierFflonk`, `AirbenderVerifierPlonk`, the multi-proof verifier over both, `EraSettlementLayerV34Upgrade`,
+/// new `EraChainTypeManager` and `ServerNotifier` implementations, a `GovernanceUpgradeTimer` and an
+/// `UpgradeStageValidator`. The CTM's `DiamondInit` and the facets' EIP-7702 checker are reused: neither has a
+/// getter, so the input names them.
 ///
-/// Governance: stage 0 pauses migrations; stage 1 upgrades the CTM proxy (the new `ChainCreationParams` only
-/// decodes on the new implementation), then calls `setNewVersionUpgrade` and `setChainCreationParams`; stage 2
-/// unpauses. With the timer, stage 0 starts it, stage 1 re-pauses and checks the deadline and the pause first,
-/// and stage 2 checks the upgrade and the unpause. The ServerNotifier upgrade is sent separately, by the owner
-/// of its ProxyAdmin.
-///
-/// The L2 upgrade transaction is v33's: `ContractDeployer.forceDeployOnAddresses` of the 31 system contracts.
-/// The three base-system bytecodes come first in its factory deps, which is how the node learns them. It is
-/// the same for every chain.
-///
-/// New chains get the new facets, the reused genesis upgrade and `DiamondInit`, the v34 genesis, and
-/// force-deployment data rebuilt with this build's L2 bytecode; its other values are carried over from the
-/// CTM's stored copy after checks against the bridgehub and CTM.
+/// The L2 upgrade transaction is v33's: `ContractDeployer.forceDeployOnAddresses` of the 31 system contracts, the
+/// same for every chain.
 ///
 /// `prepare` broadcasts only the deployments and the factory-dep publication, both permissionless, and writes
 /// everything else to the output TOML.
@@ -74,222 +51,91 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     using stdToml for string;
 
-    /// @notice Parsed input, see `upgrade-envs/v0.34.0-era/<env>.toml`.
-    // solhint-disable-next-line gas-struct-packing
-    struct V34EraInput {
-        address ctm;
-        address bytecodesSupplier;
-        address permissionlessValidator;
-        address chainAssetHandler;
-        address rollupDAManager;
-        address eip7702Checker;
-        bool deployVerifierFflonk;
-        address verifierFflonk;
-        address diamondInit;
-        uint256 eraChainId;
-        bool testnetVerifier;
-        bytes32 oldVerifierCodehash;
-        bool hasUpgradeTimer;
-        uint256 governanceUpgradeTimerInitialDelay;
-        uint256 oldProtocolVersion;
-        uint256 newProtocolVersion;
-        uint256 upgradeTimestamp;
-        bytes32 create2FactorySalt;
-        bytes currentChainCreationParamsEvent;
-        uint256[] chainIds;
-    }
-
-    V34EraInput internal v34Input;
+    /// @dev Inputs that only feed `[chain_upgrades]` and the test calls.
+    uint256 internal upgradeTimestamp;
+    uint256[] internal chainIds;
     /// @dev abi-encoded ChainCreationParams (structs with nested dynamic arrays cannot be copied to storage by
     ///      the legacy pipeline).
     bytes internal v34NewChainCreationParams;
     address internal v33Verifier;
 
-    function prepare(string memory _inputPath, string memory _outputPath) public {
+    function prepare(string memory _permanentValuesPath, string memory _inputPath, string memory _outputPath) public {
         string memory root = vm.projectRoot();
-        _loadInput(string.concat(root, _inputPath));
-        _checkLiveState();
-        _initializeV34Config();
+        string memory permanent = vm.readFile(string.concat(root, _permanentValuesPath));
+        string memory input = vm.readFile(string.concat(root, _inputPath));
+        require(!permanent.readBool("$.ctm_contracts.ctms[0].is_zk_sync_os"), "v34: first CTM is not Era");
+        initializeWithArgs({
+            ctmProxy: permanent.readAddress("$.ctm_contracts.ctms[0].proxy"),
+            bytecodesSupplier: permanent.readAddress("$.ctm_contracts.ctms[0].bytecodes_supplier"),
+            isZKsyncOS: false,
+            // Introspection leaves it zero; set below from the chains' AdminFacet.
+            rollupDAManager: address(0),
+            create2FactorySalt: input.readBytes32("$.create2_factory_salt"),
+            newConfigPath: _inputPath,
+            _outputPath: _outputPath,
+            governance: address(0),
+            zkTokenAssetId: permanent.readBytes32("$.zk_token_asset_id")
+        });
+        ctmAddresses.daAddresses.daContracts.rollupDAManager = IAdmin(upToDateZkChain.zkChainProxy)
+            .getRollupDAManager();
+        ctmAddresses.stateTransition.facets.diamondInit = input.readAddress("$.diamond_init");
+        ctmAddresses.admin.eip7702Checker = input.readAddress("$.eip7702_checker");
+        upgradeTimestamp = input.readUint("$.upgrade_timestamp");
+        chainIds = input.readUintArray("$.chain_ids");
+        v33Verifier = IChainTypeManager(newConfig.ctm).protocolVersionVerifier(getOldProtocolVersion());
+        _checkLiveState(input.readBytes("$.current_chain_creation_params_event_data"));
 
         _deployV34Contracts();
-        _checkDeployments();
-
         // Era invariant checked inside: factory deps [0..2] == genesis bootloader / AA / EVM emulator.
         publishBytecodes();
         console.log("v34: factory dependencies published");
 
         newlyGeneratedData.upgradeCutData = abi.encode(_buildUpgradeCut());
-        v34NewChainCreationParams = abi.encode(_buildNewChainCreationParams());
+        getFixedForceDeploymentsData();
+        v34NewChainCreationParams = abi.encode(getChainCreationParams(ctmAddresses.stateTransition));
 
-        string memory outputPath = string.concat(root, _outputPath);
-        _saveV34Output(outputPath);
-        console.log("v34: output written to", outputPath);
+        _saveV34Output();
+        console.log("v34: output written to", upgradeConfig.outputPath);
     }
 
-    // ======================== Input and live-state checks ========================
+    // ======================== Live-state checks ========================
 
-    function _loadInput(string memory _path) internal {
-        string memory toml = vm.readFile(_path);
-        v34Input.ctm = toml.readAddress("$.ctm");
-        v34Input.bytecodesSupplier = toml.readAddress("$.bytecodes_supplier");
-        v34Input.permissionlessValidator = toml.readAddress("$.permissionless_validator");
-        v34Input.chainAssetHandler = toml.readAddress("$.chain_asset_handler");
-        v34Input.rollupDAManager = toml.readAddress("$.rollup_da_manager");
-        v34Input.eip7702Checker = toml.readAddress("$.eip7702_checker");
-        v34Input.deployVerifierFflonk = toml.readBool("$.deploy_verifier_fflonk");
-        if (v34Input.deployVerifierFflonk) {
-            require(!toml.keyExists("$.verifier_fflonk"), "v34: verifier_fflonk with deploy_verifier_fflonk");
-        } else {
-            v34Input.verifierFflonk = toml.readAddress("$.verifier_fflonk");
-        }
-        v34Input.diamondInit = toml.readAddress("$.diamond_init");
-        v34Input.eraChainId = toml.readUint("$.era_chain_id");
-        v34Input.testnetVerifier = toml.readBool("$.testnet_verifier");
-        // A production verifier (`EraDualVerifier`) has no IS_TESTNET_VERIFIER(); it is identified by its code.
-        if (v34Input.testnetVerifier) {
-            require(!toml.keyExists("$.old_verifier_codehash"), "v34: old_verifier_codehash with a testnet verifier");
-        } else {
-            v34Input.oldVerifierCodehash = toml.readBytes32("$.old_verifier_codehash");
-        }
-        v34Input.hasUpgradeTimer = toml.keyExists("$.governance_upgrade_timer_initial_delay");
-        if (v34Input.hasUpgradeTimer) {
-            v34Input.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
-        }
-        v34Input.oldProtocolVersion = toml.readUint("$.old_protocol_version");
-        v34Input.newProtocolVersion = toml.readUint("$.new_protocol_version");
-        v34Input.upgradeTimestamp = toml.readUint("$.upgrade_timestamp");
-        v34Input.create2FactorySalt = toml.readBytes32("$.create2_factory_salt");
-        v34Input.currentChainCreationParamsEvent = toml.readBytes("$.current_chain_creation_params_event_data");
-        v34Input.chainIds = toml.readUintArray("$.chain_ids");
-    }
-
-    /// @dev Fail before deploying anything if the input does not describe the live CTM.
-    function _checkLiveState() internal {
-        IChainTypeManager ctm = IChainTypeManager(v34Input.ctm);
+    /// @dev Fail before deploying anything if the CTM is not an Era CTM one minor below the genesis, or the inputs
+    ///      the chain can't confirm by a getter don't match it.
+    function _checkLiveState(bytes memory _currentChainCreationParamsEvent) internal view {
+        IChainTypeManager ctm = IChainTypeManager(newConfig.ctm);
         require(!ctm.isZKsyncOS(), "v34: not an Era CTM");
-        require(ctm.protocolVersion() == v34Input.oldProtocolVersion, "v34: CTM not on old version");
+        require(!UpgradeHelperLib.isPatchUpgrade(getNewProtocolVersion()), "v34: must be a minor upgrade");
         require(
-            UpgradeHelperLib.getProtocolUpgradeNonce(v34Input.newProtocolVersion) ==
-                UpgradeHelperLib.getProtocolUpgradeNonce(v34Input.oldProtocolVersion) + 1,
-            "v34: new version not next minor"
+            UpgradeHelperLib.getProtocolUpgradeNonce(getNewProtocolVersion()) ==
+                UpgradeHelperLib.getProtocolUpgradeNonce(getOldProtocolVersion()) + 1,
+            "v34: CTM not on the previous minor"
         );
-        require(!UpgradeHelperLib.isPatchUpgrade(v34Input.newProtocolVersion), "v34: must be a minor upgrade");
-        require(v34Input.upgradeTimestamp != 0, "v34: zero upgrade timestamp");
+        require(getGovernanceUpgradeTimerInitialDelay() != 0, "v34: no governance_upgrade_timer_initial_delay");
+        // A testnet verifier accepts empty proofs: never on a chain whose verifier isn't one. v0.33.0's testnet
+        // verifier has this getter; its production one doesn't, so the call reverts there.
+        if (config.testnetVerifier) {
+            require(
+                IEraMultiProofVerifier(v33Verifier).IS_TESTNET_VERIFIER(),
+                "v34: old verifier is not a testnet one"
+            );
+        }
+        require(upgradeTimestamp != 0, "v34: zero upgrade timestamp");
         // No "immediately" (1) outside testnets: a production chain gets a real date.
         require(
-            v34Input.testnetVerifier || v34Input.upgradeTimestamp > block.timestamp,
+            config.testnetVerifier || upgradeTimestamp > block.timestamp,
             "v34: upgrade timestamp not in the future"
         );
-        require(v34Input.create2FactorySalt != bytes32(0), "v34: zero salt");
 
-        // The new CTM implementation's constructor arguments are the live CTM's immutables.
-        ChainTypeManagerBase liveCtm = ChainTypeManagerBase(v34Input.ctm);
-        require(liveCtm.L1_BYTECODES_SUPPLIER() == v34Input.bytecodesSupplier, "v34: supplier is not the CTM's");
-        require(
-            liveCtm.PERMISSIONLESS_VALIDATOR() == v34Input.permissionlessValidator,
-            "v34: permissionless validator is not the CTM's"
+        // The CTM's last NewChainCreationParams event: the reused DiamondInit is its cut's.
+        (, , , , Diamond.DiamondCutData memory initialCut, , , ) = abi.decode(
+            _currentChainCreationParamsEvent,
+            (address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32)
         );
-        require(liveCtm.INTEROP_CENTER() == L2_INTEROP_CENTER_ADDR, "v34: unexpected interop center");
+        require(keccak256(abi.encode(initialCut)) == ctm.initialCutHash(), "v34: stale creation cut");
         require(
-            IBridgehubBase(ctm.BRIDGE_HUB()).chainAssetHandler() == v34Input.chainAssetHandler,
-            "v34: chain asset handler is not the bridgehub's"
-        );
-
-        v33Verifier = ctm.protocolVersionVerifier(v34Input.oldProtocolVersion);
-        require(v33Verifier != address(0), "v34: no verifier for old version");
-        if (v34Input.testnetVerifier) {
-            require(ILiveEraVerifier(v33Verifier).IS_TESTNET_VERIFIER(), "v34: the live verifier is not a testnet one");
-        } else {
-            require(v33Verifier.codehash == v34Input.oldVerifierCodehash, "v34: the live verifier's code differs");
-        }
-        if (!v34Input.deployVerifierFflonk) {
-            require(
-                ILiveEraVerifier(v33Verifier).FFLONK_VERIFIER() == v34Input.verifierFflonk,
-                "v34: FFLONK verifier is not the live one"
-            );
-        }
-
-        (
-            address genesisUpgrade,
-            ,
-            ,
-            ,
-            Diamond.DiamondCutData memory initialCut,
-            bytes32 initialCutHash,
-            bytes memory forceDeploymentsData,
-            bytes32 forceDeploymentHash
-        ) = _decodeChainCreationParamsEvent();
-        require(genesisUpgrade == ctm.l1GenesisUpgrade(), "v34: genesis upgrade mismatch");
-        require(initialCutHash == ctm.initialCutHash(), "v34: stale creation cut");
-        require(keccak256(abi.encode(initialCut)) == initialCutHash, "v34: creation cut hash mismatch");
-        require(initialCut.initAddress == v34Input.diamondInit, "v34: diamond init is not the CTM's");
-        require(forceDeploymentHash == liveCtm.initialForceDeploymentHash(), "v34: stale force deployments");
-        // ChainTypeManagerBase hashes the ABI-encoded bytes, not the raw bytes.
-        require(keccak256(abi.encode(forceDeploymentsData)) == forceDeploymentHash, "v34: force deployments hash");
-
-        uint256 chainCount = v34Input.chainIds.length;
-        require(chainCount > 0, "v34: no chains");
-        for (uint256 i = 0; i < chainCount; ++i) {
-            address chain = ctm.getZKChain(v34Input.chainIds[i]);
-            require(chain != address(0), "v34: chain not on CTM");
-            require(
-                IGetters(chain).getProtocolVersion() == v34Input.oldProtocolVersion,
-                "v34: chain not on old version"
-            );
-            require(IGetters(chain).getVerifier() == v33Verifier, "v34: chain verifier is not the CTM's");
-        }
-
-        // The new AdminFacet's RollupDAManager must be the one the live facet uses.
-        address liveAdminFacet = IGetters(ctm.getZKChain(v34Input.chainIds[0])).facetAddress(
-            IAdmin.upgradeChainFromVersion.selector
-        );
-        require(
-            ILiveAdminFacet(liveAdminFacet).ROLLUP_DA_MANAGER() == v34Input.rollupDAManager,
-            "v34: rollup DA manager is not the live admin facet's"
-        );
-        require(v34Input.eip7702Checker.code.length > 0, "v34: EIP-7702 checker has no code");
-    }
-
-    /// @dev Sets every value the deployments and calls read.
-    function _initializeV34Config() internal {
-        setCreate2Salt(v34Input.create2FactorySalt);
-        config.l1ChainId = block.chainid;
-        config.isZKsyncOS = false;
-        config.eraChainId = v34Input.eraChainId;
-        config.testnetVerifier = v34Input.testnetVerifier;
-        newConfig.oldProtocolVersion = v34Input.oldProtocolVersion;
-
-        IChainTypeManager ctm = IChainTypeManager(v34Input.ctm);
-        address bridgehubAddr = ctm.BRIDGE_HUB();
-        bridgehub = L1Bridgehub(bridgehubAddr);
-        coreAddresses.bridgehub.proxies.bridgehub = bridgehubAddr;
-        coreAddresses.bridgehub.proxies.chainAssetHandler = v34Input.chainAssetHandler;
-
-        ctmAddresses.stateTransition.proxies.chainTypeManager = v34Input.ctm;
-        ctmAddresses.stateTransition.proxies.bytecodesSupplier = v34Input.bytecodesSupplier;
-        ctmAddresses.stateTransition.proxies.permissionlessValidator = v34Input.permissionlessValidator;
-        ctmAddresses.stateTransition.proxies.serverNotifier = ctm.serverNotifierAddress();
-        ctmAddresses.stateTransition.genesisUpgrade = ctm.l1GenesisUpgrade();
-        ctmAddresses.stateTransition.facets.diamondInit = v34Input.diamondInit;
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = v34Input.verifierFflonk;
-        ctmAddresses.admin.transparentProxyAdmin = Utils.getProxyAdminAddress(v34Input.ctm);
-        ctmAddresses.admin.eip7702Checker = v34Input.eip7702Checker;
-        ctmAddresses.daAddresses.daContracts.rollupDAManager = v34Input.rollupDAManager;
-
-        if (v34Input.hasUpgradeTimer) {
-            // What the base's getCreationCalldata gives the timer: its governance, which starts and is checked
-            // by the stages, is the CTM owner that sends them; its owner is the same PUH, as in v31.
-            address ctmOwner = IOwnable(v34Input.ctm).owner();
-            config.ownerAddress = ctmOwner;
-            newConfig.ecosystemAdminAddress = ctmOwner;
-            newConfig.governanceUpgradeTimerInitialDelay = v34Input.governanceUpgradeTimerInitialDelay;
-        }
-
-        // Genesis batch values and base-system hashes come from this branch's Era genesis.
-        config.contracts.chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath(false));
-        require(
-            config.contracts.chainCreationParams.latestProtocolVersion == v34Input.newProtocolVersion,
-            "v34: genesis is not for the new version"
+            initialCut.initAddress == ctmAddresses.stateTransition.facets.diamondInit,
+            "v34: diamond_init is not the CTM's"
         );
     }
 
@@ -308,11 +154,10 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             false
         );
         // Before the multi-proof verifier, whose constructor arguments are read at its deployment.
-        if (v34Input.deployVerifierFflonk) {
-            ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract("EraVerifierFflonk", false);
-        }
+        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract("EraVerifierFflonk", false);
         (, string memory verifierName) = DeployCTML1OrGateway.resolveChainVerifier(false, config.testnetVerifier);
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
+        _checkVerificationKeys();
 
         ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
 
@@ -320,70 +165,27 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmName, false);
         ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
 
-        // The validator's constructor takes getNewProtocolVersion(), set by _initializeV34Config.
-        if (v34Input.hasUpgradeTimer) {
-            deployGovernanceUpgradeTimer();
-            deployUpgradeStageValidator();
-        }
+        // The validator's constructor takes getNewProtocolVersion().
+        deployGovernanceUpgradeTimer();
+        deployUpgradeStageValidator();
     }
 
     function deployUsedUpgradeContract() internal virtual override returns (address) {
         return deploySimpleContract("EraSettlementLayerV34Upgrade", false);
     }
 
-    /// @dev The deployed contracts must match the live ones they replace, the verifier must carry the genesis VKs,
-    ///      and the timer and stage validator must be bound to this CTM and its owner.
-    function _checkDeployments() internal {
-        ChainTypeManagerBase liveCtm = ChainTypeManagerBase(v34Input.ctm);
-        ChainTypeManagerBase newCtm = ChainTypeManagerBase(
-            ctmAddresses.stateTransition.implementations.chainTypeManager
-        );
-        require(newCtm.BRIDGE_HUB() == liveCtm.BRIDGE_HUB(), "v34: new CTM BRIDGE_HUB");
-        require(newCtm.INTEROP_CENTER() == liveCtm.INTEROP_CENTER(), "v34: new CTM INTEROP_CENTER");
-        require(newCtm.L1_BYTECODES_SUPPLIER() == liveCtm.L1_BYTECODES_SUPPLIER(), "v34: new CTM supplier");
-        require(
-            newCtm.PERMISSIONLESS_VALIDATOR() == liveCtm.PERMISSIONLESS_VALIDATOR(),
-            "v34: new CTM permissionless validator"
-        );
-        require(!newCtm.isZKsyncOS(), "v34: new CTM is not Era");
-
-        address verifier = ctmAddresses.stateTransition.verifiers.verifier;
-        require(
-            address(IEraMultiProofVerifier(verifier).BOOJUM_VERIFIER()) ==
-                ctmAddresses.stateTransition.verifiers.verifierFflonk,
-            "v34: verifier Boojum slot"
-        );
-        require(
-            address(IEraMultiProofVerifier(verifier).AIRBENDER_VERIFIER()) ==
-                ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk,
-            "v34: verifier Airbender slot"
-        );
-        require(
-            IEraMultiProofVerifier(verifier).IS_TESTNET_VERIFIER() == v34Input.testnetVerifier,
-            "v34: verifier testnet flag"
-        );
+    /// @dev The prover proves against the genesis keys.
+    function _checkVerificationKeys() internal {
+        EraMultiProofVerifier verifier = EraMultiProofVerifier(ctmAddresses.stateTransition.verifiers.verifier);
         string memory genesis = vm.readFile(Utils.genesisConfigPath(false));
         require(
-            EraMultiProofVerifier(verifier).verificationKeyHash(0) ==
-                vm.parseJsonBytes32(genesis, "$.prover.fflonk_snark_wrapper_vk_hash"),
+            verifier.verificationKeyHash(0) == vm.parseJsonBytes32(genesis, "$.prover.fflonk_snark_wrapper_vk_hash"),
             "v34: Boojum VK is not the genesis one"
         );
         require(
-            EraMultiProofVerifier(verifier).verificationKeyHash(2) ==
-                vm.parseJsonBytes32(genesis, "$.prover.airbender_snark_wrapper_vk_hash"),
+            verifier.verificationKeyHash(2) == vm.parseJsonBytes32(genesis, "$.prover.airbender_snark_wrapper_vk_hash"),
             "v34: Airbender VK is not the genesis one"
         );
-
-        if (v34Input.hasUpgradeTimer) {
-            GovernanceUpgradeTimer timer = GovernanceUpgradeTimer(upgradeAddresses.upgradeTimer);
-            address ctmOwner = IOwnable(v34Input.ctm).owner();
-            require(timer.TIMER_GOVERNANCE() == ctmOwner, "v34: timer governance is not the CTM owner");
-            require(timer.owner() == ctmOwner, "v34: timer owner is not the CTM owner");
-            require(timer.INITIAL_DELAY() == v34Input.governanceUpgradeTimerInitialDelay, "v34: timer delay");
-            UpgradeStageValidator validator = UpgradeStageValidator(upgradeAddresses.upgradeStageValidator);
-            require(address(validator.CHAIN_TYPE_MANAGER()) == v34Input.ctm, "v34: stage validator CTM");
-            require(validator.NEW_PROTOCOL_VERSION() == v34Input.newProtocolVersion, "v34: stage validator version");
-        }
     }
 
     // ======================== Upgrade data ========================
@@ -398,51 +200,8 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
                 _l1ChainId: config.l1ChainId,
                 _ownerAddress: address(0),
                 _factoryDepsResult: factoryDepsResult,
-                _registeredChainIdDiamondProxy: IChainTypeManager(v34Input.ctm).getZKChain(v34Input.chainIds[0])
+                _registeredChainIdDiamondProxy: bridgehub.getZKChain(chainIds[0])
             });
-    }
-
-    /// @dev New facets in the creation cut, the reused genesis upgrade and diamond init, the v34 genesis.
-    function _buildNewChainCreationParams() internal returns (ChainCreationParams memory) {
-        (, , , , , , bytes memory storedForceDeployments, ) = _decodeChainCreationParamsEvent();
-        generatedData.forceDeploymentsData = _rebuildForceDeploymentsData(storedForceDeployments);
-        return getChainCreationParams(ctmAddresses.stateTransition);
-    }
-
-    /// @dev Rebuild the new-chain force-deployment data with this build's L2 bytecode, carrying the
-    ///      non-bytecode values over from the CTM's stored blob. Each carried value is checked against the
-    ///      live bridgehub / CTM first.
-    function _rebuildForceDeploymentsData(bytes memory _stored) internal returns (bytes memory) {
-        FixedForceDeploymentsData memory stored = abi.decode(_stored, (FixedForceDeploymentsData));
-        IChainTypeManager ctm = IChainTypeManager(v34Input.ctm);
-
-        address governance = AddressAliasHelper.undoL1ToL2Alias(stored.aliasedL1Governance);
-        address chainRegistrationSender = AddressAliasHelper.undoL1ToL2Alias(stored.aliasedChainRegistrationSender);
-        require(stored.l1ChainId == block.chainid, "v34: stored l1ChainId mismatch");
-        require(stored.eraChainId == v34Input.eraChainId, "v34: stored eraChainId mismatch");
-        require(stored.l1AssetRouter == address(bridgehub.assetRouter()), "v34: stored asset router stale");
-        require(governance == IOwnable(address(ctm)).owner(), "v34: stored governance stale");
-        require(chainRegistrationSender == bridgehub.chainRegistrationSender(), "v34: stored CRS stale");
-        require(stored.maxNumberOfZKChains == bridgehub.MAX_NUMBER_OF_ZK_CHAINS(), "v34: stored chain limit stale");
-        // The builder hard-codes these to zero; refuse to silently drop a non-zero value.
-        require(
-            stored.l2SharedBridgeLegacyImpl == address(0) && stored.l2BridgedStandardERC20Impl == address(0),
-            "v34: stored legacy impls set"
-        );
-        require(stored.dangerousTestOnlyForcedBeacon == address(0), "v34: stored test-only beacon set");
-
-        config.contracts.maxNumberOfChains = stored.maxNumberOfZKChains;
-        config.zkTokenAssetId = stored.zkTokenAssetId;
-        coreAddresses.bridges.proxies.l1AssetRouter = stored.l1AssetRouter;
-        coreAddresses.bridgehub.proxies.chainRegistrationSender = chainRegistrationSender;
-
-        FixedForceDeploymentsData memory rebuilt = _buildForceDeploymentsData(governance, address(0));
-        require(rebuilt.aliasedL1Governance == stored.aliasedL1Governance, "v34: governance alias differs");
-        require(
-            rebuilt.aliasedChainRegistrationSender == stored.aliasedChainRegistrationSender,
-            "v34: CRS alias differs"
-        );
-        return abi.encode(rebuilt);
     }
 
     /// @notice v34 force-deploys the system contracts only, as v33: the L2 core contracts hold live storage.
@@ -455,59 +214,35 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Calls ========================
 
-    // Not the base stages: its stage 0 doesn't pause, its stage 2 doesn't unpause, its stage 1 adds a DA validator
-    // call, and all three require the timer and validator, which only some environments deploy.
-    function prepareStage0GovernanceCalls() public override returns (Call[] memory calls) {
-        if (!v34Input.hasUpgradeTimer) {
-            return preparePauseGatewayMigrationsCall();
-        }
-        Call[][] memory allCalls = new Call[][](2);
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = prepareGovernanceUpgradeTimerStartCall();
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
+    function prepareVersionSpecificStage0GovernanceCallsL1() public view override returns (Call[] memory) {
+        return preparePauseGatewayMigrationsCall();
     }
 
-    function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        uint256 timerCalls = v34Input.hasUpgradeTimer ? 3 : 0;
-        Call[][] memory allCalls = new Call[][](timerCalls + 3);
-        if (v34Input.hasUpgradeTimer) {
-            // Re-pause first: an emergency execution unfreezes, which unpauses migrations, before running the
-            // proposal's calls. Idempotent otherwise.
-            allCalls[0] = preparePauseGatewayMigrationsCall();
-            allCalls[1] = prepareGovernanceUpgradeTimerCheckCall();
-            allCalls[2] = prepareCheckMigrationsPausedCalls();
-        }
-        allCalls[timerCalls] = prepareUpgradeCTMCalls();
-        allCalls[timerCalls + 1] = provideSetNewVersionUpgradeCall();
-        allCalls[timerCalls + 2] = prepareNewChainCreationParamsCall();
-        // The base recomputes the creation params; they must be the ones the output and the test chain use.
-        ChainCreationParams memory newParams = abi.decode(v34NewChainCreationParams, (ChainCreationParams));
-        require(
-            keccak256(allCalls[timerCalls + 2][0].data) ==
-                keccak256(abi.encodeCall(IChainTypeManager.setChainCreationParams, (newParams))),
-            "v34: creation params differ"
-        );
+    /// @dev Re-pause first: an emergency execution unfreezes, which unpauses migrations, before running the
+    ///      proposal's calls. Idempotent otherwise.
+    function prepareGovernanceUpgradeTimerCheckCall() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](2);
+        allCalls[0] = preparePauseGatewayMigrationsCall();
+        allCalls[1] = super.prepareGovernanceUpgradeTimerCheckCall();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareStage2GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](v34Input.hasUpgradeTimer ? 3 : 1);
+        Call[][] memory allCalls = new Call[][](3);
         allCalls[0] = new Call[](1);
         allCalls[0][0] = Call({
             target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
         });
-        if (v34Input.hasUpgradeTimer) {
-            allCalls[1] = prepareCheckUpgradeIsPresent();
-            allCalls[2] = prepareCheckMigrationsUnpausedCalls();
-        }
+        allCalls[1] = prepareCheckUpgradeIsPresent();
+        allCalls[2] = prepareCheckMigrationsUnpausedCalls();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     /// @notice The call a chain admin makes on the chain's diamond to move it from the old to the new version.
     function _v34UpgradeChainCall(uint256 _chainId) internal view returns (Call memory) {
-        address chain = IChainTypeManager(v34Input.ctm).getZKChain(_chainId);
+        address chain = bridgehub.getZKChain(_chainId);
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
             (Diamond.DiamondCutData)
@@ -516,13 +251,13 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             Call({
                 target: chain,
                 value: 0,
-                data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (chain, v34Input.oldProtocolVersion, upgradeCut))
+                data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (chain, getOldProtocolVersion(), upgradeCut))
             });
     }
 
     /// @notice The ChainAdmin multicall that upgrades one chain once stage 1 has executed.
     function getV34ChainUpgradeCall(uint256 _chainId) public view returns (address admin, bytes memory data) {
-        admin = IChainTypeManager(v34Input.ctm).getChainAdmin(_chainId);
+        admin = IChainTypeManager(newConfig.ctm).getChainAdmin(_chainId);
         Call[] memory calls = new Call[](1);
         calls[0] = _v34UpgradeChainCall(_chainId);
         data = abi.encodeCall(IChainAdmin.multicall, (calls, true));
@@ -538,13 +273,13 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     ) public view returns (bytes memory setUpgradeTimestamp, bytes memory serverNotifierTimestamp) {
         setUpgradeTimestamp = abi.encodeCall(
             IChainAdminOwnable.setUpgradeTimestamp,
-            (v34Input.newProtocolVersion, v34Input.upgradeTimestamp)
+            (getNewProtocolVersion(), upgradeTimestamp)
         );
         Call[] memory notifierCall = new Call[](1);
         notifierCall[0] = Call({
             target: ctmAddresses.stateTransition.proxies.serverNotifier,
             value: 0,
-            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, v34Input.upgradeTimestamp))
+            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, upgradeTimestamp))
         });
         serverNotifierTimestamp = abi.encodeCall(IChainAdmin.multicall, (notifierCall, true));
     }
@@ -558,8 +293,8 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             IL1Bridgehub.createNewChain,
             (
                 ERA_TEST_CREATE_CHAIN_ID,
-                v34Input.ctm,
-                bridgehub.baseTokenAssetId(v34Input.chainIds[0]),
+                newConfig.ctm,
+                bridgehub.baseTokenAssetId(chainIds[0]),
                 5,
                 caller,
                 abi.encode(abi.encode(newParams.diamondCut), newParams.forceDeploymentsData),
@@ -570,7 +305,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Output ========================
 
-    function _saveV34Output(string memory _outputPath) internal {
+    function _saveV34Output() internal {
         vm.serializeString("root", "contracts_config", _serializeContractsConfig());
         vm.serializeString("root", "state_transition", _serializeStateTransition());
         vm.serializeString("root", "deployed_addresses", _serializeDeployedAddresses());
@@ -578,9 +313,8 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         vm.serializeString("root", "governance_calls", _serializeGovernanceCalls());
         vm.serializeString("root", "chain_upgrades", _serializeChainUpgrades());
         string memory toml = vm.serializeString("root", "test_upgrade_calls", _serializeV34TestCalls());
-        vm.writeToml(toml, _outputPath);
+        vm.writeToml(toml, upgradeConfig.outputPath);
         // Adds [ctm_admin_calls] to the file just written.
-        upgradeConfig.outputPath = _outputPath;
         prepareDefaultCTMAdminCalls();
     }
 
@@ -591,10 +325,14 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         ProposedUpgrade memory proposedUpgrade = abi.decode(Bytes.slice(upgradeCut.initCalldata, 4), (ProposedUpgrade));
         address verifier = ctmAddresses.stateTransition.verifiers.verifier;
 
-        vm.serializeUint("contracts_config", "old_protocol_version", v34Input.oldProtocolVersion);
-        vm.serializeUint("contracts_config", "new_protocol_version", v34Input.newProtocolVersion);
-        vm.serializeAddress("contracts_config", "chain_type_manager", v34Input.ctm);
-        vm.serializeAddress("contracts_config", "bytecodes_supplier", v34Input.bytecodesSupplier);
+        vm.serializeUint("contracts_config", "old_protocol_version", getOldProtocolVersion());
+        vm.serializeUint("contracts_config", "new_protocol_version", getNewProtocolVersion());
+        vm.serializeAddress("contracts_config", "chain_type_manager", newConfig.ctm);
+        vm.serializeAddress(
+            "contracts_config",
+            "bytecodes_supplier",
+            ctmAddresses.stateTransition.proxies.bytecodesSupplier
+        );
         vm.serializeAddress("contracts_config", "verifier", verifier);
         vm.serializeAddress("contracts_config", "old_verifier", v33Verifier);
         // The no-argument VK hash the node stores as the version's snark wrapper key (Boojum FFLONK here).
@@ -603,11 +341,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             "verifier_vk_hash",
             EraMultiProofVerifier(verifier).verificationKeyHash()
         );
-        vm.serializeBytes32(
-            "contracts_config",
-            "old_verifier_vk_hash",
-            ILiveEraVerifier(v33Verifier).verificationKeyHash()
-        );
+        vm.serializeBytes32("contracts_config", "old_verifier_vk_hash", IVerifier(v33Verifier).verificationKeyHash());
         vm.serializeBytes32("contracts_config", "bootloader_hash", proposedUpgrade.bootloaderHash);
         vm.serializeBytes32("contracts_config", "default_aa_hash", proposedUpgrade.defaultAccountHash);
         vm.serializeBytes32("contracts_config", "evm_emulator_hash", proposedUpgrade.evmEmulatorHash);
@@ -681,14 +415,8 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             "server_notifier_proxy_addr",
             ctmAddresses.stateTransition.proxies.serverNotifier
         );
-        if (v34Input.hasUpgradeTimer) {
-            vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", upgradeAddresses.upgradeTimer);
-            vm.serializeAddress(
-                "deployed_addresses",
-                "upgrade_stage_validator",
-                upgradeAddresses.upgradeStageValidator
-            );
-        }
+        vm.serializeAddress("deployed_addresses", "l1_governance_upgrade_timer", upgradeAddresses.upgradeTimer);
+        vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
         return
             vm.serializeAddress(
                 "deployed_addresses",
@@ -711,10 +439,10 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     }
 
     function _serializeChainUpgrades() internal returns (string memory chainUpgrades) {
-        uint256 chainCount = v34Input.chainIds.length;
+        uint256 chainCount = chainIds.length;
         for (uint256 i = 0; i < chainCount; ++i) {
-            string memory key = vm.toString(v34Input.chainIds[i]);
-            chainUpgrades = vm.serializeString("chain_upgrades", key, _serializeChainUpgrade(v34Input.chainIds[i]));
+            string memory key = vm.toString(chainIds[i]);
+            chainUpgrades = vm.serializeString("chain_upgrades", key, _serializeChainUpgrade(chainIds[i]));
         }
     }
 
@@ -725,7 +453,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         string memory key = vm.toString(_chainId);
         (address admin, bytes memory upgradeCalldata) = getV34ChainUpgradeCall(_chainId);
         (bytes memory setTimestamp, bytes memory notifierTimestamp) = getV34ChainTimestampCalldata(_chainId);
-        vm.serializeAddress(key, "chain", IChainTypeManager(v34Input.ctm).getZKChain(_chainId));
+        vm.serializeAddress(key, "chain", bridgehub.getZKChain(_chainId));
         vm.serializeAddress(key, "chain_admin", admin);
         vm.serializeAddress(key, "chain_admin_owner", IOwnable(admin).owner());
         vm.serializeBytes(key, "set_upgrade_timestamp_calldata", setTimestamp);
@@ -740,7 +468,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         Call[] memory createChain = new Call[](1);
         createChain[0] = Call({target: address(bridgehub), value: 0, data: createChainData});
         Call[] memory upgradeChain = new Call[](1);
-        upgradeChain[0] = _v34UpgradeChainCall(v34Input.chainIds[0]);
+        upgradeChain[0] = _v34UpgradeChainCall(chainIds[0]);
 
         vm.serializeBytes("test_upgrade_calls", "test_create_chain_era", abi.encode(createChain));
         vm.serializeAddress("test_upgrade_calls", "test_create_chain_era_caller", createChainCaller);
@@ -749,45 +477,7 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             vm.serializeAddress(
                 "test_upgrade_calls",
                 "test_upgrade_chain_era_caller",
-                IChainTypeManager(v34Input.ctm).getChainAdmin(v34Input.chainIds[0])
+                IChainTypeManager(newConfig.ctm).getChainAdmin(chainIds[0])
             );
     }
-
-    // ======================== Helpers ========================
-
-    function _decodeChainCreationParamsEvent()
-        internal
-        view
-        returns (
-            address genesisUpgrade,
-            bytes32 genesisBatchHash,
-            uint64 genesisIndexRepeatedStorageChanges,
-            bytes32 genesisBatchCommitment,
-            Diamond.DiamondCutData memory initialCut,
-            bytes32 initialCutHash,
-            bytes memory forceDeploymentsData,
-            bytes32 forceDeploymentHash
-        )
-    {
-        return
-            abi.decode(
-                v34Input.currentChainCreationParamsEvent,
-                (address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32)
-            );
-    }
-}
-
-/// @dev The pre-v34 Era verifier (`EraTestnetVerifier` / `EraDualVerifier`) the CTM runs for v0.33.0.
-interface ILiveEraVerifier {
-    // solhint-disable-next-line func-name-mixedcase
-    function FFLONK_VERIFIER() external view returns (address);
-    // solhint-disable-next-line func-name-mixedcase
-    function IS_TESTNET_VERIFIER() external view returns (bool);
-    function verificationKeyHash() external view returns (bytes32);
-}
-
-/// @dev The live AdminFacet's public immutable.
-interface ILiveAdminFacet {
-    // solhint-disable-next-line func-name-mixedcase
-    function ROLLUP_DA_MANAGER() external view returns (address);
 }

@@ -117,6 +117,21 @@ impersonated or the delay advanced.
 > longer owns the ecosystem contracts). Pass `fork_block` = a block _before_ the
 > deployment; CREATE2 addresses are deterministic, so the output is identical.
 
+### Forge-script upgrades
+
+An upgrade whose `upgrade-envs/<upgrade>/upgrade.toml` says `prepare = "forge-script"` runs one forge script on
+the fork and checks the result with its own `verify_fork` / `verify_chain` commands instead of PUVT. Pass
+`--upgrade <upgrade>` (in CI, `-f upgrade=<upgrade>`); the rest is as above:
+
+```bash
+protocol_ops ecosystem rehearse-upgrade --upgrade <upgrade> --env <env> --fork-url <l1-rpc> \
+  --deployer-address <deployer-eoa> [--fork-block <n>]
+protocol_ops ecosystem replay-bundle --bundle <copy of output/<env>/deploy-bundle> --fork-url <l1-rpc>
+```
+
+Locally the bytecode must be the Linux CI build (`build-artifacts` of the branch's l1-contracts-ci run, unpacked
+at the repository root): macOS zksolc hashes differ, and the prepare's factory-dep check against the genesis fails.
+
 ---
 
 ## Step 2 — deploy (broadcast) + verify
