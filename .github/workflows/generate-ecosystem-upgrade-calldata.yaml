@@ -361,18 +361,12 @@ jobs:
           GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
-          # BLANK = the current release: the one upgrade-envs/v<major>.<minor>.<patch>-<name>/ of the
-          # genesis version, the upgrade protocol-ops defaults to (`current_release`).
+          # BLANK = the current release, the upgrade protocol-ops defaults to (scripts/current-release.ts).
           UPGRADE="$INPUT_UPGRADE"
           if [ -z "$UPGRADE" ]; then
-            PREFIX="$(jq -r '.protocol_semantic_version | "v\(.major).\(.minor).\(.patch)-"' configs/genesis/zksync-os/latest.json)"
-            shopt -s nullglob
-            CURRENT=(l1-contracts/upgrade-envs/"$PREFIX"*/)
-            shopt -u nullglob
-            if [ "${#CURRENT[@]}" -ne 1 ]; then
-              echo "::error::configs/genesis/zksync-os/latest.json is at ${PREFIX%-}, so upgrade-envs/ must hold exactly one ${PREFIX}<name> directory; found ${#CURRENT[@]}"; exit 1
-            fi
-            UPGRADE="$(basename "${CURRENT[0]}")"
+            UPGRADE="$(yarn -s ts-node scripts/current-release.ts)" || {
+              echo "::error::cannot resolve the current release (see the error above)"; exit 1
+            }
           fi
           # The upgrade is a directory name under upgrade-envs/; never a path. Matched as a whole
           # string (no newline either), since it goes into $GITHUB_ENV.
