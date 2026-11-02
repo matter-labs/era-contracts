@@ -38,8 +38,8 @@ Finished, and described where it now lives:
 - **`UpgradeStageValidator` and `GovernanceUpgradeTimer` are deleted.** The bootstrap's
   `migrate()` and `validateApplied()` check its preconditions and completion themselves.
 - **The ServerNotifier is an ordinary CTM-domain row.** After the bootstrap's one-time handover
-  (rendered from live state, `CTMUpgrade_v35.serverNotifierHandoverCalls`;
-  `ServerNotifierHandover.t.sol`) no prepare emits an admin call for it.
+  (rendered from live state, `CTMUpgrade_v35.serverNotifierHandoverCalls`) no prepare emits an
+  admin call for it.
 - **`ProposedUpgrade` is gone.** The engines read the transition (`upgradeFromTransition`) or the
   migration (`upgradeFromBootstrap`); nothing is repackaged into an intermediate struct.
 - **`CTMUpgradeBase` and `DefaultL2UpgradeStrategy` are gone**; the L2 side a version authors is
@@ -56,9 +56,7 @@ Finished, and described where it now lives:
   for the bootstrap edge, the transition's composer for a recurring one. The script-side proposal,
   L2 transaction and delegate-calldata composition are gone.
 - The equivalence evidence is field-level and independent: the bootstrap unit suite builds the
-  expected proposal and transaction from the manifest inputs (`RegistryBootstrapMigration.t.sol`),
-  and on `draft/v0.35.0` `UpgradeTest_Local` decodes the cut the prepare shipped and reads it back
-  field by field.
+  expected proposal and transaction from the manifest inputs (`RegistryBootstrapMigration.t.sol`).
 - `AdminFunctions.upgradeChainFromCTM` selects the cut-reading entrypoint first
   (`UpgradeChainCall.requiresCut`) and reconstructs a cut only for a pre-bootstrap chain.
   `DefaultChainUpgrade.executeUpgrade` is deleted (the chain's `executeUpgrade` is

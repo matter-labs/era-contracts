@@ -1,9 +1,10 @@
 # v31 ecosystem upgrade: generate → deploy
 
 > **Scope.** Written for the v31 rollout from the `draft-v31` line, and its paths name that
-> release's upgrade directory. On the v36 line the same two steps run the release's upgrade: the
-> generate workflow defaults to `upgrade = v0.36.0-v36` (only that directory may use
-> `prepare = "prepare-all"`) and outputs land under `upgrade-envs/v0.36.0-v36/output/<env>/`.
+> release's upgrade directory. On the current line the same two steps run the release's upgrade: the
+> generate workflow defaults to the current release, the one `upgrade-envs/v<major>.<minor>.0-<name>/`
+> of the version in `configs/genesis/zksync-os/latest.json` (only that directory may use
+> `prepare = "prepare-all"`), and outputs land under its `output/<env>/`.
 > The v31 line's verifier (PUVT, `ecosystem verify-upgrade`) does not exist on this line; the check
 > here is `ecosystem verify-bootstrap`, the registry verifier, as step 3 describes.
 

@@ -31,8 +31,7 @@ use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
 use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
 use crate::common::forge::scripts::{
-    ADMIN_FUNCTIONS_INVOCATION, CURRENT_CORE_UPGRADE_SCRIPT_PATH, CURRENT_CTM_UPGRADE_SCRIPT_PATH,
-    CURRENT_UPGRADE_LOCAL_INPUT_PATH, UPGRADE_CORE_OUTPUT_PATH,
+    current_release, CurrentRelease, ADMIN_FUNCTIONS_INVOCATION, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::governance_calls::GovernanceCallsTable;
@@ -600,24 +599,25 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long)]
     pub create2_factory_salt: Option<B256>,
 
-    #[clap(
-        long,
-        default_value = CURRENT_UPGRADE_LOCAL_INPUT_PATH
-    )]
-    pub upgrade_input_path: String,
+    /// Upgrade input TOML (relative to l1-contracts root). Defaults to the current release's
+    /// `local.toml`, or with `--env` to the release dir's `<env>.toml`.
+    #[clap(long)]
+    pub upgrade_input_path: Option<String>,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
     /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
     #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    /// Core upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = CURRENT_CORE_UPGRADE_SCRIPT_PATH)]
-    pub core_script_path: String,
+    /// Core upgrade script. Defaults to the current release's; historical releases must select their own
+    /// script and input.
+    #[clap(long)]
+    pub core_script_path: Option<String>,
 
-    /// CTM upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = CURRENT_CTM_UPGRADE_SCRIPT_PATH)]
-    pub ctm_script_path: String,
+    /// CTM upgrade script. Defaults to the current release's; historical releases must select their own
+    /// script and input.
+    #[clap(long)]
+    pub ctm_script_path: Option<String>,
 
     /// Path to a TOML file describing the CTM inputs (proxy + optional
     /// overrides). Mutually exclusive with the direct CTM flags
@@ -760,9 +760,9 @@ fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<Env
     let Some(cfg) = args.topology.env_config()? else {
         return Ok(None);
     };
-    if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+    if let Some(upgrade_input_path) = &args.upgrade_input_path {
         let input_dir = paths::resolve_l1_contracts_path()?
-            .join(args.upgrade_input_path.trim_start_matches('/'))
+            .join(upgrade_input_path.trim_start_matches('/'))
             .parent()
             .map(Path::to_path_buf)
             .context("--upgrade-input-path has no parent directory")?;
@@ -774,7 +774,7 @@ fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<Env
             input_dir == env_dir,
             "--upgrade-input-path {} is not in the release dir {} that --env {} reads its salts and owner from; \
              select that release with --upgrade-env-dir instead",
-            args.upgrade_input_path,
+            upgrade_input_path,
             env_dir.display(),
             cfg.env
         );
@@ -782,19 +782,31 @@ fn prepare_env_config(args: &UpgradePrepareAllArgs) -> anyhow::Result<Option<Env
     Ok(Some(cfg))
 }
 
+/// `explicit`, or the current release's value when it is unset (see [`current_release`]). The release is read
+/// only then, so a historical edge that names its own input and scripts does not depend on it.
+fn or_current_release(
+    explicit: &Option<String>,
+    current: impl FnOnce(&CurrentRelease) -> String,
+) -> anyhow::Result<String> {
+    match explicit {
+        Some(value) => Ok(value.clone()),
+        None => Ok(current(current_release()?)),
+    }
+}
+
 /// The env's upgrade input (`/<release dir>/<env>.toml`, relative to `l1-contracts/`) from the release dir
 /// `cfg` was loaded from, so the input, the salts and the output dir belong to the same release.
 ///
 /// Fails closed on a missing file rather than keeping the CLI default. The default is the *local* input, so a
 /// silent fallback would hand a real environment local's values for the keys the input does supply —
-/// `era_chain_id`, for one. Failing here also catches a mistyped `--env`.
+/// the owner, for one. Failing here also catches a mistyped `--env`.
 fn per_env_upgrade_input(cfg: &EnvConfig) -> anyhow::Result<String> {
     let per_env_abs = &cfg.upgrade_input_path;
     anyhow::ensure!(
         per_env_abs.exists(),
         "no upgrade input for --env {} at {}. Add it — an empty file is fine if the environment needs \
          nothing from the input — because this command will not fall back to the local default, which \
-         would silently give this environment local's `era_chain_id`.",
+         would silently give this environment local's owner and salts.",
         cfg.env,
         per_env_abs.display()
     );
@@ -823,12 +835,20 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // signer's private key with `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
         // (see `per_env_upgrade_input`).
-        if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+        if args.upgrade_input_path.is_none() {
             let per_env_rel = per_env_upgrade_input(cfg)?;
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
-            args.upgrade_input_path = per_env_rel;
+            args.upgrade_input_path = Some(per_env_rel);
         }
     }
+    let upgrade_input_path =
+        or_current_release(&args.upgrade_input_path, CurrentRelease::local_input_path)?;
+    let core_script_path = or_current_release(&args.core_script_path, |release| {
+        release.core_script_path.clone()
+    })?;
+    let ctm_script_path = or_current_release(&args.ctm_script_path, |release| {
+        release.ctm_script_path.clone()
+    })?;
     // Auto-fill the CREATE2 salt from the per-version upgrade input
     // (`<current upgrade-env dir>/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
@@ -961,10 +981,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         ctms,
         create2_factory_salt: args.create2_factory_salt,
         create2_factory_salt_per_ctm,
-        upgrade_input_path: args.upgrade_input_path.clone(),
+        upgrade_input_path,
         core_output_path: args.core_output_path.clone(),
-        core_script_path: args.core_script_path.clone(),
-        ctm_script_path: args.ctm_script_path.clone(),
+        core_script_path,
+        ctm_script_path,
         zk_token_asset_id,
         testnet_verifier,
     };
@@ -2186,15 +2206,25 @@ mod tests {
 #[cfg(test)]
 mod release_script_tests {
     use super::*;
-    use crate::common::forge::scripts::{CURRENT_UPGRADE_ENV_DIR, UPGRADE_V33_ENV_DIR};
+    use crate::common::forge::scripts::UPGRADE_V33_ENV_DIR;
     use clap::CommandFactory;
 
     #[test]
     fn prepare_defaults_to_current_release() {
         let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-        assert_eq!(args.ctm_script_path, CURRENT_CTM_UPGRADE_SCRIPT_PATH);
-        assert_eq!(args.core_script_path, CURRENT_CORE_UPGRADE_SCRIPT_PATH);
-        assert_eq!(args.upgrade_input_path, CURRENT_UPGRADE_LOCAL_INPUT_PATH);
+        let release = current_release().unwrap();
+        assert_eq!(
+            or_current_release(&args.ctm_script_path, |r| r.ctm_script_path.clone()).unwrap(),
+            release.ctm_script_path
+        );
+        assert_eq!(
+            or_current_release(&args.core_script_path, |r| r.core_script_path.clone()).unwrap(),
+            release.core_script_path
+        );
+        assert_eq!(
+            or_current_release(&args.upgrade_input_path, CurrentRelease::local_input_path).unwrap(),
+            release.local_input_path()
+        );
         let help = UpgradePrepareAllArgs::command()
             .render_long_help()
             .to_string();
@@ -2216,15 +2246,15 @@ mod release_script_tests {
         let read = |relative: &str| {
             std::fs::read_to_string(crate::common::paths::path_from_root(relative)).unwrap()
         };
-        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+        let release = current_release().unwrap();
 
         let local_test = read("l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
-        let ctm = contract_name(&args.ctm_script_path);
+        let ctm = contract_name(&release.ctm_script_path);
         assert!(
             local_test.contains(&format!(" is {ctm} {{")),
             "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
         );
-        let core = contract_name(&args.core_script_path);
+        let core = contract_name(&release.core_script_path);
         assert!(
             local_test.contains(&format!(" is {core} {{"))
                 || local_test.contains(&format!("new {core}()")),
@@ -2232,26 +2262,19 @@ mod release_script_tests {
         );
     }
 
-    /// The default scripts must be the current release's: `yarn new-release` moves them together with the
-    /// upgrade-env dir, so a hand edit of one without the other would prepare a release with another
-    /// release's scripts.
+    /// The current release (`latest.json`'s version) has its local input and its core and CTM upgrade scripts,
+    /// so a prepare with the defaults runs. `yarn new-release` creates all three.
     #[test]
-    fn release_specific_defaults_belong_to_the_current_release() {
-        let current_minor = CURRENT_UPGRADE_ENV_DIR
-            .split("/v0.")
-            .nth(1)
-            .and_then(|rest| rest.split('.').next())
-            .unwrap();
-        let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-        for script in [&args.ctm_script_path, &args.core_script_path] {
-            let script_minor = script
-                .strip_prefix("deploy-scripts/upgrade/v")
-                .and_then(|rest| rest.split('/').next());
-            assert_eq!(
-                script_minor,
-                Some(current_minor),
-                "{script} is not the current release's script"
-            );
+    fn current_release_has_its_input_and_scripts() {
+        let release = current_release().unwrap();
+        let l1 = paths::resolve_l1_contracts_path().unwrap();
+        let local_input = release.local_input_path();
+        for path in [
+            local_input.trim_start_matches('/'),
+            &release.core_script_path,
+            &release.ctm_script_path,
+        ] {
+            assert!(l1.join(path).is_file(), "the current release has no {path}");
         }
     }
 
@@ -2277,7 +2300,7 @@ mod release_script_tests {
         let cfg = prepare_env_config(&current).unwrap().unwrap();
         assert_eq!(
             per_env_upgrade_input(&cfg).unwrap(),
-            format!("{CURRENT_UPGRADE_ENV_DIR}/stage.toml")
+            format!("/{}/stage.toml", current_release().unwrap().env_dir())
         );
     }
 

@@ -39,7 +39,7 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, `v0.36.0`, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
 The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
@@ -325,7 +325,7 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 ```
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
-├── run-upgrade-test.ts            # The release upgrade (v35 -> v36) + a patch hop, via protocol-ops
+├── run-upgrade-test.ts            # The release upgrade (previous release -> current) + a patch hop, via protocol-ops
 ├── run-recurring-upgrade-test.ts  # Registry-driven minor hop (current -> next) through the executors the deployment created
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
 ├── cleanup.sh                     # Kill Anvil processes, reset state
@@ -336,8 +336,8 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
-│   ├── v0.35.0/                   # FROZEN previous-release snapshots (`upgradeSourceStateVersion`)
-│   └── v0.36.0/                   # Current-source Anvil state snapshots (`stateVersion`, regenerated)
+│   ├── <upgradeSourceStateVersion>/ # FROZEN previous-release snapshots
+│   └── <stateVersion>/            # Current-source Anvil state snapshots (regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
 │       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens

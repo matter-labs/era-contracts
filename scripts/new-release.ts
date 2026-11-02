@@ -21,23 +21,26 @@ import { join, relative } from "path";
 //   1. `configs/genesis/zksync-os/latest.json` `protocol_semantic_version`: minor + 1, patch 0. The default
 //      upgrade scripts read their target version from it, and the upgrade tests assert it.
 //   2. `l1-contracts/upgrade-envs/v0.<minor>.0-<name>/`: the local upgrade input and every per-environment
-//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's: owner and era_chain_id
-//      carry over, every CREATE2 and legacy-Gov salt is regenerated, so the new release's
+//      input (`stage.toml`, `mainnet.toml`, ...), copied from the current release's: the owner carries
+//      over, every CREATE2 and legacy-Gov salt is regenerated, so the new release's
 //      deployments do not resolve to the previous release's addresses, and the per-release switch
 //      `redeploy_zk_governance` is dropped.
-//   3. protocol-ops' current upgrade-env dir (`current_upgrade_env_dir!` in
-//      `protocol-ops/src/common/forge/scripts/mod.rs`): the prepare defaults and `--env` resolution follow it.
-//   4. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
+//      The current release is the one `upgrade-envs/v<major>.<minor>.0-<name>/` dir of the genesis version:
+//      protocol-ops (its prepare defaults, `--env` resolution) and the generate workflow read it from these two,
+//      so they move with them.
+//   3. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
 //      `upgradeSourceStateVersion` the upgrade test starts from (frozen from `--previous-release-ref` when
 //      given), with the `genesis_root` its chains were created from as `upgradeSourceGenesisRoot`, and the
 //      release's `AllContractsHashes.json` frozen next to its states. `stateVersion` moves to the new release,
 //      and the previous source chain states are deleted.
-//   5. `l1-contracts/deploy-scripts/upgrade/v<minor>/`: the new release's `CoreUpgrade_v<minor>` and
+//   4. `l1-contracts/deploy-scripts/upgrade/v<minor>/`: the new release's `CoreUpgrade_v<minor>` and
 //      `CTMUpgrade_v<minor>`, generated as plain subclasses of `DefaultCoreUpgrade` / `DefaultCTMUpgrade` for the
 //      release's own preparation to go into, unless the branch already carries them (a next edge prepared and
-//      tested ahead of the bump), in which case they are kept. The outgoing release's scripts are deleted, and
-//      protocol-ops' prepare defaults and the Foundry full-flow test (`UpgradeTest_Local`) move onto the new ones,
-//      the test together with the upgrade-env dir whose local input it reads.
+//      tested ahead of the bump), in which case they are kept. The outgoing release's scripts are deleted, and the
+//      Foundry full-flow test (`UpgradeTest_Local`) moves onto the new ones, together with the upgrade-env dir
+//      whose local input it reads. protocol-ops' prepare defaults are `v<minor>`'s scripts of the genesis version.
+//   5. The upgrade tests' inputs that name versions next to the genesis one (`RELATIVE_VERSION_FIXTURES`: the
+//      release they depart from, the targets one and two minors up, a patch on it): each moves up one minor.
 //
 // What it leaves to you (printed at the end): regenerating the new release's chain states, reviewing the
 // copied per-environment inputs, and removing or updating whatever still uses the outgoing release's scripts
@@ -46,7 +49,6 @@ import { join, relative } from "path";
 const ROOT = join(__dirname, "..");
 const GENESIS_PATH = join(ROOT, "configs/genesis/zksync-os/latest.json");
 const UPGRADE_ENVS_DIR = join(ROOT, "l1-contracts/upgrade-envs");
-const PROTOCOL_OPS_SCRIPTS_PATH = join(ROOT, "protocol-ops/src/common/forge/scripts/mod.rs");
 const ANVIL_CONFIG_PATH = join(ROOT, "l1-contracts/test/anvil-interop/config/anvil-config.json");
 const CHAIN_STATES_DIR = join(ROOT, "l1-contracts/test/anvil-interop/chain-states");
 const HASHES_PATH = join(ROOT, "AllContractsHashes.json");
@@ -60,7 +62,6 @@ function versionString(version: SemVer): string {
 const RELEASE_NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const VERSION_BLOCK_RE =
   /("protocol_semantic_version":\s*\{\s*"major":\s*)(\d+)(,\s*"minor":\s*)(\d+)(,\s*"patch":\s*)(\d+)/;
-const ENV_DIR_MACRO_RE = /(macro_rules! current_upgrade_env_dir \{\s*\(\) => \{\s*")(upgrade-envs\/[^"]+)(")/;
 
 type SemVer = { major: number; minor: number; patch: number };
 
@@ -69,6 +70,26 @@ const SALT_KEYS = ["create2_factory_salt", "legacy_gov_salt"];
 const RELEASE_ONLY_KEYS = ["redeploy_zk_governance"];
 // The upgrade pipeline's descriptor (`protocol-ops/src/common/upgrade_descriptor.rs`), not an env input.
 const UPGRADE_DESCRIPTOR_FILE = "upgrade.toml";
+const RELATIVE_VERSION_FIXTURES = [
+  "l1-contracts/upgrade-envs/foundry-upgrade.toml",
+  "l1-contracts/upgrade-envs/foundry-upgrade-recurring.toml",
+  "l1-contracts/upgrade-envs/foundry-upgrade-recurring-lagging.toml",
+  "l1-contracts/test/anvil-interop/config/release-upgrade.toml",
+  "l1-contracts/test/anvil-interop/config/patch-upgrade.toml",
+];
+
+/**
+ * `contents` with every packed version (`0x<minor><patch, 8 hex digits>`) and `v<minor>` from one minor below
+ * `current` to two above moved up one minor. Versions outside that window (`v28_protocol_version`) are references.
+ */
+function shiftFixtureVersions(contents: string, current: SemVer): string {
+  const near = (minor: number) => minor >= current.minor - 1 && minor <= current.minor + 2;
+  return contents
+    .replace(/\b0x([0-9a-fA-F]{1,2})([0-9a-fA-F]{8})\b/g, (match, minor: string, patch: string) =>
+      near(parseInt(minor, 16)) ? `0x${(parseInt(minor, 16) + 1).toString(16)}${patch}` : match
+    )
+    .replace(/\bv(\d+)\b/g, (match, minor: string) => (near(Number(minor)) ? `v${Number(minor) + 1}` : match));
+}
 
 /** The scripts protocol-ops prepares a release with: `<kind>Upgrade_v<minor>` extends `Default<kind>Upgrade`. */
 const RELEASE_SCRIPT_KINDS = ["Core", "CTM"];
@@ -104,7 +125,7 @@ function envInputHeader(env: string, release: SemVer): string {
 function rotateEnvInput(contents: string, env: string, next: SemVer): string {
   const lines = contents.split("\n");
   let start = 0;
-  while (start < lines.length && (lines[start].startsWith("#") || lines[start].trim() === "")) {
+  while (start < lines.length && (lines[start].startsWith("# Upgrade input for ") || lines[start].trim() === "")) {
     start++;
   }
   let body = lines.slice(start).join("\n");
@@ -117,7 +138,7 @@ function rotateEnvInput(contents: string, env: string, next: SemVer): string {
   body = body.replace(/^\[create2_factory_salts\]\n(?:(?!\[).*\n?)*/m, (section) =>
     section.replace(/(=\s*)"0x[0-9a-fA-F]{64}"/g, (_m, prefix) => prefix + freshSalt())
   );
-  return `${envInputHeader(env, next)}\n${body}`;
+  return body === "" ? envInputHeader(env, next) : `${envInputHeader(env, next)}\n${body}`;
 }
 
 function main(): void {
@@ -154,22 +175,20 @@ function main(): void {
   const next: SemVer = { major: current.major, minor: current.minor + 1, patch: 0 };
   write(GENESIS_PATH, genesis.replace(VERSION_BLOCK_RE, `$1${next.major}$3${next.minor}$5${next.patch}`));
 
-  // 2. Local upgrade input, from the current release's.
-  const scripts = fs.readFileSync(PROTOCOL_OPS_SCRIPTS_PATH, "utf-8");
-  const envDirMatch = scripts.match(ENV_DIR_MACRO_RE);
-  if (!envDirMatch) {
-    throw new Error(`no current_upgrade_env_dir! macro in ${PROTOCOL_OPS_SCRIPTS_PATH}`);
-  }
-  const currentEnvDir = envDirMatch[2];
-  // The branch must already be on the release it moves away from: genesis and protocol-ops' current release
-  // agree. A branch that has not merged the outgoing release yet would otherwise be bumped from a stale version.
-  const envDirVersion = currentEnvDir.match(/^upgrade-envs\/v(\d+)\.(\d+)\.\d+-/);
-  if (!envDirVersion || Number(envDirVersion[1]) !== current.major || Number(envDirVersion[2]) !== current.minor) {
+  // 2. Local upgrade input, from the current release's: the one upgrade-env dir of the genesis version, the
+  // same one protocol-ops resolves (`current_release` in protocol-ops/src/common/forge/scripts/mod.rs).
+  const currentPrefix = `v${current.major}.${current.minor}.0-`;
+  const currentEnvDirs = fs
+    .readdirSync(UPGRADE_ENVS_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith(currentPrefix))
+    .map((entry) => entry.name);
+  if (currentEnvDirs.length !== 1) {
     throw new Error(
-      `genesis is at ${versionString(current)} but protocol-ops' current release is ${currentEnvDir}; ` +
-        "merge the outgoing release's branch first"
+      `genesis is at ${versionString(current)}, so ${relative(ROOT, UPGRADE_ENVS_DIR)} must hold exactly one ` +
+        `${currentPrefix}<name> directory; found ${JSON.stringify(currentEnvDirs)}`
     );
   }
+  const currentEnvDir = `upgrade-envs/${currentEnvDirs[0]}`;
   const nextEnvDir = `upgrade-envs/${versionString(next)}-${name}`;
   const nextEnvDirAbs = join(UPGRADE_ENVS_DIR, nextEnvDir.replace("upgrade-envs/", ""));
   if (fs.existsSync(nextEnvDirAbs)) {
@@ -196,13 +215,10 @@ function main(): void {
     write(join(nextEnvDirAbs, file), rotateEnvInput(contents, env, next));
   }
 
-  // 3. protocol-ops' current upgrade-env dir; written together with its script defaults in step 5.
-  const nextScripts = scripts.replace(ENV_DIR_MACRO_RE, `$1${nextEnvDir}$3`);
-
   const repoPath = (absolute: string) => relative(ROOT, absolute).split("\\").join("/");
   const git = (gitArgs: string[]) => execFileSync("git", gitArgs, { cwd: ROOT, maxBuffer: 1 << 30 });
 
-  // 4. Anvil fixture rotation.
+  // 3. Anvil fixture rotation.
   const anvilConfig = JSON.parse(fs.readFileSync(ANVIL_CONFIG_PATH, "utf-8")) as {
     stateVersion: string;
     upgradeSourceStateVersion: string;
@@ -268,7 +284,7 @@ function main(): void {
     writes.push(() => fs.rmSync(outgoingSourceDir, { recursive: true, force: true }));
   }
 
-  // 5. Release scripts.
+  // 4. Release scripts.
   const currentScriptsDir = join(UPGRADE_SCRIPTS_DIR, `v${current.minor}`);
   const nextScriptsDir = join(UPGRADE_SCRIPTS_DIR, `v${next.minor}`);
   for (const kind of RELEASE_SCRIPT_KINDS) {
@@ -294,7 +310,6 @@ function main(): void {
     }
     return moved;
   };
-  write(PROTOCOL_OPS_SCRIPTS_PATH, moveToNextScripts(PROTOCOL_OPS_SCRIPTS_PATH, nextScripts));
   const fullFlowTest = fs.readFileSync(FULL_FLOW_TEST_PATH, "utf-8");
   if (!fullFlowTest.includes(`/${currentEnvDir}/`)) {
     throw new Error(
@@ -315,16 +330,17 @@ function main(): void {
       .toString()
       .split("\n")
       .filter(Boolean)
-      .filter(
-        (file) =>
-          !file.startsWith(`${repoPath(currentScriptsDir)}/`) &&
-          file !== repoPath(PROTOCOL_OPS_SCRIPTS_PATH) &&
-          file !== repoPath(FULL_FLOW_TEST_PATH)
-      );
+      .filter((file) => !file.startsWith(`${repoPath(currentScriptsDir)}/`) && file !== repoPath(FULL_FLOW_TEST_PATH));
   } catch (e) {
     if ((e as { status?: number }).status !== 1) {
       throw e;
     }
+  }
+
+  // 5. Upgrade test inputs.
+  for (const fixture of RELATIVE_VERSION_FIXTURES) {
+    const path = join(ROOT, fixture);
+    write(path, shiftFixtureVersions(fs.readFileSync(path, "utf-8"), current));
   }
 
   if (!dryRun) {
@@ -337,7 +353,7 @@ Still to do:
   - Regenerate chain-states/${nextStateVersion} (the 'Regenerate Anvil Interop Chain States' workflow, or
     \`cd l1-contracts/test/anvil-interop && npx ts-node setup-and-dump-state.ts\`). Until then the interop
     tests have no states for ${nextStateVersion}; the upgrade test already runs ${anvilConfig.stateVersion} -> ${nextStateVersion}.
-  - Review the per-environment inputs copied into ${nextEnvDir}/ (owner, era_chain_id and addresses carry over).${
+  - Review the per-environment inputs copied into ${nextEnvDir}/ (owner and addresses carry over).${
     stillUsingOutgoing.length > 0
       ? `
   - Remove or update what still names ${repoPath(currentScriptsDir)}/: tests built on those scripts go (the
