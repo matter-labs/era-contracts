@@ -25,13 +25,16 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
   function of an (executor, object) pair the prepares report, and the merge derives them; anything
   else a version needs governance (or an admin) to do goes through `declareExternalAction`
   (`ExternalActionsLib`) and is listed in the output's `external_actions`.
-  `DefaultChainUpgrade` is the legacy handed-cut per-chain leg the Foundry integration tests use.
+  `DefaultChainUpgrade` is the per-chain leg the Foundry integration tests use; the chain reads its
+  cut from the CTM.
 - `v36/` — the v35 -> v36 edge, the first registry-driven release and the template for the next
   one: `CoreUpgrade_v36` replaces one ecosystem implementation (`L1MessageRoot`); `CTMUpgrade_v36`
   overrides nothing.
 - The v34 -> v35 bootstrap edge (`v35/`: `CoreUpgrade_v35` deploying the `CoreUpgradeExecutor`,
   `CTMUpgrade_v35` the `CTMUpgradeExecutor`, the `RegistryBootstrapMigration` and the
-  `RegistryBootstrapSequence`) was retired with the v36 bump; it lives on `draft/v0.35.0`.
+  `RegistryBootstrapSequence`) was retired with the v36 bump; it lives on `draft/v0.35.0`. v36 also
+  removed the contracts and the legacy cut-taking CTM path it relied on, so a v36 CTM does not bring
+  a pre-v35 chain across.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 - `EmergencyUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
   emergency upgrade ("Emergency execution" below).
@@ -61,34 +64,27 @@ On one anvil fork of L1, in this order:
    runs the code the current sources produce and redeployed only when the version declares it
    changed, then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
    implementation). Output `[registry]`: `core_transition_addr` (zero when none) and
-   `core_upgrade_executor_addr` — the executor read from the live ecosystem `ProxyAdmin`'s owner,
-   or deployed by the v35 prepare.
+   `core_upgrade_executor_addr` — the executor read from the live ecosystem `ProxyAdmin`'s owner.
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
    reused when it already runs the code the current sources produce and redeployed only when the
    version names it in `changedReleaseMembers()`; the release itself is new on every version bump
    and reused only by an infrastructure-only edge. Then the transition (validated) unless the
    version declares an infrastructure-only edge, the CTM-domain `ProxyUpgradeTransition` when a
-   CTM-domain implementation changed, and — on the bootstrap edge only — the ChainAdmin's half of
-   the one-time ServerNotifier handover, rendered from live state. The prepare refuses an upgrade
-   with no core transition, no CTM-domain object and no transition. The CTM executor is read
-   on-chain (the CTM's owner, bound to it); only the bootstrap prepare takes the core executor
-   from the core prepare's output. Output `[registry]`: `ctm_transition_addr`,
-   `ctm_infrastructure_transition_addr` (each zero when none), `ctm_release_addr`,
-   `bootstrap_migration_addr` (zero unless a bootstrap) and `ctm_upgrade_executor_addr` (nonzero
-   whenever one of those objects exists).
-4. The ServerNotifier handover calls (bootstrap only), executed on the fork as each target's live
-   owner (`UpgradeFull::run_ctm_admin_steps`; see the
-   [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
-5. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
+   CTM-domain implementation changed. The prepare refuses an upgrade with no core transition, no
+   CTM-domain object and no transition. The CTM executor is read on-chain (the CTM's owner, bound
+   to it). Output `[registry]`: `ctm_transition_addr`, `ctm_infrastructure_transition_addr` (each
+   zero when none), `ctm_release_addr` and `ctm_upgrade_executor_addr` (nonzero whenever one of
+   those objects exists).
+4. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
    PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it.
-6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
+5. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
    `acceptOwnership` normalization) → the core prepare's declared calls → the executor legs,
    derived from the `[registry]` objects and executors the prepares reported, one contiguous run in
    canonical order (`applyL1Upgrade(core_transition_addr)`,
    `applyInfrastructureUpgrade(ctm_infrastructure_transition_addr)`,
    `applyCTMUpgrade(ctm_transition_addr)`, each only when its object is nonzero; none for a
-   bootstrap or a replacement) → the CTM prepare's declared calls. The layout is documented on that
+   replacement) → the CTM prepare's declared calls. The layout is documented on that
    function. The merge authors nothing else and refuses a prepare's `[governance_calls] calls`
    unless every call is a declared external action — matched by identity, target, value and
    calldata alike, not by headcount (`check_bundle_provenance`).
@@ -110,7 +106,7 @@ objects at those addresses were built from it is what step 4 establishes. Then r
 `external_actions`: one `[[external_actions]]` entry per call the objects do not describe,
 carrying the call itself (`target`, `value`, `data`) beside its `phase` (`governance` or `admin`),
 `label` and the `authority` that performs it. A registry-driven upgrade has none beyond the
-merger's extras; the bootstrap edge declares its whole one-time edge this way.
+merger's extras.
 
 ## 4. Verify
 
@@ -118,18 +114,17 @@ merger's extras; the bootstrap edge declares its whole one-time edge this way.
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x... \
   --env <env> \
-  --executor-record <the bootstrap package, or the ecosystem/ctm init outputs, that deployed the executors> \
+  --executor-record <the ecosystem/ctm init outputs, or the v35 bootstrap package, that deployed the executors> \
   [--create2-salt <a salt the package does not record>]
 ```
 
 Run it before every vote: governance approves the exact deployed objects, and this is where their
 construction is established ("Provenance and validation" in the architecture document).
-`verify-bootstrap` (alias `verify-package`, `upgrade_verification/registry/`) verifies a
-registry-driven package against live L1 and decides from the package itself which kind it is: an
-upgrade driven through the domain executors' legs, the one-time bootstrap edge, or the replacement
-of a committed transition (prepared by `DefaultTransitionReplacement`). It checks every object's
-construction (the write-once objects from their manifests, the bootstrap sequence from the objects
-it was constructed over — under the salts each prepare leg records in its output
+`verify-bootstrap` (alias `verify-package`, `upgrade_verification/registry/`; the name predates the
+removal of the bootstrap edge in v36) verifies a registry-driven package against live L1 and
+decides from the package itself which kind it is: an upgrade driven through the domain executors'
+legs, or the replacement of a committed transition (prepared by `DefaultTransitionReplacement`). It
+checks every object's construction (the write-once objects from their manifests — under the salts each prepare leg records in its output
 (`create2_factory_salt`) — and the executors from the `[upgrade_executors]` record of the run that
 deployed them, without which an executor is unverified), that every object and every member it
 names runs the reviewed build's code for its role, that every member the package newly installs
@@ -163,9 +158,7 @@ cargo run -p protocol_ops -- ecosystem upgrade-governance --env <env> --l1-rpc-u
 replays the governance bundle of `<env-out>/ecosystem.toml` on a fork as governance, fails unless
 the fork is left in the state the package describes
 ([where each check lives](../../../protocol-docs/ecosystem-upgrade.md#where-each-check-lives)), and
-emits the governance Safe bundle; `ecosystem governance-toml-to-simulator` emits the transaction-simulator JSON. On the
-bootstrap edge the bundle ends with the edge's completion check
-(`RegistryBootstrapMigration.validateApplied()`), so the replay itself reverts unless the edge completed.
+emits the governance Safe bundle; `ecosystem governance-toml-to-simulator` emits the transaction-simulator JSON.
 Monitoring and recovery: the [operations document](../../../docs/upgrade-operations.md).
 
 ## Emergency execution
@@ -198,8 +191,6 @@ governance bundle in `<env-out>/ecosystem.toml` (`[governance_calls] calls`).
 
 Gotchas:
 
-- **CTM-admin calls.** The `[ctm_admin_calls]` of a bootstrap (the ServerNotifier handover) are not
-  governance calls. They must land before the proposal.
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the
   handler names when the calldata is emitted.
@@ -221,20 +212,19 @@ Tests: `test/foundry/l1/integration/emergency-upgrade/`.
 ## 7. Chain crossing
 
 After the governance proposal, each chain crosses on its own: `protocol-ops chain upgrade` runs
-`AdminFunctions.upgradeChainFromCTM`, which selects the cut-reading entrypoint for a chain at v35
-or later and reconstructs a cut only for a chain that predates it (`UpgradeChainCall.requiresCut`).
+`AdminFunctions.upgradeChainFromCTM`, which encodes the cut-reading entrypoint
+(`UpgradeChainCall`) and refuses a chain below v35.
 Who may trigger the crossing and when is `CTMUpgradeExecutor.upgradeChain`'s policy (architecture
 document, "Flow: upgrading"). `chain set-upgrade-timestamp` schedules it on the ServerNotifier
 ({protocol-docs/upgrade-scheduling.md}); `chain set-da-validator-pair` restores the DA pair the
 upgrade resets.
 
-On the v35 bootstrap edge `upgradeChain` does not apply: the departing version has no transition.
-A chain's admin crosses it with the migration's `upgradeCut()`, and governance can cross a chain
-itself with `ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)` through
-`CTMUpgradeExecutor.forward`, a passthrough kept only until no chain can depart a pre-v35 version.
+A chain below v35 cannot cross: its version has no committed transition, and v36 removed the
+cut-taking path (`ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)` and the
+`ValidatorTimelock` forwarder) that brought pre-v35 chains across the v35 bootstrap edge.
 
-**Chain admins behind an `AccessControlRestriction`.** Every crossing after the bootstrap edge calls
-the chain's two-argument `upgradeChainFromVersion(address,uint256)` (`0x03129ad9`) instead of the
+**Chain admins behind an `AccessControlRestriction`.** Every crossing from v35 on calls the chain's
+two-argument `upgradeChainFromVersion(address,uint256)` (`0x03129ad9`) instead of the pre-v35
 cut-taking `upgradeChainFromVersion(address,uint256,DiamondCutData)` (`0x3b6d7534`). A role the
 restriction requires for the old selector does not carry over: before the chain's first crossing
 after v35, the restriction's default admin sets it for the new one
@@ -242,8 +232,7 @@ after v35, the restriction's default admin sets it for the new one
 send the crossing.
 
 Server and monitoring consumers must read the final transaction through
-`transition.l2UpgradeTx(bridgehub, chainId)` or `bootstrap.l2UpgradeTx(chainId)`. These views
-use the same chain-context composition as execution; there is no
+`transition.l2UpgradeTx(bridgehub, chainId)`. This view uses the same chain-context composition as execution; there is no
 `getL2UpgradeTxData(bridgehub, chainId, zksyncOS, data)`, so its external consumers must be updated
 and verified before rollout.
 
@@ -311,8 +300,8 @@ genesis generator, so that upgraded and freshly created chains match
 - `test/anvil-interop/run-recurring-upgrade-test.ts` — the registry-driven hop with objects
   deployed by the harness itself.
 - `test/foundry/l1/unit/concrete/Upgrades/registry/` — the bundle-execution (all legs in one
-  `Governance` proposal), executor-domain, executor, transition-replacement,
-  ServerNotifier-handover and individual-upgrade suites.
+  `Governance` proposal), executor-domain, executor, transition-replacement
+  and individual-upgrade suites.
 
 Script retirement — what tooling still decides and the batches that move it on-chain — is
 tracked in [the retirement plan](../../../docs/upgrade-script-retirement.md).

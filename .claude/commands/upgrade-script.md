@@ -30,13 +30,9 @@ the Foundry integration harness for the legacy edge.
 2. Ask the user what the release changes. Only if it needs release-specific preparation (extra contracts, a
    custom per-chain initializer, one-off governance calls), override only what the release needs in the
    generated `CoreUpgrade_v{N}` / `CTMUpgrade_v{N}`; protocol-ops and the upgrade tests already run them.
-   Use the most recent steady-state version as the template — `v36`, not `v35`:
+   Use the most recent version as the template:
    - `l1-contracts/deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol`
    - `l1-contracts/deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol`
-
-   `v35` is the one-shot registry bootstrap edge and carries a large amount of machinery
-   (`RegistryBootstrapMigration`, the authored L2 plan, the declared bootstrap actions) that a
-   normal version must NOT copy.
 
 3. Declare the release scope. `changedReleaseMembers()` lists the release members this version
    replaces; anything not listed is reused from the live release, and a member that changes without
