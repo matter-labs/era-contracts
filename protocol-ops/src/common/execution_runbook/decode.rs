@@ -31,6 +31,9 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     // then the pre-Airbender layout of the v31-line CTMs
     "setChainCreationParams((address,bytes32,uint64,bytes32,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
+    // ValidatorTimelock: per-chain roles (chain grant-upgrader)
+    "grantRole(address,bytes32,address)",
+    "revokeRole(address,bytes32,address)",
     // ChainAssetHandler
     "pauseMigration()",
     "unpauseMigration()",

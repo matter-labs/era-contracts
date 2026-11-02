@@ -37,8 +37,8 @@ Follows `AGENTS.md`, "Executing Stage and Testnet Upgrades".
 The timer delays follow earlier upgrades. v34's stage 1 forces no chain to switch (v0.33.0 keeps an unlimited
 deadline), so here the timer is a notice period. It also rules out an all-stages emergency proposal.
 
-Each chain, once stage 1 has executed (both commands below read what it registered): its ChainAdmin's owner
-sets the upgrade timestamp, with the bundle
+Each chain, once stage 1 has executed (`chain set-upgrade-timestamp` and `chain upgrade` below read what it
+registered): its ChainAdmin's owner sets the upgrade timestamp, with the bundle
 `protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --new-protocol-version 146028888064 --upgrade-timestamp <unix> --l1-rpc-url <rpc> --out <dir>`
 writes; on testnets `1` means as soon as the node sees it, on mainnet it is a real future date. Once the chain is
 drained:
@@ -65,7 +65,8 @@ revert with `PreviousUpgradeNotFinalized`, and its after-upgrade checks run on t
 ## Files
 
 - `<env>.toml`: what the script can't read from `permanent-values/<env>.toml`, the chain or the v34 genesis: the
-  verifier flavour, the timer delay, the salt, and the reused `DiamondInit` and EIP-7702 checker (no getters).
+  verifier flavour, the timer delay, the salt, the reused `DiamondInit` and EIP-7702 checker (no getters), and
+  `use_v29_introspection = false`.
 - `output/<env>/`: committed from the generate run. `output/stage/` keeps the layout stage was generated with; the
   others are in `DefaultCTMUpgrade.saveOutput`'s layout, where the zero addresses are fields v34 doesn't use and
   `admin.ecosystem_admin_addr` is the CTM owner (the PUH).

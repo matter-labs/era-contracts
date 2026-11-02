@@ -96,7 +96,12 @@ async fn run_update(args: ChainValidatorArgs, action: Action) -> anyhow::Result<
     ));
     logger::info(format!("Validator timelock: {:#x}", validator_timelock));
     logger::info(format!("Chain ID: {}", chain_id));
-    logger::info(format!("Validator address: {:#x}", args.validator_address));
+    let grantee = if action == Action::GrantUpgrader {
+        "Account"
+    } else {
+        "Validator address"
+    };
+    logger::info(format!("{grantee}: {:#x}", args.validator_address));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
     let script = match action {
@@ -126,18 +131,24 @@ async fn run_update(args: ChainValidatorArgs, action: Action) -> anyhow::Result<
         .run(script)
         .with_context(|| format!("Failed: {verb}"))?;
 
+    let mut input = serde_json::json!({
+        "admin_address": format!("{:#x}", admin_address),
+        "access_control_restriction": format!("{:#x}", args.access_control_restriction),
+        "validator_timelock": format!("{:#x}", validator_timelock),
+        "chain_id": chain_id,
+    });
+    if action == Action::GrantUpgrader {
+        input["account"] = format!("{:#x}", args.validator_address).into();
+        input["role"] = format!("{:#x}", VALIDATOR_TIMELOCK_UPGRADER_ROLE).into();
+    } else {
+        input["validator_address"] = format!("{:#x}", args.validator_address).into();
+        input["add_validator"] = (action == Action::Add).into();
+    }
     crate::common::output::write_output_if_requested(
         command,
         &args.shared,
         &runner,
-        &serde_json::json!({
-            "admin_address": format!("{:#x}", admin_address),
-            "access_control_restriction": format!("{:#x}", args.access_control_restriction),
-            "validator_timelock": format!("{:#x}", validator_timelock),
-            "chain_id": chain_id,
-            "validator_address": format!("{:#x}", args.validator_address),
-            "add_validator": action == Action::Add,
-        }),
+        &input,
         &serde_json::json!({}),
     )
     .await?;
