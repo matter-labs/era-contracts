@@ -7,6 +7,8 @@ import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {CallMode} from "contracts/transactionFilterer/interfaces/IEraMaintenanceTransactionFilterer.sol";
 import {
     IEraL2AssetRouter,
@@ -195,6 +197,37 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
         );
         assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, data));
         assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, hex"aabbcc"));
+    }
+
+    /// @dev The transfer data of a non-NTV asset is handler-defined, so neither its depositor nor its amount can
+    /// be trusted: such deposits are rejected even when the asset has a cap and the decoded depositor is exempt.
+    function test_depositOfNonNtvAssetRejected() public {
+        bytes32 customAssetId = keccak256("customAsset");
+        vm.mockCall(
+            l1AssetRouter,
+            abi.encodeCall(IAssetRouterBase.assetHandlerAddress, (customAssetId)),
+            abi.encode(makeAddr("customHandler"))
+        );
+        _setCap(customAssetId, type(uint256).max);
+        vm.prank(owner);
+        filterer.setExempt(user, true);
+
+        bytes memory data = _newDepositCalldata(user, customAssetId, 1);
+        assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, data));
+    }
+
+    /// @dev Malformed deposit calldata reverts the request instead of passing it.
+    function test_revertWhen_depositTransferDataUndecodable() public {
+        bytes memory data = abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, tokenAssetId, hex"01"));
+        vm.expectRevert();
+        filterer.isTransactionAllowed({
+            _sender: l1AssetRouter,
+            _contractL2: L2_ASSET_ROUTER_ADDR,
+            _mintValue: MINT_VALUE,
+            _l2Value: 0,
+            _l2Calldata: data,
+            _refundRecipient: user
+        });
     }
 
     /*//////////////////////////////////////////////////////////////

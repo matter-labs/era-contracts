@@ -7,12 +7,14 @@ import {Test} from "forge-std/Test.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {EraMaintenanceTransactionFilterer} from "contracts/transactionFilterer/EraMaintenanceTransactionFilterer.sol";
 import {IEraL2LegacyBridge} from "contracts/transactionFilterer/interfaces/IEraL2Legacy.sol";
 
-/// @dev The Bridgehub is mocked: these tests isolate the filterer's own rules. The deposit calldata the
+/// @dev The Bridgehub and the L1 asset router are mocked: these tests isolate the filterer's own rules. The deposit calldata the
 /// real L1 asset router produces is covered by the integration test `EraMaintenanceTransactionFiltererIntegration`.
 contract EraMaintenanceTransactionFiltererTest is Test {
     EraMaintenanceTransactionFilterer internal filterer;
@@ -26,6 +28,7 @@ contract EraMaintenanceTransactionFiltererTest is Test {
     address internal proxyAdmin = makeAddr("proxyAdmin");
     address internal bridgehub = makeAddr("bridgehub");
     address internal l1AssetRouter = makeAddr("l1AssetRouter");
+    address internal l1NativeTokenVault = makeAddr("l1NativeTokenVault");
     address internal user = makeAddr("user");
     address internal l2Receiver = makeAddr("l2Receiver");
     address internal l1Token = makeAddr("l1Token");
@@ -42,6 +45,14 @@ contract EraMaintenanceTransactionFiltererTest is Test {
             bridgehub,
             abi.encodeCall(IBridgehubBase.baseTokenAssetId, (CHAIN_ID)),
             abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(l1AssetRouter, abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()), abi.encode(l1NativeTokenVault));
+        // Every asset is NTV-handled unless a test overrides it.
+        vm.mockCall(
+            l1AssetRouter,
+            abi.encodeWithSelector(IAssetRouterBase.assetHandlerAddress.selector),
+            abi.encode(l1NativeTokenVault)
         );
 
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);

@@ -14,6 +14,12 @@ import {TransactionNotAllowed} from "contracts/common/L1ContractErrors.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IEraL2BaseToken} from "contracts/transactionFilterer/interfaces/IEraL2Legacy.sol";
+import {LogFinder} from "test-utils/LogFinder.sol";
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -33,6 +39,8 @@ contract EraMaintenanceTransactionFiltererIntegrationTest is
     TokenDeployer,
     L2TxMocker
 {
+    using LogFinder for Vm.Log[];
+
     uint256 internal constant MINT_VALUE = 250000000000100;
     uint256 internal constant L2_GAS_LIMIT = 1000000;
     uint256 internal constant TOKEN_CAP = 1000;
@@ -181,6 +189,52 @@ contract EraMaintenanceTransactionFiltererIntegrationTest is
         assertNotEq(_depositBaseToken(0), bytes32(0));
         vm.expectRevert(TransactionNotAllowed.selector);
         _depositBaseToken(1);
+    }
+
+    /// @dev A forced base token withdrawal from L1 still reaches the priority queue in `WITHDRAWALS_ONLY` mode,
+    /// with the base token capped near the fee level, while a plain base token deposit is rejected.
+    function test_forcedWithdrawalPassesInWithdrawalsOnlyMode() public {
+        bytes32[] memory assetIds = new bytes32[](1);
+        assetIds[0] = baseTokenAssetId;
+        uint256[] memory caps = new uint256[](1);
+        caps[0] = MINT_VALUE;
+        vm.startPrank(chainAdmin);
+        filterer.setDepositCaps(assetIds, caps);
+        filterer.setCallMode(CallMode.WITHDRAWALS_ONLY);
+        vm.stopPrank();
+
+        bytes memory withdrawal = abi.encodeCall(IEraL2BaseToken.withdraw, (user));
+        vm.deal(user, MINT_VALUE);
+        vm.recordLogs();
+        vm.prank(user);
+        addresses.bridgehub.requestL2TransactionDirect{value: MINT_VALUE}(
+            L2TransactionRequestDirect({
+                chainId: eraZKChainId,
+                mintValue: MINT_VALUE,
+                l2Contract: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+                l2Value: 0,
+                l2Calldata: withdrawal,
+                l2GasLimit: L2_GAS_LIMIT,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: address(0)
+            })
+        );
+        Vm.Log memory log = _priorityRequestLog();
+        (, , , L2CanonicalTransaction memory transaction, ) = abi.decode(
+            log.data,
+            (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[])
+        );
+        assertEq(address(uint160(transaction.to)), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        assertEq(keccak256(transaction.data), keccak256(withdrawal));
+        assertEq(transaction.reserved[0], MINT_VALUE);
+
+        vm.expectRevert(TransactionNotAllowed.selector);
+        _depositBaseToken(0);
+    }
+
+    function _priorityRequestLog() internal returns (Vm.Log memory) {
+        return vm.getRecordedLogs().requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
     }
 
     // add this to be excluded from coverage report

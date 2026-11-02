@@ -4,11 +4,13 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {ArrayLengthMismatch, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {ArrayLengthMismatch, MissingBaseTokenAssetId, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {CallMode, IEraMaintenanceTransactionFilterer} from "./interfaces/IEraMaintenanceTransactionFilterer.sol";
 import {IEraL2AssetRouter, IEraL2BaseToken, IEraL2LegacyBridge} from "./interfaces/IEraL2Legacy.sol";
 
@@ -22,6 +24,10 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
 
     /// @notice The L1 asset router, the `sender` of every deposit made through the Bridgehub.
     address public immutable L1_ASSET_ROUTER;
+
+    /// @notice The L1 native token vault. Deposits of assets with another handler are rejected, since their
+    /// transfer data is handler-defined and the depositor and amount cannot be decoded from it.
+    address public immutable L1_NATIVE_TOKEN_VAULT;
 
     /// @inheritdoc IEraMaintenanceTransactionFilterer
     uint256 public chainId;
@@ -49,6 +55,7 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
     constructor(IBridgehubBase _bridgeHub) {
         BRIDGE_HUB = _bridgeHub;
         L1_ASSET_ROUTER = address(_bridgeHub.assetRouter());
+        L1_NATIVE_TOKEN_VAULT = address(IL1AssetRouter(L1_ASSET_ROUTER).nativeTokenVault());
         _disableInitializers();
     }
 
@@ -66,7 +73,11 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         _transferOwnership(_owner);
         chainId = _chainId;
 
-        _setDepositCap(BRIDGE_HUB.baseTokenAssetId(_chainId), type(uint256).max);
+        bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
+        if (baseTokenAssetId == bytes32(0)) {
+            revert MissingBaseTokenAssetId();
+        }
+        _setDepositCap(baseTokenAssetId, type(uint256).max);
         _setWithdrawalFunction(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, IEraL2BaseToken.withdraw.selector, true);
         _setWithdrawalFunction(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, IEraL2BaseToken.withdrawWithMessage.selector, true);
         _setWithdrawalFunction(L2_ASSET_ROUTER_ADDR, IEraL2AssetRouter.withdraw.selector, true);
@@ -142,14 +153,7 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         return keccak256(abi.encode(_sender, _contractL2, _l2Value, keccak256(_l2Calldata), _refundRecipient));
     }
 
-    /// @notice Checks if the transaction is allowed.
-    /// @param _sender The sender of the transaction.
-    /// @param _contractL2 The L2 receiver address.
-    /// @param _mintValue The amount of base token minted on L2, including the L2 gas fee.
-    /// @param _l2Value The `msg.value` of the L2 transaction.
-    /// @param _l2Calldata The calldata of the L2 transaction.
-    /// @param _refundRecipient The address that receives the excess value.
-    /// @return Whether the transaction is allowed.
+    /// @inheritdoc ITransactionFilterer
     function isTransactionAllowed(
         address _sender,
         address _contractL2,
@@ -173,8 +177,6 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         }
 
         if (_sender == L1_ASSET_ROUTER) {
-            // Every message of the asset router is a deposit; anything else it may send (e.g. registering a
-            // custom asset handler on L2) is rejected.
             if (_contractL2 != L2_ASSET_ROUTER_ADDR || _l2Value != 0) {
                 return false;
             }
@@ -203,6 +205,9 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         if (_hasSelector(_l2Calldata, AssetRouterBase.finalizeDeposit.selector)) {
             bytes memory transferData;
             (, assetId, transferData) = abi.decode(_l2Calldata[4:], (uint256, bytes32, bytes));
+            if (IL1AssetRouter(L1_ASSET_ROUTER).assetHandlerAddress(assetId) != L1_NATIVE_TOKEN_VAULT) {
+                return false;
+            }
             // slither-disable-next-line unused-return
             (depositor, , , amount, ) = DataEncoding.decodeBridgeMintData(transferData);
         } else if (_hasSelector(_l2Calldata, IEraL2LegacyBridge.finalizeDeposit.selector)) {

@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {ZeroAddress, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
+import {MissingBaseTokenAssetId, ZeroAddress, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
@@ -26,6 +27,7 @@ contract InitializeTest is EraMaintenanceTransactionFiltererTest {
     function test_constructorReadsAssetRouterFromBridgehub() public view {
         assertEq(address(filterer.BRIDGE_HUB()), bridgehub);
         assertEq(filterer.L1_ASSET_ROUTER(), l1AssetRouter);
+        assertEq(filterer.L1_NATIVE_TOKEN_VAULT(), l1NativeTokenVault);
     }
 
     function test_initializeSetsPermissiveConfiguration() public view {
@@ -67,6 +69,19 @@ contract InitializeTest is EraMaintenanceTransactionFiltererTest {
     function test_revertWhen_chainIdIsZero() public {
         vm.expectRevert(ZeroChainId.selector);
         _deployProxy(owner, 0);
+    }
+
+    /// @dev A chain id the Bridgehub does not know has no base token; initializing with it would leave the real
+    /// base token with a zero cap and block every transaction of the chain.
+    function test_revertWhen_chainHasNoBaseToken() public {
+        uint256 unknownChainId = CHAIN_ID + 1;
+        vm.mockCall(
+            bridgehub,
+            abi.encodeCall(IBridgehubBase.baseTokenAssetId, (unknownChainId)),
+            abi.encode(bytes32(0))
+        );
+        vm.expectRevert(MissingBaseTokenAssetId.selector);
+        _deployProxy(owner, unknownChainId);
     }
 
     function test_revertWhen_initializedTwice() public {
