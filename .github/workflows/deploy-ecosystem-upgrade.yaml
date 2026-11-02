@@ -527,9 +527,10 @@ jobs:
           fi
           LOG="$DEPLOY_BUNDLE_DIR/extra-verification-logs.txt"
           if [ ! -f "$LOG" ]; then
-            if [ "${UPGRADE_KIND:-}" != "prepare-all" ]; then
-              echo "The bundle logged no contract deployments to verify ($UPGRADE)."; exit 0
-            fi
+            case "${UPGRADE_KIND:-}" in
+              forge-script|verifier-only)
+                echo "The bundle logged no contract deployments to verify (${UPGRADE:-})."; exit 0 ;;
+            esac
             echo "::error::extra-verification-logs.txt not found"; exit 1
           fi
           # $ETHERSCAN_CHAIN was resolved from the bundle's l1.chain_id, not from
