@@ -4,6 +4,9 @@ pragma solidity 0.8.28;
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {NoCommittedUpgradeCutForVersion} from "contracts/common/L1ContractErrors.sol";
+import {OutdatedProtocolVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -113,6 +116,39 @@ contract ProtocolVersion is ChainTypeManagerTest {
 
         vm.prank(governor);
         chainContractAddress.executeUpgrade(chainId, getDiamondCutDataWithCustomFacets(address(0), customFacetCuts));
+    }
+
+    /// @dev A genuine `CTMTransition` cannot pin a non-increasing edge (`VersionEdgeLib`), so the
+    ///      CTM's own check is reached only by a counterfeit object; the transition is mocked to
+    ///      isolate it.
+    function test_RevertWhen_TheEdgeDoesNotMoveTheVersionForward() public {
+        ICTMTransition transition = _mockTransition(
+            chainContractAddress.currentRelease(),
+            0,
+            0,
+            _releaseAt(0),
+            type(uint256).max
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector, 0, 0));
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
+    }
+
+    /// @dev The edge must depart the CTM's current version.
+    function test_RevertWhen_TheEdgeDepartsAnotherVersion() public {
+        uint256 otherVersion = SemVer.packSemVer(0, 1, 0);
+        ICTMTransition transition = _mockTransition(
+            chainContractAddress.currentRelease(),
+            otherVersion,
+            SemVer.packSemVer(0, 2, 0),
+            _releaseAt(SemVer.packSemVer(0, 2, 0)),
+            type(uint256).max
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(OutdatedProtocolVersion.selector, 0, otherVersion));
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
     }
 
     // upgradeChainFromVersion

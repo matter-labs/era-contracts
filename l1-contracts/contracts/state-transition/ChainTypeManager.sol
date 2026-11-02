@@ -511,8 +511,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         }
     }
 
-    /// @dev The version-edge commit shared by both entrypoints: checks the edge and moves
-    ///      `protocolVersion` forward.
+    /// @dev The version-edge commit of a transition: checks the edge and moves `protocolVersion`
+    ///      forward.
     /// @dev Note: non-sequential protocol versions are allowed (e.g., minor/patch jumps).
     function _commitVersionEdge(uint256 _oldProtocolVersion, uint256 _newProtocolVersion) internal {
         uint256 previousProtocolVersion = protocolVersion;

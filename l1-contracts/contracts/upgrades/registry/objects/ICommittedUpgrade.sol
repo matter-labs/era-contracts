@@ -5,8 +5,7 @@ pragma solidity 0.8.28;
 import {L2UpgradePlan} from "../RegistryTypes.sol";
 
 /// @notice The read surface a per-chain upgrade engine uses on the write-once object the committed
-///         cut names — a `CTMTransition` for an ordinary edge, the one-time
-///         `RegistryBootstrapMigration` for the bootstrap. See {docs/registry-driven-upgrades.md}.
+///         cut names — a `CTMTransition`. See {docs/registry-driven-upgrades.md}.
 /// @dev The two objects carry different manifests, so what they share is this view rather than a
 ///      manifest type. It exists so an engine takes the whole edge from ONE object instead of
 ///      being handed its parts separately.

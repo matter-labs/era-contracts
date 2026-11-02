@@ -56,6 +56,7 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {
     NewProtocolMajorVersionNotZero,
+    PreviousProtocolMajorVersionNotZero,
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
@@ -666,6 +667,16 @@ contract StorageRegistriesTest is Test {
         manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, SemVer.packSemVer(1, 0, 0))));
 
         vm.expectRevert(NewProtocolMajorVersionNotZero.selector);
+        new CTMTransition(manifest);
+    }
+
+    /// @dev The departing side of the same rule: no transition departs a nonzero major.
+    function test_revertWhen_transitionDepartsANonzeroMajorVersion() public {
+        TransitionManifest memory manifest = _transitionManifest();
+        manifest.fromRelease = address(new CTMRelease(_releaseManifest(facetOldAdmin, SemVer.packSemVer(1, 0, 0))));
+        manifest.newRelease = address(new CTMRelease(_releaseManifest(facetNewAdmin, SemVer.packSemVer(1, 1, 0))));
+
+        vm.expectRevert(PreviousProtocolMajorVersionNotZero.selector);
         new CTMTransition(manifest);
     }
 
