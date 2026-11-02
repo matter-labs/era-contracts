@@ -39,6 +39,7 @@ pub struct ContractHashes {
 }
 
 impl ContractHashes {
+    #[cfg(test)]
     pub fn init_from_local() -> anyhow::Result<Self> {
         Self::init_from_file(&repo_relative_path(LOCAL_CONTRACT_HASHES_PATH))
     }

@@ -93,11 +93,6 @@ impl ForgeRunner {
         })
     }
 
-    /// The per-run script-IO subdirectory, if one was requested.
-    pub fn subdir(&self) -> Option<&str> {
-        self.subdir.as_deref()
-    }
-
     /// Root-relative path (with leading slash) to hand to a forge script,
     /// honoring the per-run subdir:
     /// `script-out/x.toml` → `/script-out/<subdir>/x.toml`.
@@ -154,39 +149,6 @@ impl ForgeRunner {
     ) -> anyhow::Result<Wallet> {
         self.fund_sender(address).await?;
         Wallet::parse(None, Some(address))
-    }
-
-    /// Resolve the chain admin via `Bridgehub.getZKChain(chain_id).getAdmin()`
-    /// and prepare it as a sender on the fork (fund + impersonate).
-    pub async fn prepare_chain_admin(
-        &self,
-        bridgehub: alloy::primitives::Address,
-        chain_id: u64,
-    ) -> anyhow::Result<Wallet> {
-        let admin =
-            crate::common::l1_contracts::resolve_chain_admin(&self.rpc_url, bridgehub, chain_id)
-                .await
-                .context("resolving chain admin from L1")?;
-        self.prepare_sender(admin).await
-    }
-
-    /// Resolve the chain admin's *owner* EOA (one Ownable hop past
-    /// [`Self::prepare_chain_admin`]) and prepare it as a sender. Use this
-    /// when the script's broadcast must come from a signable EOA — the
-    /// ChainAdmin contract itself has no private key.
-    pub async fn prepare_chain_admin_owner(
-        &self,
-        bridgehub: Address,
-        chain_id: u64,
-    ) -> anyhow::Result<Wallet> {
-        let owner = crate::common::l1_contracts::resolve_chain_admin_owner(
-            &self.rpc_url,
-            bridgehub,
-            chain_id,
-        )
-        .await
-        .context("resolving chain admin owner EOA from L1")?;
-        self.prepare_sender(owner).await
     }
 
     /// Resolve the address that `Utils.adminExecuteCalls` will broadcast from
@@ -276,9 +238,6 @@ impl ForgeRunner {
         }
         if invocation.rpc_url() {
             forge = forge.with_rpc_url(self.rpc_url.clone());
-        }
-        if let Some(gas_limit) = invocation.gas_limit() {
-            forge = forge.with_gas_limit(gas_limit);
         }
         if let Some(sub) = &self.subdir {
             // Scope forge's own broadcast output (run-latest.json etc.) the

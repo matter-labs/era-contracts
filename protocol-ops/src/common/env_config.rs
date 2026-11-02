@@ -396,16 +396,7 @@ impl EnvConfig {
     }
 }
 
-/// Default output dir for an env, e.g. `<upgrade-env dir>/output/<env>/`, without loading the env.
-pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
-    Ok(resolve_l1_contracts_path()?
-        .join(upgrade_env_dir())
-        .join("output")
-        .join(env))
-}
-
 /// `upgrade-envs/<upgrade>/output/<env>/`: where generating `upgrade` for `env` writes.
-/// For [`DEFAULT_UPGRADE`] this is [`default_protocol_ops_out_dir`].
 pub fn protocol_ops_out_dir(upgrade: &str, env: &str) -> anyhow::Result<PathBuf> {
     crate::common::upgrade_descriptor::validate_upgrade_name(upgrade)?;
     Ok(resolve_l1_contracts_path()?

@@ -5,8 +5,7 @@
 //! handful of getters per object, not the objects' full ABIs, and because a package is
 //! reviewed against a COMMIT: a getter list that lives here changes only when this
 //! verifier changes, so a `zkstack-out` regeneration cannot silently move what a review
-//! reads. `ICTMRelease` is the exception — it is already exported and bound as
-//! `ICTMReleaseAbi`, so this module does not redeclare it.
+//! reads.
 
 use alloy::sol;
 

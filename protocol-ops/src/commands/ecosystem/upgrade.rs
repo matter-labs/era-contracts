@@ -2186,8 +2186,11 @@ mod tests {
 #[cfg(test)]
 mod release_script_tests {
     use super::*;
-    use crate::common::forge::scripts::{CURRENT_UPGRADE_ENV_DIR, UPGRADE_V33_ENV_DIR};
+    use crate::common::forge::scripts::CURRENT_UPGRADE_ENV_DIR;
     use clap::CommandFactory;
+
+    /// Another release's upgrade-env dir, kept in the tree, for the release-selection tests.
+    const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
 
     #[test]
     fn prepare_defaults_to_current_release() {

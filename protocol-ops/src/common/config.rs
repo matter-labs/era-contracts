@@ -4,7 +4,6 @@ static CONFIG: OnceLock<GlobalConfig> = OnceLock::new();
 
 static DEFAULT_CONFIG: GlobalConfig = GlobalConfig {
     verbose: false,
-    json_output: false,
 };
 
 /// Initialize the global config (verbose flag, etc.).
@@ -21,27 +20,8 @@ pub fn global_config() -> &'static GlobalConfig {
     CONFIG.get().unwrap_or(&DEFAULT_CONFIG)
 }
 
-/// Returns true if `--json` was passed on the command line.
-pub fn is_json_output() -> bool {
-    global_config().json_output
-}
-
 #[derive(Debug)]
 pub struct GlobalConfig {
     pub verbose: bool,
-    pub json_output: bool,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn json_output_defaults_false() {
-        let cfg = GlobalConfig {
-            verbose: false,
-            json_output: false,
-        };
-        assert!(!cfg.json_output);
-    }
-}

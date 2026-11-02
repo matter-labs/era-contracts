@@ -7,7 +7,7 @@
 
 use alloy::network::Ethereum;
 use alloy::primitives::{Address, U256};
-use alloy::providers::{Provider, ProviderBuilder, RootProvider};
+use alloy::providers::{ProviderBuilder, RootProvider};
 use anyhow::Context;
 
 use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
@@ -91,17 +91,6 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
     ensure_nonzero(ctm, "ChainTypeManagerAdded event")
 }
 
-/// Resolve `bridgehub.l1CtmDeployer()` → CTM deployment tracker (STM tracker).
-pub async fn resolve_stm_tracker(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
-    let bh = BridgehubAbi::new(bridgehub, provider(l1_rpc_url)?);
-    let tracker = bh
-        .l1CtmDeployer()
-        .call()
-        .await
-        .context("bridgehub.l1CtmDeployer() call failed")?;
-    ensure_nonzero(tracker, "bridgehub.l1CtmDeployer()")
-}
-
 /// Resolve `bridgehub.getAllZKChainChainIDs()` → list of registered chain IDs.
 pub async fn resolve_all_chain_ids(
     l1_rpc_url: &str,
@@ -138,24 +127,6 @@ pub async fn discover_all_ctms(
         }
     }
     Ok(out)
-}
-
-/// Resolve `ctm.L1_BYTECODES_SUPPLIER()` → bytecodes supplier address.
-///
-/// This getter is on the concrete `ChainTypeManager` but not in the
-/// `IChainTypeManager` interface; we use a minimal inline sol! binding.
-pub async fn resolve_bytecodes_supplier(
-    l1_rpc_url: &str,
-    ctm_proxy: Address,
-) -> anyhow::Result<Address> {
-    use crate::common::abi::IChainTypeManagerExt;
-    let ctm = IChainTypeManagerExt::new(ctm_proxy, provider(l1_rpc_url)?);
-    let addr = ctm
-        .L1_BYTECODES_SUPPLIER()
-        .call()
-        .await
-        .context("ctm.L1_BYTECODES_SUPPLIER() call failed")?;
-    ensure_nonzero(addr, "ctm.L1_BYTECODES_SUPPLIER()")
 }
 
 /// Resolve `bridgehub.owner()` → governance contract address.
@@ -397,60 +368,4 @@ pub async fn resolve_ctm_minor_protocol_version(
         .context("ctm.protocolVersion() call failed")?;
     let minor: alloy::primitives::U256 = (version >> 32) & alloy::primitives::U256::from(u32::MAX);
     Ok(minor.to::<u64>())
-}
-
-/// Resolve whether the current verifier is a testnet verifier by querying
-/// `isTestnetVerifier()` (v34+) or the legacy `IS_TESTNET_VERIFIER()` constant
-/// (pre-v34 testnet verifiers) on the verifier contract.
-///
-/// Returns `false` if the verifier exposes neither (a pre-v34 production
-/// verifier).
-pub async fn resolve_is_testnet_verifier(
-    l1_rpc_url: &str,
-    ctm_proxy: Address,
-) -> anyhow::Result<bool> {
-    use crate::common::abi::ITestnetVerifier;
-
-    let p = provider(l1_rpc_url)?;
-    let ctm = IChainTypeManagerAbi::new(ctm_proxy, p.clone());
-
-    // The verifier is part of the installed chain state and is pinned by the release the CTM
-    // points at, not keyed by protocol version on the CTM.
-    let release = ctm
-        .currentRelease()
-        .call()
-        .await
-        .context("ctm.currentRelease() call failed")?;
-    ensure_nonzero(release, "ctm.currentRelease()")?;
-    let verifier = crate::common::abi::ICTMReleaseAbi::new(release, p.clone())
-        .verifier()
-        .call()
-        .await
-        .context("release.verifier() call failed")?;
-    ensure_nonzero(verifier, "release.verifier()")?;
-
-    let code = p
-        .get_code_at(verifier)
-        .await
-        .context("get_code(verifier) failed")?;
-    anyhow::ensure!(!code.is_empty(), "verifier {verifier} has no code");
-
-    let verifier_contract = ITestnetVerifier::new(verifier, p);
-    match verifier_contract.isTestnetVerifier().call().await {
-        Ok(is_testnet) => Ok(is_testnet),
-        // Pre-v34 verifiers don't have the camelCase getter; testnet ones exported the flag as
-        // the legacy IS_TESTNET_VERIFIER constant instead.
-        Err(_) => match verifier_contract.IS_TESTNET_VERIFIER().call().await {
-            Ok(is_testnet) => Ok(is_testnet),
-            // Neither name answers — a pre-v34 production verifier.
-            Err(_) => Ok(false),
-        },
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    // Verify these symbols compile and resolve — actual calls require a live RPC.
-    #[allow(unused_imports)]
-    use super::{resolve_bytecodes_supplier, resolve_is_testnet_verifier};
 }

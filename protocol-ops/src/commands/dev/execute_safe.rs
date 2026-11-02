@@ -95,6 +95,7 @@ impl ResumeJournal {
     }
 
     /// Every entry, prior and appended, in execution order.
+    #[cfg(test)]
     pub fn transactions(&self) -> &[ExecutedTx] {
         &self.bundle.transactions
     }
@@ -569,7 +570,8 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
     .await
 }
 
-/// Convert a gwei ceiling to wei for the sender.
+/// Convert a gwei ceiling to wei.
+#[cfg(test)]
 pub fn gwei_to_wei(gwei: u128) -> u128 {
     gwei.saturating_mul(WEI_PER_GWEI)
 }

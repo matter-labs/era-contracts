@@ -8,8 +8,6 @@ use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::forge::scripts::Create2Addresses;
 use crate::common::traits::FileConfigTrait;
 
-pub use super::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION as DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS;
-
 // ── Input types ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

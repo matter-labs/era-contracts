@@ -65,7 +65,6 @@ async fn main() -> anyhow::Result<()> {
 async fn run_subcommand(cli_args: ProtocolOps) -> anyhow::Result<()> {
     init_global_config(GlobalConfig {
         verbose: cli_args.global.verbose,
-        json_output: cli_args.global.json,
     });
 
     if !cli_args.global.json {
