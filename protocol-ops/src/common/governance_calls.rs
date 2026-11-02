@@ -39,7 +39,7 @@ sol! {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GovernanceCall {
     pub target: Address,
     pub value: U256,

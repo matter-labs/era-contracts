@@ -1054,6 +1054,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             discoveredRepresentativeZkChain.l1DAValidator
         );
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
+        // Same key as `DeployCTM`; the merge hands this notifier over in a CTM executor succession.
+        vm.serializeAddress(
+            "deployed_addresses",
+            "server_notifier_proxy_addr",
+            ctmAddresses.stateTransition.proxies.serverNotifier
+        );
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "l1_rollup_da_manager",

@@ -21,13 +21,14 @@
 //!
 //! **Does the signed transaction invoke the reviewed upgrade at the intended addresses, in the
 //! intended order?** is answered by [`verify_upgrade_calls`]: each leg is re-encoded from the
-//! reviewed executor and object and the run must appear EXACTLY ONCE, CONTIGUOUS, in canonical
-//! order; every other call must be a declared governance external action, matched one for one and
-//! in declared order, that reaches none of the upgrade's authorities. With no coordinator on
-//! chain, this ordered bundle check is what keeps the core rows ahead of the CTM infrastructure
-//! and the infrastructure ahead of the transition commit; the one governance execution keeps them
-//! atomic. The legs' INTERNAL calls are NOT re-derived — the executors derive them on chain from
-//! the same pinned objects, from audited code.
+//! reviewed executor and object — preceded, when the upgrade replaces an executor, by the derived
+//! executor succession ([`super::succession`]) — and the run must appear EXACTLY ONCE, CONTIGUOUS,
+//! in canonical order; every other call must be a declared governance external action, matched one
+//! for one and in declared order, that reaches none of the upgrade's authorities. With no
+//! coordinator on chain, this ordered bundle check is what keeps the core rows ahead of the CTM
+//! infrastructure and the infrastructure ahead of the transition commit; the one governance
+//! execution keeps them atomic. The legs' INTERNAL calls are NOT re-derived — the executors
+//! derive them on chain from the same pinned objects, from audited code.
 //!
 //! Everything else this module does is the part the objects cannot answer for themselves: that
 //! the executors the legs run through are the reviewed ones (their construction,
@@ -53,13 +54,17 @@ use super::lifecycle::{
     LifecycleBindings, LifecycleReview,
 };
 use super::member_construction::{MemberReview, ReviewedEnv};
-use super::members::{verify_engine_and_l2_plan, verify_release_members, DepartingMembers};
+use super::members::{
+    verify_engine_and_l2_plan, verify_proxy_upgrade_engine, verify_release_members,
+    DepartingMembers,
+};
 use super::package::{LegKind, UpgradePackage};
 use super::provenance::{expect_code_identity, expect_code_present, tolerate};
 use super::rows::{
     participating, verify_inventory, verify_inventory_construction, Inventory, InventoryReview,
 };
 use super::shell::verify_shell_kept;
+use super::succession::{verify_succession_preconditions, SuccessionDomain};
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CommittedUpgradeView, CtmView,
     ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
@@ -132,6 +137,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 build,
                 result,
+                &members,
                 "the core transition",
                 leg.object,
                 Inventory::Ecosystem,
@@ -151,6 +157,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 build,
                 result,
+                &members,
                 "the CTM infrastructure transition",
                 leg.object,
                 Inventory::CtmDomain,
@@ -199,12 +206,20 @@ pub(crate) async fn verify<P: Provider>(
 
     // ── 2. Authority: the executors the legs run through, and the owner they answer to ──
     result.print_info("\n== Bound authority ==");
-    let core_executor = package.leg(LegKind::Core).map(|leg| leg.executor);
+    // A succession's successor is under review even when no leg of its domain runs: the bundle
+    // hands it the domain.
+    let core_succession = package.succession.core.as_ref();
+    let ctm_succession = package.succession.ctm.as_ref();
+    let core_executor = package
+        .leg(LegKind::Core)
+        .map(|leg| leg.executor)
+        .or(core_succession.map(|s| s.successor));
     let ctm_executor = package
         .legs
         .iter()
         .find(|leg| leg.kind.is_ctm())
-        .map(|leg| leg.executor);
+        .map(|leg| leg.executor)
+        .or(ctm_succession.map(|s| s.successor));
     if ctm_executor.is_some() {
         for (field, reported, what) in [
             (
@@ -246,10 +261,14 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
+    // A predecessor answers to the same governance as its successor, with nothing outstanding: a
+    // nominee accepting before the bundle runs would take the domain the succession moves.
     let executors: Vec<(&str, Address)> = core_executor
         .map(|address| ("the core executor", address))
         .into_iter()
         .chain(ctm_executor.map(|address| ("the CTM executor", address)))
+        .chain(core_succession.map(|s| ("the predecessor core executor", s.predecessor)))
+        .chain(ctm_succession.map(|s| ("the predecessor CTM executor", s.predecessor)))
         .collect();
     verify_executor_owners(
         provider,
@@ -260,9 +279,13 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await;
 
-    // The authority each domain must already HOLD. An upgrade hands nothing over — it executes on authority the previous edge established, so authority that has since
-    // drifted is a finding now rather than a revert mid-bundle.
-    if let Some(ctm_executor) = ctm_executor {
+    // The authority each domain must already HOLD. An upgrade normally hands nothing over — it
+    // executes on authority the previous edge established, so authority that has since drifted is
+    // a finding now rather than a revert mid-bundle. The one exception is an executor succession:
+    // there the PREDECESSOR must hold the domain now, and be bound like the successor it hands the
+    // domain to ([`verify_succession_preconditions`]).
+    verify_succession_preconditions(provider, result, &package.succession, &bindings).await?;
+    if let (Some(ctm_executor), None) = (ctm_executor, ctm_succession) {
         if let (Some(ctm), Some(ctm_admin)) = (bindings.ctm, bindings.ctm_proxy_admin) {
             // An executor names its CTM only as an immutable, so the reviewer is told which CTM
             // the CTM legs land on rather than left to infer it.
@@ -303,7 +326,9 @@ pub(crate) async fn verify<P: Provider>(
             }
         }
     }
-    if let (Some(core_executor), Some(core_admin)) = (core_executor, bindings.core_proxy_admin) {
+    if let (Some(core_executor), Some(core_admin), None) =
+        (core_executor, bindings.core_proxy_admin, core_succession)
+    {
         expect_owned_by(
             provider,
             result,
@@ -521,13 +546,14 @@ async fn ecosystem_anchor<P: Provider>(
     }
 }
 
-/// Every address the upgrade's calls may legitimately reach only through its legs, each with the
-/// role a reviewer reads it under: the objects this run established, the executors, the objects
-/// the legs apply, the CTM and both domains' ProxyAdmins (bound and reported).
+/// Every address the upgrade's calls may legitimately reach only through its run, each with the
+/// role a reviewer reads it under: the objects this run established, the executors (a
+/// succession's predecessors and successors included), the objects the legs apply, the CTM, both
+/// domains' ProxyAdmins (bound and reported) and the ServerNotifier a CTM succession hands over.
 ///
-/// The run of legs is the complete list of what the upgrade needs from these; a call to any of
-/// them outside it is authority the review never saw, so [`verify_upgrade_calls`] refuses it
-/// whether the package declares it or not.
+/// The run — the derived succession, then the legs — is the complete list of what the upgrade
+/// needs from these; a call to any of them outside it is authority the review never saw, so
+/// [`verify_upgrade_calls`] refuses it whether the package declares it or not.
 fn upgrade_authorities(
     package: &UpgradePackage,
     bindings: &LifecycleBindings,
@@ -570,6 +596,32 @@ fn upgrade_authorities(
         package.lifecycle.core_proxy_admin,
         "the ecosystem ProxyAdmin the package names",
     );
+    for (executor, what) in package.succession.executors() {
+        note(Some(executor), what);
+    }
+    for succession in package.succession.iter() {
+        match succession.domain {
+            SuccessionDomain::Core { proxy_admin } => note(
+                Some(proxy_admin),
+                "the ecosystem ProxyAdmin the core succession hands over",
+            ),
+            SuccessionDomain::Ctm {
+                ctm,
+                ctm_proxy_admin,
+                server_notifier,
+            } => {
+                note(Some(ctm), "the CTM the CTM succession hands over");
+                note(
+                    Some(ctm_proxy_admin),
+                    "the CTM-domain ProxyAdmin the CTM succession hands over",
+                );
+                note(
+                    Some(server_notifier),
+                    "the ServerNotifier the CTM succession hands over",
+                );
+            }
+        }
+    }
     authorities
 }
 
@@ -578,9 +630,12 @@ fn upgrade_authorities(
 /// Governance signs the legs: each is re-ENCODED here from the reviewed executor and object (the
 /// prepare summaries, which the loader reconciled with the calldata) and the expected run —
 /// core, then CTM infrastructure, then CTM transition, each only when present — must appear in
-/// the bundle EXACTLY ONCE as ONE CONTIGUOUS run. A run out of canonical order, interrupted by
-/// another call, or naming another executor or object is an ERROR: with no coordinator, the order
-/// the bundle states IS the order the domains apply in.
+/// the bundle EXACTLY ONCE as ONE CONTIGUOUS run. When the upgrade replaces an executor, the run
+/// STARTS with the executor succession, re-derived from the same summaries
+/// ([`super::succession`]): the core handover, then the CTM's, immediately before the legs that
+/// target the successors. A run out of canonical order, interrupted by another call, missing a
+/// succession call, or naming another executor or object is an ERROR: with no coordinator, the
+/// order the bundle states IS the order the domains apply in.
 ///
 /// Every other call is held to two rules. A call reaching any of `authorities` — the executors,
 /// the objects, the CTM, either ProxyAdmin — is an ERROR whether declared or not: the run is the
@@ -594,13 +649,13 @@ pub(super) fn verify_upgrade_calls(
     result: &mut VerificationResult,
 ) {
     let calls = &package.calls;
-    let expected: Vec<(LegKind, GovernanceCall)> = LegKind::CANONICAL_ORDER
+    let legs: Vec<(String, GovernanceCall)> = LegKind::CANONICAL_ORDER
         .into_iter()
         .filter_map(|kind| {
             let object = package.reported_object(kind)?;
             let executor = package.reported_executor(kind)?;
             Some((
-                kind,
+                format!("{} on {executor}", kind.entrypoint()),
                 GovernanceCall {
                     target: executor,
                     value: U256::ZERO,
@@ -610,21 +665,33 @@ pub(super) fn verify_upgrade_calls(
         })
         .collect();
 
-    if expected.len() != package.legs.len() {
+    if legs.len() != package.legs.len() {
         result.report_error(&format!(
             "the bundle carries {} executor leg(s) but the package reports the object and executor \
              of {}: a leg the summaries do not account for cannot be re-encoded from reviewed \
              values",
             package.legs.len(),
-            expected.len()
+            legs.len()
         ));
     }
 
-    // ── the run of legs ──
-    let matches = |call: &GovernanceCall, expected: &GovernanceCall| {
-        call.target == expected.target && call.value == expected.value && call.data == expected.data
-    };
-    let runs: Vec<usize> = if expected.is_empty() {
+    // The run: the derived succession (core, then CTM), then the legs.
+    let succession: Vec<(String, GovernanceCall)> = package
+        .succession
+        .iter()
+        .flat_map(|s| {
+            s.describe_calls()
+                .into_iter()
+                .map(move |described| format!("{} succession: {described}", s.domain_name()))
+                .zip(s.calls())
+        })
+        .collect();
+    let succession_len = succession.len();
+    let expected: Vec<(String, GovernanceCall)> = succession.into_iter().chain(legs).collect();
+
+    // ── the run ──
+    let runs: Vec<usize> = if expected.len() == succession_len {
+        // No leg to anchor a run on: already reported above or by the caller.
         Vec::new()
     } else {
         calls
@@ -634,29 +701,38 @@ pub(super) fn verify_upgrade_calls(
                 window
                     .iter()
                     .zip(&expected)
-                    .all(|(call, (_, expected))| matches(call, expected))
+                    .all(|(call, (_, expected))| call == expected)
             })
             .map(|(at, _)| at)
             .collect()
     };
+    let mut run_indices: Vec<usize> = package.legs.iter().map(|leg| leg.index).collect();
+    let mut run_start = package.legs.iter().map(|leg| leg.index).min();
     match runs.as_slice() {
         [at] => {
+            run_indices = (*at..at + expected.len()).collect();
+            run_start = Some(*at);
+            if succession_len > 0 {
+                result.report_ok(&format!(
+                    "the bundle carries the {succession_len} derived executor succession call(s) \
+                     immediately before the reviewed legs, re-derived from the prepare summaries"
+                ));
+            }
             result.report_ok(&format!(
                 "the bundle carries the {} reviewed leg(s) as one contiguous run in canonical \
-                 order (core -> CTM infrastructure -> CTM transition), at calls {at}..{} of {}",
-                expected.len(),
+                 order (core -> CTM infrastructure -> CTM transition), at calls {}..{} of {}",
+                expected.len() - succession_len,
+                at + succession_len,
                 at + expected.len(),
                 calls.len()
             ));
-            for (kind, call) in &expected {
+            for (described, _) in &expected {
                 result.print_info(&format!(
-                    "    · {} on {} (authority: the executor's owner, governance)",
-                    kind.entrypoint(),
-                    call.target
+                    "    · {described} (authority: the executor's owner, governance)"
                 ));
             }
         }
-        [] => report_broken_run(package, expected.len(), result),
+        [] => report_broken_run(package, expected.len() - succession_len, result),
         many => result.report_error(&format!(
             "the bundle carries the reviewed run of legs {} times (at calls {many:?}): the second \
              application is not a bundle the merge produces",
@@ -665,19 +741,18 @@ pub(super) fn verify_upgrade_calls(
     }
 
     // ── every other call ──
-    let leg_indices: Vec<usize> = package.legs.iter().map(|leg| leg.index).collect();
-    let run_start = package.legs.iter().map(|leg| leg.index).min();
     let mut others: Vec<(usize, &GovernanceCall)> = Vec::new();
     for (index, call) in calls.iter().enumerate() {
-        if leg_indices.contains(&index) {
+        if run_indices.contains(&index) {
             continue;
         }
         match authorities.get(&call.target) {
             Some(what) => result.report_error(&format!(
                 "call {index} reaches {what} ({}) with selector 0x{} outside the run of legs: the \
-                 upgrade's authorities take exactly its legs, so an extra call to one — a \
-                 nomination, a `forward`, a second application — is authority the review never \
-                 saw, whether or not the package declares it",
+                 upgrade's authorities take exactly its run — the derived executor succession and \
+                 the legs — so an extra call to one — a nomination, a `forward`, a second \
+                 application — is authority the review never saw, whether or not the package \
+                 declares it",
                 call.target,
                 alloy::hex::encode(call.data.get(..4).unwrap_or_default())
             )),
@@ -688,7 +763,8 @@ pub(super) fn verify_upgrade_calls(
 }
 
 /// Names why the expected run is not in the bundle: the legs out of canonical order, the legs
-/// not contiguous, or a leg whose re-encoding the bundle does not carry.
+/// not contiguous, the executor succession not immediately before them, or a leg whose
+/// re-encoding the bundle does not carry. `expected` counts the legs alone.
 fn report_broken_run(package: &UpgradePackage, expected: usize, result: &mut VerificationResult) {
     let legs = &package.legs;
     if expected == 0 {
@@ -723,6 +799,28 @@ fn report_broken_run(package: &UpgradePackage, expected: usize, result: &mut Ver
             pair[1].index
         ));
         return;
+    }
+    let succession = package.succession.calls();
+    if let (false, Some(first)) = (succession.is_empty(), legs.first()) {
+        let before = first.index.checked_sub(succession.len());
+        if before.map(|start| &package.calls[start..first.index]) != Some(&succession[..]) {
+            result.report_error(&format!(
+                "the executor succession is not where it must be: the {} call(s) re-derived from \
+                 the prepare summaries ({}) must sit immediately before the first leg (call {}), \
+                 in order and unaltered, but the bundle does not carry them there — a missing, \
+                 extra, reordered or altered handover leaves the legs running through an \
+                 executor that does not hold its domain",
+                succession.len(),
+                package
+                    .succession
+                    .iter()
+                    .map(|s| format!("{} {} -> {}", s.domain_name(), s.predecessor, s.successor))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                first.index
+            ));
+            return;
+        }
     }
     result.report_error(&format!(
         "the bundle's {} call(s) do not contain the {expected} reviewed leg(s), re-encoded from \
@@ -1075,9 +1173,14 @@ fn judge_release_validity(
     ));
 }
 
-/// A `ProxyUpgradeTransition`'s provenance and construction, and its domain held against
-/// `expected` — the domain of the leg that applies it (the core leg's executor applies only Core,
-/// the infrastructure leg's only CTM), fixed by the caller and never read from the object.
+/// A `ProxyUpgradeTransition`'s provenance and construction (the manifest its address commits to,
+/// `upgradeEngine` included), the engine it pins held to its role
+/// ([`verify_proxy_upgrade_engine`]), and its domain held against `expected` — the domain of the
+/// leg that applies it (the core leg's executor applies only Core, the infrastructure leg's only
+/// CTM), fixed by the caller and never read from the object.
+///
+/// Reads, in order: the object's code, its `getManifest()`, then the engine's code (and whatever
+/// its construction check reads; nothing for the default engine, which takes no arguments).
 /// Returns the whole enum-indexed inventory it pins, for [`verify_inventory`], or `None` when it
 /// cannot be read or belongs to another domain (both reported).
 #[allow(clippy::too_many_arguments)]
@@ -1085,6 +1188,7 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
     result: &mut VerificationResult,
+    members: &MemberReview<'_>,
     label: &str,
     transition: Address,
     expected: Inventory,
@@ -1122,6 +1226,17 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
     ) {
         reviewed.insert(transition, label.to_string());
     }
+    // The engine the executor delegatecalls to apply the rows runs with the executor's whole
+    // authority, so it is held to its role like a transition's engine.
+    verify_proxy_upgrade_engine(
+        provider,
+        build,
+        result,
+        members,
+        label,
+        manifest.upgradeEngine,
+    )
+    .await?;
     if manifest.domain != expected.domain_tag() {
         result.report_error(&format!(
             "{label} at {transition} is a {}-domain object, but its leg applies {}-domain rows: \
@@ -1425,6 +1540,7 @@ mod tests {
             force_deployments_data: None,
             executor_records: Default::default(),
             member_records: Default::default(),
+            succession: Default::default(),
             legs,
             calls,
         }
@@ -1653,6 +1769,134 @@ mod tests {
         );
     }
 
+    // ───────────────────────── an executor succession ─────────────────────────
+
+    use super::super::succession::{ExecutorSuccession, Successions};
+
+    const CORE_PREDECESSOR: Address = Address::repeat_byte(0xD0);
+    const CTM_PREDECESSOR: Address = Address::repeat_byte(0xD7);
+    const NOTIFIER: Address = Address::repeat_byte(0x5E);
+
+    /// Both executors replaced: the legs target the successors (`CORE_EXECUTOR`, `CTM_EXECUTOR`).
+    fn successions() -> Successions {
+        Successions {
+            core: Some(ExecutorSuccession {
+                predecessor: CORE_PREDECESSOR,
+                successor: CORE_EXECUTOR,
+                domain: SuccessionDomain::Core {
+                    proxy_admin: ECO_ADMIN,
+                },
+            }),
+            ctm: Some(ExecutorSuccession {
+                predecessor: CTM_PREDECESSOR,
+                successor: CTM_EXECUTOR,
+                domain: SuccessionDomain::Ctm {
+                    ctm: CTM,
+                    ctm_proxy_admin: CTM_ADMIN,
+                    server_notifier: NOTIFIER,
+                },
+            }),
+        }
+    }
+
+    /// The four succession calls, then all three legs.
+    fn succession_run() -> Vec<GovernanceCall> {
+        let mut calls = successions().calls();
+        calls.extend([core(), infrastructure(), transition()]);
+        calls
+    }
+
+    fn with_succession(
+        calls: Vec<GovernanceCall>,
+        external: Vec<ExternalAction>,
+    ) -> UpgradePackage {
+        let mut package = package(calls, external);
+        package.succession = successions();
+        package
+    }
+
+    /// The succession right before the legs is one reviewed run, with declared external actions
+    /// around it riding along; the succession calls themselves are not external actions.
+    #[test]
+    fn a_succession_right_before_the_legs_passes() {
+        let mut calls = vec![wiring(1)];
+        calls.extend(succession_run());
+        calls.push(wiring(2));
+        let result = judge(&with_succession(calls, declared(&[wiring(1), wiring(2)])));
+        assert_eq!(result.errors, 0, "{:?}", result.error_messages);
+    }
+
+    /// Each succession call missing breaks the run: the legs would run through an executor that
+    /// does not hold its domain.
+    #[test]
+    fn a_missing_succession_call_fails() {
+        for missing in 0..4 {
+            let mut calls = succession_run();
+            calls.remove(missing);
+            let result = judge(&with_succession(calls, Vec::new()));
+            assert!(
+                result.has_error("the executor succession is not where it must be"),
+                "call {missing}: {:?}",
+                result.error_messages
+            );
+        }
+    }
+
+    /// The succession calls reordered — the CTM's before the core's, or the successor accepting
+    /// before the predecessor nominates it — break the run.
+    #[test]
+    fn a_reordered_succession_fails() {
+        for (a, b) in [(0, 1), (1, 2), (2, 3)] {
+            let mut calls = succession_run();
+            calls.swap(a, b);
+            let result = judge(&with_succession(calls, Vec::new()));
+            assert!(
+                result.has_error("the executor succession is not where it must be"),
+                "swap {a}/{b}: {:?}",
+                result.error_messages
+            );
+        }
+    }
+
+    /// A succession call carried a second time outside the run reaches an authority: refused even
+    /// when declared as an external action.
+    #[test]
+    fn an_extra_succession_call_fails() {
+        for extra in 0..4 {
+            let duplicate = successions().calls()[extra].clone();
+            let mut calls = succession_run();
+            calls.push(duplicate.clone());
+            let result = judge(&with_succession(calls, declared(&[duplicate])));
+            assert!(
+                result.has_error("outside the run of legs"),
+                "call {extra}: {:?}",
+                result.error_messages
+            );
+        }
+    }
+
+    /// A succession separated from the legs by another call is not the reviewed run.
+    #[test]
+    fn a_succession_detached_from_the_legs_fails() {
+        let mut calls = successions().calls();
+        calls.push(wiring(1));
+        calls.extend([core(), infrastructure(), transition()]);
+        let result = judge(&with_succession(calls, declared(&[wiring(1)])));
+        assert!(
+            result.has_error("the executor succession is not where it must be"),
+            "{:?}",
+            result.error_messages
+        );
+    }
+
+    /// A handover the prepares never reported is no part of the reviewed run: its calls reach
+    /// executors no external action may touch, or are accounted for by nothing.
+    #[test]
+    fn an_unreported_succession_fails() {
+        let result = judge(&package(succession_run(), Vec::new()));
+        assert!(result.errors > 0, "{:?}", result.error_messages);
+    }
+
     /// The re-encoding the verifier compares against is the executors' real ABI, transcribed
     /// independently of the `sol!` mirror both sides use.
     #[test]
@@ -1700,22 +1944,61 @@ mod tests {
 
     const SALT: B256 = B256::repeat_byte(0x5A);
     const TRANSITION_RUNTIME: &[u8] = b"the reviewed ProxyUpgradeTransition runtime";
+    const ENGINE_RUNTIME: &[u8] = b"the reviewed DefaultProxyUpgradeEngine runtime";
 
     fn transition_code() -> Vec<u8> {
         b"reviewed creation code of ProxyUpgradeTransition".to_vec()
+    }
+
+    fn engine_code() -> Vec<u8> {
+        b"reviewed creation code of DefaultProxyUpgradeEngine".to_vec()
+    }
+
+    /// Where the prepare deploys the default engine (no constructor arguments) under [`SALT`].
+    fn engine() -> Address {
+        canonical_create2_address(SALT, &engine_code(), &[])
+    }
+
+    /// The prepare's `[member_deployments]` record of [`engine`].
+    fn engine_records() -> MemberDeployments {
+        [(
+            engine(),
+            MemberDeploymentRecord {
+                contract: "DefaultProxyUpgradeEngine".to_string(),
+                create2_factory: DETERMINISTIC_CREATE2_FACTORY,
+                create2_salt: SALT,
+                constructor_args: Bytes::new(),
+            },
+        )]
+        .into_iter()
+        .collect()
+    }
+
+    /// The build artifacts of the transition object and the default engine.
+    fn object_artifacts() -> Vec<super::super::construction::TestArtifact> {
+        vec![
+            (
+                "ProxyUpgradeTransition.sol",
+                "ProxyUpgradeTransition",
+                transition_code(),
+                TRANSITION_RUNTIME.to_vec(),
+                Vec::new(),
+            ),
+            (
+                "DefaultProxyUpgradeEngine.sol",
+                "DefaultProxyUpgradeEngine",
+                engine_code(),
+                ENGINE_RUNTIME.to_vec(),
+                Vec::new(),
+            ),
+        ]
     }
 
     fn reviewed_build() -> ReviewedBuild {
         ReviewedBuild::from_artifacts(
             CodeIdentity::empty()
                 .with_contract("l1-contracts/ProxyUpgradeTransition", TRANSITION_RUNTIME),
-            vec![(
-                "ProxyUpgradeTransition.sol",
-                "ProxyUpgradeTransition",
-                transition_code(),
-                TRANSITION_RUNTIME.to_vec(),
-                Vec::new(),
-            )],
+            object_artifacts(),
         )
     }
 
@@ -1740,13 +2023,17 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain,
             proxyUpgrades: rows,
+            upgradeEngine: engine(),
         }
     }
 
-    /// Serves `manifest` from a genuinely constructed object and verifies it as `expected`.
-    async fn verify_object(
+    /// Serves `manifest` from a genuinely constructed object, its engine running `engine_runtime`,
+    /// and verifies it as `expected` with the default engine's record.
+    async fn verify_object_with(
         manifest: &ProxyUpgradeTransitionManifest,
         expected: Inventory,
+        engine_runtime: &'static [u8],
+        records: &MemberDeployments,
     ) -> (
         Option<Vec<ProxyUpgradeRow>>,
         VerificationResult,
@@ -1757,13 +2044,18 @@ mod tests {
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
         asserter.push_success(&Bytes::from(manifest.abi_encode()));
+        if !manifest.upgradeEngine.is_zero() {
+            asserter.push_success(&Bytes::from_static(engine_runtime));
+        }
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
         let mut reviewed = BTreeMap::new();
+        let env = ReviewedEnv::default();
         let rows = verify_proxy_upgrade_transition(
             &provider,
             &reviewed_build(),
             &mut result,
+            &MemberReview::new(records, &env, None, None),
             "the object",
             address,
             expected,
@@ -1774,6 +2066,18 @@ mod tests {
         .unwrap();
         assert!(asserter.read_q().is_empty());
         (rows, result, reviewed, address)
+    }
+
+    async fn verify_object(
+        manifest: &ProxyUpgradeTransitionManifest,
+        expected: Inventory,
+    ) -> (
+        Option<Vec<ProxyUpgradeRow>>,
+        VerificationResult,
+        BTreeMap<Address, String>,
+        Address,
+    ) {
+        verify_object_with(manifest, expected, ENGINE_RUNTIME, &engine_records()).await
     }
 
     /// A genuine object of the leg's domain: its construction re-derives (the constructor argument
@@ -1860,6 +2164,7 @@ mod tests {
             let empty = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: vec![inert(); slots],
+                upgradeEngine: engine(),
             };
             let (rows, result, reviewed, address) = verify_object(&empty, expected).await;
             assert_eq!(result.errors, 1, "{:?}", result.error_messages);
@@ -1870,6 +2175,107 @@ mod tests {
                 "its construction still verifies"
             );
         }
+    }
+
+    /// The mirror decodes a manifest as Solidity encodes it, POSITIONALLY: `(domain,
+    /// proxyUpgrades, upgradeEngine)`, the engine the third head word of the struct.
+    #[test]
+    fn a_proxy_upgrade_manifest_decodes_with_its_engine() {
+        use alloy::dyn_abi::DynSolValue;
+        let row = |byte: u8| {
+            DynSolValue::Tuple(vec![
+                DynSolValue::Address(Address::repeat_byte(byte)),
+                DynSolValue::Address(Address::repeat_byte(byte + 1)),
+                DynSolValue::Address(Address::repeat_byte(byte + 2)),
+                DynSolValue::Bool(true),
+            ])
+        };
+        let solidity = DynSolValue::Tuple(vec![
+            DynSolValue::Uint(U256::from(PROXY_UPGRADE_DOMAIN_CTM), 8),
+            DynSolValue::Array(vec![row(0x10), row(0x20)]),
+            DynSolValue::Address(engine()),
+        ])
+        .abi_encode();
+        // offset, then the struct's heads: domain, the rows' offset, the engine.
+        assert_eq!(&solidity[64 + 32 + 12..64 + 64], engine().as_slice());
+
+        let decoded = ProxyUpgradeTransitionManifest::abi_decode(&solidity).unwrap();
+        assert_eq!(decoded.domain, PROXY_UPGRADE_DOMAIN_CTM);
+        assert_eq!(decoded.proxyUpgrades.len(), 2);
+        assert_eq!(decoded.proxyUpgrades[1].implNew, Address::repeat_byte(0x22));
+        assert_eq!(decoded.upgradeEngine, engine());
+        assert_eq!(
+            decoded.abi_encode(),
+            solidity,
+            "re-encodes as the address commits to"
+        );
+        let returned =
+            ProxyUpgradeTransitionView::getManifestCall::abi_decode_returns(&solidity).unwrap();
+        assert_eq!(returned.upgradeEngine, engine());
+    }
+
+    /// The engine is part of what the object's address commits to: the same rows under another
+    /// engine are another object.
+    #[test]
+    fn the_engine_is_part_of_the_construction() {
+        let mut other = manifest(PROXY_UPGRADE_DOMAIN_CORE, L1_ECOSYSTEM_CONTRACTS.len());
+        let genuine = canonical_create2_address(SALT, &transition_code(), &other.abi_encode());
+        other.upgradeEngine = STRANGER;
+        assert_ne!(
+            canonical_create2_address(SALT, &transition_code(), &other.abi_encode()),
+            genuine
+        );
+    }
+
+    /// An engine running code no reviewed engine is — it would run by delegatecall with the
+    /// executor's whole authority — is a finding, as is a zero or an unrecorded one.
+    #[tokio::test]
+    async fn an_unknown_zero_or_unrecorded_engine_fails() {
+        let manifest = manifest(PROXY_UPGRADE_DOMAIN_CTM, CTM_CONTRACTS.len());
+        let (rows, result, reviewed, address) = verify_object_with(
+            &manifest,
+            Inventory::CtmDomain,
+            b"an engine no reviewed artifact is",
+            &engine_records(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(
+            result.has_error("upgradeEngine"),
+            "{:?}",
+            result.error_messages
+        );
+        assert!(rows.is_some(), "the rows are still handed on");
+        assert!(
+            reviewed.contains_key(&address),
+            "the object's own construction holds"
+        );
+
+        let mut zero = manifest.clone();
+        zero.upgradeEngine = Address::ZERO;
+        let (_, result, _, _) = verify_object_with(
+            &zero,
+            Inventory::CtmDomain,
+            ENGINE_RUNTIME,
+            &engine_records(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("upgradeEngine is the zero address"));
+
+        let (_, result, _, _) = verify_object_with(
+            &manifest,
+            Inventory::CtmDomain,
+            ENGINE_RUNTIME,
+            &MemberDeployments::new(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(
+            result.has_error("upgradeEngine at"),
+            "{:?}",
+            result.error_messages
+        );
     }
 
     // ───────────────────────── the release's own validate() ─────────────────────────
@@ -2060,10 +2466,12 @@ mod tests {
         let core = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()],
+            upgradeEngine: engine(),
         };
         let infrastructure = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CTM,
             proxyUpgrades: vec![inert(); CTM_CONTRACTS.len()],
+            upgradeEngine: engine(),
         };
         let at = |manifest: &ProxyUpgradeTransitionManifest| {
             canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode())
@@ -2081,6 +2489,7 @@ mod tests {
         for manifest in [&core, &infrastructure] {
             asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
             asserter.push_success(&Bytes::from(manifest.abi_encode()));
+            asserter.push_success(&Bytes::from_static(ENGINE_RUNTIME));
         }
         for answer in [
             Bytes::from_static(&[0x60]), // the core executor's code
@@ -2121,6 +2530,87 @@ mod tests {
             .count();
         assert_eq!(empty_legs, 2, "{:?}", result.error_messages);
         assert!(result.ensure_success().is_err());
+    }
+
+    /// A core succession on the real path: the successor the leg targets is held as the core
+    /// executor, the predecessor answers to the same governance with nothing outstanding and
+    /// holds the ecosystem ProxyAdmin now — and the successor is not expected to hold it yet.
+    #[tokio::test]
+    async fn a_core_succession_is_held_to_the_live_chain_on_the_upgrade_path() {
+        let core = ProxyUpgradeTransitionManifest {
+            domain: PROXY_UPGRADE_DOMAIN_CORE,
+            proxyUpgrades: vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()],
+            upgradeEngine: engine(),
+        };
+        let object = canonical_create2_address(SALT, &transition_code(), &core.abi_encode());
+        let core_only = Successions {
+            core: successions().core,
+            ctm: None,
+        };
+        let mut calls = core_only.calls();
+        calls.push(leg_call(LegKind::Core, CORE_EXECUTOR, object));
+        let mut package = package(calls, Vec::new());
+        package.succession = core_only;
+        package.reported_ctm_executor = None;
+        package.reported_ctm = None;
+        package.reported_ctm_proxy_admin = None;
+        package.member_records = engine_records();
+
+        let run = |eco_admin_owner: Address| {
+            let asserter = Asserter::new();
+            let address = |a: Address| Bytes::from(a.abi_encode());
+            for answer in [
+                Bytes::from_static(TRANSITION_RUNTIME), // the core transition's code
+                Bytes::from(core.abi_encode()),         // its manifest
+                Bytes::from_static(ENGINE_RUNTIME),     // its engine's code
+                Bytes::from_static(&[0x60]),            // the successor's code
+                address(ECO_ADMIN),                     // its PROXY_ADMIN
+                address(GOVERNANCE),                    // the successor's owner
+                address(Address::ZERO),                 // its pending owner
+                address(GOVERNANCE),                    // the predecessor's owner
+                address(Address::ZERO),                 // its pending owner
+                Bytes::from_static(&[0x60]),            // the predecessor's code
+                address(ECO_ADMIN),                     // its PROXY_ADMIN
+                address(eco_admin_owner),               // the ecosystem ProxyAdmin's owner
+            ] {
+                asserter.push_success(&answer);
+            }
+            asserter
+        };
+        for (owner, holds) in [(CORE_PREDECESSOR, true), (CORE_EXECUTOR, false)] {
+            let asserter = run(owner);
+            let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+            let mut result = VerificationResult::default();
+            verify(
+                &provider,
+                &reviewed_build(),
+                &unread_genesis(),
+                &package,
+                Some(GOVERNANCE),
+                &[SALT],
+                &ReviewedEnv::default(),
+                &mut result,
+            )
+            .await
+            .unwrap();
+            assert!(asserter.read_q().is_empty(), "every answer was read");
+            // The empty inventory and the successor's missing executor record are reported in
+            // both runs; the ownership finding only when the predecessor does not hold the domain.
+            assert!(result.has_error("upgrades nothing"));
+            assert!(result.has_error("has no executor record"));
+            assert_eq!(
+                result.errors,
+                if holds { 2 } else { 3 },
+                "{:?}",
+                result.error_messages
+            );
+            assert_eq!(
+                result.has_error("the ecosystem ProxyAdmin is owned by"),
+                !holds,
+                "{:?}",
+                result.error_messages
+            );
+        }
     }
 
     /// Exercise the real upgrade verifier, not `verify_shell_kept` directly: removing its shell
@@ -2225,28 +2715,22 @@ mod tests {
             let manifest = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: rows,
+                upgradeEngine: engine(),
             };
             let object =
                 canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode());
+            let mut artifacts = object_artifacts();
+            artifacts.push((
+                "Row.sol",
+                contract,
+                creation.clone(),
+                ROW_RUNTIME.to_vec(),
+                Vec::new(),
+            ));
             let build = ReviewedBuild::from_artifacts(
                 CodeIdentity::empty()
                     .with_contract("l1-contracts/ProxyUpgradeTransition", TRANSITION_RUNTIME),
-                vec![
-                    (
-                        "ProxyUpgradeTransition.sol",
-                        "ProxyUpgradeTransition",
-                        transition_code(),
-                        TRANSITION_RUNTIME.to_vec(),
-                        Vec::new(),
-                    ),
-                    (
-                        "Row.sol",
-                        contract,
-                        creation.clone(),
-                        ROW_RUNTIME.to_vec(),
-                        Vec::new(),
-                    ),
-                ],
+                artifacts,
             )
             .with_constructor(contract, &[(parameter, "address")]);
             let records = [(
@@ -2273,15 +2757,17 @@ mod tests {
             let asserter = Asserter::new();
             asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
             asserter.push_success(&Bytes::from(self.manifest.abi_encode()));
+            asserter.push_success(&Bytes::from_static(ENGINE_RUNTIME));
             for answer in answers {
                 asserter.push_success(answer);
             }
             let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-            self.package.member_records = if recorded {
-                self.records.clone()
-            } else {
-                MemberDeployments::new()
-            };
+            // The engine is always recorded: only the row's record is what a run drives.
+            let mut records = engine_records();
+            if recorded {
+                records.extend(self.records.clone());
+            }
+            self.package.member_records = records;
             let mut result = VerificationResult::default();
             verify(
                 &provider,

@@ -13,6 +13,7 @@ use super::format_semver;
 use super::lifecycle::verify_executor_owners;
 use super::package::{LegKind, RegistryPackage, ReplacementPackage, UpgradePackage};
 use super::provenance::tolerate;
+use super::succession::SuccessionDomain;
 use super::views::{
     CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView, CoreUpgradeExecutorView, CtmView,
     Ownable2StepView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
@@ -39,9 +40,14 @@ pub(crate) async fn verify_applied<P: Provider>(
 }
 
 /// Reads, in order: each named executor's owner and pending owner (core first); for a core leg
-/// the core executor's `PROXY_ADMIN()`, its owner and the core rows; for CTM legs the CTM
-/// executor's bindings, the CTM domain ([`expect_ctm_domain_held`]), the infrastructure rows and
-/// the transition's commitment ([`expect_transition_committed`]).
+/// or a core succession the core executor's `PROXY_ADMIN()` and its owner, then the core rows
+/// (core leg); for CTM legs or a CTM succession the CTM executor's bindings and the CTM domain
+/// ([`expect_ctm_domain_held`]), then the infrastructure rows and the transition's commitment
+/// ([`expect_transition_committed`]).
+///
+/// An executor succession's successor is the executor its domain's legs target, so it is the one
+/// held here to the domain: a successor must own every contract its predecessor handed over, with
+/// no nomination outstanding, whether or not a leg of its domain ran.
 async fn verify_upgrade_applied<P: Provider>(
     provider: &P,
     package: &UpgradePackage,
@@ -52,7 +58,12 @@ async fn verify_upgrade_applied<P: Provider>(
         .legs
         .iter()
         .find(|leg| leg.kind.is_ctm())
-        .map(|leg| leg.executor);
+        .map(|leg| leg.executor)
+        .or(package.succession.ctm.map(|s| s.successor));
+    let core_executor = package
+        .leg(LegKind::Core)
+        .map(|leg| leg.executor)
+        .or(package.succession.core.map(|s| s.successor));
     let named_core = package
         .leg(LegKind::Core)
         .map(|leg| leg.executor)
@@ -72,9 +83,9 @@ async fn verify_upgrade_applied<P: Provider>(
     )
     .await;
 
-    if let Some(leg) = package.leg(LegKind::Core) {
+    if let Some(core_executor) = core_executor {
         if let Some(admin) = tolerate(
-            CoreUpgradeExecutorView::new(leg.executor, provider)
+            CoreUpgradeExecutorView::new(core_executor, provider)
                 .PROXY_ADMIN()
                 .call()
                 .await,
@@ -86,18 +97,20 @@ async fn verify_upgrade_applied<P: Provider>(
                 result,
                 "the ecosystem ProxyAdmin",
                 admin,
-                leg.executor,
+                core_executor,
                 "the core executor",
             )
             .await;
-            expect_transition_rows_applied(
-                provider,
-                result,
-                "the core transition",
-                leg.object,
-                admin,
-            )
-            .await;
+            if let Some(leg) = package.leg(LegKind::Core) {
+                expect_transition_rows_applied(
+                    provider,
+                    result,
+                    "the core transition",
+                    leg.object,
+                    admin,
+                )
+                .await;
+            }
         }
     }
 
@@ -119,7 +132,28 @@ async fn verify_upgrade_applied<P: Provider>(
     ) else {
         return;
     };
-    expect_ctm_domain_held(provider, result, ctm, ctm_admin, ctm_executor).await;
+    // A succession names the ServerNotifier it handed over; otherwise the CTM's is read.
+    let handed_notifier = package
+        .succession
+        .ctm
+        .and_then(|succession| match succession.domain {
+            SuccessionDomain::Ctm {
+                server_notifier, ..
+            } => Some((
+                server_notifier,
+                "the ServerNotifier the succession handed over",
+            )),
+            SuccessionDomain::Core { .. } => None,
+        });
+    expect_ctm_domain_held(
+        provider,
+        result,
+        ctm,
+        ctm_admin,
+        ctm_executor,
+        handed_notifier,
+    )
+    .await;
     if let Some(leg) = package.leg(LegKind::Infrastructure) {
         expect_transition_rows_applied(
             provider,
@@ -202,7 +236,8 @@ async fn verify_replacement_applied<P: Provider>(
 }
 
 /// The CTM domain landed under `executor`: the CTM owned by it with no nomination, its ProxyAdmin
-/// owned by it, and the CTM's ServerNotifier bound to the CTM and owned by it with no nomination.
+/// owned by it, and the ServerNotifier — `expected_notifier` (with what names it) when the package
+/// names one, else the CTM's — bound to the CTM and owned by it with no nomination.
 ///
 /// Reads, in order: the CTM's owner and pending owner, the ProxyAdmin's owner, the CTM's
 /// `serverNotifierAddress()`, then the notifier's owner, pending owner and `chainTypeManager()`.
@@ -212,6 +247,7 @@ async fn expect_ctm_domain_held<P: Provider>(
     ctm: Address,
     ctm_admin: Address,
     executor: Address,
+    expected_notifier: Option<(Address, &str)>,
 ) {
     expect_owner(
         provider,
@@ -232,14 +268,24 @@ async fn expect_ctm_domain_held<P: Provider>(
         "the CTM executor",
     )
     .await;
-    let Some(notifier) = tolerate(
+    let bound = tolerate(
         CtmView::new(ctm, provider)
             .serverNotifierAddress()
             .call()
             .await,
         result,
         "the CTM's serverNotifierAddress()",
-    ) else {
+    );
+    if let (Some(bound), Some((expected, expected_label))) = (bound, expected_notifier) {
+        expect_equal(
+            result,
+            "the CTM's ServerNotifier",
+            bound,
+            expected,
+            expected_label,
+        );
+    }
+    let Some(notifier) = expected_notifier.map(|(notifier, _)| notifier).or(bound) else {
         return;
     };
     expect_owner(
@@ -647,6 +693,7 @@ mod tests {
             force_deployments_data: None,
             executor_records: Default::default(),
             member_records: Default::default(),
+            succession: Default::default(),
         })
     }
 
@@ -793,6 +840,111 @@ mod tests {
             .answer("coreRow.implementation", NEW);
         let result = run(&RegistryPackage::Upgrade(package), reads).await;
         assert_eq!(result.errors, 0, "{:?}", result.error_messages);
+    }
+
+    // ───────────────────────── an executor succession ─────────────────────────
+
+    const PREDECESSOR: Address = Address::repeat_byte(0xD0);
+
+    /// The three-leg upgrade with both executors replaced: the legs' executors are the successors.
+    fn succeeded() -> UpgradePackage {
+        use super::super::succession::{ExecutorSuccession, Successions};
+        let RegistryPackage::Upgrade(mut package) = upgrade() else {
+            unreachable!()
+        };
+        package.succession = Successions {
+            core: Some(ExecutorSuccession {
+                predecessor: PREDECESSOR,
+                successor: CORE_EXECUTOR,
+                domain: SuccessionDomain::Core {
+                    proxy_admin: ECO_ADMIN,
+                },
+            }),
+            ctm: Some(ExecutorSuccession {
+                predecessor: PREDECESSOR,
+                successor: CTM_EXECUTOR,
+                domain: SuccessionDomain::Ctm {
+                    ctm: CTM,
+                    ctm_proxy_admin: CTM_ADMIN,
+                    server_notifier: NOTIFIER,
+                },
+            }),
+        };
+        package
+    }
+
+    /// After a succession, the successors hold every contract their predecessors handed over,
+    /// with nothing outstanding — and the ServerNotifier the CTM serves is the one handed over.
+    #[tokio::test]
+    async fn a_succession_that_did_not_land_fails() {
+        let package = RegistryPackage::Upgrade(succeeded());
+        let r = upgrade_reads;
+        each_unmet_expectation_fails(
+            &package,
+            r,
+            vec![
+                (
+                    "ecosystem ProxyAdmin left with the predecessor",
+                    r().set("ecoAdmin.owner", PREDECESSOR),
+                    "the ecosystem ProxyAdmin's owner",
+                ),
+                (
+                    "CTM left with the predecessor",
+                    r().set("ctm.owner", PREDECESSOR),
+                    "the CTM's owner",
+                ),
+                (
+                    "CTM ProxyAdmin left with the predecessor",
+                    r().set("ctmAdmin.owner", PREDECESSOR),
+                    "the CTM-domain ProxyAdmin's owner",
+                ),
+                (
+                    "notifier left with the predecessor",
+                    r().set("notifier.owner", PREDECESSOR),
+                    "the ServerNotifier's owner",
+                ),
+                (
+                    "notifier nomination outstanding",
+                    r().set("notifier.pendingOwner", CTM_EXECUTOR),
+                    "the ServerNotifier's pending owner",
+                ),
+                (
+                    "another notifier",
+                    r().set("ctm.serverNotifierAddress", STRANGER),
+                    "the ServerNotifier the succession handed over",
+                ),
+            ],
+        )
+        .await;
+    }
+
+    /// A succession with no leg of its domain still holds the successor to the domain: a CTM
+    /// handed over by a core-only upgrade is read like a CTM leg's.
+    #[tokio::test]
+    async fn a_successor_without_a_leg_is_held_to_its_domain() {
+        let mut package = succeeded();
+        package.legs.retain(|leg| leg.kind == LegKind::Core);
+        let reads = Reads::new()
+            .answer("coreExecutor.owner", GOVERNANCE)
+            .answer("coreExecutor.pendingOwner", Address::ZERO)
+            .answer("ctmExecutor.owner", GOVERNANCE)
+            .answer("ctmExecutor.pendingOwner", Address::ZERO)
+            .answer("coreExecutor.PROXY_ADMIN", ECO_ADMIN)
+            .answer("ecoAdmin.owner", CORE_EXECUTOR)
+            .answer("coreTransition.rows", vec![row(PROXY)])
+            .answer("coreRow.implementation", NEW)
+            .answer("ctmExecutor.CHAIN_TYPE_MANAGER", CTM)
+            .answer("ctmExecutor.CTM_PROXY_ADMIN", CTM_ADMIN)
+            .answer("ctm.owner", CTM_EXECUTOR)
+            .answer("ctm.pendingOwner", Address::ZERO)
+            .answer("ctmAdmin.owner", CTM_EXECUTOR)
+            .answer("ctm.serverNotifierAddress", NOTIFIER)
+            .answer("notifier.owner", PREDECESSOR)
+            .answer("notifier.pendingOwner", Address::ZERO)
+            .answer("notifier.chainTypeManager", CTM);
+        let result = run(&RegistryPackage::Upgrade(package), reads).await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("the ServerNotifier's owner"));
     }
 
     // ───────────────────────── a replacement ─────────────────────────

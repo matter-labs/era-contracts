@@ -23,9 +23,9 @@
 //!      produces for its role? ([`provenance`], [`members`]) — the live code against the
 //!      reviewed artifact, byte for byte outside its immutable slots: each release's facets,
 //!      `DiamondInit`, genesis upgrade and verifier tree, each L2 bytecode the release's table or
-//!      a plan names, each engine and composer, each row's `implNew`. Was each member the package
-//!      newly installs BUILT from argument values the review holds — the values that comparison
-//!      masks? ([`member_construction`]) The ZiSK Plonk backend, which no reviewed build
+//!      a plan names, each engine (a proxy upgrade transition's included) and composer, each
+//!      row's `implNew`. Was each member the package newly installs BUILT from argument values
+//!      the review holds — the values that comparison masks? ([`member_construction`]) The ZiSK Plonk backend, which no reviewed build
 //!      describes, is held to its pin ([`external_backends`]).
 //!   3. Does every proxy inventory belong to the domain its leg applies, upgrade something, and
 //!      hold only real edges, each naming the proxy of its slot, discovered on chain from the
@@ -35,14 +35,16 @@
 //!      `validate()`, which the CTM runs when it installs it?
 //!   5. Is authority bound where the review says — each executor to the independently reviewed
 //!      CTM and ProxyAdmin — and to the expected governance owner, with no nomination outstanding
-//!      on any authority the upgrade drives?
+//!      on any authority the upgrade drives? When the upgrade replaces an executor, does the
+//!      predecessor hold the domain now, bound exactly like its successor? ([`succession`])
 //!   6. Does every proxy row depart from the implementation that is actually live, read through
 //!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only; what a replayed bundle
 //!      leaves behind is checked by `ecosystem upgrade-governance` ([`applied`]).
 //!   7. Do chains crossing an edge keep the system-proxy logic new chains get? ([`shell`])
 //!   8. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
-//!      addresses, as one contiguous run in canonical order — and is every other call a reviewed
-//!      external action, in its declared position and multiplicity?
+//!      addresses, as one contiguous run in canonical order (the derived executor succession, if
+//!      any, then the legs) — and is every other call a reviewed external action, in its declared
+//!      position and multiplicity?
 //!
 //! None of it is "does an object's own fingerprint of a member match that member's code": the
 //! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
@@ -82,6 +84,7 @@ pub(crate) mod rows;
 pub(crate) mod shell;
 #[cfg(test)]
 mod shell_path_tests;
+pub(crate) mod succession;
 pub(crate) mod upgrade;
 pub(crate) mod views;
 
