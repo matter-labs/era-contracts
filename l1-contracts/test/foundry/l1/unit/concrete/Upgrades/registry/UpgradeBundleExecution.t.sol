@@ -26,6 +26,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 import {
+    DelegateCallFailed,
     L2BytecodeNotPublished,
     ProxyUpgradeDomainMismatch,
     ProxyUpgradeRowMismatch,
@@ -503,8 +504,8 @@ contract UpgradeBundleExecutionTest is CTMUpgradeExecutorFixture {
             _bundle(_infrastructureLeg(address(substituted)), _transitionLeg(address(transition)))
         );
         // The proxy answers a non-admin by delegating to its implementation, which has no
-        // `implementation()` — a revert without data.
-        vm.expectRevert(bytes(""));
+        // `implementation()` — a revert without data, which the executor wraps.
+        vm.expectRevert(abi.encodeWithSelector(DelegateCallFailed.selector, bytes("")));
         _executeProposal(proposal);
         _assertNothingApplied();
     }

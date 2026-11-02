@@ -18,7 +18,7 @@ import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {DelegateCallFailed, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice One executor per CTM: each `CTMUpgradeExecutor` is bound by immutables to one CTM and that
 ///         CTM's `ProxyAdmin`, so what it applies lands on that domain only; and the domain moves to a
@@ -111,8 +111,8 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
             _row(address(ctmDomainProxy), implOld, implNew)
         );
         // The proxy answers a non-admin by delegating to its implementation, which has no
-        // `implementation()` — a revert without data.
-        vm.expectRevert(bytes(""));
+        // `implementation()` — a revert without data, which the executor wraps.
+        vm.expectRevert(abi.encodeWithSelector(DelegateCallFailed.selector, bytes("")));
         vm.prank(governor);
         ctmExecutor2.applyInfrastructureUpgrade(infrastructure);
         assertEq(
