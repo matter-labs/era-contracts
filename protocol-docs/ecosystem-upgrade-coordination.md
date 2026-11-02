@@ -95,8 +95,9 @@ Each leg is owner-only and checks its object before acting:
   `expectedOldImpl` or already at its `implNew`, runs the release's follow-up hooks and their
   postconditions
   ([the pinned upgrade engine](../docs/registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine)).
-  The executor then requires its own ownership and the domain it lent unchanged and every row's
-  proxy to run its `implNew`, and emits `L1UpgradeApplied` / `CTMInfrastructureUpgradeApplied`.
+  The executor then requires its own ownership and the holders of the domain it lent unchanged and
+  every row's proxy to run its `implNew`, and emits `L1UpgradeApplied` /
+  `CTMInfrastructureUpgradeApplied`.
 - `applyCTMUpgrade` requires the transition to have code and commits it
   (`setNewVersionUpgradeFromTransition`: transition, version and target release together). The
   commit's checks are the CTM's, so a commit sent through `forward` gets them too
