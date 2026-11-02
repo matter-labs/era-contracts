@@ -40,7 +40,9 @@ change is a single owner call that emits an event.
    `refundRecipient` are the values the Bridgehub passes to the Mailbox: `sender` is the second
    bridge for two-bridges requests, and `refundRecipient` is already resolved (defaulted to the
    caller, aliased for contracts), so the hash must be built from those, not from the user's raw
-   request.
+   request. Requests made directly through the Era Mailbox's legacy `requestL2Transaction` (used by
+   Lido and other legacy integrators) do not go through the Bridgehub: there `sender` is the caller
+   and `refundRecipient` is the raw argument, resolved by the Mailbox only after the filter runs.
 2. **Exempt sender.** If `exempt[sender]`, the transaction passes.
 3. **Deposits through the Bridgehub.** If `sender` is the L1 asset router, the transaction is a
    token deposit (see [Deposit decoding](#deposit-decoding)). It must target the L2 asset router

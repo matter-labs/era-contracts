@@ -6,6 +6,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {MissingBaseTokenAssetId, ZeroAddress, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
@@ -59,6 +60,12 @@ contract InitializeTest is EraMaintenanceTransactionFiltererTest {
             true
         );
         _deployProxy(owner, CHAIN_ID);
+    }
+
+    function test_revertWhen_assetRouterHasNoNativeTokenVault() public {
+        vm.mockCall(l1AssetRouter, abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()), abi.encode(address(0)));
+        vm.expectRevert(ZeroAddress.selector);
+        new EraMaintenanceTransactionFilterer(IBridgehubBase(bridgehub));
     }
 
     function test_revertWhen_ownerIsZero() public {

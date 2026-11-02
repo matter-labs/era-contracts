@@ -56,6 +56,9 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         BRIDGE_HUB = _bridgeHub;
         L1_ASSET_ROUTER = address(_bridgeHub.assetRouter());
         L1_NATIVE_TOKEN_VAULT = address(IL1AssetRouter(L1_ASSET_ROUTER).nativeTokenVault());
+        if (L1_NATIVE_TOKEN_VAULT == address(0)) {
+            revert ZeroAddress();
+        }
         _disableInitializers();
     }
 
