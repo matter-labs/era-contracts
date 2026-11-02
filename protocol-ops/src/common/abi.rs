@@ -321,10 +321,75 @@ pub mod ctm_ext {
         #[sol(rpc)]
         interface IChainTypeManagerExt {
             function L1_BYTECODES_SUPPLIER() external view returns (address);
+            function admin() external view returns (address);
+            function initialForceDeploymentHash() external view returns (bytes32);
+            function newChainCreationParamsBlock(uint256 protocolVersion) external view returns (uint256);
         }
     );
 }
 pub use ctm_ext::IChainTypeManagerExt;
+
+pub mod ownable {
+    alloy::sol!(
+        #[sol(rpc)]
+        interface IOwnable {
+            function owner() external view returns (address);
+        }
+    );
+}
+pub use ownable::IOwnable;
+
+pub mod server_notifier {
+    alloy::sol!(
+        #[sol(rpc)]
+        interface IServerNotifier {
+            function setUpgradeTimestamp(uint256 _chainId, uint256 _upgradeTimestamp) external;
+            function protocolVersionToUpgradeTimestamp(uint256 chainId, uint256 oldProtocolVersion) external view returns (uint256);
+        }
+    );
+}
+pub use server_notifier::IServerNotifier;
+
+pub mod governance_upgrade_timer {
+    alloy::sol!(
+        #[sol(rpc)]
+        interface IGovernanceUpgradeTimer {
+            function deadline() external view returns (uint256);
+            function checkDeadline() external view;
+        }
+    );
+}
+pub use governance_upgrade_timer::IGovernanceUpgradeTimer;
+
+/// `ValidatorTimelock`'s per-chain role enumeration.
+pub mod per_chain_roles {
+    alloy::sol!(
+        #[sol(rpc)]
+        interface IPerChainRoles {
+            function getRoleMemberCount(address _chainAddress, bytes32 _role) external view returns (uint256);
+            function getRoleMember(address _chainAddress, bytes32 _role, uint256 _index) external view returns (address);
+        }
+    );
+}
+pub use per_chain_roles::IPerChainRoles;
+
+pub mod proxy_admin {
+    alloy::sol!(
+        interface IProxyAdmin {
+            function upgrade(address proxy, address implementation) external;
+        }
+    );
+}
+pub use proxy_admin::IProxyAdmin;
+
+/// Reverts the fork replay expects.
+pub mod upgrade_errors {
+    alloy::sol!(
+        error DeadlineNotYetPassed();
+        error NotAllBatchesExecuted();
+        error PreviousUpgradeNotFinalized(bytes32 txHash);
+    );
+}
 
 pub mod bytecodes_supplier_publish {
     alloy::sol!(

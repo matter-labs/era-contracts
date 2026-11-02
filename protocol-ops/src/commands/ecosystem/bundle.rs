@@ -36,7 +36,7 @@ use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
 use crate::commands::ecosystem::forge_checks;
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_upgrade::{self, VerifyUpgradeArgs};
-use crate::common::anvil::{send_impersonated_tx, set_balance};
+use crate::common::anvil::{evm_revert, evm_snapshot, send_impersonated_tx, set_balance};
 use crate::common::env_config::{
     default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE,
 };
@@ -844,7 +844,8 @@ impl CheckFailures {
 }
 
 /// On a real chain: the built-in publication check, then `verify_chain`. On a fork:
-/// `verify_fork`, then the built-in publication and provenance checks.
+/// `verify_fork` (in a snapshot when the built-ins follow, so they start from the same
+/// state), then the built-in publication, provenance and replay, then `fork_tests`.
 async fn check_forge_script_upgrade(
     upgrade: &ForgeScriptUpgrade,
     target: CheckTarget,
@@ -854,18 +855,32 @@ async fn check_forge_script_upgrade(
     fork_block: Option<u64>,
 ) -> anyhow::Result<()> {
     let mut failures = CheckFailures::default();
-    let run_command = |failures: &mut CheckFailures| {
-        let (name, command) = match target {
-            CheckTarget::Fork => ("verify_fork", &upgrade.verify_fork),
-            CheckTarget::Chain => ("verify_chain", &upgrade.verify_chain),
+    let (name, command) = match target {
+        CheckTarget::Fork => ("verify_fork", &upgrade.verify_fork),
+        CheckTarget::Chain => ("verify_chain", &upgrade.verify_chain),
+    };
+    let run_command = || {
+        command
+            .as_ref()
+            .map(|command| run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml))
+    };
+    if target == CheckTarget::Fork && command.is_some() {
+        let snapshot = if upgrade.builtin_checks {
+            Some(evm_snapshot(rpc_url).await)
+        } else {
+            None
         };
-        if let Some(command) = command {
-            let result = run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml);
+        if let Some(result) = run_command() {
             failures.record(name, result);
         }
-    };
-    if target == CheckTarget::Fork {
-        run_command(&mut failures);
+        if let Some(snapshot) = snapshot {
+            let restored = async { evm_revert(rpc_url, &snapshot?).await }.await;
+            if restored.is_err() {
+                // The built-ins would start from the command's state, not the bundle's.
+                failures.record("snapshot around verify_fork", restored);
+                return failures.finish();
+            }
+        }
     }
     if upgrade.builtin_checks {
         logger::step("built-in checks");
@@ -874,33 +889,89 @@ async fn check_forge_script_upgrade(
                 let publication = forge_checks::check_publication(rpc_url, &output).await;
                 failures.record("publication", publication);
                 if target == CheckTarget::Fork {
-                    let provenance = async {
-                        let factory = env_cfg.create2_factory().ok_or_else(|| {
-                            anyhow::anyhow!("permanent values have no create2_factory_addr")
-                        })?;
-                        let fork_block = fork_block
-                            .ok_or_else(|| anyhow::anyhow!("no fork block for provenance"))?;
-                        let txs = deployer_transactions(&paths.manifest)?;
-                        forge_checks::check_provenance(
-                            rpc_url,
-                            &output,
-                            factory,
-                            &txs,
-                            fork_block,
-                            &paths.work_dir,
-                        )
-                        .await
-                    };
-                    failures.record("provenance", provenance.await);
+                    builtin_fork_checks(
+                        upgrade,
+                        env_cfg,
+                        rpc_url,
+                        paths,
+                        &output,
+                        fork_block,
+                        &mut failures,
+                    )
+                    .await;
                 }
             }
             Err(error) => failures.record("built-in checks", Err(error)),
         }
     }
     if target == CheckTarget::Chain {
-        run_command(&mut failures);
+        if let Some(result) = run_command() {
+            failures.record(name, result);
+        }
     }
     failures.finish()
+}
+
+/// Provenance, then the replay; `fork_tests` only after a complete replay, on its exports.
+async fn builtin_fork_checks(
+    upgrade: &ForgeScriptUpgrade,
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
+    paths: &BundlePaths,
+    output: &forge_checks::UpgradeOutput,
+    fork_block: Option<u64>,
+    failures: &mut CheckFailures,
+) {
+    let Some(fork_block) = fork_block else {
+        failures.record("built-in checks", Err(anyhow::anyhow!("no fork block")));
+        return;
+    };
+    // A rerun in the same work dir must not hand the fork tests an earlier run's files.
+    for file in [
+        forge_checks::DEPLOYMENTS_FILE,
+        forge_checks::LAST_EXECUTE_INPUT_FILE,
+    ] {
+        match fs::remove_file(paths.work_dir.join(file)) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                failures.record("built-in checks", Err(error.into()));
+                return;
+            }
+            _ => {}
+        }
+    }
+    let provenance = async {
+        let factory = env_cfg
+            .create2_factory()
+            .ok_or_else(|| anyhow::anyhow!("permanent values have no create2_factory_addr"))?;
+        let txs = deployer_transactions(&paths.manifest)?;
+        forge_checks::check_provenance(rpc_url, output, factory, &txs, fork_block, &paths.work_dir)
+            .await
+    };
+    failures.record("provenance", provenance.await);
+    logger::step("built-in replay");
+    let replay = forge_checks::replay(rpc_url, env_cfg, output, fork_block, &paths.work_dir).await;
+    match replay {
+        Ok(chains) if !upgrade.fork_tests.is_empty() => {
+            logger::step("fork_tests");
+            let result = forge_checks::run_fork_tests(
+                &upgrade.fork_tests,
+                &env_cfg.env,
+                rpc_url,
+                fork_block,
+                &chains,
+                &paths.ecosystem_toml,
+                &paths.work_dir,
+            );
+            failures.record("fork_tests", result);
+        }
+        Ok(_) => {}
+        Err(error) => {
+            failures.record("replay", Err(error));
+            if !upgrade.fork_tests.is_empty() {
+                logger::warn("fork_tests not run: they need a complete replay");
+            }
+        }
+    }
 }
 
 /// Run a `forge-script` upgrade's check command from `l1-contracts/`.

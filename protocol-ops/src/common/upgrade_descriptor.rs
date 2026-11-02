@@ -55,16 +55,38 @@ pub struct ForgeScriptUpgrade {
     #[serde(default)]
     pub verify_chain: Option<Vec<String>>,
     /// Run the built-in checks (`commands::ecosystem::forge_checks`), which read an output in
-    /// `DefaultCTMUpgrade.saveOutput`'s layout. On a real chain: every L2 factory dep is
+    /// `DefaultCTMUpgrade.saveOutput`'s layout. They hold for a minor-version upgrade of an Era
+    /// CTM whose upgrade contract refuses a chain with unexecuted batches (v31's and v34's do).
+    /// On a real chain: every L2 factory dep is
     /// published and every output address has code. On a fork, also: every deployer
     /// transaction is a CREATE2 deployment of a bytecode in `AllContractsHashes.json` or a
-    /// publication. Without it, both `verify_fork` and `verify_chain` are required.
+    /// publication; the ServerNotifier upgrade and the governance stages, replayed as their
+    /// senders, with the CTM checked after each; then the reference chain's timestamp,
+    /// drain and upgrade, and a new test chain. The chain path needs an Ownable ChainAdmin
+    /// (`ChainAdminOwnable`): a restriction-based one is not supported. Without it, both
+    /// `verify_fork` and `verify_chain` are required.
     #[serde(default)]
     pub builtin_checks: bool,
+    /// Foundry test files run on the fork after the built-in replay, with its exports
+    /// (`forge_checks::run_fork_tests`). Needs `builtin_checks`.
+    #[serde(default)]
+    pub fork_tests: Vec<ForkTest>,
     /// How the upgrade is executed by hand, if the pipeline should write its runbook. Boxed:
     /// the variant carrying it would otherwise dwarf `PrepareAll`.
     #[serde(default)]
     pub execution: Option<Box<ExecutionScript>>,
+}
+
+/// A Foundry test file of the upgrade. It passes with at least one passed test and no failed
+/// or skipped one; in the envs `may_skip_in` names, skips are allowed and an all-skipped file
+/// passes.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ForkTest {
+    /// Relative to `l1-contracts/`.
+    pub path: String,
+    #[serde(default)]
+    pub may_skip_in: Vec<String>,
 }
 
 /// A read-only forge script that writes the transactions whoever executes the upgrade sends
@@ -153,6 +175,10 @@ impl UpgradeDescriptor {
                     "a forge-script upgrade without builtin_checks = true must declare \
                      verify_fork and verify_chain; missing: {}",
                     missing.join(", ")
+                );
+                anyhow::ensure!(
+                    upgrade.fork_tests.is_empty(),
+                    "fork_tests needs builtin_checks = true: the tests run on its replay"
                 );
             }
             // Fail on a malformed signature or argument list when loading, not mid-run.
@@ -482,6 +508,25 @@ output = "emergency-upgrade-board.json"
             "builtin_checks = true\n",
         ));
         assert!(both.verify_fork.is_some() && both.verify_chain.is_none());
+    }
+
+    #[test]
+    fn fork_tests_need_builtin_checks() {
+        let fork_tests = "fork_tests = [{ path = \"test/foundry/fork/X.t.sol\", may_skip_in = [\"mainnet\"] }]\n";
+        let error = parse(&format!("{fork_tests}{FORGE_SCRIPT}")).unwrap_err();
+        assert!(format!("{error:#}").contains("fork_tests needs builtin_checks"));
+        let upgrade = forge_script(&format!(
+            "builtin_checks = true\n{fork_tests}{FORGE_SCRIPT}"
+        ));
+        assert_eq!(
+            upgrade.fork_tests,
+            [ForkTest {
+                path: "test/foundry/fork/X.t.sol".to_string(),
+                may_skip_in: vec!["mainnet".to_string()],
+            }]
+        );
+        let unknown = "builtin_checks = true\nfork_tests = [{ path = \"x\", skip = true }]\n";
+        assert!(parse(&format!("{unknown}{FORGE_SCRIPT}")).is_err());
     }
 
     /// Every committed `upgrade-envs/<upgrade>/upgrade.toml` parses.
