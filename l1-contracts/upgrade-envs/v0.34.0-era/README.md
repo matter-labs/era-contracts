@@ -37,8 +37,11 @@ Follows `AGENTS.md`, "Executing Stage and Testnet Upgrades".
 The timer delays follow earlier upgrades. v34's stage 1 forces no chain to switch (v0.33.0 keeps an unlimited
 deadline), so here the timer is a notice period. It also rules out an all-stages emergency proposal.
 
-Each chain, after stage 1: its ChainAdmin's owner sets the upgrade timestamp (`[chain_upgrades.<id>]` or
-`protocol_ops chain set-upgrade-timestamp`). Once the chain is drained:
+Each chain, once stage 1 has executed (both commands below read what it registered): its ChainAdmin's owner
+sets the upgrade timestamp, with the bundle
+`protocol_ops chain set-upgrade-timestamp --env <env> --chain-id <id> --new-protocol-version 146028888064 --upgrade-timestamp <unix> --l1-rpc-url <rpc> --out <dir>`
+writes; on testnets `1` means as soon as the node sees it, on mainnet it is a real future date. Once the chain is
+drained:
 
 1. **Server path (first choice):** the node's operator calls `ValidatorTimelock.upgradeChainFromVersion`, which
    needs `UPGRADER_ROLE` for the diamond. Mainnet's 324 has no holder; grant only that role with
@@ -46,7 +49,8 @@ Each chain, after stage 1: its ChainAdmin's owner sets the upgrade timestamp (`[
    It simulates on a fork and writes a Safe bundle and `EXECUTE.md` for the ChainAdmin's owner. Afterwards require
    `cast call <timelock> 'hasRole(address,bytes32,address)(bool)' <diamond> $(cast keccak UPGRADER_ROLE) <operator>`
    to return `true`; a successful receipt is not enough.
-2. **Fallback:** the ChainAdmin's owner sends `chain_admin_calldata` from `[chain_upgrades.<id>]`.
+2. **Fallback:** the ChainAdmin's owner sends the bundle
+   `protocol_ops chain upgrade --env <env> --chain-id <id> --l1-rpc-url <rpc> --out <dir>` writes.
 
 ## mainnet fork test, until ZIP-18 executes
 
@@ -55,16 +59,16 @@ revert with `PreviousUpgradeNotFinalized`, and its after-upgrade checks run on t
 `fork-mainnet-zip18.sh` goes once ZIP-18 is live.
 
 1. `L1_FORK_URL=<mainnet rpc> ./fork-mainnet-zip18.sh` builds the fork and leaves its Anvil running.
-2. Set `upgrade_timestamp` in `mainnet.toml` to the value it prints; don't commit it.
-3. `ALLOW_PENDING_L2_UPGRADE=1 protocol_ops ecosystem rehearse-upgrade --upgrade v0.34.0-era --env mainnet --fork-url http://127.0.0.1:8645 --deployer-address <any EOA>`,
+2. `ALLOW_PENDING_L2_UPGRADE=1 protocol_ops ecosystem rehearse-upgrade --upgrade v0.34.0-era --env mainnet --fork-url http://127.0.0.1:8645 --deployer-address <any EOA>`,
    then `replay-bundle` with the same variable.
 
 ## Files
 
 - `<env>.toml`: what the script can't read from `permanent-values/<env>.toml`, the chain or the v34 genesis: the
-  verifier flavour, the timer delay, the salt, the reused `DiamondInit` and EIP-7702 checker (no getters), the
-  chains to upgrade and their timestamp.
-- `output/<env>/`: committed from the generate run.
+  verifier flavour, the timer delay, the salt, and the reused `DiamondInit` and EIP-7702 checker (no getters).
+- `output/<env>/`: committed from the generate run. `output/stage/` keeps the layout stage was generated with; the
+  others are in `DefaultCTMUpgrade.saveOutput`'s layout, where the zero addresses are fields v34 doesn't use and
+  `admin.ecosystem_admin_addr` is the CTM owner (the PUH).
 - `rehearse.sh`: the fork checks behind `upgrade.toml`'s `verify_fork` and `verify_chain`; its header says what it
   checks and how to run it alone.
 - `fork-mainnet-zip18.sh`: test-only, see above.

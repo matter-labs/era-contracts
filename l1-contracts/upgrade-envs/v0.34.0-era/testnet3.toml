@@ -8,6 +8,8 @@ testnet_verifier = true
 governance_upgrade_timer_initial_delay = 1200
 # CREATE2 salt for every deployment; must differ from stage's (same chain).
 create2_factory_salt = "0xddad502b2a096a3a1442ea9a8ef9fc7188c1876e20722de3b215a7a8d5403f67"
+# Never v29 introspection, which the base would pick if the bridgehub's first chain were below v0.31.
+use_v29_introspection = false
 
 # No getter exposes these two (read on Sepolia at block 12013772); the script checks diamond_init against the
 # event below.
@@ -15,11 +17,6 @@ create2_factory_salt = "0xddad502b2a096a3a1442ea9a8ef9fc7188c1876e20722de3b215a7
 diamond_init = "0x24eE94393372D90308df7ea09E8c882B46959909"
 # EIP_7702_CHECKER of chain 312's live MailboxFacet (internal immutable, read from its code).
 eip7702_checker = "0xDD658c72dd50f361deA7e3fdD19A312fE9a54569"
-
-# ServerNotifier / ChainAdmin upgrade timestamp: 1 = as soon as the node sees it (0 reverts).
-upgrade_timestamp = 1
-# Chains upgraded by this output. Chain 300300 is on v0.31.1.
-chain_ids = [312]
 
 # Data of the CTM's last NewChainCreationParams event (Sepolia block 11965266, v0.33.0):
 # abi.encode(genesisUpgrade, genesisBatchHash, genesisIndexRepeatedStorageChanges,

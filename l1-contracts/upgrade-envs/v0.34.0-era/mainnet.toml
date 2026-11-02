@@ -8,6 +8,8 @@ testnet_verifier = false
 governance_upgrade_timer_initial_delay = 172800
 # CREATE2 salt for every deployment.
 create2_factory_salt = "0x33c3ad6aa59321440ec4b49ac4b9c010a86f555643539add2327afbf12a30cd9"
+# Never v29 introspection, which the base would pick if the bridgehub's first chain were below v0.31.
+use_v29_introspection = false
 
 # No getter exposes these two (ZIP-18's, read on mainnet at block 26292702); the script checks diamond_init
 # against the event below. Re-read them once ZIP-18 has executed.
@@ -15,13 +17,6 @@ create2_factory_salt = "0x33c3ad6aa59321440ec4b49ac4b9c010a86f555643539add2327af
 diamond_init = "0xA4A7fD899CaD981A66D366D7C293A234e4c967D0"
 # EIP_7702_CHECKER of ZIP-18's MailboxFacet (internal immutable, read from its code).
 eip7702_checker = "0x4a9928907Fa80dd3c0cFBd2d30BF44160F092714"
-
-# ServerNotifier / ChainAdmin upgrade timestamp for chain 324. 0 until its date is chosen: the script rejects 0,
-# so no generation carries a date nobody chose. Commit the chosen date with the generation. The fork test sets
-# one locally, uncommitted: the fork's time + 7 days, which fork-mainnet-zip18.sh prints.
-upgrade_timestamp = 0
-# Chains upgraded by this output. The CTM's other chains get their calls from the chain workflows.
-chain_ids = [324]
 
 # Data of the NewChainCreationParams event ZIP-18's stage 1 emits:
 # abi.encode(genesisUpgrade, genesisBatchHash, genesisIndexRepeatedStorageChanges,

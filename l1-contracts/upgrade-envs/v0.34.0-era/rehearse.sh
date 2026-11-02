@@ -113,7 +113,6 @@ if [ "$PUBLISHED_ONLY" = "0" ]; then
 import json, re, sys, tomllib
 env, permanent = (tomllib.load(open(p, "rb")) for p in sys.argv[1:3])
 semver = json.load(open(sys.argv[3]))["protocol_semantic_version"]
-(chain_id,) = env["chain_ids"]  # the checks cover one chain
 ctm = permanent["ctm_contracts"]["ctms"][0]  # the script's: the first CTM, which must be Era
 if ctm["is_zk_sync_os"]:
     sys.exit("  permanent values: the first CTM is not Era")
@@ -125,9 +124,7 @@ for name, value, pattern in [
     ("TESTNET", env["testnet_verifier"], BOOL),
     ("TIMER_DELAY", env["governance_upgrade_timer_initial_delay"], NUMBER),
     ("NEW", semver["major"] << 64 | semver["minor"] << 32 | semver["patch"], NUMBER),
-    ("TS", env["upgrade_timestamp"], NUMBER),
     ("SALT", env["create2_factory_salt"], WORD),
-    ("CHAIN_ID", chain_id, NUMBER),
     ("L1_CHAIN_ID", permanent["l1_chain_id"], NUMBER),
     ("FACTORY", permanent["permanent_contracts"]["create2_factory_addr"], ADDRESS),
     ("BRIDGEHUB", permanent["core_contracts"]["bridgehub_proxy_addr"], ADDRESS),
@@ -146,6 +143,8 @@ PYINPUTS
   . "$S/inputs.env"
   # Mirrors ERA_TEST_CREATE_CHAIN_ID in deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol.
   export TEST_CHAIN_ID=555
+  # Any value: the timestamp only tells the node. protocol_ops chain set-upgrade-timestamp sends the real one.
+  export TS=1
 
   # fact NAME CAST_ARGS… — one read, exported; a failed read, a zero or a non-address stops the run.
   fact() {
@@ -179,7 +178,16 @@ PYINPUTS
   fact L1_ASSET_ROUTER call "$BRIDGEHUB" 'assetRouter()(address)'
   fact CHAIN_REGISTRATION_SENDER call "$BRIDGEHUB" 'chainRegistrationSender()(address)'
   fact GENESIS_UPGRADE call "$CTM" 'l1GenesisUpgrade()(address)'
-  fact DIAMOND call "$CTM" 'getZKChain(uint256)(address)' "$CHAIN_ID"
+  # The reference chain, as the script's introspection picks it: the bridgehub's first chain at the CTM's version.
+  unset DIAMOND
+  CHAINS=$(call "$BRIDGEHUB" 'getAllZKChains()(address[])') \
+    || { echo "REHEARSAL FAILED: the bridgehub's getAllZKChains() unreadable"; exit 1; }
+  for c in $(tr -d '[],' <<< "$CHAINS"); do
+    [ "$(call "$c" 'getChainTypeManager()(address)' 2> /dev/null | tr A-F a-f)" = "$(echo "$CTM" | tr A-F a-f)" ] \
+      && [ "$(call "$c" 'getProtocolVersion()(uint256)' 2> /dev/null | first)" = "$OLD" ] && { export DIAMOND=$c; break; }
+  done
+  [ -n "${DIAMOND:-}" ] || { echo "REHEARSAL FAILED: no chain of $CTM on its version $OLD"; exit 1; }
+  num CHAIN_ID call "$DIAMOND" 'getChainId()(uint256)'
   fact CHAIN_ADMIN call "$CTM" 'getChainAdmin(uint256)(address)' "$CHAIN_ID"
   fact CHAIN_ADMIN_OWNER call "$CHAIN_ADMIN" 'owner()(address)'
   fact OLD_VERIFIER call "$CTM" 'protocolVersionVerifier(uint256)(address)' "$OLD"
@@ -250,7 +258,7 @@ print(v)" "$1"; }
 # Fail closed: an unreadable output, a missing key or an RPC error must not count as published.
 python3 -c "import tomllib; [print(h) for h in tomllib.load(open('$OUT','rb'))['contracts_config']['l2_upgrade_tx_factory_deps']]" > "$S/v34_factory_deps.txt" \
   || { echo "REHEARSAL FAILED: cannot read l2_upgrade_tx_factory_deps from $OUT"; exit 1; }
-BS=$(toml_get contracts_config.bytecodes_supplier) || { echo "REHEARSAL FAILED: cannot read bytecodes_supplier"; exit 1; }
+BS=$(toml_get state_transition.bytecodes_supplier_addr) || { echo "REHEARSAL FAILED: cannot read bytecodes_supplier_addr"; exit 1; }
 UNPUB=0; N=0
 while read -r h; do
   N=$((N + 1))
@@ -369,6 +377,7 @@ hashes = json.load(open(E["WT"] + "/../AllContractsHashes.json"))
 zk = {e["contractName"]: e["zkBytecodeHash"].lower() for e in hashes if e.get("zkBytecodeHash")}
 known_zk = {e["zkBytecodeHash"].lower() for e in hashes if e.get("zkBytecodeHash")}
 cc, st = eco["contracts_config"], eco["state_transition"]
+upgrade_cut_data = eco["chain_upgrade_diamond_cut"]
 boot, aa, evm = genesis["bootloader_hash"], genesis["default_aa_hash"], genesis["evm_emulator_hash"]
 
 print("== Reused addresses in the output")
@@ -385,8 +394,8 @@ check("deployed_addresses: CTM ProxyAdmin, ServerNotifier proxy, RollupDAManager
       [E["CTM_PROXY_ADMIN"], E["SN"], E["ROLLUP_DA_MANAGER"]])
 
 print("== L2 upgrade transaction and ProposedUpgrade")
-cut = dec(CUT, cc["upgrade_cut_data"])
-check("upgrade_cut_data re-encodes byte for byte (cast)", enc(CUT, fmt_cut(cut)), cc["upgrade_cut_data"])
+cut = dec(CUT, upgrade_cut_data)
+check("chain_upgrade_diamond_cut re-encodes byte for byte (cast)", enc(CUT, fmt_cut(cut)), upgrade_cut_data)
 init = cut[2]
 check("init selector = upgrade(ProposedUpgrade)", init[:10], sig(f"upgrade({PU})"))
 p = dec_call(f"upgrade({PU})", init)[0]
@@ -509,7 +518,7 @@ check("stage 1 ProxyAdmin.upgrade(CTM, new implementation)", find(1, UPGRADE_CTM
 snvu = dec_call(f"setNewVersionUpgrade({CUT},uint256,uint256,uint256,address)", find(1, SET_NEW_VERSION))
 check("stage 1 setNewVersionUpgrade(cut, v0.33.0, no deadline, v0.34.0, new verifier)",
       [enc(CUT, fmt_cut(snvu[0])), I(snvu[1]), I(snvu[2]), I(snvu[3]), snvu[4]],
-      [cc["upgrade_cut_data"], I(E["OLD"]), (1 << 256) - 1, I(E["NEW"]), st["verifier_addr"]])
+      [upgrade_cut_data, I(E["OLD"]), (1 << 256) - 1, I(E["NEW"]), st["verifier_addr"]])
 check("stage 1 setChainCreationParams(new params)", find(1, SET_CREATION), "0x4958bf4f" + cc["new_chain_creation_params"][2:])
 upgrade_index = [[c[0].lower(), c[2][:10]] for c in stages[1]].index([UPGRADE_CTM[0].lower(), UPGRADE_CTM[1]])
 admin = eco["ctm_admin_calls"]
@@ -519,39 +528,41 @@ check("server_notifier_upgrade = [ServerNotifier ProxyAdmin.upgrade(ServerNotifi
       [[c[0], I(c[1]), c[2]] for c in sn_calls],
       [[E["SN_PROXY_ADMIN"], 0, calldata("upgrade(address,address)", E["SN"], st["server_notifier_implementation_addr"])]])
 
-print(f"== Chain {E['CHAIN_ID']} calls (raw calldata its ChainAdmin's owner sends to the ChainAdmin)")
-entry = eco["chain_upgrades"][E["CHAIN_ID"]]
-check("chain, chain_admin, chain_admin_owner", [entry["chain"], entry["chain_admin"], entry["chain_admin_owner"]],
-      [E["DIAMOND"], E["CHAIN_ADMIN"], E["CHAIN_ADMIN_OWNER"]])
+check("contracts_config: diamond_cut_data, force_deployments_data = the new creation params'",
+      [cc["diamond_cut_data"], cc["force_deployments_data"]], [enc(CUT, fmt_cut(creation_cut)), params[6]])
+check("contracts_config: versions, testnet flag, timer delay",
+      [I(cc["old_protocol_version"]), I(cc["new_protocol_version"]), cc["is_testnet"], I(cc["governance_upgrade_timer_initial_delay"])],
+      [I(E["OLD"]), I(E["NEW"]), E["TESTNET"] == "True", I(E["TIMER_DELAY"])])
+
+# The reference chain's calls, built here: protocol_ops chain set-upgrade-timestamp and chain upgrade write the
+# real ones for its ChainAdmin's owner.
 multicall = "multicall((address,uint256,bytes)[],bool)"
 inner = calldata(f"upgradeChainFromVersion(address,uint256,{CUT})", E["DIAMOND"], E["OLD"], fmt_cut(cut))
-check("chain_admin_calldata = multicall([diamond.upgradeChainFromVersion(diamond, v0.33.0, cut)], true)",
-      entry["chain_admin_calldata"], calldata(multicall, f"[({E['DIAMOND']},0,{inner})]", "true"))
-check(f"set_upgrade_timestamp_calldata = ChainAdmin.setUpgradeTimestamp(v0.34.0, {E['TS']}), sent directly (onlyOwner)",
-      entry["set_upgrade_timestamp_calldata"], calldata("setUpgradeTimestamp(uint256,uint256)", E["NEW"], E["TS"]))
+upgrade_calldata = calldata(multicall, f"[({E['DIAMOND']},0,{inner})]", "true")
 notify = calldata("setUpgradeTimestamp(uint256,uint256)", E["CHAIN_ID"], E["TS"])
-check(f"server_notifier_timestamp_calldata = multicall([ServerNotifier.setUpgradeTimestamp({E['CHAIN_ID']}, {E['TS']})], true)",
-      entry["server_notifier_timestamp_calldata"], calldata(multicall, f"[({E['SN']},0,{notify})]", "true"))
 test = eco["test_upgrade_calls"]
-check("test_upgrade_chain_era = the multicall's inner call, from the ChainAdmin",
-      [test["test_upgrade_chain_era"], test["test_upgrade_chain_era_caller"]],
-      [enc(CALLS, f"[({E['DIAMOND']},0,{inner})]"), E["CHAIN_ADMIN"]])
-create = dec(CALLS, test["test_create_chain_era"])
-check("test_create_chain_era = one createNewChain(555, …) call to the bridgehub, from the bridgehub admin",
-      [[c[0], I(c[1]), c[2][:10], I("0x" + c[2][10:74])] for c in create] + [test["test_create_chain_era_caller"]],
-      [[E["BRIDGEHUB"], 0, sig("createNewChain(uint256,address,bytes32,uint256,address,bytes,bytes[])"), I(E["TEST_CHAIN_ID"])], E["ECO_ADMIN"]])
+check(f"test_upgrade_chain = [chain {E['CHAIN_ID']}.upgradeChainFromVersion(chain, v0.33.0, cut)], from its ChainAdmin",
+      [test["test_upgrade_chain"], test["test_upgrade_chain_caller"]], [enc(CALLS, f"[({E['DIAMOND']},0,{inner})]"), E["CHAIN_ADMIN"]])
+create = dec(CALLS, test["test_create_chain"])
+CREATE = "createNewChain(uint256,address,bytes32,uint256,address,bytes,bytes[])"
+check("test_create_chain = one createNewChain(555, …) call to the bridgehub, from the bridgehub admin",
+      [[c[0], I(c[1]), c[2][:10], I("0x" + c[2][10:74])] for c in create] + [test["test_create_chain_caller"]],
+      [[E["BRIDGEHUB"], 0, sig(CREATE), I(E["TEST_CHAIN_ID"])], E["ECO_ADMIN"]])
 
 # Hand-off to the fork checks.
 with open(E["S"] + "/expected.env", "w") as f:
     for k, v in {
-        "EXP_L2_TX_HASH": tx_hash, "EXP_UPGRADE_CUT_HASH": keccak(cc["upgrade_cut_data"]),
+        "EXP_L2_TX_HASH": tx_hash, "EXP_UPGRADE_CUT_HASH": keccak(upgrade_cut_data),
         "EXP_INITIAL_CUT_HASH": initial_cut_hash, "EXP_FDD_HASH": keccak(enc("bytes", params[6])),
         "EXP_BATCH_ZERO": keccak(enc("(uint64,bytes32,uint64,uint256,bytes32,bytes32,bytes32,uint256,bytes32,bytes32)", batch_zero)),
         "BOOT": boot, "AA": aa, "EVM": evm, "VK0": genesis["prover"]["fflonk_snark_wrapper_vk_hash"],
         "VK2": genesis["prover"]["airbender_snark_wrapper_vk_hash"], "VERIFIER": st["verifier_addr"],
         "AIRBENDER_VERIFIER": st["airbender_verifier_addr"], "NEW_CTM_IMPL": st["chain_type_manager_implementation_addr"],
-        "NEW_SN_IMPL": st["server_notifier_implementation_addr"], "UPGRADE_CALLDATA": entry["chain_admin_calldata"],
-        "SET_TS_CALLDATA": entry["set_upgrade_timestamp_calldata"], "SN_TS_CALLDATA": entry["server_notifier_timestamp_calldata"],
+        "NEW_SN_IMPL": st["server_notifier_implementation_addr"], "UPGRADE_CALLDATA": upgrade_calldata,
+        "SET_TS_CALLDATA": calldata("setUpgradeTimestamp(uint256,uint256)", E["NEW"], E["TS"]),
+        "SN_TS_CALLDATA": calldata(multicall, f"[({E['SN']},0,{notify})]", "true"),
+        # The test chain's admin: the prepare's sender (the deployer).
+        "TC_ADMIN": dec_call(CREATE, create[0][2])[4],
         "EXP_FFLONK": fflonk, "TIMER": timer, "STAGE_VALIDATOR": validator, "S1_UPGRADE_INDEX": upgrade_index,
     }.items():
         f.write(f"{k}={v}\n")
@@ -715,7 +726,7 @@ sys.exit(0 if len(logs) == 1 and [int(t, 16) for t in logs[0]["topics"][1:1 + le
          and data in ("-", logs[0]["data"].lower()) else 1)
 PYEMITTED
 }
-for a in "$PUH" "$ECO_ADMIN" "$ECO_ADMIN_OWNER" "$CHAIN_ADMIN_OWNER"; do
+for a in "$PUH" "$ECO_ADMIN" "$ECO_ADMIN_OWNER" "$CHAIN_ADMIN_OWNER" "$TC_ADMIN"; do
   cast rpc anvil_setBalance "$a" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
 done
 
@@ -800,8 +811,8 @@ for x in "$CTM" "$NEW_CTM_IMPL" "$SN" "$NEW_SN_IMPL"; do
 done
 
 echo "== Chain $CHAIN_ID's upgrade timestamp, sent by the ChainAdmin's owner"
-send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$SET_TS_CALLDATA" "set_upgrade_timestamp_calldata -> ChainAdmin"
-send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$SN_TS_CALLDATA" "server_notifier_timestamp_calldata -> ChainAdmin"
+send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$SET_TS_CALLDATA" "ChainAdmin.setUpgradeTimestamp(v0.34.0, $TS), directly (onlyOwner)"
+send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$SN_TS_CALLDATA" "ChainAdmin multicall(ServerNotifier.setUpgradeTimestamp($CHAIN_ID, $TS))"
 python3 - "$S/receipt.json" "$(cast keccak 'UpgradeTimestampUpdated(uint256,uint256,uint256)')" <<'PYLOG' && echo "  OK   UpgradeTimestampUpdated($CHAIN_ID, v0.33.0, $TS) emitted by the ServerNotifier" || fail "UpgradeTimestampUpdated($CHAIN_ID, v0.33.0, $TS) not emitted"
 import json, os, sys
 logs = [l for l in json.load(open(sys.argv[1]))["logs"] if l["address"].lower() == os.environ["SN"].lower() and l["topics"][0] == sys.argv[2]]
@@ -1098,6 +1109,11 @@ if [ "$REF_UPGRADES" = "1" ]; then
   proof_switches "chain $CHAIN_ID" "$CHAIN_ID" "$DIAMOND" "$CHAIN_ADMIN" "$CHAIN_ADMIN_OWNER"
 elif [ "$NEW_CHAIN" != "0x0000000000000000000000000000000000000000" ]; then
   echo "== Moved to test chain $TEST_CHAIN_ID: the cap on v34 and the proof-system switches"
+  # The CTM made the deployer its admin; hand the chain to the ecosystem admin's Ownable ChainAdmin, which the
+  # ServerNotifier also accepts.
+  send "$TC_ADMIN" "$NEW_CHAIN" "$(cast calldata 'setPendingAdmin(address)' "$ECO_ADMIN")" "test chain: setPendingAdmin(ecosystem admin)"
+  send "$ECO_ADMIN_OWNER" "$ECO_ADMIN" "$(cast calldata "$MULTICALL" "[($NEW_CHAIN,0,$(cast calldata 'acceptAdmin()'))]" true)" \
+    "test chain: the ecosystem admin accepts"
   MOVING=1
   # Before a new chain takes deposits, its admin sets a base-token price and unpauses deposits (the CTM creates
   # chains with deposits paused, ChainTypeManagerBase._deployNewChain).
@@ -1106,7 +1122,6 @@ elif [ "$NEW_CHAIN" != "0x0000000000000000000000000000000000000000" ]; then
     "test chain: its admin sets the base-token price multiplier to 1/1 and unpauses deposits"
   chk "test chain: deposits not paused" "$(call "$NEW_CHAIN" 'depositsPaused()(bool)')" false
   cap_after "test chain:" "$TEST_CHAIN_ID" "$NEW_CHAIN"
-  # Its admin is the bridgehub admin (an Ownable ChainAdmin), which the ServerNotifier also accepts.
   proof_switches "test chain $TEST_CHAIN_ID" "$TEST_CHAIN_ID" "$NEW_CHAIN" "$ECO_ADMIN" "$ECO_ADMIN_OWNER"
   MOVING=0
 else
