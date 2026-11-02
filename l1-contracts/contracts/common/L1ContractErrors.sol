@@ -390,6 +390,8 @@ error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtoc
 error ProtocolIdNotGreater();
 // 0x896ad688
 error ProxyUpgradeDomainMismatch(uint8 expected, uint8 actual);
+// 0x8771630a
+error ProxyUpgradeEngineAuthorityMismatch(address proxyAdmin, address proxyAdminOwner);
 // 0x929dc94b
 error ProxyUpgradeRowMismatch(address proxy, address expectedOldImpl, address actualImpl);
 // 0xd95d4d82
@@ -508,6 +510,8 @@ error UnsupportedProofBatchEncoding(uint8 version);
 error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
+// 0xdf88c3de
+error UpgradeEngineChangedExecutorOwnership(address upgradeEngine);
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145

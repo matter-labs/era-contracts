@@ -426,11 +426,27 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             return;
         }
         // From the build ARTIFACT, for the same reason as the transition above.
+        address upgradeEngine = deployProxyUpgradeEngine();
         upgradeAddresses.ctmInfrastructureTransition = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
-            abi.encode(ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory})),
+            abi.encode(
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.CTM,
+                    proxyUpgrades: inventory,
+                    upgradeEngine: upgradeEngine
+                })
+            ),
             "ProxyUpgradeTransition"
         );
+    }
+
+    /// @notice The engine the infrastructure transition pins: the code `CTMUpgradeExecutor`
+    ///         delegatecalls to apply it, with the CTM, its `ProxyAdmin` and the ServerNotifier as
+    ///         its authority. The default applies the rows and nothing else; a version whose upgrade
+    ///         needs follow-up calls (CTM or notifier wiring) deploys its `DefaultProxyUpgradeEngine`
+    ///         subclass instead.
+    function deployProxyUpgradeEngine() internal virtual returns (address) {
+        return deploySimpleContract("DefaultProxyUpgradeEngine");
     }
 
     /// @notice The enum-indexed CTM-domain inventory of this edge: a source-checked row for every

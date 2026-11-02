@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ManifestStorage} from "./ManifestStorage.sol";
 import {IProxyUpgradeTransition} from "./IProxyUpgradeTransition.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
-import {RegistryUnknownKey} from "../../../common/L1ContractErrors.sol";
+import {RegistryUnknownKey, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {ProxyUpgradeDomain, ProxyUpgradeRow, ProxyUpgradeTransitionManifest} from "../RegistryTypes.sol";
 
 /// @title Proxy upgrade transition — one instance per domain per protocol upgrade.
@@ -18,7 +18,8 @@ import {ProxyUpgradeDomain, ProxyUpgradeRow, ProxyUpgradeTransitionManifest} fro
 /// @dev Rows are source-checked edges (`expectedOldImpl -> implNew`). What each `implNew` RUNS is
 ///      what governance reviewed before approving this object; the object's own job is to refuse a
 ///      malformed inventory at construction. A target that is not a deployed contract at all is
-///      refused where the rows are applied ({ProxyUpgradeRowLib.applyRows}).
+///      refused where the rows are applied ({ProxyUpgradeRowLib.applyRows}), and so is a codeless
+///      `upgradeEngine` ({ProxyUpgradeExecutorBase}).
 contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
     /// @notice Pins the full manifest.
     /// @param _manifest The manifest to pin. Its inventory length is checked against the member
@@ -34,6 +35,10 @@ contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
             revert RegistryUnknownKey();
         }
         ProxyUpgradeRowLib.validateRows(participating);
+        // Every transition names the code that applies it; there is no implicit default.
+        if (_manifest.upgradeEngine == address(0)) {
+            revert ZeroAddress();
+        }
     }
 
     /// @inheritdoc IProxyUpgradeTransition
@@ -44,6 +49,11 @@ contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
     /// @inheritdoc IProxyUpgradeTransition
     function domain() external view returns (ProxyUpgradeDomain) {
         return getManifest().domain;
+    }
+
+    /// @inheritdoc IProxyUpgradeTransition
+    function upgradeEngine() external view returns (address) {
+        return getManifest().upgradeEngine;
     }
 
     /// @inheritdoc IProxyUpgradeTransition

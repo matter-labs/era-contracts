@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
@@ -62,6 +63,9 @@ import {
 ///         See {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Every fixture transition departs from the fixture's current release toward `release`.
 abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPostState {
+    /// @dev The engine every transition fixture pins: the rows and nothing else.
+    DefaultProxyUpgradeEngine internal proxyUpgradeEngine = new DefaultProxyUpgradeEngine();
+
     CTMUpgradeExecutor internal ctmExecutor;
     ProxyAdmin internal ctmProxyAdmin;
     CoreUpgradeExecutor internal coreExecutor;
@@ -237,7 +241,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         inventory[uint256(L1EcosystemContract.L1Bridgehub)] = _inventoryRow;
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: inventory})
+                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: inventory, upgradeEngine: address(proxyUpgradeEngine)})
             );
     }
 
@@ -249,7 +253,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         inventory[uint256(CTMContract.ValidatorTimelock)] = _inventoryRow;
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory})
+                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory, upgradeEngine: address(proxyUpgradeEngine)})
             );
     }
 
