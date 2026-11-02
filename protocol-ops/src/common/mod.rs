@@ -17,6 +17,7 @@ pub mod l1_contracts;
 pub mod logger;
 pub mod output;
 pub mod paths;
+pub mod preflight;
 pub mod private_key;
 pub mod traits;
 pub mod upgrade_descriptor;

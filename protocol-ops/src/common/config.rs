@@ -2,7 +2,10 @@ use std::sync::OnceLock;
 
 static CONFIG: OnceLock<GlobalConfig> = OnceLock::new();
 
-static DEFAULT_CONFIG: GlobalConfig = GlobalConfig { verbose: false };
+static DEFAULT_CONFIG: GlobalConfig = GlobalConfig {
+    verbose: false,
+    json_output: false,
+};
 
 /// Initialize the global config (verbose flag, etc.).
 ///
@@ -18,7 +21,13 @@ pub fn global_config() -> &'static GlobalConfig {
     CONFIG.get().unwrap_or(&DEFAULT_CONFIG)
 }
 
+/// Returns true if `--json` was passed on the command line. zk-deployer reads it.
+pub fn is_json_output() -> bool {
+    global_config().json_output
+}
+
 #[derive(Debug)]
 pub struct GlobalConfig {
     pub verbose: bool,
+    pub json_output: bool,
 }

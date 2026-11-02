@@ -81,7 +81,7 @@ On one anvil fork of L1, in this order:
    [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
 5. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
    PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it.
-6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
+6. The merge (`upgrade/merge.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
    `acceptOwnership` normalization) → the core prepare's declared calls → the executor legs,
    derived from the `[registry]` objects and executors the prepares reported, one contiguous run in

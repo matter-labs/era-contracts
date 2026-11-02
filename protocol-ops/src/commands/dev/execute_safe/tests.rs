@@ -203,9 +203,13 @@ use alloy::primitives::B256;
 use tempfile::tempdir;
 
 use super::{
-    bump_gas, gwei_to_wei, load_executed_bundle, parse_gwei, record_executed_tx, ExecutedBundle,
-    ExecutedTx, GAS_BUMP_BPS,
+    bump_gas, load_executed_bundle, parse_gwei, record_executed_tx, ExecutedBundle, ExecutedTx,
+    GAS_BUMP_BPS, WEI_PER_GWEI,
 };
+
+fn gwei_to_wei(gwei: u128) -> u128 {
+    gwei.saturating_mul(WEI_PER_GWEI)
+}
 
 #[test]
 fn gas_price_ceilings_parse_exactly_with_decimals() {

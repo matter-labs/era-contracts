@@ -6,12 +6,12 @@
 - `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `verify-bootstrap`, `list-ctms`, `governance-toml-to-simulator`, …).
 - `protocol-ops/src/commands/ecosystem/upgrade_inner.rs` — canonical prepare-phase orchestration (`UpgradeInner::prepare`: core prepare, then the per-CTM prepare).
 - `protocol-ops/src/commands/ecosystem/upgrade_full.rs` — `UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`) + the ServerNotifier handover calls after the prepares (bootstrap only).
-- `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`), the merge (`write_merged_ecosystem_toml`) and the free `replay_governance_calls` helper.
+- `protocol-ops/src/commands/ecosystem/upgrade/` — CLI handlers, one file per command (`prepare.rs`: `run_upgrade_prepare_all`; `governance.rs`: `run_upgrade_governance` and the free `replay_governance_calls` helper; `list_ctms.rs`: `run_list_ctms`), and the merge (`merge.rs`: `write_merged_ecosystem_toml`).
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — converts prepared governance TOMLs into transaction-simulator JSON.
 - `protocol-ops/src/commands/chain/` — per-chain commands (`chain init`, `chain upgrade`, `chain set-da-validator-pair`, …).
 - `protocol-ops/src/commands/dev/execute_safe.rs` — executes a Gnosis Safe Transaction Builder JSON bundle by signing each tx with a supplied private key and sending raw transactions to the given RPC URL.
 - `protocol-ops/src/common/forge/runner.rs` — `ForgeRunner`: owns the anvil fork lifecycle and records every broadcast tx into `runner.runs()` for per-sender Safe-bundle emission.
-- `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, bytecodes supplier, validator timelock, etc.) — read live state directly from L1.
+- `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, validator timelock, etc.) — read live state directly from L1.
 - `protocol-ops/src/common/forge/scripts/mod.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes, and the `ScriptCall` table binding each typed call to its script.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
 - `l1-contracts/deploy-scripts/upgrade/v36/{CoreUpgrade_v36,CTMUpgrade_v36}.s.sol` — the current release's prepares (the first recurring registry-driven edge; the v35 bootstrap edge's were retired with the v36 bump).
@@ -235,17 +235,17 @@ For non-trivial flows (the ecosystem upgrade in particular) we keep a small libr
 
 - **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. Each prepare deploys its own domain's objects; on the bootstrap edge the CTM prepare takes the core executor from the core prepare's output. Returns the per-step output TOML paths.
 - **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before and the ServerNotifier handover calls (bootstrap only) after. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
-- **Free `replay_governance_calls` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `[governance_calls] calls`, dispatches one `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
+- **Free `replay_governance_calls` helper** in `upgrade/governance.rs` — reads each prepared TOML's hex-encoded `[governance_calls] calls`, dispatches one `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
 
 The asymmetry (Inner/Full for prepare; free fn for governance) is deliberate: prepare needs orchestration (multiple forge invocations + preconditions); governance is a single ABI-passthrough loop.
 
 ### Forge invocation
 
-Forge scripts are described in `script_params.rs` as `ForgeScriptParams` (input TOML, output TOML, script path, ABI handle, ffi flag, rpc flag, gas limit). `ForgeRunner::with_script_call` builds the calldata via the bundled ABI; `ForgeRunner::script_path_from_root` is used when the script path is custom (e.g. test variants).
+Forge scripts are described in `common/forge/scripts/mod.rs` as `ForgeScriptParams` (input TOML, output TOML, script path, ffi flag, rpc flag), bound to typed calls by the `script_calls!` table. `ForgeRunner::script_call` builds the calldata via the bundled ABI; `ForgeRunner::script_path_from_root` is used when the script path is custom (e.g. test variants).
 
 ### Auto-resolution from L1
 
-Helper functions in `common/l1_contracts.rs` resolve secondary addresses (CTM proxy, bytecodes supplier, rollup DA manager, governance, validator timelock, ZK chain diamond, …) by reading live state from the bridgehub. Callers should depend on these helpers, not on user-supplied flags, whenever possible.
+Helper functions in `common/l1_contracts.rs` resolve secondary addresses (CTM proxy, rollup DA manager, governance, validator timelock, ZK chain diamond, …) by reading live state from the bridgehub. Callers should depend on these helpers, not on user-supplied flags, whenever possible.
 
 ## General principle: minimize config in and out, query L1 instead
 

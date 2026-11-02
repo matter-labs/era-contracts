@@ -1,5 +1,33 @@
 #![allow(clippy::too_many_arguments)]
 
+// zk-deployer (zksync-os-integration-tests) deploys and deposits test tokens with these three.
+pub mod testnet_erc20_token {
+    alloy::sol!(
+        #[sol(rpc)]
+        TestnetERC20TokenAbi,
+        "../l1-contracts/zkstack-out/TestnetERC20Token.sol/TestnetERC20Token.json"
+    );
+}
+pub use testnet_erc20_token::TestnetERC20TokenAbi;
+
+pub mod il1_native_token_vault {
+    alloy::sol!(
+        #[sol(rpc)]
+        IL1NativeTokenVaultAbi,
+        "../l1-contracts/zkstack-out/IL1NativeTokenVault.sol/IL1NativeTokenVault.json"
+    );
+}
+pub use il1_native_token_vault::IL1NativeTokenVaultAbi;
+
+pub mod il1_asset_router {
+    alloy::sol!(
+        #[sol(rpc)]
+        IL1AssetRouterAbi,
+        "../l1-contracts/zkstack-out/IL1AssetRouter.sol/IL1AssetRouter.json"
+    );
+}
+pub use il1_asset_router::IL1AssetRouterAbi;
+
 pub mod bridgehub {
     alloy::sol!(
         #[sol(rpc)]
@@ -27,7 +55,6 @@ pub mod zk_chain {
 }
 pub use zk_chain::ZkChainAbi;
 
-// Using IChainTypeManager for the upgradeChainFromVersion function
 pub mod i_register_zk_chain {
     alloy::sol!(
         #[sol(rpc)]

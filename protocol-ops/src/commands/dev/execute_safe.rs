@@ -570,12 +570,6 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
     .await
 }
 
-/// Convert a gwei ceiling to wei.
-#[cfg(test)]
-pub fn gwei_to_wei(gwei: u128) -> u128 {
-    gwei.saturating_mul(WEI_PER_GWEI)
-}
-
 /// Parse a gwei amount, decimals allowed (`500`, `0.5`, `.25`), into wei. Exact
 /// (no floating point); rejects zero, more than 9 decimal places, signs,
 /// exponents and anything else that is not a plain decimal number.
