@@ -184,11 +184,11 @@ describe("01 - Deployment Verification", function () {
     ];
     // Read from the state the run that started the chains wrote, so reruns against kept chains agree.
     const fromSnapshots = runner.loadState().startedFrom !== "freshDeploy";
-    const reference = fromSnapshots ? "anvil-interop profile build" : "installed out/ artifact";
+    const reference = fromSnapshots ? "anvil-interop profile build" : "installed forge-output artifact";
 
     before(() => {
       if (!fromSnapshots) {
-        // A fresh deployment installs every predeploy from out/, whatever profile built it.
+        // A fresh deployment installs every predeploy from the profile's forge output.
         for (const contractName of artifactNames) {
           expectedBytecodes.set(contractName, getBytecode(contractName));
         }

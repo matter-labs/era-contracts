@@ -66,8 +66,8 @@ use super::rows::{
 use super::shell::verify_shell_kept;
 use super::succession::{verify_succession_preconditions, SuccessionDomain};
 use super::views::{
-    BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CommittedUpgradeView, CtmView,
-    ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
+    BridgehubView, BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CommittedUpgradeView,
+    CtmView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -345,6 +345,12 @@ pub(crate) async fn verify<P: Provider>(
     let ctm = bindings.ctm.map(|ctm| CtmView::new(ctm, provider));
     if let (Some(edge), Some(ctm)) = (&transition_edge, &ctm) {
         verify_transition_departure(result, ctm, edge).await;
+        // Only the edge onto v0.36.0 strands them: past it, there is nothing left to prevent.
+        if edge.old_version < V36 && edge.new_version >= V36 {
+            if let Some(chains) = read_chain_versions(provider, result, ctm).await {
+                judge_chains_below_v35(result, &chains);
+            }
+        }
     }
     if let Some(rows) = &infrastructure_rows {
         match bindings.ctm_proxy_admin {
@@ -508,6 +514,102 @@ async fn verify_transition_departure<P: Provider>(
             "the transition departs from release {} but the CTM is on {live_release}: the \
              release edge is refused on chain, and the two describe different starting points",
             edge.manifest.fromRelease
+        ));
+    }
+}
+
+/// v0.35.0 and v0.36.0 in the packed encoding.
+const V35: U256 = U256::from_limbs([35 << 32, 0, 0, 0]);
+const V36: U256 = U256::from_limbs([36 << 32, 0, 0, 0]);
+
+/// One chain the Bridgehub registers on the CTM.
+#[derive(Debug)]
+struct ChainVersion {
+    chain_id: U256,
+    /// `None` when its CTM or its version could not be read (already reported).
+    protocol_version: Option<U256>,
+}
+
+/// Every chain the CTM's Bridgehub registers on `ctm`, with the protocol version the CTM reports
+/// for it. `None` (reported) when the chains cannot be enumerated. A chain whose CTM or version
+/// cannot be read is an error, because it cannot be shown to be at v0.35.0 or later.
+async fn read_chain_versions<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    ctm: &CtmView::CtmViewInstance<&P>,
+) -> Option<Vec<ChainVersion>> {
+    let not_enumerable = |result: &mut VerificationResult, e: &dyn std::fmt::Display| {
+        result.report_error(&format!(
+            "the chains on the CTM cannot be enumerated ({e}), so none of them can be shown to be \
+             at v0.35.0 or later"
+        ));
+    };
+    let bridgehub = match ctm.BRIDGE_HUB().call().await {
+        Ok(bridgehub) => BridgehubView::new(bridgehub, provider),
+        Err(e) => {
+            not_enumerable(result, &e);
+            return None;
+        }
+    };
+    let chain_ids = match bridgehub.getAllZKChainChainIDs().call().await {
+        Ok(ids) => ids,
+        Err(e) => {
+            not_enumerable(result, &e);
+            return None;
+        }
+    };
+    let mut chains = Vec::new();
+    for chain_id in chain_ids {
+        let protocol_version = match bridgehub.chainTypeManager(chain_id).call().await {
+            Ok(chain_ctm) if chain_ctm != *ctm.address() => continue,
+            Ok(_) => match ctm.getProtocolVersion(chain_id).call().await {
+                Ok(version) => Some(version),
+                Err(e) => {
+                    result.report_error(&format!(
+                        "chain {chain_id}: the CTM could not read its protocol version ({e}), so \
+                         it cannot be shown to be at v0.35.0 or later"
+                    ));
+                    None
+                }
+            },
+            Err(e) => {
+                result.report_error(&format!(
+                    "chain {chain_id}: its CTM could not be read ({e}), so it cannot be shown to \
+                     be at v0.35.0 or later"
+                ));
+                None
+            }
+        };
+        chains.push(ChainVersion {
+            chain_id,
+            protocol_version,
+        });
+    }
+    Some(chains)
+}
+
+/// Reports an error for every chain below v0.35.0. The v0.36.0 CTM no longer serves the
+/// `upgradeCutHash` and `protocolVersionVerifier` views such a chain's upgrade reads, so once
+/// it lands the chain has no upgrade path. Each one has to be moved to v0.35.0 before the edge
+/// executes.
+fn judge_chains_below_v35(result: &mut VerificationResult, chains: &[ChainVersion]) {
+    let mut cleared = 0usize;
+    for chain in chains {
+        match chain.protocol_version {
+            Some(version) if version < V35 => result.report_error(&format!(
+                "chain {} is at {}: once the v0.36.0 CTM lands it has no upgrade path, so move it \
+                 to v0.35.0 before this upgrade executes",
+                chain.chain_id,
+                format_semver(version)
+            )),
+            Some(_) => cleared += 1,
+            None => {}
+        }
+    }
+    if cleared == chains.len() {
+        result.report_ok(&format!(
+            "all {} chain(s) on the CTM are at v0.35.0 or later",
+            chains.len()
         ));
     }
 }
@@ -2420,6 +2522,135 @@ mod tests {
         assert!(asserter.read_q().is_empty());
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
         assert!(result.has_error("`ChainTypeManager.replaceUpgradeTransition` refuses it"));
+    }
+
+    // ───────────────────────── chains below v0.35.0 ─────────────────────────
+
+    /// v0.29.1 in the packed encoding: a chain the v0.36.0 CTM would strand.
+    const V29_1: u64 = (29 << 32) | 1;
+
+    fn chain(chain_id: u64, protocol_version: Option<u64>) -> ChainVersion {
+        ChainVersion {
+            chain_id: U256::from(chain_id),
+            protocol_version: protocol_version.map(U256::from),
+        }
+    }
+
+    #[test]
+    fn chains_at_v35_or_later_pass_the_gate() {
+        let mut result = VerificationResult::default();
+        judge_chains_below_v35(
+            &mut result,
+            &[chain(270, Some(35 << 32)), chain(271, Some(36 << 32))],
+        );
+        assert_eq!((result.errors, result.warnings), (0, 0));
+        assert!(result.ensure_success().is_ok());
+    }
+
+    /// Each chain below v0.35.0 is an error of its own, naming the chain and its version.
+    #[test]
+    fn each_chain_below_v35_fails_the_gate() {
+        let mut result = VerificationResult::default();
+        judge_chains_below_v35(
+            &mut result,
+            &[
+                chain(270, Some(35 << 32)),
+                chain(8022832, Some(V29_1)),
+                chain(36900, Some(V29_1)),
+            ],
+        );
+        assert_eq!(result.errors, 2, "{:?}", result.error_messages);
+        assert!(result.has_error("chain 8022832 is at v0.29.1"));
+        assert!(result.has_error("chain 36900 is at v0.29.1"));
+    }
+
+    /// An unreadable version was reported as an error when it was read, so the verdict adds no
+    /// second error for it.
+    #[test]
+    fn an_unreadable_chain_adds_no_second_error() {
+        let mut result = VerificationResult::default();
+        judge_chains_below_v35(&mut result, &[chain(270, None)]);
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// The live read path, in the order it queries: the CTM's Bridgehub, its chain ids, then per
+    /// chain its CTM and, for this CTM's chains only, the version the CTM reports.
+    #[tokio::test]
+    async fn the_chains_are_enumerated_through_the_bridgehub_and_filtered_by_ctm() {
+        const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        const OTHER_CTM: Address = Address::repeat_byte(0xC1);
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::from(BRIDGEHUB.abi_encode()));
+        let ids = vec![U256::from(270u64), U256::from(271u64), U256::from(272u64)];
+        asserter.push_success(&Bytes::from(ids.abi_encode()));
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(U256::from(35u64 << 32).abi_encode()));
+        asserter.push_success(&Bytes::from(OTHER_CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_success(&Bytes::from(U256::from(V29_1).abi_encode()));
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let chains = read_chain_versions(&provider, &mut result, &CtmView::new(CTM, &provider))
+            .await
+            .expect("the chains are enumerable");
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+        assert_eq!(result.errors, 0, "{:?}", result.error_messages);
+        let read: Vec<_> = chains
+            .iter()
+            .map(|c| (c.chain_id, c.protocol_version))
+            .collect();
+        assert_eq!(
+            read,
+            vec![
+                (U256::from(270u64), Some(U256::from(35u64 << 32))),
+                (U256::from(272u64), Some(U256::from(V29_1))),
+            ]
+        );
+    }
+
+    /// A chain whose CTM or version cannot be read is an error of its own, and stays in the list
+    /// so the verdict does not count the CTM's chains as all cleared without it.
+    #[tokio::test]
+    async fn a_chain_that_cannot_be_read_fails_the_gate() {
+        const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::from(BRIDGEHUB.abi_encode()));
+        let ids = vec![U256::from(270u64), U256::from(271u64)];
+        asserter.push_success(&Bytes::from(ids.abi_encode()));
+        asserter.push_failure_msg("no CTM for 270");
+        asserter.push_success(&Bytes::from(CTM.abi_encode()));
+        asserter.push_failure_msg("no version for 271");
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let chains = read_chain_versions(&provider, &mut result, &CtmView::new(CTM, &provider))
+            .await
+            .expect("the chains are enumerable");
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+        assert_eq!(result.errors, 2, "{:?}", result.error_messages);
+        assert!(result.has_error("chain 270: its CTM could not be read"));
+        assert!(result.has_error("chain 271: the CTM could not read its protocol version"));
+        let read: Vec<_> = chains
+            .iter()
+            .map(|c| (c.chain_id, c.protocol_version))
+            .collect();
+        assert_eq!(
+            read,
+            vec![(U256::from(270u64), None), (U256::from(271u64), None)]
+        );
+    }
+
+    /// The gate cannot pass on chains it never saw: an unenumerable CTM is an error.
+    #[tokio::test]
+    async fn chains_that_cannot_be_enumerated_fail_the_gate() {
+        let asserter = Asserter::new();
+        asserter.push_failure_msg("no Bridgehub");
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        let chains =
+            read_chain_versions(&provider, &mut result, &CtmView::new(CTM, &provider)).await;
+        assert!(chains.is_none());
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("cannot be enumerated"));
     }
 
     // ───────────────────────── the whole path ─────────────────────────

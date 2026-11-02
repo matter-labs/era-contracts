@@ -24,8 +24,10 @@ fs_permissions = [
     { access = "read", path = "./script-config" },
     { access = "read", path = "./upgrade-envs/" },
     { access = "read", path = "./out" },
+    { access = "read", path = "./out-anvil-interop" },
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
+    { access = "read", path = "../AllContractsHashes.json" },
 ]
 # Only filters what `forge build` prints; the enforced policy is `solc-warnings.json`.
 ignored_error_codes = ["missing-receive-ether", "code-size", "init-code-size"]
@@ -55,15 +57,19 @@ allow_internal_expect_revert = true
 # Profile for anvil-interop state generation: disables CBOR metadata to produce
 # deterministic bytecode across platforms (macOS vs Linux CI). Without this,
 # the CBOR metadata hash differs → CREATE2 addresses differ → storage differs.
+# Its own out/cache, so it and the default build never overwrite each other; whatever reads
+# artifacts under FOUNDRY_PROFILE=anvil-interop reads them from there.
 # Usage: FOUNDRY_PROFILE=anvil-interop forge build
 [profile.anvil-interop]
 cbor_metadata = false
 bytecode_hash = "none"
+out = "out-anvil-interop"
+cache_path = "cache-forge-anvil-interop"
 
 # Deterministic sub-build for the anvil registry-driven upgrade test: the committed manifest
 # (scripts/registry-manifests/v35-local.json) names contracts by bytecode-derived values, so those
 # artifacts must be byte-identical across platforms (macOS regen vs Linux CI). Same metadata settings as anvil-interop, but with a dedicated out/cache so it
-# never clobbers the default-profile artifacts the rest of the harness loads.
+# never clobbers the artifacts the rest of the harness loads.
 # Usage: FOUNDRY_PROFILE=registry-deterministic forge build <sources>
 [profile.registry-deterministic]
 cbor_metadata = false

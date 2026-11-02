@@ -29,7 +29,12 @@ import {
     MAX_NEW_FACTORY_DEPS,
     ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE
 } from "contracts/common/Config.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_FORCE_DEPLOYER_ADDR,
+    L2_NTV_BEACON_DEPLOYER_ADDR,
+    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {BYTECODE_INFO_LENGTH} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {
@@ -1046,6 +1051,15 @@ contract StorageRegistriesTest is Test {
             "every row is joined to the SAME shell"
         );
         assertEq(derived[1].newAddress, L2InventoryLib.fixedAddress(L2EcosystemContract.SystemContext));
+    }
+
+    /// @dev The members no table fixture in this file places.
+    function test_fixedAddressOfBeaconDeployerAndWrappedBaseToken() public pure {
+        assertEq(
+            L2InventoryLib.fixedAddress(L2EcosystemContract.UpgradeableBeaconDeployer),
+            L2_NTV_BEACON_DEPLOYER_ADDR
+        );
+        assertEq(L2InventoryLib.fixedAddress(L2EcosystemContract.L2WrappedBaseToken), L2_WRAPPED_BASE_TOKEN_IMPL_ADDR);
     }
 
     /// @dev The shell is stored once on the release and served beside the table.

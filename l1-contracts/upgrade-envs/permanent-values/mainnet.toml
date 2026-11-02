@@ -1,5 +1,8 @@
 l1_chain_id = 1
 
+# The Era chain's id, which the PUH/Guardians redeploy keeps (`redeploy_zk_governance`).
+era_chain_id = 324
+
 zk_token_asset_id = "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a"
 
 # Whether this environment's CTM verifier is the testnet one. Env-wide, not per-CTM.

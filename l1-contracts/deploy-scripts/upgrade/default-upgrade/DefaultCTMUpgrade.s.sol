@@ -252,10 +252,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
-        // No `era_chain_id` read: the per-env input TOMLs still carry the key for the
-        // v31 tooling and the zk-governance PUH redeploy (PUH's real constructor arg),
-        // but nothing in this flow consumes an Era chain id.
-
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             create2FactorySalt: create2FactorySalt,

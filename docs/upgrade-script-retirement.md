@@ -63,8 +63,7 @@ Finished, and described where it now lives:
   is the bootstrap edge's `RegistryBootstrapMigration.upgradeCut()`).
 - The equivalence evidence was field-level and independent: the bootstrap unit suite built the
   expected proposal and transaction from the manifest inputs (`RegistryBootstrapMigration.t.sol`,
-  deleted with the edge in v36), and on `draft/v0.35.0` `UpgradeTest_Local` decodes the cut the
-  prepare shipped and reads it back field by field.
+  deleted with the edge in v36).
 - `AdminFunctions.upgradeChainFromCTM` encodes only the cut-reading entrypoint (`UpgradeChainCall`,
   which refuses a chain below v35); the cut-taking path (`requiresCut`) and the reconstruction of a
   cut for a pre-bootstrap chain are deleted in v36. `DefaultChainUpgrade.executeUpgrade` is deleted (the chain's `executeUpgrade` is

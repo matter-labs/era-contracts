@@ -27,14 +27,10 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
   (`ExternalActionsLib`) and is listed in the output's `external_actions`.
   `DefaultChainUpgrade` is the per-chain leg the Foundry integration tests use; the chain reads its
   cut from the CTM.
-- `v36/` — the v35 -> v36 edge, the first registry-driven release and the template for the next
-  one: `CoreUpgrade_v36` replaces one ecosystem implementation (`L1MessageRoot`); `CTMUpgrade_v36`
-  overrides nothing.
-- The v34 -> v35 bootstrap edge (`v35/`: `CoreUpgrade_v35` deploying the `CoreUpgradeExecutor`,
-  `CTMUpgrade_v35` the `CTMUpgradeExecutor`, the `RegistryBootstrapMigration` and the
-  `RegistryBootstrapSequence`) was retired with the v36 bump; it lives on `draft/v0.35.0`. v36 also
-  removed the contracts and the legacy cut-taking CTM path it relied on, so a v36 CTM does not bring
-  a pre-v35 chain across.
+- `v<minor>/` — the current release's edge, for the minor version of
+  `configs/genesis/zksync-os/latest.json`: `CoreUpgrade_v<minor>` and `CTMUpgrade_v<minor>` subclass
+  the default scripts and override only what the release changes. It is the template for the next
+  one.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 - `EmergencyUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
   emergency upgrade ("Emergency execution" below).
@@ -43,8 +39,8 @@ Other one-off scripts of shipped upgrades live on their release branches, not he
 
 ## 1. Inputs
 
-Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (see
-`upgrade-envs/v0.36.0-v36/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
+Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (the current release's are in its
+`upgrade-envs/v<major>.<minor>.0-<name>/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
 Keep inputs minimal — the prepare reads the departing version, the live implementations, the
 CTM's owner and the ecosystem `ProxyAdmin`'s owner from L1. One input cannot be derived and must
 be carried forward from the previous prepare's output: `[contracts] eip7702_checker`
@@ -84,7 +80,8 @@ On one anvil fork of L1, in this order:
    transition pins the engine, and a CTM executor whose code differs from this build gets a
    successor (`replacesCTMUpgradeExecutor()`), which `ctm_upgrade_executor_addr` then names.
 4. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
-   PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it.
+   PUH/Guardians redeploy (`zk_governance.rs`). `yarn new-release` drops the key, so a release declares it
+   only on purpose.
 5. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
    `acceptOwnership` normalization) → the core prepare's declared calls → the executor
@@ -144,7 +141,8 @@ re-derives from its `[member_deployments]` record with each constructor argument
 env value the prepare took it from (without a record it is unverified), that `ZiskVerifier`'s Plonk
 backend runs the pinned runtime, that every proxy row names its slot's proxy,
 the bound authority and the owner the upgrade is driven by, every row's departing implementation,
-that chains crossing the edge keep the system-proxy logic new chains get, readiness,
+that chains crossing the edge keep the system-proxy logic new chains get, readiness, that no
+chain on the CTM is below v35 when the edge crosses into v36 (step 6),
 and that the calldata governance signs invokes the reviewed upgrade, in canonical order, and
 nothing else. What it
 checks and deliberately does not is in
@@ -162,6 +160,10 @@ cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manife
 ```
 
 ## 6. Governance
+
+**Before the v36 proposal executes, every chain on the CTM must be at v35 or later**: past it, a
+chain below v35 has no upgrade path (step 7). Move each such chain to v35 first, while the v35 CTM
+still serves it; `verify-package` reports every chain still below v35 as an error.
 
 ```sh
 cargo run -p protocol_ops -- ecosystem upgrade-governance --env <env> --l1-rpc-url <rpc>
@@ -233,7 +235,8 @@ upgrade resets.
 
 A chain below v35 cannot cross: its version has no committed transition, and v36 removed the
 cut-taking path (`ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)` and the
-`ValidatorTimelock` forwarder) that brought pre-v35 chains across the v35 bootstrap edge.
+`ValidatorTimelock` forwarder) that brought pre-v35 chains across the v35 bootstrap edge, along with
+the `upgradeCutHash` and `protocolVersionVerifier` views a pre-v35 chain's upgrade reads.
 
 **Chain admins behind an `AccessControlRestriction`.** Every crossing from v35 on calls the chain's
 two-argument `upgradeChainFromVersion(address,uint256)` (`0x03129ad9`) instead of the pre-v35
@@ -251,15 +254,15 @@ and verified before rollout.
 ## Preparing the scripts for a new upgrade
 
 Open the release with `yarn new-release <name>` (repo root): it bumps the genesis protocol version,
-creates `upgrade-envs/v0.<minor>.0-<name>/` from the current release's inputs with fresh salts,
-moves `current_upgrade_env_dir!` and the prepare's default script paths
-(`protocol-ops/src/common/forge/scripts/mod.rs`), and generates `v<minor>/CoreUpgrade_v<minor>` and
-`CTMUpgrade_v<minor>` as plain subclasses of the default scripts unless the branch already carries
-them. The header of `scripts/new-release.ts` lists what it changes and what it leaves to you.
+creates `upgrade-envs/v0.<minor>.0-<name>/` from the current release's inputs with fresh salts, and
+generates `v<minor>/CoreUpgrade_v<minor>` and `CTMUpgrade_v<minor>` as plain subclasses of the default
+scripts unless the branch already carries them. protocol-ops' defaults and the generate workflow
+follow the genesis version, so they move with the bump. The header of `scripts/new-release.ts`
+lists what it changes and what it leaves to you.
 
-Start from `v36/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
-contracts the release changes, name every release member you replace in `changedReleaseMembers()`,
-and keep everything else derived.
+Start from the current release's `v<minor>/`: inherit the `Default*Upgrade` bases, override
+`deployNew*Contracts` with the contracts the release changes, name every release member you replace
+in `changedReleaseMembers()`, and keep everything else derived.
 
 **Declare what the upgrade is.** `DefaultCTMUpgrade.upgradeKind()` returns `ChainRelease` by
 default — the edge deploys the upgrade engine and a `CTMTransition`, and the protocol version
@@ -280,7 +283,7 @@ successful prepare from the output alone.
 
 A release whose L2 built-ins change must also author the L2
 side (`authorL2Side`: delegate/extra bytecode infos, the pinned composer and the bytecode
-artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v35` on `draft/v0.35.0` shows the shape) because the release-pair derivation puts the
+artifacts needed to publish the constructed plan’s factory dependencies) because the release-pair derivation puts the
 changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the
 executor legs is a `declareExternalAction`.
 
