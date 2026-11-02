@@ -18,8 +18,8 @@
 #      ALLOW_PENDING_L2_UPGRADE=1 (the ZIP-18 replay fork; protocol_ops passes its environment through).
 #
 # Needs: foundry (cast/anvil; forge for step 1 and the first-batch test), python3 >= 3.11 (tomllib), and for
-# step 1 the Linux CI build artifacts in {system,l1,l2}-contracts/zkout and l1-contracts/out (macOS zksolc
-# hashes differ).
+# step 1 the Linux CI build artifacts in {system,l1,l2}-contracts/zkout, l1-contracts/out and da-contracts/out
+# (macOS zksolc hashes differ).
 # Usage: UPGRADE_ENV=<env> DEPLOYER=<eoa> L1_FORK_URL=<rpc> [FORK_BLOCK=<n>] ./rehearse.sh   (PORT defaults to 8634)
 # Only the anvil it starts is stopped (by PID).
 # The first-batch test compiles contracts/ into FORK_TEST_OUT (default: a temp dir; never out/, zkout/ or
@@ -104,8 +104,7 @@ export RPC
 
 # ---------------------------------------------------------------- the environment's facts
 # Inputs from $UPGRADE_ENV.toml, permanent-values and the genesis, the rest from the chain before step 1 changes
-# it. Each input the chain also holds is checked against it (EIP7702_CHECKER in step 5, against the live
-# MailboxFacet's code). --published-only needs none, and may run after stage 1.
+# it. --published-only needs none, and may run after stage 1.
 if [ "$PUBLISHED_ONLY" = "0" ]; then
   python3 - "$HERE/$UPGRADE_ENV.toml" "$WT/upgrade-envs/permanent-values/$UPGRADE_ENV.toml" \
     "$WT/../configs/genesis/era/latest.json" <<'PYINPUTS' > "$S/inputs.env" \
@@ -119,8 +118,6 @@ if ctm["is_zk_sync_os"]:
 ADDRESS, NUMBER, WORD, BOOL = r"0x[0-9a-fA-F]{40}", r"[0-9]+", r"0x[0-9a-fA-F]{64}", r"True|False"
 for name, value, pattern in [
     ("CTM", ctm["proxy"], ADDRESS),
-    ("EIP7702_CHECKER", env["eip7702_checker"], ADDRESS),
-    ("DIAMOND_INIT", env["diamond_init"], ADDRESS),
     ("TESTNET", env["testnet_verifier"], BOOL),
     ("TIMER_DELAY", env["governance_upgrade_timer_initial_delay"], NUMBER),
     ("NEW", semver["major"] << 64 | semver["minor"] << 32 | semver["patch"], NUMBER),
@@ -134,10 +131,6 @@ for name, value, pattern in [
     if not re.fullmatch(pattern, str(value)):
         sys.exit(f"  {name}: malformed {value!r}")
     print(f"export {name}={value}")
-event = bytes.fromhex(env["current_chain_creation_params_event_data"][2:])
-cut_at, deps_at = (int.from_bytes(event[32 * i:32 * i + 32], "big") for i in (4, 6))
-print(f"export STORED_CUT=0x{32:064x}{event[cut_at:deps_at].hex()}")
-print(f"export STORED_CUT_INIT=0x{event[cut_at + 44:cut_at + 64].hex()}")
 PYINPUTS
   # shellcheck disable=SC1091
   . "$S/inputs.env"
@@ -210,9 +203,6 @@ PYINPUTS
       && echo "  OK   the old version's verifier has no IS_TESTNET_VERIFIER() (production)" \
       || fail "the old version's verifier: $(head -c 200 "$S/testnet.err")"
   fi
-  chk "current_chain_creation_params_event_data: its cut hashes to the CTM's initialCutHash()" \
-    "$(cast keccak "$STORED_CUT")" "$(call "$CTM" 'initialCutHash()(bytes32)')"
-  chk "diamond_init = that cut's initAddress" "$STORED_CUT_INIT" "$DIAMOND_INIT"
   chk "PUH, the CTM's owner() = the bridgehub's owner()" "$(call "$BRIDGEHUB" 'owner()(address)')" "$PUH"
   chk "ecosystem admin, the bridgehub's admin() = the ServerNotifier ProxyAdmin's owner()" \
     "$(call "$SN_PROXY_ADMIN" 'owner()(address)')" "$ECO_ADMIN"
@@ -272,7 +262,8 @@ echo "L2 upgrade tx factory deps: $N, unpublished: $UNPUB (supplier $BS)"
 # there can only be that contract.
 DEPLOYED_KEYS=(state_transition.admin_facet_addr state_transition.getters_facet_addr
   state_transition.mailbox_facet_addr state_transition.executor_facet_addr state_transition.migrator_facet_addr
-  state_transition.committer_facet_addr state_transition.airbender_verifier_addr state_transition.verifier_addr
+  state_transition.committer_facet_addr state_transition.diamond_init_addr state_transition.eip7702_checker_addr
+  state_transition.airbender_verifier_addr state_transition.verifier_addr
   state_transition.verifier_fflonk_addr state_transition.default_upgrade_addr
   state_transition.chain_type_manager_implementation_addr state_transition.server_notifier_implementation_addr
   deployed_addresses.l1_governance_upgrade_timer deployed_addresses.upgrade_stage_validator)
@@ -381,9 +372,8 @@ upgrade_cut_data = eco["chain_upgrade_diamond_cut"]
 boot, aa, evm = genesis["bootloader_hash"], genesis["default_aa_hash"], genesis["evm_emulator_hash"]
 
 print("== Reused addresses in the output")
-reused = {"diamond_init_addr": "DIAMOND_INIT", "genesis_upgrade_addr": "GENESIS_UPGRADE",
-          "chain_type_manager_proxy": "CTM", "bytecodes_supplier_addr": "SUPPLIER",
-          "permissionless_validator_addr": "PERMISSIONLESS_VALIDATOR", "eip7702_checker_addr": "EIP7702_CHECKER"}
+reused = {"genesis_upgrade_addr": "GENESIS_UPGRADE", "chain_type_manager_proxy": "CTM",
+          "bytecodes_supplier_addr": "SUPPLIER", "permissionless_validator_addr": "PERMISSIONLESS_VALIDATOR"}
 check("state_transition: reused addresses = the live ones", [st[k] for k in reused], [E[v] for v in reused.values()])
 # The Boojum verifier the new verifier must point at, deployed (step 4 checks its provenance).
 fflonk = st["verifier_fflonk_addr"]
@@ -463,7 +453,7 @@ check("genesis batch hash, leaf index, commitment, Airbender commitment",
       [params[1], I(params[2]), params[3], params[4]],
       [genesis["genesis_root"], genesis["genesis_rollup_leaf_index"], genesis["genesis_batch_commitment"], genesis["genesis_airbender_batch_commitment"]])
 creation_cut = params[5]
-check("creation cut initAddress = reused DiamondInit", creation_cut[1], E["DIAMOND_INIT"])
+check("creation cut initAddress = the new DiamondInit (diamond_init_addr)", creation_cut[1], st["diamond_init_addr"])
 check("creation cut initCalldata = InitializeDataNewChain(genesis hashes)", creation_cut[2], "0x" + boot[2:] + aa[2:] + evm[2:])
 check("creation cut facets = the upgrade cut's Adds", creation_cut[0], adds)
 d = dec(FDD, params[6])
@@ -489,13 +479,13 @@ UPGRADE_CTM = (E["CTM_PROXY_ADMIN"], sig("upgrade(address,address)"))
 SET_NEW_VERSION = (E["CTM"], sig(f"setNewVersionUpgrade({CUT},uint256,uint256,uint256,address)"))
 SET_CREATION = (E["CTM"], sig(f"setChainCreationParams({PARAMS})"))
 check("setChainCreationParams selector", SET_CREATION[1], "0x4958bf4f")
-# The timer's calls (stage 1's leading re-pause undoes the unpause of an emergency execution's unfreeze).
+# The timer's calls (stage 1's re-pause undoes the unpause of an emergency execution's unfreeze).
 T = {"start": (timer, sig("startTimer()")), "deadline": (timer, sig("checkDeadline()")),
      "paused": (validator, sig("checkMigrationsPaused()")), "present": (validator, sig("checkProtocolUpgradePresence()")),
      "unpaused": (validator, sig("checkMigrationsUnpaused()"))}
 shapes = {
     0: [PAUSE, T["start"]],
-    1: [PAUSE, T["deadline"], T["paused"], UPGRADE_CTM, SET_NEW_VERSION, SET_CREATION],
+    1: [T["deadline"], PAUSE, T["paused"], UPGRADE_CTM, SET_NEW_VERSION, SET_CREATION],
     2: [UNPAUSE, T["present"], T["unpaused"]],
 }
 names = {PAUSE: "pauseMigration", UNPAUSE: "unpauseMigration", UPGRADE_CTM: "ProxyAdmin.upgrade",
@@ -630,7 +620,7 @@ verifier_name = "EraMultiProofTestnetVerifier" if testnet == "true" else "EraMul
 expected = {
     "AdminFacet": ("state_transition", "admin_facet_addr", enc("uint256,address", E["L1_CHAIN_ID"], E["ROLLUP_DA_MANAGER"])),
     "GettersFacet": ("state_transition", "getters_facet_addr", ""),
-    "MailboxFacet": ("state_transition", "mailbox_facet_addr", enc("uint256,uint256,address,address,bool", E["ERA_CHAIN_ID"], E["L1_CHAIN_ID"], E["CAH"], E["EIP7702_CHECKER"], testnet)),
+    "MailboxFacet": ("state_transition", "mailbox_facet_addr", enc("uint256,uint256,address,address,bool", E["ERA_CHAIN_ID"], E["L1_CHAIN_ID"], E["CAH"], st["eip7702_checker_addr"], testnet)),
     "ExecutorFacet": ("state_transition", "executor_facet_addr", enc("uint256", E["L1_CHAIN_ID"])),
     "MigratorFacet": ("state_transition", "migrator_facet_addr", enc("uint256,bool", E["L1_CHAIN_ID"], testnet)),
     "CommitterFacet": ("state_transition", "committer_facet_addr", enc("uint256", E["L1_CHAIN_ID"])),
@@ -640,6 +630,8 @@ expected = {
     "EraChainTypeManager": ("state_transition", "chain_type_manager_implementation_addr", enc("address,address,address,address", E["BRIDGEHUB"], E["INTEROP_CENTER"], E["SUPPLIER"], E["PERMISSIONLESS_VALIDATOR"])),
     "ServerNotifier": ("state_transition", "server_notifier_implementation_addr", ""),
     "EraVerifierFflonk": ("state_transition", "verifier_fflonk_addr", ""),
+    "DiamondInit": ("state_transition", "diamond_init_addr", enc("bool", "false")),  # IS_ZKSYNC_OS
+    "EIP7702Checker": ("state_transition", "eip7702_checker_addr", ""),
     # DefaultCTMUpgrade.getCreationCalldata: delay, 2 weeks of extension, governance and owner both the PUH.
     "GovernanceUpgradeTimer": ("deployed_addresses", "l1_governance_upgrade_timer",
                                enc("uint256,uint256,address,address", E["TIMER_DELAY"], str(14 * 24 * 3600), E["PUH"], E["PUH"])),
@@ -664,7 +656,8 @@ for to, data, value in txs:
             continue
         if len(args) not in prefix_hashes:
             prefix_hashes[len(args)] = cast("keccak", "0x" + init[: len(init) - len(args)])
-        if prefix_hashes[len(args)] == evm.get(f"l1-contracts/{name}"):
+        # EIP7702Checker is built in da-contracts.
+        if prefix_hashes[len(args)] == evm.get(f"{'da' if name == 'EIP7702Checker' else 'l1'}-contracts/{name}"):
             found = name
             break
     if not found:
@@ -763,8 +756,8 @@ STARTED=$(cast block latest --field timestamp --rpc-url "$RPC")
 chk "timer deadline = stage 0's block time + delay" "$(call "$TIMER" 'deadline()(uint256)' | first)" "$((STARTED + TIMER_DELAY))"
 reverts "stage 1 before the delay: checkDeadline reverts with DeadlineNotYetPassed" "$PUH" "$TIMER" \
   "$(cast calldata 'checkDeadline()')" 'DeadlineNotYetPassed()'
-# An emergency execution unfreezes before a proposal's calls, which unpauses migrations; stage 1's leading
-# re-pause must restore it.
+# An emergency execution unfreezes before a proposal's calls, which unpauses migrations; stage 1's re-pause
+# must restore it before checkMigrationsPaused.
 send "$PUH" "$CAH" "$(cast calldata 'unpauseMigration()')" "unpauseMigration() as the PUH (emulates an unfreeze)"
 cast rpc evm_increaseTime "$TIMER_DELAY" --rpc-url "$RPC" >/dev/null && cast rpc evm_mine --rpc-url "$RPC" >/dev/null
 echo "     advanced the fork's time by $TIMER_DELAY s"
@@ -877,29 +870,6 @@ for a, frozen, sels in adds:
 raise SystemExit(0 if ok else 1)
 PYFACETS
 }
-
-echo "== The new MailboxFacet's address immutables equal chain $CHAIN_ID's live MailboxFacet's"
-# The input's eip7702_checker was read from the live facet's code, which has no getter for it. Solc embeds
-# immutables as PUSH32 words: compare the address-shaped ones (the ChainAssetHandler and the checker).
-LIVE_MAILBOX=$(call "$DIAMOND" 'facetAddress(bytes4)(address)' "$(cast sig 'l2TransactionBaseCost(uint256,uint256,uint256)')")
-python3 - "$LIVE_MAILBOX" "$(toml_get state_transition.mailbox_facet_addr)" <<'PYIMMUTABLES' && echo "  OK   both embed {ChainAssetHandler, EIP-7702 checker}" || fail "MailboxFacet address immutables differ from the live facet's"
-import os, subprocess, sys
-
-def address_words(address):
-    code = bytes.fromhex(subprocess.run(["cast", "code", address, "--rpc-url", os.environ["RPC"]],
-                                        capture_output=True, text=True, check=True).stdout.strip()[2:])
-    words, i = set(), 0
-    while i < len(code):
-        op = code[i]
-        if op == 0x7F and code[i + 1:i + 13] == bytes(12) and int.from_bytes(code[i + 1:i + 33], "big") >= 2**64:
-            words.add("0x" + code[i + 13:i + 33].hex())
-        i += 1 + (op - 0x5F if 0x60 <= op <= 0x7F else 0)
-    return words
-
-live, new = address_words(sys.argv[1]), address_words(sys.argv[2])
-print(f"     live {sys.argv[1]}: {sorted(live)}; new: {sorted(new)}")
-sys.exit(0 if live == new == {os.environ["CAH"].lower(), os.environ["EIP7702_CHECKER"].lower()} else 1)
-PYIMMUTABLES
 
 # A reference chain with a pending L2 upgrade (mainnet's 324 right after ZIP-18, until its first v0.33.0 batch
 # executes) can't take v34 yet: its after-upgrade checks move to the test chain. Its own upgrade then goes

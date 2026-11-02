@@ -30,11 +30,8 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 /// Airbender proof; the release also ships the force-fail bootloader, the 15M user L1->L2 gas cap and an EVM
 /// emulator fix.
 /// @dev Initialized by `initializeWithArgs` from the env's permanent values; the rest is introspected from the CTM
-/// or read from the v34 genesis. Deploys, through CREATE2 with the input's salt: the six facets, a fresh
-/// `EraVerifierFflonk`, `AirbenderVerifierPlonk`, the multi-proof verifier over both, `EraSettlementLayerV34Upgrade`,
-/// new `EraChainTypeManager` and `ServerNotifier` implementations, a `GovernanceUpgradeTimer` and an
-/// `UpgradeStageValidator`. The CTM's `DiamondInit` and the facets' EIP-7702 checker are reused: neither has a
-/// getter, so the input names them. Output and test calls are the base's.
+/// or read from the v34 genesis. `prepareCTMUpgrade` deploys, through CREATE2 with the input's salt, what
+/// `deployNewCTMContracts` lists below plus the six facets and `DiamondInit`. Output and test calls are the base's.
 ///
 /// The L2 upgrade transaction is v33's: `ContractDeployer.forceDeployOnAddresses` of the 31 system contracts, the
 /// same for every chain.
@@ -66,17 +63,10 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
             .getRollupDAManager();
         // v34's verifier has no PLONK verifier; introspection found v0.33.0's.
         ctmAddresses.stateTransition.verifiers.verifierPlonk = address(0);
-        ctmAddresses.stateTransition.facets.diamondInit = input.readAddress("$.diamond_init");
-        ctmAddresses.admin.eip7702Checker = input.readAddress("$.eip7702_checker");
-        _checkLiveState(input.readBytes("$.current_chain_creation_params_event_data"));
+        _checkLiveState();
 
-        _deployV34Contracts();
-        // Era invariant checked inside: factory deps [0..2] == genesis bootloader / AA / EVM emulator.
-        publishBytecodes();
-        console.log("v34: factory dependencies published");
-
-        // Writes the output; the calls below add their tables to it.
-        generateUpgradeData();
+        // Deploys, publishes the factory deps and writes the output; the calls below add their tables to it.
+        prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
         prepareDefaultTestUpgradeCalls();
@@ -85,9 +75,8 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Live-state checks ========================
 
-    /// @dev Fail before deploying anything if the CTM is not an Era CTM one minor below the genesis, or the inputs
-    ///      the chain can't confirm by a getter don't match it.
-    function _checkLiveState(bytes memory _currentChainCreationParamsEvent) internal view {
+    /// @dev Fail before deploying anything if the CTM is not an Era CTM one minor below the genesis.
+    function _checkLiveState() internal view {
         IChainTypeManager ctm = IChainTypeManager(newConfig.ctm);
         require(!ctm.isZKsyncOS(), "v34: not an Era CTM");
         require(!UpgradeHelperLib.isPatchUpgrade(getNewProtocolVersion()), "v34: must be a minor upgrade");
@@ -105,48 +94,23 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
                 "v34: old verifier is not a testnet one"
             );
         }
-
-        // The CTM's last NewChainCreationParams event: the reused DiamondInit is its cut's.
-        (, , , , Diamond.DiamondCutData memory initialCut, , , ) = abi.decode(
-            _currentChainCreationParamsEvent,
-            (address, bytes32, uint64, bytes32, Diamond.DiamondCutData, bytes32, bytes, bytes32)
-        );
-        require(keccak256(abi.encode(initialCut)) == ctm.initialCutHash(), "v34: stale creation cut");
-        require(
-            initialCut.initAddress == ctmAddresses.stateTransition.facets.diamondInit,
-            "v34: diamond_init is not the CTM's"
-        );
     }
 
     // ======================== Deployments ========================
 
-    function _deployV34Contracts() internal {
-        ctmAddresses.stateTransition.facets.adminFacet = deploySimpleContract("AdminFacet", false);
-        ctmAddresses.stateTransition.facets.gettersFacet = deploySimpleContract("GettersFacet", false);
-        ctmAddresses.stateTransition.facets.mailboxFacet = deploySimpleContract("MailboxFacet", false);
-        ctmAddresses.stateTransition.facets.executorFacet = deploySimpleContract("ExecutorFacet", false);
-        ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet", false);
-        ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet", false);
-
-        ctmAddresses.stateTransition.verifiers.airbenderVerifierPlonk = deploySimpleContract(
-            "AirbenderVerifierPlonk",
-            false
-        );
-        // Before the multi-proof verifier, whose constructor arguments are read at its deployment.
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract("EraVerifierFflonk", false);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveChainVerifier(false, config.testnetVerifier);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
-        _checkVerificationKeys();
-
+    /// @dev The timer and stage validator (base), then what v34 changes besides the facets and `DiamondInit`, which
+    ///      `prepareCTMUpgrade` deploys after the factory deps.
+    function deployNewCTMContracts() public override {
+        super.deployNewCTMContracts();
         ctmAddresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
-
+        // EraVerifierFflonk, AirbenderVerifierPlonk and the multi-proof verifier over both.
+        config.airbenderVerifier = true;
+        deployVerifiers();
+        _checkVerificationKeys();
+        deployEIP7702Checker();
         (, string memory ctmName) = DeployCTML1OrGateway.resolve(false, CTMContract.ChainTypeManager);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmName, false);
         ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
-
-        // The validator's constructor takes getNewProtocolVersion().
-        deployGovernanceUpgradeTimer();
-        deployUpgradeStageValidator();
     }
 
     function deployUsedUpgradeContract() internal virtual override returns (address) {
@@ -181,12 +145,11 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         return preparePauseGatewayMigrationsCall();
     }
 
-    /// @dev Re-pause first: an emergency execution unfreezes, which unpauses migrations, before running the
-    ///      proposal's calls. Idempotent otherwise.
-    function prepareGovernanceUpgradeTimerCheckCall() public override returns (Call[] memory calls) {
+    /// @dev Re-pause before the check: an emergency execution unfreezes, which unpauses migrations.
+    function prepareCheckMigrationsPausedCalls() public override returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](2);
         allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = super.prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[1] = super.prepareCheckMigrationsPausedCalls();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 

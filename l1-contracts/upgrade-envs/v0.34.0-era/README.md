@@ -12,18 +12,18 @@ transactions (new bootloader), a 15M gas cap on user L1→L2 transactions and an
 
 ## What changes
 
-| Where          | Change                                                                                                                                                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Deployments    | The six facets, `EraVerifierFflonk` and `AirbenderVerifierPlonk`, the multi-proof verifier over both, `EraSettlementLayerV34Upgrade`, new CTM and ServerNotifier implementations, the governance timer and stage validator |
-| Publication    | The L2 factory deps, into the CTM's BytecodesSupplier                                                                                                                                                                      |
-| Governance     | Stage 0 pauses migrations and starts the timer. Stage 1 re-pauses, checks the deadline and the pause, upgrades the CTM proxy, then `setNewVersionUpgrade` and `setChainCreationParams`. Stage 2 unpauses and checks        |
-| ServerNotifier | Upgraded by the owner of its ProxyAdmin (the ecosystem admin), outside the stages                                                                                                                                          |
-| Per chain      | After stage 1, the upgrade timestamp; once the chain is drained, the upgrade (see "Executing it")                                                                                                                          |
+| Where          | Change                                                                                                                                                                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Deployments    | The six facets and `DiamondInit`, `EraVerifierFflonk` and `AirbenderVerifierPlonk`, the multi-proof verifier over both, the EIP-7702 checker, `EraSettlementLayerV34Upgrade`, new CTM and ServerNotifier implementations, the governance timer and stage validator |
+| Publication    | The L2 factory deps, into the CTM's BytecodesSupplier                                                                                                                                                                                                              |
+| Governance     | Stage 0 pauses migrations and starts the timer. Stage 1 checks the deadline, re-pauses and checks the pause, upgrades the CTM proxy, then `setNewVersionUpgrade` and `setChainCreationParams`. Stage 2 unpauses and checks                                         |
+| ServerNotifier | Upgraded by the owner of its ProxyAdmin (the ecosystem admin), outside the stages                                                                                                                                                                                  |
+| Per chain      | After stage 1, the upgrade timestamp; once the chain is drained, the upgrade (see "Executing it")                                                                                                                                                                  |
 
 The L2 upgrade transaction is the same for every chain: `ContractDeployer.forceDeployOnAddresses` of the 31 system
 contracts, of which only `L2BaseTokenEra` and `SystemContractProxyAdmin` change. Its factory deps start with the new
 bootloader, the default account and the EVM emulator, which is how the node learns them. The L2 core contracts are
-not redeployed: they hold live storage.
+not redeployed: they hold live storage. New chains get the new facets and `DiamondInit` with the v34 genesis.
 
 ## Executing it
 
@@ -65,8 +65,7 @@ revert with `PreviousUpgradeNotFinalized`, and its after-upgrade checks run on t
 ## Files
 
 - `<env>.toml`: what the script can't read from `permanent-values/<env>.toml`, the chain or the v34 genesis: the
-  verifier flavour, the timer delay, the salt, the reused `DiamondInit` and EIP-7702 checker (no getters), and
-  `use_v29_introspection = false`.
+  verifier flavour, the timer delay, the salt and `use_v29_introspection = false`.
 - `output/<env>/`: committed from the generate run. `output/stage/` keeps the layout stage was generated with; the
   others are in `DefaultCTMUpgrade.saveOutput`'s layout, where the zero addresses are fields v34 doesn't use and
   `admin.ecosystem_admin_addr` is the CTM owner (the PUH).
