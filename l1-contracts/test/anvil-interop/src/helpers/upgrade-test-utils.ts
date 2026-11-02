@@ -335,6 +335,66 @@ export function upgradeLegSelectors(): UpgradeLegSelectors {
   ) as UpgradeLegSelectors;
 }
 
+/** A domain's handover to a successor executor, as a prepare reports it. */
+export type ExecutorSuccession =
+  | { kind: "core"; predecessor: string; successor: string; proxyAdmin: string }
+  | {
+      kind: "ctm";
+      predecessor: string;
+      successor: string;
+      ctm: string;
+      ctmProxyAdmin: string;
+      serverNotifier: string;
+    };
+
+/**
+ * The governance calls of `successions`, in order: the shapes of `ExecutorSuccessionLib` (core:
+ * `predecessor.forward([ProxyAdmin.transferOwnership(successor)])`; CTM:
+ * `predecessor.forward([CTM, CTM ProxyAdmin, ServerNotifier].transferOwnership(successor))`,
+ * `successor.acceptCTMOwnership()`, `successor.forward([ServerNotifier.acceptOwnership()])`).
+ */
+export function executorSuccessionCalls(successions: ExecutorSuccession[]): ExpectedCall[] {
+  const ownable = new ethers.utils.Interface(getAbi("Ownable2Step"));
+  const coreExecutor = new ethers.utils.Interface(getAbi("CoreUpgradeExecutor"));
+  const ctmExecutor = new ethers.utils.Interface(getAbi("CTMUpgradeExecutor"));
+  const transfer = (target: string, to: string) => ({
+    target,
+    value: 0,
+    data: ownable.encodeFunctionData("transferOwnership", [to]),
+  });
+  const calls: ExpectedCall[] = [];
+  for (const s of successions) {
+    if (s.kind === "core") {
+      calls.push({
+        label: `${s.predecessor}.forward([ProxyAdmin.transferOwnership(${s.successor})])`,
+        target: s.predecessor,
+        data: coreExecutor.encodeFunctionData("forward", [[transfer(s.proxyAdmin, s.successor)]]),
+      });
+      continue;
+    }
+    calls.push({
+      label: `${s.predecessor}.forward([CTM, CTM ProxyAdmin, ServerNotifier].transferOwnership(${s.successor}))`,
+      target: s.predecessor,
+      data: ctmExecutor.encodeFunctionData("forward", [
+        [transfer(s.ctm, s.successor), transfer(s.ctmProxyAdmin, s.successor), transfer(s.serverNotifier, s.successor)],
+      ]),
+    });
+    calls.push({
+      label: `${s.successor}.acceptCTMOwnership()`,
+      target: s.successor,
+      data: ctmExecutor.encodeFunctionData("acceptCTMOwnership", []),
+    });
+    calls.push({
+      label: `${s.successor}.forward([ServerNotifier.acceptOwnership()])`,
+      target: s.successor,
+      data: ctmExecutor.encodeFunctionData("forward", [
+        [{ target: s.serverNotifier, value: 0, data: ownable.encodeFunctionData("acceptOwnership", []) }],
+      ]),
+    });
+  }
+  return calls;
+}
+
 /** `leg` as the governance call that applies it. */
 export function upgradeLegCall(leg: UpgradeLeg): ExpectedCall {
   const { executor, method } = LEG_ENTRYPOINTS[leg.kind];
@@ -453,7 +513,9 @@ export async function assertLegsApplied(
   let rows = 0;
   let swaps = 0;
   for (const { leg, rows: legRows } of snapshots) {
-    const emitted = parsedFrom(leg.executor, legInterface(leg.kind))
+    // The swaps run in the transition's engine, delegatecalled by the executor: the events come
+    // from the executor's address but are declared by the engine, not in the executor's ABI.
+    const emitted = parsedFrom(leg.executor, new ethers.utils.Interface(getAbi("DefaultProxyUpgradeEngine")))
       .filter(({ event }) => event.name === "ProxyImplementationUpgraded")
       .map(({ event }) => ({ proxy: event.args.proxy as string, newImpl: event.args.newImpl as string }));
     const expectedSwaps = legRows.filter((row) => row.implBefore.toLowerCase() !== row.implNew.toLowerCase());

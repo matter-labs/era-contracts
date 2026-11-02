@@ -257,19 +257,23 @@ export function assertUpgradeLegs(
 }
 
 /**
- * A recurring registry hop's merged output: the bundle is exactly the reported upgrade's legs, one
- * contiguous run in canonical order with no other call, and the prepares declared no external
- * action of any phase (after the bootstrap, governance holds both domains through the executors).
+ * A recurring registry hop's merged output: the bundle is exactly `succession` (the handover to a
+ * successor executor, when the hop replaces one; see `executorSuccessionCalls`) followed by the
+ * reported upgrade's legs, one contiguous run in canonical order with no other call, and the
+ * prepares declared no external action of any phase.
  */
 export function assertRegistryHopBundle(
   merged: MergedGovernanceOutput,
   selectors: UpgradeLegSelectors,
-  expected: UpgradeLeg[]
+  expected: UpgradeLeg[],
+  succession: ExpectedCall[] = []
 ): RecoveredUpgradeLeg[] {
   const calls = governanceCallsOf(merged);
+  assertBundleIs(calls.slice(0, succession.length), succession, "the bundle's executor succession");
   const legs = assertUpgradeLegs(calls, selectors, expected);
   const others = calls
     .map((call, position) => ({ call, position }))
+    .filter(({ position }) => position >= succession.length)
     .filter(({ position }) => !legs.some((leg) => leg.position === position));
   if (others.length !== 0) {
     const lines = others.map(({ call, position }) => `  [${position}] ${describeCall(call)}`);
