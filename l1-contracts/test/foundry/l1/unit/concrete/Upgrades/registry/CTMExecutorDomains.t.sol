@@ -111,7 +111,7 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
             _row(address(ctmDomainProxy), implOld, implNew)
         );
         // The proxy answers a non-admin by delegating to its implementation, which has no
-        // `implementation()` — a revert without data.
+        // `implementation()` — a revert without data, which the executor bubbles as it is.
         vm.expectRevert(bytes(""));
         vm.prank(governor);
         ctmExecutor2.applyInfrastructureUpgrade(infrastructure);

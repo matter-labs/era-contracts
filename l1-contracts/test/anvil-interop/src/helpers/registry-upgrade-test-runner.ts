@@ -190,10 +190,10 @@ function eventsIn(
   contract: ethers.Contract,
   name: string
 ): ethers.utils.LogDescription[] {
+  const topic = contract.interface.getEventTopic(name);
   return receipt.logs
-    .filter((log) => log.address.toLowerCase() === contract.address.toLowerCase())
-    .map((log) => contract.interface.parseLog(log))
-    .filter((event) => event.name === name);
+    .filter((log) => log.address.toLowerCase() === contract.address.toLowerCase() && log.topics[0] === topic)
+    .map((log) => contract.interface.parseLog(log));
 }
 
 /** Sends `send(contract)` from `contract`'s live `owner()`, impersonated. */
@@ -370,7 +370,9 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       `  ✓ one governance execution applied ${legs.map((leg) => leg.kind).join(" -> ")} in order ` +
         `(${applied.rows} row(s) at implNew, ${applied.swaps} swap(s) emitted)`
     );
-    const swaps = eventsIn(executeReceipt, coreExecutor, "ProxyImplementationUpgraded");
+    // The executor delegatecalls its upgrade engine, so the engine's swaps are logged at the executor.
+    const coreEngine = new ethers.Contract(coreExecutor.address, getAbi("DefaultProxyUpgradeEngine"));
+    const swaps = eventsIn(executeReceipt, coreEngine, "ProxyImplementationUpgraded");
     assertEq(swaps.length, 1, "the core leg swapped exactly one proxy");
     assertEq(swaps[0].args.proxy, live.messageRootProxy, "ProxyImplementationUpgraded names the MessageRoot proxy");
     assertEq(
