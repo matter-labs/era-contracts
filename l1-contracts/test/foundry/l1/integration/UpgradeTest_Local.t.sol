@@ -17,6 +17,8 @@ import {PreviousReleaseFixture} from "./utils/PreviousReleaseFixture.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {Test} from "forge-std/Test.sol";
+import {stdJson} from "forge-std/StdJson.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -396,5 +398,137 @@ contract UpgradeIntegrationTestLocalCTMOwnerCrossing is UpgradeIntegrationReleas
             ChainRouting.matchesRelease(ICTMRelease(release), _upgradedChainDiamond),
             "the engine installed exactly the release's routing"
         );
+    }
+}
+
+/// @notice The release's own declared changes, without the harness variants the fixtures above add.
+contract CoreUpgradeDeclaredChanges is CoreUpgrade_v36 {
+    function declaredChanges() external view returns (string[] memory) {
+        return changedEcosystemImplementations();
+    }
+}
+
+/// @notice The release's own declared release-member changes.
+contract CTMUpgradeDeclaredChanges is CTMUpgrade_v36 {
+    function declaredChanges() external view returns (string[] memory) {
+        return changedReleaseMembers();
+    }
+}
+
+/// @notice A contract's runtime-code hash as `AllContractsHashes.json` records it.
+struct ContractHash {
+    string contractName;
+    bytes32 evmDeployedBytecodeHash;
+}
+
+/// @notice Every ecosystem implementation and release member whose production build differs from the previous
+///         release's is one the release declares as changed. The production prepare compares live code with that
+///         build, CBOR metadata included, and refuses to replace what the release does not declare. The suites above
+///         build without metadata, so only `AllContractsHashes.json` (built with it, and frozen next to the previous
+///         release's chain states by `yarn new-release`) shows such a change.
+contract ReleaseDeclaredChangesTest is Test {
+    using stdJson for string;
+
+    function test_everyChangedContractIsDeclared() public {
+        string memory root = vm.projectRoot();
+        string memory sourceVersion = vm
+            .readFile(string.concat(root, "/test/anvil-interop/config/anvil-config.json"))
+            .readString(".upgradeSourceStateVersion");
+        ContractHash[] memory previous = _readHashes(
+            string.concat(root, "/test/anvil-interop/chain-states/", sourceVersion, "/AllContractsHashes.json")
+        );
+        ContractHash[] memory current = _readHashes(string.concat(root, "/../AllContractsHashes.json"));
+
+        // The names `DefaultCoreUpgrade.deployNewEcosystemContractsL1` passes through the declaration check.
+        string[9] memory ecosystemImplementations = [
+            "L1Bridgehub",
+            "L1MessageRoot",
+            "CTMDeploymentTracker",
+            "L1ChainAssetHandler",
+            "L1Nullifier",
+            "L1AssetRouter",
+            "L1NativeTokenVault",
+            "L1InteropHandler",
+            "ChainRegistrationSender"
+        ];
+        string[] memory declared = new CoreUpgradeDeclaredChanges().declaredChanges();
+        for (uint256 i = 0; i < ecosystemImplementations.length; ++i) {
+            _requireDeclaredIfChanged(
+                ecosystemImplementations[i],
+                previous,
+                current,
+                declared,
+                "changedEcosystemImplementations()"
+            );
+        }
+
+        // The release members of `DeployCTMUtils.deployStateTransitionDiamondFacets` and
+        // `DeployCTM.deployEIP7702Checker`.
+        string[9] memory releaseMembers = [
+            "AdminFacet",
+            "GettersFacet",
+            "MailboxFacet",
+            "ExecutorFacet",
+            "MigratorFacet",
+            "CommitterFacet",
+            "DiamondInit",
+            "L1GenesisUpgrade",
+            "EIP7702Checker"
+        ];
+        declared = new CTMUpgradeDeclaredChanges().declaredChanges();
+        for (uint256 i = 0; i < releaseMembers.length; ++i) {
+            _requireDeclaredIfChanged(releaseMembers[i], previous, current, declared, "changedReleaseMembers()");
+        }
+    }
+
+    function _readHashes(string memory _path) private view returns (ContractHash[] memory) {
+        return
+            abi.decode(
+                vm.parseJsonTypeArray(
+                    vm.readFile(_path),
+                    "$",
+                    "ContractHash(string contractName,bytes32 evmDeployedBytecodeHash)"
+                ),
+                (ContractHash[])
+            );
+    }
+
+    /// @dev A contract the previous release did not build has no live code to replace.
+    function _requireDeclaredIfChanged(
+        string memory _name,
+        ContractHash[] memory _previous,
+        ContractHash[] memory _current,
+        string[] memory _declared,
+        string memory _declaringFunction
+    ) private pure {
+        (bool built, bytes32 currentHash) = _hashOf(_current, _name);
+        require(built, string.concat(_name, " is not in AllContractsHashes.json"));
+        (bool previouslyBuilt, bytes32 previousHash) = _hashOf(_previous, _name);
+        if (!previouslyBuilt || previousHash == currentHash) {
+            return;
+        }
+        for (uint256 i = 0; i < _declared.length; ++i) {
+            if (keccak256(bytes(_declared[i])) == keccak256(bytes(_name))) {
+                return;
+            }
+        }
+        revert(
+            string.concat(
+                _name,
+                " changed since the previous release but the release does not declare it: add it to `",
+                _declaringFunction,
+                "`"
+            )
+        );
+    }
+
+    function _hashOf(ContractHash[] memory _hashes, string memory _name) private pure returns (bool, bytes32) {
+        bytes32 contractName = keccak256(bytes(string.concat("l1-contracts/", _name)));
+        for (uint256 i = 0; i < _hashes.length; ++i) {
+            if (keccak256(bytes(_hashes[i].contractName)) == contractName) {
+                return (true, _hashes[i].evmDeployedBytecodeHash);
+            }
+        }
+        return (false, bytes32(0));
     }
 }

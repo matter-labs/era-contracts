@@ -7,7 +7,9 @@ Two kinds of directories live here, with OPPOSITE maintenance rules. Both names 
   v36 edge departs from, copied byte for byte from `draft/v0.35.0`. It is the input of
   `run-upgrade-test.ts` and of the Foundry upgrade tests (`PreviousReleaseFixture`, which loads its
   L1 state) and MUST NEVER be regenerated: contract changes on this branch must not touch it,
-  exactly like the real chains it stands in for.
+  exactly like the real chains it stands in for. Its `AllContractsHashes.json` is that release's,
+  built with metadata like production: `ReleaseDeclaredChangesTest` requires every ecosystem
+  implementation or release member whose hash has changed since then to be declared.
 
 - **`v0.36.0` (`stateVersion`) — current-genesis states.** Generated from THIS branch's sources by
   `setup-and-dump-state.ts`, consumed by the interop tests and `run-recurring-upgrade-test.ts`,
@@ -16,4 +18,5 @@ Two kinds of directories live here, with OPPOSITE maintenance rules. Both names 
 
 When the next release starts, `yarn new-release` freezes the then-current `stateVersion` as the new
 `upgradeSourceStateVersion`, records the genesis root its chains were created from as
-`upgradeSourceGenesisRoot`, deletes the outgoing source, and moves `stateVersion` on.
+`upgradeSourceGenesisRoot`, freezes the release's `AllContractsHashes.json` next to it, deletes the
+outgoing source, and moves `stateVersion` on.

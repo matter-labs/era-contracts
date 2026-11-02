@@ -26,6 +26,7 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {Utils as TestUtils} from "../../unit/concrete/Utils/Utils.sol";
 
 import {
@@ -88,14 +89,14 @@ abstract contract PreviousReleaseFixture is Test {
     }
 
     string internal constant ANVIL_INTEROP_DIR = "/test/anvil-interop";
-    string internal constant ANVIL_INTEROP_PROFILE = "anvil-interop";
 
     /// @notice Loads the previous release's L1 state into this test's EVM.
     function _loadPreviousRelease() internal returns (PreviousRelease memory release) {
         // The states are built without CBOR metadata, and upgrade prepares decide reuse by comparing code, so only a
         // build without it sees unchanged code as unchanged.
         require(
-            keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("")))) == keccak256(bytes(ANVIL_INTEROP_PROFILE)),
+            keccak256(bytes(vm.envOr("FOUNDRY_PROFILE", string("")))) ==
+                keccak256(bytes(BytecodeUtils.ANVIL_INTEROP_PROFILE)),
             "the previous release's states are built with FOUNDRY_PROFILE=anvil-interop: run these tests with "
             "`yarn test:foundry:previous-release`"
         );

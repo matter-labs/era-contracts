@@ -63,8 +63,9 @@ Foundry profile the snapshots use, so a stale snapshot fails: its setup builds t
 `outputs/predeploy-identity<run-suffix>/`, leaving the default artifacts used by coverage intact. A
 cold identity build adds compilation time; reruns reuse that separate cache. A fresh deployment
 (`ANVIL_INTEROP_FRESH_DEPLOY=1`, `run-coverage.ts --fresh-deploy`, or no snapshots for the state
-version) installs the predeploys from `out/`, whatever profile built it, so the spec compares
-against those artifacts and skips the reference build.
+version) installs the predeploys from the profile's forge output (`out/`, or `out-anvil-interop/`
+under `FOUNDRY_PROFILE=anvil-interop`), so the spec compares against those artifacts and skips the
+reference build.
 
 ## Upgrade Tests
 

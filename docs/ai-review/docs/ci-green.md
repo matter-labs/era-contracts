@@ -91,8 +91,8 @@ anvil-interop needs these artifacts, and `l1 build:foundry` regenerates `zkstack
 
 ```bash
 cd l1-contracts
+yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*', minus the suites below
 yarn test:foundry:previous-release  # the frozen-state suites, under FOUNDRY_PROFILE=anvil-interop like the states they load
-yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*', minus those; last, it rebuilds out/ with metadata
 ```
 
 Common foundry test failures and their root causes:
@@ -303,7 +303,7 @@ Before pushing, run from repo root:
 yarn l1 build:foundry
 
 # 2. Tests
-cd l1-contracts && yarn test:foundry:previous-release && yarn test:foundry && cd ..
+cd l1-contracts && yarn test:foundry && yarn test:foundry:previous-release && cd ..
 # (Only if you touched contracts that affect interop or upgrades)
 cd l1-contracts && yarn test:hardhat:interop && cd ..
 

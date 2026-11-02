@@ -378,8 +378,8 @@ yarn l1 build:foundry
 ```bash
 # Run l1-contracts foundry tests
 cd l1-contracts
+yarn test:foundry                    # everything but the suites below
 yarn test:foundry:previous-release   # the suites on the frozen previous-release state, built without metadata
-yarn test:foundry                    # everything else; run it last, it rebuilds out/ with metadata
 ```
 
 ### Running Anvil Interop Tests
@@ -404,7 +404,7 @@ After modifying mock system contracts (e.g., `MockL1MessengerHook`, `MockMintBas
 
 ```bash
 cd l1-contracts
-forge build
+FOUNDRY_PROFILE=anvil-interop forge build
 cd test/anvil-interop
 npx ts-node setup-and-dump-state.ts
 ```
@@ -486,8 +486,7 @@ cd l1-contracts && npx solhint path/to/Changed.sol
 Each step once, in this order:
 
 1. Make the tree compile — contracts, deploy scripts, tests, TypeScript.
-2. `cd l1-contracts && yarn test:foundry:previous-release && yarn test:foundry` — the whole suite, green. In this
-   order: the first builds without metadata into the same `out/`, and the second rebuilds it.
+2. `cd l1-contracts && yarn test:foundry && yarn test:foundry:previous-release` — the whole suite, green.
 3. `cd l1-contracts && yarn errors-lint --fix` — **only if** an error declaration was added or removed.
 4. `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix` from the repository root.
 5. Commit.
@@ -555,7 +554,7 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 
 ### Pre-Push Checklist
 
-1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry:previous-release && yarn test:foundry`
+1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry && yarn test:foundry:previous-release`
 2. **Run the errors lint**, only if an error declaration changed: `cd l1-contracts && yarn errors-lint --fix`
 3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
 4. **Check solc warnings**: `yarn l1 solc-warnings`

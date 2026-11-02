@@ -92,3 +92,6 @@ protocol-ops/target-linux/
 # artifacts for the implementations whose codehashes the committed v32 registries pin.
 l1-contracts/out-registry-deterministic/
 l1-contracts/cache-forge-registry-deterministic/
+# Output of [profile.anvil-interop] in l1-contracts/foundry.toml (no CBOR metadata).
+l1-contracts/out-anvil-interop/
+l1-contracts/cache-forge-anvil-interop/
