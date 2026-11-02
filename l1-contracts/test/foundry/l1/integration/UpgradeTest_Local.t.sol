@@ -23,7 +23,6 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";
@@ -76,7 +75,7 @@ contract CoreUpgradeForLocalTest is CoreUpgrade_v36 {
 /// @notice Chain leg for a chain whose admin does not act: the CTM's owner, the executor governance drives through
 ///         `forward`, crosses it through the CTM's passthrough.
 contract ChainUpgradeByCTMOwnerForLocalTest is DefaultChainUpgrade {
-    function upgradeChain(Diamond.DiamondCutData memory) public override {
+    function upgradeChain() public override {
         ChainTypeManager ctm = ChainTypeManager(IZKChain(config.chainDiamondProxyAddress).getChainTypeManager());
         vm.prank(ctm.owner());
         ctm.upgradeChainFromVersion(config.chainChainId, config.oldProtocolVersion);

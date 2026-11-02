@@ -69,7 +69,6 @@ interface IAdminFunctions {
     function adminEncodeMulticall(bytes calldata callsToExecute) external;
 
     function adminExecuteUpgrade(
-        bytes calldata diamondCut,
         address adminAddr,
         address accessControlRestriction,
         address chainDiamondProxy

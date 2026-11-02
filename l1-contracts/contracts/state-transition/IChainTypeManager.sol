@@ -52,9 +52,6 @@ interface IChainTypeManager {
     /// @notice The release used for new-chain genesis changed.
     event NewCurrentRelease(uint256 indexed protocolVersion, address indexed release);
 
-    /// @notice New UpgradeCutHash
-    event NewUpgradeCutHash(uint256 indexed protocolVersion, bytes32 indexed upgradeCutHash);
-
     /// @notice The transition committed for chains departing from `oldProtocolVersion`.
     event NewUpgradeTransition(uint256 indexed oldProtocolVersion, address indexed transition);
 
@@ -98,28 +95,18 @@ interface IChainTypeManager {
 
     function l1GenesisUpgrade() external view returns (address);
 
-    /// @dev Deprecated. Populated only by the legacy cut-taking commit path, for pre-v35 Admin
-    ///      facets that verify handed cut bytes. Registry-driven edges commit only the transition.
-    function upgradeCutHash(uint256 _protocolVersion) external view returns (bytes32);
-
-    /// @notice The verifier a pre-v35 CTM recorded for `_protocolVersion`; zero for every version
-    ///         committed by the registry model.
-    /// @dev Deprecated. Served only for the deployed pre-v35 upgrade engines, which read the
-    ///      verifier of the version a chain crosses a legacy edge to from here.
-    function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address);
-
     function protocolVersion() external view returns (uint256);
 
     /// @notice The timestamp until which `_protocolVersion` can be used.
     /// @dev The committed transition pins the deadline its edge was approved with; the current
-    ///      version has no departing transition and is usable indefinitely; versions departed via
-    ///      the legacy cut-taking path read the storage that path wrote. A deadline set via
+    ///      version has no departing transition and is usable indefinitely; versions a pre-v35 CTM
+    ///      departed read the deadline it stored. A deadline set via
     ///      {setProtocolVersionDeadline} takes precedence over all of these.
     function protocolVersionDeadline(uint256 _protocolVersion) external view returns (uint256);
 
     /// @notice Moves the deadline of a departed protocol version — operational state that keeps
     ///         changing after the commit (extended while chains lag, shortened to retire a
-    ///         version), for legacy and registry-committed versions alike.
+    ///         version).
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external;
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
@@ -142,13 +129,6 @@ interface IChainTypeManager {
     ///         params, force deployments) is derived from the bridgehub and the CTM's current
     ///         release.
     function createNewChain(uint256 _chainId, address _admin) external returns (address);
-
-    function setNewVersionUpgrade(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        address _newRelease
-    ) external;
 
     function setNewVersionUpgradeFromTransition(ICTMTransition _transition) external;
 

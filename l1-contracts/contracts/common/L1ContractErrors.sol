@@ -59,8 +59,6 @@ error BatchHashMismatch(bytes32 expected, bytes32 actual);
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x41c329f7
 error BatchTimestampGreaterThanLastL2BlockTimestamp();
-// 0x63506488
-error BootstrapAlreadyExecuted();
 // 0x81ded943
 error BootstrapAuthorityNotHeld(address target, address actualOwner);
 // 0xb772460f
@@ -69,14 +67,8 @@ error BootstrapExecutorNotBound(address executor, address expectedTarget, addres
 error BootstrapExecutorOwnerMismatch(address executor, address expectedOwner, address actualOwner);
 // 0x8a593161
 error BootstrapNominationPending(address target, address pendingOwner);
-// 0x447aee1e
-error BootstrapNotYetExecuted();
-// 0x24c8e294
-error BootstrapReleaseNotInstalled(address expected, address actual);
 // 0x5f5dd61c
 error BootstrapServerNotifierNotBound(address expected, address actual);
-// 0xdc145e4f
-error BootstrapServerNotifierRowMissing();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
@@ -171,8 +163,6 @@ error GasPerPubdataMismatch();
 error GenesisBatchHashZero();
 // 0xd356e6ba
 error HashedLogIsDefault();
-// 0x0b08d5be
-error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xf11438d9
 error IMTAlreadyInitialized();
 // 0x62f8ffe2

@@ -2,44 +2,21 @@
 
 Companion to [registry-driven-upgrades.md](registry-driven-upgrades.md). Execution is specified in
 [`protocol-docs/ecosystem-upgrade-coordination.md`](../protocol-docs/ecosystem-upgrade-coordination.md);
-the objects, executors and bootstrap are in the architecture document; the tooling is in
+the objects and executors are in the architecture document; the tooling is in
 [the runbook](../l1-contracts/deploy-scripts/upgrade/README.md). This document holds the
 operational policies none of those owns.
 
-## ServerNotifier: a one-time handover, then an ordinary CTM-domain proxy
+## ServerNotifier: an ordinary CTM-domain proxy
 
-The notifier is a per-CTM proxy. Pre-v35 deployments put it under its OWN `ProxyAdmin`, owned by
-the CTM's `ChainAdmin`, and nominated the `ChainAdmin` as its owner. From the registry bootstrap on
-it is administered like the rest of the CTM domain: its proxy sits under the CTM-domain `ProxyAdmin`
-the CTM executor owns, the CTM executor owns the notifier itself, and its implementation swaps are
-ordinary rows of a CTM-domain `ProxyUpgradeTransition`. A fresh ecosystem is deployed in that shape
-already: `DeployCTM` puts the notifier under the CTM-domain `ProxyAdmin` and hands it to the CTM
-executor.
+The notifier is a per-CTM proxy, administered like the rest of the CTM domain: its proxy sits under
+the CTM-domain `ProxyAdmin` the CTM executor owns, the CTM executor owns the notifier itself, and its
+implementation swaps are ordinary rows of a CTM-domain `ProxyUpgradeTransition`. A fresh ecosystem
+is deployed in that shape: `DeployCTM` puts the notifier under the CTM-domain `ProxyAdmin` and hands
+it to the CTM executor. No prepare emits an admin call for it.
 
-Getting there is a one-time handover and a PRECONDITION of the bootstrap, because governance cannot
-perform the ChainAdmin's half:
-
-| step | authority                                                                 | call                                                                    |
-| ---- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1    | owner of the notifier's old `ProxyAdmin`                                  | `changeProxyAdmin(notifier, ctmProxyAdmin)`                             |
-| 2    | the notifier's current owner                                              | `transferOwnership(ctmExecutor)`                                        |
-| 3    | the CTM executor's owner (governance), first call of the bootstrap bundle | `ctmExecutor.forward([notifier.acceptOwnership()])`                     |
-| 4    | the bootstrap bundle                                                      | `migrate()` swaps the notifier's implementation through `ctmProxyAdmin` |
-
-Steps 1–2 are RENDERED from live state by the bootstrap prepare
-(`CTMUpgrade_v35.serverNotifierHandoverCalls`, a step already done is left out), written to the
-prepare output's `[ctm_admin_calls].server_notifier_handover`, declared as `admin`-phase external
-actions, and run by protocol-ops right after the prepares (`UpgradeFull::run_ctm_admin_steps`). Step
-3 is derived only while the notifier is not yet the executor's, so the bootstrap bundle reverts
-until steps 1–2 landed, and step 3 itself reverts unless the CTM executor is the nominee.
-`RegistryBootstrapMigration.validate()` refuses to run unless the manifest's mandatory notifier row
-names the CTM's notifier, the notifier serves the CTM and is owned by the CTM executor with no
-nomination outstanding, and the notifier's row applies only through `ctmProxyAdmin`;
-`validateApplied()` keeps checking the ownership and the binding. `protocol-ops ecosystem
-verify-bootstrap` reports the handover as its own prerequisite.
-
-The handover is not undone if the bootstrap is cancelled afterwards: the notifier then simply
-belongs to the CTM domain early. A recurring prepare has no admin calls.
+Pre-v35 deployments put the notifier under its own `ProxyAdmin`, owned by the CTM's `ChainAdmin`;
+the one-time handover into the CTM domain belonged to the v34 -> v35 bootstrap edge, which was
+removed in v36.
 
 ## Executor succession
 

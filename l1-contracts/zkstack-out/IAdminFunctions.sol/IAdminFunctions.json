@@ -45,11 +45,6 @@
     "name": "adminExecuteUpgrade",
     "inputs": [
       {
-        "name": "diamondCut",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
         "name": "adminAddr",
         "type": "address",
         "internalType": "address"

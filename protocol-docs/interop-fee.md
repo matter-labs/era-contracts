@@ -89,5 +89,5 @@ external nodes and the ZKsync OS version committing `interop_fee_units` (with it
 protocol v35. Historical v34 and earlier data must still be decoded using their original formats.
 
 Before upgrading across the v35 boundary, all committed batches must be executed or reverted; the upgrade engine
-(`BootstrapUpgrade` on that edge, `DefaultUpgrade` after it) enforces it. Every batch executed after the upgrade was
+enforces it (`DefaultUpgrade`; on the v35 edge itself, the since-removed `BootstrapUpgrade`). Every batch executed after the upgrade was
 therefore committed with its count recorded.

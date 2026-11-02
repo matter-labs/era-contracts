@@ -5,9 +5,7 @@ pragma solidity 0.8.28;
 import {ICTMRelease} from "../objects/ICTMRelease.sol";
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {IL2DelegateCalldataComposer} from "../objects/IL2DelegateCalldataComposer.sol";
-import {IRegistryBootstrapMigration} from "../bootstrap/IRegistryBootstrapMigration.sol";
 import {IDefaultUpgrade} from "../../IDefaultUpgrade.sol";
-import {IBootstrapUpgrade} from "../../IBootstrapUpgrade.sol";
 import {Diamond} from "../../../state-transition/libraries/Diamond.sol";
 import {IComplexUpgrader} from "../../../state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2CanonicalTransactionLib} from "../../../state-transition/libraries/L2CanonicalTransactionLib.sol";
@@ -42,18 +40,6 @@ library CTMUpgradeComposer {
             );
     }
 
-    /// @notice The bootstrap edge's cut (see {buildUpgradeCutData}): the migration's engine
-    ///         as the init target and `upgradeFromBootstrap(migration)` as its calldata.
-    function buildBootstrapUpgradeCutData(
-        IRegistryBootstrapMigration _migration
-    ) internal view returns (Diamond.DiamondCutData memory) {
-        return
-            _cutNamingObject(
-                _migration.getManifest().upgradeEngine,
-                abi.encodeCall(IBootstrapUpgrade.upgradeFromBootstrap, (address(_migration)))
-            );
-    }
-
     /// @notice The composed transaction of a transition for one chain (see {buildL2UpgradeTxFromPlan}).
     /// @dev For callers holding only the transition address; an executing engine already holds the
     ///      manifest and enters at {buildL2UpgradeTxFromPlan} to avoid decoding it twice.
@@ -76,10 +62,7 @@ library CTMUpgradeComposer {
     /// @notice The FINAL L1 -> L2 protocol upgrade transaction of a chain for a FINAL L2 plan: the
     ///         force deployments, the delegate call the `L2ComplexUpgrader` performs after them (its
     ///         calldata defined by the plan's composer from `_newRelease`, `_bridgehub` and
-    ///         `_chainId`) and the factory dependencies. Every caller reaches this one function, so
-    ///         the transition path and the bootstrap edge compose the same transaction from the
-    ///         same inputs; the bootstrap has a plan and a release but no transition object to
-    ///         unpack. The engine commits the result as is: there is no later per-chain rewrite.
+    ///         `_chainId`) and the factory dependencies. The engine commits the result as is: there is no later per-chain rewrite.
     function buildL2UpgradeTxFromPlan(
         L2UpgradePlan memory _plan,
         ICTMRelease _newRelease,

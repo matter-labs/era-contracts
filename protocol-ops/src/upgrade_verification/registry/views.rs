@@ -1,5 +1,5 @@
 //! Read-only views of the registry objects and the live contracts a package touches — an
-//! ordinary upgrade's executor legs, the one-time bootstrap edge, or a transition replacement.
+//! ordinary upgrade's executor legs or a transition replacement.
 //!
 //! Declared inline rather than bound from `zkstack-out/` because the verifier needs a
 //! handful of getters per object, not the objects' full ABIs, and because a package is
@@ -30,85 +30,34 @@ sol! {
         address delegateComposer;
     }
 
-    /// Positional mirror of `RegistryTypes.BootstrapManifest`. Every field a reviewer must
-    /// agree to is here, so the verifier reads the committed manifest itself rather than the
-    /// prepare's summary of it.
-    #[derive(Debug)]
-    struct BootstrapManifest {
-        address ctm;
-        uint256 expectedProtocolVersion;
-        address ctmProxyAdmin;
-        ProxyUpgradeRow[] ctmProxyUpgrades;
-        address currentRelease;
-        uint256 oldProtocolVersionDeadline;
-        address upgradeEngine;
-        AuthoredL2Plan l2Plan;
-        uint256 upgradeTimestamp;
-        address ctmExecutor;
-        address coreExecutor;
-        address governance;
-    }
-
-    #[sol(rpc)]
-    contract RegistryBootstrapMigrationView {
-        function executed() external view returns (bool);
-        function manifestHash() external view returns (bytes32);
-        function getManifest() external view returns (BootstrapManifest memory);
-        /// The version the edge lands on: its genesis release's own, read at construction.
-        function newProtocolVersion() external view returns (uint256);
-        function validate() external view;
-        /// The edge's completion check, the bootstrap bundle's last call.
-        function validateApplied() external view;
-    }
-
-    /// One governance call of a bootstrap edge, as `RegistryBootstrapSequence` derives it.
-    #[derive(Debug)]
-    struct BootstrapAction {
-        string label;
-        string authority;
-        BootstrapCall call;
-    }
-
     /// Positional mirror of `governance/Common.sol`'s `Call`, under a distinct name so it cannot
     /// collide with the tool's own decoded governance call type.
     #[derive(Debug)]
-    struct BootstrapCall {
+    struct ForwardedCall {
         address target;
         uint256 value;
         bytes data;
     }
 
-    /// The object the edge's governance bundle is derived from: the verifier reads its one list,
-    /// so the submitted bundle can be compared against the list the contract itself derives.
-    #[sol(rpc)]
-    contract RegistryBootstrapSequenceView {
-        function actions() external view returns (BootstrapAction[] memory);
-    }
-
     /// The CTM domain's executor. `forward` is declared so the verifier can ENCODE the owner-gated
-    /// call through which governance acts on the CTM domain (the bootstrap's ServerNotifier
-    /// acceptance, a replacement's `replaceUpgradeTransition`); the two `apply*` entrypoints so it
-    /// can independently re-encode an upgrade's CTM legs and compare them byte for byte.
+    /// call through which governance acts on the CTM domain (a replacement's
+    /// `replaceUpgradeTransition`); the two `apply*` entrypoints so it can independently re-encode
+    /// an upgrade's CTM legs and compare them byte for byte.
     #[sol(rpc)]
     contract CTMUpgradeExecutorView {
         function CHAIN_TYPE_MANAGER() external view returns (address);
         function CTM_PROXY_ADMIN() external view returns (address);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
-        function forward(BootstrapCall[] calldata _calls) external payable;
+        function forward(ForwardedCall[] calldata _calls) external payable;
         function applyInfrastructureUpgrade(address _infrastructureTransition) external;
         function applyCTMUpgrade(address _transition) external;
     }
 
-    /// The CTM's ServerNotifier, whose administration and ownership the bootstrap requires
-    /// handed to the CTM domain. `acceptOwnership` is declared to ENCODE the bundle call that
-    /// completes that handover.
+    /// The CTM's ServerNotifier, which a replayed upgrade must leave bound to the CTM it serves.
     #[sol(rpc)]
     contract ServerNotifierView {
         function chainTypeManager() external view returns (address);
-        function owner() external view returns (address);
-        function pendingOwner() external view returns (address);
-        function acceptOwnership() external;
     }
 
     /// Positional mirror of `RegistryTypes.TransitionManifest` — the whole constructor argument of
@@ -265,8 +214,8 @@ sol! {
     }
 
     /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read
-    /// `L2PlanLib.requirePublished` performs when the CTM commits a transition (and the bootstrap
-    /// migration's `validate()`), so a zero here is the readiness failure that would revert it.
+    /// `L2PlanLib.requirePublished` performs when the CTM commits a transition, so a zero here is
+    /// the readiness failure that would revert it.
     /// The event carries the published code.
     #[sol(rpc)]
     contract BytecodesSupplierView {
@@ -274,8 +223,8 @@ sol! {
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
-    /// The chain registry the bootstrap's lagging-chain report enumerates, the live values a
-    /// release's force deployments are held against, the ecosystem proxies an inventory's
+    /// The chain registry a CTM's chains are enumerated from, the live values a release's force
+    /// deployments are held against, the ecosystem proxies an inventory's
     /// slots must name, and the owner a CTM also takes its chain freezes from.
     #[sol(rpc)]
     contract BridgehubView {
@@ -291,11 +240,9 @@ sol! {
         function getZKChain(uint256 _chainId) external view returns (address);
     }
 
-    /// A chain's diamond, for the verifier its chain runs today and the RollupDAManager its Admin
-    /// facet was built over.
+    /// A chain's diamond, for the RollupDAManager its Admin facet was built over.
     #[sol(rpc)]
     contract ZkChainGettersView {
-        function getVerifier() external view returns (address);
         function getRollupDAManager() external view returns (address);
     }
 

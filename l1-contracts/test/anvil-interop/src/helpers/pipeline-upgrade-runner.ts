@@ -399,17 +399,12 @@ async function runRecurringHop(
             ctm_transition_addr?: string;
             ctm_infrastructure_transition_addr?: string;
             ctm_upgrade_executor_addr?: string;
-            bootstrap_migration_addr?: string;
           };
         };
       };
     };
     const coreRegistry = merged.core.registry ?? {};
     const ctmRegistry = merged.ctms.zksync_os.registry ?? {};
-    const bootstrapMigration = ctmRegistry.bootstrap_migration_addr ?? ethers.constants.AddressZero;
-    if (bootstrapMigration !== ethers.constants.AddressZero) {
-      throw new Error(`a recurring hop must not deploy a bootstrap migration (got ${bootstrapMigration})`);
-    }
     const reportedLegs = upgradeLegsOf({
       coreTransition: coreRegistry.core_transition_addr,
       coreExecutor: coreRegistry.core_upgrade_executor_addr,

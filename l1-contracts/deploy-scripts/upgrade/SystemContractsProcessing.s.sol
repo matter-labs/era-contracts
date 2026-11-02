@@ -136,8 +136,8 @@ library SystemContractsProcessing {
 
     /// @notice Build the base force deployment array.
     /// @dev DERIVED from the release's L2 bytecode table via the SAME function the on-chain
-    ///      transition derivation uses, so the script-composed bootstrap L2 leg and every
-    ///      registry-driven edge after it are one code path. Which contracts participate is
+    ///      transition derivation uses, so the scripts and every registry-driven edge are
+    ///      one code path. Which contracts participate is
     ///      encoded once, in which table rows `buildL2BytecodeInfoTable` fills.
     function getBaseForceDeployments()
         internal

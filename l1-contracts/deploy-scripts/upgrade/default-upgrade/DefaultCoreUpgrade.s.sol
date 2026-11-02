@@ -42,8 +42,7 @@ import {CoreExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/Upgrad
 ///         `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)` from the addresses it reports.
 ///         Anything a version script still needs governance to do is declared as an external
 ///         action and listed in the output.
-/// @dev Version scripts inherit and declare what they change ({changedEcosystemImplementations});
-///      the v35 bootstrap edge also deploys the executors.
+/// @dev Version scripts inherit and declare what they change ({changedEcosystemImplementations}).
 contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     using stdToml for string;
     using ExternalActionsLib for ExternalActionsLib.Ledger;
@@ -112,7 +111,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @notice The upgrade objects of the ecosystem side. The default deploys the core transition over the
-    ///         implementations this run deployed; the bootstrap edge also deploys the executor.
+    ///         implementations this run deployed.
     function deployEcosystemUpgradeObjects() public virtual {
         if (!_liveCoreUpgradeExecutorRunsThisBuild()) {
             require(
@@ -510,7 +509,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         address executor = ProxyAdmin(admin).owner();
         require(
             executor.code.length != 0,
-            "ecosystem ProxyAdmin owner is not a contract: run the bootstrap edge first"
+            "ecosystem ProxyAdmin owner is not a contract: the ecosystem predates the registry model"
         );
         require(
             address(CoreUpgradeExecutor(payable(executor)).PROXY_ADMIN()) == admin,

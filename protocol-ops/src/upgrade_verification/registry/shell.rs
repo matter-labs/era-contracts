@@ -37,7 +37,7 @@ pub(super) enum EdgeDelegate {
 }
 
 /// Holds the shell new chains get from the transition's arriving release against the one chains
-/// crossing the edge keep, the departing release's. The bootstrap edge has no departing release.
+/// crossing the edge keep, the departing release's.
 pub(super) async fn verify_shell_kept<P: Provider>(
     provider: &P,
     identity: &CodeIdentity,

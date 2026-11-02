@@ -296,10 +296,8 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.protocolVersionDeadline(newVersion), type(uint256).max);
         // The verifier is pinned by the release the CTM now points at, not by a version-keyed map.
         assertEq(CTMRelease(chainContractAddress.currentRelease()).verifier(), address(testnetVerifier));
-        // The transition is the only commitment: the deprecated hash stays untouched and the cut
-        // derives on read.
+        // The transition is the only commitment: the cut derives on read.
         assertEq(chainContractAddress.upgradeTransition(0), address(transition));
-        assertEq(chainContractAddress.upgradeCutHash(0), bytes32(0));
         assertEq(
             keccak256(abi.encode(chainContractAddress.upgradeCutForVersion(0))),
             keccak256(abi.encode(_expectedUpgradeCut(ICTMTransition(address(transition)))))
@@ -376,8 +374,7 @@ contract CTMUpgradeExecutorTest is CTMUpgradeExecutorFixture {
         assertEq(chainContractAddress.pendingOwner(), address(0), "no pending owner may survive the accept");
     }
 
-    /// @dev The path `RegistryBootstrapMigration.migrate()` takes: the CTM's owner, which does not
-    ///      own the executor, completes its own nomination.
+    /// @dev The CTM's owner, which does not own the executor, completes its own nomination.
     function test_acceptCTMOwnership_byNominatingCTMOwner() public {
         _giveTheCTMBackAndRenominateTheExecutor();
         address executorOwner = makeAddr("executorOwner");
