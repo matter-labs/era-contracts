@@ -26,8 +26,8 @@ interface ICTMUpgradeExecutor {
 
     /// @notice Completes the two-step ownership handover of the bound CTM to this executor.
     /// @dev Callable by this executor's owner, or by the CTM's current owner (the account that
-    ///      nominated this executor), which is how `RegistryBootstrapMigration.migrate()` completes
-    ///      the handover in its own transaction.
+    ///      nominated this executor), so the handover can complete in the nominator's own
+    ///      transaction.
     function acceptCTMOwnership() external;
 
     /// @notice Applies a CTM-domain transition's source-checked implementation swaps through the

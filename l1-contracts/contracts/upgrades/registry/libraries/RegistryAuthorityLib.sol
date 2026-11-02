@@ -20,10 +20,9 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The authority shape of a registry-era ecosystem — what a completed bootstrap leaves behind
-///         and what a fresh deployment is born with: both domain executors owned by one governance,
-///         and every authority of both domains held by its executor. See "Authority" in
-///         {docs/registry-driven-upgrades.md}.
+/// @notice The authority shape of a registry-era ecosystem — what a fresh deployment is born
+///         with: both domain executors owned by one governance, and every authority of both
+///         domains held by its executor. See "Authority" in {docs/registry-driven-upgrades.md}.
 library RegistryAuthorityLib {
     /// @notice Every address the authority shape names.
     /// @param ctm The ChainTypeManager proxy.
