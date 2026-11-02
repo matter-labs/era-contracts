@@ -8,27 +8,8 @@ import {LiveRoutingDiverged} from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet} from "../RegistryTypes.sol";
 
 /// @notice The live routing of the diamond the caller is delegatecalled into, read straight from
-///         diamond storage: as the cuts that remove it — the remove side of a bootstrap engine's
-///         full facet reinstall (see {BootstrapUpgrade}), since pre-v35 facets do not
-///         self-describe — and as the check that it is still a release's.
+///         diamond storage, checked against a release's.
 library LiveRoutingReader {
-    /// @notice One `Remove` cut per live facet, covering its complete current routing.
-    /// @dev Snapshotted before anything is applied, so the mutation of the facet list during
-    ///      removal cannot skew the derivation.
-    function removeAllCuts() internal view returns (Diamond.FacetCut[] memory facetCuts) {
-        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
-        uint256 facetCount = ds.facets.length;
-        facetCuts = new Diamond.FacetCut[](facetCount);
-        for (uint256 i = 0; i < facetCount; ++i) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: address(0),
-                action: Diamond.Action.Remove,
-                isFreezable: false,
-                selectors: ds.facetToSelectors[ds.facets[i]].selectors
-            });
-        }
-    }
-
     /// @notice Reverts unless the live routing is exactly `_release`'s: the same facets, each
     ///         routing exactly the selectors it self-describes, with its row's freezability.
     /// @dev Counting is enough for equality. Every row's selectors route to its facet, so the

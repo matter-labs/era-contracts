@@ -8,7 +8,6 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {Diamond} from "./libraries/Diamond.sol";
 import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
-import {IAdminWithCut} from "./chain-interfaces/IAdminWithCut.sol";
 import {IMigrator} from "./chain-interfaces/IMigrator.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
@@ -88,9 +87,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The current packed protocolVersion. To access human-readable version, use `getSemverProtocolVersion` function.
     uint256 public protocolVersion;
 
-    /// @dev The stored per-version deadline. Written by the legacy cut-taking commit path (which
-    ///      has no transition to resolve a deadline from) and by {setProtocolVersionDeadline},
-    ///      which lets governance keep moving a deadline after the commit. When set (nonzero) it
+    /// @dev The stored per-version deadline. Written by {setProtocolVersionDeadline}, which lets
+    ///      governance keep moving a deadline after the commit (pre-v35 CTMs also wrote it at
+    ///      commit time). When set (nonzero) it
     ///      takes precedence over a committed transition's pinned deadline — see
     ///      {protocolVersionDeadline}.
     mapping(uint256 _protocolVersion => uint256) internal protocolVersionDeadlines;
@@ -102,11 +101,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///      deployed CTMs, so removing it would shift every storage slot after it.
     address internal __DEPRECATED_validatorTimelock;
 
-    /// @dev Deprecated. Written only by the legacy cut-taking commit path: pre-v35 Admin facets
-    ///      crossing that edge verify the handed cut bytes against it (served through the
-    ///      {upgradeCutHash} view). Registry-driven edges commit only the transition
-    ///      ({upgradeTransition}); chains read {upgradeCutForVersion}.
-    mapping(uint256 protocolVersion => bytes32 cutHash) internal __LEGACY_upgradeCutHash;
+    /// @dev Deprecated pre-v35 per-version cut hash. Registry-driven edges commit only the
+    ///      transition ({upgradeTransition}); chains read {upgradeCutForVersion}. Slot retained to
+    ///      preserve the upgradeable storage layout.
+    // slither-disable-next-line uninitialized-state,unused-state
+    mapping(uint256 protocolVersion => bytes32 cutHash) internal __DEPRECATED_upgradeCutHash;
 
     /// @dev The address used to manage non critical updates
     address public admin;
@@ -127,12 +126,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
     address public validatorTimelockPostV29;
 
-    /// @dev Deprecated. Off-chain tooling used it to locate the `NewUpgradeCutData` log for a
-    ///      version; the legacy cut-taking commit still writes it (its tooling reads it for the
-    ///      bootstrap edge), registry-driven commits do not — the cut is read from
-    ///      {upgradeCutForVersion}, no log archaeology needed. Served read-only
-    ///      ({upgradeCutDataBlock}) otherwise.
-    mapping(uint256 protocolVersion => uint256) internal __LEGACY_upgradeCutDataBlock;
+    /// @dev Deprecated pre-v35 block of a version's `NewUpgradeCutData` log. The cut is read from
+    ///      {upgradeCutForVersion} instead. Slot retained to preserve the upgradeable storage
+    ///      layout.
+    // slither-disable-next-line uninitialized-state,unused-state
+    mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_upgradeCutDataBlock;
 
     /// @dev Retained only to preserve the upgradeable storage layout. Pre-v35 code recorded the
     ///      block of a chain-creation-params change here; under the registry model the genesis
@@ -142,13 +140,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     // slither-disable-next-line uninitialized-state,unused-state
     mapping(uint256 protocolVersion => uint256) internal __DEPRECATED_newChainCreationParamsBlock;
 
-    /// @dev Deprecated. Written by pre-v35 CTMs only; served read-only ({protocolVersionVerifier})
-    ///      to the pre-v35 upgrade engines of legacy edges. The verifier is part of the installed
-    ///      chain state and is pinned by the release (`ICTMRelease.verifier`), so both the genesis
-    ///      path and the upgrade path read it from the release they resolve to.
-    // Never written by THIS implementation by design — live CTMs carry pre-v35 values in it.
-    // slither-disable-next-line uninitialized-state
-    mapping(uint256 protocolVersion => address) internal __LEGACY_protocolVersionVerifier;
+    /// @dev Deprecated pre-v35 per-version verifier. The verifier is pinned by the release
+    ///      (`ICTMRelease.verifier`), so both the genesis path and the upgrade path read it from the
+    ///      release they resolve to. Slot retained to preserve the upgradeable storage layout.
+    // slither-disable-next-line uninitialized-state,unused-state
+    mapping(uint256 protocolVersion => address) internal __DEPRECATED_protocolVersionVerifier;
 
     /// @dev Deprecated pre-v35 `defaultUpgrade` (the verifier-only upgrade engine). Slot retained
     ///      to preserve the upgradeable storage layout.
@@ -161,8 +157,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice The transition committed for chains departing from a given protocol version. The
     ///         ONLY commitment for registry-driven edges: {upgradeCutForVersion} derives the cut
-    ///         from it, so chains are never handed cut bytes. `upgradeCutHash` remains only for
-    ///         chains on pre-v35 Admin facets, whose handed-cut path verifies against it.
+    ///         from it, so chains are never handed cut bytes.
     mapping(uint256 oldProtocolVersion => address transition) public upgradeTransition;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -291,8 +286,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _setCurrentRelease(_initializeData.currentRelease);
     }
 
-    /// @dev THE single point every release passes through — initialization, every transition and
-    ///      the bootstrap edge, each right after it moved `protocolVersion`: the release's own check
+    /// @dev THE single point every release passes through — initialization and every transition,
+    ///      each right after it moved `protocolVersion`: the release's own check
     ///      surface, then its version and genesis batch hash.
     /// @dev The release is the one governance approved; its construction is verified off-chain,
     ///      not here — see "Provenance and validation" in {docs/registry-driven-upgrades.md}.
@@ -411,7 +406,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _commitVersionEdge(oldProtocolVersion, newProtocolVersion);
         // The transition is the ONLY commitment: the cut derives from it on read
         // (`upgradeCutForVersion`), its deadline resolves from it (`protocolVersionDeadline`),
-        // so neither the deprecated `upgradeCutHash` nor the legacy deadline storage is written.
+        // so the stored deadline is left to {setProtocolVersionDeadline}.
         _recordTransition(oldProtocolVersion, newProtocolVersion, _transition);
         _setCurrentRelease(_transition.newRelease());
     }
@@ -770,99 +765,5 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ) external onlyChainAssetHandler {
         // Function is empty due to the fact that when calling `forwardedBridgeBurn` there are no
         // state updates that occur.
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            Legacy functions
-
-        Every function below serves versions that predate the registry
-        model, each tagged with the condition under which it can go.
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Commits a version edge with a hand-composed cut instead of a transition, and installs
-    ///         the release of the version it moves to.
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
-    /// @param _newRelease the release the edge installs; the new protocol version is its own
-    /// @dev Kept for edges whose cut cannot be derived — the pre-registry bootstrap, whose departing
-    ///      version has no `fromRelease` to diff against. Registry-driven upgrades use
-    ///      {setNewVersionUpgradeFromTransition}.
-    // TODO(v36): DELETE — the v35 bootstrap is the last edge committed through this path; every
-    //            later edge has a `fromRelease` and commits a transition.
-    function setNewVersionUpgrade(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        address _newRelease
-    ) external onlyOwner {
-        if (_newRelease == address(0)) {
-            revert ZeroAddress();
-        }
-        uint256 newProtocolVersion = ICTMRelease(_newRelease).protocolVersion();
-        _commitVersionEdge(_oldProtocolVersion, newProtocolVersion);
-        // The departing version has no transition to resolve a deadline from, so the deadline is
-        // stored directly.
-        protocolVersionDeadlines[_oldProtocolVersion] = _oldProtocolVersionDeadline;
-        emit UpdateProtocolVersionDeadline(_oldProtocolVersion, _oldProtocolVersionDeadline);
-        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
-        // Emit event with backward compatible hack.
-        emit NewUpgradeCutData(newProtocolVersion, _cutData);
-        _setCurrentRelease(_newRelease);
-    }
-
-    /// @dev execute predefined upgrade
-    /// @param _chainId the chainId of the chain
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _diamondCut the diamond cut data
-    // TODO(v36): DELETE — only chains on pre-v35 Admin facets route the cut-taking entrypoint; the
-    //            v35 bootstrap is the last edge they cross.
-    function upgradeChainFromVersion(
-        uint256 _chainId,
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyOwner {
-        address chainAddress = getZKChain(_chainId);
-        IAdminWithCut(chainAddress).upgradeChainFromVersion(chainAddress, _oldProtocolVersion, _diamondCut);
-    }
-
-    /// @dev Stores the commitment pre-v35 chains verify their handed cut against
-    ///      ({upgradeCutHash}), plus the block number legacy tooling scans for the
-    ///      `NewUpgradeCutData` log ({upgradeCutDataBlock}). These legacy values ARE the point:
-    ///      a chain departing a pre-v35 version runs pre-v35 facets, and this is the only
-    ///      commitment shape those facets (and their scripts) can consume.
-    // TODO(v36): DELETE with {setNewVersionUpgrade}.
-    function setUpgradeDiamondCutInner(Diamond.DiamondCutData memory _cutData, uint256 _oldProtocolVersion) internal {
-        bytes32 newCutHash = keccak256(abi.encode(_cutData));
-        __LEGACY_upgradeCutHash[_oldProtocolVersion] = newCutHash;
-        __LEGACY_upgradeCutDataBlock[_oldProtocolVersion] = block.number;
-        emit NewUpgradeCutHash(_oldProtocolVersion, newCutHash);
-        emit NewUpgradeCutData(_oldProtocolVersion, _cutData);
-    }
-
-    /// @inheritdoc IChainTypeManager
-    // TODO(v36+): DELETE once no chain on this CTM can depart a pre-v35 version (their Admin
-    //             facets verify the handed cut against this; v35+ chains read
-    //             {upgradeCutForVersion} instead). In practice: after every chain has crossed
-    //             the bootstrap edge and the pre-v35 deadlines have passed.
-    function upgradeCutHash(uint256 _protocolVersion) public view returns (bytes32) {
-        return __LEGACY_upgradeCutHash[_protocolVersion];
-    }
-
-    /// @inheritdoc IChainTypeManager
-    // TODO(v36+): DELETE with {upgradeCutHash}, once no chain on this CTM can depart a pre-v35
-    //             version (the pre-v35 upgrade engines of those edges read the target version's
-    //             verifier here; v35+ engines read it from the release).
-    function protocolVersionVerifier(uint256 _protocolVersion) external view returns (address) {
-        return __LEGACY_protocolVersionVerifier[_protocolVersion];
-    }
-
-    /// @notice The block of a LEGACY cut commit, where its tooling finds the
-    ///         `NewUpgradeCutData` log; zero for registry-driven edges (read the cut from
-    ///         {upgradeCutForVersion} instead).
-    // TODO(v36+): DELETE with {upgradeCutHash} — chain-side scripts need it only to recover a
-    //             legacy-committed cut from logs (`GetDiamondCutData.getDiamondCutData`).
-    function upgradeCutDataBlock(uint256 _protocolVersion) public view returns (uint256) {
-        return __LEGACY_upgradeCutDataBlock[_protocolVersion];
     }
 }

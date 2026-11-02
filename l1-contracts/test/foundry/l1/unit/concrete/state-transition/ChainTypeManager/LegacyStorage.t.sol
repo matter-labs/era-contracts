@@ -10,7 +10,7 @@ import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedU
 import {L2UpgradePlan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
-/// @notice Stands in for the pre-v35 CTM implementation a live proxy runs before the bootstrap
+/// @notice Stands in for the pre-v35 CTM implementation a live proxy runs before the v35 upgrade
 ///         swaps it: it writes the two pre-v35 fields the registry model only keeps, exactly as
 ///         `setProtocolVersionVerifier` / `setDefaultUpgrade` of `draft/v0.34.0` did.
 /// @dev The pre-v35 implementation is not part of this build, so the stand-in writes through the
@@ -27,7 +27,7 @@ contract MockPreV35ChainTypeManager is ChainTypeManager {
     /// @param _protocolVersion The version the verifier is recorded for.
     /// @param _verifier The verifier recorded.
     function setProtocolVersionVerifier(uint256 _protocolVersion, address _verifier) external onlyOwner {
-        __LEGACY_protocolVersionVerifier[_protocolVersion] = _verifier;
+        __DEPRECATED_protocolVersionVerifier[_protocolVersion] = _verifier;
     }
 
     /// @param _defaultUpgrade The verifier-only upgrade engine recorded.
@@ -37,8 +37,7 @@ contract MockPreV35ChainTypeManager is ChainTypeManager {
 }
 
 /// @notice The storage a v35 CTM inherits from the pre-v35 implementation it replaces in place:
-///         every v34 slot keeps its meaning, the registry fields take FRESH slots after them, and
-///         the one v34 value deployed upgrade engines still read is still served.
+///         every v34 slot keeps its value, and the registry fields take FRESH slots after them.
 /// @dev Slot numbers are the `forge inspect ... storageLayout` of `ChainTypeManager` on
 ///      `draft/v0.34.0`: `protocolVersionVerifier` at 168 and `defaultUpgrade` at 169, the last
 ///      v34 slot.
@@ -69,7 +68,7 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
     }
 
     /// @dev Runs the pre-v35 writes on the live proxy, then swaps it to the registry-model
-    ///      implementation — the order the bootstrap's `migrate()` performs the swap in.
+    ///      implementation.
     function _writePreV35StateThenSwap(address _verifier, address _defaultUpgrade) internal {
         _swapImplementation(address(preV35Implementation));
         vm.startPrank(governor);
@@ -79,36 +78,25 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
         _swapImplementation(address(chainTypeManager));
     }
 
-    /// @dev Deployed pre-v35 upgrade engines read `protocolVersionVerifier(newVersion)` off the CTM
-    ///      when a lagging chain crosses a legacy edge after the bootstrap, so the value the
-    ///      pre-v35 implementation recorded must still be served by the v35 one.
-    function test_verifierRecordedBeforeTheSwapIsServedAfterIt() public {
+    /// @dev The value the pre-v35 implementation recorded stays in the v34 `protocolVersionVerifier`
+    ///      slot after the swap: the declaration is retained only so nothing else lands on it.
+    function test_theV34VerifierSlotKeepsItsValue() public {
         address legacyVerifier = makeAddr("legacyVerifier");
         _writePreV35StateThenSwap(legacyVerifier, makeAddr("legacyDefaultUpgrade"));
 
-        assertEq(
-            chainContractAddress.protocolVersionVerifier(LEGACY_VERSION),
-            legacyVerifier,
-            "the pre-v35 verifier is served after the swap"
-        );
         assertEq(
             vm.load(
                 address(chainContractAddress),
                 keccak256(abi.encode(LEGACY_VERSION, V34_PROTOCOL_VERSION_VERIFIER_SLOT))
             ),
             bytes32(uint256(uint160(legacyVerifier))),
-            "the getter reads the v34 `protocolVersionVerifier` mapping"
+            "the v34 value stays in its own slot"
         );
-        assertEq(
-            chainContractAddress.protocolVersionVerifier(NEW_VERSION),
-            address(0),
-            "the registry model records no verifier per version"
-        );
+        assertEq(chainContractAddress.currentRelease(), Utils.TEST_GENESIS_REGISTRY, "the release is unaffected");
     }
 
     /// @dev A v34 CTM carries a nonzero `defaultUpgrade`. Were `currentRelease` declared in its
-    ///      slot, that address would read back as the release between the bootstrap's swap and
-    ///      its commit — and after any rollback of the implementation.
+    ///      slot, that address would read back as the release after the swap.
     function test_theV34DefaultUpgradeSlotIsNotTheCurrentRelease() public {
         address legacyDefaultUpgrade = makeAddr("legacyDefaultUpgrade");
         _writePreV35StateThenSwap(makeAddr("legacyVerifier"), legacyDefaultUpgrade);

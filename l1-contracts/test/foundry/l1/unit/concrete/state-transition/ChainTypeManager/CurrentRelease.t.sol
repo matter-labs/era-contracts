@@ -18,13 +18,11 @@ import {
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
-import {L2UpgradePlan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 
 /// @notice The CTM's `currentRelease` — the release new chains are created from — moves only
-///         together with its protocol version, because a release IS one version: both version edges
-///         install the release of the version they move to, in the same call. The releases (and the
+///         together with its protocol version, because a release IS one version: a version edge
+///         installs the release of the version it moves to, in the same call. The releases (and the
 ///         transition) are mocked, as everywhere in this suite: the fixture CTM runs at version 0,
 ///         and the subject here is the CTM's bookkeeping, not the objects. The registry-driven path
 ///         with real objects is covered in `Upgrades/registry/CTMUpgradeExecutor.t.sol`.
@@ -33,40 +31,6 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
 
     function setUp() public {
         deploy();
-    }
-
-    /// @dev A stand-in transition answering exactly the reads `setNewVersionUpgradeFromTransition`
-    ///      makes, so each test can make one of them disagree with the CTM.
-    function _mockTransition(
-        address _fromRelease,
-        uint256 _oldVersion,
-        uint256 _newVersion,
-        address _newRelease
-    ) internal returns (ICTMTransition transition) {
-        transition = ICTMTransition(makeAddr("transition"));
-        vm.etch(address(transition), hex"00");
-        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.fromRelease, ()), abi.encode(_fromRelease));
-        vm.mockCall(
-            address(transition),
-            abi.encodeCall(ICTMTransition.oldProtocolVersion, ()),
-            abi.encode(_oldVersion)
-        );
-        vm.mockCall(
-            address(transition),
-            abi.encodeCall(ICTMTransition.newProtocolVersion, ()),
-            abi.encode(_newVersion)
-        );
-        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.newRelease, ()), abi.encode(_newRelease));
-        vm.mockCall(
-            address(transition),
-            abi.encodeCall(ICTMTransition.upgradeEngine, ()),
-            abi.encode(makeAddr("upgradeEngine"))
-        );
-        // The commit's own checks: the code the transition names, and an L2 plan with nothing to
-        // publish.
-        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.validate, ()), "");
-        L2UpgradePlan memory emptyPlan;
-        vm.mockCall(address(transition), abi.encodeCall(ICommittedUpgrade.l2Plan, ()), abi.encode(emptyPlan));
     }
 
     function test_initializationStartsAtTheReleasesVersion() public view {
@@ -78,7 +42,7 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
         );
     }
 
-    function test_theCutTakingEdgeInstallsTheReleaseOfItsVersion() public {
+    function test_theEdgeInstallsTheGenesisOfItsRelease() public {
         address newRelease = _releaseAt(NEW_VERSION);
         address newGenesisUpgrade = makeAddr("newGenesisUpgrade");
         bytes32 genesisBatchHash = bytes32(uint256(0x02));
@@ -89,10 +53,18 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
             abi.encode(newGenesisUpgrade, genesisBatchHash, genesisIndexRepeatedStorageChanges)
         );
 
+        ICTMTransition transition = _mockTransition(
+            Utils.TEST_GENESIS_REGISTRY,
+            0,
+            NEW_VERSION,
+            newRelease,
+            type(uint256).max
+        );
+
         vm.expectEmit(true, true, false, false);
         emit IChainTypeManager.NewCurrentRelease(NEW_VERSION, newRelease);
         vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, type(uint256).max, newRelease);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
 
         assertEq(chainContractAddress.protocolVersion(), NEW_VERSION, "the version is the release's own");
         assertEq(chainContractAddress.currentRelease(), newRelease, "the release moved with it");
@@ -116,22 +88,9 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
         assertEq(chainContractAddress.storedBatchZero(), keccak256(abi.encode(batchZero)), "batch zero too");
     }
 
-    function test_revertWhen_theCutTakingEdgeNamesNoRelease() public {
-        vm.expectRevert(ZeroAddress.selector);
-        vm.prank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, type(uint256).max, address(0));
-    }
-
-    function test_revertWhen_theCutTakingEdgeIsNotTheOwners() public {
-        address newRelease = _releaseAt(NEW_VERSION);
-        vm.expectRevert("Ownable: caller is not the owner");
-        vm.prank(makeAddr("notOwner"));
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, type(uint256).max, newRelease);
-    }
-
     function test_theTransitionEdgeInstallsItsTargetRelease() public {
         address newRelease = _releaseAt(NEW_VERSION);
-        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, newRelease);
+        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, newRelease, type(uint256).max);
 
         vm.expectEmit(true, true, false, false);
         emit IChainTypeManager.NewCurrentRelease(NEW_VERSION, newRelease);
@@ -152,7 +111,7 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
     ///      departs from any release but its own — whoever the owner is.
     function test_revertWhen_theTransitionDepartsFromAnotherRelease() public {
         address otherRelease = _releaseAt(0);
-        ICTMTransition transition = _mockTransition(otherRelease, 0, NEW_VERSION, _releaseAt(NEW_VERSION));
+        ICTMTransition transition = _mockTransition(otherRelease, 0, NEW_VERSION, _releaseAt(NEW_VERSION), type(uint256).max);
 
         vm.expectRevert(
             abi.encodeWithSelector(TransitionReleaseMismatch.selector, otherRelease, Utils.TEST_GENESIS_REGISTRY)
@@ -171,8 +130,7 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
             Utils.TEST_GENESIS_REGISTRY,
             0,
             claimedVersion,
-            _releaseAt(releaseVersion)
-        );
+            _releaseAt(releaseVersion), type(uint256).max);
 
         vm.expectRevert(
             abi.encodeWithSelector(ReleaseProtocolVersionMismatch.selector, claimedVersion, releaseVersion)
@@ -184,7 +142,7 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
     /// @dev The transition is mocked: a real `CTMTransition` reads its target's version off
     ///      `newRelease` at construction, so it can never name a zero one.
     function test_revertWhen_theTransitionNamesNoRelease() public {
-        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, address(0));
+        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, address(0), type(uint256).max);
 
         vm.expectRevert(ZeroAddress.selector);
         vm.prank(governor);
@@ -204,7 +162,7 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(makeAddr("genesisUpgrade"), bytes32(0), uint64(1))
         );
-        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, newRelease);
+        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, newRelease, type(uint256).max);
 
         vm.expectRevert(GenesisBatchHashZero.selector);
         vm.prank(governor);

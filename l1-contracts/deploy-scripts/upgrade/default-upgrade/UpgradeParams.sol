@@ -70,17 +70,8 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
-    /// @notice The ecosystem domain's executor — the `CoreUpgradeExecutor` — the core prepare of the
-    ///         BOOTSTRAP edge deployed (its output TOML, `[registry].core_upgrade_executor_addr`): the
-    ///         bootstrap manifest names it as the executor the ecosystem `ProxyAdmin` lands under.
-    ///         Every later prepare ignores it.
-    /// @dev Named for the domain rather than the contract so the prepare entry point's ABI, which
-    ///      `zkstack-out` exports, keeps its shape.
-    address ecosystemUpgradeExecutor;
     /// @notice The core prepare's Core-domain `ProxyUpgradeTransition` (its output TOML,
-    ///         `[registry].core_transition_addr`), zero when the upgrade has no ecosystem leg: the
-    ///         bootstrap edge's second object — the one its derived call sequence covers the
-    ///         ecosystem domain from — and, on every other edge, what tells this prepare whether
-    ///         the upgrade changes anything beside its own objects.
+    ///         `[registry].core_transition_addr`), zero when the upgrade has no ecosystem leg: what
+    ///         tells this prepare whether the upgrade changes anything beside its own objects.
     address coreTransition;
 }

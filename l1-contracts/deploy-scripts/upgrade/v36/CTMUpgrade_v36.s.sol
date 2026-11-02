@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 
-/// @notice The v36 CTM upgrade — the first REGISTRY-DRIVEN edge after the v35 bootstrap, run
+/// @notice The v36 CTM upgrade — a REGISTRY-DRIVEN edge from v35, run
 ///         entirely by the base pipeline: a fresh release (facets, DiamondInit, upgrade engine)
 ///         pinned by a write-once `CTMTransition`, committed by the governance call
 ///         `CTMUpgradeExecutor.applyCTMUpgrade(transition)` the merge derives. No L2

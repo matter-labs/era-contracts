@@ -60,7 +60,7 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
         chainTypeManager._setChainProtocolVersion(chainId, protocolVersion);
         chainTypeManager.setZKChain(chainId, chain);
-        chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
+        chainTypeManager.setUpgradeTransition(protocolVersion, makeAddr("transition"));
 
         ServerNotifier implementation = new ServerNotifier();
 
@@ -107,7 +107,7 @@ contract ServerNotifierTest is Test {
     function test_setUpgradeTimestampValidProtocolVersionSucceeds() public {
         uint256 deadline = block.timestamp + 7 days;
 
-        chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
+        chainTypeManager.setUpgradeTransition(protocolVersion, makeAddr("transition"));
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
         vm.startPrank(chainAdmin);
@@ -119,7 +119,7 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampCutDataForProtocolVersionNotAvailableReverts() public {
-        chainTypeManager.setUpgradeCutHash(protocolVersion, bytes32(0));
+        chainTypeManager.setUpgradeTransition(protocolVersion, address(0));
         uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);

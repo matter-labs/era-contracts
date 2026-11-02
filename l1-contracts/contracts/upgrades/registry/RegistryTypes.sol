@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-
 import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.sol";
 
 /// @title Registry data types.
@@ -200,56 +198,4 @@ enum ProxyUpgradeDomain {
 struct ProxyUpgradeTransitionManifest {
     ProxyUpgradeDomain domain;
     ProxyUpgradeRow[] proxyUpgrades;
-}
-
-/// @param ctm The ChainTypeManager proxy this migration bootstraps.
-/// @param expectedProtocolVersion The version the CTM must currently be at (the departing one).
-/// @param ctmProxyAdmin The ProxyAdmin administering every proxy in `ctmProxyUpgrades` (and the CTM
-///        proxy).
-/// @param ctmProxyUpgrades The CTM-domain inventory, indexed by {CTMContract} (same slot semantics
-///        as {ProxyUpgradeTransitionManifest}): each participating slot applies only if the proxy
-///        currently points at `expectedOldImpl`. The CTM's own implementation swap is one of
-///        these slots, and the `ServerNotifier` slot is mandatory: its proxy is the notifier whose
-///        administration and ownership must already have been handed to the CTM domain (see
-///        {docs/upgrade-operations.md}).
-/// @param currentRelease The genesis release the edge installs as the CTM's `currentRelease`. The
-///        version the CTM moves to is this release's own ({ReleaseManifest.protocolVersion}).
-/// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-/// @param upgradeEngine The bootstrap engine (`BootstrapUpgrade`), the committed cut's init
-///        target. The cut carries NO facet cuts and NO authored calldata: the facet
-///        delta cannot be derived at construction (the departing version predates releases, so
-///        there is no `fromRelease` to diff against), so the engine removes each chain's live
-///        routing and installs the genesis release's facet set AT EXECUTION. The engine is
-///        version-independent and holds nothing of its own: `currentRelease`, the version edge,
-///        the schedule and the L2 plan below are all read from this object at execution
-///        (`upgradeFromBootstrap`), composing the L2 transaction with the same composer
-///        transitions use — the bootstrap is bootstrap-specific INPUTS, not a second composition
-///        path.
-/// @param l2Plan The authored L2 input, exactly as on a transition ({AuthoredL2Plan}); the final
-///        plan is constructed from it and `currentRelease`'s own L2 bytecode table.
-/// @param upgradeTimestamp The chain-side earliest execution time the composed proposal carries.
-/// @param ctmExecutor The `CTMUpgradeExecutor` that receives BOTH CTM ownership and the
-///        CTM-domain `ProxyAdmin` — the whole CTM domain lands under one executor. It must be
-///        BOUND to `ctm` AND to `ctmProxyAdmin`, otherwise its fixed entrypoints could never
-///        drive what it is handed.
-/// @param coreExecutor The `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` is handed to earlier in
-///        the same governance bundle.
-/// @param governance The governance both executors must ALREADY answer to: an executor whose
-///        ownership moved between deployment and `migrate()` would receive its domain on behalf of
-///        whoever owns it now. The edge therefore names the expected owner and refuses to hand
-///        anything over otherwise — and refuses a PENDING transfer too, which would let a third party
-///        claim the domain right after.
-struct BootstrapManifest {
-    address ctm;
-    uint256 expectedProtocolVersion;
-    ProxyAdmin ctmProxyAdmin;
-    ProxyUpgradeRow[] ctmProxyUpgrades;
-    address currentRelease;
-    uint256 oldProtocolVersionDeadline;
-    address upgradeEngine;
-    AuthoredL2Plan l2Plan;
-    uint256 upgradeTimestamp;
-    address ctmExecutor;
-    address coreExecutor;
-    address governance;
 }

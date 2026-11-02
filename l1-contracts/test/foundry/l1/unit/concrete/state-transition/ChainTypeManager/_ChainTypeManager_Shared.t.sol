@@ -26,6 +26,9 @@ import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainTypeManager, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
+import {ICTMTransition} from "contracts/upgrades/registry/objects/ICTMTransition.sol";
+import {ICommittedUpgrade} from "contracts/upgrades/registry/objects/ICommittedUpgrade.sol";
+import {L2UpgradePlan} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
@@ -257,11 +260,74 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         return Utils.TEST_GENESIS_REGISTRY;
     }
 
-    /// @dev A mocked release pinning `_protocolVersion` (see {mockReleaseAt}): what a version edge
-    ///      committed through the cut-taking entrypoint names and installs.
+    /// @dev A mocked release pinning `_protocolVersion` (see {mockReleaseAt}): what a mocked
+    ///      transition ({_mockTransition}) names and installs.
     function _releaseAt(uint256 _protocolVersion) internal returns (address release) {
         release = makeAddr(string.concat("release-", vm.toString(_protocolVersion)));
         mockReleaseAt(release, _protocolVersion);
+    }
+
+    /// @dev A stand-in transition answering exactly the reads `setNewVersionUpgradeFromTransition`
+    ///      makes, so each test can make one of them disagree with the CTM. A real `CTMTransition`
+    ///      is covered in `Upgrades/registry/CTMUpgradeExecutor.t.sol`; here the subject is the
+    ///      CTM's bookkeeping, not the object.
+    function _mockTransition(
+        address _fromRelease,
+        uint256 _oldVersion,
+        uint256 _newVersion,
+        address _newRelease,
+        uint256 _oldVersionDeadline
+    ) internal returns (ICTMTransition transition) {
+        transition = ICTMTransition(
+            makeAddr(string.concat("transition-", vm.toString(_oldVersion), "-", vm.toString(_newVersion)))
+        );
+        vm.etch(address(transition), hex"00");
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.fromRelease, ()), abi.encode(_fromRelease));
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.oldProtocolVersion, ()),
+            abi.encode(_oldVersion)
+        );
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.newProtocolVersion, ()),
+            abi.encode(_newVersion)
+        );
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.newRelease, ()), abi.encode(_newRelease));
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.oldProtocolVersionDeadline, ()),
+            abi.encode(_oldVersionDeadline)
+        );
+        vm.mockCall(
+            address(transition),
+            abi.encodeCall(ICTMTransition.upgradeEngine, ()),
+            abi.encode(makeAddr("upgradeEngine"))
+        );
+        // The commit's own checks: the code the transition names, and an L2 plan with nothing to
+        // publish.
+        vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.validate, ()), "");
+        L2UpgradePlan memory emptyPlan;
+        vm.mockCall(address(transition), abi.encodeCall(ICommittedUpgrade.l2Plan, ()), abi.encode(emptyPlan));
+    }
+
+    /// @dev Moves the fixture CTM from its current version to `_newVersion` through a mocked
+    ///      transition departing its current release, with `_oldVersionDeadline` pinned for the
+    ///      departed version. Returns the release it installed.
+    function _commitMockedEdge(
+        uint256 _newVersion,
+        uint256 _oldVersionDeadline
+    ) internal returns (address newRelease) {
+        newRelease = _releaseAt(_newVersion);
+        ICTMTransition transition = _mockTransition(
+            chainContractAddress.currentRelease(),
+            chainContractAddress.protocolVersion(),
+            _newVersion,
+            newRelease,
+            _oldVersionDeadline
+        );
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgradeFromTransition(transition);
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
