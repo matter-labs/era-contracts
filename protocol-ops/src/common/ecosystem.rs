@@ -30,7 +30,7 @@ pub struct EcosystemArgs {
     pub env: Option<String>,
 
     /// Release upgrade-env directory (relative to `l1-contracts/`, e.g.
-    /// `upgrade-envs/v0.33.0-atomic-interop`) whose `<env>.toml` supplies the env's release values
+    /// `upgrade-envs/v0.35.0-upgrade-system`) whose `<env>.toml` supplies the env's release values
     /// (owner, era_chain_id, CREATE2 salts) and holds `output/<env>/`. Defaults to the current release's;
     /// pass an older one to operate on a historical preparation.
     #[clap(long, help_heading = "Topology", requires = "env")]

@@ -2,9 +2,7 @@ use std::sync::OnceLock;
 
 static CONFIG: OnceLock<GlobalConfig> = OnceLock::new();
 
-static DEFAULT_CONFIG: GlobalConfig = GlobalConfig {
-    verbose: false,
-};
+static DEFAULT_CONFIG: GlobalConfig = GlobalConfig { verbose: false };
 
 /// Initialize the global config (verbose flag, etc.).
 ///
@@ -24,4 +22,3 @@ pub fn global_config() -> &'static GlobalConfig {
 pub struct GlobalConfig {
     pub verbose: bool,
 }
-

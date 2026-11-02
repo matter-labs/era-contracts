@@ -409,8 +409,8 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// broadcasts them to real Sepolia. Comma-separated, e.g.
     /// `--camp-a-signers 0xAAA...,0xBBB...`. When omitted, we fall back to
     /// detecting Camp A as "any signer that signs at least one CREATE2-factory
-    /// call" (heuristic — fine for v31 stage where our only EOA happens to be
-    /// the CREATE2 deployer, but an explicit list is safer).
+    /// call" (heuristic — fine for an env where the only EOA we hold is the
+    /// CREATE2 deployer, but an explicit list is safer).
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
 
@@ -664,8 +664,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
 
     // Resolve descriptions registry: explicit `--descriptions` wins; otherwise
     // auto-discover the file alongside the env config TOML (one level up from
-    // `<env-out>/`). For the v31 stage env that's
-    // `<current upgrade-env dir>/sim-descriptions.toml`.
+    // `<env-out>/`), i.e. `<upgrade-env dir>/sim-descriptions.toml`.
     let descriptions_path = args.descriptions.or_else(|| {
         env_cfg.as_ref().and_then(|cfg| {
             Some(cfg.protocol_ops_out_dir())
@@ -1106,8 +1105,8 @@ fn write_sim_inputs_runbook(
 /// Camp-A classification:
 /// - explicit list via `--camp-a-signers` when non-empty, or
 /// - fallback heuristic: "any signer that signs at least one CREATE2-factory
-///   call". Fine for v31 stage where the only key we hold is the same EOA
-///   that signs all CREATE2 deploys; for other envs pass the list explicitly.
+///   call". Fine for an env where the only key we hold is the same EOA
+///   that signs all CREATE2 deploys; otherwise pass the list explicitly.
 fn manifest_to_simulator_transactions(
     manifest_path: &Path,
     network: &str,
