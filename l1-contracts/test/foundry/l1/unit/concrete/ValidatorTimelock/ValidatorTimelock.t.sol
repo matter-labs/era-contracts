@@ -16,6 +16,7 @@ import {
     ExecutionDelayNotIncreased,
     ExecutionDelayTooLarge,
     NotAZKChain,
+    ProtocolIdMismatch,
     RoleAccessDenied,
     TimeNotReached
 } from "contracts/common/L1ContractErrors.sol";
@@ -208,6 +209,27 @@ contract ValidatorTimelockTest is Test {
         _assertAllRoles(chainId, bob, false);
     }
 
+    function test_addValidator() public {
+        _assertAllRoles(chainId, bob, false);
+
+        vm.prank(owner);
+        validator.addValidator(zkSync, bob);
+
+        _assertAllRoles(chainId, bob, true);
+        assertFalse(validator.hasRoleForChainId(chainId, precommitterRole, bob));
+    }
+
+    function test_removeValidator() public {
+        vm.prank(owner);
+        validator.addValidator(zkSync, bob);
+        _assertAllRoles(chainId, bob, true);
+
+        vm.prank(owner);
+        validator.removeValidator(zkSync, bob);
+
+        _assertAllRoles(chainId, bob, false);
+    }
+
     function test_validatorCanMakeCall() public {
         // Setup Mock call to executor
         vm.mockCall(zkSync, abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector), "");
@@ -322,6 +344,17 @@ contract ValidatorTimelockTest is Test {
 
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion);
+    }
+
+    /// @notice The chain's revert reaches the caller with its data unchanged.
+    function test_RevertWhen_upgradeChainFromVersionRevertsInTheChain() public {
+        uint256 oldProtocolVersion = 1;
+        bytes memory reason = abi.encodeWithSelector(ProtocolIdMismatch.selector, 2, oldProtocolVersion);
+        vm.mockCallRevert(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion)), reason);
+
+        vm.prank(alice);
+        vm.expectRevert(reason);
         validator.upgradeChainFromVersion(zkSync, oldProtocolVersion);
     }
 
