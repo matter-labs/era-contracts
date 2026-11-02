@@ -15,9 +15,9 @@ Every release is prepared by its own `CoreUpgrade_v{N}` + `CTMUpgrade_v{N}`
 these defaults, so they always cover the release being built.
 
 There is no per-version chain script: every chain crosses through
-`AdminFunctions.upgradeChainFromCTM`, which picks the modern cut-reading call or the legacy
-handed-cut call from the chain's own protocol version. `DefaultChainUpgrade` remains only as
-the Foundry integration harness for the legacy edge.
+`AdminFunctions.upgradeChainFromCTM`, which has the chain read the cut its CTM committed
+(`upgradeChainFromVersion(chain, version)`) and refuses a chain below v35. `DefaultChainUpgrade`
+is the per-chain leg the Foundry integration tests use.
 
 ## Steps
 

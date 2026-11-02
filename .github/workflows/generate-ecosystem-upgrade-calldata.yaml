@@ -106,8 +106,8 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 #
 # ── 5. Upgrade an individual chain ────────────────────────────────────────
 # Once the ecosystem is on the new version, per chain (`chain_id` is the numeric
-# chain id; the target version is the one the ecosystem upgrade registered on the
-# chain's CTM with `setNewVersionUpgrade`):
+# chain id; the target version is the one the ecosystem upgrade's `CTMTransition`
+# commits on the chain's CTM):
 #
 #   # a) the chain's upgrade calldata for its ChainAdmin
 #   gh workflow run generate-chain-upgrade-calldata.yaml --ref <branch> \

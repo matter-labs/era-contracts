@@ -118,7 +118,9 @@ from calldata:
   unverifiable, which is an error.
 - **Departing state** — the version and release edge against live, and every proxy row's
   `expectedOldImpl` against the implementation actually live behind that proxy, read through the
-  domain's bound `ProxyAdmin` and accepting a row already at its `implNew`.
+  domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. On the edge onto
+  v0.36.0, also each chain the Bridgehub lists under the CTM: one below v0.35.0 is an ERROR, since
+  it has no upgrade path once the v36 CTM lands (`deploy-scripts/upgrade/README.md`, step 6).
 - **Genesis** — on the upgrade path, a release's genesis batch hash against the
   reviewed commit's genesis config (`configs/genesis/zksync-os/latest.json`), its index against
   zero, and every field of its force-deployments data against an independent expectation: the L1

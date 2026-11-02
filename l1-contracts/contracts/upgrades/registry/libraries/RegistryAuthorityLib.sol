@@ -11,11 +11,11 @@ import {CoreUpgradeExecutor} from "../executors/CoreUpgradeExecutor.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 import {
-    BootstrapAuthorityNotHeld,
-    BootstrapExecutorNotBound,
-    BootstrapExecutorOwnerMismatch,
-    BootstrapNominationPending,
-    BootstrapServerNotifierNotBound
+    RegistryAuthorityNotHeld,
+    RegistryExecutorNotBound,
+    RegistryExecutorOwnerMismatch,
+    RegistryNominationPending,
+    RegistryServerNotifierNotBound
 } from "../../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -49,12 +49,12 @@ library RegistryAuthorityLib {
     function requireRegistryAuthority(Authority memory _a) internal view {
         address ctmOwner = Ownable2Step(_a.ctm).owner();
         if (ctmOwner != _a.ctmExecutor) {
-            revert BootstrapAuthorityNotHeld(_a.ctm, ctmOwner);
+            revert RegistryAuthorityNotHeld(_a.ctm, ctmOwner);
         }
         requireNoNomination(_a.ctm);
         address proxyAdminOwner = _a.ctmProxyAdmin.owner();
         if (proxyAdminOwner != _a.ctmExecutor) {
-            revert BootstrapAuthorityNotHeld(address(_a.ctmProxyAdmin), proxyAdminOwner);
+            revert RegistryAuthorityNotHeld(address(_a.ctmProxyAdmin), proxyAdminOwner);
         }
         requireExecutorAuthorities(_a);
         requireNotifierHandedOver(_a);
@@ -80,7 +80,7 @@ library RegistryAuthorityLib {
         address ecosystemProxyAdmin = address(coreExecutor.PROXY_ADMIN());
         address ecosystemProxyAdminOwner = coreExecutor.PROXY_ADMIN().owner();
         if (ecosystemProxyAdminOwner != _a.coreExecutor) {
-            revert BootstrapAuthorityNotHeld(ecosystemProxyAdmin, ecosystemProxyAdminOwner);
+            revert RegistryAuthorityNotHeld(ecosystemProxyAdmin, ecosystemProxyAdminOwner);
         }
     }
 
@@ -90,15 +90,15 @@ library RegistryAuthorityLib {
     function requireNotifierHandedOver(Authority memory _a) internal view {
         address ctmNotifier = IChainTypeManager(_a.ctm).serverNotifierAddress();
         if (ctmNotifier != _a.serverNotifier) {
-            revert BootstrapServerNotifierNotBound(_a.serverNotifier, ctmNotifier);
+            revert RegistryServerNotifierNotBound(_a.serverNotifier, ctmNotifier);
         }
         address notifierCtm = address(ServerNotifier(_a.serverNotifier).chainTypeManager());
         if (notifierCtm != _a.ctm) {
-            revert BootstrapServerNotifierNotBound(_a.ctm, notifierCtm);
+            revert RegistryServerNotifierNotBound(_a.ctm, notifierCtm);
         }
         address notifierOwner = Ownable2Step(_a.serverNotifier).owner();
         if (notifierOwner != _a.ctmExecutor) {
-            revert BootstrapAuthorityNotHeld(_a.serverNotifier, notifierOwner);
+            revert RegistryAuthorityNotHeld(_a.serverNotifier, notifierOwner);
         }
         requireNoNomination(_a.serverNotifier);
     }
@@ -108,7 +108,7 @@ library RegistryAuthorityLib {
     function requireNoNomination(address _target) internal view {
         address pendingOwner = Ownable2Step(_target).pendingOwner();
         if (pendingOwner != address(0)) {
-            revert BootstrapNominationPending(_target, pendingOwner);
+            revert RegistryNominationPending(_target, pendingOwner);
         }
     }
 
@@ -117,7 +117,7 @@ library RegistryAuthorityLib {
     function _requireGovernedBy(address _executor, address _governance) private view {
         address owner = Ownable2Step(_executor).owner();
         if (owner != _governance) {
-            revert BootstrapExecutorOwnerMismatch(_executor, _governance, owner);
+            revert RegistryExecutorOwnerMismatch(_executor, _governance, owner);
         }
         requireNoNomination(_executor);
     }
@@ -127,7 +127,7 @@ library RegistryAuthorityLib {
     /// @param _actual What it is bound to.
     function _requireBound(address _executor, address _expected, address _actual) private pure {
         if (_actual != _expected) {
-            revert BootstrapExecutorNotBound(_executor, _expected, _actual);
+            revert RegistryExecutorNotBound(_executor, _expected, _actual);
         }
     }
 }

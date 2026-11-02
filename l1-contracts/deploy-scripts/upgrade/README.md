@@ -132,7 +132,8 @@ re-derives from its `[member_deployments]` record with each constructor argument
 env value the prepare took it from (without a record it is unverified), that `ZiskVerifier`'s Plonk
 backend runs the pinned runtime, that every proxy row names its slot's proxy,
 the bound authority and the owner the upgrade is driven by, every row's departing implementation,
-that chains crossing the edge keep the system-proxy logic new chains get, readiness,
+that chains crossing the edge keep the system-proxy logic new chains get, readiness, that no
+chain on the CTM is below v35 when the edge crosses into v36 (step 6),
 and that the calldata governance signs invokes the reviewed upgrade, in canonical order, and
 nothing else. What it
 checks and deliberately does not is in
@@ -150,6 +151,10 @@ cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manife
 ```
 
 ## 6. Governance
+
+**Before the v36 proposal executes, every chain on the CTM must be at v35 or later**: past it, a
+chain below v35 has no upgrade path (step 7). Move each such chain to v35 first, while the v35 CTM
+still serves it; `verify-package` reports every chain still below v35 as an error.
 
 ```sh
 cargo run -p protocol_ops -- ecosystem upgrade-governance --env <env> --l1-rpc-url <rpc>
@@ -221,7 +226,8 @@ upgrade resets.
 
 A chain below v35 cannot cross: its version has no committed transition, and v36 removed the
 cut-taking path (`ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)` and the
-`ValidatorTimelock` forwarder) that brought pre-v35 chains across the v35 bootstrap edge.
+`ValidatorTimelock` forwarder) that brought pre-v35 chains across the v35 bootstrap edge, along with
+the `upgradeCutHash` and `protocolVersionVerifier` views a pre-v35 chain's upgrade reads.
 
 **Chain admins behind an `AccessControlRestriction`.** Every crossing from v35 on calls the chain's
 two-argument `upgradeChainFromVersion(address,uint256)` (`0x03129ad9`) instead of the pre-v35

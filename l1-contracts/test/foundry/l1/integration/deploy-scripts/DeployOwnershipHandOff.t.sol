@@ -14,12 +14,12 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {
-    BootstrapAuthorityNotHeld,
-    BootstrapExecutorNotBound,
-    BootstrapExecutorOwnerMismatch,
-    BootstrapNominationPending,
-    BootstrapServerNotifierNotBound,
-    InvalidDAForPermanentRollup
+    InvalidDAForPermanentRollup,
+    RegistryAuthorityNotHeld,
+    RegistryExecutorNotBound,
+    RegistryExecutorOwnerMismatch,
+    RegistryNominationPending,
+    RegistryServerNotifierNotBound
 } from "contracts/common/L1ContractErrors.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -30,7 +30,7 @@ import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 /// @notice Checks that the hand-off `protocol-ops hub init` / `ctm init` performs after the deploy scripts leaves
 /// every contract with its intended owner and nothing with the deployer — and that a fresh ecosystem is born in
-/// the registry model: the end state passes the same completion check a v35 bootstrap must pass.
+/// the registry model: the end state passes `RegistryAuthorityLib.requireRegistryAuthority`.
 contract DeployOwnershipHandOffTest is ZKChainDeployer {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -108,7 +108,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         authority.ctmExecutor = upgradeExecutors.coreExecutor;
         vm.expectRevert(
             abi.encodeWithSelector(
-                BootstrapAuthorityNotHeld.selector,
+                RegistryAuthorityNotHeld.selector,
                 address(addresses.chainTypeManager),
                 upgradeExecutors.ctmExecutor
             )
@@ -119,7 +119,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         authority.ctmProxyAdmin = ProxyAdmin(ecosystemAddresses.shared.transparentProxyAdmin);
         vm.expectRevert(
             abi.encodeWithSelector(
-                BootstrapAuthorityNotHeld.selector,
+                RegistryAuthorityNotHeld.selector,
                 ecosystemAddresses.shared.transparentProxyAdmin,
                 upgradeExecutors.coreExecutor
             )
@@ -136,7 +136,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         authority.ctmProxyAdmin = unbound;
         vm.expectRevert(
             abi.encodeWithSelector(
-                BootstrapExecutorNotBound.selector,
+                RegistryExecutorNotBound.selector,
                 upgradeExecutors.ctmExecutor,
                 address(unbound),
                 ctmAddresses.admin.transparentProxyAdmin
@@ -155,7 +155,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
             abi.encodeCall(Ownable2Step.transferOwnership, (nominee))
         );
         vm.expectRevert(
-            abi.encodeWithSelector(BootstrapNominationPending.selector, address(addresses.chainTypeManager), nominee)
+            abi.encodeWithSelector(RegistryNominationPending.selector, address(addresses.chainTypeManager), nominee)
         );
         this.checkFreshAuthority();
     }
@@ -171,7 +171,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         );
         vm.expectRevert(
             abi.encodeWithSelector(
-                BootstrapAuthorityNotHeld.selector,
+                RegistryAuthorityNotHeld.selector,
                 ecosystemAddresses.shared.transparentProxyAdmin,
                 stranger
             )
@@ -187,7 +187,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         RegistryAuthorityLib.Authority memory authority = _freshAuthority();
         address otherNotifier = makeAddr("otherNotifier");
         authority.serverNotifier = otherNotifier;
-        vm.expectRevert(abi.encodeWithSelector(BootstrapServerNotifierNotBound.selector, otherNotifier, notifier));
+        vm.expectRevert(abi.encodeWithSelector(RegistryServerNotifierNotBound.selector, otherNotifier, notifier));
         this.checkAuthority(authority);
 
         address otherCTM = makeAddr("otherCTM");
@@ -198,7 +198,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         );
         vm.expectRevert(
             abi.encodeWithSelector(
-                BootstrapServerNotifierNotBound.selector,
+                RegistryServerNotifierNotBound.selector,
                 address(addresses.chainTypeManager),
                 otherCTM
             )
@@ -218,7 +218,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         );
         vm.prank(stranger);
         Ownable2Step(notifier).acceptOwnership();
-        vm.expectRevert(abi.encodeWithSelector(BootstrapAuthorityNotHeld.selector, notifier, stranger));
+        vm.expectRevert(abi.encodeWithSelector(RegistryAuthorityNotHeld.selector, notifier, stranger));
         this.checkFreshAuthority();
     }
 
@@ -227,7 +227,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
     function test_freshEcosystem_failsTheCompletionCheckUntilGovernanceAccepts() public {
         vm.expectRevert(
             abi.encodeWithSelector(
-                BootstrapExecutorOwnerMismatch.selector,
+                RegistryExecutorOwnerMismatch.selector,
                 upgradeExecutors.ctmExecutor,
                 ecosystemAddresses.shared.governance,
                 deployer
@@ -243,7 +243,7 @@ contract DeployOwnershipHandOffTest is ZKChainDeployer {
         assertEq(Ownable2Step(upgradeExecutors.coreExecutor).owner(), ecosystemAddresses.shared.governance);
         vm.expectRevert(
             abi.encodeWithSelector(
-                BootstrapExecutorOwnerMismatch.selector,
+                RegistryExecutorOwnerMismatch.selector,
                 upgradeExecutors.ctmExecutor,
                 ecosystemAddresses.shared.governance,
                 deployer

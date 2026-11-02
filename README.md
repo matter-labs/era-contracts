@@ -115,13 +115,16 @@ flowchart TB
     subgraph HELPERS["Internal runtime libraries · 12"]
         direction LR
         DERIVECALLERS["Release / transition construction"]
-        APPLYCALLERS["Executors / fresh setup"]
+        APPLYCALLERS["Executors"]
+        SHAPECALLERS["Fresh-deployment checks (DeployOwnershipHandOff.t.sol)"]
         CHAINCALLERS["ChainTypeManager / DiamondInit / upgrade engines / composer"]
         DERIVE["TransitionDerivationLib<br/>L2InventoryLib<br/>L2PlanLib<br/>VersionEdgeLib"]
-        APPLY["ProxyUpgradeRowLib<br/>RegistryAuthorityLib<br/>ObjectAnchorLib"]
+        APPLY["ProxyUpgradeRowLib<br/>ObjectAnchorLib"]
+        SHAPE["RegistryAuthorityLib"]
         CHAINCODE["CTMUpgradeComposer<br/>ReleaseFacetReader<br/>LiveRoutingReader<br/>L2CanonicalTransactionLib<br/>ZKChainSpecificForceDeploymentsLib"]
         DERIVECALLERS --> DERIVE
         APPLYCALLERS --> APPLY
+        SHAPECALLERS --> SHAPE
         CHAINCALLERS --> CHAINCODE
     end
     subgraph DATA["Data declarations · no executable contracts"]
