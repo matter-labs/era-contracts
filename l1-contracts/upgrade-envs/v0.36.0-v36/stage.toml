@@ -1,7 +1,5 @@
 # Upgrade input for the stage environment on the v36 release. See protocol-ops/README.md "Environment inputs".
 
-era_chain_id = 270
-
 # `bridgehub.owner()`, the signer of the governance bundle.
 owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 

@@ -128,7 +128,8 @@ jobs:
 
       # Built like the previous release's states (no CBOR metadata), so unchanged code compares equal.
       - name: Build l1-contracts artifacts
-        run: FOUNDRY_PROFILE=anvil-interop yarn l1 build:foundry
+        working-directory: l1-contracts
+        run: FOUNDRY_PROFILE=anvil-interop forge build
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -185,7 +186,8 @@ jobs:
 
       # Built like the previous release's states (no CBOR metadata), so unchanged code compares equal.
       - name: Build l1-contracts artifacts
-        run: FOUNDRY_PROFILE=anvil-interop yarn l1 build:foundry
+        working-directory: l1-contracts
+        run: FOUNDRY_PROFILE=anvil-interop forge build
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop

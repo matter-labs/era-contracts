@@ -1,12 +1,17 @@
+use std::fs;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 use alloy::primitives::{Address, B256};
 use alloy::sol_types::SolCall;
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::{
     AdminFunctionsAbi, IDeployCTMAbi, IDeployL1CoreContractsAbi, IFinalizeChainInitAbi,
 };
+use crate::common::paths;
+use crate::upgrade_verification::registry::genesis::ZKSYNC_OS_GENESIS_CONFIG_PATH;
 
 pub mod deploy_ctm;
 pub mod deploy_ecosystem;
@@ -17,21 +22,85 @@ pub mod upgrade_executors;
 pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
 
-/// The current release's core and CTM upgrade scripts, the prepare defaults; another edge's scripts are selected
-/// with `--core-script-path` / `--ctm-script-path`. `scripts/new-release.ts` moves these paths on a release bump.
-pub const CURRENT_CORE_UPGRADE_SCRIPT_PATH: &str =
-    "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
-pub const CURRENT_CTM_UPGRADE_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v36/CTMUpgrade_v36.s.sol";
-/// The current release's upgrade-env directory, relative to `l1-contracts/`. The prepare input default and
-/// `--env` resolution (`EnvConfig`) derive from it. `scripts/new-release.ts` moves it on a release bump.
-macro_rules! current_upgrade_env_dir {
-    () => {
-        "upgrade-envs/v0.36.0-v36"
-    };
+/// The release `configs/genesis/zksync-os/latest.json` is at: its upgrade-env directory, the one
+/// `upgrade-envs/v<major>.<minor>.0-<name>/`, and its core and CTM upgrade scripts under
+/// `deploy-scripts/upgrade/v<minor>/`. The prepare defaults and `--env` resolution (`EnvConfig`) follow it;
+/// another edge's scripts are selected with `--core-script-path` / `--ctm-script-path`.
+#[derive(Debug)]
+pub struct CurrentRelease {
+    /// The upgrade-env directory's name under `upgrade-envs/`, `v<major>.<minor>.0-<name>`.
+    pub upgrade: String,
+    pub core_script_path: String,
+    pub ctm_script_path: String,
 }
-pub const CURRENT_UPGRADE_ENV_DIR: &str = concat!("/", current_upgrade_env_dir!());
-pub const CURRENT_UPGRADE_LOCAL_INPUT_PATH: &str =
-    concat!("/", current_upgrade_env_dir!(), "/local.toml");
+
+impl CurrentRelease {
+    /// The upgrade-env directory, relative to `l1-contracts/`.
+    pub fn env_dir(&self) -> String {
+        format!("upgrade-envs/{}", self.upgrade)
+    }
+
+    /// The local upgrade input, the prepare's default `--upgrade-input-path`.
+    pub fn local_input_path(&self) -> String {
+        format!("/{}/local.toml", self.env_dir())
+    }
+}
+
+/// The current release, read once per process.
+pub fn current_release() -> anyhow::Result<&'static CurrentRelease> {
+    static CURRENT: OnceLock<Result<CurrentRelease, String>> = OnceLock::new();
+    CURRENT
+        .get_or_init(|| read_current_release().map_err(|e| format!("{e:#}")))
+        .as_ref()
+        .map_err(|e| anyhow::anyhow!("cannot resolve the current release: {e}"))
+}
+
+fn read_current_release() -> anyhow::Result<CurrentRelease> {
+    let l1_contracts = paths::resolve_l1_contracts_path()?;
+    let genesis_path = l1_contracts
+        .parent()
+        .context("l1-contracts has no parent directory")?
+        .join(ZKSYNC_OS_GENESIS_CONFIG_PATH);
+    let genesis: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(&genesis_path)
+            .with_context(|| format!("read {}", genesis_path.display()))?,
+    )
+    .with_context(|| format!("parse {}", genesis_path.display()))?;
+    let version = |part: &str| {
+        genesis["protocol_semantic_version"][part]
+            .as_u64()
+            .with_context(|| {
+                format!(
+                    "{} has no protocol_semantic_version.{part}",
+                    genesis_path.display()
+                )
+            })
+    };
+    let (major, minor) = (version("major")?, version("minor")?);
+    let prefix = format!("v{major}.{minor}.0-");
+    let envs_dir = l1_contracts.join("upgrade-envs");
+    let mut dirs = Vec::new();
+    for entry in fs::read_dir(&envs_dir).with_context(|| format!("read {}", envs_dir.display()))? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.starts_with(&prefix) && entry.path().is_dir() {
+            dirs.push(name);
+        }
+    }
+    let [upgrade] = <[String; 1]>::try_from(dirs).map_err(|dirs| {
+        anyhow::anyhow!(
+            "{} is at v{major}.{minor}, so {} must hold exactly one {prefix}<name> directory; found {dirs:?}",
+            genesis_path.display(),
+            envs_dir.display()
+        )
+    })?;
+    Ok(CurrentRelease {
+        upgrade,
+        core_script_path: format!("deploy-scripts/upgrade/v{minor}/CoreUpgrade_v{minor}.s.sol"),
+        ctm_script_path: format!("deploy-scripts/upgrade/v{minor}/CTMUpgrade_v{minor}.s.sol"),
+    })
+}
+
 /// Core prepare output. Version-free: every release's prepare writes it.
 pub const UPGRADE_CORE_OUTPUT_PATH: &str = "/script-out/upgrade-core.toml";
 /// Per-CTM prepare output, `<prefix><ctm proxy>.toml` (lowercase hex). Version-free, like the core output.

@@ -1,7 +1,5 @@
 # Upgrade input for the mainnet environment on the v36 release. See protocol-ops/README.md "Environment inputs".
 
-era_chain_id = 324
-
 # `bridgehub.owner()`, the signer of the governance bundle.
 owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 
