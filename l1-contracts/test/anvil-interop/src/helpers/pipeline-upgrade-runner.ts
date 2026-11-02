@@ -1043,7 +1043,6 @@ export function prepareUpgradeHarnessInputs(
   if (!primaryChainId) throw new Error(`No chains loaded for ${hop.label}`);
 
   let permanentValues = fs.readFileSync(path.join(l1ContractsDir, scenario.permanentValuesTemplatePath), "utf8");
-  permanentValues = replaceTomlBareValue(permanentValues, "era_chain_id", String(primaryChainId));
   permanentValues = replaceTomlStringValue(permanentValues, "bridgehub_proxy_addr", state.l1Addresses.bridgehub);
   permanentValues = replaceTomlStringValue(permanentValues, "ctm_proxy_addr", state.ctmAddresses.chainTypeManager);
   // Every prepare deploys under a salt of its own, as production rotates `[contracts]

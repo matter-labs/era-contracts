@@ -39,7 +39,7 @@ Other one-off scripts of shipped upgrades live on their release branches, not he
 ## 1. Inputs
 
 Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (the current release's are in its
-`upgrade-envs/v<major>.<minor>.0-<name>/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
+`upgrade-envs/v<major>.<minor>.<patch>-<name>/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
 Keep inputs minimal — the prepare reads the departing version, the live implementations, the
 CTM's owner and the ecosystem `ProxyAdmin`'s owner from L1. One input cannot be derived and must
 be carried forward from the previous prepare's output: `[contracts] eip7702_checker`

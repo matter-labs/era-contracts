@@ -25,7 +25,7 @@ import { join, relative } from "path";
 //      over, every CREATE2 and legacy-Gov salt is regenerated, so the new release's
 //      deployments do not resolve to the previous release's addresses, and the per-release switch
 //      `redeploy_zk_governance` is dropped.
-//      The current release is the one `upgrade-envs/v<major>.<minor>.0-<name>/` dir of the genesis version:
+//      The current release is the one `upgrade-envs/v<major>.<minor>.<patch>-<name>/` dir of the genesis version:
 //      protocol-ops (its prepare defaults, `--env` resolution) and the generate workflow read it from these two,
 //      so they move with them.
 //   3. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
@@ -177,7 +177,7 @@ function main(): void {
 
   // 2. Local upgrade input, from the current release's: the one upgrade-env dir of the genesis version, the
   // same one protocol-ops resolves (`current_release` in protocol-ops/src/common/forge/scripts/mod.rs).
-  const currentPrefix = `v${current.major}.${current.minor}.0-`;
+  const currentPrefix = `${versionString(current)}-`;
   const currentEnvDirs = fs
     .readdirSync(UPGRADE_ENVS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.startsWith(currentPrefix))
