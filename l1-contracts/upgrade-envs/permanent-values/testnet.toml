@@ -1,5 +1,8 @@
 l1_chain_id = 11155111
 
+# The Era chain's id, which the PUH/Guardians redeploy keeps (`redeploy_zk_governance`).
+era_chain_id = 270
+
 # ZK token asset ID as registered in this ecosystem's L1NativeTokenVault (0xF8d4A519...).
 # Resolves to 0xd1Ee6cE0A0fDB29793cbDC41DcFE5d356C7d5C7f ("ZKsync"/ZK), whose originChainId
 # is 301 — the bridged L1 representation of the chain-301 ZK token

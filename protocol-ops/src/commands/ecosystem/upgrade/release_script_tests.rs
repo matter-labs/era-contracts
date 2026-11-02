@@ -2,11 +2,8 @@ use super::*;
 
 use clap::Parser;
 
-use crate::common::forge::scripts::CURRENT_UPGRADE_ENV_DIR;
-use crate::common::forge::scripts::{
-    CURRENT_CORE_UPGRADE_SCRIPT_PATH, CURRENT_CTM_UPGRADE_SCRIPT_PATH,
-    CURRENT_UPGRADE_LOCAL_INPUT_PATH,
-};
+use crate::common::forge::scripts::{current_release, CurrentRelease};
+use crate::common::paths;
 use clap::CommandFactory;
 
 /// Another release's upgrade-env dir, kept in the tree, for the release-selection tests.
@@ -15,9 +12,19 @@ const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
 #[test]
 fn prepare_defaults_to_current_release() {
     let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-    assert_eq!(args.ctm_script_path, CURRENT_CTM_UPGRADE_SCRIPT_PATH);
-    assert_eq!(args.core_script_path, CURRENT_CORE_UPGRADE_SCRIPT_PATH);
-    assert_eq!(args.upgrade_input_path, CURRENT_UPGRADE_LOCAL_INPUT_PATH);
+    let release = current_release().unwrap();
+    assert_eq!(
+        or_current_release(&args.ctm_script_path, |r| r.ctm_script_path.clone()).unwrap(),
+        release.ctm_script_path
+    );
+    assert_eq!(
+        or_current_release(&args.core_script_path, |r| r.core_script_path.clone()).unwrap(),
+        release.core_script_path
+    );
+    assert_eq!(
+        or_current_release(&args.upgrade_input_path, CurrentRelease::local_input_path).unwrap(),
+        release.local_input_path()
+    );
     let help = UpgradePrepareAllArgs::command()
         .render_long_help()
         .to_string();
@@ -39,15 +46,15 @@ fn prepare_defaults_match_the_foundry_full_flow_test() {
     let read = |relative: &str| {
         std::fs::read_to_string(crate::common::paths::path_from_root(relative)).unwrap()
     };
-    let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
+    let release = current_release().unwrap();
 
     let local_test = read("l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
-    let ctm = contract_name(&args.ctm_script_path);
+    let ctm = contract_name(&release.ctm_script_path);
     assert!(
         local_test.contains(&format!(" is {ctm} {{")),
         "UpgradeTest_Local's CTM test subclass must extend the default CTM script {ctm}"
     );
-    let core = contract_name(&args.core_script_path);
+    let core = contract_name(&release.core_script_path);
     assert!(
             local_test.contains(&format!(" is {core} {{"))
                 || local_test.contains(&format!("new {core}()")),
@@ -55,26 +62,19 @@ fn prepare_defaults_match_the_foundry_full_flow_test() {
         );
 }
 
-/// The default scripts must be the current release's: `yarn new-release` moves them together with the
-/// upgrade-env dir, so a hand edit of one without the other would prepare a release with another
-/// release's scripts.
+/// The current release (`latest.json`'s version) has its local input and its core and CTM upgrade scripts,
+/// so a prepare with the defaults runs. `yarn new-release` creates all three.
 #[test]
-fn release_specific_defaults_belong_to_the_current_release() {
-    let current_minor = CURRENT_UPGRADE_ENV_DIR
-        .split("/v0.")
-        .nth(1)
-        .and_then(|rest| rest.split('.').next())
-        .unwrap();
-    let args = UpgradePrepareAllArgs::try_parse_from(["prepare"]).unwrap();
-    for script in [&args.ctm_script_path, &args.core_script_path] {
-        let script_minor = script
-            .strip_prefix("deploy-scripts/upgrade/v")
-            .and_then(|rest| rest.split('/').next());
-        assert_eq!(
-            script_minor,
-            Some(current_minor),
-            "{script} is not the current release's script"
-        );
+fn current_release_has_its_input_and_scripts() {
+    let release = current_release().unwrap();
+    let l1 = paths::resolve_l1_contracts_path().unwrap();
+    let local_input = release.local_input_path();
+    for path in [
+        local_input.trim_start_matches('/'),
+        &release.core_script_path,
+        &release.ctm_script_path,
+    ] {
+        assert!(l1.join(path).is_file(), "the current release has no {path}");
     }
 }
 
@@ -100,7 +100,7 @@ fn upgrade_env_dir_selects_the_per_env_input() {
     let cfg = prepare_env_config(&current).unwrap().unwrap();
     assert_eq!(
         per_env_upgrade_input(&cfg).unwrap(),
-        format!("{CURRENT_UPGRADE_ENV_DIR}/stage.toml")
+        format!("/{}/stage.toml", current_release().unwrap().env_dir())
     );
 }
 

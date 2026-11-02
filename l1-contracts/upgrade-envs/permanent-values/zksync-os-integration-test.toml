@@ -4,6 +4,9 @@
 #
 # Paired by basename with `../v0.31.0-interopB/v30-local-fixture.toml`.
 
+# The Era chain's id, which the PUH/Guardians redeploy keeps (`redeploy_zk_governance`).
+era_chain_id = 6565
+
 # Dummy ZK token asset ID for test fixtures. On mainnet this would be
 # DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).
 zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"

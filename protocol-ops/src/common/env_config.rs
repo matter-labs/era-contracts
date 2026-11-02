@@ -5,15 +5,15 @@
 //! Rather than asking the user to pass every flag explicitly, commands that
 //! flatten an [`crate::common::EcosystemArgs`] expose `--env <name>` which
 //! reads `upgrade-envs/permanent-values/<env>.toml` (and the release upgrade input
-//! TOML for env-specific values like `era_chain_id` / `owner_address`) and
+//! TOML for release-specific values like `owner_address` and the salts) and
 //! fills the missing args.
 //!
 //! Any explicit CLI flag still wins — `--env` is purely a defaults source.
 //!
 //! Layout (relative to `l1-contracts/`):
 //!
-//!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2)
-//!   <current upgrade-env dir>/<env>.toml          (owner, era_chain_id)
+//!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2, era_chain_id)
+//!   <current upgrade-env dir>/<env>.toml          (owner, salts)
 //!
 //! Older releases' inputs contain unquoted hex literals (e.g. `old_protocol_version =
 //! 0x1d…`) which `toml-rs` chokes on, so we parse it line-by-line for the
@@ -27,30 +27,22 @@ use alloy::primitives::{Address, B256};
 use anyhow::Context;
 use serde::Deserialize;
 
-use crate::common::forge::scripts::CURRENT_UPGRADE_ENV_DIR;
+use crate::common::forge::scripts::current_release;
 use crate::common::paths::resolve_l1_contracts_path;
 
 /// The release's upgrade: the directory under `upgrade-envs/` that `upgrade-prepare-all`
 /// and the generate / replay pipeline (`ecosystem rehearse-upgrade`, `replay-bundle`)
-/// target when none is named. The last segment of [`CURRENT_UPGRADE_ENV_DIR`].
-pub const DEFAULT_UPGRADE: &str = last_path_segment(CURRENT_UPGRADE_ENV_DIR);
-
-const fn last_path_segment(path: &'static str) -> &'static str {
-    let bytes = path.as_bytes();
-    let mut start = bytes.len();
-    while start > 0 && bytes[start - 1] != b'/' {
-        start -= 1;
-    }
-    match std::str::from_utf8(bytes.split_at(start).1) {
-        Ok(segment) => segment,
-        Err(_) => panic!("upgrade-env dir is not UTF-8"),
-    }
+/// target when none is named. The release `configs/genesis/zksync-os/latest.json` is at
+/// (see [`current_release`]).
+pub fn default_upgrade() -> anyhow::Result<&'static str> {
+    Ok(&current_release()?.upgrade)
 }
+
 /// The release's upgrade-env directory. Salts, per-env inputs and the canonical output
 /// directory all live here. It is the same directory the prepare defaults use, so it moves with each
 /// release rather than trailing an older one.
-fn upgrade_env_dir() -> &'static str {
-    CURRENT_UPGRADE_ENV_DIR.trim_start_matches('/')
+fn upgrade_env_dir() -> anyhow::Result<String> {
+    Ok(current_release()?.env_dir())
 }
 const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
@@ -61,6 +53,10 @@ pub struct PermanentValues {
     /// against it as a basic "right network" sanity check.
     #[serde(default)]
     pub l1_chain_id: Option<u64>,
+    /// The Era chain's id, which the PUH/Guardians redeploy keeps
+    /// ([`crate::commands::ecosystem::zk_governance`]).
+    #[serde(default)]
+    pub era_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
     pub testnet_verifier: Option<bool>,
@@ -177,7 +173,6 @@ pub struct PermanentContracts {
 #[derive(Debug, Default, Clone)]
 pub struct UpgradeInputs {
     pub owner_address: Option<Address>,
-    pub era_chain_id: Option<u64>,
     /// Whether THIS release replaces the ecosystem's governance set (a new
     /// `ProtocolUpgradeHandler` implementation plus Guardians / SecurityCouncil /
     /// EmergencyUpgradeBoard, wired in by one governance call — see
@@ -208,7 +203,7 @@ impl EnvConfig {
     /// Load `<l1-contracts>/upgrade-envs/permanent-values/<env>.toml` and the
     /// upgrade input TOML for the same env. Both files must exist.
     pub fn load(env: &str) -> anyhow::Result<Self> {
-        Self::load_from_upgrade_env_dir(env, upgrade_env_dir())
+        Self::load_from_upgrade_env_dir(env, &upgrade_env_dir()?)
     }
 
     /// `load` against an explicit upgrade-env directory (relative to `l1-contracts/`) instead of the
@@ -318,9 +313,9 @@ impl EnvConfig {
         Ok(self.release_input()?.owner_address)
     }
 
-    /// The env's `era_chain_id` from the release input; errors like [`Self::owner_address`].
-    pub fn era_chain_id(&self) -> anyhow::Result<Option<u64>> {
-        Ok(self.release_input()?.era_chain_id)
+    /// The env's `era_chain_id`, a permanent value.
+    pub fn era_chain_id(&self) -> Option<u64> {
+        self.permanent.era_chain_id
     }
 
     /// Whether this release replaces the ecosystem's governance set — see
@@ -412,8 +407,6 @@ fn parse_upgrade_input(content: &str) -> UpgradeInputs {
         let line = line.trim();
         if let Some(addr) = match_quoted_address(line, "owner_address") {
             out.owner_address = Some(addr);
-        } else if let Some(id) = match_unquoted_uint(line, "era_chain_id") {
-            out.era_chain_id = Some(id);
         } else if let Some(flag) = match_unquoted_bool(line, "redeploy_zk_governance") {
             out.redeploy_zk_governance = flag;
         }
@@ -519,17 +512,6 @@ fn match_unquoted_bool(line: &str, key: &str) -> Option<bool> {
     line[prefix.len()..].split('#').next()?.trim().parse().ok()
 }
 
-fn match_unquoted_uint(line: &str, key: &str) -> Option<u64> {
-    let prefix = format!("{key} = ");
-    if !line.starts_with(&prefix) {
-        return None;
-    }
-    let rest = &line[prefix.len()..];
-    // Strip optional trailing comment.
-    let value = rest.split('#').next()?.trim();
-    value.parse().ok()
-}
-
 fn match_quoted_h256(line: &str, key: &str) -> Option<B256> {
     let prefix = format!("{key} = \"");
     if !line.starts_with(&prefix) {
@@ -549,7 +531,7 @@ mod tests {
     /// PUH-governed env redeployed the whole governance set.
     #[test]
     fn zk_governance_redeploy_defaults_to_off() {
-        assert!(!parse_upgrade_input("era_chain_id = 270\n").redeploy_zk_governance);
+        assert!(!parse_upgrade_input("").redeploy_zk_governance);
         assert!(!parse_upgrade_input("redeploy_zk_governance = false\n").redeploy_zk_governance);
         assert!(parse_upgrade_input("redeploy_zk_governance = true\n").redeploy_zk_governance);
         assert!(
@@ -604,7 +586,7 @@ mod tests {
     #[test]
     fn every_current_release_input_has_its_permanent_values() {
         let l1 = resolve_l1_contracts_path().unwrap();
-        let release_dir = l1.join(upgrade_env_dir());
+        let release_dir = l1.join(upgrade_env_dir().unwrap());
         let mut envs = 0;
         for entry in fs::read_dir(&release_dir).unwrap() {
             let path = entry.unwrap().path();
@@ -728,17 +710,9 @@ mod tests {
         .expect("permanent values alone still load");
         assert_ne!(cfg.bridgehub(), Address::ZERO);
         assert!(cfg.owner_address().is_err());
-        assert!(cfg.era_chain_id().is_err());
+        assert!(cfg.era_chain_id().is_some(), "a permanent value");
         assert!(cfg.create2_factory_salt_for_upgrade().is_err());
         assert!(cfg.create2_factory_salt_for_upgrade_per_ctm().is_err());
-    }
-
-    /// The generate / replay pipeline's default upgrade and the directory every release
-    /// command reads its inputs from and writes its outputs to must name the same upgrade,
-    /// or `rehearse-upgrade` would pack one release's inputs under another's output dir.
-    #[test]
-    fn default_upgrade_is_the_release_env_dir() {
-        assert_eq!(upgrade_env_dir(), format!("upgrade-envs/{DEFAULT_UPGRADE}"));
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the

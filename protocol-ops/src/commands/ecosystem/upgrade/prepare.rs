@@ -11,10 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::env_config::EnvConfig;
-use crate::common::forge::scripts::{
-    CURRENT_CORE_UPGRADE_SCRIPT_PATH, CURRENT_CTM_UPGRADE_SCRIPT_PATH,
-    CURRENT_UPGRADE_LOCAL_INPUT_PATH, UPGRADE_CORE_OUTPUT_PATH,
-};
+use crate::common::forge::scripts::{current_release, CurrentRelease, UPGRADE_CORE_OUTPUT_PATH};
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::output::write_output_if_requested;
@@ -60,24 +57,25 @@ pub struct UpgradePrepareAllArgs {
     #[clap(long)]
     pub create2_factory_salt: Option<B256>,
 
-    #[clap(
-        long,
-        default_value = CURRENT_UPGRADE_LOCAL_INPUT_PATH
-    )]
-    pub upgrade_input_path: String,
+    /// Upgrade input TOML (relative to l1-contracts root). Defaults to the current release's
+    /// `local.toml`, or with `--env` to the release dir's `<env>.toml`.
+    #[clap(long)]
+    pub upgrade_input_path: Option<String>,
 
     /// Override the core-prepare output TOML path (relative to l1-contracts
     /// root). Defaults to the canonical `script-out/upgrade-core.toml`.
     #[clap(long, default_value = UPGRADE_CORE_OUTPUT_PATH, hide = true)]
     pub core_output_path: String,
 
-    /// Core upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = CURRENT_CORE_UPGRADE_SCRIPT_PATH)]
-    pub core_script_path: String,
+    /// Core upgrade script. Defaults to the current release's; historical releases must select their own
+    /// script and input.
+    #[clap(long)]
+    pub core_script_path: Option<String>,
 
-    /// CTM upgrade script; historical releases must select their own script and input.
-    #[clap(long, default_value = CURRENT_CTM_UPGRADE_SCRIPT_PATH)]
-    pub ctm_script_path: String,
+    /// CTM upgrade script. Defaults to the current release's; historical releases must select their own
+    /// script and input.
+    #[clap(long)]
+    pub ctm_script_path: Option<String>,
 
     /// Path to a TOML file describing the CTM inputs (proxy + optional
     /// overrides). Mutually exclusive with the direct CTM flags
@@ -160,9 +158,9 @@ pub(super) fn prepare_env_config(
     let Some(cfg) = args.topology.env_config()? else {
         return Ok(None);
     };
-    if args.upgrade_input_path != CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+    if let Some(upgrade_input_path) = &args.upgrade_input_path {
         let input_dir = paths::resolve_l1_contracts_path()?
-            .join(args.upgrade_input_path.trim_start_matches('/'))
+            .join(upgrade_input_path.trim_start_matches('/'))
             .parent()
             .map(Path::to_path_buf)
             .context("--upgrade-input-path has no parent directory")?;
@@ -174,7 +172,7 @@ pub(super) fn prepare_env_config(
             input_dir == env_dir,
             "--upgrade-input-path {} is not in the release dir {} that --env {} reads its salts and owner from; \
              select that release with --upgrade-env-dir instead",
-            args.upgrade_input_path,
+            upgrade_input_path,
             env_dir.display(),
             cfg.env
         );
@@ -182,19 +180,31 @@ pub(super) fn prepare_env_config(
     Ok(Some(cfg))
 }
 
+/// `explicit`, or the current release's value when it is unset (see [`current_release`]). The release is read
+/// only then, so a historical edge that names its own input and scripts does not depend on it.
+pub(super) fn or_current_release(
+    explicit: &Option<String>,
+    current: impl FnOnce(&CurrentRelease) -> String,
+) -> anyhow::Result<String> {
+    match explicit {
+        Some(value) => Ok(value.clone()),
+        None => Ok(current(current_release()?)),
+    }
+}
+
 /// The env's upgrade input (`/<release dir>/<env>.toml`, relative to `l1-contracts/`) from the release dir
 /// `cfg` was loaded from, so the input, the salts and the output dir belong to the same release.
 ///
 /// Fails closed on a missing file rather than keeping the CLI default. The default is the *local* input, so a
 /// silent fallback would hand a real environment local's values for the keys the input does supply —
-/// `era_chain_id`, for one. Failing here also catches a mistyped `--env`.
+/// the owner, for one. Failing here also catches a mistyped `--env`.
 pub(super) fn per_env_upgrade_input(cfg: &EnvConfig) -> anyhow::Result<String> {
     let per_env_abs = &cfg.upgrade_input_path;
     anyhow::ensure!(
         per_env_abs.exists(),
         "no upgrade input for --env {} at {}. Add it — an empty file is fine if the environment needs \
          nothing from the input — because this command will not fall back to the local default, which \
-         would silently give this environment local's `era_chain_id`.",
+         would silently give this environment local's owner and salts.",
         cfg.env,
         per_env_abs.display()
     );
@@ -223,12 +233,20 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         // signer's private key with `cast wallet address`).
         // Resolve --upgrade-input-path from --env, unless the caller passed one explicitly
         // (see `per_env_upgrade_input`).
-        if args.upgrade_input_path == CURRENT_UPGRADE_LOCAL_INPUT_PATH {
+        if args.upgrade_input_path.is_none() {
             let per_env_rel = per_env_upgrade_input(cfg)?;
             logger::info(format!("Using per-env upgrade input: {per_env_rel}"));
-            args.upgrade_input_path = per_env_rel;
+            args.upgrade_input_path = Some(per_env_rel);
         }
     }
+    let upgrade_input_path =
+        or_current_release(&args.upgrade_input_path, CurrentRelease::local_input_path)?;
+    let core_script_path = or_current_release(&args.core_script_path, |release| {
+        release.core_script_path.clone()
+    })?;
+    let ctm_script_path = or_current_release(&args.ctm_script_path, |release| {
+        release.ctm_script_path.clone()
+    })?;
     // Auto-fill the CREATE2 salt from the per-version upgrade input
     // (`<current upgrade-env dir>/<env>.toml [contracts]
     // create2_factory_salt`). Recording the salt in version control makes
@@ -361,10 +379,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         ctms,
         create2_factory_salt: args.create2_factory_salt,
         create2_factory_salt_per_ctm,
-        upgrade_input_path: args.upgrade_input_path.clone(),
+        upgrade_input_path,
         core_output_path: args.core_output_path.clone(),
-        core_script_path: args.core_script_path.clone(),
-        ctm_script_path: args.ctm_script_path.clone(),
+        core_script_path,
+        ctm_script_path,
         zk_token_asset_id,
         testnet_verifier,
     };

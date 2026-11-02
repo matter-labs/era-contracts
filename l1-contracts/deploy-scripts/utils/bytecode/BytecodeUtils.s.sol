@@ -8,6 +8,16 @@ library BytecodeUtils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
+    // Builds into its own output directory (l1-contracts/foundry.toml).
+    string internal constant ANVIL_INTEROP_PROFILE = "anvil-interop";
+
+    /// @notice The forge output directory of the profile in effect, relative to the project root.
+    function forgeOutDir() internal view returns (string memory) {
+        return
+            compareStrings(vm.envOr("FOUNDRY_PROFILE", string("")), ANVIL_INTEROP_PROFILE)
+                ? "/../l1-contracts/out-anvil-interop/"
+                : "/../l1-contracts/out/";
+    }
 
     /**
      * @dev Read foundry bytecodes
@@ -20,7 +30,7 @@ library BytecodeUtils {
         return bytecode;
     }
 
-    /// @notice Read L1 creation bytecode from `out/`.
+    /// @notice Read L1 creation bytecode from {forgeOutDir}.
     function readBytecodeL1(string memory _fileName, string memory _contractName) internal view returns (bytes memory) {
         return readFoundryBytecodeL1(_fileName, _contractName);
     }
@@ -30,7 +40,7 @@ library BytecodeUtils {
         string memory contractName
     ) private view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
+        string memory path = string.concat(forgeOutDir(), fileName, "/", contractName, ".json");
         return readFoundryBytecode(path);
     }
 
@@ -43,13 +53,13 @@ library BytecodeUtils {
         return vm.parseJsonBytes(json, ".deployedBytecode.object");
     }
 
-    /// @notice Read L1 deployed bytecode from `out/`.
+    /// @notice Read L1 deployed bytecode from {forgeOutDir}.
     function readDeployedBytecodeL1(
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
+        string memory path = string.concat(forgeOutDir(), _fileName, "/", _contractName, ".json");
         return readFoundryDeployedBytecode(path);
     }
 

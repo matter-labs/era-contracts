@@ -12,7 +12,7 @@
 //!   every bundle under impersonation and run the upgrade's checks. What "prepare" and
 //!   "checks" mean comes from `upgrade-envs/<upgrade>/upgrade.toml`: `prepare-all` is the
 //!   release's `upgrade-prepare-all` + `verify-bootstrap`, the registry verifier (only for
-//!   [`DEFAULT_UPGRADE`]); a `forge-script` upgrade runs one script and its own checks.
+//!   [`default_upgrade`]); a `forge-script` upgrade runs one script and its own checks.
 //!   A `forge-script` upgrade with an `[execution]` script also gets `EXECUTE.md`, the
 //!   runbook of the txs whoever executes sends by hand, checked on the same fork.
 //! - `replay-bundle` (CONSUME): rehearse a packed bundle on a fresh fork, broadcast the
@@ -37,7 +37,7 @@ use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_bootstrap::{self, VerifyBootstrapArgs};
 use crate::common::anvil::{send_impersonated_tx, set_balance};
-use crate::common::env_config::{protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE};
+use crate::common::env_config::{default_upgrade, protocol_ops_out_dir, EnvConfig};
 use crate::common::ethereum::get_provider;
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
@@ -762,8 +762,9 @@ pub struct RehearseUpgradeArgs {
     #[clap(long)]
     pub env: String,
     /// The upgrade to generate: a directory under `upgrade-envs/` with an `upgrade.toml`.
-    #[clap(long, default_value = DEFAULT_UPGRADE)]
-    pub upgrade: String,
+    /// Defaults to the current release's.
+    #[clap(long)]
+    pub upgrade: Option<String>,
     /// L1 RPC to fork. Nothing is signed and nothing touches this chain.
     #[clap(long)]
     pub fork_url: String,
@@ -793,20 +794,37 @@ pub struct RehearseUpgradeArgs {
     pub foundry_zksync_version: Option<String>,
 }
 
+/// `prepare-all` is the current release's flow (its `upgrade-prepare-all` and verifier), so only the current
+/// release's upgrade may use it; `message` gets the current release's name. A `forge-script` upgrade does not
+/// read the current release at all.
+fn ensure_prepare_all_is_current(
+    descriptor: &UpgradeDescriptor,
+    upgrade: &str,
+    message: impl FnOnce(&str) -> String,
+) -> anyhow::Result<()> {
+    if matches!(descriptor, UpgradeDescriptor::PrepareAll {}) {
+        let current = default_upgrade()?;
+        anyhow::ensure!(upgrade == current, message(current));
+    }
+    Ok(())
+}
+
 /// Fork L1, prepare the upgrade, pack the deploy bundle, replay it and run the upgrade's checks.
 pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<()> {
     warn_ignored_gw_rpc_url(args.gw_rpc_url.as_deref());
     let env_cfg = EnvConfig::load(&args.env)?;
-    let descriptor = UpgradeDescriptor::load(&args.upgrade)?;
-    anyhow::ensure!(
-        !matches!(descriptor, UpgradeDescriptor::PrepareAll {}) || args.upgrade == DEFAULT_UPGRADE,
-        "`prepare-all` is the {DEFAULT_UPGRADE} flow; {} cannot use it",
-        args.upgrade
-    );
-    let output_dir = protocol_ops_out_dir(&args.upgrade, &env_cfg.env)?;
+    let upgrade_name = match &args.upgrade {
+        Some(upgrade) => upgrade.clone(),
+        None => default_upgrade()?.to_string(),
+    };
+    let descriptor = UpgradeDescriptor::load(&upgrade_name)?;
+    ensure_prepare_all_is_current(&descriptor, &upgrade_name, |current| {
+        format!("`prepare-all` is the {current} flow; {upgrade_name} cannot use it")
+    })?;
+    let output_dir = protocol_ops_out_dir(&upgrade_name, &env_cfg.env)?;
     logger::info(format!(
         "Upgrade {} | env {} | bridgehub {:#x} | deployer {:#x} (impersonated)",
-        args.upgrade,
+        upgrade_name,
         env_cfg.env,
         env_cfg.bridgehub(),
         args.deployer_address
@@ -859,7 +877,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         }
         UpgradeDescriptor::ForgeScript(upgrade) => {
             upgrade::run_forge_script_prepare(
-                &args.upgrade,
+                &upgrade_name,
                 upgrade,
                 &env_cfg.env,
                 &rpc_url,
@@ -879,7 +897,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     logger::step("pack the deploy bundle");
     pack_deploy_bundle(
         &env_cfg,
-        &args.upgrade,
+        &upgrade_name,
         &output_dir,
         &output_dir.join("deploy-bundle"),
         &paths::contracts_root(),
@@ -906,7 +924,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
     }) = &descriptor
     {
         write_execution_runbook(
-            &args.upgrade,
+            &upgrade_name,
             execution,
             &env_cfg,
             &rpc_url,
@@ -1045,12 +1063,13 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
     // `prepare-all` means this release's `upgrade-prepare-all` + `verify-bootstrap`. A bundle
     // another line generated with its own `prepare-all` (e.g. a v31 bundle) would be checked by
     // the wrong verifier — after a real broadcast, at that — so refuse it before anything is sent.
-    anyhow::ensure!(
-        !matches!(descriptor, UpgradeDescriptor::PrepareAll {}) || metadata.upgrade == DEFAULT_UPGRADE,
-        "the bundle was generated for {}, but `prepare-all` here is the {DEFAULT_UPGRADE} flow and \
-         its verifier; replay it with the protocol_ops of the line that generated it",
-        metadata.upgrade
-    );
+    ensure_prepare_all_is_current(&descriptor, &metadata.upgrade, |current| {
+        format!(
+            "the bundle was generated for {}, but `prepare-all` here is the {current} flow and \
+             its verifier; replay it with the protocol_ops of the line that generated it",
+            metadata.upgrade
+        )
+    })?;
     let deployer = metadata
         .deployer_address
         .ok_or_else(|| anyhow::anyhow!("bundle metadata has no deployer_address"))?;
@@ -1185,9 +1204,9 @@ mod tests {
     #[test]
     fn source_provenance_excludes_generated_outputs_but_tracks_inputs() {
         let repo = tempfile::tempdir().unwrap();
-        let input = format!("l1-contracts/upgrade-envs/{DEFAULT_UPGRADE}/mainnet.toml");
-        let output =
-            format!("l1-contracts/upgrade-envs/{DEFAULT_UPGRADE}/output/mainnet/ecosystem.toml");
+        let upgrade = default_upgrade().unwrap();
+        let input = format!("l1-contracts/upgrade-envs/{upgrade}/mainnet.toml");
+        let output = format!("l1-contracts/upgrade-envs/{upgrade}/output/mainnet/ecosystem.toml");
         let (input, output) = (input.as_str(), output.as_str());
         let source = "l1-contracts/contracts/Example.sol";
         let simulation = "l1-contracts/dev/simulation/UpgradeSimulation.s.sol";
@@ -1214,7 +1233,7 @@ mod tests {
         )
         .is_some());
         let status = || {
-            let pathspecs = contract_source_pathspecs(DEFAULT_UPGRADE);
+            let pathspecs = contract_source_pathspecs(upgrade);
             let args: Vec<&str> = ["status", "--porcelain", "--"]
                 .into_iter()
                 .chain(pathspecs.iter().map(String::as_str))
@@ -1249,7 +1268,7 @@ mod tests {
     fn write_metadata(bundle: &Path, files: &[&str]) -> DeployBundleMetadata {
         let metadata = DeployBundleMetadata {
             schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
-            upgrade: DEFAULT_UPGRADE.to_string(),
+            upgrade: default_upgrade().unwrap().to_string(),
             env: "stage".to_string(),
             contracts_commit: "test".to_string(),
             contracts_worktree_dirty: false,
@@ -1408,7 +1427,7 @@ mod tests {
         let bundle = dir.path().join("packed");
         let metadata = pack_deploy_bundle(
             &env_cfg,
-            DEFAULT_UPGRADE,
+            default_upgrade().unwrap(),
             &output,
             &bundle,
             &repo,

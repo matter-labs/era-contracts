@@ -14,7 +14,7 @@
 - `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, validator timelock, etc.) — read live state directly from L1.
 - `protocol-ops/src/common/forge/scripts/mod.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes, and the `ScriptCall` table binding each typed call to its script.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
-- `l1-contracts/deploy-scripts/upgrade/v36/{CoreUpgrade_v36,CTMUpgrade_v36}.s.sol` — the current release's prepares (the first recurring registry-driven edge; the v35 bootstrap edge's were retired with the v36 bump).
+- `l1-contracts/deploy-scripts/upgrade/v<minor>/{CoreUpgrade_v<minor>,CTMUpgrade_v<minor>}.s.sol` — the current release's prepares, for the minor version of `configs/genesis/zksync-os/latest.json`.
 - The core prepare deploys the Core-domain `ProxyUpgradeTransition`, the CTM prepare the CTM-domain one and/or the `CTMTransition`, and the merge derives the executor legs (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) from the objects and executors they report — there is no compose step. The merged package carries ONE governance bundle, `[governance_calls] calls`: the merge's extras (PUH/Guardians wiring, CTM `acceptOwnership()` normalization), the core prepare's declared calls, the derived legs in canonical order (none for a bootstrap or a replacement), then the CTM prepare's declared calls. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
 
 ## Verifying a package before it is signed
@@ -31,9 +31,9 @@ artifacts rather than reconstructed from a CREATE2 deployment history.
 
 > Pre-registry calldata packages are verified by the `ecosystem verify-upgrade` of the release
 > branches that shipped them, not here. A registry-driven upgrade is reviewed the same way for
-> every release, so a release does NOT get a verifier module of its own: `v36` needs no code here —
-> its prepare is `CTMUpgrade_v36 is DefaultCTMUpgrade {}`, an ordinary upgrade, and the upgrade
-> path verifies it as one. If a future release ever seems to need version-specific handling, it
+> every release, so a release does NOT get a verifier module of its own: it needs no code here —
+> its prepare is a `DefaultCTMUpgrade` subclass, an ordinary upgrade, and the upgrade path
+> verifies it as one. If a future release ever seems to need version-specific handling, it
 > belongs as an INPUT to the general path, not as a new module.
 
 It answers two questions and keeps them apart.
@@ -304,4 +304,4 @@ When reviewing a protocol-ops PR:
 4. **Does the new flow produce one Safe bundle per signer per phase?** If a single phase emits multiple bundles for the same signer, that's a sign the orchestration logic should be on one shared `ForgeRunner`.
 5. **Does the prepare phase rely on data only present in-memory across forge invocations?** If yes, either pass it via TOML written by the previous forge call or use CREATE2 determinism — don't fold separate phases back into one forge process to dodge the question.
 6. **Are addresses in the orchestration code resolved via `l1_contracts.rs` or via `script_params` consts?** Hardcoded addresses anywhere in protocol-ops are almost always wrong.
-7. **Does the new code reintroduce a monolithic prepare, or author governance calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v35/`, `v36/`) via `upgrade-prepare-all`; the merger copies bundles and authors nothing — the only calldata it produces is the executor legs, each a pure function of an (executor, object) pair the prepares report — and anything that is not an executor leg must be a declared external action.
+7. **Does the new code reintroduce a monolithic prepare, or author governance calldata in Rust?** Push back. Current work targets the `Default*Upgrade` version scripts (`v<minor>/`) via `upgrade-prepare-all`; the merger copies bundles and authors nothing — the only calldata it produces is the executor legs, each a pure function of an (executor, object) pair the prepares report — and anything that is not an executor leg must be a declared external action.
