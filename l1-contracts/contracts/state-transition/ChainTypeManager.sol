@@ -29,7 +29,6 @@ import {
 } from "../common/Config.sol";
 import {
     AdminZero,
-    LegacyCutForRegistryDrivenVersion,
     OutdatedProtocolVersion,
     TransitionDeadlineMismatch,
     UpgradeTransitionUnchanged
@@ -825,28 +824,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ) external onlyOwner {
         address chainAddress = getZKChain(_chainId);
         IAdminWithCut(chainAddress).upgradeChainFromVersion(chainAddress, _oldProtocolVersion, _diamondCut);
-    }
-
-    /// @dev Re-commits the cut for a LEGACY-committed version (operational fix-up while pre-v35
-    ///      chains still have to cross such an edge, e.g. the v35 bootstrap). Refused for a version
-    ///      nothing was committed for and for a registry-committed one.
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    // TODO(v36): DELETE with {setNewVersionUpgrade} — meaningless once no version is committed
-    //            through the legacy path.
-    function setUpgradeDiamondCut(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion
-    ) external onlyOwner {
-        // A registry-committed departure is repaired by {replaceUpgradeTransition}; a cut hash
-        // written next to its transition would be served to nobody.
-        if (upgradeTransition[_oldProtocolVersion] != address(0)) {
-            revert LegacyCutForRegistryDrivenVersion(_oldProtocolVersion);
-        }
-        if (__LEGACY_upgradeCutHash[_oldProtocolVersion] == bytes32(0)) {
-            revert NoCommittedUpgradeCutForVersion(_oldProtocolVersion);
-        }
-        setUpgradeDiamondCutInner(_cutData, _oldProtocolVersion);
     }
 
     /// @dev Stores the commitment pre-v35 chains verify their handed cut against

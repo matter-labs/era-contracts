@@ -164,8 +164,6 @@ interface IChainTypeManager {
     ///         machine-readable pointer tooling composes that version's upgrade cut from.
     function upgradeTransition(uint256 _oldProtocolVersion) external view returns (address);
 
-    function setUpgradeDiamondCut(Diamond.DiamondCutData calldata _cutData, uint256 _oldProtocolVersion) external;
-
     function executeUpgrade(uint256 _chainId, Diamond.DiamondCutData calldata _diamondCut) external;
 
     function setPriorityTxMaxGasLimit(uint256 _chainId, uint256 _maxGasLimit) external;
