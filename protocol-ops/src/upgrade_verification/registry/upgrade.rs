@@ -1,6 +1,5 @@
-//! Verification of a registry-driven UPGRADE — the ordinary case, and the one every upgrade
-//! after the bootstrap takes: governance calls the domain executors directly, one contiguous run
-//! of 1..3 legs in canonical order (`protocol-docs/ecosystem-upgrade-coordination.md`):
+//! Verification of a registry-driven UPGRADE — the ordinary case: governance calls the domain
+//! executors directly, one contiguous run of 1..3 legs in canonical order (`protocol-docs/ecosystem-upgrade-coordination.md`):
 //!
 //! 1. `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)` — a Core-domain
 //!    `ProxyUpgradeTransition`;
@@ -54,9 +53,7 @@ use super::lifecycle::{
     LifecycleBindings, LifecycleReview,
 };
 use super::member_construction::{MemberReview, ReviewedEnv};
-use super::members::{
-    verify_engine_and_l2_plan, verify_release_members, DepartingMembers, TRANSITION_ENGINES,
-};
+use super::members::{verify_engine_and_l2_plan, verify_release_members, DepartingMembers};
 use super::package::{LegKind, UpgradePackage};
 use super::provenance::{expect_code_identity, expect_code_present, tolerate};
 use super::rows::{
@@ -263,8 +260,7 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await;
 
-    // The authority each domain must already HOLD. Unlike a bootstrap, an upgrade hands nothing
-    // over — it executes on authority the previous edge established, so authority that has since
+    // The authority each domain must already HOLD. An upgrade hands nothing over — it executes on authority the previous edge established, so authority that has since
     // drifted is a finding now rather than a revert mid-bundle.
     if let Some(ctm_executor) = ctm_executor {
         if let (Some(ctm), Some(ctm_admin)) = (bindings.ctm, bindings.ctm_proxy_admin) {
@@ -337,7 +333,6 @@ pub(crate) async fn verify<P: Provider>(
                         rows,
                         domain_admin,
                         anchor: bindings.ctm,
-                        departure_unreadable: None,
                         reported: package.reported_singletons,
                     },
                 )
@@ -363,7 +358,6 @@ pub(crate) async fn verify<P: Provider>(
                         rows,
                         domain_admin,
                         anchor,
-                        departure_unreadable: None,
                         reported: Default::default(),
                     },
                 )
@@ -934,7 +928,6 @@ pub(super) async fn verify_transition<P: Provider>(
         members,
         label,
         manifest.upgradeEngine,
-        TRANSITION_ENGINES,
         &manifest.l2Plan,
     )
     .await?;
@@ -1031,8 +1024,7 @@ pub(super) async fn verify_release<P: Provider>(
 }
 
 /// The release's own `validate()`, called before the vote. It is state-independent and runs on
-/// chain when a transition is built over the release, in the bootstrap's `validate()`, and when
-/// the CTM installs it, so a revert here is the release failing every one of them.
+/// chain when a transition is built over the release and when the CTM installs it, so a revert here is the release failing every one of them.
 fn judge_release_validity(
     result: &mut VerificationResult,
     label: &str,
@@ -1986,14 +1978,14 @@ mod tests {
 
     // ───────────────────────── readiness ─────────────────────────
 
-    /// boot-42: the publication check reads the object's `l2Plan()` against the CTM's supplier and
-    /// names the call that would refuse an unpublished dependency — for the bootstrap, the
-    /// migration's `validate()` rather than a transition commit.
+    /// The publication check reads the object's `l2Plan()` against the CTM's supplier and names
+    /// the call that would refuse an unpublished dependency — for a replacement,
+    /// `replaceUpgradeTransition` rather than a transition commit.
     #[tokio::test]
     async fn an_unpublished_dependency_names_the_call_that_refuses_it() {
         use super::super::views::{L2UpgradePlan, UniversalContractUpgradeInfo};
         const SUPPLIER: Address = Address::repeat_byte(0x5B);
-        const MIGRATION: Address = Address::repeat_byte(0x3B);
+        const REPLACEMENT: Address = Address::repeat_byte(0x3B);
         let plan = L2UpgradePlan {
             deployments: Vec::<UniversalContractUpgradeInfo>::new(),
             delegateTo: Address::ZERO,
@@ -2012,17 +2004,16 @@ mod tests {
             &mut result,
             &CtmView::new(CTM, &provider),
             Publication {
-                object: MIGRATION,
-                label: "the bootstrap migration",
-                required_by: "`RegistryBootstrapMigration.validate()` (run by `migrate()`)",
+                object: REPLACEMENT,
+                label: "the replacement",
+                required_by: "`ChainTypeManager.replaceUpgradeTransition`",
             },
         )
         .await
         .unwrap();
         assert!(asserter.read_q().is_empty());
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
-        assert!(result
-            .has_error("`RegistryBootstrapMigration.validate()` (run by `migrate()`) refuses it"));
+        assert!(result.has_error("`ChainTypeManager.replaceUpgradeTransition` refuses it"));
     }
 
     // ───────────────────────── the whole path ─────────────────────────

@@ -90,7 +90,13 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
 
     function test_theTransitionEdgeInstallsItsTargetRelease() public {
         address newRelease = _releaseAt(NEW_VERSION);
-        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, newRelease, type(uint256).max);
+        ICTMTransition transition = _mockTransition(
+            Utils.TEST_GENESIS_REGISTRY,
+            0,
+            NEW_VERSION,
+            newRelease,
+            type(uint256).max
+        );
 
         vm.expectEmit(true, true, false, false);
         emit IChainTypeManager.NewCurrentRelease(NEW_VERSION, newRelease);
@@ -111,7 +117,13 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
     ///      departs from any release but its own — whoever the owner is.
     function test_revertWhen_theTransitionDepartsFromAnotherRelease() public {
         address otherRelease = _releaseAt(0);
-        ICTMTransition transition = _mockTransition(otherRelease, 0, NEW_VERSION, _releaseAt(NEW_VERSION), type(uint256).max);
+        ICTMTransition transition = _mockTransition(
+            otherRelease,
+            0,
+            NEW_VERSION,
+            _releaseAt(NEW_VERSION),
+            type(uint256).max
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(TransitionReleaseMismatch.selector, otherRelease, Utils.TEST_GENESIS_REGISTRY)
@@ -130,7 +142,9 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
             Utils.TEST_GENESIS_REGISTRY,
             0,
             claimedVersion,
-            _releaseAt(releaseVersion), type(uint256).max);
+            _releaseAt(releaseVersion),
+            type(uint256).max
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(ReleaseProtocolVersionMismatch.selector, claimedVersion, releaseVersion)
@@ -142,7 +156,13 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
     /// @dev The transition is mocked: a real `CTMTransition` reads its target's version off
     ///      `newRelease` at construction, so it can never name a zero one.
     function test_revertWhen_theTransitionNamesNoRelease() public {
-        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, address(0), type(uint256).max);
+        ICTMTransition transition = _mockTransition(
+            Utils.TEST_GENESIS_REGISTRY,
+            0,
+            NEW_VERSION,
+            address(0),
+            type(uint256).max
+        );
 
         vm.expectRevert(ZeroAddress.selector);
         vm.prank(governor);
@@ -162,7 +182,13 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
             abi.encodeWithSelector(ICTMRelease.genesisParams.selector),
             abi.encode(makeAddr("genesisUpgrade"), bytes32(0), uint64(1))
         );
-        ICTMTransition transition = _mockTransition(Utils.TEST_GENESIS_REGISTRY, 0, NEW_VERSION, newRelease, type(uint256).max);
+        ICTMTransition transition = _mockTransition(
+            Utils.TEST_GENESIS_REGISTRY,
+            0,
+            NEW_VERSION,
+            newRelease,
+            type(uint256).max
+        );
 
         vm.expectRevert(GenesisBatchHashZero.selector);
         vm.prank(governor);

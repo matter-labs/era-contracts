@@ -314,10 +314,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     /// @dev Moves the fixture CTM from its current version to `_newVersion` through a mocked
     ///      transition departing its current release, with `_oldVersionDeadline` pinned for the
     ///      departed version. Returns the release it installed.
-    function _commitMockedEdge(
-        uint256 _newVersion,
-        uint256 _oldVersionDeadline
-    ) internal returns (address newRelease) {
+    function _commitMockedEdge(uint256 _newVersion, uint256 _oldVersionDeadline) internal returns (address newRelease) {
         newRelease = _releaseAt(_newVersion);
         ICTMTransition transition = _mockTransition(
             chainContractAddress.currentRelease(),

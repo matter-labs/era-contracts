@@ -438,11 +438,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
       "CTM currentRelease moved to the transition's target release"
     );
     assertEq(
-      await ctm.upgradeCutHash(live.oldVersion),
-      ethers.constants.HashZero,
-      "deprecated upgradeCutHash stays untouched on the transition path"
-    );
-    assertEq(
       (await ctm.protocolVersionDeadline(live.oldVersion)).toString(),
       ethers.constants.MaxUint256.toString(),
       "departing version's deadline resolves through the committed transition"

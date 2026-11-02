@@ -16,7 +16,6 @@ import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-up
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
 
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {LogFinder} from "./utils/LogFinder.sol";
 

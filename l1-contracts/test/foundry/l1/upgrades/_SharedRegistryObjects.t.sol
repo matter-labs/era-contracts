@@ -30,16 +30,11 @@ import {
     AuthoredL2Plan,
     GenesisFacet,
     L2UpgradePlan,
-    ProxyUpgradeRow,
     ReleaseGenesisData,
     ReleaseManifest,
     TransitionManifest
 } from "contracts/upgrades/registry/RegistryTypes.sol";
-import {
-    CTM_CONTRACT_COUNT,
-    CTMContract,
-    L2_ECOSYSTEM_CONTRACT_COUNT
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {L2_ECOSYSTEM_CONTRACT_COUNT} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {L2PlanFixtures} from "foundry-test/l1/unit/concrete/Upgrades/registry/L2PlanFixtures.sol";
 import {Bytes32MetadataToken, NoMetadataToken} from "./_NonStandardBaseTokens.sol";
 

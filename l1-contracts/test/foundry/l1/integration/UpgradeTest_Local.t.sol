@@ -23,7 +23,6 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {ICTMUpgradeExecutor} from "contracts/upgrades/registry/executors/ICTMUpgradeExecutor.sol";

@@ -562,7 +562,7 @@ mod tests {
         assert!(!parse_upgrade_input("redeploy_zk_governance = false\n").redeploy_zk_governance);
         assert!(parse_upgrade_input("redeploy_zk_governance = true\n").redeploy_zk_governance);
         assert!(
-            parse_upgrade_input("redeploy_zk_governance = true # the bootstrap release\n")
+            parse_upgrade_input("redeploy_zk_governance = true # a release that redeploys it\n")
                 .redeploy_zk_governance
         );
     }
