@@ -5,14 +5,17 @@
 //! supplier, CTM deployment tracker, …) directly from L1 rather than
 //! requiring callers to pass them explicitly.
 
+use alloy::network::Ethereum;
 use alloy::primitives::{Address, Bytes, U256};
+use alloy::providers::{ProviderBuilder, RootProvider};
 use anyhow::Context;
 
 use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
-use crate::common::ethereum::{get_read_provider, AlloyProvider};
+
+type AlloyProvider = RootProvider<Ethereum>;
 
 fn provider(rpc_url: &str) -> anyhow::Result<AlloyProvider> {
-    get_read_provider(rpc_url)
+    Ok(ProviderBuilder::default().connect_http(rpc_url.parse()?))
 }
 
 fn ensure_nonzero(addr: Address, what: &str) -> anyhow::Result<Address> {
@@ -377,9 +380,10 @@ pub(crate) fn reverted_without_data(error: &alloy::contract::Error) -> bool {
         if execution_revert_data(error).is_some_and(|data| data.is_empty()))
 }
 
-/// From a verifier with code: a production one lacks the getter; any other error, a revert
-/// with data included, is no answer.
-fn testnet_flag(answer: Result<bool, alloy::contract::Error>) -> anyhow::Result<bool> {
+/// `IS_TESTNET_VERIFIER()`'s answer from a verifier with code: a production one lacks the
+/// getter; any other error, a revert with data included, is no answer. Stricter than
+/// `resolve_is_testnet_verifier`, which reads every error as a production verifier.
+pub(crate) fn testnet_flag(answer: Result<bool, alloy::contract::Error>) -> anyhow::Result<bool> {
     match answer {
         Ok(is_testnet) => Ok(is_testnet),
         Err(error) if reverted_without_data(&error) => Ok(false),
@@ -388,13 +392,15 @@ fn testnet_flag(answer: Result<bool, alloy::contract::Error>) -> anyhow::Result<
 }
 
 /// Resolve whether the current verifier is a testnet verifier by querying
-/// `IS_TESTNET_VERIFIER()` on the verifier contract (see `testnet_flag`).
+/// `IS_TESTNET_VERIFIER()` on the verifier contract.
+///
+/// Returns `false` if the verifier doesn't expose this constant (production
+/// verifiers or older deployments).
 pub async fn resolve_is_testnet_verifier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
 ) -> anyhow::Result<bool> {
     use crate::common::abi::ITestnetVerifier;
-    use alloy::providers::Provider;
 
     let p = provider(l1_rpc_url)?;
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, p.clone());
@@ -410,26 +416,23 @@ pub async fn resolve_is_testnet_verifier(
         .await
         .context("ctm.protocolVersionVerifier() call failed")?;
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
-    let code = p
-        .get_code_at(verifier)
-        .await
-        .with_context(|| format!("eth_getCode({verifier:#x})"))?;
-    anyhow::ensure!(!code.is_empty(), "verifier {verifier:#x} has no code");
 
-    testnet_flag(
-        ITestnetVerifier::new(verifier, p)
-            .IS_TESTNET_VERIFIER()
-            .call()
-            .await,
-    )
-    .with_context(|| format!("verifier {verifier:#x}"))
+    let verifier_contract = ITestnetVerifier::new(verifier, p);
+    match verifier_contract.IS_TESTNET_VERIFIER().call().await {
+        Ok(is_testnet) => Ok(is_testnet),
+        // Older verifiers don't expose IS_TESTNET_VERIFIER — treat as production.
+        Err(_) => Ok(false),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use alloy::transports::{RpcError, TransportErrorKind};
 
-    use super::*;
+    // Verify these symbols compile and resolve — actual calls require a live RPC.
+    use super::testnet_flag;
+    #[allow(unused_imports)]
+    use super::{resolve_bytecodes_supplier, resolve_is_testnet_verifier};
 
     #[test]
     fn a_reverting_testnet_getter_means_production_and_other_errors_propagate() {

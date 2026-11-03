@@ -40,7 +40,7 @@ use crate::common::anvil::{evm_revert, evm_snapshot, send_impersonated_tx, set_b
 use crate::common::env_config::{
     default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE,
 };
-use crate::common::ethereum::{get_provider, get_read_provider};
+use crate::common::ethereum::get_provider;
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
 use crate::common::upgrade_descriptor::{ExecutionScript, ForgeScriptUpgrade, UpgradeDescriptor};
@@ -1334,7 +1334,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
     // `--rpc` would otherwise receive real, correctly signed transactions. Mirrors the
     // `cast chain-id` preflight the Deploy workflow runs before it exports any secret.
     if let ReplayMode::Broadcast { rpc_url, .. } | ReplayMode::Verify { rpc_url } = &mode {
-        let actual = get_read_provider(rpc_url)?
+        let actual = get_provider(rpc_url)?
             .get_chain_id()
             .await
             .context("eth_chainId on --rpc")?;
