@@ -2,7 +2,7 @@
 //! upgrade of an Era CTM; what one upgrade must contain is left to its `fork_tests`, which the
 //! files written here feed. They need an output in `DefaultCTMUpgrade.saveOutput`'s layout, a
 //! minor-version upgrade whose upgrade contract refuses a chain with unexecuted batches (v31's
-//! and v34's do), and an Ownable ChainAdmin on the reference chain.
+//! and v34's do), a CTM owned by a PUH, and an Ownable ChainAdmin on the reference chain.
 //!
 //! - publication (fork and chain): the L2 upgrade tx's factory deps are published, the output
 //!   addresses have code, the output's CTM is the bridgehub's for the reference chain, and its
@@ -12,8 +12,10 @@
 //!   output address, and each output address without code at the fork block is deployed
 //!   exactly once;
 //! - replay (fork): the ServerNotifier upgrade and stages 0–2 from their real senders, the CTM
-//!   checked after each; the reference chain's timestamp, drain and upgrade; a test chain; the
-//!   last execute tx (warn-only);
+//!   checked after each, with anyone's `PUH.reinforceUnfreeze()` before stage 1, which must still
+//!   pass; the reference chain's timestamp and upgrade as `chain
+//!   set-upgrade-timestamp` and `chain upgrade` send them, around a drain; a test chain; the
+//!   reference chain's last execute tx;
 //! - `fork_tests`: the upgrade's Foundry files, on the replayed fork.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -25,7 +27,7 @@ use std::process::Command;
 use alloy::consensus::Transaction as _;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::TransactionBuilder;
-use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
+use alloy::primitives::{address, keccak256, Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::rpc::types::{Filter, TransactionRequest};
 use alloy::sol_types::{SolCall, SolError, SolValue};
@@ -37,18 +39,21 @@ use crate::common::abi::upgrade_errors::{DeadlineNotYetPassed, NotAllBatchesExec
 use crate::common::abi::{
     BridgehubAbi, ChainAdminOwnableAbi, IBytecodesSupplierPublish, IChainAdminAbi,
     IChainAssetHandlerAbi, IChainTypeManagerAbi, IChainTypeManagerExt, IGovernanceUpgradeTimer,
-    IOwnable, IPerChainRoles, IProxyAdmin, IServerNotifier, ValidatorTimelockAbi, ZkChainAbi,
+    IOwnable, IPerChainRoles, IProtocolUpgradeHandler, IProxyAdmin, IServerNotifier,
+    ValidatorTimelockAbi, ZkChainAbi,
 };
 use crate::common::anvil::{evm_increase_time_and_mine, send_impersonated_tx, set_balance};
+use crate::common::chain_upgrade_calls;
 use crate::common::env_config::EnvConfig;
 use crate::common::ethereum::{get_read_provider, AlloyProvider};
+use crate::common::forge::{split_into_bundles, ForgeRunner, ForgeScriptArgs, SafeBundle};
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
 use crate::common::l1_contracts::{
     execution_revert_data, resolve_bytecodes_supplier, resolve_is_testnet_verifier,
     resolve_is_zksync_os, reverted_without_data,
 };
 use crate::common::upgrade_descriptor::ForkTest;
-use crate::common::{logger, paths};
+use crate::common::{logger, output, paths, SharedRunArgs};
 use crate::upgrade_verification::constants::{
     EIP1967_IMPLEMENTATION_SLOT, EIP1967_PROXY_ADMIN_SLOT,
 };
@@ -327,9 +332,9 @@ async fn check_chain_ctm(
     Ok(())
 }
 
-/// A deployer transaction as `prepare/*.safe.json` holds it.
+/// A transaction as a Safe bundle file holds it.
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct DeployerTx {
+pub(crate) struct SafeTx {
     pub to: Address,
     /// Decimal or `0x` hex.
     pub value: String,
@@ -340,7 +345,7 @@ pub(crate) async fn check_provenance(
     rpc_url: &str,
     output: &UpgradeOutput,
     factory: Address,
-    txs: &[DeployerTx],
+    txs: &[SafeTx],
     fork_block: u64,
 ) -> anyhow::Result<()> {
     let provider = get_read_provider(rpc_url)?;
@@ -374,7 +379,7 @@ pub(crate) async fn check_provenance(
 /// The provenance rules, without RPC. `undeployed`: output addresses without code at the fork
 /// block. Returns the deployed addresses in order.
 fn identify_deployments(
-    txs: &[DeployerTx],
+    txs: &[SafeTx],
     factory: Address,
     supplier: Address,
     output: &BTreeMap<Address, String>,
@@ -456,11 +461,13 @@ fn identify_deployments(
 // ─── The replay ──────────────────────────────────────────────────────────────────
 
 /// For the first-batch fork test.
-pub(crate) const LAST_EXECUTE_INPUT_FILE: &str = "last_execute_input.hex";
+const LAST_EXECUTE_INPUT_FILE: &str = "last_execute_input.hex";
 /// Blocks per `eth_getLogs`: thirdweb's Sepolia RPC caps it at 1,000.
 const EXECUTE_LOG_WINDOW: u64 = 1_000;
 /// Search depth: about a week of 12 s L1 blocks.
 const EXECUTE_LOG_SPAN: u64 = 50_000;
+/// Stands for anyone: `reinforceUnfreeze()` has no access control.
+const ANYONE: Address = address!("1111111111111111111111111111111111111111");
 
 /// The replay's Anvil: reads via `provider`, impersonated sends via `common::anvil`.
 struct Fork {
@@ -509,6 +516,35 @@ impl Fork {
         Ok(())
     }
 
+    /// A `ForgeRunner` like the chain commands', on a fork of this Anvil.
+    fn chain_command_runner(&self) -> anyhow::Result<ForgeRunner> {
+        ForgeRunner::new(&SharedRunArgs {
+            l1_rpc_url: self.rpc_url.clone(),
+            out: None,
+            subdir: None,
+            forge_args: ForgeScriptArgs::default(),
+        })
+    }
+
+    /// Sends what `runner` broadcast as `command` writes it into its Safe bundles. Stops the
+    /// runner's Anvil first: it reads this one at the current block, which must stay the head
+    /// while it runs.
+    async fn send_broadcasts(&self, runner: ForgeRunner, command: &str) -> anyhow::Result<()> {
+        let bundles = split_into_bundles(&runner, command)?;
+        drop(runner);
+        let calls = bundle_calls(&bundles)?;
+        anyhow::ensure!(!calls.is_empty(), "{command} broadcast nothing");
+        // The command funded its senders on its own fork only.
+        for from in calls.iter().map(|(from, _)| *from).collect::<BTreeSet<_>>() {
+            set_balance(&self.rpc_url, from).await?;
+        }
+        for (index, (from, tx)) in calls.into_iter().enumerate() {
+            let label = format!("{command} tx #{index} ({from} -> {})", tx.to);
+            self.send(from, tx.to, tx.data.into(), &label).await?;
+        }
+        Ok(())
+    }
+
     async fn expect_revert<E: SolError>(
         &self,
         from: Address,
@@ -553,6 +589,28 @@ impl Fork {
             .ok_or_else(|| anyhow::anyhow!("no latest block"))?;
         Ok(block.header.timestamp)
     }
+}
+
+/// Each bundle's transactions with its signer. The replay can't send value.
+fn bundle_calls(bundles: &[SafeBundle]) -> anyhow::Result<Vec<(Address, SafeTx)>> {
+    let mut calls = Vec::new();
+    for bundle in bundles {
+        let from: Address = bundle
+            .target
+            .parse()
+            .with_context(|| format!("bundle signer {:?}", bundle.target))?;
+        for tx in output::safe_txs_from_bundle(bundle)? {
+            let tx: SafeTx = serde_json::from_value(tx)?;
+            anyhow::ensure!(
+                tx.value.parse::<U256>().is_ok_and(|value| value.is_zero()),
+                "a transaction from {from} to {} sends value {}",
+                tx.to,
+                tx.value
+            );
+            calls.push((from, tx));
+        }
+    }
+    Ok(calls)
 }
 
 fn multicall(calls: &[GovernanceCall]) -> Vec<u8> {
@@ -623,7 +681,9 @@ pub(crate) async fn replay(
     let test = create_test_chain(&fork, output, &facts)
         .await
         .context("the test chain")?;
-    try_write_last_execute_input(&fork, &facts, fork_block, work_dir).await;
+    write_last_execute_input(&fork, &facts, fork_block, work_dir)
+        .await
+        .context("the reference chain's last execute transaction")?;
     Ok(ReplayedChains {
         reference: facts.chain_id,
         test,
@@ -691,6 +751,7 @@ async fn read_facts(
         chain_admin_owner,
     };
     for sender in [
+        ANYONE,
         facts.ctm_owner,
         facts.chain_admin_owner,
         output.ctm_admin_calls.chain_admin_owner,
@@ -746,8 +807,8 @@ async fn ctm_kept_state(
     ))
 }
 
-/// Stages 0–2 from the CTM's owner, warping past any timer's deadline, with stage 1 split
-/// around the CTM's proxy upgrade to check what it keeps.
+/// Each stage's calls in turn from the CTM's owner, as on the normal path, past the timer's delay.
+/// Stage 1 is split around the CTM's proxy upgrade to check what it keeps.
 async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> anyhow::Result<()> {
     let provider = &fork.provider;
     let config = &output.contracts_config;
@@ -813,18 +874,19 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
         }
     }
 
-    // An emergency execution unfreezes before its calls, which unpauses migrations; stage 1
-    // must pause them again for its checkMigrationsPaused.
+    // Anyone can unpause migrations between the stages: the PUH's `reinforceUnfreeze()` needs only
+    // an unfrozen protocol. A stage 1 that doesn't re-pause reverts at `checkMigrationsPaused()`.
     fork.send(
+        ANYONE,
         facts.ctm_owner,
-        *chain_asset_handler.address(),
-        IChainAssetHandlerAbi::unpauseMigrationCall {}.abi_encode(),
-        "unpauseMigration() as the CTM owner (emulates an emergency execution's unfreeze)",
+        IProtocolUpgradeHandler::reinforceUnfreezeCall {}.abi_encode(),
+        &format!("PUH.reinforceUnfreeze() from {ANYONE}"),
     )
     .await?;
     let mut report = Report::default();
+    // It swallows its calls' failures.
     report.equal(
-        "migrations unpaused before stage 1",
+        "migrations unpaused by reinforceUnfreeze()",
         chain_asset_handler.migrationPaused().call().await?,
         false,
     );
@@ -943,9 +1005,9 @@ async fn batch_counts(
     ])
 }
 
-/// The timestamp (as `Utils.adminExecuteCalls` sends it: the ChainAdmin's setter directly, the
-/// ServerNotifier's via `multicall`), the drain, the upgrade. A pending L2 upgrade fails it up
-/// front: the upgrade would revert `PreviousUpgradeNotFinalized`, and nothing here clears it.
+/// The timestamp, the drain and the upgrade, the chain commands' calls from their senders. A
+/// pending L2 upgrade fails it up front: the upgrade would revert `PreviousUpgradeNotFinalized`,
+/// and nothing here clears it.
 async fn upgrade_reference_chain(
     fork: &Fork,
     output: &UpgradeOutput,
@@ -968,34 +1030,20 @@ async fn upgrade_reference_chain(
     let chain_id = U256::from(facts.chain_id);
     let timestamp = U256::from(fork.latest_timestamp().await?);
 
-    let set_timestamp = ChainAdminOwnableAbi::setUpgradeTimestampCall {
-        _protocolVersion: new,
-        _upgradeTimestamp: timestamp,
-    }
-    .abi_encode();
-    fork.send(
-        owner,
-        chain_admin,
-        set_timestamp,
-        "ChainAdmin.setUpgradeTimestamp",
+    // An Ownable ChainAdmin: no AccessControlRestriction.
+    let mut runner = fork.chain_command_runner()?;
+    chain_upgrade_calls::set_upgrade_timestamp(
+        &runner,
+        facts.bridgehub,
+        facts.chain_id,
+        Address::ZERO,
+        new,
+        timestamp,
     )
-    .await?;
-    let notify = GovernanceCall {
-        target: facts.server_notifier,
-        value: U256::ZERO,
-        data: IServerNotifier::setUpgradeTimestampCall {
-            _chainId: chain_id,
-            _upgradeTimestamp: timestamp,
-        }
-        .abi_encode(),
-    };
-    fork.send(
-        owner,
-        chain_admin,
-        multicall(&[notify]),
-        "ChainAdmin multicall(ServerNotifier.setUpgradeTimestamp)",
-    )
-    .await?;
+    .await?
+    .run(&mut runner)?;
+    fork.send_broadcasts(runner, "chain set-upgrade-timestamp")
+        .await?;
     let mut report = Report::default();
     report.equal(
         "ServerNotifier protocolVersionToUpgradeTimestamp(chain, old)",
@@ -1015,31 +1063,35 @@ async fn upgrade_reference_chain(
     );
     report.finish()?;
 
-    let upgrade = multicall(&output.test_upgrade_calls.test_upgrade_chain);
     let [committed, verified, executed] = batch_counts(&diamond).await?;
     logger::info(format!(
         "batches committed / verified / executed: {committed} / {verified} / {executed}"
     ));
     if committed != executed {
+        // The output's upgrade calls: `chain upgrade`'s script reverts here before it broadcasts.
         fork.expect_revert::<NotAllBatchesExecuted>(
             owner,
             chain_admin,
-            &upgrade,
-            "the upgrade with batches in flight (its upgrade contract must refuse them, as v31's \
-             and v34's do)",
+            &multicall(&output.test_upgrade_calls.test_upgrade_chain),
+            "ChainAdmin multicall(test_upgrade_chain) with batches in flight (its upgrade \
+             contract must refuse them, as v31's and v34's do)",
         )
         .await?;
         drain(fork, facts, executed).await?;
     } else {
         logger::info("no batches in flight: the NotAllBatchesExecuted check is skipped");
     }
-    fork.send(
-        owner,
-        chain_admin,
-        upgrade,
-        "ChainAdmin multicall(test_upgrade_chain)",
+    let mut runner = fork.chain_command_runner()?;
+    let (_, upgrade) = chain_upgrade_calls::upgrade(
+        &runner,
+        facts.bridgehub,
+        facts.chain_id,
+        Address::ZERO,
+        None,
     )
     .await?;
+    upgrade.run(&mut runner)?;
+    fork.send_broadcasts(runner, "chain upgrade").await?;
     let mut report = Report::default();
     report.equal(
         "chain protocol version = new_protocol_version",
@@ -1137,28 +1189,6 @@ async fn create_test_chain(
     anyhow::ensure!(!chain.is_zero(), "test chain {chain_id} is not registered");
     Report::default().ok(format!("test chain {chain_id} created at {chain}"));
     Ok(chain_id)
-}
-
-/// Warns instead of failing: an idle chain, an RPC's range cap or a rate limit can hide the log,
-/// and only a fork test needs the file: `V34EraFirstBatch.t.sol` skips a production verifier
-/// before reading it and fails without it otherwise. `builtin_fork_checks` deletes a stale file
-/// first, so a failure leaves none. Returns the warning.
-async fn try_write_last_execute_input(
-    fork: &Fork,
-    facts: &Facts,
-    fork_block: u64,
-    work_dir: &Path,
-) -> Option<String> {
-    let error = write_last_execute_input(fork, facts, fork_block, work_dir)
-        .await
-        .err()?;
-    // The error can quote the RPC URL.
-    let warning = format!(
-        "{LAST_EXECUTE_INPUT_FILE} not written: the last execute transaction: {}",
-        quote(&format!("{error:#}"))
-    );
-    logger::warn(&warning);
-    Some(warning)
 }
 
 /// As raw `0x` hex without a newline: decoding is version-specific, so the fork tests do it.
@@ -1685,8 +1715,8 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         })
     }
 
-    fn deploy(salt: B256, init_code: &[u8]) -> (DeployerTx, Address) {
-        let tx = DeployerTx {
+    fn deploy(salt: B256, init_code: &[u8]) -> (SafeTx, Address) {
+        let tx = SafeTx {
             to: FACTORY,
             value: "0".to_string(),
             data: [salt.as_slice(), init_code].concat().into(),
@@ -1697,8 +1727,8 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         )
     }
 
-    fn publication() -> DeployerTx {
-        DeployerTx {
+    fn publication() -> SafeTx {
+        SafeTx {
             to: SUPPLIER,
             value: "0x0".to_string(),
             data: IBytecodesSupplierPublish::publishEraBytecodesCall {
@@ -1715,7 +1745,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
     }
 
     /// The rules with each of `deployed` in the output and without code at the fork block.
-    fn run(txs: &[DeployerTx], deployed: &[Address]) -> (Vec<String>, Vec<Address>) {
+    fn run(txs: &[SafeTx], deployed: &[Address]) -> (Vec<String>, Vec<Address>) {
         let output: BTreeMap<Address, String> = deployed
             .iter()
             .enumerate()
@@ -1779,7 +1809,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
     #[test]
     fn rejects_targets_the_output_does_not_list() {
         let (facet, _) = deploy(SALT, &facet_init());
-        let stray = DeployerTx {
+        let stray = SafeTx {
             to: Address::repeat_byte(0x99),
             value: "0".to_string(),
             data: Bytes::from(vec![1, 2, 3, 4]),
@@ -1815,6 +1845,68 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(errors[0].contains("a second time"), "{errors:?}");
         assert_eq!(found.len(), 1);
+    }
+
+    /// A command's bundles as `split_into_bundles` makes them from forge's broadcasts.
+    fn bundle(target: Address, txs: &[(Address, &str, &str)]) -> SafeBundle {
+        SafeBundle {
+            target: format!("{target:#x}"),
+            steps: vec!["chain upgrade".to_string()],
+            txs: txs
+                .iter()
+                .map(|(to, value, data)| {
+                    serde_json::json!({
+                        "step": "chain upgrade",
+                        "from": format!("{target:#x}"),
+                        "to": format!("{to:#x}"),
+                        "data": data,
+                        "value": value,
+                    })
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn the_replay_sends_each_bundle_from_its_signer_as_written() {
+        let (owner, admin) = (Address::repeat_byte(0xa2), Address::repeat_byte(0xa1));
+        let notifier = Address::repeat_byte(0x5e);
+        let bundles = [
+            bundle(owner, &[(admin, "0", "0x0102"), (admin, "0", "0x03")]),
+            bundle(notifier, &[(CTM, "0", "0x")]),
+        ];
+        let calls: Vec<_> = bundle_calls(&bundles)
+            .unwrap()
+            .into_iter()
+            .map(|(from, tx)| (from, tx.to, tx.data.to_vec()))
+            .collect();
+        assert_eq!(
+            calls,
+            [
+                (owner, admin, vec![1, 2]),
+                (owner, admin, vec![3]),
+                (notifier, CTM, vec![]),
+            ]
+        );
+        let paying = [bundle(owner, &[(admin, "0x1", "0x")])];
+        let error = bundle_calls(&paying).unwrap_err().to_string();
+        assert!(error.ends_with("sends value 0x1"), "{error}");
+        let mut unsigned = bundle(owner, &[(admin, "0", "0x")]);
+        unsigned.target = String::new();
+        assert!(bundle_calls(&[unsigned]).is_err());
+    }
+
+    #[test]
+    fn reinforce_unfreeze_is_the_puhs_function() {
+        let path = paths::resolve_l1_contracts_path()
+            .unwrap()
+            .join("scripts/abi/TestnetProtocolUpgradeHandler.json");
+        let puh: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(
+            puh["methodIdentifiers"]["reinforceUnfreeze()"],
+            alloy::hex::encode(IProtocolUpgradeHandler::reinforceUnfreezeCall::SELECTOR)
+        );
     }
 
     #[test]
@@ -2118,7 +2210,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         RootProvider::new(RpcClient::mocked(asserter.clone()))
     }
 
-    /// `try_write_last_execute_input`'s warning and file, on an RPC that answers
+    /// `write_last_execute_input`'s error and file, on an RPC that answers
     /// `getTotalBatchesExecuted()` with 7, then with what `respond` pushes.
     async fn lookup(respond: impl FnOnce(&Asserter)) -> (Option<String>, Option<String>) {
         let asserter = Asserter::new();
@@ -2140,34 +2232,30 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         };
         let work_dir = tempfile::tempdir().unwrap();
         // Below EXECUTE_LOG_WINDOW: one eth_getLogs request.
-        let warning = try_write_last_execute_input(&fork, &facts, 500, work_dir.path()).await;
+        let error = write_last_execute_input(&fork, &facts, 500, work_dir.path())
+            .await
+            .err()
+            .map(|error| format!("{error:#}"));
         let file = fs::read_to_string(work_dir.path().join(LAST_EXECUTE_INPUT_FILE)).ok();
-        (warning, file)
+        (error, file)
     }
 
     #[tokio::test]
-    async fn a_failed_execute_log_lookup_warns_and_writes_no_file() {
+    async fn a_failed_execute_log_lookup_fails_and_writes_no_file() {
         // An idle chain, or a log older than the search.
-        let (warning, file) = lookup(|rpc| rpc.push_success(&Vec::<Log>::new())).await;
+        let (error, file) = lookup(|rpc| rpc.push_success(&Vec::<Log>::new())).await;
         assert_eq!(file, None);
         assert_eq!(
-            warning.unwrap(),
-            "last_execute_input.hex not written: the last execute transaction: \
-             0 BlockExecution logs for batch 7 in the 501 blocks up to 500"
+            error.unwrap(),
+            "0 BlockExecution logs for batch 7 in the 501 blocks up to 500"
         );
-        // An RPC error, its URL redacted.
-        let (warning, file) = lookup(|rpc| {
-            rpc.push_failure_msg("429 Too Many Requests from https://eth.example/v2/SOMEKEY")
-        })
-        .await;
+        // An RPC error; `CheckFailures` redacts its URL.
+        let (error, file) = lookup(|rpc| rpc.push_failure_msg("429 Too Many Requests")).await;
         assert_eq!(file, None);
-        let warning = warning.unwrap();
-        assert!(
-            warning.ends_with(
-                "eth_getLogs: server returned an error response: error code -32603: \
-                 429 Too Many Requests from <url>"
-            ),
-            "{warning}"
+        assert_eq!(
+            error.unwrap(),
+            "eth_getLogs: server returned an error response: error code -32603: \
+             429 Too Many Requests"
         );
     }
 
@@ -2200,12 +2288,12 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
             effective_gas_price: None,
             block_timestamp: None,
         };
-        let (warning, file) = lookup(|rpc| {
+        let (error, file) = lookup(|rpc| {
             rpc.push_success(&vec![log]);
             rpc.push_success(&tx);
         })
         .await;
-        assert_eq!((warning, file.as_deref()), (None, Some("0xabcd")));
+        assert_eq!((error, file.as_deref()), (None, Some("0xabcd")));
     }
 
     #[tokio::test]

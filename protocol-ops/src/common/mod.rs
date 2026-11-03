@@ -2,6 +2,7 @@ pub mod abi;
 pub mod addresses;
 pub mod anvil;
 pub mod args;
+pub mod chain_upgrade_calls;
 pub mod cmd;
 pub mod config;
 pub mod ecosystem;

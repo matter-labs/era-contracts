@@ -218,10 +218,10 @@ fn read_manifest(path: &Path) -> anyhow::Result<BundleManifest> {
 }
 
 /// The deployer transactions of every bundle the manifest names.
-fn deployer_transactions(manifest_path: &Path) -> anyhow::Result<Vec<forge_checks::DeployerTx>> {
+fn deployer_transactions(manifest_path: &Path) -> anyhow::Result<Vec<forge_checks::SafeTx>> {
     #[derive(Deserialize)]
     struct SafeFile {
-        transactions: Vec<forge_checks::DeployerTx>,
+        transactions: Vec<forge_checks::SafeTx>,
     }
     let dir = manifest_path
         .parent()
@@ -927,15 +927,6 @@ async fn builtin_fork_checks(
         return;
     };
     let fork_block = fork.block;
-    // A rerun must not hand the fork tests a stale file.
-    let stale = paths.work_dir.join(forge_checks::LAST_EXECUTE_INPUT_FILE);
-    match fs::remove_file(stale) {
-        Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-            failures.record("built-in checks", Err(error.into()));
-            return;
-        }
-        _ => {}
-    }
     let provenance = async {
         let factory = env_cfg
             .create2_factory()

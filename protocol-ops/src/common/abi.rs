@@ -343,7 +343,6 @@ pub mod server_notifier {
     alloy::sol!(
         #[sol(rpc)]
         interface IServerNotifier {
-            function setUpgradeTimestamp(uint256 _chainId, uint256 _upgradeTimestamp) external;
             function protocolVersionToUpgradeTimestamp(uint256 chainId, uint256 oldProtocolVersion) external view returns (uint256);
         }
     );
@@ -360,6 +359,15 @@ pub mod governance_upgrade_timer {
     );
 }
 pub use governance_upgrade_timer::IGovernanceUpgradeTimer;
+
+pub mod protocol_upgrade_handler {
+    alloy::sol!(
+        interface IProtocolUpgradeHandler {
+            function reinforceUnfreeze() external;
+        }
+    );
+}
+pub use protocol_upgrade_handler::IProtocolUpgradeHandler;
 
 /// `ValidatorTimelock`'s per-chain role enumeration.
 pub mod per_chain_roles {
