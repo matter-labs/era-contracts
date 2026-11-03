@@ -1,10 +1,18 @@
 use alloy::node_bindings::AnvilInstance;
-use alloy::primitives::Address;
+use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 use anyhow::Context;
 use serde_json::json;
 
+use crate::common::abi::ZkChainAbi;
 use crate::common::ethereum::get_provider;
+use crate::common::logger;
+
+/// `ZKChainStorage` slots of a chain diamond's batch counters, the ones the transaction
+/// simulator's `batch-state-emulation.ts` overrides too.
+const TOTAL_BATCHES_EXECUTED_SLOT: u64 = 11;
+const TOTAL_BATCHES_VERIFIED_SLOT: u64 = 12;
+const TOTAL_BATCHES_COMMITTED_SLOT: u64 = 13;
 
 /// Start anvil forking the given RPC URL with auto-impersonation enabled.
 ///
@@ -42,6 +50,73 @@ pub async fn set_balance(rpc_url: &str, address: Address) -> anyhow::Result<()> 
         )
         .await
         .with_context(|| format!("anvil_setBalance({address:#x}) failed against {rpc_url}"))?;
+    Ok(())
+}
+
+/// Count every batch `chain` has committed as verified and executed on an anvil fork, so a
+/// simulated diamond cut gets past `NotAllBatchesExecuted`. The slots are checked against the
+/// diamond's getters before anything is written. Only safe against anvil — real L1 rejects the call.
+pub async fn emulate_all_batches_executed(rpc_url: &str, chain: Address) -> anyhow::Result<()> {
+    let provider = get_provider(rpc_url)?;
+    let zk_chain = ZkChainAbi::new(chain, provider.clone());
+    let executed = zk_chain.getTotalBatchesExecuted().call().await?;
+    let verified = zk_chain.getTotalBatchesVerified().call().await?;
+    let committed = zk_chain.getTotalBatchesCommitted().call().await?;
+    for (slot, expected, name) in [
+        (
+            TOTAL_BATCHES_EXECUTED_SLOT,
+            executed,
+            "totalBatchesExecuted",
+        ),
+        (
+            TOTAL_BATCHES_VERIFIED_SLOT,
+            verified,
+            "totalBatchesVerified",
+        ),
+        (
+            TOTAL_BATCHES_COMMITTED_SLOT,
+            committed,
+            "totalBatchesCommitted",
+        ),
+    ] {
+        let stored = provider
+            .get_storage_at(chain, U256::from(slot))
+            .await
+            .with_context(|| format!("reading slot {slot} of {chain:#x}"))?;
+        anyhow::ensure!(
+            stored == expected,
+            "slot {slot} of {chain:#x} holds {stored}, not {name} = {expected}: the diamond's storage \
+             layout moved, update the batch counter slots"
+        );
+    }
+    if executed == committed && verified == committed {
+        return Ok(());
+    }
+
+    logger::warn(format!(
+        "[SIMULATION] {chain:#x} has executed {executed} of {committed} committed batches: counting \
+         all of them as executed on the fork. On L1 the cut still needs them executed."
+    ));
+    let value = format!("{:#x}", B256::from(committed));
+    for slot in [TOTAL_BATCHES_EXECUTED_SLOT, TOTAL_BATCHES_VERIFIED_SLOT] {
+        provider
+            .raw_request::<_, serde_json::Value>(
+                "anvil_setStorageAt".into(),
+                json!([
+                    format!("{chain:#x}"),
+                    format!("{:#x}", U256::from(slot)),
+                    value
+                ]),
+            )
+            .await
+            .with_context(|| {
+                format!("anvil_setStorageAt({chain:#x}, {slot}) failed against {rpc_url}")
+            })?;
+    }
+    provider
+        .raw_request::<_, serde_json::Value>("evm_mine".into(), json!([]))
+        .await
+        .with_context(|| format!("evm_mine failed against {rpc_url}"))?;
     Ok(())
 }
 

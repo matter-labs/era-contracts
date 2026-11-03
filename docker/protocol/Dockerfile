@@ -18,24 +18,24 @@ ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
 FROM lukemathwalker/cargo-chef:latest-rust-1 AS planner
 
 COPY protocol-ops /src/protocol-ops
-COPY tools/zksync-os-genesis-gen /src/tools/zksync-os-genesis-gen
 COPY tools/wallets-gen /src/tools/wallets-gen
 COPY tools/upgrade-readiness-checker /src/tools/upgrade-readiness-checker
 
 RUN mkdir -p /recipes && \
     cd /src/protocol-ops && cargo chef prepare --recipe-path /recipes/protocol-ops.json && \
-    cd /src/tools/zksync-os-genesis-gen && cargo chef prepare --recipe-path /recipes/genesis-gen.json && \
     cd /src/tools/wallets-gen && cargo chef prepare --recipe-path /recipes/wallets-gen.json && \
     cd /src/tools/upgrade-readiness-checker && cargo chef prepare --recipe-path /recipes/upgrade-readiness-checker.json
 
 ########################################
 # 2a) Rust build (parallel with 2b)
 ########################################
-# Compiles the 4 binaries in isolation. Buildkit auto-parallelizes this stage
-# with the forge-builder stage below (no cross-deps). The only contract input
-# Rust needs is `l1-contracts/zkstack-out/` (committed JSON ABIs read by
-# `abigen!` macros at compile time) — we COPY that subset rather than the
-# whole tree so a Solidity-only change doesn't invalidate the cargo layers.
+# Compiles the 3 binaries in isolation. Not tools/zksync-os-genesis-gen: it
+# depends on the private zksync-os-private repo, and nothing in the image runs
+# it. Buildkit auto-parallelizes this stage with the forge-builder stage below
+# (no cross-deps). The only contract input Rust needs is `l1-contracts/zkstack-out/`
+# (committed JSON ABIs read by `abigen!` macros at compile time) — we COPY that
+# subset rather than the whole tree so a Solidity-only change doesn't
+# invalidate the cargo layers.
 FROM ${BUILD_BASE_IMAGE} AS cargo-builder
 
 ARG RUST_TARGET
@@ -44,26 +44,18 @@ WORKDIR /contracts
 
 # === Cook Rust dependencies (cached until Cargo.toml/lock change) ===
 # BuildKit cache mounts:
-#   - /usr/local/cargo/{registry,git} are shared across all four cooks AND the
-#     subsequent cargo build steps (one crates.io fetch, reused 8x).
-#   - Each `target/` mount has its own `id=` so the four crates don't fight over
+#   - /usr/local/cargo/{registry,git} are shared across all three cooks AND the
+#     subsequent cargo build steps (one crates.io fetch, reused 6x).
+#   - Each `target/` mount has its own `id=` so the three crates don't fight over
 #     the same incremental directory; the same id is reused by the later
 #     `cargo build --release` so it doesn't redo dep compilation.
 # `sharing=locked` is conservative — it serializes concurrent access, fine here
-# because the four cooks are sequential anyway.
+# because the three cooks are sequential anyway.
 WORKDIR /contracts/protocol-ops
 COPY --from=planner /recipes/protocol-ops.json recipe.json
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=/contracts/protocol-ops/target,id=protocol-ops-target,sharing=locked \
-    cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
-
-WORKDIR /contracts/tools/zksync-os-genesis-gen
-COPY --from=planner /recipes/genesis-gen.json recipe.json
-COPY tools/zksync-os-genesis-gen/rust-toolchain.toml ./
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/contracts/tools/zksync-os-genesis-gen/target,id=genesis-gen-target,sharing=locked \
     cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
 WORKDIR /contracts/tools/wallets-gen
@@ -93,13 +85,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/contracts/protocol-ops/target,id=protocol-ops-target,sharing=locked \
     cargo build --bin protocol_ops --release --target ${RUST_TARGET} && \
     cp target/${RUST_TARGET}/release/protocol_ops ./
-
-WORKDIR /contracts/tools/zksync-os-genesis-gen
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/contracts/tools/zksync-os-genesis-gen/target,id=genesis-gen-target,sharing=locked \
-    cargo build --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/zksync-os-genesis-gen ./
 
 WORKDIR /contracts/tools/wallets-gen
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
@@ -198,7 +183,7 @@ ARG NODE_MAJOR
 ARG YARN_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PATH=/contracts/protocol-ops:/contracts/tools/zksync-os-genesis-gen:/contracts/tools/wallets-gen:/contracts/tools/upgrade-readiness-checker:/usr/local/bin:$PATH \
+    PATH=/contracts/protocol-ops:/contracts/tools/wallets-gen:/contracts/tools/upgrade-readiness-checker:/usr/local/bin:$PATH \
     FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
     FOUNDRY_OFFLINE=true \
     XDG_CONFIG_HOME=/etc/xdg
@@ -219,7 +204,6 @@ COPY --from=forge-builder /usr/local/bin/anvil /usr/local/bin/anvil
 COPY --from=forge-builder /root/.svm /root/.svm
 # === Copy protocol_ops and tools binaries from cargo-builder ===
 COPY --from=cargo-builder /contracts/protocol-ops/protocol_ops /contracts/protocol-ops/protocol_ops
-COPY --from=cargo-builder /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen
 COPY --from=cargo-builder /contracts/tools/wallets-gen/wallets-gen /contracts/tools/wallets-gen/wallets-gen
 COPY --from=cargo-builder /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker
 
@@ -247,5 +231,5 @@ RUN mkdir -p /etc/xdg/zksync-tooling && \
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help && \
-    zksync-os-genesis-gen --help && wallets-gen --help && upgrade-readiness-checker --help && \
+    wallets-gen --help && upgrade-readiness-checker --help && \
     node --version && yarn --version

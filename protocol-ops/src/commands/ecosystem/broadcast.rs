@@ -118,8 +118,11 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
     // execution order, but we sort defensively in case future versions emit
     // them out of order (the index is the source of truth either way).
     manifest.bundles.sort_by_key(|b| b.index);
+    // The prepare writes no bundles when every contract already exists, e.g. on a regeneration
+    // after the deployment.
     if manifest.bundles.is_empty() {
-        anyhow::bail!("manifest.bundles is empty");
+        logger::info("manifest.bundles is empty: nothing to broadcast");
+        return Ok(());
     }
 
     let key_map = if args.unlocked {

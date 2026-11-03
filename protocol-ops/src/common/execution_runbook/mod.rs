@@ -16,7 +16,6 @@
 //! The Markdown is written already formatted the way prettier formats it.
 
 mod check;
-mod decode;
 mod load;
 mod render;
 #[cfg(test)]
