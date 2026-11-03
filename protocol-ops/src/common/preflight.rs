@@ -3,15 +3,18 @@ use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 
-use crate::common::{logger, paths::resolve_l1_contracts_path};
+use crate::common::{
+    logger,
+    paths::{l1_contracts_forge_out, resolve_l1_contracts_path},
+};
 
 /// Ensure all Forge artifact directories needed by `bootstrap` and `apply`
 /// exist, building them automatically when they are missing.
 ///
-/// Runs `forge build` in `l1-contracts/` if its `out/` directory is absent.
+/// Runs `forge build` in `l1-contracts/` if its output directory is absent.
 pub fn check_required_artifacts() -> Result<()> {
     let l1 = resolve_l1_contracts_path()?;
-    if !l1.join("out").exists() {
+    if !l1.join(l1_contracts_forge_out()).exists() {
         forge_build(&l1)?;
     }
 

@@ -85,10 +85,9 @@ ownership above on behalf of `Governance`, so none of them stays with the deploy
 only `Governance` can call `ChainRegistrationSender.deregisterInteropPairs` for any pair (a chain's admin can for
 its own chain's pairs).
 
-Two inputs are immutable once deployed and therefore must be right the first time: the L1 WETH
+One input is immutable once deployed and therefore must be right the first time: the L1 WETH
 address (baked into the asset router and vault implementations; resolved from the L1 chain id when
-omitted, so `hub init` needs `--token-weth-address` on any other network) and the Era chain id
-(default `270`). Note that `ctm init` and `ecosystem init` currently resolve the L1 network from
+omitted, so `hub init` needs `--token-weth-address` on any other network). Note that `ctm init` and `ecosystem init` currently resolve the L1 network from
 its chain id unconditionally and refuse to run on any L1 other than mainnet, Sepolia, Holesky or a
 local Anvil (`L1Network::from_l1_rpc`); a private L1 needs a tooling change first.
 
@@ -214,7 +213,7 @@ governance enables interop for it on `L1MessageRoot`, and its admin allows each 
 | Input                                    | Source                                                                                                                  |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | L1 RPC, deployer EOA                     | `--l1-rpc-url`, `--deployer-address` (the bundle's signer; no key is given to the simulation)                           |
-| Owner, Era chain id, ZK token asset id   | flags; `ecosystem init` and `ctm init` also take `--env <name>` (see below)                                             |
+| Owner, ZK token asset id                 | flags; `ecosystem init` and `ctm init` also take `--env <name>` (see below)                                             |
 | Bridgehub (for `ctm init`, `chain init`) | `--bridgehub` (required by `chain init`), or the env preset for `ctm init`                                              |
 | CTM (for `chain init`)                   | `--ctm-proxy`; pass it explicitly (see below)                                                                           |
 | VM type, testnet verifier                | `--vm-type`, `--with-testnet-verifier` (defaults to true; pass `false` for a production ecosystem)                      |
@@ -223,7 +222,7 @@ governance enables interop for it on `L1MessageRoot`, and its admin allows each 
 | Chain parameters                         | chain id, owner, operators, base token and price ratio, `--da-mode`, `--l1-da-validator`, pubdata delivery overrides    |
 
 `--env <name>` exists only on `ecosystem init` and `ctm init`; `hub init` and `chain init` take
-flags only. It reads two files: the owner and the Era chain id come from the release input
+flags only. It reads two files: the owner comes from the release input
 `l1-contracts/upgrade-envs/<release>/<name>.toml`, the ZK token asset id from
 `l1-contracts/upgrade-envs/permanent-values/<name>.toml`. Since `permanent-values` requires
 `bridgehub_proxy_addr`, `--env` cannot be used for an ecosystem that does not exist yet; a fresh

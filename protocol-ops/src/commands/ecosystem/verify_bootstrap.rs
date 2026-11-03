@@ -79,6 +79,12 @@ pub struct VerifyBootstrapArgs {
     #[clap(long)]
     pub expected_bridgehub: Option<Address>,
 
+    /// The ZK token asset id every release the package installs must pin, in place of the env's
+    /// `zk_token_asset_id`. Only for an ecosystem the env file does not describe — a harness's
+    /// scratch L1; the report says which one was used.
+    #[clap(long)]
+    pub expected_zk_token_asset_id: Option<B256>,
+
     /// A hashes file in the `AllContractsHashes.json` format to hold the local build and the live
     /// code against, instead of the committed `AllContractsHashes.json`. Only for a harness that
     /// verifies deployments of an uncommitted build (the committed file is regenerated last):
@@ -100,6 +106,7 @@ pub async fn run(args: VerifyBootstrapArgs) -> anyhow::Result<()> {
         &args.executor_records,
         args.env.as_deref(),
         args.expected_bridgehub,
+        args.expected_zk_token_asset_id,
         args.contract_hashes.as_deref(),
         &mut result,
     )

@@ -185,8 +185,7 @@ as protocol components. Existing preparation entrypoints are marked explicitly.
 ```mermaid
 flowchart TB
     OPS["protocol-ops · existing CLI"]
-    PREP["CoreUpgrade_v36 / CTMUpgrade_v36<br/>new recurring prepare scripts"]
-    V35["CoreUpgrade_v35 / CTMUpgrade_v35<br/>existing scripts extended for bootstrap"]
+    PREP["CoreUpgrade_vN / CTMUpgrade_vN<br/>the current release's prepare scripts"]
     BASE["DefaultCoreUpgrade / DefaultCTMUpgrade<br/>existing prepare pipeline"]
     REPLACE["DefaultTransitionReplacement<br/>recovery preparation"]
     ACTIONS["ExternalActionsLib<br/>declared governance / admin actions"]
@@ -201,15 +200,12 @@ flowchart TB
     VERIFY["VerifyEmergencyUpgrade"]
     PACKAGE["Prepared governance package"]
     OPS --> PREP
-    OPS --> V35
     OPS --> REPLACE
     PREP --> BASE
-    V35 --> BASE
     REPLACE --> BASE
     BASE --> ACTIONS
     BASE --> PROBE
     BASE --> CACHE
-    V35 -->|"executor deployments"| RECORD
     CACHE --> BLAKE
     BASE --> PACKAGE
     OPS --> SIM
@@ -220,7 +216,7 @@ flowchart TB
 ```
 
 Tooling sources: [prepare helpers](./l1-contracts/deploy-scripts/upgrade/default-upgrade/),
-[v36 scripts](./l1-contracts/deploy-scripts/upgrade/v36/),
+[the current release's scripts](./l1-contracts/deploy-scripts/upgrade/README.md#layout),
 [emergency tooling](./l1-contracts/deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol),
 [executor records](./l1-contracts/deploy-scripts/utils/UpgradeExecutorsRecord.sol),
 [chain-call adapter](./l1-contracts/deploy-scripts/utils/UpgradeChainCall.sol),
@@ -251,7 +247,7 @@ The current branch includes the following review surfaces:
 | Separately administered proxies | [ProxyUpgradeRowLib](./l1-contracts/contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol): source-checked rows applied through each executor's bound ProxyAdmin (the ServerNotifier after its one-time handover) and verified in the transaction that applies them.                                                                                                                                                                                                                                                                                                                                                                   |
 | L2 and bootstrap payloads       | [CTMUpgradeComposer](./l1-contracts/contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol), [L2DefaultDelegateCalldataComposer](./l1-contracts/contracts/upgrades/L2DefaultDelegateCalldataComposer.sol), and [RegistryBootstrapMigration](./l1-contracts/contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol).                                                                                                                                                                                                                                                                                                       |
 | Individual-contract changes     | [RegistryIndividualUpgrade tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/RegistryIndividualUpgrade.t.sol): facet-only, verifier-only and validator-timelock-only upgrades assert that unrelated state is unchanged.                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Production proposal generation  | [v36 prepare scripts](./l1-contracts/deploy-scripts/upgrade/v36): the merge derives each upgrade's executor legs, in canonical order, from the objects the prepares deploy; other actions must be declared in the output.                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Production proposal generation  | [the current release's prepare scripts](./l1-contracts/deploy-scripts/upgrade/README.md#layout): the merge derives each upgrade's executor legs, in canonical order, from the objects the prepares deploy; other actions must be declared in the output.                                                                                                                                                                                                                                                                                                                                                                                      |
 
 Security review should focus on the full authority and execution path:
 

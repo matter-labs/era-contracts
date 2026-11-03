@@ -10,7 +10,12 @@ import * as fs from "fs";
 import * as path from "path";
 
 const ZKSTACK_OUT_ROOT = path.resolve(__dirname, "../../../../zkstack-out");
-const FORGE_OUT_ROOT = path.resolve(__dirname, "../../../../out");
+// The `anvil-interop` profile builds into its own out dir (l1-contracts/foundry.toml). Resolved per read: the
+// entry points set FOUNDRY_PROFILE after their imports.
+export function forgeOutRoot(): string {
+  const out = process.env.FOUNDRY_PROFILE === "anvil-interop" ? "out-anvil-interop" : "out";
+  return path.resolve(__dirname, "../../../..", out);
+}
 // Output of the `registry-deterministic` foundry profile (see l1-contracts/foundry.toml):
 // CBOR-metadata-free artifacts that are byte-identical across platforms. The registry-driven
 // upgrade runner deploys every codehash-pinned implementation from here so that registries
@@ -24,13 +29,13 @@ interface ForgeArtifact {
 }
 
 function loadArtifactFromOut(artifactRelativePath: string): ForgeArtifact {
-  const artifactPath = path.join(FORGE_OUT_ROOT, artifactRelativePath);
+  const artifactPath = path.join(forgeOutRoot(), artifactRelativePath);
   return JSON.parse(fs.readFileSync(artifactPath, "utf-8")) as ForgeArtifact;
 }
 
 /**
  * Load an ABI array from compiled artifacts.
- * Prefers zkstack-out/ (committed, ABI-only files) over out/ (forge build output).
+ * Prefers zkstack-out/ (committed, ABI-only files) over the forge build output ({@link forgeOutRoot}).
  */
 export function loadAbiFromOut(artifactRelativePath: string): JsonFragment[] {
   const zkstackPath = path.join(ZKSTACK_OUT_ROOT, artifactRelativePath);
@@ -51,7 +56,7 @@ export function loadBytecodeFromOut(artifactRelativePath: string): string {
 /**
  * Load creation (init) bytecode — needed for ContractFactory.deploy().
  *
- * Deployment bytecode always comes from forge build output in out/.
+ * Deployment bytecode always comes from the forge build output ({@link forgeOutRoot}).
  * zkstack-out intentionally stores ABI-oriented artifacts only.
  */
 export function loadCreationBytecodeFromOut(artifactRelativePath: string): string {

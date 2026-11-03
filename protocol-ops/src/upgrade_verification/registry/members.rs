@@ -85,7 +85,7 @@ pub(crate) const VERIFIERS: &[&str] = &[
 ];
 /// The engine a `CTMTransition` pins (`DefaultCTMUpgrade.deployUsedUpgradeContract`).
 pub(crate) const TRANSITION_ENGINES: &[&str] = &["DefaultUpgrade"];
-/// The engine the bootstrap migration pins (`CTMUpgrade_v35.deployUsedUpgradeContract`).
+/// The engine the bootstrap migration pins.
 pub(crate) const BOOTSTRAP_ENGINES: &[&str] = &["BootstrapUpgrade"];
 /// The `IL2DelegateCalldataComposer`s an authored L2 plan may name.
 pub(crate) const DELEGATE_COMPOSERS: &[&str] = &["L2DefaultDelegateCalldataComposer"];
@@ -823,9 +823,9 @@ mod tests {
         }
     }
 
-    /// The facet set, the engines and the composer are the contracts the prepares deploy for
-    /// those roles (`DeployCTMUtils.deployStateTransitionDiamondFacets`, the engines'
-    /// `deployUsedUpgradeContract`, `CTMUpgrade_v35.deployNewCTMContracts`).
+    /// The facet set and the transition engine are the contracts the prepares deploy for those
+    /// roles (`DeployCTMUtils.deployStateTransitionDiamondFacets`,
+    /// `DefaultCTMUpgrade.deployUsedUpgradeContract`).
     #[test]
     fn the_roles_are_what_the_prepares_deploy() {
         let read = |path: &str| std::fs::read_to_string(format!("{L1_CONTRACTS}/{path}")).unwrap();
@@ -840,12 +840,6 @@ mod tests {
         assert!(ctm_utils.contains("\"L1GenesisUpgrade\","));
         let default_ctm = read("deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol");
         assert!(default_ctm.contains("return deploySimpleContract(\"DefaultUpgrade\");"));
-        let v35 = read("deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol");
-        assert!(v35.contains("return deploySimpleContract(\"BootstrapUpgrade\");"));
-        assert!(v35.contains("deploySimpleContract(\"L2DefaultDelegateCalldataComposer\")"));
-        assert!(v35.contains(
-            "getZKOSBytecodeInfoForContract(\"L2DefaultUpgrade.sol\", \"L2DefaultUpgrade\")"
-        ));
     }
 
     /// The L2 table pins each member's own contract (`CoreOnGatewayHelper._resolveContractName`

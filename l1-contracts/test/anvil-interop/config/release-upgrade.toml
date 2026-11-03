@@ -1,13 +1,13 @@
-# Upgrade input for the v35 upgrade scenario (the frozen previous-release state -> this branch's version).
+# Upgrade input for the release edge (the frozen previous-release state -> this branch's version).
 # `bridgehub_proxy_address` and `owner_address` are substituted by the harness from the loaded
 # chain states; everything else, including `[chain] chain_id`, is a literal that has to match
 # the fixture.
 #
 # The departing version below is informational (the prepare reads it from the CTM). There is no
-# target version: the scenario runs protocol-ops' default scripts, which take it from the genesis
-# config, as a production prepare does.
+# target version: the edge runs the release's scripts, which take it from the genesis config, as a
+# production prepare does.
 
-old_protocol_version = 0x2200000000
+old_protocol_version = 0x2300000000
 bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"
 owner_address = "0x0000000000000000000000000000000000000000"
 

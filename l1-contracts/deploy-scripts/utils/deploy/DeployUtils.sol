@@ -42,7 +42,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         return (implementation, proxy);
     }
 
-    /// @notice Creation code for `contractName`, read from `l1-contracts/out/`. Deployers that
+    /// @notice Creation code for `contractName`, read from {BytecodeUtils.forgeOutDir}. Deployers that
     /// read from elsewhere override this.
     function getCreationCode(string memory contractName) internal view virtual returns (bytes memory) {
         return ContractsBytecodesLib.getCreationCodeEVM(contractName);
