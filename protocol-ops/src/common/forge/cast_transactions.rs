@@ -31,7 +31,7 @@ const SCRIPT_LIB_SOURCE_PREFIX: &str = "deploy-scripts/";
 const KEEP_UNDER_SCRIPT_PREFIX: &[&str] = &["Create2AndTransfer"];
 
 /// Set of `contractName`s whose compilation target source-path lives under
-/// `SCRIPT_LIB_SOURCE_PREFIX`. Built lazily by walking `<l1-contracts>/out/*.sol/*.json`
+/// `SCRIPT_LIB_SOURCE_PREFIX`. Built lazily by walking `<l1-contracts>/<forge out>/*.sol/*.json`
 /// on first use, cached for the rest of the process. Returns an empty set if
 /// the artifacts dir can't be read (no filtering happens; safe degradation).
 /// Names listed in [`KEEP_UNDER_SCRIPT_PREFIX`] are excluded so their
@@ -39,7 +39,9 @@ const KEEP_UNDER_SCRIPT_PREFIX: &[&str] = &["Create2AndTransfer"];
 fn script_only_library_names() -> &'static HashSet<String> {
     static SET: OnceLock<HashSet<String>> = OnceLock::new();
     SET.get_or_init(|| {
-        let out_dir = paths::contracts_root().join("l1-contracts").join("out");
+        let out_dir = paths::contracts_root()
+            .join("l1-contracts")
+            .join(paths::l1_contracts_forge_out());
         let mut names = HashSet::new();
         let walker = match std::fs::read_dir(&out_dir) {
             Ok(it) => it,

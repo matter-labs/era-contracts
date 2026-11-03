@@ -1,10 +1,10 @@
-# Upgrade input for the same-minor PATCH hop: a verifier replacement published as a new release
+# Upgrade input for the same-minor PATCH hop: a `DiamondInit` replacement published as a new release
 # that copies the departing one except that member. A patch may change the release but may not
 # carry an L2 upgrade, and it deliberately does not require an earlier L2 upgrade to be finalized
-# first — the hop runs with one still pending. Substituted by the harness like
-# v35-upgrade.toml; only `contracts.new_protocol_version` is consumed.
+# first. Substituted by the harness like release-upgrade.toml; only
+# `contracts.new_protocol_version` is consumed.
 
-old_protocol_version = 0x2300000000
+old_protocol_version = 0x2400000000
 bridgehub_proxy_address = "0x0000000000000000000000000000000000000000"
 owner_address = "0x0000000000000000000000000000000000000000"
 
@@ -22,5 +22,5 @@ recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000
 bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
-latest_protocol_version = 0x2300000001
-new_protocol_version = 0x2300000001
+latest_protocol_version = 0x2400000001
+new_protocol_version = 0x2400000001

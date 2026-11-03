@@ -210,7 +210,7 @@ library Utils {
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
         // TODO(EVM-746): use forge to read the bytecode
         // solhint-disable-next-line func-named-parameters
-        string memory path = string.concat("/../l1-contracts/out/", facetName, ".sol/", facetName, "Facet.json");
+        string memory path = string.concat(BytecodeUtils.forgeOutDir(), facetName, ".sol/", facetName, "Facet.json");
         bytes memory bytecode = BytecodeUtils.readFoundryDeployedBytecode(path);
         return getAllSelectors(bytecode);
     }

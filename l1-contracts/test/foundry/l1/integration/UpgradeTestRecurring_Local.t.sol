@@ -24,38 +24,33 @@ import {ProxyUpgradeDomain, ProxyUpgradeRow} from "contracts/upgrades/registry/R
 import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol";
 import {IL1InteropFeeManager} from "contracts/core/interop-fee/IL1InteropFeeManager.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {
-    CTMContract,
-    L1EcosystemContract,
-    L2_ECOSYSTEM_CONTRACT_COUNT
-} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
+import {CTMContract, L1EcosystemContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IChainAdminMulticall} from "deploy-scripts/AdminFunctions.s.sol";
 
-import {UpgradeIntegrationBootstrapFixture} from "./UpgradeTest_Local.t.sol";
+import {UpgradeIntegrationReleaseFixture} from "./UpgradeTest_Local.t.sol";
+import {LiveL2Table} from "./UpgradeTestFresh_Local.t.sol";
+import {RegistryPostState} from "../unit/concrete/Upgrades/registry/RegistryPostState.sol";
 
 /*//////////////////////////////////////////////////////////////
             THE VERSION SCRIPTS THE RECURRING HOPS RUN
 //////////////////////////////////////////////////////////////*/
 
 /// @notice The shared base of every recurring hop in this file: the real `DefaultCTMUpgrade`
-///         pipeline with the two bytecode-table reads the local fixture cannot afford substituted,
-///         plus read access to the objects the prepare deployed.
-/// @dev The substitution is not a convenience: the fixture's LIVE release was pinned with the same
-///      empty table (see `CTMUpgradeForLocalTest`), so a hop reading the real one would pin a
-///      different manifest and publish a new release for a hop that changes nothing. Everything
-///      this file tests — the declaration, the objects, the version and release invariants — runs
-///      unmocked.
+///         pipeline with the L2 table read off the live release, as the local fixture cannot afford
+///         rebuilding it from every L2 artifact (see `CTMUpgradeForLocalTest`), plus read access to the
+///         objects the prepare deployed. Everything this file tests — the declaration, the objects, the
+///         version and release invariants — runs unmocked.
 abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
-    function getL2BytecodeInfoTable() internal pure override returns (bytes[] memory) {
-        return new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT);
+    function getL2BytecodeInfoTable() internal view override returns (bytes[] memory) {
+        return LiveL2Table.table(newConfig.ctm);
     }
 
-    function getL2SystemProxyBytecodeInfo() internal pure override returns (bytes memory) {
-        return "";
+    function getL2SystemProxyBytecodeInfo() internal view override returns (bytes memory) {
+        return LiveL2Table.shell(newConfig.ctm);
     }
 
     /// @notice The transition this prepare deployed, zero when it deployed none.
@@ -227,7 +222,7 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 //////////////////////////////////////////////////////////////*/
 
 /// @notice RECURRING prepares run through the real production pipeline, on the registry-driven
-///         ecosystem the v35 bootstrap fixture leaves behind. The subject is what preparation can
+///         ecosystem the release fixture leaves behind. The subject is what preparation can
 ///         EMIT: an infrastructure-only upgrade (the fleet-wide saving the model exists for — see
 ///         "Infrastructure-only upgrades" in {protocol-docs/ecosystem-upgrade-coordination.md}),
 ///         a chain-release one, a mixed one, and the shapes it must refuse. Each prepared hop is
@@ -235,10 +230,10 @@ contract CoreUpgradeOrphanedDeployment is DefaultCoreUpgrade {
 /// @dev Everything here drives `DefaultCoreUpgrade`/`DefaultCTMUpgrade` themselves; the object
 ///      layer is covered separately by `RegistryIndividualUpgrade.t.sol`, which cannot show that
 ///      PREPARATION can produce these shapes.
-contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixture {
+contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationReleaseFixture, RegistryPostState {
     using stdToml for string;
 
-    /// @dev The upgrade input whose target EQUALS the version the bootstrap left live (the genesis
+    /// @dev The upgrade input whose target EQUALS the version the release edge left live (the genesis
     ///      version, as it names none): what an infrastructure-only hop must be given.
     string internal constant SAME_VERSION_INPUT = RELEASE_UPGRADE_INPUT;
     /// @dev The upgrade input naming the next minor: what a chain-release hop is given.
@@ -455,13 +450,13 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
     /// @notice A validator holding `UPGRADER_ROLE` crosses a registry-driven edge through the
     ///         timelock once the chain's upgrade timestamp has passed: the timelock forwards the
     ///         cut-reading call the v35+ Admin facet serves.
-    /// @dev The fixture's pre-bootstrap timelock is built from current source, so this shows the
-    ///      forwarding, not that the bootstrap's timelock swap is needed; `UpgradeTest_Local`
-    ///      asserts the swap row.
+    /// @dev The fixture's timelock is the previous release's, so this shows that a timelock of that
+    ///      release forwards the cut-reading call. The hop keeps the live verifier: the fixture's
+    ///      chains require their second proof system, which the hops' single-proof verifier lacks.
     function test_chainReleaseEdge_isCrossedByAValidatorThroughTheTimelock() public {
         uint256 liveVersion = IChainTypeManager(inputs.ctm).protocolVersion();
         CoreUpgradeNoEcosystemLeg core = new CoreUpgradeNoEcosystemLeg();
-        RecurringCTMUpgradeForTests hop = new CTMUpgradeVerifierRelease();
+        RecurringCTMUpgradeForTests hop = new CTMUpgradeVersionOnly();
         _prepareHop(core, hop, NEXT_VERSION_INPUT, "recurring-validator-crossing");
         _runUpgrade(core, hop);
 
@@ -845,7 +840,7 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
 
     // ───────────────────────────── helpers ─────────────────────────────
 
-    /// @dev Initializes the CTM side of a hop against the live (post-bootstrap) ecosystem exactly
+    /// @dev Initializes the CTM side of a hop against the live (upgraded) ecosystem exactly
     ///      as `protocol-ops` does. Kept separate from `_initHop` so a test can put
     ///      `vm.expectRevert` immediately before THIS call.
     function _initCTMHop(
@@ -870,7 +865,7 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
             _input,
             string.concat("/script-out/foundry-upgrade/", _outName, "-ctm.toml"),
             inputs.governance,
-            bytes32(uint256(1)),
+            previousRelease.zkTokenAssetId,
             true
         );
         _hop.setEIP7702Checker(inputs.eip7702Checker);

@@ -3,11 +3,11 @@
 ## Relevant files
 
 - `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check` for all Rust crates, and `cargo clippy -D warnings` for `protocol-ops`.
-- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, foundry tests, verifier-generator check, coverage.
+- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, foundry tests (the frozen-state suites in their own `test-foundry-previous-release` job), verifier-generator check, coverage.
 - `.github/workflows/pre-merge-checks.yaml` — `check-hashes`, `check-selectors`, `check-zkstack-out`, `check-zksync-os-genesis`, `state-generation-check`, and the `pre-merge-verified` gate. Skipped while a PR is a draft (see "CI tiers" below).
 - `.github/workflows/build-contract-artifacts.yaml` — the `build` job (`workflow_call`) `pre-merge-checks` uses; `l1-contracts-ci` keeps its own inline copy because its build is a coverage matrix. `.github/actions/restore-ci-artifacts` is how their other jobs read what either built.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
-- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, v34→v35 (bootstrap) and v35→v36 (registry-driven) upgrade tests.
+- `.github/workflows/anvil-interop-ci.yaml` — interop integration test, the release upgrade test (the previous release's frozen states to the current one, then a patch) and the recurring registry-driven upgrade test.
 - `.github/workflows/update-generated-artifacts.yaml` — the one-dispatch regen (hashes + selectors + zkstack-out, then chain states) that clears every pre-merge check.
 - `recompute_hashes.sh` — one-shot rebuild + recompute + write hashes.
 - `package.json`, `l1-contracts/package.json` — top-level scripts referenced below.
@@ -66,7 +66,7 @@ Doing steps 3-5 before step 1 is the most common time-sink.
 
 ## 1. Tests
 
-This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and the **upgrade pipelines** (v34 → v35 and v35 → v36, real-state replay).
+This is where the bulk of regressions surface — get this green first. Three test suites in CI: **foundry** (per-project), **anvil-interop** (full L1↔L2 flow), and the **upgrade pipelines** (the release edge from the previous release's frozen states, and the recurring edge).
 
 ### Install the pinned Foundry release
 
@@ -91,7 +91,8 @@ anvil-interop needs these artifacts, and `l1 build:foundry` regenerates `zkstack
 
 ```bash
 cd l1-contracts
-yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*'
+yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*', minus the suites below
+yarn test:foundry:previous-release  # the frozen-state suites, under FOUNDRY_PROFILE=anvil-interop like the states they load
 ```
 
 Common foundry test failures and their root causes:
@@ -139,12 +140,12 @@ Commit the regenerated `chain-states/` files alongside the contract change. CI n
 Two runners cover the two shapes of upgrade, and CI runs each as its own job in
 `anvil-interop-ci.yaml`.
 
-`run-upgrade-test.ts` is the **bootstrap** edge: it drives protocol-ops's split
-flow (`ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged
-governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade`
-per chain), which installs the registry objects and hands ecosystem authority to the
-executors. It then chains follow-up hops through the same tooling to prove the installed
-model keeps working: a same-minor verifier patch, then a subsequent minor upgrade.
+`run-upgrade-test.ts` is the **release** edge: it drives protocol-ops's split flow
+(`ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance
+calls, `ecosystem verify-package`, `ecosystem upgrade-governance` to replay the bundle, then each
+chain crossing) over the previous release's frozen states, then a same-minor patch through
+the same tooling. It needs `l1-contracts` built with `FOUNDRY_PROFILE=anvil-interop`, like those
+states.
 
 `run-recurring-upgrade-test.ts` is the **steady-state** edge, driven at the object level
 rather than through the governance-calldata scripts. `REGEN_REGISTRIES=1` regenerates its
@@ -165,7 +166,7 @@ Prerequisites: same as anvil-interop tests (both foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v35/CoreUpgrade_v35.s.sol"** or **`CTMUpgrade_v35.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
+- **`Script not found: deploy-scripts/upgrade/v<minor>/CoreUpgrade_v<minor>.s.sol`** (or `CTMUpgrade_v<minor>.s.sol`) — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 
@@ -302,7 +303,7 @@ Before pushing, run from repo root:
 yarn l1 build:foundry
 
 # 2. Tests
-cd l1-contracts && yarn test:foundry && cd ..
+cd l1-contracts && yarn test:foundry && yarn test:foundry:previous-release && cd ..
 # (Only if you touched contracts that affect interop or upgrades)
 cd l1-contracts && yarn test:hardhat:interop && cd ..
 
