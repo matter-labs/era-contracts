@@ -42,7 +42,6 @@ struct Config {
 ///         optimizer-free coverage build allows.
 struct MultiProofConfig {
     bool enabled;
-    address ziskPlonkVerifierAddr;
     address ziskRangeVerifierAddr;
 }
 
@@ -98,9 +97,6 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         if (toml.keyExists("$.multi_proof_verifier")) {
             config.multiProof.enabled = toml.readBool("$.multi_proof_verifier");
-        }
-        if (toml.keyExists("$.zisk_plonk_verifier_addr")) {
-            config.multiProof.ziskPlonkVerifierAddr = toml.readAddress("$.zisk_plonk_verifier_addr");
         }
         // When set, deploy uses this verifier instead of deploying the default ZiskVerifier.
         if (toml.keyExists("$.zisk_range_verifier_addr")) {
@@ -252,10 +248,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "PilfflonkVerifier")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "ZiskVerifier")) {
-            // The standalone snarkJS Plonk verifier this wraps; deployed
-            // beforehand (see verifiers/README.md) and passed by address.
-            return abi.encode(config.multiProof.ziskPlonkVerifierAddr);
+            return abi.encode(ctmAddresses.multiProof.ziskSnarkVerifier);
         } else if (compareStrings(contractName, "ZiskTestnetVerifier")) {
             address ziskRangeVerifier = ctmAddresses.multiProof.ziskVerifier;
             return abi.encode(ziskRangeVerifier);

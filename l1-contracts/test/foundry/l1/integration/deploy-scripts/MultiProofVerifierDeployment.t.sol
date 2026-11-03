@@ -8,7 +8,9 @@ import {DeployCTMScript} from "deploy-scripts/ctm/DeployCTM.s.sol";
 import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
+import {PilfflonkVerifier} from "contracts/state-transition/verifiers/PilfflonkVerifier.sol";
 import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
+import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 
@@ -16,16 +18,15 @@ import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsy
 ///      only the verifier fields of the config, so this reaches them directly
 ///      instead of standing up a Bridgehub for the whole CTM deployment.
 contract MultiProofVerifierDeployer is DeployCTMScript {
-    function deployMultiProofLane(address _owner, address _ziskPlonk, bool _testnet) public {
-        deployMultiProofLane(_owner, _ziskPlonk, _testnet, address(0));
+    function deployMultiProofLane(address _owner, bool _testnet) public {
+        deployMultiProofLane(_owner, _testnet, address(0));
     }
 
-    function deployMultiProofLane(address _owner, address _ziskPlonk, bool _testnet, address _ziskRange) public {
+    function deployMultiProofLane(address _owner, bool _testnet, address _ziskRange) public {
         config.multiProof.ziskRangeVerifierAddr = _ziskRange;
         config.testnetVerifier = _testnet;
         config.multiProof.enabled = true;
         config.ownerAddress = _owner;
-        config.multiProof.ziskPlonkVerifierAddr = _ziskPlonk;
         deployVerifiers();
     }
 
@@ -47,32 +48,32 @@ contract MultiProofVerifierDeployer is DeployCTMScript {
 contract MultiProofVerifierDeploymentTest is Test {
     MultiProofVerifierDeployer internal deployer;
     address internal owner;
-    address internal ziskPlonk;
 
     function setUp() public {
         deployer = new MultiProofVerifierDeployer();
         owner = makeAddr("verifierOwner");
-        ziskPlonk = makeAddr("ziskSnarkPlonkVerifier");
-        // The deploy requires the snarkJS Plonk verifier to be deployed
-        // already. These tests read wiring rather than verify a proof, so any
-        // code at the address serves.
-        vm.etch(ziskPlonk, hex"fe");
     }
 
-    /// @dev The snarkJS Plonk verifier is deployed by hand before the CTM
-    ///      deployment runs, so an address that holds no code is an operator
-    ///      mistake the deploy refuses rather than carries into settlement.
-    function test_plonkVerifierWithoutCode_revertsDeployment() public {
-        address notDeployed = makeAddr("neverDeployed");
+    /// @dev The deploy deploys ZiSK's vendored pilfflonk verifier itself and
+    ///      wires it into the ZiskVerifier it deploys, so no operator-supplied
+    ///      SNARK verifier is involved.
+    function testFuzz_defaultRangeVerifier_wiresVendoredSnarkVerifier(bool _testnet) public {
+        deployer.deployMultiProofLane(owner, _testnet);
+        CTMDeployedAddresses memory addresses = deployer.getAddresses();
 
-        vm.expectRevert("zisk_plonk_verifier_addr holds no code: deploy the snarkJS Plonk verifier first");
-        deployer.deployMultiProofLane(owner, notDeployed, true);
+        address snarkVerifier = addresses.multiProof.ziskSnarkVerifier;
+        assertEq(snarkVerifier.codehash, address(new PilfflonkVerifier()).codehash, "vendored pilfflonk verifier");
+        assertEq(
+            address(ZiskVerifier(addresses.multiProof.ziskVerifier).SNARK_VERIFIER()),
+            snarkVerifier,
+            "ZiskVerifier wraps it"
+        );
     }
 
     /// @dev The testnet lane puts `MultiProofTestnetVerifier` in the CTM, over
     ///      `MultiProofVerifier`, over the ZKsync OS verifier.
     function test_testnetLane_composition() public {
-        deployer.deployMultiProofLane(owner, ziskPlonk, true);
+        deployer.deployMultiProofLane(owner, true);
         CTMDeployedAddresses memory addresses = deployer.getAddresses();
 
         address chainVerifier = addresses.stateTransition.verifiers.verifier;
@@ -107,7 +108,7 @@ contract MultiProofVerifierDeploymentTest is Test {
 
     /// @dev The production lane puts `MultiProofVerifier` in the CTM directly.
     function test_prodLane_composition() public {
-        deployer.deployMultiProofLane(owner, ziskPlonk, false);
+        deployer.deployMultiProofLane(owner, false);
         CTMDeployedAddresses memory addresses = deployer.getAddresses();
 
         assertEq(
@@ -128,9 +129,9 @@ contract MultiProofVerifierDeploymentTest is Test {
     }
 
     function test_repeatedDeployment_clearsUnusedComponents() public {
-        deployer.deployMultiProofLane(owner, ziskPlonk, true);
+        deployer.deployMultiProofLane(owner, true);
         assertGt(deployer.getAddresses().multiProof.ziskTestnetVerifier.code.length, 0);
-        deployer.deployMultiProofLane(owner, ziskPlonk, false);
+        deployer.deployMultiProofLane(owner, false);
         assertEq(deployer.getAddresses().multiProof.ziskTestnetVerifier, address(0));
         deployer.deployAirbenderLane(false);
         _assertAirbenderOnlyAddresses();
@@ -144,6 +145,7 @@ contract MultiProofVerifierDeploymentTest is Test {
             addresses.stateTransition.verifiers.verifierPlonk
         );
         assertEq(addresses.multiProof.airbenderVerifier, address(0));
+        assertEq(addresses.multiProof.ziskSnarkVerifier, address(0));
         assertEq(addresses.multiProof.ziskVerifier, address(0));
         assertEq(addresses.multiProof.ziskTestnetVerifier, address(0));
         assertEq(addresses.multiProof.multiProofVerifier, address(0));
@@ -151,14 +153,14 @@ contract MultiProofVerifierDeploymentTest is Test {
 
     function test_rangeVerifierWithoutCode_revertsDeployment() public {
         vm.expectRevert("zisk_range_verifier_addr holds no code: deploy the range verifier first");
-        deployer.deployMultiProofLane(owner, ziskPlonk, false, makeAddr("missingRangeVerifier"));
+        deployer.deployMultiProofLane(owner, false, makeAddr("missingRangeVerifier"));
     }
 
     function testFuzz_rangeVerifierOverride_wiringAndOutput(bool _testnet) public {
         // Only address selection is under test; proof verification has separate suites.
         address rangeVerifier = makeAddr("externalRangeVerifier");
         vm.etch(rangeVerifier, hex"fe");
-        deployer.deployMultiProofLane(owner, ziskPlonk, _testnet, rangeVerifier);
+        deployer.deployMultiProofLane(owner, _testnet, rangeVerifier);
         CTMDeployedAddresses memory addresses = deployer.getAddresses();
 
         address selected = address(MultiProofVerifier(addresses.multiProof.multiProofVerifier).ZISK_RANGE_VERIFIER());
@@ -168,11 +170,13 @@ contract MultiProofVerifierDeploymentTest is Test {
         }
         assertEq(selected, rangeVerifier);
         assertEq(addresses.multiProof.ziskVerifier, rangeVerifier);
+        // An operator's range verifier brings its own SNARK verifier.
+        assertEq(addresses.multiProof.ziskSnarkVerifier, address(0), "no SNARK verifier deployed");
         _assertOutputRangeVerifier(rangeVerifier);
     }
 
     function test_defaultRangeVerifier_output() public {
-        deployer.deployMultiProofLane(owner, ziskPlonk, false);
+        deployer.deployMultiProofLane(owner, false);
         _assertOutputRangeVerifier(deployer.getAddresses().multiProof.ziskVerifier);
     }
 
@@ -199,6 +203,12 @@ contract MultiProofVerifierDeploymentTest is Test {
             vm.parseTomlAddress(output, ".deployed_addresses.state_transition.verifier_addr"),
             addresses.stateTransition.verifiers.verifier
         );
+        string memory snarkVerifierKey = ".deployed_addresses.state_transition.zisk_snark_verifier_addr";
+        if (addresses.multiProof.ziskSnarkVerifier != address(0)) {
+            assertEq(vm.parseTomlAddress(output, snarkVerifierKey), addresses.multiProof.ziskSnarkVerifier);
+        } else {
+            assertFalse(vm.keyExistsToml(output, snarkVerifierKey), "no SNARK verifier in the output");
+        }
         if (addresses.multiProof.ziskTestnetVerifier != address(0)) {
             assertEq(
                 vm.parseTomlAddress(output, ".deployed_addresses.state_transition.zisk_testnet_verifier_addr"),
@@ -211,7 +221,7 @@ contract MultiProofVerifierDeploymentTest is Test {
     /// @dev The ZKsync OS verifier holds the PLONK sub-verifier, which the
     ///      deploy wires at construction.
     function test_airbenderVerifier_wiresPlonkSubVerifier() public {
-        deployer.deployMultiProofLane(owner, ziskPlonk, true);
+        deployer.deployMultiProofLane(owner, true);
         CTMDeployedAddresses memory addresses = deployer.getAddresses();
 
         ZKsyncOSVerifier airbenderVerifier = ZKsyncOSVerifier(addresses.multiProof.airbenderVerifier);
@@ -226,7 +236,7 @@ contract MultiProofVerifierDeploymentTest is Test {
     /// @dev The tooling introspects the sub-verifier through whichever contract
     ///      the CTM holds, so both compositions must answer.
     function test_tooling_introspectsChainVerifier() public {
-        deployer.deployMultiProofLane(owner, ziskPlonk, true);
+        deployer.deployMultiProofLane(owner, true);
         (, address plonk) = DeployCTML1OrGateway.getSubVerifiers(
             deployer.getAddresses().stateTransition.verifiers.verifier
         );
@@ -235,7 +245,7 @@ contract MultiProofVerifierDeploymentTest is Test {
             MultiProofTestnetVerifier(deployer.getAddresses().stateTransition.verifiers.verifier).isTestnetVerifier()
         );
 
-        deployer.deployMultiProofLane(owner, ziskPlonk, false);
+        deployer.deployMultiProofLane(owner, false);
         (, plonk) = DeployCTML1OrGateway.getSubVerifiers(deployer.getAddresses().stateTransition.verifiers.verifier);
         assertEq(plonk, deployer.getAddresses().stateTransition.verifiers.verifierPlonk, "prod lane PLONK");
         assertFalse(MultiProofVerifier(deployer.getAddresses().stateTransition.verifiers.verifier).isTestnetVerifier());
