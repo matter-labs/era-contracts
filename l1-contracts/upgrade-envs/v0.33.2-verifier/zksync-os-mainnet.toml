@@ -29,7 +29,7 @@ governance_upgrade_timer_initial_delay = 0
 # Deterministic CREATE2 factory. The salt is fresh for this upgrade: a repeated (salt, initcode)
 # pair resolves to an already deployed contract. To deploy anew, commit a new salt here before
 # generating (transaction-simulator's Generate upgrade data workflow does it with `salt: fresh`).
-create2_factory_salt = "0xc2c225faf4a143458c3c674b68845dc67af3c95966b64113124759498fa427aa"
+create2_factory_salt = "0xff21a787a5744a33f9d809f97f4272aae124589dff93834bc970d08fa9bea9b3"
 
 # Every chain registered on the CTM, all on v0.33.0. 20250714 has never committed a batch.
 chain_ids = [5790, 51703, 61703, 20250714, 886229927]
