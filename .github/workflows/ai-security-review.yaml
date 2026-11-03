@@ -1,0 +1,30 @@
+name: AI Security Review
+
+on:
+  pull_request:
+    branches: [draft/v0.36.0]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: ai-security-review-caller-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  security-review:
+    name: Security review
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.user.type == 'User' &&
+      github.event.sender.type == 'User' &&
+      !endsWith(github.actor, '[bot]')
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    uses: matter-labs/zksync-ci-common/.github/workflows/ai-security-review.yaml@a0d18463bb8b79e58a9f62eda0f6f99e1c6577df
+    with:
+      maximum_batches: 24
+      fail_on_findings: false
