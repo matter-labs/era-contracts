@@ -13,7 +13,7 @@
     "description": "Stage 0: start the governance upgrade timer (GovernanceUpgradeTimer.startTimer)",
     "network": "mainnet",
     "from": "0x3d67838307eedef76026b84170737254a5faa438",
-    "to": "0x019517fd35e9710ad6e0bb3e4ff53ec0b004c577",
+    "to": "0xe4ed33dbdbe8662dd4f6556d42042c5c0519316a",
     "data": "0xa39f7449",
     "value": "0",
     "tag": "stage0"
@@ -22,7 +22,7 @@
     "description": "Stage 1: check the governance upgrade timer's deadline has passed (GovernanceUpgradeTimer.checkDeadline)",
     "network": "mainnet",
     "from": "0x3d67838307eedef76026b84170737254a5faa438",
-    "to": "0x019517fd35e9710ad6e0bb3e4ff53ec0b004c577",
+    "to": "0xe4ed33dbdbe8662dd4f6556d42042c5c0519316a",
     "data": "0x43bf9936",
     "value": "0",
     "timeIncrease": 200000,
@@ -32,7 +32,7 @@
     "description": "Stage 1: check chain migrations are paused (UpgradeStageValidator.checkMigrationsPaused)",
     "network": "mainnet",
     "from": "0x3d67838307eedef76026b84170737254a5faa438",
-    "to": "0x630652ac78ce7f5b68b6a19393353ec56604d725",
+    "to": "0x2039bade9c289996dcb48dd9932f7a40b809859d",
     "data": "0x386584cf",
     "value": "0",
     "tag": "stage1"
@@ -42,7 +42,7 @@
     "network": "mainnet",
     "from": "0x3d67838307eedef76026b84170737254a5faa438",
     "to": "0xf9fc08eaa6dad8dde886f3b174a019c9ac56b2ef",
-    "data": "0xca4ea3570000000000000000000000000000000000000000000000000000002100000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000002100000002000000000000000000000000e36cb649cb6891368b3da75a5baccab65fe9fb59",
+    "data": "0xca4ea3570000000000000000000000000000000000000000000000000000002100000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000021000000020000000000000000000000000d3389de1fa6c769fdfd29a561734b4a458c5c38",
     "value": "0",
     "tag": "stage1"
   },
@@ -50,7 +50,7 @@
     "description": "Stage 2: check the new protocol version is registered on the CTM (UpgradeStageValidator.checkProtocolUpgradePresence)",
     "network": "mainnet",
     "from": "0x3d67838307eedef76026b84170737254a5faa438",
-    "to": "0x630652ac78ce7f5b68b6a19393353ec56604d725",
+    "to": "0x2039bade9c289996dcb48dd9932f7a40b809859d",
     "data": "0x37076ce3",
     "value": "0",
     "valueToMint": "10",
@@ -69,7 +69,7 @@
     "description": "Stage 2: check chain migrations are unpaused (UpgradeStageValidator.checkMigrationsUnpaused)",
     "network": "mainnet",
     "from": "0x3d67838307eedef76026b84170737254a5faa438",
-    "to": "0x630652ac78ce7f5b68b6a19393353ec56604d725",
+    "to": "0x2039bade9c289996dcb48dd9932f7a40b809859d",
     "data": "0x407a5a0b",
     "value": "0",
     "tag": "stage2"
