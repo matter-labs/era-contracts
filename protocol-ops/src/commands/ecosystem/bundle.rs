@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
-use crate::commands::ecosystem::forge_checks;
+use crate::commands::ecosystem::forge_checks::{self, ForkOrigin};
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_upgrade::{self, VerifyUpgradeArgs};
 use crate::common::anvil::{evm_revert, evm_snapshot, send_impersonated_tx, set_balance};
@@ -789,7 +789,7 @@ enum CheckTarget {
 /// Check the upgrade's effects: PUVT for v31; for a `forge-script` upgrade, its declared
 /// command and, with `builtin_checks`, the built-ins.
 ///
-/// `fork_block`: the block the fork was taken at (fork target only).
+/// `fork`: what the fork was taken from (fork target only).
 #[allow(clippy::too_many_arguments)]
 async fn check_upgrade(
     descriptor: &UpgradeDescriptor,
@@ -800,7 +800,7 @@ async fn check_upgrade(
     zk_governance_commit: &str,
     paths: &BundlePaths,
     transactions_log_override: Option<&Path>,
-    fork_block: Option<u64>,
+    fork: Option<ForkOrigin<'_>>,
 ) -> anyhow::Result<()> {
     match descriptor {
         UpgradeDescriptor::PrepareAll {} => {
@@ -815,7 +815,7 @@ async fn check_upgrade(
             .await
         }
         UpgradeDescriptor::ForgeScript(upgrade) => {
-            check_forge_script_upgrade(upgrade, target, env_cfg, rpc_url, paths, fork_block).await
+            check_forge_script_upgrade(upgrade, target, env_cfg, rpc_url, paths, fork).await
         }
     }
 }
@@ -852,7 +852,7 @@ async fn check_forge_script_upgrade(
     env_cfg: &EnvConfig,
     rpc_url: &str,
     paths: &BundlePaths,
-    fork_block: Option<u64>,
+    fork: Option<ForkOrigin<'_>>,
 ) -> anyhow::Result<()> {
     let mut failures = CheckFailures::default();
     let (name, command) = match target {
@@ -895,7 +895,7 @@ async fn check_forge_script_upgrade(
                         rpc_url,
                         paths,
                         &output,
-                        fork_block,
+                        fork,
                         &mut failures,
                     )
                     .await;
@@ -919,13 +919,14 @@ async fn builtin_fork_checks(
     rpc_url: &str,
     paths: &BundlePaths,
     output: &forge_checks::UpgradeOutput,
-    fork_block: Option<u64>,
+    fork: Option<ForkOrigin<'_>>,
     failures: &mut CheckFailures,
 ) {
-    let Some(fork_block) = fork_block else {
+    let Some(fork) = fork else {
         failures.record("built-in checks", Err(anyhow::anyhow!("no fork block")));
         return;
     };
+    let fork_block = fork.block;
     // A rerun in the same work dir must not hand the fork tests an earlier run's files.
     for file in [
         forge_checks::DEPLOYMENTS_FILE,
@@ -957,7 +958,7 @@ async fn builtin_fork_checks(
                 &upgrade.fork_tests,
                 &env_cfg.env,
                 rpc_url,
-                fork_block,
+                fork,
                 &chains,
                 &paths.ecosystem_toml,
                 &paths.work_dir,
@@ -1176,7 +1177,10 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &args.zk_governance_commit,
         &paths,
         None,
-        Some(forked_at_block),
+        Some(ForkOrigin {
+            url: &args.fork_url,
+            block: forked_at_block,
+        }),
     )
     .await?;
     drop(anvil);
@@ -1381,7 +1385,10 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 &zk_governance_commit,
                 &paths,
                 args.transactions_log.as_deref(),
-                Some(fork_block),
+                Some(ForkOrigin {
+                    url: &fork_url,
+                    block: fork_block,
+                }),
             )
             .await?;
             drop(anvil);

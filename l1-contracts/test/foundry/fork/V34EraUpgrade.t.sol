@@ -51,10 +51,11 @@ import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMul
 /// @notice v34 Era on the fork protocol-ops replayed the upgrade on (`fork_tests` in `upgrade.toml`): the output
 /// against the chain, the build and the env TOML; the CTM, the ServerNotifier and the upgraded chains; the 15M cap
 /// on user L1->L2 transactions; the proof-system switches.
-/// @dev protocol-ops exports the inputs: `L1_RPC_URL`, `UPGRADE_ENV`, `FORK_BLOCK`, `REFERENCE_CHAIN_ID` (the
-/// upgraded chain), `TEST_CHAIN_ID` and `CHECKS_DIR` (`deployments.json` and a copy of the bundle's `ecosystem.toml`).
-/// The L1 before the upgrade is read on a fork of `FORK_BLOCK`. The reference chain's admin calls are pranked as its
-/// `getAdmin()`, the ChainAdmin.
+/// @dev protocol-ops exports the inputs: `FORK_URL` and `FORK_BLOCK` (the RPC and the block the replayed fork was
+/// taken from), `UPGRADE_ENV`, `REFERENCE_CHAIN_ID` (the upgraded chain), `TEST_CHAIN_ID` and `CHECKS_DIR`
+/// (`deployments.json` and a copy of the bundle's `ecosystem.toml`). The L1 before the upgrade is read on a fork of
+/// `FORK_URL` at `FORK_BLOCK`, not of the replayed fork: concurrent reads below Anvil 1.5.1's head deadlock it. The
+/// reference chain's admin calls are pranked as its `getAdmin()`, the ChainAdmin.
 contract V34EraUpgradeForkTest is Test {
     string internal constant ALL_CONTRACTS_HASHES = "/../AllContractsHashes.json";
     /// @dev v0.33.0's L2 upgrade tx, whose force deployments v34 keeps: the same for every env.
@@ -71,7 +72,7 @@ contract V34EraUpgradeForkTest is Test {
     bytes32 internal constant SERVER_NOTIFIER_INITIALIZED_SLOT = bytes32(uint256(1));
     uint256 internal constant SERVER_NOTIFIER_INITIALIZED_SHIFT = 20 * 8;
 
-    string internal rpcUrl;
+    string internal forkUrl;
     uint256 internal forkBlock;
     uint256 internal referenceChainId;
     uint256 internal testChainId;
@@ -87,7 +88,7 @@ contract V34EraUpgradeForkTest is Test {
         if (bytes(checksDir).length == 0) {
             vm.skip(true, "no CHECKS_DIR: protocol-ops' fork_tests run this on the fork it replayed the upgrade on");
         }
-        rpcUrl = vm.envString("L1_RPC_URL");
+        forkUrl = vm.envString("FORK_URL");
         forkBlock = vm.envUint("FORK_BLOCK");
         referenceChainId = vm.envUint("REFERENCE_CHAIN_ID");
         testChainId = vm.envUint("TEST_CHAIN_ID");
@@ -114,7 +115,7 @@ contract V34EraUpgradeForkTest is Test {
 
     /// @dev Only this CTM's chains are called: a legacy chain may revert a call to its diamond.
     function test_referenceChainIsTheScriptsPick() public {
-        vm.createSelectFork(rpcUrl, forkBlock);
+        vm.createSelectFork(forkUrl, forkBlock);
         uint256 oldVersion = ctm.protocolVersion();
         uint256[] memory chainIds = bridgehub.getAllZKChainChainIDs();
         uint256 first = 0;
@@ -135,7 +136,7 @@ contract V34EraUpgradeForkTest is Test {
         V34EraOutputChecks.Output memory out = _output();
         string memory genesis = vm.readFile(Utils.genesisConfigPath(false));
         IOwnable serverNotifier = IOwnable(ctm.serverNotifierAddress());
-        vm.createSelectFork(rpcUrl, forkBlock);
+        vm.createSelectFork(forkUrl, forkBlock);
         address ownerBefore = serverNotifier.owner();
         address ctmBefore = address(ServerNotifier(address(serverNotifier)).chainTypeManager());
         vm.selectFork(replayedFork);
@@ -219,7 +220,7 @@ contract V34EraUpgradeForkTest is Test {
             keccak256(abi.encode(V34EraOutputChecks.proposedUpgrade(cut).l2ProtocolUpgradeTx)),
             "reference chain: the pending L2 upgrade tx is the cut's"
         );
-        vm.createSelectFork(rpcUrl, forkBlock);
+        vm.createSelectFork(forkUrl, forkBlock);
         uint256 limitBefore = chain.getPriorityTxMaxGasLimit();
         vm.selectFork(replayedFork);
         assertEq(chain.getPriorityTxMaxGasLimit(), limitBefore, "reference chain: priorityTxMaxGasLimit unchanged");
@@ -227,7 +228,7 @@ contract V34EraUpgradeForkTest is Test {
 
     /// @dev Before v34 the reference chain takes a deposit over the cap.
     function test_capIsNewInV34() public {
-        vm.createSelectFork(rpcUrl, forkBlock);
+        vm.createSelectFork(forkUrl, forkBlock);
         _deposit(referenceChainId, CAP_L2_GAS_LIMIT + 1);
     }
 
@@ -300,7 +301,7 @@ contract V34EraUpgradeForkTest is Test {
         );
         refs.genesis = _genesis(genesis);
         refs.l2 = _l2Bytecodes(refs.genesis);
-        vm.createSelectFork(rpcUrl, forkBlock);
+        vm.createSelectFork(forkUrl, forkBlock);
         refs.oldProtocolVersion = ctm.protocolVersion();
         refs.l1 = _l1Facts();
         vm.selectFork(replayedFork);
