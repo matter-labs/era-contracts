@@ -827,8 +827,10 @@ struct CheckFailures(Vec<String>);
 impl CheckFailures {
     fn record(&mut self, checker: &str, result: anyhow::Result<()>) {
         if let Err(error) = result {
-            logger::error(format!("{checker} failed: {error:#}"));
-            self.0.push(format!("{checker}: {error:#}"));
+            // An RPC error quotes the URL, which can carry an API key.
+            let error = forge_checks::redact_urls(&format!("{error:#}"));
+            logger::error(format!("{checker} failed: {error}"));
+            self.0.push(format!("{checker}: {error}"));
         }
     }
 
@@ -886,7 +888,8 @@ async fn check_forge_script_upgrade(
         logger::step("built-in checks");
         match forge_checks::UpgradeOutput::read(&paths.ecosystem_toml) {
             Ok(output) => {
-                let publication = forge_checks::check_publication(rpc_url, &output).await;
+                let publication =
+                    forge_checks::check_publication(rpc_url, &output, env_cfg.bridgehub()).await;
                 failures.record("publication", publication);
                 if target == CheckTarget::Fork {
                     builtin_fork_checks(
@@ -1726,8 +1729,16 @@ mod tests {
         failures.record("verify_fork", Err(anyhow::anyhow!("exit status 1")));
         failures.record("publication", Ok(()));
         failures.record("provenance", Err(anyhow::anyhow!("unidentified init code")));
+        // reqwest's error names the URL, which can carry an API key.
+        let timeout = anyhow::anyhow!("error sending request for url (https://eth.example/v2/KEY)");
+        failures.record("replay", Err(timeout.context("eth_call")));
         let message = failures.finish().unwrap_err().to_string();
-        assert!(message.starts_with("2 check(s) failed"), "{message}");
+        assert!(message.starts_with("3 check(s) failed"), "{message}");
+        assert!(
+            message.contains("replay: eth_call: error sending request for url (<url>)"),
+            "{message}"
+        );
+        assert!(!message.contains("KEY"), "{message}");
         assert!(message.contains("verify_fork: exit status 1"), "{message}");
         assert!(
             message.contains("provenance: unidentified init code"),

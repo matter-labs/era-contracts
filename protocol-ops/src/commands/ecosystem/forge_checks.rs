@@ -4,8 +4,8 @@
 //! Foundry tests, which the files written here feed.
 //!
 //! - publication (fork and chain): every factory dep of the L2 upgrade transaction is
-//!   published in the BytecodesSupplier, every output address has code, and the output's
-//!   supplier is the CTM's;
+//!   published in the BytecodesSupplier, every output address has code, the output's CTM is
+//!   the env's bridgehub's for the reference chain, and the output's supplier is the CTM's;
 //! - provenance (fork): every deployer transaction is a CREATE2 deployment through the env's
 //!   factory of a bytecode in `AllContractsHashes.json`, or a publication to the supplier;
 //!   one salt; every deployment is an output address, and every output address without code at
@@ -13,9 +13,10 @@
 //!   (`{salt, deployments: [{contract, address, args}]}`); whether the salt and the
 //!   constructor args are the right ones is the upgrade's knowledge, checked in Foundry;
 //! - the replay (fork): the ServerNotifier upgrade and governance stages 0–2, each sent as its
-//!   real sender, with the CTM checked after each; the reference chain's upgrade timestamp,
-//!   drain and upgrade, which a pending L2 upgrade fails; a new test chain; the reference
-//!   chain's last execute transaction. It assumes a minor-version upgrade whose upgrade
+//!   real sender, with the CTM checked after each and an emergency execution's unfreeze
+//!   emulated before stage 1; the reference chain's upgrade timestamp, drain and upgrade, which
+//!   a pending L2 upgrade fails; a new test chain; the reference chain's last execute
+//!   transaction, whose lookup only warns. It assumes a minor-version upgrade whose upgrade
 //!   contract refuses a chain with unexecuted batches (v31's and v34's do);
 //! - `fork_tests`: the upgrade's Foundry test files, on the replayed fork, with its exports.
 
@@ -28,7 +29,7 @@ use std::process::Command;
 use alloy::consensus::Transaction as _;
 use alloy::eips::BlockNumberOrTag;
 use alloy::network::TransactionBuilder;
-use alloy::primitives::{b256, keccak256, Address, Bytes, B256, U256};
+use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::providers::Provider;
 use alloy::rpc::types::{Filter, TransactionRequest};
 use alloy::sol_types::{SolCall, SolError, SolValue};
@@ -52,7 +53,9 @@ use crate::common::l1_contracts::{
 };
 use crate::common::upgrade_descriptor::ForkTest;
 use crate::common::{logger, paths};
-use crate::upgrade_verification::constants::EIP1967_PROXY_ADMIN_SLOT;
+use crate::upgrade_verification::constants::{
+    EIP1967_IMPLEMENTATION_SLOT, EIP1967_PROXY_ADMIN_SLOT,
+};
 use crate::upgrade_verification::verifiers::VerificationResult;
 use crate::upgrade_verification::versions::v31::elements::set_new_version_upgrade::{
     upgradeCall, BytecodesSupplier, DiamondCutData,
@@ -211,8 +214,13 @@ impl Report {
 }
 
 /// Every factory dep of the L2 upgrade transaction is published, every output address has
-/// code, and the output's supplier is the CTM's. Read-only, so safe against a real chain.
-pub(crate) async fn check_publication(rpc_url: &str, output: &UpgradeOutput) -> anyhow::Result<()> {
+/// code, the output's CTM is the one `bridgehub` (the env's) records for the reference chain,
+/// and the output's supplier is the CTM's. Read-only, so safe against a real chain.
+pub(crate) async fn check_publication(
+    rpc_url: &str,
+    output: &UpgradeOutput,
+    bridgehub: Address,
+) -> anyhow::Result<()> {
     let provider = get_read_provider(rpc_url)?;
     let mut report = Report::default();
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
@@ -264,12 +272,73 @@ pub(crate) async fn check_publication(rpc_url: &str, output: &UpgradeOutput) -> 
         ));
     }
 
+    // The bridgehub's registry, not the CTM's own BRIDGE_HUB(), which another CTM deployed
+    // with the env's bridgehub also returns. A failed read is one more error, not the only one.
+    let registered = async {
+        let (_, chain_id) = reference_chain(&provider, output).await?;
+        check_chain_ctm(&provider, bridgehub, chain_id, ctm, &mut report).await
+    };
+    if let Err(error) = registered.await {
+        report.error(format!(
+            "the bridgehub's CTM for the reference chain: {}",
+            quote(&format!("{error:#}"))
+        ));
+    }
     report.equal(
         "state_transition.bytecodes_supplier_addr = the CTM's L1_BYTECODES_SUPPLIER()",
         supplier,
         resolve_bytecodes_supplier(rpc_url, ctm).await?,
     );
     report.finish()
+}
+
+/// The reference chain's diamond: the one chain `test_upgrade_chain` calls.
+fn reference_diamond(test_upgrade_chain: &[GovernanceCall]) -> anyhow::Result<Address> {
+    test_upgrade_chain
+        .first()
+        .map(|call| call.target)
+        .filter(|diamond| {
+            test_upgrade_chain
+                .iter()
+                .all(|call| call.target == *diamond)
+        })
+        .ok_or_else(|| anyhow::anyhow!("test_upgrade_chain must call one chain"))
+}
+
+/// The reference chain's diamond and chain id.
+async fn reference_chain(
+    provider: &AlloyProvider,
+    output: &UpgradeOutput,
+) -> anyhow::Result<(Address, u64)> {
+    let diamond = reference_diamond(&output.test_upgrade_calls.test_upgrade_chain)?;
+    let chain_id = ZkChainAbi::new(diamond, provider.clone())
+        .getChainId()
+        .call()
+        .await
+        .with_context(|| format!("getChainId() on {diamond}"))?;
+    Ok((diamond, u64::try_from(chain_id)?))
+}
+
+/// `bridgehub.chainTypeManager(chain_id)` = the output's CTM.
+async fn check_chain_ctm(
+    provider: &AlloyProvider,
+    bridgehub: Address,
+    chain_id: u64,
+    ctm: Address,
+    report: &mut Report,
+) -> anyhow::Result<()> {
+    report.equal(
+        &format!(
+            "the bridgehub's chainTypeManager({chain_id}) = state_transition.chain_type_manager_proxy"
+        ),
+        BridgehubAbi::new(bridgehub, provider.clone())
+            .chainTypeManager(U256::from(chain_id))
+            .call()
+            .await
+            .with_context(|| format!("{bridgehub}.chainTypeManager({chain_id})"))?,
+        ctm,
+    );
+    Ok(())
 }
 
 /// A deployer transaction as `prepare/*.safe.json` holds it.
@@ -437,9 +506,6 @@ pub(crate) const LAST_EXECUTE_INPUT_FILE: &str = "last_execute_input.hex";
 const EXECUTE_LOG_WINDOW: u64 = 1_000;
 /// How far back from the fork block the search goes: about a week of 12-second L1 blocks.
 const EXECUTE_LOG_SPAN: u64 = 50_000;
-/// EIP-1967's implementation slot.
-const EIP1967_IMPLEMENTATION_SLOT: B256 =
-    b256!("360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc");
 
 /// The fork the bundle was replayed on: reads through `provider`, impersonated sends through
 /// `common::anvil`.
@@ -580,7 +646,8 @@ pub(crate) struct ReplayedChains {
 }
 
 /// Replays the upgrade on the fork as whoever executes it would, checking the CTM and the
-/// reference chain on the way. Stops at the first failure: later steps need the state.
+/// reference chain on the way. Stops at the first failure, as later steps need the state; the
+/// last execute transaction's lookup, which no state depends on, only warns.
 pub(crate) async fn replay(
     rpc_url: &str,
     env_cfg: &EnvConfig,
@@ -607,9 +674,8 @@ pub(crate) async fn replay(
     let test = create_test_chain(&fork, output, &facts)
         .await
         .context("the test chain")?;
-    write_last_execute_input(&fork, &facts, fork_block, work_dir)
-        .await
-        .context("the last execute transaction")?;
+    // Without the file, V34EraFirstBatch.t.sol's setUp fails reading it on a testnet verifier.
+    try_write_last_execute_input(&fork, &facts, fork_block, work_dir).await;
     Ok(ReplayedChains {
         reference: facts.chain_id,
         test,
@@ -633,27 +699,9 @@ async fn read_facts(
     );
 
     let ctm = output.state_transition_address("chain_type_manager_proxy")?;
-    let calls = &output.test_upgrade_calls.test_upgrade_chain;
-    let diamond = calls
-        .first()
-        .map(|call| call.target)
-        .filter(|diamond| calls.iter().all(|call| call.target == *diamond))
-        .ok_or_else(|| anyhow::anyhow!("test_upgrade_chain must call one chain"))?;
-    let chain_id = u64::try_from(
-        ZkChainAbi::new(diamond, provider.clone())
-            .getChainId()
-            .call()
-            .await?,
-    )?;
+    let (diamond, chain_id) = reference_chain(provider, output).await?;
     let bridgehub = env_cfg.bridgehub();
-    report.equal(
-        &format!("the bridgehub's chainTypeManager({chain_id}) = state_transition.chain_type_manager_proxy"),
-        BridgehubAbi::new(bridgehub, provider.clone())
-            .chainTypeManager(U256::from(chain_id))
-            .call()
-            .await?,
-        ctm,
-    );
+    check_chain_ctm(provider, bridgehub, chain_id, ctm, &mut report).await?;
     report.equal(
         "the CTM's BRIDGE_HUB() = bridgehub_proxy_addr",
         IChainTypeManagerAbi::new(ctm, provider.clone())
@@ -721,7 +769,7 @@ async fn upgrade_server_notifier(
     let mut report = Report::default();
     report.equal(
         "ServerNotifier implementation = state_transition.server_notifier_implementation_addr",
-        fork.slot_address(facts.server_notifier, EIP1967_IMPLEMENTATION_SLOT)
+        fork.slot_address(facts.server_notifier, EIP1967_IMPLEMENTATION_SLOT.parse()?)
             .await?,
         output.state_transition_address("server_notifier_implementation_addr")?,
     );
@@ -751,8 +799,9 @@ async fn ctm_kept_state(
     ))
 }
 
-/// Stages 0–2 from the CTM's owner: with a timer, its deadline after stage 0 and a warp past
-/// it; stage 1 split around the CTM's proxy upgrade to check what it keeps; then the CTM.
+/// Stages 0–2 from the CTM's owner: migrations paused after stage 0; with a timer, its deadline
+/// and a warp past it; an emergency execution's unfreeze; stage 1 split around the CTM's proxy
+/// upgrade to check what it keeps; then the CTM.
 async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> anyhow::Result<()> {
     let provider = &fork.provider;
     let config = &output.contracts_config;
@@ -763,6 +812,13 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
     );
     let ctm = IChainTypeManagerAbi::new(facts.ctm, provider.clone());
     let ext = IChainTypeManagerExt::new(facts.ctm, provider.clone());
+    let chain_asset_handler = IChainAssetHandlerAbi::new(
+        BridgehubAbi::new(facts.bridgehub, provider.clone())
+            .chainAssetHandler()
+            .call()
+            .await?,
+        provider.clone(),
+    );
     let old_pointer = ext.newChainCreationParamsBlock(old).call().await?;
     let old_is_testnet = resolve_is_testnet_verifier(&fork.rpc_url, facts.ctm)
         .await
@@ -771,6 +827,14 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
     let started_after = fork.latest_timestamp().await?;
     fork.send_calls(facts.ctm_owner, &stages.stage0_calls, "stage 0")
         .await?;
+    // Stage 0 pauses migrations for the delay before stage 1.
+    let mut report = Report::default();
+    report.equal(
+        "migrations paused after stage 0",
+        chain_asset_handler.migrationPaused().call().await?,
+        true,
+    );
+    report.finish()?;
     let timer = output
         .deployed_addresses
         .get("l1_governance_upgrade_timer")
@@ -803,6 +867,23 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
         }
     }
 
+    // An emergency execution unfreezes before a proposal's calls, which unpauses migrations;
+    // stage 1 must pause them again for its checkMigrationsPaused.
+    fork.send(
+        facts.ctm_owner,
+        *chain_asset_handler.address(),
+        IChainAssetHandlerAbi::unpauseMigrationCall {}.abi_encode(),
+        "unpauseMigration() as the CTM owner (emulates an emergency execution's unfreeze)",
+    )
+    .await?;
+    let mut report = Report::default();
+    report.equal(
+        "migrations unpaused before stage 1",
+        chain_asset_handler.migrationPaused().call().await?,
+        false,
+    );
+    report.finish()?;
+
     let proxy_admin = fork
         .slot_address(facts.ctm, EIP1967_PROXY_ADMIN_SLOT.parse()?)
         .await?;
@@ -828,7 +909,7 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
     let mut report = Report::default();
     report.equal(
         "CTM implementation = state_transition.chain_type_manager_implementation_addr",
-        fork.slot_address(facts.ctm, EIP1967_IMPLEMENTATION_SLOT)
+        fork.slot_address(facts.ctm, EIP1967_IMPLEMENTATION_SLOT.parse()?)
             .await?,
         output.state_transition_address("chain_type_manager_implementation_addr")?,
     );
@@ -876,16 +957,9 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
         ext.initialForceDeploymentHash().call().await?,
         force_deployments_hash(&config.force_deployments_data),
     );
-    let chain_asset_handler = BridgehubAbi::new(facts.bridgehub, provider.clone())
-        .chainAssetHandler()
-        .call()
-        .await?;
     report.equal(
         "migrations unpaused",
-        IChainAssetHandlerAbi::new(chain_asset_handler, provider.clone())
-            .migrationPaused()
-            .call()
-            .await?,
+        chain_asset_handler.migrationPaused().call().await?,
         false,
     );
     // setChainCreationParams keys the pointer under the CTM's current version, so it must run
@@ -1121,6 +1195,27 @@ async fn create_test_chain(
     Ok(chain_id)
 }
 
+/// `write_last_execute_input`, warning instead of failing: an idle chain, an RPC's range cap or a
+/// rate limit hides the log, and only a fork test that reads the file needs it. Returns the
+/// warning. `builtin_fork_checks` deletes an earlier run's file first, so a failure leaves none.
+async fn try_write_last_execute_input(
+    fork: &Fork,
+    facts: &Facts,
+    fork_block: u64,
+    work_dir: &Path,
+) -> Option<String> {
+    let error = write_last_execute_input(fork, facts, fork_block, work_dir)
+        .await
+        .err()?;
+    // The error can quote the RPC's URL, which can carry an API key.
+    let warning = format!(
+        "{LAST_EXECUTE_INPUT_FILE} not written: the last execute transaction: {}",
+        quote(&format!("{error:#}"))
+    );
+    logger::warn(&warning);
+    Some(warning)
+}
+
 /// The raw input of the transaction that executed the reference chain's last batch, as `0x`
 /// hex without a newline. Decoding it is version-specific, so it stays in the fork tests.
 async fn write_last_execute_input(
@@ -1292,8 +1387,8 @@ fn fork_test_verdict(
         }
     }
     anyhow::ensure!(failures.is_empty(), "{}{logged}", failures.join("; "));
+    // With none failed, every result passed or is a skip in an env that allows them.
     anyhow::ensure!(passed + skips.len() > 0, "no results{logged}");
-    anyhow::ensure!(passed > 0 || may_skip, "no test passed{logged}");
     anyhow::ensure!(exited_ok, "forge test exited with an error{logged}");
     Ok(skips)
 }
@@ -1363,7 +1458,7 @@ fn strip_ansi(text: &str) -> String {
 
 /// `text` with each URL, from its scheme to whitespace, `)`, `"` or `'`, replaced by `<url>`:
 /// forge quotes RPC URLs, and anvil passes on upstream errors whose URL can carry an API key.
-fn redact_urls(text: &str) -> String {
+pub(crate) fn redact_urls(text: &str) -> String {
     let mut redacted = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(separator) = rest.find("://") {
@@ -1400,7 +1495,8 @@ pub(crate) struct ForkOrigin<'a> {
 }
 
 /// Runs each fork test file on the replayed fork with the replay's exports; `CHECKS_DIR` holds
-/// `deployments.json`, `last_execute_input.hex` and a copy of `ecosystem.toml`.
+/// `deployments.json`, `last_execute_input.hex` if the replay found it, and a copy of
+/// `ecosystem.toml`.
 pub(crate) fn run_fork_tests(
     tests: &[ForkTest],
     env: &str,
@@ -1500,6 +1596,14 @@ pub(crate) fn run_fork_tests(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloy::consensus::transaction::Recovered;
+    use alloy::consensus::{Signed, TxEnvelope, TxLegacy};
+    use alloy::primitives::{Signature, TxKind};
+    use alloy::providers::RootProvider;
+    use alloy::rpc::client::RpcClient;
+    use alloy::rpc::types::Log;
+    use alloy::transports::mock::Asserter;
+
     use crate::common::governance_calls::encode_calls;
     use crate::common::paths;
     use crate::upgrade_verification::versions::v31::utils::bytecode_verifier::{
@@ -2068,6 +2172,152 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         // Only one result counts.
         let error = verdict(&format!("{PASSED}\n{PASSED}"), true, "testnet3", &[]).unwrap_err();
         assert!(error.contains("printed 2 JSON lines"), "{error}");
+    }
+
+    #[test]
+    fn the_reference_chain_is_the_one_test_upgrade_chain_calls() {
+        let call = |target: u8| GovernanceCall {
+            target: Address::repeat_byte(target),
+            value: U256::ZERO,
+            data: vec![0xab],
+        };
+        assert_eq!(
+            reference_diamond(&[call(0xd1), call(0xd1)]).unwrap(),
+            Address::repeat_byte(0xd1)
+        );
+        for calls in [&[][..], &[call(0xd1), call(0xd2)][..]] {
+            let error = reference_diamond(calls).unwrap_err();
+            assert!(error.to_string().contains("must call one chain"), "{error}");
+        }
+    }
+
+    const BRIDGEHUB: Address = Address::repeat_byte(0xb4);
+    const DIAMOND: Address = Address::repeat_byte(0xd1);
+
+    /// A provider that answers each request with the next response `asserter` holds.
+    fn mocked(asserter: &Asserter) -> AlloyProvider {
+        RootProvider::new(RpcClient::mocked(asserter.clone()))
+    }
+
+    /// `try_write_last_execute_input` on an RPC that answers `getTotalBatchesExecuted()` with 7,
+    /// then with what `respond` pushes; its warning and the file it wrote.
+    async fn lookup(respond: impl FnOnce(&Asserter)) -> (Option<String>, Option<String>) {
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::from(U256::from(7).to_be_bytes::<32>()));
+        respond(&asserter);
+        let fork = Fork {
+            rpc_url: String::new(),
+            provider: mocked(&asserter),
+        };
+        let facts = Facts {
+            ctm: CTM,
+            ctm_owner: Address::repeat_byte(0xa0),
+            server_notifier: Address::repeat_byte(0x5e),
+            bridgehub: BRIDGEHUB,
+            diamond: DIAMOND,
+            chain_id: 312,
+            chain_admin: Address::repeat_byte(0xa1),
+            chain_admin_owner: Address::repeat_byte(0xa2),
+        };
+        let work_dir = tempfile::tempdir().unwrap();
+        // Below EXECUTE_LOG_WINDOW: one eth_getLogs request.
+        let warning = try_write_last_execute_input(&fork, &facts, 500, work_dir.path()).await;
+        let file = fs::read_to_string(work_dir.path().join(LAST_EXECUTE_INPUT_FILE)).ok();
+        (warning, file)
+    }
+
+    #[tokio::test]
+    async fn a_failed_execute_log_lookup_warns_and_writes_no_file() {
+        // An idle chain, or a log older than the search.
+        let (warning, file) = lookup(|rpc| rpc.push_success(&Vec::<Log>::new())).await;
+        assert_eq!(file, None);
+        assert_eq!(
+            warning.unwrap(),
+            "last_execute_input.hex not written: the last execute transaction: \
+             0 BlockExecution logs for batch 7 in the 501 blocks up to 500"
+        );
+        // An RPC error, with the URL an upstream's message can carry redacted.
+        let (warning, file) = lookup(|rpc| {
+            rpc.push_failure_msg("429 Too Many Requests from https://eth.example/v2/SOMEKEY")
+        })
+        .await;
+        assert_eq!(file, None);
+        let warning = warning.unwrap();
+        assert!(
+            warning.ends_with(
+                "eth_getLogs: server returned an error response: error code -32603: \
+                 429 Too Many Requests from <url>"
+            ),
+            "{warning}"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_execute_lookup_writes_the_transactions_input() {
+        let hash = B256::repeat_byte(0xe7);
+        let log = Log {
+            inner: alloy::primitives::Log::new_unchecked(
+                DIAMOND,
+                vec![
+                    keccak256("BlockExecution(uint256,bytes32,bytes32)"),
+                    B256::from(U256::from(7)),
+                ],
+                Bytes::new(),
+            ),
+            transaction_hash: Some(hash),
+            ..Default::default()
+        };
+        let execute = TxLegacy {
+            to: TxKind::Call(Address::repeat_byte(0x7e)),
+            input: Bytes::from(vec![0xab, 0xcd]),
+            ..Default::default()
+        };
+        let signed = Signed::new_unchecked(execute, Signature::test_signature(), hash);
+        let tx = alloy::rpc::types::Transaction {
+            inner: Recovered::new_unchecked(TxEnvelope::Legacy(signed), Address::repeat_byte(0xee)),
+            block_hash: None,
+            block_number: None,
+            transaction_index: None,
+            effective_gas_price: None,
+            block_timestamp: None,
+        };
+        let (warning, file) = lookup(|rpc| {
+            rpc.push_success(&vec![log]);
+            rpc.push_success(&tx);
+        })
+        .await;
+        assert_eq!((warning, file.as_deref()), (None, Some("0xabcd")));
+    }
+
+    #[tokio::test]
+    async fn the_ctm_must_be_the_bridgehubs_for_the_reference_chain() {
+        let asserter = Asserter::new();
+        let provider = mocked(&asserter);
+        let verdict = || async {
+            let mut report = Report::default();
+            check_chain_ctm(&provider, BRIDGEHUB, 312, CTM, &mut report).await?;
+            report.finish()
+        };
+        let answer = |ctm: Address| asserter.push_success(&Bytes::from(ctm.into_word().to_vec()));
+        answer(CTM);
+        assert!(verdict().await.is_ok());
+        // A self-consistent CTM and supplier of another ecosystem.
+        let other = Address::repeat_byte(0xc8);
+        answer(other);
+        assert_eq!(
+            verdict().await.unwrap_err().to_string(),
+            format!(
+                "the bridgehub's chainTypeManager(312) = state_transition.chain_type_manager_proxy: \
+                 expected {CTM}, got {other}"
+            )
+        );
+        // A failed read names the call.
+        asserter.push_failure_msg("upstream down");
+        let error = verdict().await.unwrap_err();
+        assert!(
+            format!("{error:#}").starts_with(&format!("{BRIDGEHUB}.chainTypeManager(312): ")),
+            "{error:#}"
+        );
     }
 
     #[test]

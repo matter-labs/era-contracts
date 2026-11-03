@@ -125,7 +125,8 @@ the fork and checks the result instead of PUVT: with protocol-ops' built-in chec
 replay of the stages and the chain upgrade, which fails while the reference chain has a pending L2 upgrade; then each
 `fork_tests` file runs as `forge test` on the replayed fork, with `L1_RPC_URL`, `FORK_URL` (the RPC the replayed fork
 was started from, which the reads at `FORK_BLOCK` use), `UPGRADE_ENV`, `FORK_BLOCK`, `REFERENCE_CHAIN_ID`,
-`TEST_CHAIN_ID` and `CHECKS_DIR` (`deployments.json`, `last_execute_input.hex`, a copy of `ecosystem.toml`) exported.
+`TEST_CHAIN_ID` and `CHECKS_DIR` (`deployments.json`, `last_execute_input.hex` if the replay found the reference
+chain's last execute transaction, a copy of `ecosystem.toml`) exported.
 A file passes with a passed test and nothing failed or skipped; skips are allowed in the envs its `may_skip_in` lists.
 Pass `--upgrade <upgrade>` (in CI, `-f upgrade=<upgrade>`); the rest is as above:
 
