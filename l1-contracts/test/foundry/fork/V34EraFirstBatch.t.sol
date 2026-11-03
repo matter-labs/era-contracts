@@ -26,12 +26,10 @@ import {Bytes} from "contracts/vendor/Bytes.sol";
 /// @title V34EraFirstBatchForkTest
 /// @notice The boundary between a chain's last v33 batch and its first v34 ones, on its real L1 state: the upgrade
 /// batch commits on the last v33 batch, proves and executes, and the next batch chains on it.
-/// @dev Runs on the fork protocol-ops upgraded the chain on (`fork_tests` in `upgrade-envs/v0.34.0-era/upgrade.toml`).
-/// Inputs: `UPGRADE_ENV` (for the bridgehub), `REFERENCE_CHAIN_ID`, and `CHECKS_DIR/last_execute_input.hex`, the
-/// input of the transaction that executed the chain's last v33 batch; `V34_PREV_BATCH`, that batch's stored info,
-/// replaces the file in a local run. Everything else is read from the chain. The batches are synthetic: nothing runs
-/// on L2, and the testnet verifier accepts the empty proof, so this does not exercise public inputs or verification
-/// keys. It skips where the chain's verifier is a production one, and without the inputs.
+/// @dev Runs on protocol-ops' replayed fork (`fork_tests`). The last v33 batch's stored info comes from its execute
+/// tx input in `CHECKS_DIR/last_execute_input.hex`, or in a local run from `V34_PREV_BATCH`. The batches are
+/// synthetic: nothing runs on L2, and the testnet verifier accepts the empty proof, so public inputs and verification
+/// keys go untested. Skips on a production verifier.
 contract V34EraFirstBatchForkTest is Test {
     // Synthetic batch contents: L1 only needs them to be non-zero and consistent.
     bytes32 internal constant STATE_DIFF_HASH = keccak256("v34 fork test: state diff hash");
@@ -169,9 +167,8 @@ contract V34EraFirstBatchForkTest is Test {
         _sendCommit(upgradeBatch, nextBatch);
     }
 
-    /// @dev The stored info of the chain's last executed batch, from the input of the transaction that executed it
-    /// (protocol-ops writes it): `executeBatchesSharedBridge` with v33's execute data, whose first field is the
-    /// batches.
+    /// @dev The last executed batch's stored info, from its execute tx's input: `executeBatchesSharedBridge` with
+    /// v33's execute data, which starts with the batches.
     function _lastV33Batch(string memory _checksDir) internal view returns (bytes memory) {
         bytes memory input = vm.parseBytes(vm.readFile(string.concat(_checksDir, "/last_execute_input.hex")));
         assertEq(bytes4(input), ValidatorTimelock.executeBatchesSharedBridge.selector, "an execute transaction");

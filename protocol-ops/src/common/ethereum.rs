@@ -14,20 +14,18 @@ use crate::common::l1_contracts::execution_revert_data;
 
 pub type AlloyProvider = RootProvider<Ethereum>;
 
-/// Retries of a rate-limited read: a public endpoint's throttle clears within seconds, and a
-/// dead one shouldn't stall a run for long.
+/// A public endpoint's throttle clears within seconds; a dead one shouldn't stall the run.
 const RATE_LIMIT_RETRIES: u32 = 5;
-/// The wait between retries when the endpoint gives no hint: public endpoints throttle per
-/// second.
+/// The backoff without a hint from the endpoint: public endpoints throttle per second.
 const RATE_LIMIT_BACKOFF_MS: u64 = 1_000;
-/// The longest wait an endpoint's hint may ask for: Infura asks for minutes on a daily quota,
-/// and retries × this cap bounds a stalled call to seconds.
+/// Caps the endpoint's hint (Infura asks for minutes on a daily quota), so a stalled call takes
+/// seconds.
 const MAX_RATE_LIMIT_BACKOFF: Duration = Duration::from_secs(2);
-/// No client-side compute budget: reads go out one at a time, so the backoff alone paces them.
+/// No client-side budget: reads go out one at a time, so the backoff alone paces them.
 const UNLIMITED_COMPUTE_UNITS_PER_SECOND: u64 = u64::MAX;
 
-/// alloy's rate-limit policy (429, 503, rate-limit messages) with the endpoint's backoff hint
-/// capped at [`MAX_RATE_LIMIT_BACKOFF`], never retrying a revert.
+/// alloy's rate-limit policy (429, 503, rate-limit messages) with the hint capped, never
+/// retrying a revert.
 #[derive(Debug, Clone, Copy)]
 struct CappedRateLimitPolicy(RateLimitRetryPolicy);
 
@@ -64,8 +62,8 @@ pub fn get_provider(url: &str) -> anyhow::Result<AlloyProvider> {
         .connect_http(url.parse().context("invalid RPC URL")?))
 }
 
-/// A provider that retries rate-limited calls. For reads only: the policy also retries a 503,
-/// and a send the node accepted before answering 503 would go out twice.
+/// Retries rate-limited calls. Reads only: it also retries a 503, so a send the node accepted
+/// before answering 503 would go out twice.
 pub fn get_read_provider(url: &str) -> anyhow::Result<AlloyProvider> {
     read_provider(url, RATE_LIMIT_BACKOFF_MS)
 }
@@ -147,8 +145,8 @@ mod tests {
         }
     }
 
-    /// A local HTTP endpoint answering with `responses` in turn, the last one repeating:
-    /// a status line and a JSON-RPC result or error. Returns its URL and the request count.
+    /// A local endpoint answering `responses` (status line, JSON-RPC result or error) in turn,
+    /// the last repeating; returns its URL and request count.
     fn serve(responses: &'static [(&'static str, &'static str)]) -> (String, Arc<AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());

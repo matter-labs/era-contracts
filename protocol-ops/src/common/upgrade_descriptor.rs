@@ -5,11 +5,11 @@
 //! - `prepare = "prepare-all"`: the v31 flow, `upgrade-prepare-all` plus PUVT.
 //! - `prepare = "forge-script"`: one forge script, run on a fork as the deployer. Its
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
-//!   PUVT only knows v31, so it is checked by protocol-ops' built-in checks
-//!   (`builtin_checks`), its own commands (`verify_fork` / `verify_chain`), or both. An
-//!   optional `[execution]` script writes the transactions whoever executes sends by hand;
-//!   the pipeline replays them on the fork and renders `EXECUTE.md` from them. Its `envs`
-//!   limits it to the environments whose governance can run it.
+//!   PUVT only knows v31, so it is checked by the built-ins (`builtin_checks`), its own
+//!   `verify_fork` / `verify_chain`, or both. An optional `[execution]` script writes the
+//!   transactions whoever executes sends by hand; the pipeline replays them on the fork and
+//!   renders `EXECUTE.md` from them. Its `envs` limits it to the environments whose governance
+//!   can run it.
 
 use std::path::{Path, PathBuf};
 
@@ -54,21 +54,11 @@ pub struct ForgeScriptUpgrade {
     /// as `verify_fork`; must never send a transaction.
     #[serde(default)]
     pub verify_chain: Option<Vec<String>>,
-    /// Run the built-in checks (`commands::ecosystem::forge_checks`), which read an output in
-    /// `DefaultCTMUpgrade.saveOutput`'s layout. They hold for a minor-version upgrade of an Era
-    /// CTM whose upgrade contract refuses a chain with unexecuted batches (v31's and v34's do).
-    /// On a real chain: every L2 factory dep is
-    /// published and every output address has code. On a fork, also: every deployer
-    /// transaction is a CREATE2 deployment of a bytecode in `AllContractsHashes.json` or a
-    /// publication; the ServerNotifier upgrade and the governance stages, replayed as their
-    /// senders, with the CTM checked after each; then the reference chain's timestamp,
-    /// drain and upgrade, and a new test chain. The chain path needs an Ownable ChainAdmin
-    /// (`ChainAdminOwnable`): a restriction-based one is not supported. Without it, both
-    /// `verify_fork` and `verify_chain` are required.
+    /// Run the built-in checks; `commands::ecosystem::forge_checks` says what they check and
+    /// need. Without them, both `verify_fork` and `verify_chain` are required.
     #[serde(default)]
     pub builtin_checks: bool,
-    /// Foundry test files run on the fork after the built-in replay, with its exports
-    /// (`forge_checks::run_fork_tests`). Needs `builtin_checks`.
+    /// Foundry test files run on the built-ins' replayed fork. Needs `builtin_checks`.
     #[serde(default)]
     pub fork_tests: Vec<ForkTest>,
     /// How the upgrade is executed by hand, if the pipeline should write its runbook. Boxed:
@@ -77,9 +67,8 @@ pub struct ForgeScriptUpgrade {
     pub execution: Option<Box<ExecutionScript>>,
 }
 
-/// A Foundry test file of the upgrade. It passes with at least one passed test and no failed
-/// or skipped one; in the envs `may_skip_in` names, skips are allowed and an all-skipped file
-/// passes.
+/// Passes with a passed test and none failed or skipped; in the `may_skip_in` envs, skips are
+/// allowed and an all-skipped file passes.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ForkTest {
@@ -453,8 +442,7 @@ output = "emergency-upgrade-board.json"
         assert!(parse("prepare = \"prepare-all\"\nextra = 1\n").is_err());
     }
 
-    /// `FORGE_SCRIPT` with its check commands dropped (`verify_fork` and/or `verify_chain`)
-    /// and `extra` lines at the top.
+    /// `FORGE_SCRIPT` without the `dropped` commands, `extra` prepended.
     fn without_commands(dropped: &[&str], extra: &str) -> String {
         let kept: Vec<&str> = FORGE_SCRIPT
             .lines()

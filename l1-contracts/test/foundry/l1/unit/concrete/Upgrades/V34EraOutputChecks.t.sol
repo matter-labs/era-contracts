@@ -15,13 +15,10 @@ import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 /// @title V34EraOutputChecksTest
-/// @notice `V34EraOutputChecks` passes testnet3's committed output and fails each tampered copy with the check that
-/// catches it.
-/// @dev No fork and no build artifacts. The references come from a fixture (the facts `V34EraUpgrade.t.sol` reads
-/// from Sepolia at the output's fork block and from `testnet3.toml`) and from the committed output itself: the
-/// genesis values, the L2 bytecode hashes and the reference chain's selectors, which the fork test compares with the
-/// genesis, the build and the chain. So nothing here changes with a later build. The deployments are synthetic, with
-/// the fixture's constructor arguments: protocol-ops identifies the real ones on a fork.
+/// @notice `V34EraOutputChecks` passes testnet3's committed output and fails tampered copies with the right check.
+/// @dev No fork or build artifacts, so a later build changes nothing here: the references come from the fixture,
+/// except what `_referencesFromOutput` takes from the output itself, which `V34EraUpgrade.t.sol` checks against the
+/// genesis, the build and the chain. The deployments are synthetic: protocol-ops identifies the real ones on a fork.
 contract V34EraOutputChecksTest is Test {
     string internal constant OUTPUT = "/upgrade-envs/v0.34.0-era/output/testnet3/ecosystem.toml";
     string internal constant FIXTURE = "/test/foundry/l1/unit/concrete/Upgrades/fixtures/v34-era-testnet3.toml";
@@ -80,8 +77,6 @@ contract V34EraOutputChecksTest is Test {
         this.runChecks(out, refs.salt, deployments, refs);
     }
 
-    /// @dev The order that matters: with `setChainCreationParams` first, its block is recorded under the old version
-    /// and new chains can't find their creation params.
     function test_setChainCreationParamsFirstFails() public {
         (
             V34EraOutputChecks.Output memory out,
@@ -200,7 +195,7 @@ contract V34EraOutputChecksTest is Test {
         this.runChecks(out, refs.salt, deployments, refs);
     }
 
-    /// @dev The MailboxFacet built for another era chain id, as with `config.eraChainId = 271` in the script.
+    /// @dev A MailboxFacet built for another era chain id, as by `config.eraChainId = 271` in the script.
     function test_wrongConstructorArgFails() public {
         (
             V34EraOutputChecks.Output memory out,
@@ -282,7 +277,7 @@ contract V34EraOutputChecksTest is Test {
         l1.testChainId = vm.parseTomlUint(_fixture, "$.l1.test_chain_id");
     }
 
-    /// @dev The genesis values, the L2 bytecode hashes and the reference chain's selectors, as the output has them.
+    /// @dev The genesis values, L2 bytecode hashes and reference chain's selectors, as the output has them.
     function _referencesFromOutput(
         V34EraOutputChecks.Output memory _out,
         V34EraOutputChecks.References memory _refs

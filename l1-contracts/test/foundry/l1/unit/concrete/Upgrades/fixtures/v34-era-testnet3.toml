@@ -1,5 +1,5 @@
-# What V34EraOutputChecks.t.sol checks testnet3's committed v34 output against: the facts V34EraUpgrade.t.sol reads
-# from Sepolia at block 12018509 (the output's fork block) and from upgrade-envs/v0.34.0-era/testnet3.toml.
+# The facts V34EraUpgrade.t.sol reads for testnet3: Sepolia at block 12018509 (the output's fork block) and
+# upgrade-envs/v0.34.0-era/testnet3.toml.
 
 [env]
 testnet_verifier = true

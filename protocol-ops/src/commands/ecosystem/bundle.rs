@@ -786,10 +786,8 @@ enum CheckTarget {
     Chain,
 }
 
-/// Check the upgrade's effects: PUVT for v31; for a `forge-script` upgrade, its declared
-/// command and, with `builtin_checks`, the built-ins.
-///
-/// `fork`: what the fork was taken from (fork target only).
+/// Check the upgrade's effects: PUVT for v31, else the upgrade's command and/or the built-ins.
+/// `fork`: for the fork target only.
 #[allow(clippy::too_many_arguments)]
 async fn check_upgrade(
     descriptor: &UpgradeDescriptor,
@@ -820,14 +818,14 @@ async fn check_upgrade(
     }
 }
 
-/// Failures of a run's checkers. Every checker runs; the run then fails listing each failure.
+/// Every checker runs; the run then fails listing each failure.
 #[derive(Default)]
 struct CheckFailures(Vec<String>);
 
 impl CheckFailures {
     fn record(&mut self, checker: &str, result: anyhow::Result<()>) {
         if let Err(error) = result {
-            // An RPC error quotes the URL, which can carry an API key.
+            // An RPC error can quote the URL.
             let error = forge_checks::redact_urls(&format!("{error:#}"));
             logger::error(format!("{checker} failed: {error}"));
             self.0.push(format!("{checker}: {error}"));
@@ -845,9 +843,8 @@ impl CheckFailures {
     }
 }
 
-/// On a real chain: the built-in publication check, then `verify_chain`. On a fork:
-/// `verify_fork` (in a snapshot when the built-ins follow, so they start from the same
-/// state), then the built-in publication, provenance and replay, then `fork_tests`.
+/// Chain: the built-in publication, then `verify_chain`. Fork: `verify_fork` (in a snapshot
+/// when the built-ins follow), then the built-ins and `fork_tests`.
 async fn check_forge_script_upgrade(
     upgrade: &ForgeScriptUpgrade,
     target: CheckTarget,
@@ -878,7 +875,7 @@ async fn check_forge_script_upgrade(
         if let Some(snapshot) = snapshot {
             let restored = async { evm_revert(rpc_url, &snapshot?).await }.await;
             if restored.is_err() {
-                // The built-ins would start from the command's state, not the bundle's.
+                // The built-ins would start from verify_fork's state, not the bundle's.
                 failures.record("snapshot around verify_fork", restored);
                 return failures.finish();
             }
@@ -915,7 +912,7 @@ async fn check_forge_script_upgrade(
     failures.finish()
 }
 
-/// Provenance, then the replay; `fork_tests` only after a complete replay, on its exports.
+/// `fork_tests` run only after a complete replay.
 async fn builtin_fork_checks(
     upgrade: &ForgeScriptUpgrade,
     env_cfg: &EnvConfig,
@@ -930,7 +927,7 @@ async fn builtin_fork_checks(
         return;
     };
     let fork_block = fork.block;
-    // A rerun in the same work dir must not hand the fork tests an earlier run's files.
+    // A rerun must not hand the fork tests stale files.
     for file in [
         forge_checks::DEPLOYMENTS_FILE,
         forge_checks::LAST_EXECUTE_INPUT_FILE,
@@ -1372,7 +1369,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 metadata.l1.forked_at_block,
             )?;
             let rpc_url = anvil.endpoint();
-            // The bundle's `forked_at_block` may be absent; the fork's own height is certain.
+            // `forked_at_block` may be absent; the fork's height is certain.
             let fork_block = get_provider(&rpc_url)?
                 .get_block_number()
                 .await
@@ -1729,7 +1726,7 @@ mod tests {
         failures.record("verify_fork", Err(anyhow::anyhow!("exit status 1")));
         failures.record("publication", Ok(()));
         failures.record("provenance", Err(anyhow::anyhow!("unidentified init code")));
-        // reqwest's error names the URL, which can carry an API key.
+        // reqwest's error names the URL.
         let timeout = anyhow::anyhow!("error sending request for url (https://eth.example/v2/KEY)");
         failures.record("replay", Err(timeout.context("eth_call")));
         let message = failures.finish().unwrap_err().to_string();

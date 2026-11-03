@@ -9,11 +9,10 @@ args = [
   "/upgrade-envs/v0.34.0-era/{env}.toml",
   "/upgrade-envs/v0.34.0-era/output/{env}/ecosystem.toml",
 ]
-# protocol-ops' checks: publication; on a fork, also provenance and a replay, then the fork tests on it.
+# protocol-ops' built-in checks; the fork tests run on their replay.
 builtin_checks = true
 fork_tests = [
-  # The output against the chain, build and env; the CTM and chains after; the 15M cap; proof switches.
   { path = "test/foundry/fork/V34EraUpgrade.t.sol" },
-  # The first v34 batches; they skip where the reference chain verifies real proofs.
+  # Skips where the reference chain verifies real proofs.
   { path = "test/foundry/fork/V34EraFirstBatch.t.sol", may_skip_in = ["mainnet"] },
 ]

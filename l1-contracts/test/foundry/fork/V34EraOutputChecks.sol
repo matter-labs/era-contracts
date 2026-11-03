@@ -36,28 +36,25 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @title V34EraOutputChecks
-/// @notice What the v34 Era upgrade's output must hold, given the facts it was generated from: the base
-/// `contracts_config` keys, the chain upgrade cut and its L2 transaction, the new chains' creation params, the
-/// governance stages, the ServerNotifier upgrade, the test calls and every deployment's constructor arguments.
-/// @dev Reads `ecosystem.toml` in `DefaultCTMUpgrade.saveOutput`'s layout and protocol-ops' `deployments.json`; the
-/// caller supplies the facts. `V34EraUpgrade.t.sol` reads them from the chain, the build and the env TOML;
+/// @notice Checks the v34 Era upgrade's `ecosystem.toml` and protocol-ops' `deployments.json` against the facts
+/// they were generated from.
+/// @dev The caller supplies the facts: `V34EraUpgrade.t.sol` from the chain, the build and the env TOML;
 /// `V34EraOutputChecks.t.sol` from a fixture, to show each check failing on a tampered output.
 library V34EraOutputChecks {
     VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
 
-    /// @dev `DefaultCTMUpgrade.getCreationCalldata`'s for the governance upgrade timer.
+    /// @dev As `DefaultCTMUpgrade.getCreationCalldata` sets it.
     uint256 internal constant TIMER_MAX_ADDITIONAL_DELAY = 2 weeks;
     /// @dev The bootloader, the default account and the EVM emulator lead the L2 upgrade tx's factory deps.
     uint256 internal constant BASE_SYSTEM_FACTORY_DEPS = 3;
-    /// @dev v34's facets: Admin, Getters, Mailbox, Executor, Migrator, Committer.
+    /// @dev Admin, Getters, Mailbox, Executor, Migrator, Committer.
     uint256 private constant FACETS = 6;
     /// @dev `FixedForceDeploymentsData`'s `*BytecodeInfo` / `beaconDeployerInfo` fields.
     uint256 private constant BYTECODE_INFO_FIELDS = 10;
 
     /// @notice A check failed.
     error OutputCheckFailed(string check);
-    /// @notice A value differs from the expected one. A zero `got` means an expected item is missing, a zero
-    /// `expected` that an item is not expected.
+    /// @notice A value differs: a zero `got` marks a missing item, a zero `expected` an unexpected one.
     error OutputMismatch(string check, bytes32 got, bytes32 expected);
 
     /// @dev The `ecosystem.toml` keys the checks read.
@@ -185,7 +182,7 @@ library V34EraOutputChecks {
         bytes data;
     }
 
-    /// @dev A contract the upgrade deploys, with its constructor arguments and their names.
+    /// @dev `argNames` label the constructor arguments in failures.
     struct ExpectedDeployment {
         string contractName;
         address deployed;
@@ -590,8 +587,7 @@ library V34EraOutputChecks {
         _eqWord(data.zkTokenAssetId, l1.zkTokenAssetId, "force deployments data: zkTokenAssetId");
     }
 
-    /// @dev Each stage holds exactly its calls, with no value; their order matters only where the invariants below
-    /// say so (they hold for any order that executes).
+    /// @dev Each stage holds exactly its calls, without value, in any order that keeps the pairs below.
     function _checkStages(Output memory _out, References memory _refs) private pure {
         _checkSetNewVersionUpgrade(_out, _refs);
         StageCall[] memory stage0 = _stage0(_out.addresses, _refs.l1);
@@ -604,7 +600,7 @@ library V34EraOutputChecks {
         _checkOrder(_out.stage1, stage1[1], stage1[2], "stage 1: pauseMigration before checkMigrationsPaused");
         _checkOrder(_out.stage1, stage1[2], stage1[3], "stage 1: checkMigrationsPaused before the CTM's upgrade");
         _checkOrder(_out.stage1, stage1[3], stage1[4], "stage 1: the CTM's upgrade before setNewVersionUpgrade");
-        // setChainCreationParams records its block under the CTM's current version, so it must follow.
+        // setChainCreationParams keys its block by the CTM's current version, so it must follow.
         _checkOrder(_out.stage1, stage1[4], stage1[5], "stage 1: setNewVersionUpgrade before setChainCreationParams");
         _checkOrder(_out.stage1, stage1[0], stage1[3], "stage 1: checkDeadline before the CTM's upgrade");
         _checkOrder(_out.stage2, stage2[0], stage2[2], "stage 2: unpauseMigration before checkMigrationsUnpaused");
@@ -654,7 +650,7 @@ library V34EraOutputChecks {
                 )
             )
         );
-        // The output's own params re-encoded: this pins the calldata; `_checkCreationParams` checks the content.
+        // The output's own params: this pins the calldata, `_checkCreationParams` the content.
         calls[5] = StageCall(
             "setChainCreationParams",
             l1.ctm,
@@ -781,8 +777,7 @@ library V34EraOutputChecks {
         _eqAddress(_out.testCreateChainCaller, l1.ecosystemAdmin, "test_create_chain_caller = the bridgehub's admin");
     }
 
-    /// @dev The salt, then each contract exactly once at its output address with its constructor arguments, which
-    /// are all static: word i is argument i.
+    /// @dev The constructor arguments are all static: word i is argument i.
     function _checkDeployments(
         Addresses memory _a,
         bytes32 _salt,

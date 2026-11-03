@@ -1,24 +1,21 @@
-//! Built-in checks of a `forge-script` upgrade (`builtin_checks = true` in its `upgrade.toml`).
-//! They read `ecosystem.toml` in the layout `DefaultCTMUpgrade.saveOutput` writes and are the
-//! same for every upgrade of an Era CTM; what one upgrade must contain is checked by its own
-//! Foundry tests, which the files written here feed.
+//! Built-in checks of a `forge-script` upgrade (`builtin_checks = true`), the same for every
+//! upgrade of an Era CTM; what one upgrade must contain is left to its `fork_tests`, which the
+//! files written here feed. They need an output in `DefaultCTMUpgrade.saveOutput`'s layout, a
+//! minor-version upgrade whose upgrade contract refuses a chain with unexecuted batches (v31's
+//! and v34's do), and an Ownable ChainAdmin on the reference chain.
 //!
-//! - publication (fork and chain): every factory dep of the L2 upgrade transaction is
-//!   published in the BytecodesSupplier, every output address has code, the output's CTM is
-//!   the env's bridgehub's for the reference chain, and the output's supplier is the CTM's;
-//! - provenance (fork): every deployer transaction is a CREATE2 deployment through the env's
-//!   factory of a bytecode in `AllContractsHashes.json`, or a publication to the supplier;
-//!   one salt; every deployment is an output address, and every output address without code at
-//!   the fork block is deployed exactly once. Writes `deployments.json`
-//!   (`{salt, deployments: [{contract, address, args}]}`); whether the salt and the
-//!   constructor args are the right ones is the upgrade's knowledge, checked in Foundry;
-//! - the replay (fork): the ServerNotifier upgrade and governance stages 0–2, each sent as its
-//!   real sender, with the CTM checked after each and an emergency execution's unfreeze
-//!   emulated before stage 1; the reference chain's upgrade timestamp, drain and upgrade, which
-//!   a pending L2 upgrade fails; a new test chain; the reference chain's last execute
-//!   transaction, whose lookup only warns. It assumes a minor-version upgrade whose upgrade
-//!   contract refuses a chain with unexecuted batches (v31's and v34's do);
-//! - `fork_tests`: the upgrade's Foundry test files, on the replayed fork, with its exports.
+//! - publication (fork and chain): the L2 upgrade tx's factory deps are published, the output
+//!   addresses have code, the output's CTM is the bridgehub's for the reference chain, and its
+//!   supplier is the CTM's;
+//! - provenance (fork): each deployer tx is a CREATE2 deployment through the env's factory of
+//!   a bytecode in `AllContractsHashes.json`, or a publication; one salt; each deployment is an
+//!   output address, and each output address without code at the fork block is deployed
+//!   exactly once.
+//!   Writes `deployments.json`; the salt and constructor args are checked in Foundry;
+//! - replay (fork): the ServerNotifier upgrade and stages 0–2 from their real senders, the CTM
+//!   checked after each; the reference chain's timestamp, drain and upgrade; a test chain; the
+//!   last execute tx (warn-only);
+//! - `fork_tests`: the upgrade's Foundry files, on the replayed fork.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
@@ -64,7 +61,6 @@ use crate::upgrade_verification::versions::v31::utils::{
     bytecode_verifier::BytecodeVerifier, compute_create2_address_evm,
 };
 
-/// The identified deployments, written into the run's work dir for the fork tests.
 pub(crate) const DEPLOYMENTS_FILE: &str = "deployments.json";
 
 /// What the built-ins read from `ecosystem.toml`.
@@ -78,7 +74,7 @@ pub(crate) struct UpgradeOutput {
     pub governance_calls: GovernanceCalls,
     pub ctm_admin_calls: CtmAdminCalls,
     pub test_upgrade_calls: TestUpgradeCalls,
-    /// The L2 upgrade transaction's factory deps, decoded from the cut.
+    /// The L2 upgrade tx's, decoded from the cut.
     #[serde(skip)]
     pub factory_deps: Vec<B256>,
 }
@@ -151,7 +147,6 @@ impl UpgradeOutput {
         Ok(output)
     }
 
-    /// `state_transition.<key>`, which must be set and non-zero.
     pub(crate) fn state_transition_address(&self, key: &str) -> anyhow::Result<Address> {
         self.state_transition
             .get(key)
@@ -160,8 +155,6 @@ impl UpgradeOutput {
             .ok_or_else(|| anyhow::anyhow!("state_transition.{key} is missing or zero"))
     }
 
-    /// Every non-zero address of `[state_transition]` and `[deployed_addresses]`, with the
-    /// keys that name it.
     pub(crate) fn output_addresses(&self) -> BTreeMap<Address, String> {
         let mut out: BTreeMap<Address, String> = BTreeMap::new();
         let tables = [
@@ -180,8 +173,7 @@ impl UpgradeOutput {
     }
 }
 
-/// A checker's findings, printed the way PUVT prints its own; `finish` fails listing every
-/// error.
+/// A checker's findings, printed like PUVT's; `finish` fails listing every error.
 #[derive(Default)]
 pub(crate) struct Report {
     result: VerificationResult,
@@ -213,9 +205,7 @@ impl Report {
     }
 }
 
-/// Every factory dep of the L2 upgrade transaction is published, every output address has
-/// code, the output's CTM is the one `bridgehub` (the env's) records for the reference chain,
-/// and the output's supplier is the CTM's. Read-only, so safe against a real chain.
+/// Read-only, so safe against a real chain.
 pub(crate) async fn check_publication(
     rpc_url: &str,
     output: &UpgradeOutput,
@@ -225,7 +215,7 @@ pub(crate) async fn check_publication(
     let mut report = Report::default();
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
     let ctm = output.state_transition_address("chain_type_manager_proxy")?;
-    // A ZKsync OS CTM publishes EVM bytecodes, into `evmPublishingBlock`.
+    // ZKsync OS publishes EVM bytecodes, into `evmPublishingBlock`.
     anyhow::ensure!(
         !resolve_is_zksync_os(rpc_url, ctm).await?,
         "{ctm} is a ZKsync OS CTM: the built-in checks support Era CTMs only"
@@ -272,8 +262,7 @@ pub(crate) async fn check_publication(
         ));
     }
 
-    // The bridgehub's registry, not the CTM's own BRIDGE_HUB(), which another CTM deployed
-    // with the env's bridgehub also returns. A failed read is one more error, not the only one.
+    // A failed read is recorded, not fatal.
     let registered = async {
         let (_, chain_id) = reference_chain(&provider, output).await?;
         check_chain_ctm(&provider, bridgehub, chain_id, ctm, &mut report).await
@@ -305,7 +294,6 @@ fn reference_diamond(test_upgrade_chain: &[GovernanceCall]) -> anyhow::Result<Ad
         .ok_or_else(|| anyhow::anyhow!("test_upgrade_chain must call one chain"))
 }
 
-/// The reference chain's diamond and chain id.
 async fn reference_chain(
     provider: &AlloyProvider,
     output: &UpgradeOutput,
@@ -319,7 +307,8 @@ async fn reference_chain(
     Ok((diamond, u64::try_from(chain_id)?))
 }
 
-/// `bridgehub.chainTypeManager(chain_id)` = the output's CTM.
+/// By the bridgehub's registry, not the CTM's `BRIDGE_HUB()`: another CTM deployed with this
+/// bridgehub returns it too.
 async fn check_chain_ctm(
     provider: &AlloyProvider,
     bridgehub: Address,
@@ -350,7 +339,6 @@ pub(crate) struct DeployerTx {
     pub data: Bytes,
 }
 
-/// One identified CREATE2 deployment.
 #[derive(Debug, Serialize)]
 pub(crate) struct Deployment {
     /// `AllContractsHashes.json`'s name, e.g. `l1-contracts/AdminFacet`.
@@ -368,9 +356,6 @@ pub(crate) struct Deployments {
     pub deployments: Vec<Deployment>,
 }
 
-/// Provenance of the deployer transactions on the fork the bundle was replayed on, through
-/// `factory` (`permanent-values/<env>.toml`'s `create2_factory_addr`). Writes
-/// `deployments.json` into `work_dir`.
 pub(crate) async fn check_provenance(
     rpc_url: &str,
     output: &UpgradeOutput,
@@ -412,8 +397,8 @@ pub(crate) async fn check_provenance(
     report.finish()
 }
 
-/// The provenance rules on their own (no RPC). `undeployed`: the output addresses that had
-/// no code at the fork block.
+/// The provenance rules, without RPC. `undeployed`: output addresses without code at the fork
+/// block.
 fn identify_deployments(
     txs: &[DeployerTx],
     factory: Address,
@@ -500,22 +485,20 @@ fn identify_deployments(
 
 // ─── The replay ──────────────────────────────────────────────────────────────────
 
-/// The reference chain's last execute transaction's input, for the first-batch fork tests.
+/// For the first-batch fork test.
 pub(crate) const LAST_EXECUTE_INPUT_FILE: &str = "last_execute_input.hex";
-/// Blocks per `BlockExecution` log search: thirdweb's Sepolia RPC caps `eth_getLogs` at 1,000.
+/// Blocks per `eth_getLogs`: thirdweb's Sepolia RPC caps it at 1,000.
 const EXECUTE_LOG_WINDOW: u64 = 1_000;
-/// How far back from the fork block the search goes: about a week of 12-second L1 blocks.
+/// Search depth: about a week of 12 s L1 blocks.
 const EXECUTE_LOG_SPAN: u64 = 50_000;
 
-/// The fork the bundle was replayed on: reads through `provider`, impersonated sends through
-/// `common::anvil`.
+/// The replay's Anvil: reads via `provider`, impersonated sends via `common::anvil`.
 struct Fork {
     rpc_url: String,
     provider: AlloyProvider,
 }
 
 impl Fork {
-    /// Sends `data` from `from` with the gas the node estimates plus a quarter.
     async fn send(
         &self,
         from: Address,
@@ -539,7 +522,7 @@ impl Fork {
         Ok(())
     }
 
-    /// Sends each call from `from`; the replay can't send value.
+    /// The replay can't send value.
     async fn send_calls(
         &self,
         from: Address,
@@ -556,7 +539,6 @@ impl Fork {
         Ok(())
     }
 
-    /// An `eth_call` that must revert with `E`.
     async fn expect_revert<E: SolError>(
         &self,
         from: Address,
@@ -603,7 +585,6 @@ impl Fork {
     }
 }
 
-/// `ChainAdmin.multicall(calls, true)`.
 fn multicall(calls: &[GovernanceCall]) -> Vec<u8> {
     let calls = calls
         .iter()
@@ -620,8 +601,8 @@ fn multicall(calls: &[GovernanceCall]) -> Vec<u8> {
     .abi_encode()
 }
 
-/// `initialForceDeploymentHash` as the CTM computes it: keccak of `abi.encode(bytes)`, the
-/// offset and length words followed by the padded data, not of the raw bytes.
+/// `initialForceDeploymentHash` as the CTM computes it: keccak of `abi.encode(bytes)`, not of
+/// the raw bytes.
 fn force_deployments_hash(data: &Bytes) -> B256 {
     keccak256(data.abi_encode())
 }
@@ -632,7 +613,7 @@ struct Facts {
     ctm_owner: Address,
     server_notifier: Address,
     bridgehub: Address,
-    /// The reference chain: the one `test_upgrade_chain` upgrades.
+    /// The reference chain's.
     diamond: Address,
     chain_id: u64,
     chain_admin: Address,
@@ -645,9 +626,7 @@ pub(crate) struct ReplayedChains {
     pub test: u64,
 }
 
-/// Replays the upgrade on the fork as whoever executes it would, checking the CTM and the
-/// reference chain on the way. Stops at the first failure, as later steps need the state; the
-/// last execute transaction's lookup, which no state depends on, only warns.
+/// Stops at the first failure, as later steps need the state.
 pub(crate) async fn replay(
     rpc_url: &str,
     env_cfg: &EnvConfig,
@@ -674,7 +653,6 @@ pub(crate) async fn replay(
     let test = create_test_chain(&fork, output, &facts)
         .await
         .context("the test chain")?;
-    // Without the file, V34EraFirstBatch.t.sol's setUp fails reading it on a testnet verifier.
     try_write_last_execute_input(&fork, &facts, fork_block, work_dir).await;
     Ok(ReplayedChains {
         reference: facts.chain_id,
@@ -713,7 +691,7 @@ async fn read_facts(
     report.finish()?;
 
     // `Utils.adminExecuteCalls` sends to an Ownable ChainAdmin from its owner; a
-    // restriction-based one has no owner() and would need its restriction's admin instead.
+    // restriction-based one would need its restriction's admin.
     let chain_admin = output.test_upgrade_calls.test_upgrade_chain_caller;
     let chain_admin_owner = match IOwnable::new(chain_admin, provider.clone())
         .owner()
@@ -776,8 +754,7 @@ async fn upgrade_server_notifier(
     report.finish()
 }
 
-/// The CTM state its proxy upgrade must keep: owner, admin, ServerNotifier, ValidatorTimelock,
-/// initial cut hash, and the reference chain's diamond.
+/// The CTM state its proxy upgrade must keep.
 async fn ctm_kept_state(
     fork: &Fork,
     facts: &Facts,
@@ -799,9 +776,8 @@ async fn ctm_kept_state(
     ))
 }
 
-/// Stages 0–2 from the CTM's owner: migrations paused after stage 0; with a timer, its deadline
-/// and a warp past it; an emergency execution's unfreeze; stage 1 split around the CTM's proxy
-/// upgrade to check what it keeps; then the CTM.
+/// Stages 0–2 from the CTM's owner, warping past any timer's deadline, with stage 1 split
+/// around the CTM's proxy upgrade to check what it keeps.
 async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> anyhow::Result<()> {
     let provider = &fork.provider;
     let config = &output.contracts_config;
@@ -867,8 +843,8 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
         }
     }
 
-    // An emergency execution unfreezes before a proposal's calls, which unpauses migrations;
-    // stage 1 must pause them again for its checkMigrationsPaused.
+    // An emergency execution unfreezes before its calls, which unpauses migrations; stage 1
+    // must pause them again for its checkMigrationsPaused.
     fork.send(
         facts.ctm_owner,
         *chain_asset_handler.address(),
@@ -962,8 +938,8 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
         chain_asset_handler.migrationPaused().call().await?,
         false,
     );
-    // setChainCreationParams keys the pointer under the CTM's current version, so it must run
-    // after setNewVersionUpgrade; otherwise new chains can't find their creation params.
+    // setChainCreationParams keys the pointer by the CTM's current version: run before
+    // setNewVersionUpgrade, it leaves new chains without creation params.
     let new_pointer = u64::try_from(ext.newChainCreationParamsBlock(new).call().await?)?;
     if (before_stage1 + 1..=stage1_end).contains(&new_pointer) {
         report.ok("CTM newChainCreationParamsBlock(new) is a stage-1 block");
@@ -997,10 +973,9 @@ async fn batch_counts(
     ])
 }
 
-/// The timestamp, sent as `Utils.adminExecuteCalls` sends it to an Ownable ChainAdmin (its
-/// setter directly, the ServerNotifier's through `multicall`); the drain; the upgrade. A
-/// pending L2 upgrade fails it before anything is sent: the upgrade would revert
-/// `PreviousUpgradeNotFinalized`, and nothing here clears it.
+/// The timestamp (as `Utils.adminExecuteCalls` sends it: the ChainAdmin's setter directly, the
+/// ServerNotifier's via `multicall`), the drain, the upgrade. A pending L2 upgrade fails it up
+/// front: the upgrade would revert `PreviousUpgradeNotFinalized`, and nothing here clears it.
 async fn upgrade_reference_chain(
     fork: &Fork,
     output: &UpgradeOutput,
@@ -1155,7 +1130,6 @@ async fn drain(fork: &Fork, facts: &Facts, executed: U256) -> anyhow::Result<()>
     Ok(())
 }
 
-/// Sends `test_create_chain` from its caller; the chain must be registered.
 async fn create_test_chain(
     fork: &Fork,
     output: &UpgradeOutput,
@@ -1195,9 +1169,10 @@ async fn create_test_chain(
     Ok(chain_id)
 }
 
-/// `write_last_execute_input`, warning instead of failing: an idle chain, an RPC's range cap or a
-/// rate limit hides the log, and only a fork test that reads the file needs it. Returns the
-/// warning. `builtin_fork_checks` deletes an earlier run's file first, so a failure leaves none.
+/// Warns instead of failing: an idle chain, an RPC's range cap or a rate limit can hide the log,
+/// and only a fork test needs the file: `V34EraFirstBatch.t.sol` skips a production verifier
+/// before reading it and fails without it otherwise. `builtin_fork_checks` deletes a stale file
+/// first, so a failure leaves none. Returns the warning.
 async fn try_write_last_execute_input(
     fork: &Fork,
     facts: &Facts,
@@ -1207,7 +1182,7 @@ async fn try_write_last_execute_input(
     let error = write_last_execute_input(fork, facts, fork_block, work_dir)
         .await
         .err()?;
-    // The error can quote the RPC's URL, which can carry an API key.
+    // The error can quote the RPC URL.
     let warning = format!(
         "{LAST_EXECUTE_INPUT_FILE} not written: the last execute transaction: {}",
         quote(&format!("{error:#}"))
@@ -1216,8 +1191,7 @@ async fn try_write_last_execute_input(
     Some(warning)
 }
 
-/// The raw input of the transaction that executed the reference chain's last batch, as `0x`
-/// hex without a newline. Decoding it is version-specific, so it stays in the fork tests.
+/// As raw `0x` hex without a newline: decoding is version-specific, so the fork tests do it.
 async fn write_last_execute_input(
     fork: &Fork,
     facts: &Facts,
@@ -1266,9 +1240,8 @@ async fn write_last_execute_input(
     Ok(())
 }
 
-/// The inclusive `(from, to)` block ranges the execute log search asks for, newest first:
-/// `EXECUTE_LOG_WINDOW` blocks each, adjacent, `EXECUTE_LOG_SPAN` blocks in all up to
-/// `fork_block`, or down to block 0.
+/// Inclusive `(from, to)` ranges, newest first: adjacent `EXECUTE_LOG_WINDOW`s covering
+/// `EXECUTE_LOG_SPAN` blocks up to `fork_block`, or down to block 0.
 fn execute_log_windows(fork_block: u64) -> Vec<(u64, u64)> {
     let lowest = fork_block.saturating_sub(EXECUTE_LOG_SPAN - 1);
     let mut windows = Vec::new();
@@ -1297,15 +1270,13 @@ struct TestResult {
     reason: Option<String>,
 }
 
-/// At most this many characters of forge's error, or of a test's reason, go into a message.
+/// Cap on a quoted forge error or test reason, in characters.
 const QUOTE_MAX_CHARS: usize = 300;
 
-/// The verdict on one file's `forge test --json` run. It passes with a passed test and no
-/// failed or skipped one, and fails naming each; in an env its `may_skip_in` names, skips are
-/// allowed and an all-skipped file passes. The result is stdout's one line that starts with
-/// `{`: forge writes its log there too. Output it doesn't know fails, so another forge's format
-/// can't pass; without JSON it quotes forge's error, and a failure quotes the log's first error,
-/// which names a failed request. `Ok` holds the allowed skips with forge's reasons.
+/// One file's verdict by `ForkTest`'s rule, naming every failure; `Ok` holds the allowed skips
+/// with their reasons. The result is stdout's one line starting with `{` (forge logs there too).
+/// Unknown output fails, so another forge's format can't pass. Without JSON it quotes forge's
+/// error; a failure quotes the log's first error, which names a failed request.
 fn fork_test_verdict(
     stdout: &str,
     stderr: &str,
@@ -1387,14 +1358,14 @@ fn fork_test_verdict(
         }
     }
     anyhow::ensure!(failures.is_empty(), "{}{logged}", failures.join("; "));
-    // With none failed, every result passed or is a skip in an env that allows them.
+    // No failures: every result passed or is an allowed skip.
     anyhow::ensure!(passed + skips.len() > 0, "no results{logged}");
     anyhow::ensure!(exited_ok, "forge test exited with an error{logged}");
     Ok(skips)
 }
 
-/// The level of a line of forge's log, which it writes to stdout as `<time> <LEVEL> <target>:
-/// <message>`; `None` for any other line.
+/// The level of a forge log line (`<time> <LEVEL> <target>: <message>`, on stdout); `None` for
+/// any other line.
 fn tracing_level(line: &str) -> Option<&str> {
     let mut words = line.split_whitespace();
     let time = words.next()?;
@@ -1403,9 +1374,8 @@ fn tracing_level(line: &str) -> Option<&str> {
         .then_some(level)
 }
 
-/// Forge's error, short: its first `Error` line with the causes listed under it, from stderr or
-/// else `stdout` (its lines that are neither the result nor the log); failing that, `stdout`'s
-/// first line.
+/// Forge's first `Error` line with the causes under it, from stderr, else from `stdout` (lines
+/// neither result nor log); else `stdout`'s first line.
 fn forge_error(stdout: &[&str], stderr: &str) -> Option<String> {
     let stderr: Vec<&str> = stderr.lines().map(str::trim).collect();
     let error_block = [&stderr[..], stdout].into_iter().find_map(|output| {
@@ -1432,7 +1402,7 @@ fn forge_error(stdout: &[&str], stderr: &str) -> Option<String> {
         .map(|error| quote(&error))
 }
 
-/// `text` for a message: without colours, its URLs redacted, then cut to `QUOTE_MAX_CHARS`.
+/// For a message: no colours, URLs redacted, cut to `QUOTE_MAX_CHARS`.
 fn quote(text: &str) -> String {
     let text = redact_urls(&strip_ansi(text));
     match text.char_indices().nth(QUOTE_MAX_CHARS) {
@@ -1441,7 +1411,7 @@ fn quote(text: &str) -> String {
     }
 }
 
-/// `text` without ANSI escape sequences: forge colours its log even when it isn't a terminal.
+/// Forge colours its log even when stdout isn't a terminal.
 fn strip_ansi(text: &str) -> String {
     let mut stripped = String::with_capacity(text.len());
     let mut chars = text.chars();
@@ -1456,8 +1426,8 @@ fn strip_ansi(text: &str) -> String {
     stripped
 }
 
-/// `text` with each URL, from its scheme to whitespace, `)`, `"` or `'`, replaced by `<url>`:
-/// forge quotes RPC URLs, and anvil passes on upstream errors whose URL can carry an API key.
+/// Each URL, from its scheme to whitespace, `)`, `"` or `'`, becomes `<url>`: an RPC URL can
+/// carry an API key, and forge and anvil quote them in errors.
 pub(crate) fn redact_urls(text: &str) -> String {
     let mut redacted = String::with_capacity(text.len());
     let mut rest = text;
@@ -1478,25 +1448,20 @@ pub(crate) fn redact_urls(text: &str) -> String {
     redacted
 }
 
-/// At most this many lines of forge's stderr, or of its log, go into ours.
+/// At most this many lines of forge's stderr or log go into ours.
 const TAIL_LINES: usize = 20;
 
-/// The last `TAIL_LINES` of `lines`, without colours or URLs.
 fn tail(lines: &[&str]) -> String {
     let start = lines.len().saturating_sub(TAIL_LINES);
     redact_urls(&strip_ansi(&lines[start..].join("\n")))
 }
 
-/// What a fork was taken from: the L1 RPC it forked, and the block.
 #[derive(Clone, Copy)]
 pub(crate) struct ForkOrigin<'a> {
     pub url: &'a str,
     pub block: u64,
 }
 
-/// Runs each fork test file on the replayed fork with the replay's exports; `CHECKS_DIR` holds
-/// `deployments.json`, `last_execute_input.hex` if the replay found it, and a copy of
-/// `ecosystem.toml`.
 pub(crate) fn run_fork_tests(
     tests: &[ForkTest],
     env: &str,
@@ -1511,9 +1476,9 @@ pub(crate) fn run_fork_tests(
         .context("copy ecosystem.toml into CHECKS_DIR")?;
     let exports = [
         ("L1_RPC_URL", rpc_url.to_string()),
-        // For the L1 at FORK_BLOCK, which forge must not read from the Anvil: Anvil 1.5.1 serves
-        // a block below its head holding a lock (`Backend::with_database_at`) while a task on its
-        // own runtime fetches a miss, so concurrent reads there block every worker and deadlock.
+        // For reads at FORK_BLOCK, which must not go to the Anvil: Anvil 1.5.1 serves a block
+        // below its head holding a lock (`Backend::with_database_at`) while a task on its own
+        // runtime fetches a miss, so concurrent reads there deadlock.
         (FORK_URL, origin.url.to_string()),
         ("UPGRADE_ENV", env.to_string()),
         ("FORK_BLOCK", origin.block.to_string()),
@@ -1522,7 +1487,7 @@ pub(crate) fn run_fork_tests(
         ("CHECKS_DIR", checks_dir.display().to_string()),
     ];
     for (name, value) in &exports {
-        // The RPC the fork was taken from can carry an API key.
+        // FORK_URL can carry an API key.
         let shown = if *name == FORK_URL {
             "<the --fork-url, not shown>"
         } else {
@@ -1543,8 +1508,8 @@ pub(crate) fn run_fork_tests(
             .unwrap_or_default(),
     );
 
-    // Forge pins `--fork-url` to the Anvil's head, where reads are safe. Nothing may mine on the
-    // Anvil while forge runs: that would put its reads below the head.
+    // Forge pins `--fork-url` to the Anvil's head, where reads are safe; nothing may mine on
+    // the Anvil while forge runs, or its reads fall below the head.
     let mut report = Report::default();
     for test in tests {
         let out = Command::new("forge")
@@ -1567,7 +1532,7 @@ pub(crate) fn run_fork_tests(
             .with_context(|| format!("run forge test for {}", test.path))?;
         let stdout = String::from_utf8_lossy(&out.stdout);
         let stderr = String::from_utf8_lossy(&out.stderr);
-        // Forge's log, such as a request that timed out, whatever the verdict.
+        // Forge's log (e.g. a timed-out request), whatever the verdict.
         let plain = strip_ansi(&stdout);
         let log: Vec<&str> = plain
             .lines()
@@ -1619,9 +1584,8 @@ mod tests {
         format!("0x{}", alloy::hex::encode(encode_calls(calls)))
     }
 
-    /// A base-layout output whose cut and stages come from v34 stage's committed output (its
-    /// `contracts_config.upgrade_cut_data` is encoded like `chain_upgrade_diamond_cut`); the
-    /// addresses are synthetic.
+    /// The cut and stages from v34 stage's committed output (whose `upgrade_cut_data` is encoded
+    /// like `chain_upgrade_diamond_cut`), with synthetic addresses.
     fn base_layout_output() -> String {
         let l1_contracts = paths::resolve_l1_contracts_path().unwrap();
         let path = l1_contracts.join("upgrade-envs/v0.34.0-era/output/stage/ecosystem.toml");
@@ -1729,7 +1693,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
     const FACTORY: Address = Address::repeat_byte(0xfa);
     const SALT: B256 = B256::repeat_byte(0x5a);
 
-    /// A synthetic bytecode (two words, the least `try_parse_bytecode` accepts) and a second one.
+    /// Two words, the least `try_parse_bytecode` accepts.
     fn bytecode(tag: u8) -> Vec<u8> {
         vec![tag; 64]
     }
@@ -1775,13 +1739,12 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         }
     }
 
-    /// The facet with one constructor word, and the checker without args.
+    /// The facet with one constructor word.
     fn facet_init() -> Vec<u8> {
         [bytecode(1), vec![0x0a; 32]].concat()
     }
 
-    /// Runs the rules with every deployed address in the output and undeployed at the fork
-    /// block; returns the errors and what was identified.
+    /// The rules with each of `deployed` in the output and without code at the fork block.
     fn run(txs: &[DeployerTx], deployed: &[Address]) -> (Vec<String>, Deployments) {
         let output: BTreeMap<Address, String> = deployed
             .iter()
@@ -1908,8 +1871,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         assert_ne!(force_deployments_hash(&data), keccak256(&data));
     }
 
-    // `forge test --json` samples hand-written to Foundry v1.5.1's serde shape, not captured
-    // (CI's generate jobs pin v1.5.1):
+    // Hand-written to Foundry v1.5.1's `--json` shape (CI pins v1.5.1):
     // `{"<file>:<contract>": {"duration", "test_results": {"<test>": {"status", "reason", …}},
     // "warnings"}}`. A `vm.skip` in `setUp` comes back as one `setUp()` result.
     const PASSED: &str = r#"{"test/foundry/fork/V34EraUpgrade.t.sol:V34EraUpgradeTest":{"duration":"2.41s","test_results":{"test_chainState()":{"status":"Success","reason":null,"counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":912345}},"traces":[],"labeled_addresses":{},"duration":{"secs":1,"nanos":20},"breakpoints":{},"gas_snapshots":{}},"test_proofSwitches()":{"status":"Success","reason":null,"counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":512345}},"traces":[],"labeled_addresses":{},"duration":{"secs":0,"nanos":900},"breakpoints":{},"gas_snapshots":{}}},"warnings":[]}}"#;
@@ -1967,8 +1929,8 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
             error.contains(&format!("skipped ({reason}) outside may_skip_in")),
             "{error}"
         );
-        // A file all skipped, here in setUp: passes where it may skip, fails elsewhere, even
-        // while another file passes.
+        // All skipped (in setUp): passes where it may skip, fails elsewhere, even beside a
+        // passing file.
         assert_eq!(
             verdict(SETUP_SKIPPED, true, "mainnet", &["mainnet"])
                 .unwrap()
@@ -1983,7 +1945,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
 
     #[test]
     fn output_the_verdict_does_not_know_fails() {
-        // Forge 1.5.1 prints nothing and exits 0 for a --match-path that matches no file.
+        // No file matched.
         for may_skip_in in [&[][..], &["testnet3"][..]] {
             let error = verdict("", true, "testnet3", may_skip_in).unwrap_err();
             assert!(error.contains("no results"), "{error}");
@@ -2009,7 +1971,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
 
     #[test]
     fn every_failure_is_named() {
-        // Two suites: a failure in one, a failure and a skip outside may_skip_in in the other.
+        // A failure in one suite, a failure and a disallowed skip in the other.
         let suite = |name: &str, statuses: &[(&str, &str)]| {
             let mut json = PASSED.replace("V34EraUpgradeTest", name);
             for (status, reason) in statuses {
@@ -2084,7 +2046,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         // Kept short.
         let long = failed(&format!("Error: {}", "x".repeat(1000)), "");
         assert!(long.ends_with('…') && long.chars().count() < 2 * QUOTE_MAX_CHARS);
-        // No URL survives, one across the cut included: an upstream one can carry an API key.
+        // No URL survives, even one across the cut.
         let upstream = "Error: upstream (https://user:pw@eth.example/v2/SOMEKEY?k=1) failed";
         let near_the_cut = format!("Error: {} https://eth.example/v2/SOMEKEY", "x".repeat(282));
         for stdout in [upstream.to_string(), near_the_cut] {
@@ -2107,8 +2069,8 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         );
     }
 
-    /// Forge 1.5.1's log line for a read that timed out, coloured as in CI's gate run
-    /// 41665061152, whose forge read through Anvil; here the URL is an upstream's.
+    /// Forge 1.5.1's log line for a timed-out read, coloured, from CI gate run 41665061152 (with
+    /// an upstream URL here).
     const TIMEOUT_LOG: &str = "\x1b[2m2026-11-03T15:50:58.223673Z\x1b[0m \x1b[31mERROR\x1b[0m \
         \x1b[2msharedbackend\x1b[0m\x1b[2m:\x1b[0m Failed to send/recv `storage` \x1b[3merr\x1b[0m\
         \x1b[2m=\x1b[0mfailed to get storage for 0xbB94d8F4080d5CD34d6215399f26771990f38A1d at 45: \
@@ -2169,7 +2131,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         let many: Vec<&str> = many.iter().map(String::as_str).collect();
         assert_eq!(tail(&many), many[5..].join("\n"));
 
-        // Only one result counts.
+        // Two JSON lines fail.
         let error = verdict(&format!("{PASSED}\n{PASSED}"), true, "testnet3", &[]).unwrap_err();
         assert!(error.contains("printed 2 JSON lines"), "{error}");
     }
@@ -2194,13 +2156,12 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
     const BRIDGEHUB: Address = Address::repeat_byte(0xb4);
     const DIAMOND: Address = Address::repeat_byte(0xd1);
 
-    /// A provider that answers each request with the next response `asserter` holds.
     fn mocked(asserter: &Asserter) -> AlloyProvider {
         RootProvider::new(RpcClient::mocked(asserter.clone()))
     }
 
-    /// `try_write_last_execute_input` on an RPC that answers `getTotalBatchesExecuted()` with 7,
-    /// then with what `respond` pushes; its warning and the file it wrote.
+    /// `try_write_last_execute_input`'s warning and file, on an RPC that answers
+    /// `getTotalBatchesExecuted()` with 7, then with what `respond` pushes.
     async fn lookup(respond: impl FnOnce(&Asserter)) -> (Option<String>, Option<String>) {
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from(U256::from(7).to_be_bytes::<32>()));
@@ -2236,7 +2197,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
             "last_execute_input.hex not written: the last execute transaction: \
              0 BlockExecution logs for batch 7 in the 501 blocks up to 500"
         );
-        // An RPC error, with the URL an upstream's message can carry redacted.
+        // An RPC error, its URL redacted.
         let (warning, file) = lookup(|rpc| {
             rpc.push_failure_msg("429 Too Many Requests from https://eth.example/v2/SOMEKEY")
         })

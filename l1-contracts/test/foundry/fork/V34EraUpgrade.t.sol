@@ -48,14 +48,9 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
 
 /// @title V34EraUpgradeForkTest
-/// @notice v34 Era on the fork protocol-ops replayed the upgrade on (`fork_tests` in `upgrade.toml`): the output
-/// against the chain, the build and the env TOML; the CTM, the ServerNotifier and the upgraded chains; the 15M cap
-/// on user L1->L2 transactions; the proof-system switches.
-/// @dev protocol-ops exports the inputs: `FORK_URL` and `FORK_BLOCK` (the RPC and the block the replayed fork was
-/// taken from), `UPGRADE_ENV`, `REFERENCE_CHAIN_ID` (the upgraded chain), `TEST_CHAIN_ID` and `CHECKS_DIR`
-/// (`deployments.json` and a copy of the bundle's `ecosystem.toml`). The L1 before the upgrade is read on a fork of
-/// `FORK_URL` at `FORK_BLOCK`, not of the replayed fork: concurrent reads below Anvil 1.5.1's head deadlock it. The
-/// reference chain's admin calls are pranked as its `getAdmin()`, the ChainAdmin.
+/// @notice v34 Era checks on protocol-ops' replayed fork (`fork_tests`).
+/// @dev The L1 before the upgrade is read on a fork of `FORK_URL` at `FORK_BLOCK`: concurrent reads below the
+/// replayed fork's head deadlock its Anvil (see protocol-ops' `run_fork_tests`).
 contract V34EraUpgradeForkTest is Test {
     string internal constant ALL_CONTRACTS_HASHES = "/../AllContractsHashes.json";
     /// @dev v0.33.0's L2 upgrade tx, whose force deployments v34 keeps: the same for every env.
@@ -243,7 +238,8 @@ contract V34EraUpgradeForkTest is Test {
         _deposit(referenceChainId, CAP_L2_GAS_LIMIT);
     }
 
-    /// @dev The admin announces the change to the server, then makes it; Boojum and Airbender can't both go.
+    /// @dev As the chain's `getAdmin()`, the ChainAdmin: announce to the server, then switch. Boojum and Airbender
+    /// can't both go.
     function test_proofSystemSwitches() public {
         IZKChain chain = _chain(referenceChainId);
         IServerNotifier serverNotifier = IServerNotifier(ctm.serverNotifierAddress());
@@ -287,7 +283,6 @@ contract V34EraUpgradeForkTest is Test {
             );
     }
 
-    /// @dev The env TOML, the genesis and the build, then the L1 at the fork block.
     function _references() internal returns (V34EraOutputChecks.References memory refs) {
         string memory env = vm.readFile(envTomlPath);
         refs.isTestnet = vm.parseTomlBool(env, "$.testnet_verifier");
@@ -349,8 +344,8 @@ contract V34EraUpgradeForkTest is Test {
             });
     }
 
-    /// @dev v33's force deployments with v34's two changes at this build; the factory deps they, the genesis and
-    /// the L2 core contracts make; the BeaconProxy and the bytecode infos of new chains.
+    /// @dev v33's force deployments with v34's two changes, the factory deps, the BeaconProxy and new chains'
+    /// bytecode infos, all at this build.
     function _l2Bytecodes(
         V34EraOutputChecks.Genesis memory _genesisValues
     ) internal view returns (V34EraOutputChecks.L2Bytecodes memory l2) {
@@ -543,7 +538,7 @@ contract V34EraUpgradeForkTest is Test {
             USER_PRIORITY_TX_MAX_GAS_LIMIT,
             string.concat(label, "user priority tx gas cap")
         );
-        // As many facets as the cut adds, each routing exactly the selectors it adds, with its freezable flag.
+        // The cut's Adds exactly: each facet routes its selectors with its freezable flag.
         Diamond.FacetCut[] memory adds = V34EraOutputChecks.adds(_cut);
         assertEq(chain.facets().length, adds.length, string.concat(label, "facets = the cut's Adds"));
         for (uint256 i = 0; i < adds.length; ++i) {
@@ -606,7 +601,6 @@ contract V34EraUpgradeForkTest is Test {
         assertEq(chain.getTotalPriorityTxs(), count + 1, "one more priority transaction");
     }
 
-    /// @dev Notify the ServerNotifier, then switch Airbender, as the chain's admin.
     function _switchAirbender(
         IZKChain _zkChain,
         IServerNotifier _serverNotifier,
