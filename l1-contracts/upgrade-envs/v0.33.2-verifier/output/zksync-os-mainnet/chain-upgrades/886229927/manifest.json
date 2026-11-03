@@ -3,18 +3,14 @@
     {
       "file": "01_chain.set-upgrade-timestamp_0xd196e1a3e65b19d5f6b5d9cff169cd0e18cbbea8.safe.json",
       "index": 1,
-      "steps": [
-        "chain.set-upgrade-timestamp"
-      ],
+      "steps": ["chain.set-upgrade-timestamp"],
       "target": "0xd196e1a3e65b19d5f6b5d9cff169cd0e18cbbea8",
       "tx_count": 1
     },
     {
       "file": "02_chain.upgrade_0xd196e1a3e65b19d5f6b5d9cff169cd0e18cbbea8.safe.json",
       "index": 2,
-      "steps": [
-        "chain.upgrade"
-      ],
+      "steps": ["chain.upgrade"],
       "target": "0xd196e1a3e65b19d5f6b5d9cff169cd0e18cbbea8",
       "tx_count": 1
     }
