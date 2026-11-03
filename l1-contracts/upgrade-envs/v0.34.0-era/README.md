@@ -8,7 +8,7 @@ transactions (new bootloader), a 15M gas cap on user L1→L2 transactions and an
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | stage (Sepolia, chain 499)    | Executed 2026-10-22 as one emergency proposal, without a timer. `output/stage/` is generate run [39414177988](https://github.com/matter-labs/era-contracts/actions/runs/39414177988); its input `stage.toml` is in git history at `93e2c5a7b`                                                                                                                                                                                                               |
 | testnet3 (Sepolia, chain 312) | `output/testnet3/` is generate run [41594035218](https://github.com/matter-labs/era-contracts/actions/runs/41594035218) (Sepolia block 12018509); its deployer bundle was deployed by run [40849834276](https://github.com/matter-labs/era-contracts/actions/runs/40849834276), and the three contracts the base deployment flow added by run [41599475703](https://github.com/matter-labs/era-contracts/actions/runs/41599475703). Governance not executed |
-| mainnet (chain 324)           | Generated once ZIP-18 has executed; until then rehearsed on a ZIP-18 replay (below)                                                                                                                                                                                                                                                                                                                                                                         |
+| mainnet (chain 324)           | Not generated yet: generated on a mainnet fork once chain 324 is on v0.33.0 with its first v0.33.0 batch executed                                                                                                                                                                                                                                                                                                                                           |
 
 ## What changes
 
@@ -52,16 +52,6 @@ drained:
 2. **Fallback:** the ChainAdmin's owner sends the bundle
    `protocol_ops chain upgrade --env <env> --chain-id <id> --l1-rpc-url <rpc> --out <dir>` writes.
 
-## mainnet fork test, until ZIP-18 executes
-
-On a mainnet fork with ZIP-18 replayed, chain 324 still has ZIP-18's L2 upgrade pending: its v34 upgrade must
-revert with `PreviousUpgradeNotFinalized`, and its after-upgrade checks run on test chain 555 instead.
-`fork-mainnet-zip18.sh` goes once ZIP-18 is live.
-
-1. `L1_FORK_URL=<mainnet rpc> ./fork-mainnet-zip18.sh` builds the fork and leaves its Anvil running.
-2. `ALLOW_PENDING_L2_UPGRADE=1 protocol_ops ecosystem rehearse-upgrade --upgrade v0.34.0-era --env mainnet --fork-url http://127.0.0.1:8645 --deployer-address <any EOA>`,
-   then `replay-bundle` with the same variable.
-
 ## Files
 
 - `<env>.toml`: what the script can't read from `permanent-values/<env>.toml`, the chain or the v34 genesis: the
@@ -71,7 +61,6 @@ revert with `PreviousUpgradeNotFinalized`, and its after-upgrade checks run on t
   `admin.ecosystem_admin_addr` is the CTM owner (the PUH).
 - `rehearse.sh`: the fork checks behind `upgrade.toml`'s `verify_fork` and `verify_chain`; its header says what it
   checks and how to run it alone.
-- `fork-mainnet-zip18.sh`: test-only, see above.
 
 Generating and deploying work as for every forge-script upgrade (`docs/ecosystem-upgrade-deploy.md`).
 
