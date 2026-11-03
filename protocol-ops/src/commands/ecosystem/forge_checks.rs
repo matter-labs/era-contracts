@@ -433,9 +433,10 @@ fn identify_deployments(
 
 /// The reference chain's last execute transaction's input, for the first-batch fork tests.
 pub(crate) const LAST_EXECUTE_INPUT_FILE: &str = "last_execute_input.hex";
-/// `BlockExecution` log search windows up to the fork block: public RPCs cap a search at
-/// 50,000 blocks.
-const EXECUTE_LOG_WINDOWS: [u64; 2] = [5_000, 50_000];
+/// Blocks per `BlockExecution` log search: thirdweb's Sepolia RPC caps `eth_getLogs` at 1,000.
+const EXECUTE_LOG_WINDOW: u64 = 1_000;
+/// How far back from the fork block the search goes: about a week of 12-second L1 blocks.
+const EXECUTE_LOG_SPAN: u64 = 50_000;
 /// EIP-1967's implementation slot.
 const EIP1967_IMPLEMENTATION_SLOT: B256 =
     b256!("360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc");
@@ -1133,15 +1134,15 @@ async fn write_last_execute_input(
         .getTotalBatchesExecuted()
         .call()
         .await?;
-    let mut logs = Vec::new();
-    for window in EXECUTE_LOG_WINDOWS {
-        let filter = Filter::new()
-            .address(facts.diamond)
-            .event_signature(keccak256("BlockExecution(uint256,bytes32,bytes32)"))
-            .topic1(B256::from(batch))
-            .from_block(fork_block.saturating_sub(window - 1))
-            .to_block(fork_block);
-        logs = provider.get_logs(&filter).await.context("eth_getLogs")?;
+    let filter = Filter::new()
+        .address(facts.diamond)
+        .event_signature(keccak256("BlockExecution(uint256,bytes32,bytes32)"))
+        .topic1(B256::from(batch));
+    let (mut logs, mut searched_from) = (Vec::new(), fork_block);
+    for (from, to) in execute_log_windows(fork_block) {
+        let window = filter.clone().from_block(from).to_block(to);
+        logs = provider.get_logs(&window).await.context("eth_getLogs")?;
+        searched_from = from;
         if !logs.is_empty() {
             break;
         }
@@ -1150,7 +1151,7 @@ async fn write_last_execute_input(
         anyhow::bail!(
             "{} BlockExecution logs for batch {batch} in the {} blocks up to {fork_block}",
             logs.len(),
-            EXECUTE_LOG_WINDOWS[EXECUTE_LOG_WINDOWS.len() - 1]
+            fork_block - searched_from + 1
         );
     };
     let hash = log
@@ -1168,6 +1169,23 @@ async fn write_last_execute_input(
         path.display()
     ));
     Ok(())
+}
+
+/// The inclusive `(from, to)` block ranges the execute log search asks for, newest first:
+/// `EXECUTE_LOG_WINDOW` blocks each, adjacent, `EXECUTE_LOG_SPAN` blocks in all up to
+/// `fork_block`, or down to block 0.
+fn execute_log_windows(fork_block: u64) -> Vec<(u64, u64)> {
+    let lowest = fork_block.saturating_sub(EXECUTE_LOG_SPAN - 1);
+    let mut windows = Vec::new();
+    let mut to = fork_block;
+    loop {
+        let from = to.saturating_sub(EXECUTE_LOG_WINDOW - 1).max(lowest);
+        windows.push((from, to));
+        if from == lowest {
+            return windows;
+        }
+        to = from - 1;
+    }
 }
 
 // ─── fork_tests ──────────────────────────────────────────────────────────────────
@@ -2050,5 +2068,28 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         // Only one result counts.
         let error = verdict(&format!("{PASSED}\n{PASSED}"), true, "testnet3", &[]).unwrap_err();
         assert!(error.contains("printed 2 JSON lines"), "{error}");
+    }
+
+    #[test]
+    fn the_execute_log_search_walks_back_in_adjacent_windows() {
+        let span =
+            |windows: &[(u64, u64)]| windows.iter().map(|(from, to)| to - from + 1).sum::<u64>();
+        // testnet3's gate fork block: 50 full windows, newest first, without gaps or overlap.
+        let windows = execute_log_windows(12_018_509);
+        assert_eq!(windows.len(), 50);
+        assert_eq!(windows[0], (12_017_510, 12_018_509));
+        assert_eq!(windows[49], (11_968_510, 11_969_509));
+        assert_eq!(span(&windows), EXECUTE_LOG_SPAN);
+        for pair in windows.windows(2) {
+            assert_eq!(pair[1].1 + 1, pair[0].0, "{pair:?}");
+        }
+        assert!(windows
+            .iter()
+            .all(|(from, to)| to - from + 1 == EXECUTE_LOG_WINDOW));
+        // Below EXECUTE_LOG_SPAN the search stops at block 0, the last window cut short.
+        assert_eq!(execute_log_windows(1_234), vec![(235, 1_234), (0, 234)]);
+        assert_eq!(span(&execute_log_windows(49_999)), EXECUTE_LOG_SPAN);
+        assert_eq!(execute_log_windows(49_999)[49], (0, 999));
+        assert_eq!(execute_log_windows(0), vec![(0, 0)]);
     }
 }
