@@ -90,8 +90,10 @@ A version `0x02` leg is either executed on the destination or refunded on the so
 
 ## Limits
 
-- A halted or hostile destination can withhold the expiry, as it can withhold execution. So can a destination
-  that never upgrades to contracts supporting version `0x02`: a sender should check the destination's protocol
-  version before opting in.
+- A halted or hostile destination can withhold the expiry, as it can withhold execution.
+- A destination on contracts older than v36 rejects version `0x02`, so it can neither execute nor expire such a
+  leg until it upgrades, while the same transfer sent as `0x01` would execute. Until every interop peer is on
+  v36, senders such as SDKs and Prividium should keep `0x01` as the default and send `0x02` only to a destination
+  they have checked is on v36.
 - A bundle that was unbundled can't expire. Unbundling is the unbundler's own choice, by default the sender's.
 - Multi-leg flows can't opt in.
