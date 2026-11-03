@@ -51,11 +51,10 @@ import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMul
 /// @notice v34 Era on the fork protocol-ops replayed the upgrade on (`fork_tests` in `upgrade.toml`): the output
 /// against the chain, the build and the env TOML; the CTM, the ServerNotifier and the upgraded chains; the 15M cap
 /// on user L1->L2 transactions; the proof-system switches.
-/// @dev protocol-ops exports the inputs: `L1_RPC_URL`, `UPGRADE_ENV`, `FORK_BLOCK`, `REFERENCE_CHAIN_ID`,
-/// `UPGRADED_CHAIN_ID` (the reference chain if it upgraded, else the test chain), `TEST_CHAIN_ID` and `CHECKS_DIR`
-/// (`deployments.json` and a copy of the bundle's `ecosystem.toml`). The L1 before the upgrade is read on a fork of
-/// `FORK_BLOCK`. Calls a chain's admin makes are pranked as `getAdmin()`: the reference chain's ChainAdmin, or the
-/// deployer for the test chain.
+/// @dev protocol-ops exports the inputs: `L1_RPC_URL`, `UPGRADE_ENV`, `FORK_BLOCK`, `REFERENCE_CHAIN_ID` (the
+/// upgraded chain), `TEST_CHAIN_ID` and `CHECKS_DIR` (`deployments.json` and a copy of the bundle's `ecosystem.toml`).
+/// The L1 before the upgrade is read on a fork of `FORK_BLOCK`. The reference chain's admin calls are pranked as its
+/// `getAdmin()`, the ChainAdmin.
 contract V34EraUpgradeForkTest is Test {
     string internal constant ALL_CONTRACTS_HASHES = "/../AllContractsHashes.json";
     /// @dev v0.33.0's L2 upgrade tx, whose force deployments v34 keeps: the same for every env.
@@ -65,8 +64,6 @@ contract V34EraUpgradeForkTest is Test {
     uint256 internal constant CAP_L2_GAS_LIMIT = USER_PRIORITY_TX_MAX_GAS_LIMIT + TX_SLOT_OVERHEAD_L2_GAS;
     /// @dev Any price works as long as the mint covers the base cost at it.
     uint256 internal constant DEPOSIT_GAS_PRICE = 100 gwei;
-    /// @dev A fresh chain's base token price: one to one, as every env's chains use ETH.
-    uint128 internal constant ETH_BASE_TOKEN_MULTIPLIER = 1;
     /// @dev `EraMultiProofVerifier`'s verification types.
     uint256 internal constant BOOJUM_VERIFICATION_TYPE = 0;
     uint256 internal constant AIRBENDER_VERIFICATION_TYPE = 2;
@@ -77,7 +74,6 @@ contract V34EraUpgradeForkTest is Test {
     string internal rpcUrl;
     uint256 internal forkBlock;
     uint256 internal referenceChainId;
-    uint256 internal upgradedChainId;
     uint256 internal testChainId;
     string internal checksDir;
     string internal envTomlPath;
@@ -94,7 +90,6 @@ contract V34EraUpgradeForkTest is Test {
         rpcUrl = vm.envString("L1_RPC_URL");
         forkBlock = vm.envUint("FORK_BLOCK");
         referenceChainId = vm.envUint("REFERENCE_CHAIN_ID");
-        upgradedChainId = vm.envUint("UPGRADED_CHAIN_ID");
         testChainId = vm.envUint("TEST_CHAIN_ID");
         string memory env = vm.envString("UPGRADE_ENV");
         envTomlPath = string.concat(vm.projectRoot(), "/upgrade-envs/v0.34.0-era/", env, ".toml");
@@ -216,19 +211,8 @@ contract V34EraUpgradeForkTest is Test {
         V34EraOutputChecks.Output memory out = _output();
         Diamond.DiamondCutData memory cut = abi.decode(out.chainUpgradeDiamondCut, (Diamond.DiamondCutData));
         V34EraOutputChecks.Genesis memory genesis = _genesis(vm.readFile(Utils.genesisConfigPath(false)));
-        _checkChainState(upgradedChainId, out, cut, genesis);
-        if (testChainId != upgradedChainId) {
-            _checkChainState(testChainId, out, cut, genesis);
-        }
-        if (upgradedChainId != referenceChainId) {
-            // The export says the reference chain didn't upgrade (an L2 upgrade pending): so must the chain.
-            assertNotEq(
-                _chain(referenceChainId).getProtocolVersion(),
-                out.newProtocolVersion,
-                "reference chain not upgraded, as exported"
-            );
-            return;
-        }
+        _checkChainState(referenceChainId, out, cut, genesis);
+        _checkChainState(testChainId, out, cut, genesis);
         IZKChain chain = _chain(referenceChainId);
         assertEq(
             chain.getL2SystemContractsUpgradeTxHash(),
@@ -248,22 +232,19 @@ contract V34EraUpgradeForkTest is Test {
     }
 
     function test_userPriorityTxGasLimitCap() public {
-        if (upgradedChainId == testChainId) {
-            _openForDeposits(_chain(testChainId));
-        }
         (address depositor, uint256 mint, L2TransactionRequestDirect memory request) = _depositRequest(
-            upgradedChainId,
+            referenceChainId,
             CAP_L2_GAS_LIMIT + 1
         );
         vm.expectRevert(TooMuchGas.selector);
         vm.prank(depositor, depositor);
         bridgehub.requestL2TransactionDirect{value: mint}(request);
-        _deposit(upgradedChainId, CAP_L2_GAS_LIMIT);
+        _deposit(referenceChainId, CAP_L2_GAS_LIMIT);
     }
 
     /// @dev The admin announces the change to the server, then makes it; Boojum and Airbender can't both go.
     function test_proofSystemSwitches() public {
-        IZKChain chain = _chain(upgradedChainId);
+        IZKChain chain = _chain(referenceChainId);
         IServerNotifier serverNotifier = IServerNotifier(ctm.serverNotifierAddress());
         address admin = chain.getAdmin();
         uint8 both = BOOJUM_PROOF_SYSTEM_MASK | AIRBENDER_PROOF_SYSTEM_MASK;
@@ -273,7 +254,7 @@ contract V34EraUpgradeForkTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         chain.setProofSystemStatus(ProofSystem.Airbender, false);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        serverNotifier.notifyProofSystemStatus(upgradedChainId, withoutAirbender);
+        serverNotifier.notifyProofSystemStatus(referenceChainId, withoutAirbender);
 
         _switchAirbender(chain, serverNotifier, admin, false);
         DisabledProofSystems memory disabled = chain.disabledProofSystems();
@@ -579,15 +560,6 @@ contract V34EraUpgradeForkTest is Test {
                 );
             }
         }
-    }
-
-    /// @dev A new chain is created with deposits paused and no base token price.
-    function _openForDeposits(IZKChain _zkChain) internal {
-        vm.startPrank(_zkChain.getAdmin());
-        _zkChain.setTokenMultiplier(ETH_BASE_TOKEN_MULTIPLIER, ETH_BASE_TOKEN_MULTIPLIER);
-        _zkChain.unpauseDeposits();
-        vm.stopPrank();
-        assertFalse(_zkChain.depositsPaused(), "test chain takes deposits");
     }
 
     /// @dev From a fresh EOA, refunds to it, with a mint that covers a deposit just over the cap.

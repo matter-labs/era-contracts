@@ -387,7 +387,6 @@ pub mod upgrade_errors {
     alloy::sol!(
         error DeadlineNotYetPassed();
         error NotAllBatchesExecuted();
-        error PreviousUpgradeNotFinalized(bytes32 txHash);
     );
 }
 

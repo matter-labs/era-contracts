@@ -31,7 +31,7 @@ import {Bytes} from "contracts/vendor/Bytes.sol";
 /// input of the transaction that executed the chain's last v33 batch; `V34_PREV_BATCH`, that batch's stored info,
 /// replaces the file in a local run. Everything else is read from the chain. The batches are synthetic: nothing runs
 /// on L2, and the testnet verifier accepts the empty proof, so this does not exercise public inputs or verification
-/// keys. It skips where the chain didn't upgrade or its verifier is a production one, and without the inputs.
+/// keys. It skips where the chain's verifier is a production one, and without the inputs.
 contract V34EraFirstBatchForkTest is Test {
     // Synthetic batch contents: L1 only needs them to be non-zero and consistent.
     bytes32 internal constant STATE_DIFF_HASH = keccak256("v34 fork test: state diff hash");
@@ -78,9 +78,8 @@ contract V34EraFirstBatchForkTest is Test {
         validatorTimelock = ValidatorTimelock(ctm.validatorTimelockPostV29());
         messageRoot = bridgehub.messageRoot();
         uint256 newProtocolVersion = ctm.protocolVersion();
-        if (chain.getProtocolVersion() != newProtocolVersion) {
-            vm.skip(true, string.concat("chain ", vm.toString(chainId), " didn't upgrade (an L2 upgrade pending?)"));
-        }
+        // Before reading the verifier: a production v33 one has no `IS_TESTNET_VERIFIER()`.
+        assertEq(chain.getProtocolVersion(), newProtocolVersion, "chain protocol version");
         if (!IEraMultiProofVerifier(chain.getVerifier()).IS_TESTNET_VERIFIER()) {
             vm.skip(true, "a production verifier rejects the synthetic batches' empty proofs");
         }
@@ -100,7 +99,6 @@ contract V34EraFirstBatchForkTest is Test {
         assertEq(chain.getTotalBatchesCommitted(), lastV33BatchNumber, "committed batches");
         assertEq(chain.getTotalBatchesVerified(), lastV33BatchNumber, "verified batches");
         assertEq(chain.getTotalBatchesExecuted(), lastV33BatchNumber, "executed batches");
-        assertEq(chain.getProtocolVersion(), newProtocolVersion, "chain protocol version");
         assertTrue(ctm.protocolVersionIsActive(newProtocolVersion), "v0.34.0 active on the CTM");
         upgradeTxHash = chain.getL2SystemContractsUpgradeTxHash();
         assertTrue(upgradeTxHash != bytes32(0), "pending L2 upgrade tx");

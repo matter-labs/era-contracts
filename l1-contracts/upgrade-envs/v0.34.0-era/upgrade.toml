@@ -19,6 +19,6 @@ builtin_checks = true
 fork_tests = [
   # The output against the chain, build and env; the CTM and chains after; the 15M cap; proof switches.
   { path = "test/foundry/fork/V34EraUpgrade.t.sol" },
-  # The first v34 batches; they skip where the reference chain can't upgrade or verifies real proofs.
+  # The first v34 batches; they skip where the reference chain verifies real proofs.
   { path = "test/foundry/fork/V34EraFirstBatch.t.sol", may_skip_in = ["mainnet"] },
 ]

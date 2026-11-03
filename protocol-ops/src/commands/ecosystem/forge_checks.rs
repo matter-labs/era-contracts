@@ -14,9 +14,9 @@
 //!   constructor args are the right ones is the upgrade's knowledge, checked in Foundry;
 //! - the replay (fork): the ServerNotifier upgrade and governance stages 0–2, each sent as its
 //!   real sender, with the CTM checked after each; the reference chain's upgrade timestamp,
-//!   drain and upgrade; a new test chain; the reference chain's last execute transaction. It
-//!   assumes a minor-version upgrade whose upgrade contract refuses a chain with unexecuted
-//!   batches (v31's and v34's do);
+//!   drain and upgrade, which a pending L2 upgrade fails; a new test chain; the reference
+//!   chain's last execute transaction. It assumes a minor-version upgrade whose upgrade
+//!   contract refuses a chain with unexecuted batches (v31's and v34's do);
 //! - `fork_tests`: the upgrade's Foundry test files, on the replayed fork, with its exports.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,9 +36,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::common::abi::chain_admin_ownable::IChainAdminOwnable;
-use crate::common::abi::upgrade_errors::{
-    DeadlineNotYetPassed, NotAllBatchesExecuted, PreviousUpgradeNotFinalized,
-};
+use crate::common::abi::upgrade_errors::{DeadlineNotYetPassed, NotAllBatchesExecuted};
 use crate::common::abi::{
     BridgehubAbi, ChainAdminOwnableAbi, IBytecodesSupplierPublish, IChainAdminAbi,
     IChainAssetHandlerAbi, IChainTypeManagerAbi, IChainTypeManagerExt, IGovernanceUpgradeTimer,
@@ -577,8 +575,6 @@ struct Facts {
 /// The chains the fork tests are pointed at.
 pub(crate) struct ReplayedChains {
     pub reference: u64,
-    /// The reference chain if it upgraded, else the test chain.
-    pub upgraded: u64,
     pub test: u64,
 }
 
@@ -604,20 +600,17 @@ pub(crate) async fn replay(
     replay_stages(&fork, output, &facts)
         .await
         .context("the governance stages")?;
-    let upgraded = upgrade_reference_chain(&fork, output, &facts)
+    upgrade_reference_chain(&fork, output, &facts)
         .await
         .with_context(|| format!("chain {}", facts.chain_id))?;
     let test = create_test_chain(&fork, output, &facts)
         .await
         .context("the test chain")?;
-    if upgraded {
-        write_last_execute_input(&fork, &facts, fork_block, work_dir)
-            .await
-            .context("the last execute transaction")?;
-    }
+    write_last_execute_input(&fork, &facts, fork_block, work_dir)
+        .await
+        .context("the last execute transaction")?;
     Ok(ReplayedChains {
         reference: facts.chain_id,
-        upgraded: if upgraded { facts.chain_id } else { test },
         test,
     })
 }
@@ -930,15 +923,22 @@ async fn batch_counts(
 }
 
 /// The timestamp, sent as `Utils.adminExecuteCalls` sends it to an Ownable ChainAdmin (its
-/// setter directly, the ServerNotifier's through `multicall`); the drain; the upgrade.
-/// Returns whether the chain upgraded: it can't while an L2 upgrade is pending, which passes
-/// only with `ALLOW_PENDING_L2_UPGRADE=1`.
+/// setter directly, the ServerNotifier's through `multicall`); the drain; the upgrade. A
+/// pending L2 upgrade fails it before anything is sent: the upgrade would revert
+/// `PreviousUpgradeNotFinalized`, and nothing here clears it.
 async fn upgrade_reference_chain(
     fork: &Fork,
     output: &UpgradeOutput,
     facts: &Facts,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<()> {
     let provider = &fork.provider;
+    let diamond = ZkChainAbi::new(facts.diamond, provider.clone());
+    let pending = diamond.getL2SystemContractsUpgradeTxHash().call().await?;
+    anyhow::ensure!(
+        pending.is_zero(),
+        "a pending L2 upgrade ({pending}) blocks the upgrade; wait until its first batch on its \
+         current version executes"
+    );
     let (owner, chain_admin) = (facts.chain_admin_owner, facts.chain_admin);
     let config = &output.contracts_config;
     let (old, new) = (
@@ -995,7 +995,6 @@ async fn upgrade_reference_chain(
     );
     report.finish()?;
 
-    let diamond = ZkChainAbi::new(facts.diamond, provider.clone());
     let upgrade = multicall(&output.test_upgrade_calls.test_upgrade_chain);
     let [committed, verified, executed] = batch_counts(&diamond).await?;
     logger::info(format!(
@@ -1014,24 +1013,6 @@ async fn upgrade_reference_chain(
     } else {
         logger::info("no batches in flight: the NotAllBatchesExecuted check is skipped");
     }
-
-    let pending = diamond.getL2SystemContractsUpgradeTxHash().call().await?;
-    if !pending.is_zero() {
-        fork.expect_revert::<PreviousUpgradeNotFinalized>(
-            owner,
-            chain_admin,
-            &upgrade,
-            "the upgrade with an L2 upgrade pending",
-        )
-        .await?;
-        anyhow::ensure!(
-            std::env::var("ALLOW_PENDING_L2_UPGRADE").as_deref() == Ok("1"),
-            "an L2 upgrade ({pending}) is pending, so the chain's upgrade can't be rehearsed; \
-             ALLOW_PENDING_L2_UPGRADE=1 accepts the test chain's instead"
-        );
-        logger::warn("ALLOW_PENDING_L2_UPGRADE=1: the fork tests run on the test chain");
-        return Ok(false);
-    }
     fork.send(
         owner,
         chain_admin,
@@ -1045,8 +1026,7 @@ async fn upgrade_reference_chain(
         diamond.getProtocolVersion().call().await?,
         new,
     );
-    report.finish()?;
-    Ok(true)
+    report.finish()
 }
 
 /// Reverts the unexecuted batches through the ValidatorTimelock, as a `REVERTER_ROLE` holder
@@ -1342,7 +1322,6 @@ pub(crate) fn run_fork_tests(
         ("UPGRADE_ENV", env.to_string()),
         ("FORK_BLOCK", fork_block.to_string()),
         ("REFERENCE_CHAIN_ID", chains.reference.to_string()),
-        ("UPGRADED_CHAIN_ID", chains.upgraded.to_string()),
         ("TEST_CHAIN_ID", chains.test.to_string()),
         ("CHECKS_DIR", checks_dir.display().to_string()),
     ];
@@ -1715,7 +1694,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
     // `{"<file>:<contract>": {"duration", "test_results": {"<test>": {"status", "reason", …}},
     // "warnings"}}`. A `vm.skip` in `setUp` comes back as one `setUp()` result.
     const PASSED: &str = r#"{"test/foundry/fork/V34EraUpgrade.t.sol:V34EraUpgradeTest":{"duration":"2.41s","test_results":{"test_chainState()":{"status":"Success","reason":null,"counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":912345}},"traces":[],"labeled_addresses":{},"duration":{"secs":1,"nanos":20},"breakpoints":{},"gas_snapshots":{}},"test_proofSwitches()":{"status":"Success","reason":null,"counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":512345}},"traces":[],"labeled_addresses":{},"duration":{"secs":0,"nanos":900},"breakpoints":{},"gas_snapshots":{}}},"warnings":[]}}"#;
-    const SETUP_SKIPPED: &str = r#"{"test/foundry/fork/V34EraFirstBatch.t.sol:V34EraFirstBatchTest":{"duration":"0.12s","test_results":{"setUp()":{"status":"Skipped","reason":"run from rehearse.sh","counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":0}},"traces":[],"labeled_addresses":{},"duration":{"secs":0,"nanos":0},"breakpoints":{},"gas_snapshots":{}}},"warnings":[]}}"#;
+    const SETUP_SKIPPED: &str = r#"{"test/foundry/fork/V34EraFirstBatch.t.sol:V34EraFirstBatchForkTest":{"duration":"0.12s","test_results":{"setUp()":{"status":"Skipped","reason":"a production verifier rejects the synthetic batches' empty proofs","counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":0}},"traces":[],"labeled_addresses":{},"duration":{"secs":0,"nanos":0},"breakpoints":{},"gas_snapshots":{}}},"warnings":[]}}"#;
 
     const SUITE: &str = "test/foundry/fork/V34EraUpgrade.t.sol:V34EraUpgradeTest";
 
@@ -1754,21 +1733,19 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
     #[test]
     fn skips_pass_only_in_the_envs_a_file_names() {
         // One test skipped, one passed.
+        let reason = "a production verifier rejects the synthetic batches' empty proofs";
         let one_skipped = PASSED.replacen(
             r#""status":"Success","reason":null"#,
-            r#""status":"Skipped","reason":"reference chain not upgraded""#,
+            &format!(r#""status":"Skipped","reason":"{reason}""#),
             1,
         );
         assert_eq!(
             verdict(&one_skipped, true, "mainnet", &["mainnet"]),
-            Ok(vec![format!(
-                "{} test_chainState(): reference chain not upgraded",
-                SUITE
-            )])
+            Ok(vec![format!("{SUITE} test_chainState(): {reason}")])
         );
         let error = verdict(&one_skipped, true, "testnet3", &["mainnet"]).unwrap_err();
         assert!(
-            error.contains("skipped (reference chain not upgraded) outside may_skip_in"),
+            error.contains(&format!("skipped ({reason}) outside may_skip_in")),
             "{error}"
         );
         // A file all skipped, here in setUp: passes where it may skip, fails elsewhere, even
