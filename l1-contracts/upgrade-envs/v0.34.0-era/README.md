@@ -59,8 +59,10 @@ drained:
 - `output/<env>/`: committed from the generate run. `output/stage/` keeps the layout stage was generated with; the
   others are in `DefaultCTMUpgrade.saveOutput`'s layout, where the zero addresses are fields v34 doesn't use and
   `admin.ecosystem_admin_addr` is the CTM owner (the PUH).
-- `rehearse.sh`: the fork checks behind `upgrade.toml`'s `verify_fork` and `verify_chain`; its header says what it
-  checks and how to run it alone.
+- The checks: protocol-ops' built-ins (`builtin_checks` in `upgrade.toml`), then its `fork_tests`,
+  `test/foundry/fork/V34EraUpgrade.t.sol` and `V34EraFirstBatch.t.sol`, on the replayed fork. In CI,
+  `test/foundry/l1/unit/concrete/Upgrades/V34EraOutputChecks.t.sol` runs the output checks on the committed testnet3
+  output.
 
 Generating and deploying work as for every forge-script upgrade (`docs/ecosystem-upgrade-deploy.md`).
 

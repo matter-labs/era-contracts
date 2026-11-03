@@ -5,10 +5,11 @@
 //! - `prepare = "prepare-all"`: the v31 flow, `upgrade-prepare-all` plus PUVT.
 //! - `prepare = "forge-script"`: one forge script, run on a fork as the deployer. Its
 //!   broadcasts become the deployer's bundle, packed exactly like `upgrade-prepare-all`'s.
-//!   The upgrade supplies its own checks, since PUVT only knows v31. An optional
-//!   `[execution]` script writes the transactions whoever executes sends by hand; the
-//!   pipeline replays them on the fork and renders `EXECUTE.md` from them. Its `envs`
-//!   limits it to the environments whose governance can run it.
+//!   PUVT only knows v31, so it is checked by the built-ins (`builtin_checks`), its own
+//!   `verify_fork` / `verify_chain`, or both. An optional `[execution]` script writes the
+//!   transactions whoever executes sends by hand; the pipeline replays them on the fork and
+//!   renders `EXECUTE.md` from them. Its `envs` limits it to the environments whose governance
+//!   can run it.
 
 use std::path::{Path, PathBuf};
 
@@ -47,14 +48,34 @@ pub struct ForgeScriptUpgrade {
     pub args: Vec<String>,
     /// Checks a fork on which the bundle was replayed; may send impersonated transactions.
     /// Run from `l1-contracts/` with `L1_RPC_URL`, `ECOSYSTEM_TOML` and `UPGRADE_ENV` set.
-    pub verify_fork: Vec<String>,
+    #[serde(default)]
+    pub verify_fork: Option<Vec<String>>,
     /// Read-only checks against a real chain the bundle was broadcast to. Same environment
     /// as `verify_fork`; must never send a transaction.
-    pub verify_chain: Vec<String>,
+    #[serde(default)]
+    pub verify_chain: Option<Vec<String>>,
+    /// Run the built-in checks; `commands::ecosystem::forge_checks` says what they check and
+    /// need. Without them, both `verify_fork` and `verify_chain` are required.
+    #[serde(default)]
+    pub builtin_checks: bool,
+    /// Foundry test files run on the built-ins' replayed fork. Needs `builtin_checks`.
+    #[serde(default)]
+    pub fork_tests: Vec<ForkTest>,
     /// How the upgrade is executed by hand, if the pipeline should write its runbook. Boxed:
     /// the variant carrying it would otherwise dwarf `PrepareAll`.
     #[serde(default)]
     pub execution: Option<Box<ExecutionScript>>,
+}
+
+/// Passes with a passed test and none failed or skipped; in the `may_skip_in` envs, skips are
+/// allowed and an all-skipped file passes.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ForkTest {
+    /// Relative to `l1-contracts/`.
+    pub path: String,
+    #[serde(default)]
+    pub may_skip_in: Vec<String>,
 }
 
 /// A read-only forge script that writes the transactions whoever executes the upgrade sends
@@ -121,10 +142,34 @@ impl UpgradeDescriptor {
     fn parse(raw: &str, has_permanent_values: impl Fn(&str) -> bool) -> anyhow::Result<Self> {
         let descriptor: Self = toml::from_str(raw)?;
         if let Self::ForgeScript(upgrade) = &descriptor {
-            anyhow::ensure!(
-                !upgrade.verify_fork.is_empty() && !upgrade.verify_chain.is_empty(),
-                "a forge-script upgrade must declare verify_fork and verify_chain"
-            );
+            let commands = [
+                ("verify_fork", &upgrade.verify_fork),
+                ("verify_chain", &upgrade.verify_chain),
+            ];
+            for (name, command) in commands {
+                anyhow::ensure!(
+                    command.as_ref().is_none_or(|command| !command.is_empty()),
+                    "{name} is empty; drop it or name a command"
+                );
+            }
+            // Neither the fork nor the chain run may end up checking nothing.
+            if !upgrade.builtin_checks {
+                let missing: Vec<&str> = commands
+                    .iter()
+                    .filter(|(_, command)| command.is_none())
+                    .map(|(name, _)| *name)
+                    .collect();
+                anyhow::ensure!(
+                    missing.is_empty(),
+                    "a forge-script upgrade without builtin_checks = true must declare \
+                     verify_fork and verify_chain; missing: {}",
+                    missing.join(", ")
+                );
+                anyhow::ensure!(
+                    upgrade.fork_tests.is_empty(),
+                    "fork_tests needs builtin_checks = true: the tests run on its replay"
+                );
+            }
             // Fail on a malformed signature or argument list when loading, not mid-run.
             upgrade.calldata("env")?;
             if let Some(execution) = &upgrade.execution {
@@ -393,9 +438,83 @@ output = "emergency-upgrade-board.json"
     }
 
     #[test]
-    fn rejects_missing_checks_and_unknown_fields() {
-        assert!(parse(&FORGE_SCRIPT.replace("verify_chain", "# verify_chain")).is_err());
+    fn rejects_unknown_fields() {
         assert!(parse("prepare = \"prepare-all\"\nextra = 1\n").is_err());
+    }
+
+    /// `FORGE_SCRIPT` without the `dropped` commands, `extra` prepended.
+    fn without_commands(dropped: &[&str], extra: &str) -> String {
+        let kept: Vec<&str> = FORGE_SCRIPT
+            .lines()
+            .filter(|line| {
+                !dropped
+                    .iter()
+                    .any(|name| line.starts_with(&format!("{name} =")))
+            })
+            .collect();
+        format!("{extra}{}", kept.join("\n"))
+    }
+
+    #[test]
+    fn rejects_a_forge_script_upgrade_that_could_verify_nothing() {
+        for (dropped, missing) in [
+            (
+                &["verify_fork", "verify_chain"][..],
+                "verify_fork, verify_chain",
+            ),
+            (&["verify_chain"][..], "missing: verify_chain"),
+            (&["verify_fork"][..], "missing: verify_fork"),
+        ] {
+            let error = parse(&without_commands(dropped, "")).unwrap_err();
+            assert!(
+                format!("{error:#}").contains(missing),
+                "{dropped:?}: {error:#}"
+            );
+        }
+        let empty = FORGE_SCRIPT.replace(
+            r#"verify_chain = ["bash", "upgrade-envs/v0.33.0-compiler/rehearse-stage.sh", "--published-only"]"#,
+            "verify_chain = []",
+        );
+        assert!(parse(&empty).is_err());
+    }
+
+    #[test]
+    fn accepts_builtin_checks_alone_or_both_commands_alone() {
+        let builtin = forge_script(&without_commands(
+            &["verify_fork", "verify_chain"],
+            "builtin_checks = true\n",
+        ));
+        assert!(builtin.builtin_checks);
+        assert_eq!((builtin.verify_fork, builtin.verify_chain), (None, None));
+        // v33's shape: both commands, no built-ins.
+        let commands = forge_script(FORGE_SCRIPT);
+        assert!(!commands.builtin_checks);
+        assert!(commands.verify_fork.is_some() && commands.verify_chain.is_some());
+        // Built-ins with one command.
+        let both = forge_script(&without_commands(
+            &["verify_chain"],
+            "builtin_checks = true\n",
+        ));
+        assert!(both.verify_fork.is_some() && both.verify_chain.is_none());
+    }
+
+    #[test]
+    fn fork_tests_need_builtin_checks() {
+        let fork_tests = "fork_tests = [{ path = \"test/foundry/fork/X.t.sol\", may_skip_in = [\"mainnet\"] }]\n";
+        let error = parse(&format!("{fork_tests}{FORGE_SCRIPT}")).unwrap_err();
+        assert!(format!("{error:#}").contains("fork_tests needs builtin_checks"));
+        let upgrade = forge_script(&format!(
+            "builtin_checks = true\n{fork_tests}{FORGE_SCRIPT}"
+        ));
+        assert_eq!(
+            upgrade.fork_tests,
+            [ForkTest {
+                path: "test/foundry/fork/X.t.sol".to_string(),
+                may_skip_in: vec!["mainnet".to_string()],
+            }]
+        );
+        let unknown = "builtin_checks = true\nfork_tests = [{ path = \"x\", skip = true }]\n";
+        assert!(parse(&format!("{unknown}{FORGE_SCRIPT}")).is_err());
     }
 
     /// Every committed `upgrade-envs/<upgrade>/upgrade.toml` parses.

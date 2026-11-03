@@ -33,16 +33,17 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::commands::ecosystem::broadcast::{self, UpgradeBroadcastArgs};
+use crate::commands::ecosystem::forge_checks::{self, ForkOrigin};
 use crate::commands::ecosystem::upgrade::{self, UpgradePrepareAllArgs};
 use crate::commands::ecosystem::verify_upgrade::{self, VerifyUpgradeArgs};
-use crate::common::anvil::{send_impersonated_tx, set_balance};
+use crate::common::anvil::{evm_revert, evm_snapshot, send_impersonated_tx, set_balance};
 use crate::common::env_config::{
     default_protocol_ops_out_dir, protocol_ops_out_dir, EnvConfig, DEFAULT_UPGRADE,
 };
-use crate::common::ethereum::get_provider;
+use crate::common::ethereum::{get_provider, get_read_provider};
 use crate::common::execution_runbook;
 use crate::common::private_key::pk_to_address;
-use crate::common::upgrade_descriptor::{ExecutionScript, UpgradeDescriptor};
+use crate::common::upgrade_descriptor::{ExecutionScript, ForgeScriptUpgrade, UpgradeDescriptor};
 use crate::common::{logger, paths};
 
 // ─── Constants ───────────────────────────────────────────────────────────────────
@@ -214,6 +215,23 @@ fn read_manifest(path: &Path) -> anyhow::Result<BundleManifest> {
         );
     }
     Ok(manifest)
+}
+
+/// The deployer transactions of every bundle the manifest names.
+fn deployer_transactions(manifest_path: &Path) -> anyhow::Result<Vec<forge_checks::DeployerTx>> {
+    #[derive(Deserialize)]
+    struct SafeFile {
+        transactions: Vec<forge_checks::DeployerTx>,
+    }
+    let dir = manifest_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("{} has no parent", manifest_path.display()))?;
+    let mut txs = Vec::new();
+    for bundle in read_manifest(manifest_path)?.bundles {
+        let file: SafeFile = crate::common::files::read_json_file(dir.join(&bundle.file))?;
+        txs.extend(file.transactions);
+    }
+    Ok(txs)
 }
 
 fn stays_inside_bundle(relative: &str) -> bool {
@@ -768,7 +786,8 @@ enum CheckTarget {
     Chain,
 }
 
-/// Check the upgrade's effects: PUVT for v31, the upgrade's declared command otherwise.
+/// Check the upgrade's effects: PUVT for v31, else the upgrade's command and/or the built-ins.
+/// `fork`: for the fork target only.
 #[allow(clippy::too_many_arguments)]
 async fn check_upgrade(
     descriptor: &UpgradeDescriptor,
@@ -779,6 +798,7 @@ async fn check_upgrade(
     zk_governance_commit: &str,
     paths: &BundlePaths,
     transactions_log_override: Option<&Path>,
+    fork: Option<ForkOrigin<'_>>,
 ) -> anyhow::Result<()> {
     match descriptor {
         UpgradeDescriptor::PrepareAll {} => {
@@ -793,11 +813,164 @@ async fn check_upgrade(
             .await
         }
         UpgradeDescriptor::ForgeScript(upgrade) => {
-            let command = match target {
-                CheckTarget::Fork => &upgrade.verify_fork,
-                CheckTarget::Chain => &upgrade.verify_chain,
-            };
-            run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml)
+            check_forge_script_upgrade(upgrade, target, env_cfg, rpc_url, paths, fork).await
+        }
+    }
+}
+
+/// Every checker runs; the run then fails listing each failure.
+#[derive(Default)]
+struct CheckFailures(Vec<String>);
+
+impl CheckFailures {
+    fn record(&mut self, checker: &str, result: anyhow::Result<()>) {
+        if let Err(error) = result {
+            // An RPC error can quote the URL.
+            let error = forge_checks::redact_urls(&format!("{error:#}"));
+            logger::error(format!("{checker} failed: {error}"));
+            self.0.push(format!("{checker}: {error}"));
+        }
+    }
+
+    fn finish(self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            self.0.is_empty(),
+            "{} check(s) failed:\n  - {}",
+            self.0.len(),
+            self.0.join("\n  - ")
+        );
+        Ok(())
+    }
+}
+
+/// Chain: the built-in publication, then `verify_chain`. Fork: `verify_fork` (in a snapshot
+/// when the built-ins follow), then the built-ins and `fork_tests`.
+async fn check_forge_script_upgrade(
+    upgrade: &ForgeScriptUpgrade,
+    target: CheckTarget,
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
+    paths: &BundlePaths,
+    fork: Option<ForkOrigin<'_>>,
+) -> anyhow::Result<()> {
+    let mut failures = CheckFailures::default();
+    let (name, command) = match target {
+        CheckTarget::Fork => ("verify_fork", &upgrade.verify_fork),
+        CheckTarget::Chain => ("verify_chain", &upgrade.verify_chain),
+    };
+    let run_command = || {
+        command
+            .as_ref()
+            .map(|command| run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml))
+    };
+    if target == CheckTarget::Fork && command.is_some() {
+        let snapshot = if upgrade.builtin_checks {
+            Some(evm_snapshot(rpc_url).await)
+        } else {
+            None
+        };
+        if let Some(result) = run_command() {
+            failures.record(name, result);
+        }
+        if let Some(snapshot) = snapshot {
+            let restored = async { evm_revert(rpc_url, &snapshot?).await }.await;
+            if restored.is_err() {
+                // The built-ins would start from verify_fork's state, not the bundle's.
+                failures.record("snapshot around verify_fork", restored);
+                return failures.finish();
+            }
+        }
+    }
+    if upgrade.builtin_checks {
+        logger::step("built-in checks");
+        match forge_checks::UpgradeOutput::read(&paths.ecosystem_toml) {
+            Ok(output) => {
+                let publication =
+                    forge_checks::check_publication(rpc_url, &output, env_cfg.bridgehub()).await;
+                failures.record("publication", publication);
+                if target == CheckTarget::Fork {
+                    builtin_fork_checks(
+                        upgrade,
+                        env_cfg,
+                        rpc_url,
+                        paths,
+                        &output,
+                        fork,
+                        &mut failures,
+                    )
+                    .await;
+                }
+            }
+            Err(error) => failures.record("built-in checks", Err(error)),
+        }
+    }
+    if target == CheckTarget::Chain {
+        if let Some(result) = run_command() {
+            failures.record(name, result);
+        }
+    }
+    failures.finish()
+}
+
+/// `fork_tests` run only after a complete replay.
+async fn builtin_fork_checks(
+    upgrade: &ForgeScriptUpgrade,
+    env_cfg: &EnvConfig,
+    rpc_url: &str,
+    paths: &BundlePaths,
+    output: &forge_checks::UpgradeOutput,
+    fork: Option<ForkOrigin<'_>>,
+    failures: &mut CheckFailures,
+) {
+    let Some(fork) = fork else {
+        failures.record("built-in checks", Err(anyhow::anyhow!("no fork block")));
+        return;
+    };
+    let fork_block = fork.block;
+    // A rerun must not hand the fork tests stale files.
+    for file in [
+        forge_checks::DEPLOYMENTS_FILE,
+        forge_checks::LAST_EXECUTE_INPUT_FILE,
+    ] {
+        match fs::remove_file(paths.work_dir.join(file)) {
+            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+                failures.record("built-in checks", Err(error.into()));
+                return;
+            }
+            _ => {}
+        }
+    }
+    let provenance = async {
+        let factory = env_cfg
+            .create2_factory()
+            .ok_or_else(|| anyhow::anyhow!("permanent values have no create2_factory_addr"))?;
+        let txs = deployer_transactions(&paths.manifest)?;
+        forge_checks::check_provenance(rpc_url, output, factory, &txs, fork_block, &paths.work_dir)
+            .await
+    };
+    failures.record("provenance", provenance.await);
+    logger::step("built-in replay");
+    let replay = forge_checks::replay(rpc_url, env_cfg, output, fork_block, &paths.work_dir).await;
+    match replay {
+        Ok(chains) if !upgrade.fork_tests.is_empty() => {
+            logger::step("fork_tests");
+            let result = forge_checks::run_fork_tests(
+                &upgrade.fork_tests,
+                &env_cfg.env,
+                rpc_url,
+                fork,
+                &chains,
+                &paths.ecosystem_toml,
+                &paths.work_dir,
+            );
+            failures.record("fork_tests", result);
+        }
+        Ok(_) => {}
+        Err(error) => {
+            failures.record("replay", Err(error));
+            if !upgrade.fork_tests.is_empty() {
+                logger::warn("fork_tests not run: they need a complete replay");
+            }
         }
     }
 }
@@ -1004,6 +1177,10 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &args.zk_governance_commit,
         &paths,
         None,
+        Some(ForkOrigin {
+            url: &args.fork_url,
+            block: forked_at_block,
+        }),
     )
     .await?;
     drop(anvil);
@@ -1171,7 +1348,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
     // `--rpc` would otherwise receive real, correctly signed transactions. Mirrors the
     // `cast chain-id` preflight the Deploy workflow runs before it exports any secret.
     if let ReplayMode::Broadcast { rpc_url, .. } | ReplayMode::Verify { rpc_url } = &mode {
-        let actual = get_provider(rpc_url)?
+        let actual = get_read_provider(rpc_url)?
             .get_chain_id()
             .await
             .context("eth_chainId on --rpc")?;
@@ -1192,6 +1369,11 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 metadata.l1.forked_at_block,
             )?;
             let rpc_url = anvil.endpoint();
+            // `forked_at_block` may be absent; the fork's height is certain.
+            let fork_block = get_provider(&rpc_url)?
+                .get_block_number()
+                .await
+                .context("eth_blockNumber")?;
             fund_signers(&descriptor, &rpc_url, &env_cfg, deployer, &paths).await?;
             broadcast_impersonated(&rpc_url, &paths).await?;
             check_upgrade(
@@ -1203,6 +1385,10 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 &zk_governance_commit,
                 &paths,
                 args.transactions_log.as_deref(),
+                Some(ForkOrigin {
+                    url: &fork_url,
+                    block: fork_block,
+                }),
             )
             .await?;
             drop(anvil);
@@ -1232,6 +1418,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 &zk_governance_commit,
                 &paths,
                 args.transactions_log.as_deref(),
+                None,
             )
             .await?;
         }
@@ -1245,6 +1432,7 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
                 &zk_governance_commit,
                 &paths,
                 args.transactions_log.as_deref(),
+                None,
             )
             .await?;
         }
@@ -1530,6 +1718,31 @@ mod tests {
             ..base.clone()
         })
         .is_ok());
+    }
+
+    #[test]
+    fn every_failing_checker_is_reported() {
+        let mut failures = CheckFailures::default();
+        failures.record("verify_fork", Err(anyhow::anyhow!("exit status 1")));
+        failures.record("publication", Ok(()));
+        failures.record("provenance", Err(anyhow::anyhow!("unidentified init code")));
+        // reqwest's error names the URL.
+        let timeout = anyhow::anyhow!("error sending request for url (https://eth.example/v2/KEY)");
+        failures.record("replay", Err(timeout.context("eth_call")));
+        let message = failures.finish().unwrap_err().to_string();
+        assert!(message.starts_with("3 check(s) failed"), "{message}");
+        assert!(
+            message.contains("replay: eth_call: error sending request for url (<url>)"),
+            "{message}"
+        );
+        assert!(!message.contains("KEY"), "{message}");
+        assert!(message.contains("verify_fork: exit status 1"), "{message}");
+        assert!(
+            message.contains("provenance: unidentified init code"),
+            "{message}"
+        );
+        assert!(!message.contains("publication"), "{message}");
+        assert!(CheckFailures::default().finish().is_ok());
     }
 
     // ─── chain-id preflight (P1) ────────────────────────────────────────────
