@@ -34,20 +34,22 @@
 //!      describes, is held to its pin ([`external_backends`]).
 //!   3. Does every proxy inventory belong to the domain its leg applies, upgrade something, and
 //!      hold only real edges, each naming the proxy of its slot, discovered on chain from the
-//!      Bridgehub or the CTM? ([`rows`])
+//!      REVIEWED Bridgehub or a CTM registered on it? ([`rows`], [`ecosystem_binding`])
 //!   4. Does every release the package installs pin the reviewed genesis — the genesis config's
 //!      root and the force deployments the prepare wrote ([`genesis`]) — and pass its own
 //!      `validate()`, which the CTM runs when it installs it?
-//!   5. Is authority bound where the review says — each executor to the independently reviewed
-//!      CTM and ProxyAdmin — and to the expected governance owner, with no nomination outstanding
-//!      on any authority the upgrade drives?
+//!   5. Is authority bound where the review says — the package's Bridgehub, every CTM it drives
+//!      and both executors' ProxyAdmins to the reviewed Bridgehub ([`ecosystem_binding`]), each
+//!      executor to that CTM and ProxyAdmin — and to the expected governance owner, with no
+//!      nomination outstanding on any authority the upgrade drives and the CTM's
+//!      ValidatorTimelock still governance's?
 //!   6. Does every proxy row depart from the implementation that is actually live, read through
 //!      its domain's `ProxyAdmin`? ([`rows`]) A pre-execution check only; what a replayed bundle
 //!      leaves behind is checked by `ecosystem upgrade-governance` ([`applied`]).
 //!   7. Do chains crossing an edge keep the system-proxy logic new chains get? ([`shell`])
 //!   8. Does the transaction governance signs invoke the reviewed upgrade, at the reviewed
-//!      addresses, as one contiguous run in canonical order — and is every other call a reviewed
-//!      external action, in its declared position and multiplicity?
+//!      addresses, as one contiguous run in canonical order — and are its calls other than the
+//!      executor legs exactly the declared external actions? ([`declared_calls`])
 //!
 //! None of it is "does an object's own fingerprint of a member match that member's code": the
 //! manifest author supplies both halves of such a pair, so it can only ever agree with itself.
@@ -75,8 +77,12 @@ use crate::upgrade_verification::report::VerificationResult;
 pub(crate) mod applied;
 pub(crate) mod bootstrap;
 pub(crate) mod construction;
+mod declared_calls;
+pub(crate) mod ecosystem_binding;
 pub(crate) mod external_backends;
 pub(crate) mod genesis;
+#[cfg(test)]
+mod keyed_l1;
 pub(crate) mod lifecycle;
 pub(crate) mod member_construction;
 pub(crate) mod members;
@@ -109,12 +115,13 @@ use views::CommittedUpgradeView;
 /// bootstrap that is the owner the CTM domain lands on permanently; otherwise it is the owner of
 /// the whole lifecycle. `executor_records` are files whose `[upgrade_executors]` records add to
 /// the package's own ([`records`]). `env` names the upgrade env whose permanent values hold the
-/// reviewed ZK token asset id an installed release's force deployments are held against
-/// ([`genesis`]); a replacement, or an upgrade without a transition leg, installs no release and
-/// does not need it. The env's permanent values are also what the members' constructor
-/// arguments are held against where they come from the env ([`member_construction`]), and it
-/// selects the ZiSK backend pins that apply ([`external_backends`]). `expected_bridgehub`
-/// replaces the env's `bridgehub_proxy_addr` as the Bridgehub under review. `contract_hashes`
+/// reviewed Bridgehub every package kind is bound to ([`ecosystem_binding`]) and the reviewed ZK
+/// token asset id an installed release's force deployments are held against ([`genesis`]); a
+/// replacement, or an upgrade without a transition leg, installs no release and does not need the
+/// token. The env's permanent values are also what the members' constructor arguments are held
+/// against where they come from the env ([`member_construction`]), and it selects the ZiSK
+/// backend pins that apply ([`external_backends`]). `expected_bridgehub` replaces the env's
+/// `bridgehub_proxy_addr` as the reviewed Bridgehub; a run naming neither is refused. `contract_hashes`
 /// replaces the committed `AllContractsHashes.json` the build is held against (see the
 /// `--contract-hashes` help).
 #[allow(clippy::too_many_arguments)]
@@ -143,17 +150,7 @@ pub(crate) async fn verify(
     let genesis_root = genesis::reviewed_genesis_root();
     let genesis_image = genesis::reviewed_genesis_image();
     let env_config = env.map(EnvConfig::load).transpose()?;
-    if let (Some(expected), Some(config)) = (expected_bridgehub, &env_config) {
-        if expected != config.bridgehub() {
-            result.report_warn(&format!(
-                "--expected-bridgehub {expected} is not env {}'s bridgehub_proxy_addr {}: the flag \
-                 is the reviewed Bridgehub, and this run reviews a harness L1, not the env's",
-                config.env,
-                config.bridgehub()
-            ));
-        }
-    }
-    let reviewed_env = ReviewedEnv::new(env_config.as_ref(), expected_bridgehub);
+    let reviewed_env = reviewed_env(env_config.as_ref(), expected_bridgehub, result)?;
 
     let mut package = RegistryPackage::load(ecosystem_toml)?;
     let held = match &mut package {
@@ -229,6 +226,41 @@ pub(crate) async fn verify(
             .await
         }
     }
+}
+
+/// The reviewer's inputs ([`ReviewedEnv`]), with the reviewed Bridgehub every package kind is
+/// verified against ([`ecosystem_binding`]): `expected_bridgehub` when given — with a warning when
+/// it is not the env's — else the env's `bridgehub_proxy_addr`. A run that names neither, or names
+/// the zero address, stops here.
+fn reviewed_env(
+    config: Option<&EnvConfig>,
+    expected_bridgehub: Option<Address>,
+    result: &mut VerificationResult,
+) -> anyhow::Result<ReviewedEnv> {
+    if let (Some(expected), Some(config)) = (expected_bridgehub, config) {
+        if expected != config.bridgehub() {
+            result.report_warn(&format!(
+                "--expected-bridgehub {expected} is not env {}'s bridgehub_proxy_addr {}: the flag \
+                 is the reviewed Bridgehub, and this run reviews a harness L1, not the env's",
+                config.env,
+                config.bridgehub()
+            ));
+        }
+    }
+    let reviewed = ReviewedEnv::new(config, expected_bridgehub);
+    let Some(bridgehub) = reviewed.bridgehub() else {
+        anyhow::bail!(
+            "a registry package is verified against the ecosystem it targets: pass --env <name> \
+             (its permanent-values bridgehub_proxy_addr is the reviewed Bridgehub) or \
+             --expected-bridgehub <address>"
+        );
+    };
+    anyhow::ensure!(
+        !bridgehub.address.is_zero(),
+        "{} is the zero address: there is no reviewed Bridgehub to verify the package against",
+        bridgehub.source
+    );
+    Ok(reviewed)
 }
 
 /// The ZK token asset id the reviewed env's permanent values declare. Required on the paths that
@@ -331,6 +363,55 @@ mod tests {
             stage.require_zk_token_asset_id().unwrap()
         );
         assert!(EnvConfig::load("no-such-env").is_err());
+    }
+
+    /// Q1/Q2: the reviewed Bridgehub is `--expected-bridgehub`, else the env's; the flag wins
+    /// over a different env value with a warning, and a run naming neither, or zero, stops.
+    #[test]
+    fn the_reviewed_bridgehub_is_the_flag_else_the_envs() {
+        let stage = EnvConfig::load("stage").unwrap();
+        let other = Address::repeat_byte(0x0B);
+        let run = |config: Option<&EnvConfig>, flag: Option<Address>| {
+            let mut result = VerificationResult::default();
+            let reviewed = reviewed_env(config, flag, &mut result)
+                .map(|env| env.bridgehub().map(|b| (b.address, b.source.clone())));
+            (reviewed, result)
+        };
+
+        let (reviewed, result) = run(None, Some(other));
+        assert_eq!(
+            reviewed.unwrap(),
+            Some((other, "the reviewer's --expected-bridgehub".to_string()))
+        );
+        assert_eq!((result.errors, result.warnings), (0, 0));
+
+        let (reviewed, result) = run(Some(&stage), None);
+        assert_eq!(
+            reviewed.unwrap(),
+            Some((
+                stage.bridgehub(),
+                "env stage's bridgehub_proxy_addr".to_string()
+            ))
+        );
+        assert_eq!((result.errors, result.warnings), (0, 0));
+
+        let (reviewed, result) = run(Some(&stage), Some(stage.bridgehub()));
+        assert_eq!(reviewed.unwrap().unwrap().0, stage.bridgehub());
+        assert_eq!((result.errors, result.warnings), (0, 0));
+
+        let (reviewed, result) = run(Some(&stage), Some(other));
+        assert_eq!(reviewed.unwrap().unwrap().0, other, "the flag wins");
+        assert_eq!((result.errors, result.warnings), (0, 1));
+
+        let (reviewed, _) = run(None, None);
+        let message = reviewed.unwrap_err().to_string();
+        assert!(
+            message.contains("--env") && message.contains("--expected-bridgehub"),
+            "{message}"
+        );
+
+        let (reviewed, _) = run(None, Some(Address::ZERO));
+        assert!(reviewed.unwrap_err().to_string().contains("zero address"));
     }
 
     #[test]

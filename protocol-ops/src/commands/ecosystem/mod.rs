@@ -10,6 +10,7 @@ use clap::Subcommand;
 use crate::{
     commands::ecosystem::broadcast::UpgradeBroadcastArgs,
     commands::ecosystem::bundle::{RehearseUpgradeArgs, ReplayBundleArgs, VerifyBundleArgs},
+    commands::ecosystem::deployer_plan::CheckDeployerPlanArgs,
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
@@ -18,6 +19,7 @@ use crate::{
 
 pub mod broadcast;
 pub mod bundle;
+pub mod deployer_plan;
 pub mod init;
 pub mod simulator;
 pub mod upgrade;
@@ -68,6 +70,12 @@ pub enum EcosystemCommands {
     ReplayBundle(ReplayBundleArgs),
     /// Check a deploy bundle's files against the digests in its `bundle-metadata.json`.
     VerifyBundle(VerifyBundleArgs),
+    /// Hold every call the deployer would sign to this checkout before anything is signed: no
+    /// value; CREATE2 deployments only under the env's salts, of reviewed code the package records
+    /// or names; every other call only from the reviewed allowlist. `replay-bundle` runs it before
+    /// a fork rehearsal or a broadcast.
+    #[command(name = "check-deployer-plan")]
+    CheckDeployerPlan(CheckDeployerPlanArgs),
     /// Print a starter `--ctm-config` TOML by enumerating every CTM
     /// registered on the supplied bridgehub. Use this on stage / mainnet to
     /// discover the Atlas CTM address without having to look it up by hand.
@@ -96,6 +104,7 @@ pub async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::RehearseUpgrade(args) => bundle::run_rehearse_upgrade(args).await,
         EcosystemCommands::ReplayBundle(args) => bundle::run_replay_bundle(args).await,
         EcosystemCommands::VerifyBundle(args) => bundle::run_verify_bundle(args),
+        EcosystemCommands::CheckDeployerPlan(args) => deployer_plan::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
     }

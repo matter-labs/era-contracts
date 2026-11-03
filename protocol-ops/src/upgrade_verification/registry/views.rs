@@ -181,11 +181,13 @@ sol! {
         function rows() external view returns (ProxyUpgradeRow[] memory);
     }
 
-    /// The live owner and outstanding nomination of an `Ownable2Step` lifecycle object.
+    /// The live owner and outstanding nomination of an `Ownable2Step` contract, and the call
+    /// through which the nominee takes it.
     #[sol(rpc)]
     contract Ownable2StepView {
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
+        function acceptOwnership() external;
     }
 
     /// Positional mirror of `RegistryTypes.GenesisFacet`.
@@ -274,12 +276,14 @@ sol! {
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
-    /// The chain registry the bootstrap's lagging-chain report enumerates, the live values a
-    /// release's force deployments are held against, the ecosystem proxies an inventory's
-    /// slots must name, and the owner a CTM also takes its chain freezes from.
+    /// The chain registry the bootstrap's lagging-chain report enumerates, the CTM registry every
+    /// CTM a package drives must be in, the live values a release's force deployments are held
+    /// against, the ecosystem proxies an inventory's slots must name, and the owner a CTM also
+    /// takes its chain freezes from.
     #[sol(rpc)]
     contract BridgehubView {
         function owner() external view returns (address);
+        function chainTypeManagerIsRegistered(address _chainTypeManager) external view returns (bool);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
         function chainTypeManager(uint256 _chainId) external view returns (address);
         function assetRouter() external view returns (address);
