@@ -157,6 +157,10 @@ pub struct L1Provenance {
     pub chain_id: Option<u64>,
     /// The L1 height the bundles were computed against; replays fork there.
     pub forked_at_block: Option<u64>,
+    /// Whether that height was pinned (`--fork-block`) rather than the chain tip: a rehearsal
+    /// against state the chain has since moved past, e.g. an environment already upgraded.
+    #[serde(default)]
+    pub fork_block_pinned: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,6 +194,7 @@ struct ManifestBundle {
 pub struct BundleProvenance {
     pub deployer: Option<Address>,
     pub forked_at_block: Option<u64>,
+    pub fork_block_pinned: bool,
     pub zk_governance_commit: Option<String>,
     pub foundry_zksync_version: Option<String>,
 }
@@ -201,11 +206,15 @@ fn sha256_file(path: &Path) -> anyhow::Result<String> {
 
 fn read_manifest(path: &Path) -> anyhow::Result<BundleManifest> {
     let manifest: BundleManifest = crate::common::files::read_json_file(path)?;
-    anyhow::ensure!(
-        !manifest.bundles.is_empty(),
-        "{} lists no bundles",
-        path.display()
-    );
+    // No bundles is a valid result: the prepare skips every contract that already exists at its
+    // CREATE2 address, so a regeneration after the deployment has nothing to send. The checks
+    // that follow still verify the deployed contracts.
+    if manifest.bundles.is_empty() {
+        logger::info(format!(
+            "{} lists no bundles: every contract is already deployed",
+            path.display()
+        ));
+    }
     for bundle in &manifest.bundles {
         anyhow::ensure!(
             Path::new(&bundle.file)
@@ -343,6 +352,7 @@ pub fn pack_deploy_bundle(
         l1: L1Provenance {
             chain_id: env_cfg.l1_chain_id(),
             forked_at_block: provenance.forked_at_block,
+            fork_block_pinned: provenance.fork_block_pinned,
         },
         deployer_address: provenance.deployer,
         zk_governance_commit: provenance.zk_governance_commit.clone(),
@@ -724,7 +734,10 @@ async fn fund_signers(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CheckTarget {
     Fork,
-    Chain,
+    /// `fork_block_pinned` as the bundle records it.
+    Chain {
+        fork_block_pinned: bool,
+    },
 }
 
 /// Check the upgrade's effects: PUVT for `prepare-all`, the built-in checks of a verifier-only
@@ -766,15 +779,21 @@ async fn check_upgrade(
                     )
                     .await
                 }
-                CheckTarget::Chain => {
-                    verifier_only_check::check_chain(rpc_url, &paths.ecosystem_toml, &input).await
+                CheckTarget::Chain { fork_block_pinned } => {
+                    verifier_only_check::check_chain(
+                        rpc_url,
+                        &paths.ecosystem_toml,
+                        &input,
+                        fork_block_pinned,
+                    )
+                    .await
                 }
             }
         }
         UpgradeDescriptor::ForgeScript(upgrade) => {
             let command = match target {
                 CheckTarget::Fork => &upgrade.verify_fork,
-                CheckTarget::Chain => &upgrade.verify_chain,
+                CheckTarget::Chain { .. } => &upgrade.verify_chain,
             };
             run_upgrade_check(command, &env_cfg.env, rpc_url, &paths.ecosystem_toml)
         }
@@ -966,6 +985,7 @@ pub async fn run_rehearse_upgrade(args: RehearseUpgradeArgs) -> anyhow::Result<(
         &BundleProvenance {
             deployer: Some(args.deployer_address),
             forked_at_block: Some(forked_at_block),
+            fork_block_pinned: args.fork_block.is_some(),
             zk_governance_commit: Some(args.zk_governance_commit.clone()),
             foundry_zksync_version: args.foundry_zksync_version.clone(),
         },
@@ -1370,7 +1390,9 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
             check_upgrade(
                 &descriptor,
                 &metadata.upgrade,
-                CheckTarget::Chain,
+                CheckTarget::Chain {
+                    fork_block_pinned: metadata.l1.fork_block_pinned,
+                },
                 &env_cfg,
                 &rpc_url,
                 &zk_governance_commit,
@@ -1383,7 +1405,9 @@ pub async fn run_replay_bundle(args: ReplayBundleArgs) -> anyhow::Result<()> {
             check_upgrade(
                 &descriptor,
                 &metadata.upgrade,
-                CheckTarget::Chain,
+                CheckTarget::Chain {
+                    fork_block_pinned: metadata.l1.fork_block_pinned,
+                },
                 &env_cfg,
                 &rpc_url,
                 &zk_governance_commit,
@@ -1487,6 +1511,7 @@ mod tests {
             l1: L1Provenance {
                 chain_id: Some(1),
                 forked_at_block: Some(1),
+                fork_block_pinned: false,
             },
             deployer_address: Some(TARGET.parse().unwrap()),
             zk_governance_commit: None,
@@ -1658,6 +1683,56 @@ mod tests {
         );
         assert!(bundle.join(BUNDLE_METADATA_FILE).is_file());
         verify_bundle_integrity(&bundle).unwrap();
+    }
+
+    // A regeneration after the deployment: the prepare skipped every contract, so the manifest
+    // is empty. It packs into a bundle that passes the integrity check and records the pin.
+    #[test]
+    fn packs_an_empty_manifest_when_everything_is_deployed() {
+        let dir = tempfile::tempdir().unwrap();
+        let output = dir.path().join("output");
+        let repo = dir.path().join("repository");
+        write(&repo.join("AllContractsHashes.json"), "[]");
+        write(&output.join("ecosystem.toml"), "old_protocol_version = 1\n");
+        write(&output.join(MANIFEST_FILE), r#"{"bundles":[]}"#);
+        let Ok(env_cfg) = EnvConfig::load("stage") else {
+            return; // no checkout around the test binary
+        };
+        let provenance = BundleProvenance {
+            deployer: Some(TARGET.parse().unwrap()),
+            forked_at_block: Some(42),
+            fork_block_pinned: true,
+            ..BundleProvenance::default()
+        };
+        let bundle = dir.path().join("packed");
+        let metadata = pack_deploy_bundle(
+            &env_cfg,
+            DEFAULT_UPGRADE,
+            &output,
+            &bundle,
+            &repo,
+            &provenance,
+        )
+        .unwrap();
+
+        let files: Vec<_> = metadata.files.keys().cloned().collect();
+        assert_eq!(files, ["ecosystem.toml", MANIFEST_FILE]);
+        assert!(metadata.l1.fork_block_pinned);
+        assert!(
+            verify_bundle_integrity(&bundle)
+                .unwrap()
+                .l1
+                .fork_block_pinned
+        );
+    }
+
+    // Bundles packed before `fork_block_pinned` existed were all generated at a recorded height
+    // and load as not pinned, which keeps their real-chain check strict.
+    #[test]
+    fn a_bundle_without_fork_block_pinned_loads_as_not_pinned() {
+        let l1: L1Provenance =
+            serde_json::from_str(r#"{"chain_id":1,"forked_at_block":7}"#).unwrap();
+        assert!(!l1.fork_block_pinned);
     }
 
     #[test]

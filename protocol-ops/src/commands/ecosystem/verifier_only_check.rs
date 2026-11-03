@@ -206,10 +206,16 @@ impl Report {
 }
 
 /// Read-only check of the deployments on the chain the bundle was broadcast to.
+///
+/// `fork_block_pinned`: the bundle was generated at a pinned L1 height, as a rehearsal on an
+/// environment that has since taken the upgrade with other contracts. The CTM then points at
+/// those, so a different verifier for the new version is only reported. A bundle generated at
+/// the tip cannot get there: its prepare requires the CTM on the old version.
 pub async fn check_chain(
     rpc_url: &str,
     ecosystem_toml: &Path,
     upgrade_input: &Path,
+    fork_block_pinned: bool,
 ) -> anyhow::Result<()> {
     logger::step("verifier-only deployment check (read-only)");
     let expected = Expected::load(ecosystem_toml, upgrade_input)?;
@@ -220,13 +226,24 @@ pub async fn check_chain(
     let version = ctm.protocolVersion().call().await?;
     if version == expected.new_version {
         logger::info("CTM is on the new version: the governance stages have run");
-        report.check(
-            "CTM verifier for the new version",
-            ctm.protocolVersionVerifier(expected.new_version)
-                .call()
-                .await?,
-            expected.verifier,
-        );
+        let verifier = ctm
+            .protocolVersionVerifier(expected.new_version)
+            .call()
+            .await?;
+        if fork_block_pinned && verifier != expected.verifier {
+            logger::warn(format!(
+                "CTM verifier for the new version is {verifier:#x}, not this deployment's {:#x}: \
+                 the bundle was generated at a pinned fork block, and the environment took the \
+                 upgrade with other contracts",
+                expected.verifier
+            ));
+        } else {
+            report.check(
+                "CTM verifier for the new version",
+                verifier,
+                expected.verifier,
+            );
+        }
     } else {
         report.check(
             "CTM still on the old version (governance not run yet)",
