@@ -12,7 +12,12 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IUpgradePreconditionChecker} from "contracts/upgrades/IUpgradePreconditionChecker.sol";
-import {CutDataForProtocolVersionNotAvailable, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    CutDataForProtocolVersionNotAvailable,
+    Unauthorized,
+    ZeroAddress,
+    ZeroUpgradeTimestamp
+} from "contracts/common/L1ContractErrors.sol";
 
 // Isolates notifier behavior from any release-specific prerequisites.
 contract UpgradePreconditionCheckerStub is IUpgradePreconditionChecker {
@@ -60,7 +65,7 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
         chainTypeManager._setChainProtocolVersion(chainId, protocolVersion);
         chainTypeManager.setZKChain(chainId, chain);
-        chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
+        chainTypeManager.setUpgradeTransition(protocolVersion, makeAddr("transition"));
 
         ServerNotifier implementation = new ServerNotifier();
 
@@ -79,10 +84,9 @@ contract ServerNotifierTest is Test {
         serverNotifier.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
     }
 
-    /// @dev Pins the storage layout the deployed (pre-bootstrap) notifiers carry. The bootstrap
-    ///      swaps the notifier's implementation and then reads its owner, nomination and CTM through
-    ///      the NEW layout, so a reordered declaration would make those reads describe other slots
-    ///      (boot-55).
+    /// @dev Pins the storage layout the deployed notifiers carry. An implementation upgrade reads
+    ///      their owner, nomination and CTM through the NEW layout, so a reordered declaration would
+    ///      make those reads describe other slots (boot-55).
     function test_storageLayoutIsTheDeployedOne() public {
         uint256 deadline = block.timestamp + 7 days;
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
@@ -107,7 +111,7 @@ contract ServerNotifierTest is Test {
     function test_setUpgradeTimestampValidProtocolVersionSucceeds() public {
         uint256 deadline = block.timestamp + 7 days;
 
-        chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
+        chainTypeManager.setUpgradeTransition(protocolVersion, makeAddr("transition"));
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
         vm.startPrank(chainAdmin);
@@ -119,7 +123,7 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampCutDataForProtocolVersionNotAvailableReverts() public {
-        chainTypeManager.setUpgradeCutHash(protocolVersion, bytes32(0));
+        chainTypeManager.setUpgradeTransition(protocolVersion, address(0));
         uint256 deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
@@ -127,6 +131,12 @@ contract ServerNotifierTest is Test {
         vm.startPrank(chainAdmin);
         vm.expectRevert(abi.encodeWithSelector(CutDataForProtocolVersionNotAvailable.selector, protocolVersion));
         serverNotifier.setUpgradeTimestamp(chainId, deadline);
+    }
+
+    function test_setUpgradeTimestampZeroTimestampReverts() public {
+        vm.startPrank(chainAdmin);
+        vm.expectRevert(ZeroUpgradeTimestamp.selector);
+        serverNotifier.setUpgradeTimestamp(chainId, 0);
     }
 
     function test_setUpgradeTimestampInvalidCallerReverts() public {

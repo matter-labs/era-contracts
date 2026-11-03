@@ -19,6 +19,7 @@ const CTM: Address = Address::repeat_byte(0xC7);
 pub(super) const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
 const CTM_ADMIN: Address = Address::repeat_byte(0xA7);
 const SUPPLIER: Address = Address::repeat_byte(0x5B);
+const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
 pub(super) const GOVERNANCE: Address = Address::repeat_byte(0x60);
 const OLD_VERSION: u64 = 35 << 32;
 const NEW_VERSION: u64 = 36 << 32;
@@ -156,6 +157,10 @@ impl ShellPathFixture {
         self.asserter
             .push_success(&Bytes::from(U256::from(OLD_VERSION).abi_encode()));
         self.address(FROM_RELEASE);
+        // The edge crosses into v0.36.0, so the CTM's chains are checked; it has none.
+        self.address(BRIDGEHUB);
+        self.asserter
+            .push_success(&Bytes::from(Vec::<U256>::new().abi_encode()));
         self.readiness_and_shell_reads();
     }
 

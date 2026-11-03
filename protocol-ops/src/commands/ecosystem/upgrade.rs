@@ -4,10 +4,8 @@
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
 //!                         by running the release's `CoreUpgrade_v<N>` once + `CTMUpgrade_v<N>`
-//!                         once for the target `--ctm-proxy` on a single anvil fork, then
-//!                         executes the CTM-admin calls the CTM prepare emits (the
-//!                         registry bootstrap's ServerNotifier handover; none on a
-//!                         recurring upgrade). Emits per-script governance TOMLs.
+//!                         once for the target `--ctm-proxy` on a single anvil fork.
+//!                         Emits per-script governance TOMLs.
 //!   `upgrade-governance`  replays the package's one governance bundle
 //!                         (`[governance_calls] calls`) on an anvil fork, holds a
 //!                         registry package's fork state against what it must
@@ -295,11 +293,9 @@ fn executor_leg(
 ///    `ctm_upgrade_executor_addr`;
 /// 3. `CTMUpgradeExecutor.applyCTMUpgrade(ctm_transition_addr)` on `ctm_upgrade_executor_addr`.
 ///
-/// A bootstrap edge (`bootstrap_migration_addr` nonzero) and a transition replacement
-/// (`replacement_transition_addr` nonzero) derive none: the bootstrap's core transition rides its
-/// own derived sequence, and a replacement is one declared `forward`. Either one reporting an
-/// object only a leg would apply is refused, as is a leg whose executor is missing or zero and a
-/// package that is none of the three kinds yet derives no leg.
+/// A transition replacement (`replacement_transition_addr` nonzero) derives none: it is one
+/// declared `forward`. A replacement reporting an object only a leg would apply is refused, as is
+/// a leg whose executor is missing or zero and a package that is neither kind yet derives no leg.
 fn derive_executor_legs(
     core: &toml::value::Table,
     ctms: &[(Address, &toml::value::Table)],
@@ -311,7 +307,6 @@ fn derive_executor_legs(
     let mut infrastructure = None;
     let mut transition = None;
     let mut ctm_executor = None;
-    let mut bootstrap = None;
     let mut replacement = None;
     for (proxy, body) in ctms {
         let read = |key: &str| {
@@ -321,7 +316,6 @@ fn derive_executor_legs(
             (&mut infrastructure, "ctm_infrastructure_transition_addr"),
             (&mut transition, "ctm_transition_addr"),
             (&mut ctm_executor, "ctm_upgrade_executor_addr"),
-            (&mut bootstrap, "bootstrap_migration_addr"),
             (&mut replacement, "replacement_transition_addr"),
         ] {
             if let Some(address) = read(key)? {
@@ -334,25 +328,6 @@ fn derive_executor_legs(
         }
     }
 
-    if let Some(migration) = bootstrap {
-        anyhow::ensure!(
-            replacement.is_none(),
-            "the CTM prepare reports both a bootstrap migration ({migration:#x}) and a \
-             replacement transition: one package is one kind"
-        );
-        for (key, object) in [
-            ("ctm_infrastructure_transition_addr", infrastructure),
-            ("ctm_transition_addr", transition),
-        ] {
-            if let Some(object) = object {
-                anyhow::bail!(
-                    "the bootstrap edge {migration:#x} derives no executor leg, but its CTM \
-                     prepare reports {key} {object:#x}, which nothing in the edge would apply"
-                );
-            }
-        }
-        return Ok(Vec::new());
-    }
     if let Some(replacement) = replacement {
         for (key, object) in [
             ("core_transition_addr", core_transition),
@@ -410,8 +385,7 @@ fn derive_executor_legs(
     anyhow::ensure!(
         !legs.is_empty(),
         "the prepares report no core transition, no CTM infrastructure transition and no CTM \
-         transition, and the package is neither a bootstrap edge nor a transition replacement: \
-         it upgrades nothing"
+         transition, and the package is not a transition replacement: it upgrades nothing"
     );
     Ok(legs)
 }
@@ -420,9 +394,7 @@ fn derive_executor_legs(
 ///
 /// Each TOML's `[governance_calls] calls` is one `governanceExecuteCalls` (legacy Governance) or
 /// `governanceExecuteCallsDirect` (PUH) invocation signed by `sender` (the governance owner), so
-/// they merge into one governance Safe bundle. A bootstrap bundle's last call is
-/// `RegistryBootstrapMigration.validateApplied()`, so an incomplete edge reverts the replay
-/// itself. Right after a registry package's bundle runs, the fork is also held against the whole
+/// they merge into one governance Safe bundle. Right after a registry package's bundle runs, the fork is also held against the whole
 /// state it must have left ([`expect_applied`]), so a bundle that executes without landing fails
 /// the command here.
 /// Returns the resolved governance contract address for diagnostics.
@@ -1178,10 +1150,9 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// (the in-memory PUH/Guardians wiring and the CTM `acceptOwnership()` normalization) into a
 /// single ecosystem TOML at `dst`.
 ///
-/// The merger COMPOSES nothing. The one bundle is, in order: the extras (they must precede a
-/// bootstrap's `ctm.transferOwnership(migration)`, which assumes governance already owns the
-/// CTM), the core prepare's declared calls, the DERIVED executor legs ([`derive_executor_legs`]:
-/// one contiguous run in canonical order, none for a bootstrap or a replacement), then the CTM
+/// The merger COMPOSES nothing. The one bundle is, in order: the extras, the core prepare's
+/// declared calls, the DERIVED executor legs ([`derive_executor_legs`]: one contiguous run in
+/// canonical order, none for a replacement), then the CTM
 /// prepare's declared calls. Every call other than a leg is declared in `external_actions` with
 /// phase `governance`; a prepare bundle carrying a call the artifact does not name fails the
 /// merge (`check_bundle_provenance`). The legs need no summary table of their own: the verifier
@@ -1774,7 +1745,6 @@ mod tests {
         let mut all: Vec<(&str, Address)> = vec![
             ("ctm_transition_addr", Address::ZERO),
             ("ctm_infrastructure_transition_addr", Address::ZERO),
-            ("bootstrap_migration_addr", Address::ZERO),
             ("ctm_upgrade_executor_addr", CTM_EXECUTOR),
         ];
         for (key, address) in entries {
@@ -1859,37 +1829,6 @@ mod tests {
         );
     }
 
-    /// A bootstrap edge derives no leg: its core transition rides the bootstrap's own sequence.
-    #[test]
-    fn a_bootstrap_derives_no_leg() {
-        let legs = derive(
-            core_body(Some(CORE_TRANSITION)),
-            Some(ctm_body(&[(
-                "bootstrap_migration_addr",
-                Address::repeat_byte(0x55),
-            )])),
-        )
-        .unwrap();
-        assert!(legs.is_empty());
-    }
-
-    /// A bootstrap reporting a CTM-domain object would ship an object nothing applies.
-    #[test]
-    fn a_bootstrap_with_a_ctm_object_is_refused() {
-        for key in ["ctm_transition_addr", "ctm_infrastructure_transition_addr"] {
-            let err = derive(
-                core_body(None),
-                Some(ctm_body(&[
-                    ("bootstrap_migration_addr", Address::repeat_byte(0x55)),
-                    (key, TRANSITION),
-                ])),
-            )
-            .unwrap_err();
-            assert!(err.to_string().contains("derives no executor leg"), "{err}");
-            assert!(err.to_string().contains(key), "{err}");
-        }
-    }
-
     /// A replacement derives no leg: its `ctm_transition_addr` is the replacement, which its one
     /// declared `forward` installs.
     #[test]
@@ -1934,19 +1873,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_bootstrap_beside_a_replacement_is_refused() {
-        let err = derive(
-            core_body(None),
-            Some(ctm_body(&[
-                ("bootstrap_migration_addr", Address::repeat_byte(0x55)),
-                ("replacement_transition_addr", TRANSITION),
-            ])),
-        )
-        .unwrap_err();
-        assert!(err.to_string().contains("one package is one kind"), "{err}");
-    }
-
     /// A leg whose executor is missing or zero has nowhere to be sent.
     #[test]
     fn a_leg_without_its_executor_is_refused() {
@@ -1976,7 +1902,7 @@ mod tests {
         );
     }
 
-    /// Neither a bootstrap nor a replacement, and no object to apply: it upgrades nothing.
+    /// Not a replacement, and no object to apply: it upgrades nothing.
     #[test]
     fn a_package_with_no_leg_is_refused() {
         let err = derive(core_body(None), Some(ctm_body(&[]))).unwrap_err();
@@ -2011,9 +1937,7 @@ mod tests {
         crate::common::governance_calls::decode_calls(hex).unwrap()
     }
 
-    /// The one bundle's order: the merger's extras first — a bootstrap's
-    /// `ctm.transferOwnership(migration)` assumes governance already accepted the CTM — then the
-    /// core prepare's calls, the derived legs as one contiguous run, then the CTM prepare's calls.
+    /// The one bundle's order: the merger's extras first, then the core prepare's calls, the derived legs as one contiguous run, then the CTM prepare's calls.
     /// Every call but the legs is declared, the extras included, and no summary table is added.
     #[test]
     fn the_merged_bundle_runs_extras_core_legs_then_ctm() {
@@ -2175,32 +2099,6 @@ mod tests {
             ]
         );
     }
-
-    /// A bootstrap merge derives no leg, so the bundle is the extras followed by the prepares'
-    /// declared calls.
-    #[test]
-    fn a_bootstrap_merge_derives_no_executor_leg() {
-        let extra = call(0xe1, &[0x01]);
-        let ctm = call(0xd1, &[0x03]);
-        let doc = merge_prepare_outputs(
-            prepare_output(core_body(Some(CORE_TRANSITION)), &[]),
-            vec![(
-                Address::repeat_byte(0x77),
-                prepare_output(
-                    ctm_body(&[("bootstrap_migration_addr", Address::repeat_byte(0x55))]),
-                    std::slice::from_ref(&ctm),
-                ),
-            )],
-            &[ExtraGovernanceCall {
-                label: "extra",
-                authority: "protocol governance",
-                call: extra.clone(),
-            }],
-        )
-        .unwrap();
-        let bundle = merged_bundle(&doc);
-        assert_eq!(targets_and_data(&bundle), targets_and_data(&[extra, ctm]));
-    }
 }
 
 #[cfg(test)]
@@ -2232,8 +2130,7 @@ mod release_script_tests {
         assert!(help.contains("--upgrade-input-path"));
     }
 
-    /// The Foundry full-flow upgrade test of the default edge (`UpgradeTest_Local`, the registry
-    /// bootstrap) must run the scripts this command prepares with by default: its CTM test subclass
+    /// The Foundry full-flow upgrade test of the default edge (`UpgradeTest_Local`) must run the scripts this command prepares with by default: its CTM test subclass
     /// extends the default CTM script, and it runs the default core script (or a subclass). A
     /// release that changes a default here fails this until that test is moved onto the new
     /// scripts too.

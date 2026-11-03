@@ -59,24 +59,6 @@ error BatchHashMismatch(bytes32 expected, bytes32 actual);
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x41c329f7
 error BatchTimestampGreaterThanLastL2BlockTimestamp();
-// 0x63506488
-error BootstrapAlreadyExecuted();
-// 0x81ded943
-error BootstrapAuthorityNotHeld(address target, address actualOwner);
-// 0xb772460f
-error BootstrapExecutorNotBound(address executor, address expectedTarget, address actualTarget);
-// 0x00fcba27
-error BootstrapExecutorOwnerMismatch(address executor, address expectedOwner, address actualOwner);
-// 0x8a593161
-error BootstrapNominationPending(address target, address pendingOwner);
-// 0x447aee1e
-error BootstrapNotYetExecuted();
-// 0x24c8e294
-error BootstrapReleaseNotInstalled(address expected, address actual);
-// 0x5f5dd61c
-error BootstrapServerNotifierNotBound(address expected, address actual);
-// 0xdc145e4f
-error BootstrapServerNotifierRowMissing();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
@@ -171,8 +153,6 @@ error GasPerPubdataMismatch();
 error GenesisBatchHashZero();
 // 0xd356e6ba
 error HashedLogIsDefault();
-// 0x0b08d5be
-error HashMismatch(bytes32 expected, bytes32 actual);
 // 0xf11438d9
 error IMTAlreadyInitialized();
 // 0x62f8ffe2
@@ -402,6 +382,8 @@ error QueueIsEmpty();
 error RecoverToL1NotSupported();
 // 0xab143c06
 error Reentrancy();
+// 0x209041bb
+error RegistryAuthorityNotHeld(address target, address actualOwner);
 // 0xcb530847
 error RegistryDuplicateFacetRow(address facet);
 // 0x3e28bae4
@@ -410,12 +392,20 @@ error RegistryDuplicateProxyRow(address proxy);
 error RegistryDuplicateSelector(bytes4 selector);
 // 0xba5f0dd8
 error RegistryEmptySelectors(address facet);
+// 0x7f0cb258
+error RegistryExecutorNotBound(address executor, address expectedTarget, address actualTarget);
+// 0x13b9b4bd
+error RegistryExecutorOwnerMismatch(address executor, address expectedOwner, address actualOwner);
 // 0xd79000b2
 error RegistryInventoryLengthMismatch(uint256 expected, uint256 actual);
 // 0xb40929f4
 error RegistryMemberHasNoFixedAddress(uint256 member);
+// 0x428770d5
+error RegistryNominationPending(address target, address pendingOwner);
 // 0xef72ee1a
 error RegistrySelfEdgeProxyRow(address proxy);
+// 0xef9c6325
+error RegistryServerNotifierNotBound(address expected, address actual);
 // 0xe89c554c
 error RegistryTargetHasNoCode(address target);
 // 0x1f20dafa

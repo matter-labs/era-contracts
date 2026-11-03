@@ -14,6 +14,7 @@ import {
     AccessToFunctionDenied,
     NoCallsProvided,
     NotARestriction,
+    OnlySelfAllowed,
     RestrictionWasAlreadyPresent,
     RestrictionWasNotPresent
 } from "contracts/common/L1ContractErrors.sol";
@@ -59,6 +60,15 @@ contract ChainAdminTest is Test {
 
         vm.prank(address(chainAdmin));
         chainAdmin.addRestriction(address(dummyRestriction));
+    }
+
+    /// @notice Restriction management is reachable only through the admin's own `multicall`.
+    function test_addRestrictionRevertNotSelf() public {
+        vm.prank(owner);
+        vm.expectRevert(OnlySelfAllowed.selector);
+        chainAdmin.addRestriction(address(dummyRestriction));
+
+        assertFalse(chainAdmin.isRestrictionActive(address(dummyRestriction)));
     }
 
     function test_addRestrictionRevertInvalidRestriction() public {

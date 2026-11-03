@@ -35,13 +35,19 @@ Finished, and described where it now lives:
   write-once objects, in canonical order. Each call is a function of an (executor, object) pair the
   prepares report; the Rust merger derives those calls and composes nothing else. Spec:
   `protocol-docs/ecosystem-upgrade-coordination.md`.
-- **`UpgradeStageValidator` and `GovernanceUpgradeTimer` are deleted.** The bootstrap's
-  `migrate()` and `validateApplied()` check its preconditions and completion themselves.
-- **The ServerNotifier is an ordinary CTM-domain row.** After the bootstrap's one-time handover
-  (rendered from live state, `CTMUpgrade_v35.serverNotifierHandoverCalls`) no prepare emits an
-  admin call for it.
-- **`ProposedUpgrade` is gone.** The engines read the transition (`upgradeFromTransition`) or the
-  migration (`upgradeFromBootstrap`); nothing is repackaged into an intermediate struct.
+- **`UpgradeStageValidator` and `GovernanceUpgradeTimer` are deleted.** The executors and the
+  write-once objects check an upgrade's preconditions and completion themselves.
+- **The pre-registry bootstrap edge is deleted (v36, EVM-1644).** `RegistryBootstrapMigration`,
+  `RegistryBootstrapSequence`, `BootstrapUpgrade`, `BootstrapManifest`, the CTM's legacy cut-taking
+  commit and chain entrypoint (`setNewVersionUpgrade`, `setUpgradeDiamondCut`,
+  `upgradeChainFromVersion(uint256,uint256,DiamondCutData)`) and its `upgradeCutHash` /
+  `protocolVersionVerifier` / `upgradeCutDataBlock` views are gone; a v36 CTM does not bring a
+  pre-v35 chain across.
+- **The ServerNotifier is an ordinary CTM-domain row.** No prepare emits an admin call for it. The
+  bootstrap's one-time handover (`serverNotifierHandoverCalls`, the `[ctm_admin_calls]` output
+  section) was deleted with the edge in v36.
+- **`ProposedUpgrade` is gone.** The engine reads the transition (`upgradeFromTransition`);
+  nothing is repackaged into an intermediate struct.
 - **`CTMUpgradeBase` and `DefaultL2UpgradeStrategy` are gone**; the L2 side a version authors is
   one `authorL2Side` result.
 - **Objects carry no codehash pins.** Every object and member is a plain address, the chain
@@ -52,18 +58,19 @@ Finished, and described where it now lives:
 
 ## Batch 1: finish the deletion that current contracts already enable — implemented
 
-- The committed cut is READ from the object that composes it — `RegistryBootstrapMigration.upgradeCut()`
-  for the bootstrap edge, the transition's composer for a recurring one. The script-side proposal,
-  L2 transaction and delegate-calldata composition are gone.
-- The equivalence evidence is field-level and independent: the bootstrap unit suite builds the
-  expected proposal and transaction from the manifest inputs (`RegistryBootstrapMigration.t.sol`).
-- `AdminFunctions.upgradeChainFromCTM` selects the cut-reading entrypoint first
-  (`UpgradeChainCall.requiresCut`) and reconstructs a cut only for a pre-bootstrap chain.
-  `DefaultChainUpgrade.executeUpgrade` is deleted (the chain's `executeUpgrade` is
+- The committed cut is READ from the object that composes it — the transition's composer. The
+  script-side proposal, L2 transaction and delegate-calldata composition are gone (and so, in v36,
+  is the bootstrap edge's `RegistryBootstrapMigration.upgradeCut()`).
+- The equivalence evidence was field-level and independent: the bootstrap unit suite built the
+  expected proposal and transaction from the manifest inputs (`RegistryBootstrapMigration.t.sol`,
+  deleted with the edge in v36).
+- `AdminFunctions.upgradeChainFromCTM` encodes only the cut-reading entrypoint (`UpgradeChainCall`,
+  which refuses a chain below v35); the cut-taking path (`requiresCut`) and the reconstruction of a
+  cut for a pre-bootstrap chain are deleted in v36. `DefaultChainUpgrade.executeUpgrade` is deleted (the chain's `executeUpgrade` is
   `onlyChainTypeManager`, so it could not succeed).
 - The output's `diamond_cut_data` is retired; the field is optional in the v31 verifier (shipped
   v31–v33 artifacts carry it). `force_deployments_data` and `chain_upgrade_diamond_cut` stay: both
-  have live consumers (new-Gateway bring-up; the anvil bootstrap chain leg).
+  have live consumers (new-Gateway bring-up; the upgrade integration tests).
 - Unchanged release members are reused by CODE IDENTITY: the prepare probes what the current
   sources produce (a local, never-broadcast deployment with this run's constructor arguments — an
   artifact's `deployedBytecode` has immutable slots zeroed) and keeps the live member when they
@@ -71,18 +78,18 @@ Finished, and described where it now lives:
   per version), and when every member is reused the transition derives an empty L1 delta by value;
   only an infrastructure-only edge, whose release manifest is identical, reuses the live release
   object. `DefaultCoreUpgrade` deploys or reuses every L1 ecosystem implementation against the live
-  one the same way, so a version script lists only what it changes; `CoreUpgrade_v35` keeps only
-  the bootstrap's own deployment (the core executor).
+  one the same way, so a version script lists only what it changes (`CoreUpgrade_v35`, retired with the v36
+  bump, kept only the bootstrap's own deployment, the core executor).
 - Replacing a live member is a change of SCOPE and must be INTENDED: the prepare refuses to replace
   any member the version does not name in `changedReleaseMembers()`, and any ecosystem
-  implementation the version does not declare. The v34 -> v35 bootstrap declares the whole set,
-  since it authors a complete release for a pre-registry ecosystem — the genesis engine
-  (`L1GenesisUpgrade`) included: the pre-v35 one lacks the entrypoint the v35 Admin facet
+  implementation the version does not declare. The v34 -> v35 bootstrap (deleted in v36) declared the
+  whole set, since it authored a complete release for a pre-registry ecosystem — the genesis
+  engine (`L1GenesisUpgrade`) included: the pre-v35 one lacks the entrypoint the v35 Admin facet
   calls, so a release that kept it could create no chain.
 - A registry-era CTM's members (facets, `DiamondInit`, verifier, genesis engine) come from its
   current RELEASE, never from a chain: a chain at the CTM's version may not exist yet after a
-  commit, and a chain cannot show `DiamondInit` at all. Only a pre-registry CTM (the bootstrap
-  source) is discovered through a chain.
+  commit, and a chain cannot show `DiamondInit` at all. Only a pre-registry CTM (the source of the
+  bootstrap edge, deleted in v36) is discovered through a chain.
 - Two findings fixed here: a hash taken from a build artifact while the object is deployed from
   the script's own compiled copy can differ (CBOR metadata records the remappings), so registry
   objects are deployed from the same artifact a reviewer reproduces
@@ -123,7 +130,7 @@ No new permanent registries and no deployment-inventory redesign in this release
   prepare script decides is a candidate; an action an existing object already describes is not.
 - Discover addresses through EXISTING getters rather than reconstructing them (`DiamondInit` is
   the worked example). `setAddressesBasedOnCTM` and `setAddressesBasedOnBridgehub` shrink exactly
-  as far as existing getters reach; discovery stays for the legacy bootstrap and for reports.
+  as far as existing getters reach; discovery stays for reports (the legacy bootstrap it also served is deleted in v36).
 - Remove a script only where its responsibility ALREADY has a replacement. "The operator will
   remember" is not a replacement.
 
@@ -135,8 +142,7 @@ from a getter the deployed contracts expose.
 
 ## Batch 3: move cross-contract follow-up work into audited execution
 
-Inventory all declared external actions and classify each by reason: bootstrap authorization,
-upgrade-specific wiring, governance self-upgrade, or Gateway operations.
+Inventory all declared external actions and classify each by reason: upgrade-specific wiring, governance self-upgrade, or Gateway operations.
 
 For wiring intrinsic to an upgrade, prefer an existing implementation's fixed initializer when it
 has the required authority and can express the complete action. Otherwise define a narrowly scoped,
@@ -178,7 +184,7 @@ execute an individual-contract upgrade without legacy bootstrap preparation. Tes
 unauthorized/repeated finalization, incorrect bindings, failed handover and the absence of an
 exposed initialization window.
 
-## Batch 5: collapse production preparation and isolate bootstrap
+## Batch 5: collapse production preparation
 
 After batches 2–4, use one reusable prepare client for the existing objects. Inputs are explicit
 changed members, new artifact references, schedule and any pinned version-specific code. Read
@@ -189,14 +195,14 @@ The recurring output should identify source/target objects, implementation/codeh
 required authorities, the governance calls and unresolved external actions. Reporting may format
 on-chain facts; it must not decide execution order or recreate the payload.
 
-Keep the pre-registry entry edge in a small named legacy adapter. Do not delete its cut-taking
-ABI, handovers or frozen tests while supported chains still require them.
+The pre-registry entry edge, its cut-taking ABI, handovers and frozen tests are deleted in v36
+(EVM-1644), so there is no legacy adapter to isolate.
 
 Delete or shrink: the `DefaultCTMUpgrade` / `DefaultCoreUpgrade` inheritance layers, empty version
 subclasses, `UpgradeHelperLib` and bundle-merging helpers with no consumers. Keep generic Safe
 serialization, signer handling and simulation.
 
-Gate: production preparation must demonstrate bootstrap, recurring no-Gateway, individual-member,
+Gate: production preparation must demonstrate recurring no-Gateway, individual-member,
 L1-only and mixed L1/L2 flows. Assert that every submitted call is an executor leg of the one
 canonical run or an explicitly required external action.
 

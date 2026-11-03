@@ -74,10 +74,7 @@ that order or not at all (see
 [the coordination doc](../protocol-docs/ecosystem-upgrade-coordination.md)). A core-only upgrade needs no CTM leg.
 Every call but a leg is declared in `external_actions`, and each prepare must emit its declared actions in
 declaration order. The merge refuses a package that would leave a reported object unapplied or that upgrades
-nothing, and a leg whose executor is missing or zero. The bootstrap edge derives no leg: its bundle is the list
-`RegistryBootstrapSequence.actions()` derives (the core transition included), ending in the edge's completion
-check `validateApplied()`, so an edge that does not complete reverts the whole bundle. `ecosystem
-upgrade-governance` replays that bundle on a fork as the governance owner, then holds the fork against everything a
+nothing, and a leg whose executor is missing or zero. `ecosystem upgrade-governance` replays that bundle on a fork as the governance owner, then holds the fork against everything a
 registry package must leave behind, part of which the contracts check themselves: the CTM at the
 target version and release with the transition committed for its departure (the release at the CTM's version),
 every row's proxy at its `implNew`, the CTM, its ProxyAdmin and its ServerNotifier owned by the CTM executor with
@@ -87,8 +84,9 @@ expectation fails the command.
 
 A fresh ecosystem (`ecosystem init`, or `hub init` + `ctm init`) is born into the registry model: the
 deployer creates the core executor and the CTM executor, hands them the ProxyAdmins, the CTM and the
-ServerNotifier, and nominates the ecosystem governance, which `hub init` / `ctm init` accept. Its first upgrade
-is therefore an ordinary one, never the bootstrap edge. Owner operations on its CTM go through
+ServerNotifier, and nominates the ecosystem governance, which `hub init` / `ctm init` accept. Every upgrade of
+it is an ordinary one; the one-time bootstrap edge that brought pre-registry CTMs into the model was retired in
+v36, so a v36 CTM does not bring a pre-v35 chain across. Owner operations on its CTM go through
 `CTMUpgradeExecutor.forward`.
 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
@@ -151,10 +149,10 @@ any Safe-bundle-aware executor.
 
 ## Verifying a registry-driven upgrade before it is signed
 
-`ecosystem verify-bootstrap` (alias `verify-package`) is the verifier for current packages. It
-reads the merged `ecosystem.toml` and decides from its calldata whether it drives an upgrade (executor
-legs), the one-time bootstrap edge (`migrate()`) or a transition replacement (a `forward` carrying
-`replaceUpgradeTransition`). It refuses a package that is none of them or mixes them. For an upgrade it
+`ecosystem verify-bootstrap` (alias `verify-package`) is the verifier for current packages; its name predates
+the retirement of the one-time bootstrap edge in v36. It reads the merged `ecosystem.toml` and decides from its
+calldata whether it drives an upgrade (executor legs) or a transition replacement (a `forward` carrying
+`replaceUpgradeTransition`). It refuses a package that is neither or mixes them. For an upgrade it
 recovers each leg's executor and object from the calldata and reconciles them with the prepare
 summaries (`[core.registry]`, `[ctms.*.registry]`), both ways: a reported object without its leg, a
 leg without its reported object, a substituted object or executor, a duplicated leg, a leg carrying
@@ -175,13 +173,11 @@ It answers two questions and keeps them apart.
 
 **What does this upgrade do?** is answered by reviewing the objects the package names — the
 Core-domain and CTM-domain `ProxyUpgradeTransition`s and the `CTMTransition` its legs apply, the
-release pair, and the domain executors it runs through (for the bootstrap edge also the migration
-and the sequence its calls are derived from). Each `ProxyUpgradeTransition`'s domain is held
+release pair, and the domain executors it runs through. Each `ProxyUpgradeTransition`'s domain is held
 against the domain of the leg that applies it, fixed by the leg rather than read from the object. Each is held against its own
 construction: the reviewed creation code, run on that object's reviewed constructor arguments,
 must land at the object's address. For a write-once object those arguments are the manifest it
-serves; for an executor they are the ones its record states (below), and for the bootstrap
-sequence the migration and core transition the package names — never the object's own getters,
+serves; for an executor they are the ones its record states (below) — never the object's own getters,
 since a genuine executor built for an attacker's owner answers them exactly like the reviewed one.
 That is what establishes the audited CONSTRUCTOR produced it, which a runtime codehash cannot (and
 the lifecycle objects set immutables, so no codehash identifies them at all) — so it needs the
@@ -192,14 +188,11 @@ and `--create2-salt` adds reviewer-supplied ones (the env's `[contracts] create2
 `[create2_factory_salts]` entries).
 An executor is re-derived from its EXECUTOR RECORD, which is mandatory: the `[upgrade_executors]`
 table the run that deployed it wrote (the `ecosystem init` / `ctm init` forge outputs
-`script-out/output-deploy-l1.toml` / `output-deploy-ctm.toml`, or a bootstrap package, which carries
-its own), passed with the repeatable `--executor-record`. The record's salt and ORIGINAL constructor
+`script-out/output-deploy-l1.toml` / `output-deploy-ctm.toml`), passed with the repeatable `--executor-record`. The record's salt and ORIGINAL constructor
 arguments re-derive the address; its immutable bindings are still held against the package's values,
 and its initial owner is only reported — a fresh ecosystem constructs its executors for the deployer
 and nominates governance. An executor without a record is unverified, which is an error. The live
-owner and pending owner are checked separately, against the reviewed governance. A bootstrap also requires the CTM's
-Bridgehub to be owned by the manifest's governance, since the CTM takes `freezeChain` / `unfreezeChain` from the
-Bridgehub's owner too ({protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain}). Each write-once object's live code is
+owner and pending owner are checked separately, against the reviewed governance. Each write-once object's live code is
 also compared with the reviewed build's deployed bytecode of its contract. Every release the package installs is
 held against the reviewed genesis: `genesisBatchHash` against the `genesis_root` of
 `configs/genesis/zksync-os/latest.json`, `genesisIndexRepeatedStorageChanges` against zero, and
@@ -214,8 +207,7 @@ arriving release's system-proxy shell is compared with the departing one's, comp
 stripped: a logic change fails unless the edge ships a delegate the reviewed commit builds other
 than the stock `L2DefaultUpgrade`, which is then reported for the reviewer to confirm. The
 release's own `validate()` is called as well: it reads no state, and it runs on chain when a
-transition is built over the release, in the bootstrap's `validate()` and when the CTM installs the
-release, so a revert — a codeless `diamondInit`, `genesisUpgrade`, verifier or facet
+transition is built over the release and when the CTM installs the release, so a revert — a codeless `diamondInit`, `genesisUpgrade`, verifier or facet
 (`RegistryTargetHasNoCode`), a facet with no selectors (`RegistryEmptySelectors`), a selector two
 facets route (`RegistryDuplicateSelector`), or a facet that does not answer `selectors()` (a revert
 without data) — fails the run before the vote rather than governance's execution.
@@ -225,17 +217,17 @@ is compared with the reviewed artifact of each contract its role admits, byte fo
 artifact's immutable slots (`immutableReferences`) — which proves the code, not the values its
 constructor wrote into those slots (see the construction records below):
 
-| Member                                                     | Must run                                                                                                                                                                                                                                                                     |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a release's genesis facets                                 | `AdminFacet`, `GettersFacet`, `MailboxFacet`, `ExecutorFacet`, `MigratorFacet` or `CommitterFacet`                                                                                                                                                                           |
-| a release's `diamondInit` / `genesisUpgrade`               | `DiamondInit` / `L1GenesisUpgrade`                                                                                                                                                                                                                                           |
-| a release's `verifier`                                     | `MultiProofTestnetVerifier`, `MultiProofVerifier`, `ZKsyncOSTestnetVerifier` or `ZKsyncOSVerifier`, and each sub-verifier it names through `INNER_VERIFIER` / `AIRBENDER_VERIFIER` / `ZISK_RANGE_VERIFIER` / `PLONK_VERIFIER` the reviewed contract of its place in the tree |
-| a transition's / the bootstrap migration's `upgradeEngine` | `DefaultUpgrade` / `BootstrapUpgrade`                                                                                                                                                                                                                                        |
-| an L2 plan's `delegateComposer`                            | `L2DefaultDelegateCalldataComposer`                                                                                                                                                                                                                                          |
-| each proxy row's `implNew`                                 | the contract of the row's slot (`MultisigCommitter` or `ValidatorTimelock` for the timelock)                                                                                                                                                                                 |
+| Member                                       | Must run                                                                                                                                                                                                                                                                     |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a release's genesis facets                   | `AdminFacet`, `GettersFacet`, `MailboxFacet`, `ExecutorFacet`, `MigratorFacet` or `CommitterFacet`                                                                                                                                                                           |
+| a release's `diamondInit` / `genesisUpgrade` | `DiamondInit` / `L1GenesisUpgrade`                                                                                                                                                                                                                                           |
+| a release's `verifier`                       | `MultiProofTestnetVerifier`, `MultiProofVerifier`, `ZKsyncOSTestnetVerifier` or `ZKsyncOSVerifier`, and each sub-verifier it names through `INNER_VERIFIER` / `AIRBENDER_VERIFIER` / `ZISK_RANGE_VERIFIER` / `PLONK_VERIFIER` the reviewed contract of its place in the tree |
+| a transition's `upgradeEngine`               | `DefaultUpgrade`                                                                                                                                                                                                                                                             |
+| an L2 plan's `delegateComposer`              | `L2DefaultDelegateCalldataComposer`                                                                                                                                                                                                                                          |
+| each proxy row's `implNew`                   | the contract of the row's slot (`MultisigCommitter` or `ValidatorTimelock` for the timelock)                                                                                                                                                                                 |
 
 A release may carry over the verifier already in force where it departs from — the departing
-release's, or for the bootstrap the one the CTM's chains at the departing version run — even when
+release's — even when
 an earlier build produced it: the prepare pins the live verifier unless the version deploys one, and
 an unchanged verifier is not something the upgrade changes. Every other member must be this
 build's. `ZiskVerifier`'s snarkJS Plonk backend is built outside this repository, so no reviewed
@@ -252,7 +244,6 @@ GWAssetTracker), its system-proxy shell `SystemContractProxy`'s, a plan's delega
 records each contract it deploys through `deploySimpleContract` or as a proxy implementation
 (`[member_deployments]`, merged under `[core]` and `[ctms.*]`: the contract, the CREATE2 factory, the
 salt and the exact constructor arguments). A release member the departing release does not name
-(at the bootstrap: anything but the verifier the chains run, and the sub-verifiers its tree names),
 every engine and composer, each row's `implNew` and the implementation behind a proxy the package
 introduces must have one: the reviewed creation code run on the recorded arguments under the
 recorded salt, through the deterministic factory, must land at the member, and the arguments must be
@@ -278,7 +269,7 @@ record claiming the expected value for a member built over another does not re-d
 no check consulted are listed for information.
 
 **Every proxy row names the proxy of its slot.** Row `i` of a Core-domain inventory is
-`L1EcosystemContract` member `i`, of a CTM-domain one or the bootstrap's `CTMContract` member `i`,
+`L1EcosystemContract` member `i`, of a CTM-domain one `CTMContract` member `i`,
 and that member's proxy is discovered on chain: the Bridgehub (from the CTM's `BRIDGE_HUB()`, or the
 core prepare's `bridgehub_proxy_addr` for a core-only package naming no CTM) and its `assetRouter()`, the router's `L1_NULLIFIER()` and
 `nativeTokenVault()`, the Bridgehub's `messageRoot()`, `l1CtmDeployer()`, `chainAssetHandler()` and
@@ -297,7 +288,7 @@ getter (unchanged across the swap), else the inventory row of the slot they name
 the package reports for that slot (`[ctms.*.state_transition]`) once it is shown to run the
 reviewed `TransparentUpgradeableProxy`, with the CTM-domain ProxyAdmin in its EIP-1967 admin slot
 and an implementation in its EIP-1967 implementation slot that runs the slot's reviewed contract —
-a singleton the upgrade introduces, like the v35 bootstrap's `L1InteropFeeManager`. Such a proxy's
+a singleton the upgrade introduces, such as an `L1InteropFeeManager`. Such a proxy's
 `initialize` calldata is not reviewed. `BRIDGE_HUB` has no fallback. A zero value, or one nothing
 establishes, fails the run; `PERMISSIONLESS_VALIDATOR` is written into every new chain once. The
 implementation's construction record is held against the same values (its `_bridgehub` against the
@@ -334,12 +325,7 @@ swapped order or another call between two legs fails the run. The legs' internal
 deliberately not re-derived — the executors derive them on chain from the same pinned objects. Every
 other call must be a declared governance external action, matched one for one and in declared order,
 with every declaration present, and none may reach the upgrade's authorities (the executors, the
-objects, the CTM, either ProxyAdmin) whether declared or not. For the
-bootstrap edge the bundle must END with the run `actions()` of the construction-verified sequence
-derives, in order — whose last call is `validateApplied()` on the migration, so a failing completion
-check reverts the whole bootstrap — and every call before it must be a declared external action to
-a target outside the edge's authorities: an extra call to the CTM, a `ProxyAdmin`, an executor or an
-object is an error whether declared or not. A replacement's bundle must carry the one `forward`,
+objects, the CTM, either ProxyAdmin) whether declared or not. A replacement's bundle must carry the one `forward`,
 sent to the executor that owns the CTM, and nothing else may reach the CTM or its executor.
 
 Around those it checks what the objects cannot answer for themselves: authority bound where the
@@ -347,11 +333,8 @@ review says (governance owning each executor with no nomination outstanding, the
 to the reviewed CTM and CTM-domain ProxyAdmin, the core executor to the ecosystem ProxyAdmin, no
 binding zero, and each domain still held by its executor), the
 live state the upgrade departs from, and readiness — the L2 factory dependencies published on the
-CTM's supplier, which the CTM's commit requires (and, for the bootstrap edge, the migration's
-`validate()`). Readiness is reported apart
-from anything about value. For the bootstrap edge it also lists, as warnings, every chain on the
-CTM still below the departing version: those chains keep upgrading along the pre-registry edges
-through the CTM's legacy `protocolVersionVerifier` getter.
+CTM's supplier, which the CTM's commit requires. Readiness is reported apart from anything about
+value.
 
 Anything a reviewer could not establish is an ERROR, never a warning: warnings do not fail a run,
 so an unverifiable input reported as one reads, afterwards, exactly like a check that passed.

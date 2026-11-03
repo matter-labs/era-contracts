@@ -1,30 +1,27 @@
 //! What a registry package must have left behind once its governance bundle ran, read from the
 //! fork `ecosystem upgrade-governance` replayed it on. The contracts assert part of it themselves
-//! (the bootstrap's `validateApplied()`, the CTM executor's check of its own commit); this holds
+//! (the CTM executor's check of its own commit); this holds
 //! the whole post-state a second time, so a bundle that executed but did not land is caught here
 //! too (`protocol-docs/ecosystem-upgrade.md#where-each-check-lives`).
 
 use alloy::primitives::Address;
 use alloy::providers::Provider;
 
-use crate::upgrade_verification::constants::CTM_CONTRACT_SERVER_NOTIFIER_SLOT;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::format_semver;
 use super::lifecycle::verify_executor_owners;
-use super::package::{
-    BootstrapPackage, LegKind, RegistryPackage, ReplacementPackage, UpgradePackage,
-};
+use super::package::{LegKind, RegistryPackage, ReplacementPackage, UpgradePackage};
 use super::provenance::tolerate;
 use super::views::{
     CTMReleaseView, CTMTransitionView, CTMUpgradeExecutorView, CoreUpgradeExecutorView, CtmView,
     Ownable2StepView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
-    RegistryBootstrapMigrationView, ServerNotifierView,
+    ServerNotifierView,
 };
 
 /// Holds the live state after `package`'s bundle executed against everything it must have left:
 /// each unmet expectation, and each read that fails, is an ERROR. `governance` is the account
-/// that executed the bundle; a bootstrap holds its executors to its manifest's governance instead.
+/// that executed the bundle.
 pub(crate) async fn verify_applied<P: Provider>(
     provider: &P,
     package: &RegistryPackage,
@@ -34,9 +31,6 @@ pub(crate) async fn verify_applied<P: Provider>(
     match package {
         RegistryPackage::Upgrade(package) => {
             verify_upgrade_applied(provider, package, governance, result).await
-        }
-        RegistryPackage::Bootstrap(package) => {
-            verify_bootstrap_applied(provider, package, result).await
         }
         RegistryPackage::Replacement(package) => {
             verify_replacement_applied(provider, package, governance, result).await
@@ -125,7 +119,7 @@ async fn verify_upgrade_applied<P: Provider>(
     ) else {
         return;
     };
-    expect_ctm_domain_held(provider, result, ctm, ctm_admin, ctm_executor, None).await;
+    expect_ctm_domain_held(provider, result, ctm, ctm_admin, ctm_executor).await;
     if let Some(leg) = package.leg(LegKind::Infrastructure) {
         expect_transition_rows_applied(
             provider,
@@ -138,144 +132,6 @@ async fn verify_upgrade_applied<P: Provider>(
     }
     if let Some(leg) = package.leg(LegKind::Transition) {
         expect_transition_committed(provider, result, ctm, leg.object).await;
-    }
-}
-
-/// Reads, in order: the migration's manifest, `executed()` and `newProtocolVersion()`; the CTM's
-/// version and release, and the release's own version; the CTM domain
-/// ([`expect_ctm_domain_held`]); both executors' owners; the core executor's `PROXY_ADMIN()` and
-/// its owner; the CTM rows, then the core transition's rows.
-async fn verify_bootstrap_applied<P: Provider>(
-    provider: &P,
-    package: &BootstrapPackage,
-    result: &mut VerificationResult,
-) {
-    let migration = RegistryBootstrapMigrationView::new(package.migration, provider);
-    let Some(manifest) = tolerate(
-        migration.getManifest().call().await,
-        result,
-        "the migration's manifest",
-    ) else {
-        return;
-    };
-    match tolerate(
-        migration.executed().call().await,
-        result,
-        "the migration's executed()",
-    ) {
-        Some(true) => result.report_ok("the migration ran"),
-        Some(false) => result.report_error(
-            "the migration reports executed() == false: the bundle did not run the edge",
-        ),
-        None => {}
-    }
-    let ctm = CtmView::new(manifest.ctm, provider);
-    let target = tolerate(
-        migration.newProtocolVersion().call().await,
-        result,
-        "the migration's newProtocolVersion()",
-    );
-    let version = tolerate(
-        ctm.protocolVersion().call().await,
-        result,
-        "the CTM's protocolVersion()",
-    );
-    if let (Some(target), Some(version)) = (target, version) {
-        expect_equal(
-            result,
-            "the CTM's protocol version",
-            format_semver(version),
-            format_semver(target),
-            "the edge's target",
-        );
-    }
-    if let Some(release) = tolerate(
-        ctm.currentRelease().call().await,
-        result,
-        "the CTM's currentRelease()",
-    ) {
-        expect_equal(
-            result,
-            "the CTM's current release",
-            release,
-            manifest.currentRelease,
-            "the manifest's release",
-        );
-        expect_release_at_version(provider, result, release, version).await;
-    }
-
-    let notifier = manifest
-        .ctmProxyUpgrades
-        .get(CTM_CONTRACT_SERVER_NOTIFIER_SLOT)
-        .map(|row| row.proxy);
-    if notifier.is_none() {
-        result.report_error(
-            "the manifest carries no ServerNotifier slot, so the notifier the edge binds cannot \
-             be read",
-        );
-    }
-    expect_ctm_domain_held(
-        provider,
-        result,
-        manifest.ctm,
-        manifest.ctmProxyAdmin,
-        manifest.ctmExecutor,
-        notifier,
-    )
-    .await;
-    verify_executor_owners(
-        provider,
-        result,
-        Some(manifest.governance),
-        "the manifest's governance",
-        &[
-            ("the core executor", manifest.coreExecutor),
-            ("the CTM executor", manifest.ctmExecutor),
-        ],
-    )
-    .await;
-    let eco_admin = tolerate(
-        CoreUpgradeExecutorView::new(manifest.coreExecutor, provider)
-            .PROXY_ADMIN()
-            .call()
-            .await,
-        result,
-        "the core executor's PROXY_ADMIN",
-    );
-    if let Some(admin) = eco_admin {
-        expect_owner(
-            provider,
-            result,
-            "the ecosystem ProxyAdmin",
-            admin,
-            manifest.coreExecutor,
-            "the core executor",
-        )
-        .await;
-    }
-
-    let ctm_rows: Vec<ProxyUpgradeRow> = manifest
-        .ctmProxyUpgrades
-        .into_iter()
-        .filter(|row| !row.implNew.is_zero())
-        .collect();
-    expect_rows_applied(
-        provider,
-        result,
-        "the migration's CTM-domain inventory",
-        &ctm_rows,
-        manifest.ctmProxyAdmin,
-    )
-    .await;
-    if let (Some(core_transition), Some(admin)) = (package.core_transition, eco_admin) {
-        expect_transition_rows_applied(
-            provider,
-            result,
-            "the core transition",
-            core_transition,
-            admin,
-        )
-        .await;
     }
 }
 
@@ -346,8 +202,7 @@ async fn verify_replacement_applied<P: Provider>(
 }
 
 /// The CTM domain landed under `executor`: the CTM owned by it with no nomination, its ProxyAdmin
-/// owned by it, and the ServerNotifier — `expected_notifier` when the package names one, else the
-/// CTM's — bound to the CTM and owned by it with no nomination.
+/// owned by it, and the CTM's ServerNotifier bound to the CTM and owned by it with no nomination.
 ///
 /// Reads, in order: the CTM's owner and pending owner, the ProxyAdmin's owner, the CTM's
 /// `serverNotifierAddress()`, then the notifier's owner, pending owner and `chainTypeManager()`.
@@ -357,7 +212,6 @@ async fn expect_ctm_domain_held<P: Provider>(
     ctm: Address,
     ctm_admin: Address,
     executor: Address,
-    expected_notifier: Option<Address>,
 ) {
     expect_owner(
         provider,
@@ -378,24 +232,14 @@ async fn expect_ctm_domain_held<P: Provider>(
         "the CTM executor",
     )
     .await;
-    let bound = tolerate(
+    let Some(notifier) = tolerate(
         CtmView::new(ctm, provider)
             .serverNotifierAddress()
             .call()
             .await,
         result,
         "the CTM's serverNotifierAddress()",
-    );
-    if let (Some(bound), Some(expected)) = (bound, expected_notifier) {
-        expect_equal(
-            result,
-            "the CTM's ServerNotifier",
-            bound,
-            expected,
-            "the manifest's ServerNotifier",
-        );
-    }
-    let Some(notifier) = expected_notifier.or(bound) else {
+    ) else {
         return;
     };
     expect_owner(
@@ -669,9 +513,7 @@ mod tests {
     use super::super::package::{
         recover_legs, DeadlineChange, LifecycleInputs, RecoveredReplacement,
     };
-    use super::super::views::{AuthoredL2Plan, BootstrapManifest};
     use crate::common::governance_calls::GovernanceCall;
-    use crate::upgrade_verification::constants::CTM_CONTRACTS;
 
     const GOVERNANCE: Address = Address::repeat_byte(0x60);
     const CORE_EXECUTOR: Address = Address::repeat_byte(0xE0);
@@ -679,7 +521,6 @@ mod tests {
     const CORE_TRANSITION: Address = Address::repeat_byte(0xEE);
     const INFRASTRUCTURE: Address = Address::repeat_byte(0x1F);
     const TRANSITION: Address = Address::repeat_byte(0xCC);
-    const MIGRATION: Address = Address::repeat_byte(0x3B);
     const CTM: Address = Address::repeat_byte(0xC7);
     const CTM_ADMIN: Address = Address::repeat_byte(0xA7);
     const ECO_ADMIN: Address = Address::repeat_byte(0xA0);
@@ -954,193 +795,13 @@ mod tests {
         assert_eq!(result.errors, 0, "{:?}", result.error_messages);
     }
 
-    // ───────────────────────── the bootstrap ─────────────────────────
-
-    fn manifest() -> BootstrapManifest {
-        let mut rows = vec![
-            ProxyUpgradeRow {
-                proxy: Address::ZERO,
-                expectedOldImpl: Address::ZERO,
-                implNew: Address::ZERO,
-                callInitializeUpgrade: false,
-            };
-            CTM_CONTRACTS.len()
-        ];
-        rows[CTM_CONTRACTS
-            .iter()
-            .position(|m| *m == "ChainTypeManager")
-            .unwrap()] = row(CTM);
-        rows[CTM_CONTRACT_SERVER_NOTIFIER_SLOT] = row(NOTIFIER);
-        BootstrapManifest {
-            ctm: CTM,
-            expectedProtocolVersion: U256::from(V35),
-            ctmProxyAdmin: CTM_ADMIN,
-            ctmProxyUpgrades: rows,
-            currentRelease: R36,
-            oldProtocolVersionDeadline: U256::MAX,
-            upgradeEngine: Address::repeat_byte(0xEA),
-            l2Plan: AuthoredL2Plan {
-                delegateBytecodeInfo: Bytes::new(),
-                extraBytecodeInfos: Vec::new(),
-                delegateComposer: Address::ZERO,
-            },
-            upgradeTimestamp: U256::ZERO,
-            ctmExecutor: CTM_EXECUTOR,
-            coreExecutor: CORE_EXECUTOR,
-            governance: GOVERNANCE,
-        }
-    }
-
-    fn bootstrap() -> RegistryPackage {
-        RegistryPackage::Bootstrap(BootstrapPackage {
-            core_transition: Some(CORE_TRANSITION),
-            release: R36,
-            migration: MIGRATION,
-            reported_migration: Some(MIGRATION),
-            reported_ctm_executor: Some(CTM_EXECUTOR),
-            reported_ctm: Some(CTM),
-            reported_ctm_proxy_admin: Some(CTM_ADMIN),
-            reported_singletons: Default::default(),
-            ctm_key: "zksync_os".to_string(),
-            calls: Vec::new(),
-            external_actions: Vec::new(),
-            create2_salts: Vec::new(),
-            lifecycle: Default::default(),
-            force_deployments_data: None,
-            executor_records: Default::default(),
-            member_records: Default::default(),
-        })
-    }
-
-    /// The landed edge, in the order `verify_bootstrap_applied` reads it.
-    fn bootstrap_reads() -> Reads {
-        Reads::new()
-            .answer("migration.getManifest", manifest())
-            .answer("migration.executed", true)
-            .answer("migration.newProtocolVersion", U256::from(V36))
-            .answer("ctm.protocolVersion", U256::from(V36))
-            .answer("ctm.currentRelease", R36)
-            .answer("release.protocolVersion", U256::from(V36))
-            .answer("ctm.owner", CTM_EXECUTOR)
-            .answer("ctm.pendingOwner", Address::ZERO)
-            .answer("ctmAdmin.owner", CTM_EXECUTOR)
-            .answer("ctm.serverNotifierAddress", NOTIFIER)
-            .answer("notifier.owner", CTM_EXECUTOR)
-            .answer("notifier.pendingOwner", Address::ZERO)
-            .answer("notifier.chainTypeManager", CTM)
-            .answer("coreExecutor.owner", GOVERNANCE)
-            .answer("coreExecutor.pendingOwner", Address::ZERO)
-            .answer("ctmExecutor.owner", GOVERNANCE)
-            .answer("ctmExecutor.pendingOwner", Address::ZERO)
-            .answer("coreExecutor.PROXY_ADMIN", ECO_ADMIN)
-            .answer("ecoAdmin.owner", CORE_EXECUTOR)
-            .answer("ctmRow.implementation", NEW)
-            .answer("notifierRow.implementation", NEW)
-            .answer("coreTransition.rows", vec![row(PROXY)])
-            .answer("coreRow.implementation", NEW)
-    }
-
-    /// boot-49..55: what `validateApplied` asserts on chain, read again after the replay.
-    #[tokio::test]
-    async fn a_bootstrap_that_did_not_land_fails() {
-        let r = bootstrap_reads;
-        each_unmet_expectation_fails(
-            &bootstrap(),
-            r,
-            vec![
-                (
-                    "not executed",
-                    r().set("migration.executed", false),
-                    "executed() == false",
-                ),
-                (
-                    "version",
-                    r().set("ctm.protocolVersion", U256::from(V35))
-                        .set("release.protocolVersion", U256::from(V35)),
-                    "the CTM's protocol version is v0.35.0, not the edge's target",
-                ),
-                (
-                    "release",
-                    r().set("ctm.currentRelease", STRANGER),
-                    "not the manifest's release",
-                ),
-                (
-                    "release version",
-                    r().set("release.protocolVersion", U256::from(V35)),
-                    "the current release's version",
-                ),
-                (
-                    "CTM left with the migration",
-                    r().set("ctm.owner", MIGRATION),
-                    "the CTM's owner",
-                ),
-                (
-                    "CTM nomination",
-                    r().set("ctm.pendingOwner", CTM_EXECUTOR),
-                    "the CTM's pending owner",
-                ),
-                (
-                    "CTM ProxyAdmin",
-                    r().set("ctmAdmin.owner", MIGRATION),
-                    "the CTM-domain ProxyAdmin's owner",
-                ),
-                (
-                    "notifier re-pointed",
-                    r().set("ctm.serverNotifierAddress", STRANGER),
-                    "not the manifest's ServerNotifier",
-                ),
-                (
-                    "notifier owner",
-                    r().set("notifier.owner", STRANGER),
-                    "the ServerNotifier's owner",
-                ),
-                (
-                    "notifier nomination",
-                    r().set("notifier.pendingOwner", STRANGER),
-                    "the ServerNotifier's pending owner",
-                ),
-                (
-                    "notifier CTM",
-                    r().set("notifier.chainTypeManager", STRANGER),
-                    "the CTM the ServerNotifier serves",
-                ),
-                (
-                    "executor owner",
-                    r().set("ctmExecutor.owner", STRANGER),
-                    "the manifest's governance",
-                ),
-                (
-                    "executor nomination",
-                    r().set("coreExecutor.pendingOwner", STRANGER),
-                    "has a pending owner",
-                ),
-                (
-                    "ecosystem ProxyAdmin",
-                    r().set("ecoAdmin.owner", GOVERNANCE),
-                    "the ecosystem ProxyAdmin's owner",
-                ),
-                (
-                    "CTM row",
-                    r().set("ctmRow.implementation", OLD),
-                    "the migration's CTM-domain inventory's proxy",
-                ),
-                (
-                    "core row",
-                    r().set("coreRow.implementation", OLD),
-                    "the core transition's proxy",
-                ),
-            ],
-        )
-        .await;
-    }
-
     // ───────────────────────── a replacement ─────────────────────────
 
     const REPLACEMENT: Address = Address::repeat_byte(0xB4);
     const DEADLINE: u64 = 1_900_000_000;
 
     fn replacement(deadline: Option<DeadlineChange>) -> RegistryPackage {
-        RegistryPackage::Replacement(Box::new(ReplacementPackage {
+        RegistryPackage::Replacement(ReplacementPackage {
             forward: RecoveredReplacement {
                 index: 0,
                 executor: CTM_EXECUTOR,
@@ -1164,7 +825,7 @@ mod tests {
             reported_new_version: None,
             executor_records: Default::default(),
             member_records: Default::default(),
-        }))
+        })
     }
 
     fn replacement_reads() -> Reads {

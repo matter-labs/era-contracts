@@ -1,75 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.10;
 
-import {Vm} from "forge-std/Vm.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ICTMRelease} from "contracts/upgrades/registry/objects/ICTMRelease.sol";
 
 library GetDiamondCutData {
-    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    // solhint-disable-next-line const-name-snakecase
-    Vm internal constant vm = Vm(VM_ADDRESS);
-
-    error NoLogsFound(bytes32 selector);
-    error NoMatchingLogEntry();
-
-    /// @notice Fetches logs from a specific block with a given topic selector.
-    function _fetchLogsFromBlock(
-        uint256 blockNumber,
-        address contractAddress,
-        bytes32 topicSelector
-    ) internal returns (Vm.EthGetLogs[] memory logs) {
-        bytes32[] memory topics = new bytes32[](1);
-        topics[0] = topicSelector;
-        logs = vm.eth_getLogs(blockNumber, blockNumber, contractAddress, topics);
-    }
-
-    /// @notice Finds a log entry matching the given criteria from recorded logs.
-    function _findLogEntry(
-        Vm.Log[] memory logs,
-        address contractAddress,
-        bytes32 topicSelector
-    ) internal pure returns (Vm.Log memory logEntry) {
-        uint256 logsLength = logs.length;
-        for (uint256 i = 0; i < logsLength; ++i) {
-            Vm.Log memory entry = logs[i];
-            if (entry.emitter == contractAddress && entry.topics.length > 0 && entry.topics[0] == topicSelector) {
-                return entry;
-            }
-        }
-        revert NoMatchingLogEntry();
-    }
-
-    /// @notice Fetches the diamond cut data by reading the on-chain log for the given protocol version.
-    /// @dev This keeps the existing behavior for live scripts where `eth_getLogs` is available.
-    function getDiamondCutData(
-        address ctm,
-        uint256 protocolVersion
-    ) external returns (Diamond.DiamondCutData memory diamondCutData) {
-        ChainTypeManager chainTypeManager = ChainTypeManager(ctm);
-        uint256 blockWithData = chainTypeManager.upgradeCutDataBlock(protocolVersion);
-        Vm.EthGetLogs[] memory logs = _fetchLogsFromBlock(
-            blockWithData,
-            ctm,
-            IChainTypeManager.NewUpgradeCutData.selector
-        );
-        if (logs.length == 0) {
-            revert NoLogsFound(IChainTypeManager.NewUpgradeCutData.selector);
-        }
-        diamondCutData = abi.decode(logs[0].data, (Diamond.DiamondCutData));
-    }
-
-    /// @notice Parse diamond cut data from already-recorded logs (e.g. in tests).
-    function getDiamondCutDataFromRecordedLogs(
-        Vm.Log[] memory logs,
-        address ctm
-    ) internal pure returns (Diamond.DiamondCutData memory diamondCutData) {
-        Vm.Log memory logEntry = _findLogEntry(logs, ctm, IChainTypeManager.NewUpgradeCutData.selector);
-        diamondCutData = abi.decode(logEntry.data, (Diamond.DiamondCutData));
-    }
-
     /// @notice Read chain creation params from the CTM via `eth_getLogs`.
     /// @param  ctm        Target CTM proxy.
     /// @param  skipLogs   When true, returns `("", "")` without touching

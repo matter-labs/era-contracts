@@ -1,11 +1,11 @@
 //! `protocol-ops ecosystem verify-bootstrap` (alias `verify-package`) — read-only verification
-//! of a v35 registry-driven upgrade package against the live L1 it targets.
+//! of a registry-driven upgrade package against the live L1 it targets.
 //!
-//! Handles every kind of package and decides which from its calldata: an UPGRADE whose
-//! governance bundle calls the domain executors directly (1..3 legs in canonical order), the
-//! one-time BOOTSTRAP edge onto the registry model, and a transition REPLACEMENT forwarded through
-//! the CTM executor. The name kept its original spelling
-//! because the docs and runbooks that reference it predate the other paths.
+//! Handles both kinds of package and decides which from its calldata: an UPGRADE whose
+//! governance bundle calls the domain executors directly (1..3 legs in canonical order), and a
+//! transition REPLACEMENT forwarded through the CTM executor. The name is historical — it once
+//! also verified the one-time bootstrap edge onto the registry model, retired in v36 — and is
+//! kept because the docs and runbooks reference it.
 //!
 //! A registry package's reviewable content is the write-once objects and the authority they land
 //! on, so the tool needs only the merged prepare TOML and an L1 RPC: an object's provenance is
@@ -32,11 +32,9 @@ pub struct VerifyBootstrapArgs {
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
-    /// The reviewed governance address the upgrade must be driven by — for a bootstrap, the
-    /// owner the CTM domain lands on permanently (held against the manifest's); for an upgrade or
-    /// a replacement, the owner every executor the package drives must have. Without it a bootstrap's owner is reported but not checked against
-    /// the review, and any other package fails — so supply it for any package that will actually
-    /// be signed.
+    /// The reviewed governance address the upgrade must be driven by: the owner every executor
+    /// the package drives must have. Without it the package fails — so supply it for any package
+    /// that will actually be signed.
     #[clap(long)]
     pub expected_governance_owner: Option<Address>,
 
@@ -50,18 +48,18 @@ pub struct VerifyBootstrapArgs {
     pub create2_salts: Vec<B256>,
 
     /// A file carrying `[upgrade_executors]` records, repeatable: the forge output of `ecosystem
-    /// init` / `ctm init` (`DeployL1CoreContracts`, `DeployCTM`) or a merged bootstrap package.
-    /// Each executor is re-derived from the salt and ORIGINAL constructor arguments its record
-    /// states, so one whose owner moved since its deployment still verifies; an
-    /// executor with no record is unverified — an error. Adds to the records the package carries
-    /// (a bootstrap package carries its own); two different records of one executor are refused.
+    /// init` / `ctm init` (`DeployL1CoreContracts`, `DeployCTM`). Each executor is re-derived
+    /// from the salt and ORIGINAL constructor arguments its record states, so one whose owner
+    /// moved since its deployment still verifies; an executor with no record is unverified — an
+    /// error. Adds to the records the package carries; two different records of one executor are
+    /// refused.
     #[clap(long = "executor-record")]
     pub executor_records: Vec<PathBuf>,
 
     /// The upgrade env (`stage`, `mainnet`, ...) whose reviewed
     /// `upgrade-envs/permanent-values/<env>.toml` the package is held against. Every release the
     /// package installs pins that file's `zk_token_asset_id` in its genesis force deployments, so
-    /// a recurring or bootstrap package is refused without it; a replacement installs no release
+    /// a package with a transition leg is refused without it; a replacement installs no release
     /// and does not need it. The env's `testnet_verifier`, `bridgehub_proxy_addr` and each CTM's
     /// `rollup_da_manager` are also what the constructor arguments of every member the package
     /// newly installs are held against (its `l1_chain_id` must equal the RPC's), and it selects

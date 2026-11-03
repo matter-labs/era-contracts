@@ -22,7 +22,7 @@
 //!
 //! The arguments are a manifest for the write-once objects (read off the object itself, which
 //! the match then proves it was built from) and the binding values for the lifecycle objects —
-//! the executors and the bootstrap sequence — whose constructors set immutables. Those
+//! the executors — whose constructors set immutables. Those
 //! are the objects a runtime codehash cannot identify at all (the artifact's immutable slots are
 //! zero), so construction is the ONLY identity check they get, and its arguments come from the
 //! reviewed package and manifest — for an executor, from the record of the run that deployed it,
@@ -85,11 +85,6 @@ pub(crate) const DETERMINISTIC_CREATE2_FACTORY: Address = ZKSYNC_OS_DETERMINISTI
 /// The objects a registry package names — write-once and lifecycle — as `(artifact file,
 /// contract)` under `l1-contracts/out`. Identified by construction and by runtime.
 const OBJECT_ARTIFACTS: &[(&str, &str)] = &[
-    (
-        "RegistryBootstrapMigration.sol",
-        "RegistryBootstrapMigration",
-    ),
-    ("RegistryBootstrapSequence.sol", "RegistryBootstrapSequence"),
     ("CTMRelease.sol", "CTMRelease"),
     ("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
     ("CTMTransition.sol", "CTMTransition"),
@@ -575,15 +570,6 @@ pub(crate) mod constructor_args {
     ) -> Vec<u8> {
         (initial_owner, ctm, ctm_proxy_admin).abi_encode_params()
     }
-
-    /// `RegistryBootstrapSequence(RegistryBootstrapMigration _migration, IProxyUpgradeTransition
-    /// _coreTransition)` — the core transition a Core-domain `ProxyUpgradeTransition`.
-    pub(crate) fn registry_bootstrap_sequence(
-        migration: Address,
-        core_transition: Address,
-    ) -> Vec<u8> {
-        (migration, core_transition).abi_encode_params()
-    }
 }
 
 #[cfg(test)]
@@ -1014,13 +1000,6 @@ mod tests {
         assert_eq!(word_of_address(&encoded, 0), owner);
         assert_eq!(word_of_address(&encoded, 1), ctm);
         assert_eq!(word_of_address(&encoded, 2), proxy_admin);
-
-        let migration = Address::repeat_byte(0x06);
-        let registry = Address::repeat_byte(0x07);
-        let encoded = constructor_args::registry_bootstrap_sequence(migration, registry);
-        assert_eq!(encoded.len(), 64);
-        assert_eq!(word_of_address(&encoded, 0), migration);
-        assert_eq!(word_of_address(&encoded, 1), registry);
     }
 
     /// The owner is an argument like any other: a genuine executor built for a different owner

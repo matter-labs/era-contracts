@@ -397,8 +397,6 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
             return abi.encode(ctmAddresses.multiProof.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "BootstrapUpgrade")) {
-            return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {

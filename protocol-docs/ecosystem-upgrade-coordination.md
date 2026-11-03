@@ -157,12 +157,12 @@ so governance through `forward`) and the Bridgehub's owner, directly. On a `Prot
 ecosystem the Bridgehub's owner is the handler, which freezes and unfreezes chains by calling their
 CTM itself: the Security Council's soft freeze, hard freeze and unfreeze, the `reinforce*` variants,
 and the unfreeze that opens every emergency upgrade. Without the second caller they would stop
-reaching a CTM's chains once the bootstrap hands that CTM to its executor. The direct route leaves no
+reaching a CTM's chains, since the CTM is owned by its executor. The direct route leaves no
 `CallForwarded` entry; the chain's own `Freeze` / `Unfreeze` events remain.
 
-The second caller is safe only while the Bridgehub's owner is the executors' governance, so
-`verify-bootstrap` holds `bridgehub.owner()` to the bootstrap manifest's governance before the edge
-is signed. The handler wraps each chain's call in `try/catch`, so a chain it failed to freeze goes
+The second caller is safe only while the Bridgehub's owner is the executors' governance. Package
+verification no longer checks `bridgehub.owner()`: that check belonged to the v34 -> v35 bootstrap
+edge, removed in v36. The handler wraps each chain's call in `try/catch`, so a chain it failed to freeze goes
 unreported: after a freeze, check `isDiamondStorageFrozen()` on every chain and use the handler's
 `reinforceFreezeOneChain`, which reverts visibly, for any that is not.
 
@@ -194,9 +194,8 @@ Consequences:
 - A chain that already crossed keeps the state it reached and continues on its own onward edge: the
   chain-side version check refuses to replay the replacement from the earlier source.
 - A deadline change stays a separate `setProtocolVersionDeadline`, which may ride the same `forward`.
-- Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) are repaired by the
-  legacy cut setter, which refuses a registry-committed departure and a version nothing was
-  committed for.
+- Legacy-committed departures (pre-registry chains crossing the v35 bootstrap) cannot be repaired:
+  the legacy cut setter `setUpgradeDiamondCut` was removed in v36 with the rest of that edge.
 
 ### Preparing and verifying a replacement
 
@@ -244,8 +243,8 @@ introduce placeholder lists, loops or a second CTM today solely for this extensi
 - `CTMExecutorDomains.t.sol` adds a second real CTM with its own executor: each executor commits on
   its own CTM only and applies rows through its own `ProxyAdmin` only, and a same-CTM successor
   takes over through `forward`.
-- protocol-ops: the merge derives the legs in canonical order, each alone, and none for a bootstrap
-  or a replacement (`commands/ecosystem/upgrade.rs`); the package loader refuses mixed kinds and
+- protocol-ops: the merge derives the legs in canonical order, each alone, and none for a
+  replacement (`commands/ecosystem/upgrade.rs`); the package loader refuses mixed kinds and
   missing, duplicated, substituted or value-carrying legs and unknown executor selectors
   (`upgrade_verification/registry/package.rs`); `verify_upgrade_calls` refuses a swapped or
   interrupted run, undeclared, duplicated, missing or reordered external actions, and any other call
