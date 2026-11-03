@@ -571,4 +571,23 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
         handler.expireAtomicBundle(ectxBundleBytes, finality, 0);
     }
+
+    /// @notice A `Verified` leg can still expire. Execution skips the finality gate for a `Verified` bundle, so only
+    /// the `Expired` status stops an expired one from executing.
+    function test_expirableLeg_verifiedThenExpired_neverExecutes() public {
+        _setUpAtomicStack();
+        AtomicFinalityProof memory finality = _sendExpirableLeg(interopTargetContract);
+        L2InteropHandler handler = L2InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        vm.chainId(destinationChainId);
+        handler.verifyAtomicBundle(ectxBundleBytes, finality);
+
+        _passExpiryTime();
+        bool afterCommit = AtomicFlowFixtures.expiryValue(ectx.flowId, ectx.bundleHash) >
+            AtomicFlowFixtures.commitValue(ectx.flowId, ectx.bundleHash);
+        handler.expireAtomicBundle(ectxBundleBytes, finality, afterCommit ? 1 : 0);
+        assertEq(uint256(handler.bundleStatus(ectx.bundleHash)), uint256(BundleStatus.Expired));
+
+        vm.expectRevert(abi.encodeWithSelector(BundleAlreadyProcessed.selector, ectx.bundleHash));
+        handler.executeAtomicBundle(ectxBundleBytes, finality);
+    }
 }
