@@ -9,12 +9,7 @@ args = [
   "/upgrade-envs/v0.34.0-era/{env}.toml",
   "/upgrade-envs/v0.34.0-era/output/{env}/ecosystem.toml",
 ]
-# On the fork the bundle was replayed on: CREATE2 provenance, the ServerNotifier upgrade, governance
-# stages, the reference chain's timestamp, drain and upgrade, a test chain, L1 assertions.
-verify_fork = ["bash", "upgrade-envs/v0.34.0-era/rehearse.sh"]
-# Read-only against the real chain: every factory dep is published and every deployed contract has code.
-verify_chain = ["bash", "upgrade-envs/v0.34.0-era/rehearse.sh", "--published-only"]
-# protocol-ops' checks, beside rehearse.sh for now: publication; on a fork, provenance and a replay too.
+# protocol-ops' checks: publication; on a fork, also provenance and a replay, then the fork tests on it.
 builtin_checks = true
 fork_tests = [
   # The output against the chain, build and env; the CTM and chains after; the 15M cap; proof switches.

@@ -481,8 +481,8 @@ jobs:
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
 
-      # A forge-script upgrade declares a read-only `verify_chain` check, run here against the
-      # real chain. v31's post-deploy check is PUVT, which stays a separate step.
+      # A forge-script upgrade's read-only checks (built-in publication and/or `verify_chain`), run
+      # here against the real chain. v31's post-deploy check is PUVT, which stays a separate step.
       - name: Check the broadcast on L1 (the upgrade's declared check)
         if: ${{ !inputs.verify_only && env.UPGRADE_KIND == 'forge-script' }}
         run: |
