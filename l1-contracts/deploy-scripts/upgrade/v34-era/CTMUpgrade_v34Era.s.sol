@@ -23,7 +23,6 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
-import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
 /// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0. From then on every batch needs a Boojum and an
@@ -141,31 +140,20 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Calls ========================
 
+    /// @dev No `DefaultCoreUpgrade` runs alongside to pause migrations, and the CTM's `setNewVersionUpgrade` reverts
+    ///      unless they are paused (`MigrationsNotPaused`): stage 0 pauses them, stage 2 unpauses. No stage-1
+    ///      re-pause: only an emergency execution unpauses in between, and testnet3 and mainnet take the normal path.
     function prepareVersionSpecificStage0GovernanceCallsL1() public view override returns (Call[] memory) {
         return preparePauseGatewayMigrationsCall();
     }
 
-    /// @dev Re-pause before the check: an emergency execution unfreezes, which unpauses migrations.
-    function prepareCheckMigrationsPausedCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = super.prepareCheckMigrationsPausedCalls();
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
-    }
-
-    /// @dev Unpause first, as testnet3's stage-2 proposal does. Once that proposal no longer fixes the order, the
-    ///      unpause moves into `prepareVersionSpecificStage2GovernanceCallsL1`.
-    function prepareStage2GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-        allCalls[0] = new Call[](1);
-        allCalls[0][0] = Call({
+    function prepareVersionSpecificStage2GovernanceCallsL1() public view override returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
             target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
         });
-        allCalls[1] = prepareCheckUpgradeIsPresent();
-        allCalls[2] = prepareCheckMigrationsUnpausedCalls();
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     // ======================== Output ========================

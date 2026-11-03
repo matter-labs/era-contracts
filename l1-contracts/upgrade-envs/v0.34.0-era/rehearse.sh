@@ -479,14 +479,14 @@ UPGRADE_CTM = (E["CTM_PROXY_ADMIN"], sig("upgrade(address,address)"))
 SET_NEW_VERSION = (E["CTM"], sig(f"setNewVersionUpgrade({CUT},uint256,uint256,uint256,address)"))
 SET_CREATION = (E["CTM"], sig(f"setChainCreationParams({PARAMS})"))
 check("setChainCreationParams selector", SET_CREATION[1], "0x4958bf4f")
-# The timer's calls (stage 1's re-pause undoes the unpause of an emergency execution's unfreeze).
+# The timer's and the stage validator's calls.
 T = {"start": (timer, sig("startTimer()")), "deadline": (timer, sig("checkDeadline()")),
      "paused": (validator, sig("checkMigrationsPaused()")), "present": (validator, sig("checkProtocolUpgradePresence()")),
      "unpaused": (validator, sig("checkMigrationsUnpaused()"))}
 shapes = {
     0: [PAUSE, T["start"]],
-    1: [T["deadline"], PAUSE, T["paused"], UPGRADE_CTM, SET_NEW_VERSION, SET_CREATION],
-    2: [UNPAUSE, T["present"], T["unpaused"]],
+    1: [T["deadline"], T["paused"], UPGRADE_CTM, SET_NEW_VERSION, SET_CREATION],
+    2: [T["present"], UNPAUSE, T["unpaused"]],
 }
 names = {PAUSE: "pauseMigration", UNPAUSE: "unpauseMigration", UPGRADE_CTM: "ProxyAdmin.upgrade",
          SET_NEW_VERSION: "setNewVersionUpgrade", SET_CREATION: "setChainCreationParams", T["start"]: "startTimer",
@@ -500,7 +500,7 @@ def find(n, call):
     found = [c for c in stages[n] if [c[0].lower(), c[2][:10]] == [call[0].lower(), call[1]]]
     return found[0][2] if len(found) == 1 else "(not exactly once)"
 
-for n, call in [(0, PAUSE), (1, PAUSE), (2, UNPAUSE), (0, T["start"]), (1, T["deadline"]), (1, T["paused"]),
+for n, call in [(0, PAUSE), (2, UNPAUSE), (0, T["start"]), (1, T["deadline"]), (1, T["paused"]),
                 (2, T["present"]), (2, T["unpaused"])]:
     check(f"stage {n} {names[call]}: no arguments", find(n, call), call[1])
 check("stage 1 ProxyAdmin.upgrade(CTM, new implementation)", find(1, UPGRADE_CTM),
@@ -749,9 +749,6 @@ STARTED=$(cast block latest --field timestamp --rpc-url "$RPC")
 chk "timer deadline = stage 0's block time + delay" "$(call "$TIMER" 'deadline()(uint256)' | first)" "$((STARTED + TIMER_DELAY))"
 reverts "stage 1 before the delay: checkDeadline reverts with DeadlineNotYetPassed" "$PUH" "$TIMER" \
   "$(cast calldata 'checkDeadline()')" 'DeadlineNotYetPassed()'
-# An emergency execution unfreezes before a proposal's calls, which unpauses migrations; stage 1's re-pause
-# must restore it before checkMigrationsPaused.
-send "$PUH" "$CAH" "$(cast calldata 'unpauseMigration()')" "unpauseMigration() as the PUH (emulates an unfreeze)"
 cast rpc evm_increaseTime "$TIMER_DELAY" --rpc-url "$RPC" >/dev/null && cast rpc evm_mine --rpc-url "$RPC" >/dev/null
 echo "     advanced the fork's time by $TIMER_DELAY s"
 # Stage 1 up to and including the CTM proxy upgrade, then the CTM's state on the new implementation.

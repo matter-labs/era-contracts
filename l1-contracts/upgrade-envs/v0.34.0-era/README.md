@@ -16,7 +16,7 @@ transactions (new bootloader), a 15M gas cap on user L1→L2 transactions and an
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Deployments    | The six facets and `DiamondInit`, `EraVerifierFflonk` and `AirbenderVerifierPlonk`, the multi-proof verifier over both, the EIP-7702 checker, `EraSettlementLayerV34Upgrade`, new CTM and ServerNotifier implementations, the governance timer and stage validator |
 | Publication    | The L2 factory deps, into the CTM's BytecodesSupplier                                                                                                                                                                                                              |
-| Governance     | Stage 0 pauses migrations and starts the timer. Stage 1 checks the deadline, re-pauses and checks the pause, upgrades the CTM proxy, then `setNewVersionUpgrade` and `setChainCreationParams`. Stage 2 unpauses and checks                                         |
+| Governance     | Stage 0 pauses migrations and starts the timer. Stage 1 checks the deadline and the pause, upgrades the CTM proxy, then `setNewVersionUpgrade` and `setChainCreationParams`. Stage 2 checks that the CTM has the new version, unpauses, then checks the unpause    |
 | ServerNotifier | Upgraded by the owner of its ProxyAdmin (the ecosystem admin), outside the stages                                                                                                                                                                                  |
 | Per chain      | After stage 1, the upgrade timestamp; once the chain is drained, the upgrade (see "Executing it")                                                                                                                                                                  |
 
@@ -35,7 +35,9 @@ Follows `AGENTS.md`, "Executing Stage and Testnet Upgrades".
 - **mainnet:** one Tally proposal per stage, with stage 1 at least 48 hours after stage 0.
 
 The timer delays follow earlier upgrades. v34's stage 1 forces no chain to switch (v0.33.0 keeps an unlimited
-deadline), so here the timer is a notice period. It also rules out an all-stages emergency proposal.
+deadline), so here the timer is a notice period. It also rules out an all-stages emergency proposal, and stage 1
+can't take the emergency path on its own either: that path unpauses migrations before the proposal's calls, and
+stage 1 checks that they are paused.
 
 Each chain, once stage 1 has executed (`chain set-upgrade-timestamp` and `chain upgrade` below read what it
 registered): its ChainAdmin's owner sets the upgrade timestamp, with the bundle
