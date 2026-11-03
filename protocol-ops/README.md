@@ -33,6 +33,29 @@ cargo run --release --bin protocol_ops -- chain init \
 
 See `chain init --help` for owners, advanced input, and forge passthrough flags.
 
+### Commands
+
+| Command                                         | What it does                                                                                                              |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `ecosystem init`                                | Deploy a fresh ecosystem (Bridgehub + CTM) into the registry model.                                                       |
+| `hub init` / `ctm init`                         | The same in two steps: the core contracts, then one CTM registered on them.                                               |
+| `ecosystem upgrade-prepare-all`                 | Phase 1 of an upgrade: deploy the release's objects on a fork and write the merged `ecosystem.toml`.                      |
+| `ecosystem upgrade-governance`                  | Phase 2: replay the package's governance bundle on a fork and emit its Safe bundle.                                       |
+| `ecosystem verify-bootstrap` (`verify-package`) | Verify a registry-driven package before it is signed ([below](#verifying-a-registry-driven-upgrade-before-it-is-signed)). |
+| `ecosystem rehearse-upgrade`                    | Prepare, pack the deploy bundle, replay it under impersonation and run the upgrade's checks.                              |
+| `ecosystem replay-bundle` / `verify-bundle`     | Consume a deploy bundle (rehearse, broadcast or check it) / check its files against its digests.                          |
+| `ecosystem upgrade-broadcast`                   | Broadcast a `manifest.json`'s bundles, each under its signer's key.                                                       |
+| `ecosystem list-ctms`                           | Print a starter `--ctm-config` for every CTM on a Bridgehub.                                                              |
+| `ecosystem manifest-to-simulator`               | Turn one or more Safe-bundle manifests into a transaction-simulator scenario.                                             |
+| `ecosystem governance-toml-to-simulator`        | Turn a governance TOML into transaction-simulator JSON.                                                                   |
+| `chain init`                                    | Register a new chain on a CTM.                                                                                            |
+| `chain upgrade`                                 | Phase 3: upgrade one chain to the CTM's version.                                                                          |
+| `chain set-upgrade-timestamp`                   | Tell the server when the pending upgrade activates.                                                                       |
+| `chain set-da-validator-pair`                   | Re-set a chain's DA validator pair after an upgrade reset it.                                                             |
+| `chain add-validator` / `remove-validator`      | Grant or revoke every batch operator role on the chain's ValidatorTimelock.                                               |
+| `dev execute-safe`                              | Execute one Safe Transaction Builder JSON under one key.                                                                  |
+| `dev execution-runbook`                         | Render `EXECUTE.md`, the copy-into-MetaMask runbook, from an upgrade's transactions.                                      |
+
 ### Common flags (most init / upgrade commands)
 
 Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
@@ -44,7 +67,7 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 | _(forge passthrough)_ | Forwarded via **`ForgeScriptArgs`** (see `--help` on each command). |
 
 > **`--deployer-address` / `--private-key`** are **not** part of `SharedRunArgs`.
-> Bootstrap and apply commands declare their own deployer key flags because they need
+> The commands that deploy declare their own deployer key flags because they need
 > an EOA to simulate forge scripts against the Anvil fork. Extra signers (e.g.
 > **`--owner`**) stay on specific commands.
 
@@ -131,13 +154,14 @@ replays it like any other. Verify it with `verify-package` before it is signed (
 and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
 `[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
 reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set). The old
-protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (see
-[Preparing an upgrade](#preparing-an-upgrade)) unless `--upgrade-env-dir` selects another (on the commands built on the
-shared `--env` topology args; `ecosystem init` / `ctm init` always use the current release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
-selected release dir rather than mixing one release's input with another's salts. The owner and CREATE2 salts
-come from that release input, and a command that needs one of them fails when the release has no input for the
-env: it never falls back to the deployer, local's values or random salts. `yarn new-release` creates the next
-release's inputs from the current ones with fresh salts.
+protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release
+dir is the current release's (see [Preparing an upgrade](#preparing-an-upgrade)) unless `--upgrade-env-dir`
+selects another (on the commands built on the shared `--env` topology args; `ecosystem init` / `ctm init` always
+use the current release). It is the only release selector: `upgrade-prepare-all` rejects an
+`--upgrade-input-path` outside the selected release dir rather than mixing one release's input with another's
+salts. The owner and CREATE2 salts come from that release input, and a command that needs one of them fails when
+the release has no input for the env: it never falls back to the deployer, local's values or random salts.
+`yarn new-release` creates the next release's inputs from the current ones with fresh salts.
 
 ## Execution model
 

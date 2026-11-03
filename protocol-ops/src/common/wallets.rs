@@ -134,17 +134,10 @@ impl Wallet {
             .build()?;
         Ok(Self::new(signer))
     }
-
-    pub fn empty() -> Self {
-        Self {
-            address: Address::ZERO,
-            private_key: None,
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------
-// Wallets YAML schema (used by `apply` to load operator keys for each chain)
+// Wallets YAML schema (zk-deployer loads each chain's operator keys with it)
 // ---------------------------------------------------------------------------
 
 // Wallet's Debug impl redacts PrivateKeySigner automatically.

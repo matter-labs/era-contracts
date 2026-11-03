@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 
+// zk-deployer (zksync-os-integration-tests) deploys and deposits test tokens with these three.
 pub mod testnet_erc20_token {
     alloy::sol!(
         #[sol(rpc)]
@@ -8,6 +9,24 @@ pub mod testnet_erc20_token {
     );
 }
 pub use testnet_erc20_token::TestnetERC20TokenAbi;
+
+pub mod il1_native_token_vault {
+    alloy::sol!(
+        #[sol(rpc)]
+        IL1NativeTokenVaultAbi,
+        "../l1-contracts/zkstack-out/IL1NativeTokenVault.sol/IL1NativeTokenVault.json"
+    );
+}
+pub use il1_native_token_vault::IL1NativeTokenVaultAbi;
+
+pub mod il1_asset_router {
+    alloy::sol!(
+        #[sol(rpc)]
+        IL1AssetRouterAbi,
+        "../l1-contracts/zkstack-out/IL1AssetRouter.sol/IL1AssetRouter.json"
+    );
+}
+pub use il1_asset_router::IL1AssetRouterAbi;
 
 pub mod bridgehub {
     alloy::sol!(
@@ -18,15 +37,6 @@ pub mod bridgehub {
 }
 pub use bridgehub::BridgehubAbi;
 
-pub mod message_root {
-    alloy::sol!(
-        #[sol(rpc)]
-        MessageRootAbi,
-        "../l1-contracts/zkstack-out/MessageRootBase.sol/MessageRootBase.json"
-    );
-}
-pub use message_root::MessageRootAbi;
-
 pub mod i_chain_type_manager {
     alloy::sol!(
         #[sol(rpc)]
@@ -36,15 +46,6 @@ pub mod i_chain_type_manager {
 }
 pub use i_chain_type_manager::IChainTypeManagerAbi;
 
-pub mod i_ctm_release {
-    alloy::sol!(
-        #[sol(rpc)]
-        ICTMReleaseAbi,
-        "../l1-contracts/zkstack-out/ICTMRelease.sol/ICTMRelease.json"
-    );
-}
-pub use i_ctm_release::ICTMReleaseAbi;
-
 pub mod zk_chain {
     alloy::sol!(
         #[sol(rpc)]
@@ -53,70 +54,6 @@ pub mod zk_chain {
     );
 }
 pub use zk_chain::ZkChainAbi;
-
-pub mod validator_timelock {
-    alloy::sol!(
-        #[sol(rpc)]
-        ValidatorTimelockAbi,
-        "../l1-contracts/zkstack-out/IValidatorTimelock.sol/IValidatorTimelock.json"
-    );
-}
-pub use validator_timelock::ValidatorTimelockAbi;
-
-pub mod i_chain_asset_handler {
-    alloy::sol!(
-        #[sol(rpc)]
-        IChainAssetHandlerAbi,
-        "../l1-contracts/zkstack-out/IChainAssetHandler.sol/IChainAssetHandlerBase.json"
-    );
-}
-pub use i_chain_asset_handler::IChainAssetHandlerAbi;
-
-// Using IChainTypeManager for the upgradeChainFromVersion function
-pub mod chain_type_manager_upgrade_fn {
-    alloy::sol!(
-        #[sol(rpc)]
-        ChainTypeManagerUpgradeFnAbi,
-        "../l1-contracts/zkstack-out/IChainTypeManager.sol/IChainTypeManager.json"
-    );
-}
-pub use chain_type_manager_upgrade_fn::ChainTypeManagerUpgradeFnAbi;
-
-pub mod admin {
-    alloy::sol!(
-        #[sol(rpc)]
-        AdminAbi,
-        "../l1-contracts/zkstack-out/IAdmin.sol/IAdmin.json"
-    );
-}
-pub use admin::AdminAbi;
-
-pub mod diamond_cut {
-    alloy::sol!(
-        #[sol(rpc)]
-        DiamondCutAbi,
-        "../l1-contracts/zkstack-out/IDiamondCut.sol/IDiamondCut.json"
-    );
-}
-pub use diamond_cut::DiamondCutAbi;
-
-pub mod chain_admin_ownable {
-    alloy::sol!(
-        #[sol(rpc)]
-        ChainAdminOwnableAbi,
-        "../l1-contracts/zkstack-out/IChainAdminOwnable.sol/IChainAdminOwnable.json"
-    );
-}
-pub use chain_admin_ownable::ChainAdminOwnableAbi;
-
-pub mod i_chain_admin {
-    alloy::sol!(
-        #[sol(rpc)]
-        IChainAdminAbi,
-        "../l1-contracts/zkstack-out/IChainAdmin.sol/IChainAdmin.json"
-    );
-}
-pub use i_chain_admin::IChainAdminAbi;
 
 pub mod i_register_zk_chain {
     alloy::sol!(
@@ -162,64 +99,6 @@ pub mod i_deploy_l1_core_contracts {
     );
 }
 pub use i_deploy_l1_core_contracts::IDeployL1CoreContractsAbi;
-
-pub mod il1_native_token_vault {
-    alloy::sol!(
-        #[sol(rpc)]
-        IL1NativeTokenVaultAbi,
-        "../l1-contracts/zkstack-out/IL1NativeTokenVault.sol/IL1NativeTokenVault.json"
-    );
-}
-pub use il1_native_token_vault::IL1NativeTokenVaultAbi;
-
-pub mod il2_native_token_vault {
-    alloy::sol!(
-        #[sol(rpc)]
-        IL2NativeTokenVaultAbi,
-        "../l1-contracts/zkstack-out/IL2NativeTokenVault.sol/IL2NativeTokenVault.json"
-    );
-}
-pub use il2_native_token_vault::IL2NativeTokenVaultAbi;
-
-pub mod il1_asset_router {
-    alloy::sol!(
-        #[sol(rpc)]
-        IL1AssetRouterAbi,
-        "../l1-contracts/zkstack-out/IL1AssetRouter.sol/IL1AssetRouter.json"
-    );
-}
-pub use il1_asset_router::IL1AssetRouterAbi;
-
-pub mod il2_asset_router {
-    alloy::sol!(
-        #[sol(rpc)]
-        IL2AssetRouterAbi,
-        "../l1-contracts/zkstack-out/IL2AssetRouter.sol/IL2AssetRouter.json"
-    );
-}
-pub use il2_asset_router::IL2AssetRouterAbi;
-
-pub mod ctm_ext {
-    alloy::sol!(
-        #[sol(rpc)]
-        interface IChainTypeManagerExt {
-            function L1_BYTECODES_SUPPLIER() external view returns (address);
-        }
-    );
-}
-pub use ctm_ext::IChainTypeManagerExt;
-
-pub mod testnet_verifier {
-    alloy::sol!(
-        #[sol(rpc)]
-        interface ITestnetVerifier {
-            function isTestnetVerifier() external view returns (bool);
-            // Legacy pre-v34 name (a public constant on testnet verifiers of those versions).
-            function IS_TESTNET_VERIFIER() external view returns (bool);
-        }
-    );
-}
-pub use testnet_verifier::ITestnetVerifier;
 
 pub mod access_control_default_admin_rules {
     alloy::sol!(

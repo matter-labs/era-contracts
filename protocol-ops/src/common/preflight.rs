@@ -1,3 +1,5 @@
+//! Used by zk-deployer (zksync-os-integration-tests), not by any protocol-ops command.
+
 use std::path::Path;
 use std::process::Command;
 
@@ -8,7 +10,7 @@ use crate::common::{
     paths::{l1_contracts_forge_out, resolve_l1_contracts_path},
 };
 
-/// Ensure all Forge artifact directories needed by `bootstrap` and `apply`
+/// Ensure all Forge artifact directories needed by zk-deployer's `bootstrap` and `apply`
 /// exist, building them automatically when they are missing.
 ///
 /// Runs `forge build` in `l1-contracts/` if its output directory is absent.

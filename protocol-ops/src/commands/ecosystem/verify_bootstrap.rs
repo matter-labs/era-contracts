@@ -1,5 +1,5 @@
 //! `protocol-ops ecosystem verify-bootstrap` (alias `verify-package`) — read-only verification
-//! of a v35 registry-driven upgrade package against the live L1 it targets.
+//! of a registry-driven upgrade package against the live L1 it targets.
 //!
 //! Handles every kind of package and decides which from its calldata: an UPGRADE whose
 //! governance bundle calls the domain executors directly (1..3 legs in canonical order), the

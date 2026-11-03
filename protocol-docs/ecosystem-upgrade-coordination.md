@@ -245,7 +245,7 @@ introduce placeholder lists, loops or a second CTM today solely for this extensi
   its own CTM only and applies rows through its own `ProxyAdmin` only, and a same-CTM successor
   takes over through `forward`.
 - protocol-ops: the merge derives the legs in canonical order, each alone, and none for a bootstrap
-  or a replacement (`commands/ecosystem/upgrade.rs`); the package loader refuses mixed kinds and
+  or a replacement (`commands/ecosystem/upgrade/merge.rs`); the package loader refuses mixed kinds and
   missing, duplicated, substituted or value-carrying legs and unknown executor selectors
   (`upgrade_verification/registry/package.rs`); `verify_upgrade_calls` refuses a swapped or
   interrupted run, undeclared, duplicated, missing or reordered external actions, and any other call

@@ -105,7 +105,6 @@ fn read_current_release() -> anyhow::Result<CurrentRelease> {
 pub const UPGRADE_CORE_OUTPUT_PATH: &str = "/script-out/upgrade-core.toml";
 /// Per-CTM prepare output, `<prefix><ctm proxy>.toml` (lowercase hex). Version-free, like the core output.
 pub const UPGRADE_CTM_OUTPUT_PATH_PREFIX: &str = "/script-out/upgrade-ctm-";
-pub const UPGRADE_V33_ENV_DIR: &str = "/upgrade-envs/v0.33.0-atomic-interop";
 
 #[derive(Debug, Clone, Copy)]
 pub struct ForgeScriptParams {
@@ -114,7 +113,6 @@ pub struct ForgeScriptParams {
     script_path: &'static str,
     ffi: bool,
     rpc_url: bool,
-    gas_limit: Option<u64>,
 }
 
 impl ForgeScriptParams {
@@ -125,7 +123,6 @@ impl ForgeScriptParams {
             script_path,
             ffi: false,
             rpc_url: false,
-            gas_limit: None,
         }
     }
 
@@ -136,11 +133,6 @@ impl ForgeScriptParams {
 
     pub const fn with_rpc_url(mut self) -> Self {
         self.rpc_url = true;
-        self
-    }
-
-    pub const fn with_gas_limit(mut self, gas_limit: u64) -> Self {
-        self.gas_limit = Some(gas_limit);
         self
     }
 
@@ -165,10 +157,6 @@ impl ForgeScriptParams {
 
     pub fn rpc_url(&self) -> bool {
         self.rpc_url
-    }
-
-    pub fn gas_limit(&self) -> Option<u64> {
-        self.gas_limit
     }
 }
 

@@ -21,7 +21,7 @@ pub fn global_config() -> &'static GlobalConfig {
     CONFIG.get().unwrap_or(&DEFAULT_CONFIG)
 }
 
-/// Returns true if `--json` was passed on the command line.
+/// Returns true if `--json` was passed on the command line. zk-deployer reads it.
 pub fn is_json_output() -> bool {
     global_config().json_output
 }
@@ -30,18 +30,4 @@ pub fn is_json_output() -> bool {
 pub struct GlobalConfig {
     pub verbose: bool,
     pub json_output: bool,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn json_output_defaults_false() {
-        let cfg = GlobalConfig {
-            verbose: false,
-            json_output: false,
-        };
-        assert!(!cfg.json_output);
-    }
 }

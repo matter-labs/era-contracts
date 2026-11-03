@@ -101,7 +101,7 @@ impl OwnableProxyKind {
 pub struct CoreContracts {
     pub bridgehub_proxy_addr: Address,
     /// Which governance contract sits at `bridgehub.owner()`. Drives the
-    /// fork-replay path (`v31 governance`):
+    /// governance fork-replay path:
     ///   - `legacy` (default): legacy ZKsync `Governance.sol` Ownable2Step
     ///     timelock. Replay goes through `Utils.executeCalls` (scheduleTransparent
     ///     + execute, signed by the Ownable owner).
@@ -153,7 +153,7 @@ pub struct PermanentContracts {
     pub create2_factory_addr: Option<Address>,
     // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
     // rotates every regen (the CREATE2 deployer would collide with previously
-    // deployed addresses if reused), so it belongs in the v31 input TOML
+    // deployed addresses if reused), so it belongs in the release's input TOML
     // (`<current upgrade-env dir>/<env>.toml [contracts] create2_factory_salt`)
     // alongside the rest of the per-regen inputs. See
     // `EnvConfig::create2_factory_salt_for_upgrade`.
@@ -273,7 +273,7 @@ impl EnvConfig {
     /// create2_factory_salt`. Distinct from `create2_factory_salt()` (which
     /// reads the chain-permanent salt out of `permanent-values/`); this one
     /// is the salt used to deploy *this upgrade*'s implementations, recorded
-    /// alongside the rest of the v31 inputs so re-prepares are reproducible.
+    /// alongside the rest of the release's inputs so re-prepares are reproducible.
     /// Re-reads the TOML each call rather than caching, so editing the file
     /// between commands is reflected without restarting the CLI.
     pub fn create2_factory_salt_for_upgrade(&self) -> anyhow::Result<Option<B256>> {
@@ -382,16 +382,7 @@ impl EnvConfig {
     }
 }
 
-/// Default output dir for an env, e.g. `<upgrade-env dir>/output/<env>/`, without loading the env.
-pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
-    Ok(resolve_l1_contracts_path()?
-        .join(upgrade_env_dir()?)
-        .join("output")
-        .join(env))
-}
-
 /// `upgrade-envs/<upgrade>/output/<env>/`: where generating `upgrade` for `env` writes.
-/// For [`default_upgrade`] this is [`default_protocol_ops_out_dir`].
 pub fn protocol_ops_out_dir(upgrade: &str, env: &str) -> anyhow::Result<PathBuf> {
     crate::common::upgrade_descriptor::validate_upgrade_name(upgrade)?;
     Ok(resolve_l1_contracts_path()?
@@ -414,7 +405,7 @@ fn parse_upgrade_input(content: &str) -> UpgradeInputs {
     out
 }
 
-/// Read `[contracts] create2_factory_salt` from a v31 input TOML.
+/// Read `[contracts] create2_factory_salt` from a release's input TOML.
 fn read_core_create2_salt(content: &str) -> Option<B256> {
     read_h256_under_contracts(content, "create2_factory_salt")
 }

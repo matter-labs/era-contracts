@@ -89,6 +89,7 @@ pub fn merge_call_array_hex(chunks: &[&str]) -> anyhow::Result<String> {
 }
 
 /// Empty `Call[]` encoded as `0x…`.
+#[cfg(test)]
 pub fn empty_calls_hex() -> String {
     format!("0x{}", hex::encode(encode_calls(&[])))
 }
