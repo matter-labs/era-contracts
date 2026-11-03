@@ -12,9 +12,7 @@
 #      (with the timer, after its delay), the reference chain's timestamp, its upgrade reverting while batches
 #      are in flight, the drain, the upgrade, a test chain, and the L1 state after each step; then v34's L1
 #      behaviour: the 15M cap on user L1->L2 transactions (before and after the upgrade) and the proof-system
-#      switches. A reference chain with a pending L2 upgrade (mainnet's 324 right after ZIP-18) can't upgrade yet:
-#      its after-upgrade checks move to the test chain, which passes only with ALLOW_PENDING_L2_UPGRADE=1 (the
-#      ZIP-18 replay fork; protocol_ops passes its environment through).
+#      switches.
 #
 # Needs: foundry (cast/anvil; forge for step 1), python3 >= 3.11 (tomllib), and for step 1 the Linux CI build
 # artifacts in {system,l1,l2}-contracts/zkout, l1-contracts/out and da-contracts/out (macOS zksolc hashes differ).
@@ -51,17 +49,12 @@ OUT=${ECOSYSTEM_TOML:-$WT$OUT_REL}
 BROADCAST_LOG=
 FAILED=0
 SKIPPED=0
-# Checks run on the test chain because the reference chain can't upgrade yet (a pending L2 upgrade).
-MOVED=0
 python3 -c 'import tomllib' 2>/dev/null || { echo "REHEARSAL FAILED: needs python3 >= 3.11 (tomllib)"; exit 1; }
 export OUT S HERE WT
 
 fail() { echo "  FAIL $*"; FAILED=$((FAILED + 1)); }
-# While MOVING=1, every check counts as moved to the test chain (see the reference chain's upgrade in step 5).
-moved() { [ "${MOVING:-0}" = "1" ] && MOVED=$((MOVED + 1)); return 0; }
 # chk LABEL GOT EXPECTED — an empty EXPECTED is a failed read (e.g. a before-snapshot), never a match.
 chk() {
-  moved
   [ -n "$3" ] || { fail "$1: no expected value (failed read), got ${2:-nothing}"; return; }
   [ "$(echo "$2" | tr A-F a-f)" = "$(echo "$3" | tr A-F a-f)" ] && echo "  OK   $1" || fail "$1: expected $3, got $2"
 }
@@ -177,6 +170,13 @@ PYINPUTS
   fact LIVE_ADMIN_FACET call "$DIAMOND" 'facetAddress(bytes4)(address)' "$(cast sig 'acceptAdmin()')"
   fact ROLLUP_DA_MANAGER call "$LIVE_ADMIN_FACET" 'ROLLUP_DA_MANAGER()(address)'
   num ERA_CHAIN_ID call "$L1_ASSET_ROUTER" 'ERA_CHAIN_ID()(uint256)'
+  # A pending L2 upgrade makes the chain's v34 upgrade revert (PreviousUpgradeNotFinalized).
+  PENDING=$(call "$DIAMOND" 'getL2SystemContractsUpgradeTxHash()(bytes32)')
+  [ "$PENDING" = "0x0000000000000000000000000000000000000000000000000000000000000000" ] || {
+    echo "REHEARSAL FAILED: chain $CHAIN_ID has a pending L2 upgrade (${PENDING:-unreadable});" \
+      "wait until its first batch on its current version executes"
+    exit 1
+  }
 
   echo "== The inputs against the chain"
   chk "l1_chain_id = the RPC's chain id" "$(cast chain-id --rpc-url "$RPC")" "$L1_CHAIN_ID"
@@ -537,8 +537,6 @@ with open(E["S"] + "/expected.env", "w") as f:
         "NEW_SN_IMPL": st["server_notifier_implementation_addr"], "UPGRADE_CALLDATA": upgrade_calldata,
         "SET_TS_CALLDATA": calldata("setUpgradeTimestamp(uint256,uint256)", E["NEW"], E["TS"]),
         "SN_TS_CALLDATA": calldata(multicall, f"[({E['SN']},0,{notify})]", "true"),
-        # The test chain's admin: the prepare's sender (the deployer).
-        "TC_ADMIN": dec_call(CREATE, create[0][2])[4],
         "EXP_FFLONK": fflonk, "TIMER": timer, "STAGE_VALIDATOR": validator, "S1_UPGRADE_INDEX": upgrade_index,
     }.items():
         f.write(f"{k}={v}\n")
@@ -662,19 +660,16 @@ PYPROVENANCE
 # ---------------------------------------------------------------- 5. the fork flow
 # send FROM TO DATA LABEL [VALUE [GAS_PRICE]] — impersonated; cast waits for the receipt, kept in $S/receipt.json.
 send() {
-  moved
   cast send --unlocked --from "$1" "$2" "$3" ${5:+--value "$5"} ${6:+--gas-price "$6"} --rpc-url "$RPC" --json 2> "$S/send.err" | grep '^{' | tail -1 > "$S/receipt.json"
   st=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('status'))" "$S/receipt.json" 2>/dev/null)
   [ "$st" = "0x1" ] && echo "  OK   $4" || fail "$4 (status ${st:-none}: $(head -c 300 "$S/send.err"))"
 }
 # calls LABEL FROM TO DATA [VALUE] — eth_call must succeed. No fee fields: it runs at gas price 0.
 calls() {
-  moved
   out=$(cast call --from "$2" "$3" "$4" ${5:+--value "$5"} --rpc-url "$RPC" 2>&1) && echo "  OK   $1" || fail "$1: $(echo "$out" | tail -1 | head -c 200)"
 }
 # reverts LABEL FROM TO DATA [ERROR_SIGNATURE [VALUE]] — eth_call must revert, with that error when given.
 reverts() {
-  moved
   out=$(cast call --from "$2" "$3" "$4" ${6:+--value "$6"} --rpc-url "$RPC" 2>&1) && { fail "$1: did not revert"; return; }
   echo "$out" | grep -qi revert || { fail "$1: the call failed without a revert: $(echo "$out" | tail -1 | head -c 200)"; return; }
   if [ -n "${5:-}" ]; then
@@ -688,7 +683,6 @@ reverts() {
 # emitted LABEL ADDRESS EVENT_SIGNATURE TOPICS DATA — $S/receipt.json holds exactly one such log. TOPICS: its
 # leading indexed arguments, space-separated numbers, or - for none; DATA: its exact (lowercase) hex data, or - for any.
 emitted() {
-  moved
   python3 - "$S/receipt.json" "$2" "$(cast keccak "$3")" "$4" "$5" <<'PYEMITTED' && echo "  OK   $1" || fail "$1"
 import json, sys
 receipt, address, topic0, topics, data = sys.argv[1:]
@@ -705,14 +699,13 @@ sys.exit(0 if len(logs) == 1 and [int(t, 16) for t in logs[0]["topics"][1:1 + le
          and data in ("-", logs[0]["data"].lower()) else 1)
 PYEMITTED
 }
-for a in "$PUH" "$ECO_ADMIN" "$ECO_ADMIN_OWNER" "$CHAIN_ADMIN_OWNER" "$TC_ADMIN"; do
+for a in "$PUH" "$ECO_ADMIN" "$ECO_ADMIN_OWNER" "$CHAIN_ADMIN_OWNER"; do
   cast rpc anvil_setBalance "$a" 0x56BC75E2D63100000 --rpc-url "$RPC" >/dev/null
 done
 
-# Read before the upgrade: v34 must keep the limit, and a pending L2 upgrade blocks the chain's v34 upgrade.
+# Read before the upgrade: v34 must keep the limit.
 B_PRIORITY_LIMIT=$(call "$DIAMOND" 'getPriorityTxMaxGasLimit()(uint256)' | first)
-PENDING_L2_UPGRADE=$(call "$DIAMOND" 'getL2SystemContractsUpgradeTxHash()(bytes32)')
-echo "     chain $CHAIN_ID: priorityTxMaxGasLimit $B_PRIORITY_LIMIT, pending L2 upgrade tx $PENDING_L2_UPGRADE"
+echo "     chain $CHAIN_ID: priorityTxMaxGasLimit $B_PRIORITY_LIMIT"
 B_OWNER=$(call "$CTM" 'owner()(address)'); B_ADMIN=$(call "$CTM" 'admin()(address)')
 B_SN=$(call "$CTM" 'serverNotifierAddress()(address)'); B_VT=$(call "$CTM" 'validatorTimelockPostV29()(address)')
 B_CUT=$(call "$CTM" 'initialCutHash()(bytes32)'); B_CHAIN=$(call "$CTM" 'getZKChain(uint256)(address)' "$CHAIN_ID")
@@ -857,17 +850,6 @@ raise SystemExit(0 if ok else 1)
 PYFACETS
 }
 
-# A reference chain with a pending L2 upgrade (mainnet's 324 right after ZIP-18, until its first v0.33.0 batch
-# executes) can't take v34 yet: its after-upgrade checks move to the test chain. Its own upgrade then goes
-# untested, so that is a failure unless ALLOW_PENDING_L2_UPGRADE=1 (the ZIP-18 replay fork).
-REF_UPGRADES=1
-if [ "$PENDING_L2_UPGRADE" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]; then
-  REF_UPGRADES=0
-  [ "${ALLOW_PENDING_L2_UPGRADE:-0}" = "1" ] || fail "chain $CHAIN_ID has a pending L2 upgrade" \
-    "(${PENDING_L2_UPGRADE:-unreadable}), so its v34 upgrade can't be rehearsed; wait until it is finalized" \
-    "(ALLOW_PENDING_L2_UPGRADE=1 accepts the test chain's checks instead: ZIP-18 replay only)"
-fi
-
 # A fresh address with no code: well-known dev-key addresses can carry EIP-7702 code on Sepolia.
 DEPOSITOR=0x5995a0003D4AbbF54CbD8C6B4DC3A83C1Ea5912B
 # The 15M cap bounds the tx body: l2GasLimit minus the overhead, 10,000 with no calldata or factory deps.
@@ -901,22 +883,13 @@ MINT=$(mint "$CHAIN_ID")
 case "$MINT" in '' | *[!0-9]*) fail "chain $CHAIN_ID's l2TransactionBaseCost unreadable: ${MINT:-no answer}" ;; esac
 calls "before v34: l2GasLimit 15,010,001 is accepted" "$DEPOSITOR" "$BRIDGEHUB" "$(deposit "$CHAIN_ID" "$MINT" $((CAP_GAS_LIMIT + 1)))" "$MINT"
 
-if [ "$REF_UPGRADES" = "1" ]; then
-  echo "== Chain $CHAIN_ID's upgrade, sent by the ChainAdmin's owner"
-  send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$UPGRADE_CALLDATA" "ChainAdmin multicall(upgradeChainFromVersion)"
-  chain_state "chain $CHAIN_ID:" "$DIAMOND"
-  chk "chain $CHAIN_ID: L2 upgrade tx hash = keccak(abi.encode(tx))" "$(call "$DIAMOND" 'getL2SystemContractsUpgradeTxHash()(bytes32)')" "$EXP_L2_TX_HASH"
-  chk "chain $CHAIN_ID: priorityTxMaxGasLimit unchanged" "$(call "$DIAMOND" 'getPriorityTxMaxGasLimit()(uint256)' | first)" "$B_PRIORITY_LIMIT"
-  echo "== Chain $CHAIN_ID's cap on user L1->L2 transactions on v34"
-  cap_after "chain $CHAIN_ID v34:" "$CHAIN_ID" "$DIAMOND"
-else
-  echo "== Chain $CHAIN_ID has a pending L2 upgrade: its v34 upgrade must wait for it"
-  reverts "upgrade reverts with PreviousUpgradeNotFinalized" "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$UPGRADE_CALLDATA" \
-    'PreviousUpgradeNotFinalized(bytes32)'
-  for c in "state after the upgrade (the test chain's covers it)" "L2 upgrade tx hash" "priorityTxMaxGasLimit unchanged"; do
-    echo "  SKIP chain $CHAIN_ID: $c"; SKIPPED=$((SKIPPED + 1))
-  done
-fi
+echo "== Chain $CHAIN_ID's upgrade, sent by the ChainAdmin's owner"
+send "$CHAIN_ADMIN_OWNER" "$CHAIN_ADMIN" "$UPGRADE_CALLDATA" "ChainAdmin multicall(upgradeChainFromVersion)"
+chain_state "chain $CHAIN_ID:" "$DIAMOND"
+chk "chain $CHAIN_ID: L2 upgrade tx hash = keccak(abi.encode(tx))" "$(call "$DIAMOND" 'getL2SystemContractsUpgradeTxHash()(bytes32)')" "$EXP_L2_TX_HASH"
+chk "chain $CHAIN_ID: priorityTxMaxGasLimit unchanged" "$(call "$DIAMOND" 'getPriorityTxMaxGasLimit()(uint256)' | first)" "$B_PRIORITY_LIMIT"
+echo "== Chain $CHAIN_ID's cap on user L1->L2 transactions on v34"
+cap_after "chain $CHAIN_ID v34:" "$CHAIN_ID" "$DIAMOND"
 
 echo "== Test chain created with the new params, as the bridgehub admin"
 read -r TC_TARGET TC_DATA < "$S/test_create_chain.txt"
@@ -963,34 +936,12 @@ proof_switches() {
   chk "$1: disabledProofSystems = (false, false) again" "$(call "$3" 'disabledProofSystems()((bool,bool))')" "(false, false)"
 }
 
-if [ "$REF_UPGRADES" = "1" ]; then
-  proof_switches "chain $CHAIN_ID" "$CHAIN_ID" "$DIAMOND" "$CHAIN_ADMIN" "$CHAIN_ADMIN_OWNER"
-elif [ "$NEW_CHAIN" != "0x0000000000000000000000000000000000000000" ]; then
-  echo "== Moved to test chain $TEST_CHAIN_ID: the cap on v34 and the proof-system switches"
-  # The CTM made the deployer its admin; hand the chain to the ecosystem admin's Ownable ChainAdmin, which the
-  # ServerNotifier also accepts.
-  send "$TC_ADMIN" "$NEW_CHAIN" "$(cast calldata 'setPendingAdmin(address)' "$ECO_ADMIN")" "test chain: setPendingAdmin(ecosystem admin)"
-  send "$ECO_ADMIN_OWNER" "$ECO_ADMIN" "$(cast calldata "$MULTICALL" "[($NEW_CHAIN,0,$(cast calldata 'acceptAdmin()'))]" true)" \
-    "test chain: the ecosystem admin accepts"
-  MOVING=1
-  # Before a new chain takes deposits, its admin sets a base-token price and unpauses deposits (the CTM creates
-  # chains with deposits paused, ChainTypeManagerBase._deployNewChain).
-  send "$ECO_ADMIN_OWNER" "$ECO_ADMIN" \
-    "$(cast calldata "$MULTICALL" "[($NEW_CHAIN,0,$(cast calldata 'setTokenMultiplier(uint128,uint128)' 1 1)),($NEW_CHAIN,0,$(cast calldata 'unpauseDeposits()'))]" true)" \
-    "test chain: its admin sets the base-token price multiplier to 1/1 and unpauses deposits"
-  chk "test chain: deposits not paused" "$(call "$NEW_CHAIN" 'depositsPaused()(bool)')" false
-  cap_after "test chain:" "$TEST_CHAIN_ID" "$NEW_CHAIN"
-  proof_switches "test chain $TEST_CHAIN_ID" "$TEST_CHAIN_ID" "$NEW_CHAIN" "$ECO_ADMIN" "$ECO_ADMIN_OWNER"
-  MOVING=0
-else
-  fail "the moved checks: no test chain"
-fi
+proof_switches "chain $CHAIN_ID" "$CHAIN_ID" "$DIAMOND" "$CHAIN_ADMIN" "$CHAIN_ADMIN_OWNER"
 
 echo
 checks() { [ "$1" = "1" ] && echo "1 check" || echo "$1 checks"; }
 NOTE=
 [ "$SKIPPED" = "0" ] || NOTE="$(checks "$SKIPPED") skipped"
-[ "$MOVED" = "0" ] || NOTE="${NOTE:+$NOTE, }$(checks "$MOVED") moved to the test chain"
 if [ "$FAILED" = "0" ]; then
   echo "REHEARSAL PASSED${NOTE:+ ($NOTE)}"
 else
