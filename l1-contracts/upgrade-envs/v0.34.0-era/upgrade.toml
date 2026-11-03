@@ -13,6 +13,6 @@ args = [
 builtin_checks = true
 fork_tests = [
   { path = "test/foundry/fork/V34EraUpgrade.t.sol" },
-  # Skips where the reference chain verifies real proofs.
-  { path = "test/foundry/fork/V34EraFirstBatch.t.sol", may_skip_in = ["mainnet"] },
+  # Its synthetic batches need a testnet verifier.
+  { path = "test/foundry/fork/V34EraFirstBatch.t.sol", envs = ["testnet3"] },
 ]

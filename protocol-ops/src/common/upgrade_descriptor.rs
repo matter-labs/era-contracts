@@ -67,15 +67,46 @@ pub struct ForgeScriptUpgrade {
     pub execution: Option<Box<ExecutionScript>>,
 }
 
-/// Passes with a passed test and none failed or skipped; in the `may_skip_in` envs, skips are
-/// allowed and an all-skipped file passes.
+/// Passes when forge exits 0 and every one of its tests, at least one, passed: none may skip.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ForkTest {
     /// Relative to `l1-contracts/`.
     pub path: String,
+    /// The environments it runs in; absent means every environment. Leave out one where it
+    /// can't pass, e.g. a production verifier.
     #[serde(default)]
-    pub may_skip_in: Vec<String>,
+    pub envs: Option<Vec<String>>,
+}
+
+impl ForkTest {
+    pub fn runs_in(&self, env: &str) -> bool {
+        self.envs
+            .as_ref()
+            .is_none_or(|envs| envs.iter().any(|listed| listed == env))
+    }
+}
+
+/// `what`'s `envs`, if given, must name environments with permanent values.
+fn check_envs(
+    what: &str,
+    envs: Option<&[String]>,
+    has_permanent_values: &impl Fn(&str) -> bool,
+) -> anyhow::Result<()> {
+    let Some(envs) = envs else {
+        return Ok(());
+    };
+    anyhow::ensure!(
+        !envs.is_empty(),
+        "{what}.envs is empty; drop it to run it for every env"
+    );
+    for env in envs {
+        anyhow::ensure!(
+            is_plain_name(env) && has_permanent_values(env),
+            "{what}.envs lists {env:?}, which has no permanent-values/<env>.toml"
+        );
+    }
+    Ok(())
 }
 
 /// A read-only forge script that writes the transactions whoever executes the upgrade sends
@@ -170,6 +201,10 @@ impl UpgradeDescriptor {
                     "fork_tests needs builtin_checks = true: the tests run on its replay"
                 );
             }
+            for test in &upgrade.fork_tests {
+                let what = format!("fork_tests {:?}", test.path);
+                check_envs(&what, test.envs.as_deref(), &has_permanent_values)?;
+            }
             // Fail on a malformed signature or argument list when loading, not mid-run.
             upgrade.calldata("env")?;
             if let Some(execution) = &upgrade.execution {
@@ -181,18 +216,11 @@ impl UpgradeDescriptor {
                     "execution.output {:?} must be a file name under output/<env>/",
                     execution.output
                 );
-                if let Some(envs) = &execution.envs {
-                    anyhow::ensure!(
-                        !envs.is_empty(),
-                        "execution.envs is empty; drop it to run the script for every env"
-                    );
-                    for env in envs {
-                        anyhow::ensure!(
-                            is_plain_name(env) && has_permanent_values(env),
-                            "execution.envs lists {env:?}, which has no permanent-values/<env>.toml"
-                        );
-                    }
-                }
+                check_envs(
+                    "execution",
+                    execution.envs.as_deref(),
+                    &has_permanent_values,
+                )?;
             }
         }
         Ok(descriptor)
@@ -500,7 +528,7 @@ output = "emergency-upgrade-board.json"
 
     #[test]
     fn fork_tests_need_builtin_checks() {
-        let fork_tests = "fork_tests = [{ path = \"test/foundry/fork/X.t.sol\", may_skip_in = [\"mainnet\"] }]\n";
+        let fork_tests = "fork_tests = [{ path = \"test/foundry/fork/X.t.sol\" }]\n";
         let error = parse(&format!("{fork_tests}{FORGE_SCRIPT}")).unwrap_err();
         assert!(format!("{error:#}").contains("fork_tests needs builtin_checks"));
         let upgrade = forge_script(&format!(
@@ -510,11 +538,40 @@ output = "emergency-upgrade-board.json"
             upgrade.fork_tests,
             [ForkTest {
                 path: "test/foundry/fork/X.t.sol".to_string(),
-                may_skip_in: vec!["mainnet".to_string()],
+                envs: None,
             }]
         );
-        let unknown = "builtin_checks = true\nfork_tests = [{ path = \"x\", skip = true }]\n";
-        assert!(parse(&format!("{unknown}{FORGE_SCRIPT}")).is_err());
+        // `may_skip_in` is gone: no fork test may skip.
+        for unknown in ["skip = true", "may_skip_in = [\"stage\"]"] {
+            let raw = format!(
+                "builtin_checks = true\nfork_tests = [{{ path = \"x\", {unknown} }}]\n{FORGE_SCRIPT}"
+            );
+            assert!(parse(&raw).is_err(), "{unknown} accepted");
+        }
+    }
+
+    /// The descriptor with one fork test whose `envs` is `envs`.
+    fn with_fork_test_envs(envs: &str) -> String {
+        format!(
+            "builtin_checks = true\nfork_tests = [{{ path = \"x\", envs = {envs} }}]\n{FORGE_SCRIPT}"
+        )
+    }
+
+    #[test]
+    fn a_fork_test_runs_in_its_envs_or_every_env() {
+        let scoped = forge_script(&with_fork_test_envs(r#"["stage"]"#));
+        assert!(scoped.fork_tests[0].runs_in("stage"));
+        assert!(!scoped.fork_tests[0].runs_in("testnet"));
+        let unscoped = ForkTest {
+            path: "x".to_string(),
+            envs: None,
+        };
+        assert!(["stage", "testnet", "mainnet"]
+            .iter()
+            .all(|env| unscoped.runs_in(env)));
+        for bad in ["[]", r#"["mainnet"]"#, r#"["../permanent-values/stage"]"#] {
+            assert!(parse(&with_fork_test_envs(bad)).is_err(), "{bad} accepted");
+        }
     }
 
     /// Every committed `upgrade-envs/<upgrade>/upgrade.toml` parses.

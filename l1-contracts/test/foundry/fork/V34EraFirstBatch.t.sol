@@ -29,7 +29,7 @@ import {Bytes} from "contracts/vendor/Bytes.sol";
 /// @dev Runs on protocol-ops' replayed fork (`fork_tests`). The last v33 batch's stored info comes from its execute
 /// tx input in `CHECKS_DIR/last_execute_input.hex`, or in a local run from `V34_PREV_BATCH`. The batches are
 /// synthetic: nothing runs on L2, and the testnet verifier accepts the empty proof, so public inputs and verification
-/// keys go untested. Skips on a production verifier.
+/// keys go untested. A production verifier rejects them: `upgrade.toml` runs this on testnet3 only.
 contract V34EraFirstBatchForkTest is Test {
     // Synthetic batch contents: L1 only needs them to be non-zero and consistent.
     bytes32 internal constant STATE_DIFF_HASH = keccak256("v34 fork test: state diff hash");
@@ -78,9 +78,7 @@ contract V34EraFirstBatchForkTest is Test {
         uint256 newProtocolVersion = ctm.protocolVersion();
         // Before reading the verifier: a production v33 one has no `IS_TESTNET_VERIFIER()`.
         assertEq(chain.getProtocolVersion(), newProtocolVersion, "chain protocol version");
-        if (!IEraMultiProofVerifier(chain.getVerifier()).IS_TESTNET_VERIFIER()) {
-            vm.skip(true, "a production verifier rejects the synthetic batches' empty proofs");
-        }
+        assertTrue(IEraMultiProofVerifier(chain.getVerifier()).IS_TESTNET_VERIFIER(), "a testnet verifier");
 
         bytes memory prevBatch = vm.envOr("V34_PREV_BATCH", bytes(""));
         if (prevBatch.length == 0) {

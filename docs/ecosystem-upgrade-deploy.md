@@ -129,8 +129,9 @@ fails while the reference chain has a pending L2 upgrade, and when its last exec
 blocks before the fork block (none executed there, or an RPC error). Each `fork_tests` file then runs as `forge test`
 on the replayed fork, with `L1_RPC_URL`, `FORK_URL` (the RPC the fork was taken from, for reads at
 `FORK_BLOCK`), `FORK_BLOCK`, `UPGRADE_ENV`, `REFERENCE_CHAIN_ID`, `TEST_CHAIN_ID` and `CHECKS_DIR` (`ecosystem.toml`,
-and the input of the reference chain's last execute tx in `last_execute_input.hex`) exported. A file passes with a
-passed test and nothing failed or skipped; in its `may_skip_in` envs, skips are allowed and an all-skipped file passes.
+and the input of the reference chain's last execute tx in `last_execute_input.hex`) exported. Every listed file must
+exist; each runs in the envs its `envs` lists (absent: every env) and passes when forge exits 0 and all its tests, at
+least one, passed. None may skip: leave an env out of `envs` where the file can't pass.
 Pass `--upgrade <upgrade>` (in CI, `-f upgrade=<upgrade>`); the rest is as above:
 
 ```bash

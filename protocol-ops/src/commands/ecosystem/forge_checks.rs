@@ -272,7 +272,7 @@ pub(crate) async fn check_publication(
     if let Err(error) = registered.await {
         report.error(format!(
             "the bridgehub's CTM for the reference chain: {}",
-            quote(&format!("{error:#}"))
+            redact_urls(&format!("{error:#}"))
         ));
     }
     report.equal(
@@ -1258,7 +1258,7 @@ fn execute_log_windows(fork_block: u64) -> Vec<(u64, u64)> {
 
 // ─── fork_tests ──────────────────────────────────────────────────────────────────
 
-/// `forge test --json` per suite, as far as the verdict reads it.
+/// `forge test --json`'s result for one suite, as far as the verdict reads it.
 #[derive(Deserialize)]
 struct SuiteResult {
     test_results: BTreeMap<String, TestResult>,
@@ -1266,164 +1266,50 @@ struct SuiteResult {
 
 #[derive(Deserialize)]
 struct TestResult {
-    status: String,
+    status: TestStatus,
+    /// Forge's reason for a failure or skip, e.g. the failed assertion.
     reason: Option<String>,
 }
 
-/// Cap on a quoted forge error or test reason, in characters.
-const QUOTE_MAX_CHARS: usize = 300;
-
-/// One file's verdict by `ForkTest`'s rule, naming every failure; `Ok` holds the allowed skips
-/// with their reasons. The result is stdout's one line starting with `{` (forge logs there too).
-/// Unknown output fails, so another forge's format can't pass. Without JSON it quotes forge's
-/// error; a failure quotes the log's first error, which names a failed request.
-fn fork_test_verdict(
-    stdout: &str,
-    stderr: &str,
-    exited_ok: bool,
-    env: &str,
-    test: &ForkTest,
-) -> anyhow::Result<Vec<String>> {
-    let (stdout, stderr) = (strip_ansi(stdout), strip_ansi(stderr));
-    let lines: Vec<&str> = stdout
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .collect();
-    if lines.is_empty() {
-        // Forge 1.5.1 prints nothing and exits 0 when no file matches.
-        anyhow::ensure!(
-            !exited_ok,
-            "no results: no test file matches (missing or renamed?)"
-        );
-        anyhow::bail!(
-            "forge test failed without results: {}",
-            forge_error(&[], &stderr).unwrap_or_else(|| "forge printed no error".to_string())
-        );
-    }
-    let errors: Vec<&str> = lines
-        .iter()
-        .copied()
-        .filter(|line| tracing_level(line) == Some("ERROR"))
-        .collect();
-    let logged = errors.first().map_or(String::new(), |first| {
-        format!(
-            "; forge logged {} error(s), the first: {}",
-            errors.len(),
-            quote(first)
-        )
-    });
-    let (json, other): (Vec<&str>, Vec<&str>) = lines
-        .iter()
-        .copied()
-        .filter(|line| tracing_level(line).is_none())
-        .partition(|line| line.starts_with('{'));
-    let suites: BTreeMap<String, SuiteResult> = match json.as_slice() {
-        [line] => match serde_json::from_str(line) {
-            Ok(suites) => suites,
-            // A syntax or EOF error: a line of forge's output, not its result.
-            Err(error) if !error.is_data() => anyhow::bail!(
-                "forge test's output is not JSON ({error}){}{logged}",
-                forge_error(&other, &stderr).map_or(String::new(), |error| format!(": {error}"))
-            ),
-            // serde quotes the value it rejects, which can hold a URL.
-            Err(error) => anyhow::bail!(
-                "forge test's JSON is not in Foundry v1.5.1's format: {}",
-                quote(&error.to_string())
-            ),
-        },
-        [] => anyhow::bail!(
-            "forge test printed no JSON result{}{logged}",
-            forge_error(&other, &stderr).map_or(String::new(), |error| format!(": {error}"))
-        ),
-        _ => anyhow::bail!(
-            "forge test printed {} JSON lines, not one{logged}",
-            json.len()
-        ),
-    };
-    let may_skip = test.may_skip_in.iter().any(|listed| listed == env);
-    let (mut passed, mut skips, mut failures) = (0, Vec::new(), Vec::new());
-    for (suite, result) in &suites {
-        for (name, test_result) in &result.test_results {
-            let reason = quote(test_result.reason.as_deref().unwrap_or("no reason"));
-            match test_result.status.as_str() {
-                "Success" => passed += 1,
-                "Failure" => failures.push(format!("{suite} {name} failed: {reason}")),
-                "Skipped" if may_skip => skips.push(format!("{suite} {name}: {reason}")),
-                "Skipped" => failures.push(format!(
-                    "{suite} {name} skipped ({reason}) outside may_skip_in"
-                )),
-                other => failures.push(format!("{suite} {name}: unknown status {other:?}")),
-            }
-        }
-    }
-    anyhow::ensure!(failures.is_empty(), "{}{logged}", failures.join("; "));
-    // No failures: every result passed or is an allowed skip.
-    anyhow::ensure!(passed + skips.len() > 0, "no results{logged}");
-    anyhow::ensure!(exited_ok, "forge test exited with an error{logged}");
-    Ok(skips)
+/// Foundry v1.5.1's; any other status fails to parse.
+#[derive(Debug, Deserialize)]
+enum TestStatus {
+    Success,
+    Failure,
+    Skipped,
 }
 
-/// The level of a forge log line (`<time> <LEVEL> <target>: <message>`, on stdout); `None` for
-/// any other line.
-fn tracing_level(line: &str) -> Option<&str> {
-    let mut words = line.split_whitespace();
-    let time = words.next()?;
-    let level = words.next()?;
-    (time.ends_with('Z') && ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"].contains(&level))
-        .then_some(level)
-}
-
-/// Forge's first `Error` line with the causes under it, from stderr, else from `stdout` (lines
-/// neither result nor log); else `stdout`'s first line.
-fn forge_error(stdout: &[&str], stderr: &str) -> Option<String> {
-    let stderr: Vec<&str> = stderr.lines().map(str::trim).collect();
-    let error_block = [&stderr[..], stdout].into_iter().find_map(|output| {
-        let mut lines = output
+/// A file passes when forge exits 0 and every one of its tests, at least one, passed. `stdout`
+/// must be the JSON result alone, so anything else forge prints fails it. A failure carries
+/// forge's reason with its URLs redacted: `Report::error` prints it before `CheckFailures` would.
+fn fork_test_verdict(stdout: &str, exited_ok: bool) -> anyhow::Result<()> {
+    let suites = serde_json::from_str::<BTreeMap<String, SuiteResult>>(stdout);
+    if let Ok(suites) = &suites {
+        let not_passed: Vec<String> = suites
             .iter()
-            .copied()
-            .skip_while(|line| !line.starts_with("Error"));
-        let headline = lines.next()?;
-        // eyre's report: a blank line, `Context:`, then `- Error #<n>: <cause>` lines.
-        let causes = lines
-            .take_while(|line| {
-                line.is_empty() || *line == "Context:" || line.starts_with("- Error #")
+            .flat_map(|(suite, result)| {
+                result
+                    .test_results
+                    .iter()
+                    .filter(|(_, test)| !matches!(test.status, TestStatus::Success))
+                    .map(move |(name, test)| {
+                        let reason = test
+                            .reason
+                            .as_deref()
+                            .map_or(String::new(), |reason| format!(": {}", redact_urls(reason)));
+                        format!("{suite} {name}: {:?}{reason}", test.status)
+                    })
             })
-            .filter_map(|line| line.split_once(": ").map(|(_, cause)| cause));
-        Some(
-            std::iter::once(headline)
-                .chain(causes)
-                .collect::<Vec<_>>()
-                .join(": "),
-        )
-    });
-    error_block
-        .or_else(|| stdout.first().map(|line| line.to_string()))
-        .map(|error| quote(&error))
-}
-
-/// For a message: no colours, URLs redacted, cut to `QUOTE_MAX_CHARS`.
-fn quote(text: &str) -> String {
-    let text = redact_urls(&strip_ansi(text));
-    match text.char_indices().nth(QUOTE_MAX_CHARS) {
-        Some((cut, _)) => format!("{}…", &text[..cut]),
-        None => text,
+            .collect();
+        anyhow::ensure!(not_passed.is_empty(), "{}", not_passed.join("; "));
     }
-}
-
-/// Forge colours its log even when stdout isn't a terminal.
-fn strip_ansi(text: &str) -> String {
-    let mut stripped = String::with_capacity(text.len());
-    let mut chars = text.chars();
-    while let Some(c) = chars.next() {
-        if c != '\x1b' {
-            stripped.push(c);
-        } else if chars.next() == Some('[') {
-            // A CSI sequence ends with a byte in `@`..=`~`; any other escape is two characters.
-            chars.by_ref().find(|c| ('@'..='~').contains(c));
-        }
-    }
-    stripped
+    anyhow::ensure!(exited_ok, "forge test exited with an error");
+    let suites = suites.context("forge test's stdout is not its JSON result")?;
+    anyhow::ensure!(
+        suites.values().any(|suite| !suite.test_results.is_empty()),
+        "no test ran"
+    );
+    Ok(())
 }
 
 /// Each URL, from its scheme to whitespace, `)`, `"` or `'`, becomes `<url>`: an RPC URL can
@@ -1448,12 +1334,14 @@ pub(crate) fn redact_urls(text: &str) -> String {
     redacted
 }
 
-/// At most this many lines of forge's stderr or log go into ours.
-const TAIL_LINES: usize = 20;
-
-fn tail(lines: &[&str]) -> String {
-    let start = lines.len().saturating_sub(TAIL_LINES);
-    redact_urls(&strip_ansi(&lines[start..].join("\n")))
+/// The listed files missing under `l1_contracts`, whatever their envs: forge exits 0 on a
+/// `--match-path` that matches nothing.
+fn missing_fork_tests<'a>(l1_contracts: &Path, tests: &'a [ForkTest]) -> Vec<&'a str> {
+    tests
+        .iter()
+        .map(|test| test.path.as_str())
+        .filter(|path| !l1_contracts.join(path).is_file())
+        .collect()
 }
 
 #[derive(Clone, Copy)]
@@ -1472,6 +1360,13 @@ pub(crate) fn run_fork_tests(
     checks_dir: &Path,
 ) -> anyhow::Result<()> {
     const FORK_URL: &str = "FORK_URL";
+    let l1_contracts = paths::resolve_l1_contracts_path()?;
+    let missing = missing_fork_tests(&l1_contracts, tests);
+    anyhow::ensure!(
+        missing.is_empty(),
+        "fork_tests lists files that don't exist: {}",
+        missing.join(", ")
+    );
     fs::copy(ecosystem_toml, checks_dir.join("ecosystem.toml"))
         .context("copy ecosystem.toml into CHECKS_DIR")?;
     let exports = [
@@ -1495,7 +1390,6 @@ pub(crate) fn run_fork_tests(
         };
         logger::info(format!("{name}={shown}"));
     }
-    let l1_contracts = paths::resolve_l1_contracts_path()?;
     let version = Command::new("forge")
         .arg("--version")
         .output()
@@ -1512,6 +1406,10 @@ pub(crate) fn run_fork_tests(
     // the Anvil while forge runs, or its reads fall below the head.
     let mut report = Report::default();
     for test in tests {
+        if !test.runs_in(env) {
+            logger::info(format!("fork test {} doesn't run in {env}", test.path));
+            continue;
+        }
         let out = Command::new("forge")
             .args([
                 "test",
@@ -1528,29 +1426,15 @@ pub(crate) fn run_fork_tests(
             .arg(checks_dir.join("forge-cache"))
             .current_dir(&l1_contracts)
             .envs(exports.iter().map(|(name, value)| (name, value)))
+            // Forge logs to stdout, at the default level a failed RPC read among it; with its log
+            // off, stdout is the JSON result alone.
+            .env("RUST_LOG", "off")
             .output()
             .with_context(|| format!("run forge test for {}", test.path))?;
-        let stdout = String::from_utf8_lossy(&out.stdout);
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        // Forge's log (e.g. a timed-out request), whatever the verdict.
-        let plain = strip_ansi(&stdout);
-        let log: Vec<&str> = plain
-            .lines()
-            .map(str::trim)
-            .filter(|line| tracing_level(line).is_some())
-            .collect();
-        if !log.is_empty() {
-            logger::warn(format!("forge's log for {}:\n{}", test.path, tail(&log)));
-        }
-        match fork_test_verdict(&stdout, &stderr, out.status.success(), env, test) {
-            Ok(skips) => {
-                for skip in &skips {
-                    logger::info(format!("allowed skip in {env}: {skip}"));
-                }
-                report.ok(format!("fork test {}", test.path));
-            }
+        match fork_test_verdict(&String::from_utf8_lossy(&out.stdout), out.status.success()) {
+            Ok(()) => report.ok(format!("fork test {}", test.path)),
             Err(error) => {
-                logger::warn(tail(&stderr.lines().collect::<Vec<_>>()));
+                logger::warn(redact_urls(&String::from_utf8_lossy(&out.stderr)));
                 report.error(format!("{}: {error:#}", test.path));
             }
         }
@@ -1921,269 +1805,111 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         assert_ne!(force_deployments_hash(&data), keccak256(&data));
     }
 
-    // Hand-written to Foundry v1.5.1's `--json` shape (CI pins v1.5.1):
-    // `{"<file>:<contract>": {"duration", "test_results": {"<test>": {"status", "reason", …}},
-    // "warnings"}}`. A `vm.skip` in `setUp` comes back as one `setUp()` result.
-    const PASSED: &str = r#"{"test/foundry/fork/V34EraUpgrade.t.sol:V34EraUpgradeTest":{"duration":"2.41s","test_results":{"test_chainState()":{"status":"Success","reason":null,"counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":912345}},"traces":[],"labeled_addresses":{},"duration":{"secs":1,"nanos":20},"breakpoints":{},"gas_snapshots":{}},"test_proofSwitches()":{"status":"Success","reason":null,"counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":512345}},"traces":[],"labeled_addresses":{},"duration":{"secs":0,"nanos":900},"breakpoints":{},"gas_snapshots":{}}},"warnings":[]}}"#;
-    const SETUP_SKIPPED: &str = r#"{"test/foundry/fork/V34EraFirstBatch.t.sol:V34EraFirstBatchForkTest":{"duration":"0.12s","test_results":{"setUp()":{"status":"Skipped","reason":"a production verifier rejects the synthetic batches' empty proofs","counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":0}},"traces":[],"labeled_addresses":{},"duration":{"secs":0,"nanos":0},"breakpoints":{},"gas_snapshots":{}}},"warnings":[]}}"#;
+    /// Forge 1.5.1's stdout under `RUST_LOG=off` for a file that skips in `setUp`.
+    const SKIPPED: &str = r#"{"test/foundry/fork/V34EraUpgrade.t.sol:V34EraUpgradeForkTest":{"duration":"244µs 916ns","test_results":{"setUp()":{"status":"Skipped","reason":"skipped: no CHECKS_DIR: protocol-ops' fork_tests run this on the fork it replayed the upgrade on","counterexample":null,"logs":[],"decoded_logs":[],"kind":{"Unit":{"gas":0}},"traces":[],"labeled_addresses":{},"duration":"0s","breakpoints":{},"gas_snapshots":{}}},"warnings":[]}}"#;
 
-    const SUITE: &str = "test/foundry/fork/V34EraUpgrade.t.sol:V34EraUpgradeTest";
-
-    fn fork_test(may_skip_in: &[&str]) -> ForkTest {
-        ForkTest {
-            path: "test/foundry/fork/V34EraUpgrade.t.sol".to_string(),
-            may_skip_in: may_skip_in.iter().map(|env| env.to_string()).collect(),
-        }
+    /// `SKIPPED` with its one result's status and reason replaced.
+    fn with_result(status: &str, reason: Option<&str>) -> String {
+        let reason = reason.map_or("null".to_string(), |reason| format!("{reason:?}"));
+        let skipped = r#""status":"Skipped","reason":"skipped: no CHECKS_DIR: protocol-ops' fork_tests run this on the fork it replayed the upgrade on""#;
+        SKIPPED.replace(
+            skipped,
+            &format!(r#""status":"{status}","reason":{reason}"#),
+        )
     }
 
-    fn verdict(
-        stdout: &str,
-        exited_ok: bool,
-        env: &str,
-        may_skip_in: &[&str],
-    ) -> Result<Vec<String>, String> {
-        fork_test_verdict(stdout, "", exited_ok, env, &fork_test(may_skip_in))
-            .map_err(|error| format!("{error:#}"))
+    fn with_status(status: &str) -> String {
+        with_result(status, None)
+    }
+
+    fn verdict(stdout: &str, exited_ok: bool) -> Result<(), String> {
+        fork_test_verdict(stdout, exited_ok).map_err(|error| format!("{error:#}"))
     }
 
     #[test]
-    fn a_fork_test_file_passes_only_with_a_passed_test_and_nothing_failed() {
-        assert_eq!(verdict(PASSED, true, "testnet3", &[]), Ok(vec![]));
-        let failed = PASSED.replacen(
-            r#""status":"Success","reason":null"#,
-            r#""status":"Failure","reason":"TooMuchGas()""#,
-            1,
+    fn a_fork_test_file_passes_only_if_every_test_passed() {
+        assert_eq!(verdict(&with_status("Success"), true), Ok(()));
+        let suite = "test/foundry/fork/V34EraUpgrade.t.sol:V34EraUpgradeForkTest";
+        assert_eq!(
+            verdict(&with_status("Failure"), false),
+            Err(format!("{suite} setUp(): Failure"))
         );
-        let error = verdict(&failed, false, "testnet3", &["testnet3"]).unwrap_err();
-        assert!(
-            error.contains("test_chainState() failed: TooMuchGas()"),
-            "{error}"
+        // Forge's reason comes along, without the URLs in it.
+        let reason = "could not instantiate forked environment with provider \
+            https://eth.example/v2/SOMEKEY: operation timed out";
+        assert_eq!(
+            verdict(&with_result("Failure", Some(reason)), false),
+            Err(format!(
+                "{suite} setUp(): Failure: could not instantiate forked environment with \
+                 provider <url> operation timed out"
+            ))
         );
-    }
-
-    #[test]
-    fn skips_pass_only_in_the_envs_a_file_names() {
-        // One test skipped, one passed.
-        let reason = "a production verifier rejects the synthetic batches' empty proofs";
-        let one_skipped = PASSED.replacen(
-            r#""status":"Success","reason":null"#,
-            &format!(r#""status":"Skipped","reason":"{reason}""#),
-            1,
+        // A skip fails even where forge exits 0.
+        assert_eq!(
+            verdict(SKIPPED, true),
+            Err(format!(
+                "{suite} setUp(): Skipped: skipped: no CHECKS_DIR: protocol-ops' fork_tests run \
+                 this on the fork it replayed the upgrade on"
+            ))
+        );
+        // A failure beside a pass.
+        let two = with_status("Success").replace(
+            r#""test_results":{"#,
+            r#""test_results":{"test_cap()":{"status":"Failure"},"#,
         );
         assert_eq!(
-            verdict(&one_skipped, true, "mainnet", &["mainnet"]),
-            Ok(vec![format!("{SUITE} test_chainState(): {reason}")])
+            verdict(&two, false),
+            Err(format!("{suite} test_cap(): Failure"))
         );
-        let error = verdict(&one_skipped, true, "testnet3", &["mainnet"]).unwrap_err();
-        assert!(
-            error.contains(&format!("skipped ({reason}) outside may_skip_in")),
-            "{error}"
-        );
-        // All skipped (in setUp): passes where it may skip, fails elsewhere, even beside a
-        // passing file.
-        assert_eq!(
-            verdict(SETUP_SKIPPED, true, "mainnet", &["mainnet"])
-                .unwrap()
-                .len(),
-            1
-        );
-        assert!(verdict(SETUP_SKIPPED, true, "testnet3", &[])
-            .unwrap_err()
-            .contains("setUp() skipped"));
-        assert!(verdict(PASSED, true, "testnet3", &[]).is_ok());
     }
 
     #[test]
-    fn output_the_verdict_does_not_know_fails() {
-        // No file matched.
-        for may_skip_in in [&[][..], &["testnet3"][..]] {
-            let error = verdict("", true, "testnet3", may_skip_in).unwrap_err();
-            assert!(error.contains("no results"), "{error}");
-            assert!(verdict("\n", false, "testnet3", may_skip_in).is_err());
-        }
-        let unknown = PASSED.replacen(r#""status":"Success""#, r#""status":"Ignored""#, 1);
-        assert!(verdict(&unknown, true, "testnet3", &[])
-            .unwrap_err()
-            .contains("unknown status"));
-        let renamed = PASSED.replace("test_results", "results");
-        assert!(verdict(&renamed, true, "testnet3", &[])
-            .unwrap_err()
-            .contains("v1.5.1"));
-        assert!(verdict("Compiling 3 files", true, "testnet3", &[]).is_err());
-        assert!(verdict("{}", true, "testnet3", &["testnet3"])
-            .unwrap_err()
-            .contains("no results"));
-        // Parsed, but forge said it failed.
-        assert!(verdict(PASSED, false, "testnet3", &[])
-            .unwrap_err()
-            .contains("exited with an error"));
-    }
-
-    #[test]
-    fn every_failure_is_named() {
-        // A failure in one suite, a failure and a disallowed skip in the other.
-        let suite = |name: &str, statuses: &[(&str, &str)]| {
-            let mut json = PASSED.replace("V34EraUpgradeTest", name);
-            for (status, reason) in statuses {
-                json = json.replacen(
-                    r#""status":"Success","reason":null"#,
-                    &format!(r#""status":"{status}","reason":"{reason}""#),
-                    1,
-                );
-            }
-            json[1..json.len() - 1].to_string()
-        };
-        let a = suite("A", &[("Failure", "TooMuchGas()")]);
-        let b = suite(
-            "B",
-            &[
-                ("Failure", "SlotOccupied() != already initialized"),
-                ("Skipped", "fork https://eth.example/v2/SOMEKEY unreachable"),
-            ],
-        );
-        let error = verdict(&format!("{{{a},{b}}}"), false, "testnet3", &[]).unwrap_err();
-        for named in [
-            "V34EraUpgrade.t.sol:A test_chainState() failed: TooMuchGas()",
-            "V34EraUpgrade.t.sol:B test_chainState() failed: SlotOccupied() != already initialized",
-            "V34EraUpgrade.t.sol:B test_proofSwitches() skipped (fork <url> unreachable) outside",
-        ] {
-            assert!(error.contains(named), "{named} in {error}");
-        }
-        assert!(!error.contains("SOMEKEY"), "{error}");
-    }
-
-    #[test]
-    fn output_that_is_not_json_quotes_forges_error() {
-        let failed = |stdout: &str, stderr: &str| {
-            let error = fork_test_verdict(stdout, stderr, false, "mainnet", &fork_test(&[]));
-            format!("{:#}", error.unwrap_err())
-        };
-        // Forge's stderr for a fork it couldn't reach, as in a mainnet replay.
-        let stderr = "Warning: Found unknown `zksync` config for profile `default` defined in foundry.toml.\n\
-            Error: could not instantiate forked environment with provider localhost\n\
-            \n\
-            Context:\n\
-            - Error #0: error sending request for url (http://localhost:29550/)\n\
-            - Error #1: operation timed out\n";
-        let forge = "Error: could not instantiate forked environment with provider localhost: \
-            error sending request for url (<url>): operation timed out";
+    fn a_result_the_verdict_does_not_know_fails() {
+        // No test ran: no suite, or a suite without results.
+        assert_eq!(verdict("{}", true), Err("no test ran".to_string()));
+        let empty = r#"{"x.t.sol:X":{"test_results":{}}}"#;
+        assert_eq!(verdict(empty, true), Err("no test ran".to_string()));
+        // All passed, but forge exited with an error.
         assert_eq!(
-            failed("", stderr),
-            format!("forge test failed without results: {forge}")
+            verdict(&with_status("Success"), false),
+            Err("forge test exited with an error".to_string())
         );
-        assert_eq!(
-            failed("Compiling 3 files", stderr),
-            format!("forge test printed no JSON result: {forge}")
-        );
-        // A result cut short.
-        let cut = failed(&PASSED[..PASSED.len() / 2], stderr);
-        assert!(
-            cut.starts_with("forge test's output is not JSON (EOF while parsing")
-                && cut.ends_with(&format!("): {forge}")),
-            "{cut}"
-        );
-        // The exit status doesn't change that.
-        let exited_ok = fork_test_verdict("Compiling", stderr, true, "mainnet", &fork_test(&[]));
-        assert!(format!("{:#}", exited_ok.unwrap_err()).ends_with(forge));
-        // An `Error` line on stdout, or else stdout's first line.
-        let warnings = "Warning: Found unknown `zksync` config for profile `default`.\n";
-        assert!(failed("Error: could not read CHECKS_DIR\n", warnings)
-            .ends_with("result: Error: could not read CHECKS_DIR"));
-        assert!(
-            failed("\nCompiling 3 files\nDone", warnings).ends_with("result: Compiling 3 files")
-        );
-        assert!(failed("", "").ends_with(": forge printed no error"));
-        // Kept short.
-        let long = failed(&format!("Error: {}", "x".repeat(1000)), "");
-        assert!(long.ends_with('…') && long.chars().count() < 2 * QUOTE_MAX_CHARS);
-        // No URL survives, even one across the cut.
-        let upstream = "Error: upstream (https://user:pw@eth.example/v2/SOMEKEY?k=1) failed";
-        let near_the_cut = format!("Error: {} https://eth.example/v2/SOMEKEY", "x".repeat(282));
-        for stdout in [upstream.to_string(), near_the_cut] {
-            let error = failed(&stdout, "");
+        // Not the JSON alone: nothing, a log line before it, or another status.
+        let logged = format!("2026-11-03T15:50:58Z ERROR sharedbackend: failed\n{SKIPPED}");
+        for stdout in ["", logged.as_str(), &with_status("Ignored")] {
+            let error = verdict(stdout, true).unwrap_err();
             assert!(
-                !error.contains("://") && !error.contains("SOMEKEY"),
+                error.starts_with("forge test's stdout is not its JSON result"),
                 "{error}"
             );
         }
-        assert!(failed(upstream, "").ends_with(": Error: upstream (<url>) failed"));
-        // Valid JSON of another shape is a format error, without forge's output.
-        let renamed = failed(&PASSED.replace("test_results", "results"), stderr);
-        assert!(renamed.contains("v1.5.1") && !renamed.contains("operation timed out"));
-        // serde quotes a rejected value: its URL is redacted.
-        let shape = r#"{"x.t.sol:X":{"test_results":"https://eth.example/v2/SOMEKEY"}}"#;
-        let quoted = failed(shape, "");
-        assert!(
-            quoted.contains(r#"invalid type: string "<url>""#) && !quoted.contains("SOMEKEY"),
-            "{quoted}"
+    }
+
+    #[test]
+    fn a_missing_fork_test_file_is_named() {
+        let root = tempfile::tempdir().unwrap();
+        fs::create_dir_all(root.path().join("test")).unwrap();
+        fs::write(root.path().join("test/A.t.sol"), "").unwrap();
+        let test = |path: &str| ForkTest {
+            path: path.to_string(),
+            envs: Some(vec!["mainnet".to_string()]),
+        };
+        let tests = [test("test/A.t.sol"), test("test/B.t.sol"), test("test")];
+        // Whatever its envs; a directory is no file.
+        assert_eq!(
+            missing_fork_tests(root.path(), &tests),
+            ["test/B.t.sol", "test"]
         );
     }
 
-    /// Forge 1.5.1's log line for a timed-out read, coloured, from CI gate run 41665061152 (with
-    /// an upstream URL here).
-    const TIMEOUT_LOG: &str = "\x1b[2m2026-11-03T15:50:58.223673Z\x1b[0m \x1b[31mERROR\x1b[0m \
-        \x1b[2msharedbackend\x1b[0m\x1b[2m:\x1b[0m Failed to send/recv `storage` \x1b[3merr\x1b[0m\
-        \x1b[2m=\x1b[0mfailed to get storage for 0xbB94d8F4080d5CD34d6215399f26771990f38A1d at 45: \
-        error sending request for url (https://eth.example/v2/SOMEKEY); operation timed out \
-        \x1b[3maddress\x1b[0m\x1b[2m=\x1b[0m0xbB94d8F4080d5CD34d6215399f26771990f38A1d \
-        \x1b[3mindex\x1b[0m\x1b[2m=\x1b[0m45";
-    const TIMEOUT_QUOTED: &str = "forge logged 1 error(s), the first: \
-        2026-11-03T15:50:58.223673Z ERROR sharedbackend: Failed to send/recv `storage` \
-        err=failed to get storage for 0xbB94d8F4080d5CD34d6215399f26771990f38A1d at 45: \
-        error sending request for url (<url>); operation timed out address=";
-
     #[test]
-    fn forges_log_on_stdout_does_not_hide_the_result() {
-        // Passing JSON between log lines, an error and a warning, passes.
-        let warning = "2026-11-03T15:50:59Z WARN foundry_evm: a warning";
-        let passed = format!("{TIMEOUT_LOG}\n{PASSED}\n{warning}\n");
-        assert_eq!(verdict(&passed, true, "testnet3", &[]), Ok(vec![]));
-
-        // Failing JSON after a log line names the failure and the logged error.
-        let failed = PASSED.replacen(
-            r#""status":"Success","reason":null"#,
-            r#""status":"Failure","reason":"backend: failed while inspecting""#,
-            1,
-        );
-        let error =
-            verdict(&format!("{TIMEOUT_LOG}\n{failed}"), false, "testnet3", &[]).unwrap_err();
-        assert!(
-            error.starts_with(&format!(
-                "{SUITE} test_chainState() failed: backend: failed while inspecting; {TIMEOUT_QUOTED}"
-            )),
-            "{error}"
-        );
-        assert!(
-            !error.contains('\x1b') && !error.contains("SOMEKEY"),
-            "{error}"
-        );
-
-        // Only the log: no JSON, with forge's error when it printed one.
-        let only_log = format!("{TIMEOUT_LOG}\n");
-        let warnings = "Warning: Found unknown `zksync` config for profile `default`.\n";
-        let no_json = fork_test_verdict(&only_log, warnings, false, "testnet3", &fork_test(&[]));
-        assert!(format!("{:#}", no_json.unwrap_err()).starts_with(&format!(
-            "forge test printed no JSON result; {TIMEOUT_QUOTED}"
-        )));
-        let stderr = format!("{warnings}Error: could not instantiate forked environment\n");
-        let no_json = fork_test_verdict(&only_log, &stderr, false, "testnet3", &fork_test(&[]));
-        assert!(format!("{:#}", no_json.unwrap_err()).starts_with(&format!(
-            "forge test printed no JSON result: Error: could not instantiate forked environment; \
-             {TIMEOUT_QUOTED}"
-        )));
-
-        // What goes into our log: no colours, no URLs, the last TAIL_LINES lines.
+    fn urls_are_redacted() {
+        let text = "Error: upstream (https://user:pw@eth.example/v2/SOMEKEY?k=1) failed; \
+            ws://node:8546 'http://a.b/KEY2' \"https://c.d/KEY3\" plain";
         assert_eq!(
-            tail(&["\x1b[31mERROR\x1b[0m https://eth.example/v2/SOMEKEY"]),
-            "ERROR <url>"
+            redact_urls(text),
+            "Error: upstream (<url>) failed; <url> '<url>' \"<url>\" plain"
         );
-        let many: Vec<String> = (0..TAIL_LINES + 5).map(|n| format!("line {n}")).collect();
-        let many: Vec<&str> = many.iter().map(String::as_str).collect();
-        assert_eq!(tail(&many), many[5..].join("\n"));
-
-        // Two JSON lines fail.
-        let error = verdict(&format!("{PASSED}\n{PASSED}"), true, "testnet3", &[]).unwrap_err();
-        assert!(error.contains("printed 2 JSON lines"), "{error}");
     }
 
     #[test]
