@@ -38,8 +38,6 @@ fs_permissions = [
     { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
-    { access = "read", path = "../AllContractsHashes.json" },
-    { access = "read", path = "./test/foundry/l1/unit/concrete/Upgrades/fixtures/" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]

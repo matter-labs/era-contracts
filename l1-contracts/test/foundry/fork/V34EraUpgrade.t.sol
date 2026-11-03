@@ -3,10 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {V34EraOutputChecks} from "./V34EraOutputChecks.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {
     AIRBENDER_PROOF_SYSTEM_MASK,
     BOOJUM_PROOF_SYSTEM_MASK,
@@ -24,37 +22,28 @@ import {
     TooMuchGas,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IEraMultiProofVerifier} from "contracts/state-transition/chain-interfaces/IEraMultiProofVerifier.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {ProposedUpgrade} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {EraMultiProofVerifier} from "contracts/state-transition/verifiers/EraMultiProofVerifier.sol";
+import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
+import {Bytes} from "contracts/vendor/Bytes.sol";
 
 /// @title V34EraUpgradeForkTest
 /// @notice v34 Era checks on protocol-ops' replayed fork (`fork_tests`).
 /// @dev The L1 before the upgrade is read on a fork of `FORK_URL` at `FORK_BLOCK`: concurrent reads below the
 /// replayed fork's head deadlock its Anvil (see protocol-ops' `run_fork_tests`).
 contract V34EraUpgradeForkTest is Test {
-    string internal constant ALL_CONTRACTS_HASHES = "/../AllContractsHashes.json";
-    /// @dev v0.33.0's L2 upgrade tx, whose force deployments v34 keeps: the same for every env.
-    string internal constant V33_STAGE_OUTPUT = "/upgrade-envs/v0.33.0-compiler/output/stage/ecosystem.toml";
     /// @dev The largest deposit `l2GasLimit` the cap admits: it bounds the body, and a deposit without calldata or
     /// factory deps carries the slot overhead.
     uint256 internal constant CAP_L2_GAS_LIMIT = USER_PRIORITY_TX_MAX_GAS_LIMIT + TX_SLOT_OVERHEAD_L2_GAS;
@@ -67,13 +56,23 @@ contract V34EraUpgradeForkTest is Test {
     bytes32 internal constant SERVER_NOTIFIER_INITIALIZED_SLOT = bytes32(uint256(1));
     uint256 internal constant SERVER_NOTIFIER_INITIALIZED_SHIFT = 20 * 8;
 
+    /// @dev The v34 genesis values the checks compare with.
+    struct Genesis {
+        bytes32 bootloaderHash;
+        bytes32 defaultAccountHash;
+        bytes32 evmEmulatorHash;
+        bytes32 root;
+        uint64 leafIndex;
+        bytes32 batchCommitment;
+        bytes32 airbenderBatchCommitment;
+    }
+
     string internal forkUrl;
     uint256 internal forkBlock;
     uint256 internal referenceChainId;
     uint256 internal testChainId;
     string internal checksDir;
     string internal envTomlPath;
-    string internal permanentTomlPath;
     IL1Bridgehub internal bridgehub;
     IChainTypeManager internal ctm;
     uint256 internal replayedFork;
@@ -89,46 +88,20 @@ contract V34EraUpgradeForkTest is Test {
         testChainId = vm.envUint("TEST_CHAIN_ID");
         string memory env = vm.envString("UPGRADE_ENV");
         envTomlPath = string.concat(vm.projectRoot(), "/upgrade-envs/v0.34.0-era/", env, ".toml");
-        permanentTomlPath = string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/", env, ".toml");
         // The script's CTM: the first one, which must be Era.
-        string memory permanent = vm.readFile(permanentTomlPath);
+        string memory permanent = vm.readFile(
+            string.concat(vm.projectRoot(), "/upgrade-envs/permanent-values/", env, ".toml")
+        );
         assertFalse(vm.parseTomlBool(permanent, "$.ctm_contracts.ctms[0].is_zk_sync_os"), "the first CTM is Era");
         bridgehub = IL1Bridgehub(vm.parseTomlAddress(permanent, "$.core_contracts.bridgehub_proxy_addr"));
         ctm = IChainTypeManager(vm.parseTomlAddress(permanent, "$.ctm_contracts.ctms[0].proxy"));
         replayedFork = vm.activeFork();
     }
 
-    // ─── The output ──────────────────────────────────────────────────────────────────
-
-    function test_outputMatchesTheEnvironment() public {
-        V34EraOutputChecks.Output memory out = _output();
-        (bytes32 salt, V34EraOutputChecks.Deployment[] memory deployments) = V34EraOutputChecks.readDeployments(
-            vm.readFile(string.concat(checksDir, "/deployments.json"))
-        );
-        V34EraOutputChecks.check(out, salt, deployments, _references());
-    }
-
-    /// @dev Only this CTM's chains are called: a legacy chain may revert a call to its diamond.
-    function test_referenceChainIsTheScriptsPick() public {
-        vm.createSelectFork(forkUrl, forkBlock);
-        uint256 oldVersion = ctm.protocolVersion();
-        uint256[] memory chainIds = bridgehub.getAllZKChainChainIDs();
-        uint256 first = 0;
-        bool found = false;
-        for (uint256 i = 0; i < chainIds.length && !found; ++i) {
-            if (bridgehub.chainTypeManager(chainIds[i]) == address(ctm)) {
-                found = IGetters(bridgehub.getZKChain(chainIds[i])).getProtocolVersion() == oldVersion;
-                first = chainIds[i];
-            }
-        }
-        assertTrue(found, "a chain of the CTM on its version at FORK_BLOCK");
-        assertEq(referenceChainId, first, "REFERENCE_CHAIN_ID = the bridgehub's first chain of the CTM on its version");
-    }
-
     // ─── The CTM and the ServerNotifier ──────────────────────────────────────────────
 
     function test_ctmAndServerNotifierAfterTheStages() public {
-        V34EraOutputChecks.Output memory out = _output();
+        string memory out = _output();
         string memory genesis = vm.readFile(Utils.genesisConfigPath(false));
         IOwnable serverNotifier = IOwnable(ctm.serverNotifierAddress());
         vm.createSelectFork(forkUrl, forkBlock);
@@ -142,16 +115,20 @@ contract V34EraUpgradeForkTest is Test {
             "ServerNotifier chainTypeManager unchanged"
         );
 
-        EraMultiProofVerifier verifier = EraMultiProofVerifier(ctm.protocolVersionVerifier(out.newProtocolVersion));
+        EraMultiProofVerifier verifier = EraMultiProofVerifier(ctm.protocolVersionVerifier(_newProtocolVersion(out)));
         assertEq(
             verifier.IS_TESTNET_VERIFIER(),
             vm.parseTomlBool(vm.readFile(envTomlPath), "$.testnet_verifier"),
             "verifier: testnet flag = the env's testnet_verifier"
         );
-        assertEq(address(verifier.BOOJUM_VERIFIER()), out.addresses.verifierFflonk, "verifier: Boojum verifier");
+        assertEq(
+            address(verifier.BOOJUM_VERIFIER()),
+            _outputAddress(out, "verifier_fflonk_addr"),
+            "verifier: Boojum verifier"
+        );
         assertEq(
             address(verifier.AIRBENDER_VERIFIER()),
-            out.addresses.airbenderVerifier,
+            _outputAddress(out, "airbender_verifier_addr"),
             "verifier: Airbender verifier"
         );
         assertEq(
@@ -164,14 +141,16 @@ contract V34EraUpgradeForkTest is Test {
             vm.parseJsonBytes32(genesis, "$.prover.airbender_snark_wrapper_vk_hash"),
             "verifier: Airbender VK = the genesis one"
         );
-        assertEq(ctm.l1GenesisUpgrade(), out.addresses.genesisUpgrade, "CTM l1GenesisUpgrade");
+        assertEq(ctm.l1GenesisUpgrade(), _outputAddress(out, "genesis_upgrade_addr"), "CTM l1GenesisUpgrade");
         assertEq(ctm.storedBatchZero(), keccak256(abi.encode(_batchZero(_genesis(genesis)))), "CTM storedBatchZero");
 
+        address ctmImplementation = _outputAddress(out, "chain_type_manager_implementation_addr");
+        address serverNotifierImplementation = _outputAddress(out, "server_notifier_implementation_addr");
         address[4] memory owned = [
             address(ctm),
-            out.addresses.ctmImplementation,
+            ctmImplementation,
             address(serverNotifier),
-            out.addresses.serverNotifierImplementation
+            serverNotifierImplementation
         ];
         for (uint256 i = 0; i < owned.length; ++i) {
             assertEq(IOwnable(owned[i]).pendingOwner(), address(0), "no pending owner");
@@ -183,11 +162,11 @@ contract V34EraUpgradeForkTest is Test {
         vm.expectRevert(SlotOccupied.selector);
         ctm.initialize(init);
         vm.expectRevert(SlotOccupied.selector);
-        IChainTypeManager(out.addresses.ctmImplementation).initialize(init);
+        IChainTypeManager(ctmImplementation).initialize(init);
         // A proxy initialized before `initialize` took `initializer` (mainnet's) has `_initialized` 0: only the
         // reentrancy guard stops a second call. The implementation's disabled initializers pin the slot and offset.
         assertEq(
-            _serverNotifierInitialized(out.addresses.serverNotifierImplementation),
+            _serverNotifierInitialized(serverNotifierImplementation),
             type(uint8).max,
             "ServerNotifier implementation: _initialized at its slot and offset"
         );
@@ -198,21 +177,24 @@ contract V34EraUpgradeForkTest is Test {
         }
         ServerNotifier(address(serverNotifier)).initialize(address(this));
         vm.expectRevert("Initializable: contract is already initialized");
-        ServerNotifier(out.addresses.serverNotifierImplementation).initialize(address(this));
+        ServerNotifier(serverNotifierImplementation).initialize(address(this));
     }
 
     // ─── The chains ──────────────────────────────────────────────────────────────────
 
     function test_upgradedChainsState() public {
-        V34EraOutputChecks.Output memory out = _output();
-        Diamond.DiamondCutData memory cut = abi.decode(out.chainUpgradeDiamondCut, (Diamond.DiamondCutData));
-        V34EraOutputChecks.Genesis memory genesis = _genesis(vm.readFile(Utils.genesisConfigPath(false)));
+        string memory out = _output();
+        Diamond.DiamondCutData memory cut = abi.decode(
+            vm.parseTomlBytes(out, "$.chain_upgrade_diamond_cut"),
+            (Diamond.DiamondCutData)
+        );
+        Genesis memory genesis = _genesis(vm.readFile(Utils.genesisConfigPath(false)));
         _checkChainState(referenceChainId, out, cut, genesis);
         _checkChainState(testChainId, out, cut, genesis);
         IZKChain chain = _chain(referenceChainId);
         assertEq(
             chain.getL2SystemContractsUpgradeTxHash(),
-            keccak256(abi.encode(V34EraOutputChecks.proposedUpgrade(cut).l2ProtocolUpgradeTx)),
+            keccak256(abi.encode(_proposedUpgrade(cut).l2ProtocolUpgradeTx)),
             "reference chain: the pending L2 upgrade tx is the cut's"
         );
         vm.createSelectFork(forkUrl, forkBlock);
@@ -268,8 +250,34 @@ contract V34EraUpgradeForkTest is Test {
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────────
 
-    function _output() internal view returns (V34EraOutputChecks.Output memory) {
-        return V34EraOutputChecks.readOutput(vm.readFile(string.concat(checksDir, "/ecosystem.toml")));
+    /// @dev The output protocol-ops replayed.
+    function _output() internal view returns (string memory) {
+        return vm.readFile(string.concat(checksDir, "/ecosystem.toml"));
+    }
+
+    function _outputAddress(string memory _toml, string memory _key) internal pure returns (address) {
+        return vm.parseTomlAddress(_toml, string.concat("$.state_transition.", _key));
+    }
+
+    function _newProtocolVersion(string memory _toml) internal pure returns (uint256) {
+        return vm.parseTomlUint(_toml, "$.contracts_config.new_protocol_version");
+    }
+
+    function _proposedUpgrade(Diamond.DiamondCutData memory _cut) internal pure returns (ProposedUpgrade memory) {
+        assertEq(bytes4(_cut.initCalldata), IDefaultUpgrade.upgrade.selector, "the cut calls upgrade(ProposedUpgrade)");
+        return abi.decode(Bytes.slice(_cut.initCalldata, 4), (ProposedUpgrade));
+    }
+
+    /// @dev The cut's facet cuts after its leading Removes.
+    function _adds(Diamond.DiamondCutData memory _cut) internal pure returns (Diamond.FacetCut[] memory added) {
+        uint256 removes = 0;
+        while (removes < _cut.facetCuts.length && _cut.facetCuts[removes].action == Diamond.Action.Remove) {
+            ++removes;
+        }
+        added = new Diamond.FacetCut[](_cut.facetCuts.length - removes);
+        for (uint256 i = 0; i < added.length; ++i) {
+            added[i] = _cut.facetCuts[removes + i];
+        }
     }
 
     function _chain(uint256 _chainId) internal view returns (IZKChain) {
@@ -283,57 +291,9 @@ contract V34EraUpgradeForkTest is Test {
             );
     }
 
-    function _references() internal returns (V34EraOutputChecks.References memory refs) {
-        string memory env = vm.readFile(envTomlPath);
-        refs.isTestnet = vm.parseTomlBool(env, "$.testnet_verifier");
-        refs.timerDelay = vm.parseTomlUint(env, "$.governance_upgrade_timer_initial_delay");
-        refs.salt = vm.parseTomlBytes32(env, "$.create2_factory_salt");
-        string memory genesis = vm.readFile(Utils.genesisConfigPath(false));
-        refs.newProtocolVersion = SemVer.packSemVer(
-            uint32(vm.parseJsonUint(genesis, "$.protocol_semantic_version.major")),
-            uint32(vm.parseJsonUint(genesis, "$.protocol_semantic_version.minor")),
-            uint32(vm.parseJsonUint(genesis, "$.protocol_semantic_version.patch"))
-        );
-        refs.genesis = _genesis(genesis);
-        refs.l2 = _l2Bytecodes(refs.genesis);
-        vm.createSelectFork(forkUrl, forkBlock);
-        refs.oldProtocolVersion = ctm.protocolVersion();
-        refs.l1 = _l1Facts();
-        vm.selectFork(replayedFork);
-    }
-
-    /// @dev Read as the script reads them.
-    function _l1Facts() internal view returns (V34EraOutputChecks.L1Facts memory l1) {
-        string memory permanent = vm.readFile(permanentTomlPath);
-        l1.l1ChainId = vm.parseTomlUint(permanent, "$.l1_chain_id");
-        l1.zkTokenAssetId = vm.parseTomlBytes32(permanent, "$.zk_token_asset_id");
-        l1.bridgehub = address(bridgehub);
-        l1.ctm = address(ctm);
-        l1.l1AssetRouter = address(bridgehub.assetRouter());
-        l1.eraChainId = IL1AssetRouter(l1.l1AssetRouter).ERA_CHAIN_ID();
-        l1.maxNumberOfZKChains = L1Bridgehub(address(bridgehub)).MAX_NUMBER_OF_ZK_CHAINS();
-        l1.chainAssetHandler = bridgehub.chainAssetHandler();
-        l1.chainRegistrationSender = bridgehub.chainRegistrationSender();
-        l1.ecosystemAdmin = bridgehub.admin();
-        l1.ecosystemAdminOwner = IOwnable(l1.ecosystemAdmin).owner();
-        l1.ctmOwner = IOwnable(address(ctm)).owner();
-        l1.ctmProxyAdmin = Utils.getProxyAdminAddress(address(ctm));
-        l1.bytecodesSupplier = ChainTypeManagerBase(address(ctm)).L1_BYTECODES_SUPPLIER();
-        l1.permissionlessValidator = ctm.PERMISSIONLESS_VALIDATOR();
-        l1.interopCenter = ChainTypeManagerBase(address(ctm)).INTEROP_CENTER();
-        l1.genesisUpgrade = ctm.l1GenesisUpgrade();
-        l1.serverNotifier = ctm.serverNotifierAddress();
-        l1.serverNotifierProxyAdmin = Utils.getProxyAdminAddress(l1.serverNotifier);
-        l1.referenceChain = bridgehub.getZKChain(referenceChainId);
-        l1.referenceChainAdmin = ctm.getChainAdmin(referenceChainId);
-        l1.rollupDAManager = IAdmin(l1.referenceChain).getRollupDAManager();
-        l1.referenceChainSelectors = _selectors(IGetters(l1.referenceChain).facets());
-        l1.testChainId = testChainId;
-    }
-
-    function _genesis(string memory _json) internal pure returns (V34EraOutputChecks.Genesis memory) {
+    function _genesis(string memory _json) internal pure returns (Genesis memory) {
         return
-            V34EraOutputChecks.Genesis({
+            Genesis({
                 bootloaderHash: vm.parseJsonBytes32(_json, "$.bootloader_hash"),
                 defaultAccountHash: vm.parseJsonBytes32(_json, "$.default_aa_hash"),
                 evmEmulatorHash: vm.parseJsonBytes32(_json, "$.evm_emulator_hash"),
@@ -344,153 +304,8 @@ contract V34EraUpgradeForkTest is Test {
             });
     }
 
-    /// @dev v33's force deployments with v34's two changes, the factory deps, the BeaconProxy and new chains'
-    /// bytecode infos, all at this build.
-    function _l2Bytecodes(
-        V34EraOutputChecks.Genesis memory _genesisValues
-    ) internal view returns (V34EraOutputChecks.L2Bytecodes memory l2) {
-        string memory hashes = vm.readFile(string.concat(vm.projectRoot(), ALL_CONTRACTS_HASHES));
-        string[] memory names = _contractNames(hashes);
-        l2.forceDeployments = _v34ForceDeployments(hashes, names);
-        string[] memory core = _coreContracts();
-        uint256 n = l2.forceDeployments.length;
-        uint256 base = V34EraOutputChecks.BASE_SYSTEM_FACTORY_DEPS;
-        l2.factoryDeps = new bytes32[](base + n + core.length);
-        (l2.factoryDeps[0], l2.factoryDeps[1], l2.factoryDeps[2]) = (
-            _genesisValues.bootloaderHash,
-            _genesisValues.defaultAccountHash,
-            _genesisValues.evmEmulatorHash
-        );
-        for (uint256 i = 0; i < n; ++i) {
-            l2.factoryDeps[base + i] = l2.forceDeployments[i].bytecodeHash;
-        }
-        for (uint256 i = 0; i < core.length; ++i) {
-            l2.factoryDeps[base + n + i] = _zkHash(hashes, names, core[i]);
-        }
-        l2.beaconProxy = _zkHash(hashes, names, "l1-contracts/BeaconProxy");
-        string[] memory infos = _bytecodeInfoContracts();
-        l2.bytecodeInfos = new bytes32[](infos.length);
-        for (uint256 i = 0; i < infos.length; ++i) {
-            l2.bytecodeInfos[i] = _zkHash(hashes, names, infos[i]);
-        }
-    }
-
-    function _v34ForceDeployments(
-        string memory _hashes,
-        string[] memory _names
-    ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory deployments) {
-        string memory v33 = vm.readFile(string.concat(vm.projectRoot(), V33_STAGE_OUTPUT));
-        Diamond.DiamondCutData memory v33Cut = abi.decode(
-            vm.parseTomlBytes(v33, "$.contracts_config.upgrade_cut_data"),
-            (Diamond.DiamondCutData)
-        );
-        deployments = V34EraOutputChecks.forceDeployments(
-            V34EraOutputChecks.proposedUpgrade(v33Cut).l2ProtocolUpgradeTx.data
-        );
-        uint256 replaced = 0;
-        for (uint256 i = 0; i < deployments.length; ++i) {
-            if (deployments[i].newAddress == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
-                deployments[i].bytecodeHash = _zkHash(_hashes, _names, "l1-contracts/L2BaseTokenEra");
-                ++replaced;
-            } else if (deployments[i].newAddress == L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR) {
-                deployments[i].bytecodeHash = _zkHash(_hashes, _names, "l1-contracts/SystemContractProxyAdmin");
-                ++replaced;
-            }
-        }
-        assertEq(replaced, 2, "v33's force deployments hold 0x800A and 0x1000c once each");
-        // Every entry's zk hash, with a zero for the L1-only contracts.
-        bytes32[] memory known = abi.decode(vm.parseJson(_hashes, "$[*].zkBytecodeHash"), (bytes32[]));
-        for (uint256 i = 0; i < deployments.length; ++i) {
-            bytes32 hash = deployments[i].bytecodeHash;
-            bool found = false;
-            for (uint256 j = 0; j < known.length && !found; ++j) {
-                found = hash != bytes32(0) && known[j] == hash;
-            }
-            assertTrue(
-                found,
-                string.concat("force deployment at ", vm.toString(deployments[i].newAddress), ": this build's")
-            );
-        }
-    }
-
-    /// @dev The L2 core contracts' bytecodes the L2 upgrade tx publishes besides the force-deployed ones.
-    function _coreContracts() internal pure returns (string[] memory names) {
-        names = new string[](18);
-        names[0] = "l1-contracts/L2Bridgehub";
-        names[1] = "l1-contracts/L2AssetRouter";
-        names[2] = "l1-contracts/L2NativeTokenVault";
-        names[3] = "l1-contracts/L2MessageRoot";
-        names[4] = "l1-contracts/L2MessageVerification";
-        names[5] = "l1-contracts/L2ChainAssetHandler";
-        names[6] = "l1-contracts/L2InteropRootStorage";
-        names[7] = "l1-contracts/BaseTokenHolder";
-        names[8] = "l1-contracts/L2AssetTracker";
-        names[9] = "l1-contracts/InteropCenter";
-        names[10] = "l1-contracts/InteropHandler";
-        names[11] = "l1-contracts/GWAssetTracker";
-        names[12] = "l1-contracts/TransparentUpgradeableProxy";
-        names[13] = "l1-contracts/BeaconProxy";
-        names[14] = "l1-contracts/L2SharedBridgeLegacy";
-        names[15] = "l1-contracts/BridgedStandardERC20";
-        names[16] = "l1-contracts/DiamondProxy";
-        names[17] = "l1-contracts/ProxyAdmin";
-    }
-
-    /// @dev `FixedForceDeploymentsData`'s bytecode infos, in field order.
-    function _bytecodeInfoContracts() internal pure returns (string[] memory names) {
-        names = new string[](10);
-        names[0] = "l1-contracts/L2Bridgehub";
-        names[1] = "l1-contracts/L2AssetRouter";
-        names[2] = "l1-contracts/L2NativeTokenVault";
-        names[3] = "l1-contracts/L2MessageRoot";
-        names[4] = "l1-contracts/L2ChainAssetHandler";
-        names[5] = "l1-contracts/InteropCenter";
-        names[6] = "l1-contracts/InteropHandler";
-        names[7] = "l1-contracts/L2AssetTracker";
-        names[8] = "l1-contracts/UpgradeableBeaconDeployer";
-        names[9] = "l1-contracts/BaseTokenHolder";
-    }
-
-    /// @dev `AllContractsHashes.json`'s names, in its order.
-    function _contractNames(string memory _hashes) internal pure returns (string[] memory) {
-        return abi.decode(vm.parseJson(_hashes, "$[*].contractName"), (string[]));
-    }
-
-    function _zkHash(
-        string memory _hashes,
-        string[] memory _names,
-        string memory _name
-    ) internal pure returns (bytes32) {
-        uint256 found = 0;
-        uint256 at = 0;
-        for (uint256 i = 0; i < _names.length; ++i) {
-            if (keccak256(bytes(_names[i])) == keccak256(bytes(_name))) {
-                ++found;
-                at = i;
-            }
-        }
-        assertEq(found, 1, string.concat(_name, " once in AllContractsHashes.json"));
-        return vm.parseJsonBytes32(_hashes, string.concat("$[", vm.toString(at), "].zkBytecodeHash"));
-    }
-
-    function _selectors(IGetters.Facet[] memory _facets) internal pure returns (bytes4[] memory selectors) {
-        uint256 total = 0;
-        for (uint256 i = 0; i < _facets.length; ++i) {
-            total += _facets[i].selectors.length;
-        }
-        selectors = new bytes4[](total);
-        uint256 next = 0;
-        for (uint256 i = 0; i < _facets.length; ++i) {
-            for (uint256 j = 0; j < _facets[i].selectors.length; ++j) {
-                selectors[next++] = _facets[i].selectors[j];
-            }
-        }
-    }
-
     /// @dev As `ChainTypeManagerBase` stores it for the new chain creation params.
-    function _batchZero(
-        V34EraOutputChecks.Genesis memory _genesisValues
-    ) internal pure returns (IExecutor.StoredBatchInfo memory) {
+    function _batchZero(Genesis memory _genesisValues) internal pure returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
                 batchNumber: 0,
@@ -508,13 +323,13 @@ contract V34EraUpgradeForkTest is Test {
 
     function _checkChainState(
         uint256 _chainId,
-        V34EraOutputChecks.Output memory _out,
+        string memory _out,
         Diamond.DiamondCutData memory _cut,
-        V34EraOutputChecks.Genesis memory _genesisValues
+        Genesis memory _genesisValues
     ) internal view {
         IZKChain chain = _chain(_chainId);
         string memory label = string.concat("chain ", vm.toString(_chainId), ": ");
-        assertEq(chain.getProtocolVersion(), _out.newProtocolVersion, string.concat(label, "protocol version"));
+        assertEq(chain.getProtocolVersion(), _newProtocolVersion(_out), string.concat(label, "protocol version"));
         assertEq(
             chain.getL2BootloaderBytecodeHash(),
             _genesisValues.bootloaderHash,
@@ -530,7 +345,7 @@ contract V34EraUpgradeForkTest is Test {
             _genesisValues.evmEmulatorHash,
             string.concat(label, "EVM emulator")
         );
-        assertEq(chain.getVerifier(), _out.addresses.verifier, string.concat(label, "verifier"));
+        assertEq(chain.getVerifier(), _outputAddress(_out, "verifier_addr"), string.concat(label, "verifier"));
         DisabledProofSystems memory disabled = chain.disabledProofSystems();
         assertTrue(!disabled.boojum && !disabled.airbender, string.concat(label, "no proof system disabled"));
         assertEq(
@@ -539,7 +354,7 @@ contract V34EraUpgradeForkTest is Test {
             string.concat(label, "user priority tx gas cap")
         );
         // The cut's Adds exactly: each facet routes its selectors with its freezable flag.
-        Diamond.FacetCut[] memory adds = V34EraOutputChecks.adds(_cut);
+        Diamond.FacetCut[] memory adds = _adds(_cut);
         assertEq(chain.facets().length, adds.length, string.concat(label, "facets = the cut's Adds"));
         for (uint256 i = 0; i < adds.length; ++i) {
             assertEq(

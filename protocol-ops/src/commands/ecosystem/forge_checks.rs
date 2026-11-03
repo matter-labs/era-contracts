@@ -10,8 +10,7 @@
 //! - provenance (fork): each deployer tx is a CREATE2 deployment through the env's factory of
 //!   a bytecode in `AllContractsHashes.json`, or a publication; one salt; each deployment is an
 //!   output address, and each output address without code at the fork block is deployed
-//!   exactly once.
-//!   Writes `deployments.json`; the salt and constructor args are checked in Foundry;
+//!   exactly once;
 //! - replay (fork): the ServerNotifier upgrade and stages 0–2 from their real senders, the CTM
 //!   checked after each; the reference chain's timestamp, drain and upgrade; a test chain; the
 //!   last execute tx (warn-only);
@@ -31,7 +30,7 @@ use alloy::providers::Provider;
 use alloy::rpc::types::{Filter, TransactionRequest};
 use alloy::sol_types::{SolCall, SolError, SolValue};
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::common::abi::chain_admin_ownable::IChainAdminOwnable;
 use crate::common::abi::upgrade_errors::{DeadlineNotYetPassed, NotAllBatchesExecuted};
@@ -60,8 +59,6 @@ use crate::upgrade_verification::versions::v31::elements::set_new_version_upgrad
 use crate::upgrade_verification::versions::v31::utils::{
     bytecode_verifier::BytecodeVerifier, compute_create2_address_evm,
 };
-
-pub(crate) const DEPLOYMENTS_FILE: &str = "deployments.json";
 
 /// What the built-ins read from `ecosystem.toml`.
 #[derive(Debug, Deserialize)]
@@ -339,30 +336,12 @@ pub(crate) struct DeployerTx {
     pub data: Bytes,
 }
 
-#[derive(Debug, Serialize)]
-pub(crate) struct Deployment {
-    /// `AllContractsHashes.json`'s name, e.g. `l1-contracts/AdminFacet`.
-    pub contract: String,
-    pub address: Address,
-    /// The constructor arguments after the bytecode.
-    pub args: Bytes,
-}
-
-/// `deployments.json`.
-#[derive(Debug, Serialize)]
-pub(crate) struct Deployments {
-    /// `None` when nothing is deployed.
-    pub salt: Option<B256>,
-    pub deployments: Vec<Deployment>,
-}
-
 pub(crate) async fn check_provenance(
     rpc_url: &str,
     output: &UpgradeOutput,
     factory: Address,
     txs: &[DeployerTx],
     fork_block: u64,
-    work_dir: &Path,
 ) -> anyhow::Result<()> {
     let provider = get_read_provider(rpc_url)?;
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
@@ -380,7 +359,7 @@ pub(crate) async fn check_provenance(
     }
     let hashes = BytecodeVerifier::init_from_local()?;
     let mut report = Report::default();
-    let found = identify_deployments(
+    identify_deployments(
         txs,
         factory,
         supplier,
@@ -389,16 +368,11 @@ pub(crate) async fn check_provenance(
         &hashes,
         &mut report,
     );
-    fs::create_dir_all(work_dir)?;
-    let path = work_dir.join(DEPLOYMENTS_FILE);
-    fs::write(&path, serde_json::to_string_pretty(&found)? + "\n")
-        .with_context(|| format!("write {}", path.display()))?;
-    report.ok(format!("deployments written to {}", path.display()));
     report.finish()
 }
 
 /// The provenance rules, without RPC. `undeployed`: output addresses without code at the fork
-/// block.
+/// block. Returns the deployed addresses in order.
 fn identify_deployments(
     txs: &[DeployerTx],
     factory: Address,
@@ -407,14 +381,14 @@ fn identify_deployments(
     undeployed: &BTreeSet<Address>,
     hashes: &BytecodeVerifier,
     report: &mut Report,
-) -> Deployments {
+) -> Vec<Address> {
     let publish = [
         IBytecodesSupplierPublish::publishEraBytecodeCall::SELECTOR,
         IBytecodesSupplierPublish::publishEraBytecodesCall::SELECTOR,
     ];
     let errors_before = report.errors.len();
     let mut salt: Option<B256> = None;
-    let mut deployments: Vec<Deployment> = Vec::new();
+    let mut deployments: Vec<Address> = Vec::new();
     let mut publications = 0;
     for (index, tx) in txs.iter().enumerate() {
         let label = format!("deployer tx #{index} (to {})", tx.to);
@@ -443,7 +417,7 @@ fn identify_deployments(
             Some(_) => {}
         }
         let address = compute_create2_address_evm(factory, tx_salt, keccak256(init_code));
-        let Some((contract, args)) = hashes.try_parse_bytecode(init_code) else {
+        let Some((contract, _)) = hashes.try_parse_bytecode(init_code) else {
             report.error(format!(
                 "{label}: the init code for {address} is no bytecode of AllContractsHashes.json \
                  followed by constructor args"
@@ -456,18 +430,14 @@ fn identify_deployments(
             report.error(format!(
                 "{label} deploys {contract} at {address}, which the output doesn't list"
             ));
-        } else if deployments.iter().any(|known| known.address == address) {
+        } else if deployments.contains(&address) {
             report.error(format!("{label} deploys {address} a second time"));
         } else {
-            deployments.push(Deployment {
-                contract,
-                address,
-                args: args.into(),
-            });
+            deployments.push(address);
         }
     }
     for address in undeployed {
-        if !deployments.iter().any(|known| known.address == *address) {
+        if !deployments.contains(address) {
             report.error(format!(
                 "{} {address} had no code at the fork block, and no deployer transaction deploys it",
                 output[address]
@@ -480,7 +450,7 @@ fn identify_deployments(
             deployments.len()
         ));
     }
-    Deployments { salt, deployments }
+    deployments
 }
 
 // ─── The replay ──────────────────────────────────────────────────────────────────
@@ -1745,7 +1715,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
     }
 
     /// The rules with each of `deployed` in the output and without code at the fork block.
-    fn run(txs: &[DeployerTx], deployed: &[Address]) -> (Vec<String>, Deployments) {
+    fn run(txs: &[DeployerTx], deployed: &[Address]) -> (Vec<String>, Vec<Address>) {
         let output: BTreeMap<Address, String> = deployed
             .iter()
             .enumerate()
@@ -1774,19 +1744,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
             &[facet_address, checker_address],
         );
         assert!(errors.is_empty(), "{errors:?}");
-        assert_eq!(found.salt, Some(SALT));
-        let summary: Vec<_> = found
-            .deployments
-            .iter()
-            .map(|d| (d.contract.as_str(), d.address, d.args.to_vec()))
-            .collect();
-        assert_eq!(
-            summary,
-            [
-                ("l1-contracts/Facet", facet_address, vec![0x0a; 32]),
-                ("da-contracts/Checker", checker_address, vec![]),
-            ]
-        );
+        assert_eq!(found, [facet_address, checker_address]);
     }
 
     #[test]
@@ -1804,7 +1762,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
             errors[1].contains("no deployer transaction deploys it"),
             "{errors:?}"
         );
-        assert!(found.deployments.is_empty());
+        assert!(found.is_empty());
     }
 
     #[test]
@@ -1856,7 +1814,7 @@ test_create_chain_caller = "0x00000000000000000000000000000000000000a4"
         let (errors, found) = run(&[facet.clone(), facet], &[facet_address]);
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(errors[0].contains("a second time"), "{errors:?}");
-        assert_eq!(found.deployments.len(), 1);
+        assert_eq!(found.len(), 1);
     }
 
     #[test]

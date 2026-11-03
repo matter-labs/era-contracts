@@ -927,26 +927,21 @@ async fn builtin_fork_checks(
         return;
     };
     let fork_block = fork.block;
-    // A rerun must not hand the fork tests stale files.
-    for file in [
-        forge_checks::DEPLOYMENTS_FILE,
-        forge_checks::LAST_EXECUTE_INPUT_FILE,
-    ] {
-        match fs::remove_file(paths.work_dir.join(file)) {
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                failures.record("built-in checks", Err(error.into()));
-                return;
-            }
-            _ => {}
+    // A rerun must not hand the fork tests a stale file.
+    let stale = paths.work_dir.join(forge_checks::LAST_EXECUTE_INPUT_FILE);
+    match fs::remove_file(stale) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+            failures.record("built-in checks", Err(error.into()));
+            return;
         }
+        _ => {}
     }
     let provenance = async {
         let factory = env_cfg
             .create2_factory()
             .ok_or_else(|| anyhow::anyhow!("permanent values have no create2_factory_addr"))?;
         let txs = deployer_transactions(&paths.manifest)?;
-        forge_checks::check_provenance(rpc_url, output, factory, &txs, fork_block, &paths.work_dir)
-            .await
+        forge_checks::check_provenance(rpc_url, output, factory, &txs, fork_block).await
     };
     failures.record("provenance", provenance.await);
     logger::step("built-in replay");
