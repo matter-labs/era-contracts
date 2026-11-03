@@ -159,8 +159,6 @@ jobs:
       - name: Restore this commit's artifacts
         uses: ./.github/actions/restore-ci-artifacts
 
-      # The real-pairing ZiSK suite needs the GPL-3 PLONK backend, which this
-      # repository does not ship; it skips here and runs in zksync-os-integration-tests.
       - name: Run tests
         working-directory: ./l1-contracts
         run: yarn test:foundry

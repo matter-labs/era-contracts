@@ -18,7 +18,7 @@ import {ICommitter, CommitBatchInfoZKsyncOS} from "contracts/state-transition/ch
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IZiskSnarkPlonkVerifier} from "contracts/state-transition/chain-interfaces/IZiskSnarkPlonkVerifier.sol";
+import {IZiskSnarkVerifier} from "contracts/state-transition/chain-interfaces/IZiskSnarkVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
@@ -49,7 +49,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
     address internal owner;
     address internal validator;
     address internal airbenderPlonk;
-    address internal ziskPlonk;
+    address internal ziskSnark;
     MultiProofVerifier internal verifier;
     IExecutor.StoredBatchInfo internal genesis;
 
@@ -57,11 +57,11 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         owner = makeAddr("chainAdmin");
         validator = makeAddr("validator");
         airbenderPlonk = makeAddr("airbenderPlonk");
-        ziskPlonk = makeAddr("ziskPlonk");
+        ziskSnark = makeAddr("ziskSnark");
         _setProofResults(true, true);
         verifier = new MultiProofVerifier(
             new ZKsyncOSVerifier(IVerifier(airbenderPlonk)),
-            new ZiskVerifier(IZiskSnarkPlonkVerifier(ziskPlonk))
+            new ZiskVerifier(IZiskSnarkVerifier(ziskSnark))
         );
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
         chain = _deployChain(10);
@@ -137,7 +137,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
         assertEq(IGetters(chain).getTotalBatchesCommitted(), 1);
         assertEq(IGetters(chain).getTotalBatchesVerified(), 0);
         // The disabled backend must not even be called, including when it reverts.
-        vm.mockCallRevert(ziskPlonk, abi.encodeWithSelector(IZiskSnarkPlonkVerifier.verifyProof.selector), hex"dead");
+        vm.mockCallRevert(ziskSnark, abi.encodeWithSelector(IZiskSnarkVerifier.verifyProof.selector), hex"dead");
         _prove(chain, genesis, first);
 
         IExecutor.StoredBatchInfo memory second = _commit(chain, first);
@@ -226,7 +226,7 @@ contract DisabledProofSystemsTest is UtilsCallMockerTest {
 
     function _setProofResults(bool _airbender, bool _zisk) internal {
         vm.mockCall(airbenderPlonk, abi.encodeWithSelector(IVerifier.verify.selector), abi.encode(_airbender));
-        vm.mockCall(ziskPlonk, abi.encodeWithSelector(IZiskSnarkPlonkVerifier.verifyProof.selector), abi.encode(_zisk));
+        vm.mockCall(ziskSnark, abi.encodeWithSelector(IZiskSnarkVerifier.verifyProof.selector), abi.encode(_zisk));
     }
 
     function _assertDisabledProofSystems(address _chain, uint8 _mask) internal view {

@@ -68,7 +68,7 @@ contract MockExpectArgsVerifier is IVerifier {
 }
 
 /// @dev Mock range verifier that passes only when it receives the RAW batch
-///      public inputs (not a pre-chained single value) and exactly a 24-word
+///      public inputs (not a pre-chained single value) and exactly the SNARK-length
 ///      SNARK proof — i.e. exactly what the reconstructing range verifier
 ///      needs to rebuild the ZiSK public values itself.
 contract MockExpectPublicInputsVerifier is IVerifier {
@@ -95,7 +95,7 @@ contract MockExpectZiskCallVerifier is IVerifier {
     }
 
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) external view returns (bool) {
-        return _proof.length == 24 && keccak256(abi.encode(_publicInputs)) == EXPECTED_PIS_HASH;
+        return _proof.length == ZISK_SNARK_PROOF_LENGTH && keccak256(abi.encode(_publicInputs)) == EXPECTED_PIS_HASH;
     }
     function verificationKeyHash() external pure returns (bytes32) {
         return bytes32(uint256(5));
@@ -150,11 +150,11 @@ contract MultiProofVerifierTest is Test {
         pis[2] = 44;
     }
 
-    /// @dev Build a type-5 proof: [type|version, prevHash, N, airbender[N], zisk[24]].
-    ///      The 24-word ZiSK section is opaque here (the mock range verifier
+    /// @dev Build a type-5 proof: [type|version, prevHash, N, airbender[N], zisk[ZISK_SNARK_PROOF_LENGTH]].
+    ///      The ZiSK section is opaque here (the mock range verifier
     ///      reconstructs the public values it needs from the batch inputs).
     function _type5Proof(uint256 _previousHash, uint256 _airbenderLen) internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](3 + _airbenderLen + 24);
+        proof = new uint256[](3 + _airbenderLen + ZISK_SNARK_PROOF_LENGTH);
         proof[0] = 5; // MULTI_PROOF_TYPE
         proof[1] = _previousHash;
         proof[2] = _airbenderLen;
@@ -162,13 +162,13 @@ contract MultiProofVerifierTest is Test {
             proof[3 + i] = 100 + i;
         }
         uint256 ziskStart = 3 + _airbenderLen;
-        for (uint256 i = 0; i < 24; i++) {
+        for (uint256 i = 0; i < ZISK_SNARK_PROOF_LENGTH; i++) {
             proof[ziskStart + i] = 1000 + i;
         }
     }
 
     function _fakeComponent(uint256 _publicInput) internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](24);
+        proof = new uint256[](ZISK_SNARK_PROOF_LENGTH);
         proof[0] = 3;
         proof[1] = 0;
         proof[2] = 13;
@@ -176,7 +176,7 @@ contract MultiProofVerifierTest is Test {
     }
 
     function _fakeAllType5Proof(uint256 _publicInput) internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](3 + 4 + 24);
+        proof = new uint256[](3 + 4 + ZISK_SNARK_PROOF_LENGTH);
         proof[0] = 5;
         proof[1] = 0;
         proof[2] = 4;
@@ -264,7 +264,7 @@ contract MultiProofVerifierTest is Test {
 
     function test_proofTooShort_reverts() public {
         uint256[] memory publicInputs = _singlePublicInputs();
-        // Declares 2 Airbender words but does not carry the 24 ZiSK words.
+        // Declares 2 Airbender words but does not carry the ZiSK SNARK words.
         uint256[] memory proof = new uint256[](3 + 2 + 10);
         proof[0] = 5;
         proof[2] = 2;
@@ -386,11 +386,11 @@ contract MultiProofVerifierTest is Test {
 
     /// @dev The ZiSK range verifier receives the RAW batch public inputs (so it
     ///      can rebuild the self-contained seed-0 chain itself) and exactly the
-    ///      24-word SNARK section — never a pre-chained single value and never
+    ///      SNARK section — never a pre-chained single value and never
     ///      the ten dropped public-values words.
     /// @dev A carried hash is refused before either side is reached, so the
     ///      proof carries zero in that slot.
-    function test_zisk_receivesRawBatchInputsAnd24WordProof() public {
+    function test_zisk_receivesRawBatchInputsAndSnarkProof() public {
         uint256[] memory pis = _rangePublicInputs();
         MultiProofVerifier expecting = new MultiProofVerifier(
             IVerifier(address(passVerifier)),
@@ -401,7 +401,7 @@ contract MultiProofVerifierTest is Test {
     }
 
     /// @dev Each sub-verifier receives exactly its own section: the Airbender
-    ///      words after the three header words, then the 24 ZiSK words. Words
+    ///      words after the three header words, then the ZiSK SNARK words. Words
     ///      after the ZiSK section reach neither.
     function testFuzz_subVerifiers_receiveExactSections(uint8 _airbenderLen, uint8 _trailingLen, uint256 _seed) public {
         uint256[] memory pis = _rangePublicInputs();
@@ -579,7 +579,7 @@ contract ZiskTestnetVerifierTest is Test {
     }
 
     function _fakeProof(uint256 _foldedPublicInput) internal pure returns (uint256[] memory proof) {
-        proof = new uint256[](24);
+        proof = new uint256[](ZISK_SNARK_PROOF_LENGTH);
         proof[0] = 3;
         proof[1] = 0;
         proof[2] = 13;
@@ -606,7 +606,7 @@ contract ZiskTestnetVerifierTest is Test {
         uint256[] memory inputs = _publicInputs();
         uint256 folded = new ZKsyncOSVerifier(IVerifier(address(passVerifier))).computeZKsyncOSHash(0, inputs);
         uint256[] memory proof = _fakeProof(folded);
-        proof[23] = 1;
+        proof[ZISK_SNARK_PROOF_LENGTH - 1] = 1;
 
         vm.expectRevert(InvalidMockProof.selector);
         verifier.verify(inputs, proof);
@@ -614,7 +614,7 @@ contract ZiskTestnetVerifierTest is Test {
 
     function test_realProof_delegatesToInnerVerifier() public {
         ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(passVerifier)));
-        uint256[] memory proof = new uint256[](24);
+        uint256[] memory proof = new uint256[](ZISK_SNARK_PROOF_LENGTH);
         proof[0] = 1;
 
         assertTrue(verifier.verify(_publicInputs(), proof));
@@ -625,7 +625,7 @@ contract ZiskTestnetVerifierTest is Test {
     ///      unless the complete mock marker is present.
     function test_realProof_startingWithMockType_delegatesToInnerVerifier() public {
         ZiskTestnetVerifier verifier = new ZiskTestnetVerifier(IVerifier(address(passVerifier)));
-        uint256[] memory proof = new uint256[](24);
+        uint256[] memory proof = new uint256[](ZISK_SNARK_PROOF_LENGTH);
         proof[0] = 3;
         proof[1] = 1;
 
