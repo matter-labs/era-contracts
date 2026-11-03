@@ -27,8 +27,8 @@ testnet_verifier = false
 governance_upgrade_timer_initial_delay = 0
 
 # Deterministic CREATE2 factory. The salt is fresh for this upgrade: a repeated (salt, initcode)
-# pair resolves to an already deployed contract. Rotate it before any regen that must deploy anew:
-#   python3 -c "import secrets; print('0x' + secrets.token_hex(32))"
+# pair resolves to an already deployed contract. To deploy anew, run the generate workflow with
+# `create2_salt: fresh`; with commit_outputs it commits the new salt here.
 create2_factory_salt = "0xc2c225faf4a143458c3c674b68845dc67af3c95966b64113124759498fa427aa"
 
 # Every chain registered on the CTM, all on v0.33.0. 20250714 has never committed a batch.
