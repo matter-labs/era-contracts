@@ -14,6 +14,7 @@ const CONTRACTS_DIRECTORIES: Record<string, string[]> = {
     "bridge/asset-tracker/AssetTrackerErrors.sol",
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
+    "transactionFilterer/TransactionFiltererErrors.sol",
   ],
   "./deploy-scripts": ["utils/ZkSyncScriptErrors.sol"],
   "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
