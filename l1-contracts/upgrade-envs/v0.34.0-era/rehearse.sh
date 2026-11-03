@@ -11,26 +11,20 @@
 #   5. on the fork, as the real senders (impersonated): the ServerNotifier upgrade, governance stages 0/1/2
 #      (with the timer, after its delay), the reference chain's timestamp, its upgrade reverting while batches
 #      are in flight, the drain, the upgrade, a test chain, and the L1 state after each step; then v34's L1
-#      behaviour: the 15M cap on user L1->L2 transactions (before and after the upgrade), the chain's first v34
-#      batches committed, proved and executed (test/foundry/fork/V34EraFirstBatch.t.sol, in forge's
-#      memory), and the proof-system switches. A reference chain with a pending L2 upgrade (mainnet's 324 right
-#      after ZIP-18) can't upgrade yet: its after-upgrade checks move to the test chain, which passes only with
-#      ALLOW_PENDING_L2_UPGRADE=1 (the ZIP-18 replay fork; protocol_ops passes its environment through).
+#      behaviour: the 15M cap on user L1->L2 transactions (before and after the upgrade) and the proof-system
+#      switches. A reference chain with a pending L2 upgrade (mainnet's 324 right after ZIP-18) can't upgrade yet:
+#      its after-upgrade checks move to the test chain, which passes only with ALLOW_PENDING_L2_UPGRADE=1 (the
+#      ZIP-18 replay fork; protocol_ops passes its environment through).
 #
-# Needs: foundry (cast/anvil; forge for step 1 and the first-batch test), python3 >= 3.11 (tomllib), and for
-# step 1 the Linux CI build artifacts in {system,l1,l2}-contracts/zkout, l1-contracts/out and da-contracts/out
-# (macOS zksolc hashes differ).
+# Needs: foundry (cast/anvil; forge for step 1), python3 >= 3.11 (tomllib), and for step 1 the Linux CI build
+# artifacts in {system,l1,l2}-contracts/zkout, l1-contracts/out and da-contracts/out (macOS zksolc hashes differ).
 # Usage: UPGRADE_ENV=<env> DEPLOYER=<eoa> L1_FORK_URL=<rpc> [FORK_BLOCK=<n>] ./rehearse.sh   (PORT defaults to 8634)
 # Only the anvil it starts is stopped (by PID).
-# The first-batch test compiles contracts/ into FORK_TEST_OUT (default: a temp dir; never out/, zkout/ or
-# cache-forge/, which step 1 reads). FIRST_BATCH_TEST=0 skips it; it is on by default only when running
-# standalone with a testnet verifier, which accepts the test's empty proofs.
 #
 # The generate / deploy pipeline (upgrade.toml in this directory) reuses it:
 #   L1_RPC_URL=<fork>  ECOSYSTEM_TOML=<bundle's toml>  — check a fork the bundle was already replayed on
 #       (`protocol_ops ecosystem rehearse-upgrade` / `replay-bundle`): no anvil is started and step 1 is
-#       skipped. The deployer transactions are read from prepare/ next to ECOSYSTEM_TOML. The first-batch
-#       test runs only with FIRST_BATCH_TEST=1.
+#       skipped. The deployer transactions are read from prepare/ next to ECOSYSTEM_TOML.
 #   L1_RPC_URL=<chain> [ECOSYSTEM_TOML=<toml>] ./rehearse.sh --published-only — read-only, safe against
 #       a real chain: every factory dep is published and every deployed contract has code, then stop. It
 #       never starts anvil, prepares or funds; without ECOSYSTEM_TOML it reads the committed output.
@@ -76,8 +70,6 @@ first() { awk '{print $1}'; }
 
 if [ -n "${L1_RPC_URL:-}" ]; then
   RPC="$L1_RPC_URL"
-  # Opt-in here: CI's verify-bundle-handoff has no build, and an RPC may cap the log search.
-  FIRST_BATCH_TEST=${FIRST_BATCH_TEST:-0}
   echo "using the chain at L1_RPC_URL, block $(cast block-number --rpc-url "$RPC")"
 else
   : "${L1_FORK_URL:?set L1_FORK_URL to an RPC of the environment L1}"
@@ -98,8 +90,6 @@ else
   kill -0 "$ANVIL_PID" 2>/dev/null || { echo "REHEARSAL FAILED: anvil exited (log: $S/anvil_v34.log)"; exit 1; }
   echo "fork block: $(cast block-number --rpc-url "$RPC")"
 fi
-# The first-batch test searches the chain's history up to here.
-START_BLOCK=$(cast block-number --rpc-url "$RPC")
 export RPC
 
 # ---------------------------------------------------------------- the environment's facts
@@ -207,10 +197,6 @@ PYINPUTS
   chk "ecosystem admin, the bridgehub's admin() = the ServerNotifier ProxyAdmin's owner()" \
     "$(call "$SN_PROXY_ADMIN" 'owner()(address)')" "$ECO_ADMIN"
   [ "$FAILED" = "0" ] || { echo "REHEARSAL FAILED: the inputs differ from the chain"; exit 1; }
-  # Standalone, on by default only where the empty-proof test can pass: a testnet verifier.
-  if [ -z "${FIRST_BATCH_TEST:-}" ]; then
-    [ "$TESTNET" = "True" ] && FIRST_BATCH_TEST=1 || FIRST_BATCH_TEST=0
-  fi
 fi
 
 # ---------------------------------------------------------------- 1. prepare
@@ -931,104 +917,6 @@ else
     echo "  SKIP chain $CHAIN_ID: $c"; SKIPPED=$((SKIPPED + 1))
   done
 fi
-
-echo "== Chain $CHAIN_ID's first v34 batches, committed, proved and executed in forge's fork of this fork"
-FIRST_BATCH_TESTS=2 # the test_ functions in V34EraFirstBatch.t.sol
-# first_batches — the last v33 batch's stored info from its execute tx, then the fork test. Stops at the first failure.
-first_batches() {
-  local committed verified executed topic0 window from n=0 h prev want out_dir wt_dir lc_out lc_wt
-  read -r committed verified executed <<< "$(counts)"
-  case "$executed" in '' | *[!0-9]*) fail "first v34 batches: not run (chain $CHAIN_ID's batch counts unreadable)"; return ;; esac
-  if [ "$committed" != "$executed" ] || [ "$verified" != "$executed" ] \
-    || [ "$(call "$DIAMOND" 'getProtocolVersion()(uint256)' | first)" != "$NEW" ]; then
-    fail "first v34 batches: not run (chain $CHAIN_ID not drained or not on v0.34.0)"; return
-  fi
-  case "$START_BLOCK" in '' | *[!0-9]*) fail "first v34 batches: not run (no start block)"; return ;; esac
-
-  # Only the calldata of the tx that executed it has the full stored info. Before START_BLOCK, Anvil asks upstream.
-  topic0=$(cast keccak 'BlockExecution(uint256,bytes32,bytes32)')
-  for window in 5000 50000; do
-    # window blocks up to START_BLOCK inclusive: public RPCs cap a log search at 50,000 blocks.
-    from=$((START_BLOCK > window ? START_BLOCK - window + 1 : 0))
-    cast logs --rpc-url "$RPC" --address "$DIAMOND" --from-block "$from" --to-block "$START_BLOCK" --json \
-      "$topic0" "$(cast to-uint256 "$executed")" > "$S/execution_logs.json" 2> "$S/execution_logs.err" \
-      || { fail "first v34 batches: cast logs failed: $(head -c 300 "$S/execution_logs.err")"; return; }
-    n=$(python3 -c 'import json, sys; print(len(json.load(open(sys.argv[1]))))' "$S/execution_logs.json") \
-      || { fail "first v34 batches: cast logs gave no JSON"; return; }
-    [ "$n" = "0" ] || break
-  done
-  [ "$n" = "1" ] || { fail "first v34 batches: $n BlockExecution logs for batch $executed in the $window blocks before $START_BLOCK"; return; }
-  h=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))[0]["transactionHash"])' "$S/execution_logs.json")
-  cast tx "$h" input --rpc-url "$RPC" > "$S/execute_input.hex" 2> "$S/execute_input.err" \
-    || { fail "first v34 batches: cannot read tx $h: $(head -c 300 "$S/execute_input.err")"; return; }
-  prev=$(python3 - "$S/execute_input.hex" "$executed" <<'PYPREV'
-import json, os, subprocess, sys
-
-def cast(*args):
-    r = subprocess.run(["cast", *args], capture_output=True, text=True)
-    if r.returncode:
-        raise SystemExit(f"     cast {args[0]} failed: {r.stderr.strip()[:400]}")
-    return r.stdout.strip()
-
-SIG = "executeBatchesSharedBridge(address,uint256,uint256,bytes)"
-# v33's StoredBatchInfo (no airbenderCommitment) and execute data, after the version byte 0x01.
-STORED = "(uint64,bytes32,uint64,uint256,bytes32,bytes32,bytes32,uint256,bytes32)"
-EXECUTE = f"f({STORED}[],(bytes32[],bytes32[],bytes32[])[],(uint256,uint256,bytes32[])[][],(uint8,bool,uint16,address,bytes32,bytes32)[][],bytes[][],bytes32[],address)"
-tx_input, batch = open(sys.argv[1]).read().strip(), int(sys.argv[2])
-if tx_input[:10] != cast("sig", SIG):
-    raise SystemExit(f"     not {SIG}: {tx_input[:10]}")
-# --json: the plain output appends annotations such as [1.077e5].
-chain, _, _, data = json.loads(cast("calldata-decode", "--json", SIG, tx_input))
-if chain.lower() != os.environ["DIAMOND"].lower() or data[:4] != "0x01":
-    raise SystemExit(f"     not chain {os.environ['CHAIN_ID']}'s v33 execute data: chain {chain}, version byte {data[:4]}")
-stored = [b for b in json.loads(cast("abi-decode", "--input", "--json", EXECUTE, "0x" + data[4:]))[0] if int(str(b[0]), 0) == batch]
-if len(stored) != 1:
-    raise SystemExit(f"     batch {batch} appears {len(stored)} times in the execute data")
-print(cast("abi-encode", f"f({STORED})", "(" + ",".join(str(x) for x in stored[0]) + ")"))
-PYPREV
-  ) || { fail "first v34 batches: batch $executed's execute tx $h does not decode (see above)"; return; }
-  want=$(call "$DIAMOND" 'storedBatchHash(uint256)(bytes32)' "$executed")
-  [ -n "$want" ] && [ "$(cast keccak "$prev" | tr A-F a-f)" = "$(echo "$want" | tr A-F a-f)" ] \
-    || { fail "first v34 batches: batch $executed's stored info from tx $h does not hash to storedBatchHash ${want:-(unreadable)}"; return; }
-  echo "  OK   batch $executed's stored info, decoded from its execute tx $h, reproduces storedBatchHash"
-
-  # Step 1 needs out/, zkout/ and cache-forge/ to hold the CI build and nothing else.
-  FORK_TEST_OUT=${FORK_TEST_OUT:-$S/forge}
-  out_dir=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$FORK_TEST_OUT") && wt_dir=$(cd "$WT" && pwd -P) \
-    || { fail "first v34 batches: cannot resolve FORK_TEST_OUT=$FORK_TEST_OUT"; return; }
-  # Compared in lower case: macOS file systems ignore case.
-  lc_out=$(echo "$out_dir/" | tr '[:upper:]' '[:lower:]'); lc_wt=$(echo "$wt_dir" | tr '[:upper:]' '[:lower:]')
-  case "$lc_out" in "$lc_wt/" | "$lc_wt"/out/* | "$lc_wt"/zkout/* | "$lc_wt"/cache-forge/*)
-    fail "first v34 batches: FORK_TEST_OUT must be outside l1-contracts/{out,zkout,cache-forge}"; return ;;
-  esac
-  echo "     forge test, build in $out_dir"
-  (cd "$WT" && V34_PREV_BATCH="$prev" forge test --fork-url "$RPC" --no-storage-caching \
-    --match-path test/foundry/fork/V34EraFirstBatch.t.sol --out "$out_dir/out" --cache-path "$out_dir/cache" \
-    --json > "$S/first_batch.json" 2> "$S/first_batch.err")
-  # Every test must pass: a skipped or missing one fails too.
-  python3 - "$S/first_batch.json" "$FIRST_BATCH_TESTS" <<'PYFORGE' && echo "  OK   first v34 batches: all $FIRST_BATCH_TESTS fork tests passed" \
-    || { fail "first v34 batches (forge stderr: $S/first_batch.err)"; tail -30 "$S/first_batch.err" | sed 's/^/     /'; }
-import json, sys
-try:
-    suites = json.load(open(sys.argv[1]))
-except ValueError as e:
-    raise SystemExit(f"     forge wrote no JSON results: {e}")
-results = [(f"{suite.split(':')[-1]}.{name}", t["status"], t.get("reason")) for suite, r in suites.items() for name, t in r["test_results"].items()]
-for name, status, reason in results:
-    if status != "Success":
-        print(f"     {status} {name}: {reason}")
-passed = sum(status == "Success" for _, status, _ in results)
-print(f"     {passed} of {len(results)} passed, {sys.argv[2]} expected")
-sys.exit(0 if passed == len(results) == int(sys.argv[2]) else 1)
-PYFORGE
-}
-case "$FIRST_BATCH_TEST" in
-  # A reference chain that couldn't upgrade (a pending L2 upgrade) has no v34 batches to test.
-  1) if [ "$REF_UPGRADES" = "1" ]; then first_batches; else
-       echo "  SKIP first v34 batches (chain $CHAIN_ID not upgraded: pending L2 upgrade)"; SKIPPED=$((SKIPPED + 1)); fi ;;
-  0) echo "  SKIP first v34 batches (set FIRST_BATCH_TEST=1)"; SKIPPED=$((SKIPPED + 1)) ;;
-  *) fail "FIRST_BATCH_TEST must be 0 or 1, got '$FIRST_BATCH_TEST'" ;;
-esac
 
 echo "== Test chain created with the new params, as the bridgehub admin"
 read -r TC_TARGET TC_DATA < "$S/test_create_chain.txt"

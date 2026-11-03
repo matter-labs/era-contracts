@@ -14,3 +14,11 @@ args = [
 verify_fork = ["bash", "upgrade-envs/v0.34.0-era/rehearse.sh"]
 # Read-only against the real chain: every factory dep is published and every deployed contract has code.
 verify_chain = ["bash", "upgrade-envs/v0.34.0-era/rehearse.sh", "--published-only"]
+# protocol-ops' checks, beside rehearse.sh for now: publication; on a fork, provenance and a replay too.
+builtin_checks = true
+fork_tests = [
+  # The output against the chain, build and env; the CTM and chains after; the 15M cap; proof switches.
+  { path = "test/foundry/fork/V34EraUpgrade.t.sol" },
+  # The first v34 batches; they skip where the reference chain can't upgrade or verifies real proofs.
+  { path = "test/foundry/fork/V34EraFirstBatch.t.sol", may_skip_in = ["mainnet"] },
+]

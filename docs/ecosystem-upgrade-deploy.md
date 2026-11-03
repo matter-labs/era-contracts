@@ -120,7 +120,12 @@ impersonated or the delay advanced.
 ### Forge-script upgrades
 
 An upgrade whose `upgrade-envs/<upgrade>/upgrade.toml` says `prepare = "forge-script"` runs one forge script on
-the fork and checks the result with its own `verify_fork` / `verify_chain` commands instead of PUVT. Pass
+the fork and checks the result instead of PUVT: with protocol-ops' built-in checks (`builtin_checks = true`), its own
+`verify_fork` / `verify_chain` commands, or both. The built-ins check the publication, the CREATE2 provenance and a
+replay of the stages and the chain upgrade; then each `fork_tests` file runs as `forge test` on the replayed fork,
+with `L1_RPC_URL`, `UPGRADE_ENV`, `FORK_BLOCK`, `REFERENCE_CHAIN_ID`, `UPGRADED_CHAIN_ID`, `TEST_CHAIN_ID` and
+`CHECKS_DIR` (`deployments.json`, `last_execute_input.hex`, a copy of `ecosystem.toml`) exported. A file passes with
+a passed test and nothing failed or skipped; skips are allowed in the envs its `may_skip_in` lists. Pass
 `--upgrade <upgrade>` (in CI, `-f upgrade=<upgrade>`); the rest is as above:
 
 ```bash
