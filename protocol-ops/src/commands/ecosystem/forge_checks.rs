@@ -46,7 +46,7 @@ use crate::common::abi::{
 };
 use crate::common::anvil::{evm_increase_time_and_mine, send_impersonated_tx, set_balance};
 use crate::common::env_config::EnvConfig;
-use crate::common::ethereum::{get_provider, AlloyProvider};
+use crate::common::ethereum::{get_read_provider, AlloyProvider};
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
 use crate::common::l1_contracts::{
     execution_revert_data, resolve_bytecodes_supplier, resolve_is_testnet_verifier,
@@ -215,7 +215,7 @@ impl Report {
 /// Every factory dep of the L2 upgrade transaction is published, every output address has
 /// code, and the output's supplier is the CTM's. Read-only, so safe against a real chain.
 pub(crate) async fn check_publication(rpc_url: &str, output: &UpgradeOutput) -> anyhow::Result<()> {
-    let provider = get_provider(rpc_url)?;
+    let provider = get_read_provider(rpc_url)?;
     let mut report = Report::default();
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
     let ctm = output.state_transition_address("chain_type_manager_proxy")?;
@@ -312,7 +312,7 @@ pub(crate) async fn check_provenance(
     fork_block: u64,
     work_dir: &Path,
 ) -> anyhow::Result<()> {
-    let provider = get_provider(rpc_url)?;
+    let provider = get_read_provider(rpc_url)?;
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
     let addresses = output.output_addresses();
     let mut undeployed = BTreeSet::new();
@@ -442,7 +442,8 @@ const EXECUTE_LOG_WINDOWS: [u64; 2] = [5_000, 50_000];
 const EIP1967_IMPLEMENTATION_SLOT: B256 =
     b256!("360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc");
 
-/// The fork the bundle was replayed on; every send is impersonated.
+/// The fork the bundle was replayed on: reads through `provider`, impersonated sends through
+/// `common::anvil`.
 struct Fork {
     rpc_url: String,
     provider: AlloyProvider,
@@ -592,7 +593,7 @@ pub(crate) async fn replay(
 ) -> anyhow::Result<ReplayedChains> {
     let fork = Fork {
         rpc_url: rpc_url.to_string(),
-        provider: get_provider(rpc_url)?,
+        provider: get_read_provider(rpc_url)?,
     };
     let facts = read_facts(&fork, env_cfg, output)
         .await
