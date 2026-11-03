@@ -62,7 +62,9 @@ On one anvil fork of L1, in this order:
 2. The core prepare (`noGovernancePrepare`): each ecosystem implementation reused when it already
    runs the code the current sources produce and redeployed only when the version declares it
    changed, then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
-   implementation). Output `[registry]`: `core_transition_addr` (zero when none) and
+   implementation), pinning the `DefaultProxyUpgradeEngine` it deploys (`deployProxyUpgradeEngine()`
+   is the override point for a release engine with follow-up calls). Output `[registry]`:
+   `core_transition_addr` (zero when none) and
    `core_upgrade_executor_addr` — the executor read from the live ecosystem `ProxyAdmin`'s owner,
    or deployed by the v35 prepare.
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
@@ -77,7 +79,8 @@ On one anvil fork of L1, in this order:
    from the core prepare's output. Output `[registry]`: `ctm_transition_addr`,
    `ctm_infrastructure_transition_addr` (each zero when none), `ctm_release_addr`,
    `bootstrap_migration_addr` (zero unless a bootstrap) and `ctm_upgrade_executor_addr` (nonzero
-   whenever one of those objects exists).
+   whenever one of those objects exists). As on the core side, the CTM-domain transition pins the
+   engine.
 4. The ServerNotifier handover calls (bootstrap only), executed on the fork as each target's live
    owner (`UpgradeFull::run_ctm_admin_steps`; see the
    [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).

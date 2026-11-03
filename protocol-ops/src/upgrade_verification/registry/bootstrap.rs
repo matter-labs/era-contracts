@@ -232,6 +232,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 build,
                 result,
+                &members,
                 "the core transition",
                 core_transition_addr,
                 Inventory::Ecosystem,
@@ -2150,6 +2151,7 @@ mod tests {
     const ROOT_PROXY: Address = Address::repeat_byte(0x7A);
     const OTHER_PROXY: Address = Address::repeat_byte(0x7B);
     const TIMELOCK: Address = Address::repeat_byte(0x7C);
+    const ENGINE: Address = Address::repeat_byte(0x7E);
 
     impl ReviewedRootRun {
         fn manifest() -> views::BootstrapManifest {
@@ -2239,6 +2241,7 @@ mod tests {
                 views::ProxyUpgradeTransitionManifest {
                     domain: PROXY_UPGRADE_DOMAIN_CORE,
                     proxyUpgrades: rows,
+                    upgradeEngine: ENGINE,
                 },
             );
             let (reviewed_root, ctms_root) = self.message_root;

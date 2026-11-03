@@ -14,6 +14,7 @@
 //! | release | `l2SystemProxyBytecodeInfo` | the bytecode info of [`SYSTEM_PROXY_SHELL`] |
 //! | transition | `upgradeEngine` | [`TRANSITION_ENGINES`] |
 //! | bootstrap migration | `upgradeEngine` | [`BOOTSTRAP_ENGINES`] |
+//! | proxy upgrade transition (either domain) | `upgradeEngine` | [`PROXY_UPGRADE_ENGINES`] |
 //! | transition, bootstrap migration | `l2Plan.delegateComposer` | the composer [`DELEGATE_COMPOSERS`] pairs with the plan's delegate |
 //! | transition, bootstrap migration | `l2Plan.delegateBytecodeInfo` | the bytecode info of one of [`L2_DELEGATES`] |
 //! | transition, bootstrap migration | each `l2Plan.extraBytecodeInfos` entry | the bytecode info of a reviewed contract |
@@ -87,6 +88,11 @@ pub(crate) const VERIFIERS: &[&str] = &[
 pub(crate) const TRANSITION_ENGINES: &[&str] = &["DefaultUpgrade"];
 /// The engine the bootstrap migration pins (`CTMUpgrade_v35.deployUsedUpgradeContract`).
 pub(crate) const BOOTSTRAP_ENGINES: &[&str] = &["BootstrapUpgrade"];
+/// The engine a `ProxyUpgradeTransition` pins, which its domain's executor delegatecalls to apply
+/// the rows (`DefaultCoreUpgrade` / `DefaultCTMUpgrade.deployProxyUpgradeEngine`). A release whose
+/// proxy upgrade needs follow-up calls deploys a `DefaultProxyUpgradeEngine` subclass instead, and
+/// admits it here, so its follow-up calls are reviewed code.
+pub(crate) const PROXY_UPGRADE_ENGINES: &[&str] = &["DefaultProxyUpgradeEngine"];
 /// Each L2 upgrade delegate an authored L2 plan may name, with the `IL2DelegateCalldataComposer`
 /// that composes its calldata. A plan naming a delegate without a composer cannot be constructed
 /// (`L2PlanLib.build` reverts with `L2PlanDelegateNeedsComposer`).
@@ -122,6 +128,7 @@ pub(crate) const MEMBER_ARTIFACTS: &[(&str, &str)] = &[
     ("ZiskVerifier.sol", "ZiskVerifier"),
     ("DefaultUpgrade.sol", "DefaultUpgrade"),
     ("BootstrapUpgrade.sol", "BootstrapUpgrade"),
+    ("DefaultProxyUpgradeEngine.sol", "DefaultProxyUpgradeEngine"),
     (
         "L2DefaultDelegateCalldataComposer.sol",
         "L2DefaultDelegateCalldataComposer",
@@ -665,6 +672,57 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
     Ok(())
 }
 
+/// The `upgradeEngine` a `ProxyUpgradeTransition` pins against [`PROXY_UPGRADE_ENGINES`]: its
+/// runtime must be a reviewed engine's (an unknown engine is an ERROR — it runs by delegatecall
+/// with the executor's whole authority), and, since the prepare deploys the engine its object
+/// pins, its construction must re-derive from the package's `[member_deployments]` record. A zero
+/// engine is refused, as the object's constructor refuses it.
+pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
+    provider: &P,
+    build: &ReviewedBuild,
+    result: &mut VerificationResult,
+    members: &MemberReview<'_>,
+    label: &str,
+    engine: Address,
+) -> anyhow::Result<()> {
+    let member_label = format!("{label}: upgradeEngine");
+    if engine.is_zero() {
+        result.report_error(&format!(
+            "{member_label} is the zero address: the object's constructor refuses it \
+             (`ZeroAddress`), and the executor would delegatecall nothing"
+        ));
+        return Ok(());
+    }
+    let Some(identified) = expect_code_identity(
+        provider,
+        build,
+        result,
+        &member_label,
+        engine,
+        PROXY_UPGRADE_ENGINES,
+    )
+    .await?
+    else {
+        return Ok(());
+    };
+    expect_member_construction(
+        provider,
+        build,
+        result,
+        members,
+        Member {
+            label: &member_label,
+            address: engine,
+            admitted: PROXY_UPGRADE_ENGINES,
+            identified,
+            carried_over: None,
+            new_because: "the prepare deploys the engine its object pins",
+            context: ArgContext::None,
+        },
+    )
+    .await
+}
+
 /// The reviewed contract `info` is the ZKsync OS bytecode info of, when it is one of
 /// [`L2_DELEGATES`]; whether it is (and what else it may be) is reported by
 /// [`judge_authored_l2_bytecodes`].
@@ -837,6 +895,7 @@ mod tests {
             VERIFIERS,
             TRANSITION_ENGINES,
             BOOTSTRAP_ENGINES,
+            PROXY_UPGRADE_ENGINES,
             COMPOSERS,
         ]
         .concat();

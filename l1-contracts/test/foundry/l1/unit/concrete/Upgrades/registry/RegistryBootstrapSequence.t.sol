@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {ProxyUpgradeEngineAuthorityMismatch} from "contracts/common/L1ContractErrors.sol";
+import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {
@@ -75,6 +77,9 @@ contract SeqImplNew {
 ///      `RegistryBootstrapMigration` — because the property under test is the derivation, and a
 ///      mocked object would be deriving from the test's own answers.
 contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
+    /// @dev The engine every transition fixture pins: the rows and nothing else.
+    DefaultProxyUpgradeEngine internal proxyUpgradeEngine = new DefaultProxyUpgradeEngine();
+
     RegistryBootstrapMigration internal migration;
     RegistryBootstrapSequence internal sequence;
     CTMUpgradeExecutor internal ctmExecutor;
@@ -179,6 +184,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     function _deployCoreTransition() internal returns (IProxyUpgradeTransition) {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.Core;
+        manifest.upgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(bridgehubProxy),
@@ -384,6 +390,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     function test_revertWhen_theCoreTransitionIsACTMDomainObject() public {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.upgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(ctmDomainProxy),
@@ -554,7 +561,8 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
             ++next;
         }
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        // The core executor's engine refuses to run without the ecosystem ProxyAdmin it would act on.
+        vm.expectPartialRevert(ProxyUpgradeEngineAuthorityMismatch.selector);
         this.runBundle(bundle);
         _assertEdgeNotApplied();
     }

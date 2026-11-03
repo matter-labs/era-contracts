@@ -197,9 +197,33 @@ enum ProxyUpgradeDomain {
 ///        intended change having been written into one (see {ProxyUpgradeRowLib.toRows}). In the CTM
 ///        domain only the TUPPs under the CTM `ProxyAdmin` can apply; ecosystem singletons are not
 ///        expressible there.
+/// @param upgradeEngine The `IProxyUpgradeEngine` the domain's executor delegatecalls to apply
+///        this transition: `DefaultProxyUpgradeEngine` (the rows and nothing else) or a release's
+///        subclass of it that adds the upgrade's follow-up calls as audited code. Never zero.
 struct ProxyUpgradeTransitionManifest {
     ProxyUpgradeDomain domain;
     ProxyUpgradeRow[] proxyUpgrades;
+    address upgradeEngine;
+}
+
+/// @notice What a domain executor hands its transition's `upgradeEngine`. Built by the executor
+///         from its own immutable bindings, never from the manifest or the caller.
+/// @dev The engine runs by delegatecall, so it cannot read these from the executor's immutables
+///      (an immutable in the engine is the ENGINE's bytecode) and must not read its own storage
+///      (that is the executor's): this struct is its only view of where it runs.
+/// @param transition The `ProxyUpgradeTransition` being applied.
+/// @param upgradeEngine The engine itself (`address(this)` is the executor while it runs), so a
+///        release engine can read its own typed configuration through an external call.
+/// @param domain The executor's domain.
+/// @param proxyAdmin The executor's bound `ProxyAdmin`, owned by the executor.
+/// @param chainTypeManager The CTM executor's bound ChainTypeManager; zero in the `Core` domain.
+// solhint-disable-next-line gas-struct-packing
+struct ProxyUpgradeContext {
+    address transition;
+    address upgradeEngine;
+    ProxyUpgradeDomain domain;
+    address proxyAdmin;
+    address chainTypeManager;
 }
 
 /// @param ctm The ChainTypeManager proxy this migration bootstraps.

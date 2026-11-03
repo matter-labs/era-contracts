@@ -905,6 +905,7 @@ mod tests {
     const CTM_ADMIN: Address = Address::repeat_byte(0xA7);
     const ECO_ADMIN: Address = Address::repeat_byte(0xA0);
     const NOTIFIER: Address = Address::repeat_byte(0x5E);
+    const ENGINE: Address = Address::repeat_byte(0xE9);
     const R36: Address = Address::repeat_byte(0x36);
     const PROXY: Address = Address::repeat_byte(0x70);
     const OLD: Address = Address::repeat_byte(0x01);
@@ -1005,6 +1006,7 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: rows,
+            upgradeEngine: ENGINE,
         }
     }
 

@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
@@ -85,6 +86,9 @@ import {
 ///         explicit routing + inline mandatory pins; transitions derive their facet delta
 ///         from the `(fromRelease, newRelease)` pair at initialization.
 contract StorageRegistriesTest is Test {
+    /// @dev The engine every transition fixture pins: the rows and nothing else.
+    DefaultProxyUpgradeEngine internal proxyUpgradeEngine = new DefaultProxyUpgradeEngine();
+
     ProxyUpgradeTransition internal coreTransition;
     CTMRelease internal fromRelease;
     CTMRelease internal newRelease;
@@ -168,6 +172,7 @@ contract StorageRegistriesTest is Test {
         // One participating slot in the enum-indexed inventory — every other slot's zero
         // `implNew` is the explicit "not upgraded" statement and produces no row.
         manifest.domain = ProxyUpgradeDomain.Core;
+        manifest.upgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(0xB001),
@@ -856,7 +861,8 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_aCtmInventoryChangesNothing() public {
         ProxyUpgradeTransitionManifest memory manifest = ProxyUpgradeTransitionManifest({
             domain: ProxyUpgradeDomain.CTM,
-            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT)
+            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
+            upgradeEngine: address(proxyUpgradeEngine)
         });
         vm.expectRevert(RegistryUnknownKey.selector);
         new ProxyUpgradeTransition(manifest);
@@ -883,7 +889,11 @@ contract StorageRegistriesTest is Test {
         }
         vm.assume(participating != 0);
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeTransition(
-            ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: slots})
+            ProxyUpgradeTransitionManifest({
+                domain: ProxyUpgradeDomain.Core,
+                proxyUpgrades: slots,
+                upgradeEngine: address(proxyUpgradeEngine)
+            })
         ).rows();
         assertEq(rows.length, participating, "one row per participating slot");
         uint256 next = 0;
@@ -1697,6 +1707,7 @@ contract StorageRegistriesTest is Test {
     /// @dev Two participating CTM-domain slots: the CTM itself and the ServerNotifier.
     function _ctmManifestWithTwoRows() internal returns (ProxyUpgradeTransitionManifest memory manifest) {
         manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.upgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = _ctmInventoryWithTwoRows();
     }
 

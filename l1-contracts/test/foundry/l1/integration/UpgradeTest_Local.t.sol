@@ -329,6 +329,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
                 _recordedMember(ctmOutput, ctmSalt, manifest.ctmProxyUpgrades[i].implNew);
             }
         }
+        _recordedMember(coreOutput, coreSalt, coreUpgrade.coreTransition().upgradeEngine());
         ProxyUpgradeRow[] memory coreRows = coreUpgrade.coreTransition().getManifest().proxyUpgrades;
         uint256 coreRowCount = coreRows.length;
         for (uint256 i = 0; i < coreRowCount; ++i) {

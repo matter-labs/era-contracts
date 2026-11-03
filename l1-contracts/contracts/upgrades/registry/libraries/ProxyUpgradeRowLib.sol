@@ -8,10 +8,8 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {ObjectAnchorLib} from "./ObjectAnchorLib.sol";
 import {CTM_CONTRACT_COUNT, L1_ECOSYSTEM_CONTRACT_COUNT} from "./ContractIdentifiers.sol";
 import {IProxyUpgradeInitializable} from "../IUpgradeInit.sol";
-import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
 import {ProxyUpgradeDomain, ProxyUpgradeRow} from "../RegistryTypes.sol";
 import {
-    ProxyUpgradeDomainMismatch,
     ProxyUpgradeRowMismatch,
     RegistryDuplicateProxyRow,
     RegistryInventoryLengthMismatch,
@@ -94,24 +92,6 @@ library ProxyUpgradeRowLib {
         }
     }
 
-    /// @notice Applies a proxy upgrade transition of `_domain` through `_admin`: the object must be
-    ///         deployed code of that domain, then {applyRows} runs its rows.
-    /// @param _admin The applying executor's bound `ProxyAdmin`.
-    /// @param _transition The write-once transition governance approved.
-    /// @param _domain The domain the applying executor administers.
-    function applyTransition(
-        ProxyAdmin _admin,
-        IProxyUpgradeTransition _transition,
-        ProxyUpgradeDomain _domain
-    ) internal {
-        ObjectAnchorLib.requireCode(address(_transition));
-        ProxyUpgradeDomain transitionDomain = _transition.domain();
-        if (transitionDomain != _domain) {
-            revert ProxyUpgradeDomainMismatch(uint8(_domain), uint8(transitionDomain));
-        }
-        applyRows(_admin, _transition.rows());
-    }
-
     /// @notice Applies every row with the source-checked semantics above through `_admin`, the
     ///         applying contract's bound `ProxyAdmin`, which administers every proxy of its domain,
     ///         after {requireRowCode} over the whole set, then verifies every row's proxy runs its
@@ -139,6 +119,14 @@ library ProxyUpgradeRowLib {
             }
             emit ProxyImplementationUpgraded(address(proxy), newImpl);
         }
+        requireRowsApplied(_admin, _rows);
+    }
+
+    /// @notice Reverts unless every row's proxy runs its `implNew`.
+    /// @dev The executors run it again after their engine returns, so a follow-up hook that moves a
+    ///      proxy of the row set is caught too.
+    function requireRowsApplied(ProxyAdmin _admin, ProxyUpgradeRow[] memory _rows) internal view {
+        uint256 length = _rows.length;
         for (uint256 i = 0; i < length; ++i) {
             address liveImpl = _admin.getProxyImplementation(ITransparentUpgradeableProxy(_rows[i].proxy));
             if (liveImpl != _rows[i].implNew) {

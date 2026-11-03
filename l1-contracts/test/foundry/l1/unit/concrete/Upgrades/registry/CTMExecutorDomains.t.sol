@@ -64,6 +64,7 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
         ctmProxyAdmin2 = new ProxyAdmin();
         ctmExecutor2 = new CTMUpgradeExecutor(governor, IChainTypeManager(address(ctm2)), ctmProxyAdmin2);
         ctmProxyAdmin2.transferOwnership(address(ctmExecutor2));
+        _handARealServerNotifierTo(ctm2, ctmExecutor2, address(ctmProxyAdmin2));
         vm.prank(governor);
         ctm2.transferOwnership(address(ctmExecutor2));
         vm.prank(governor);
@@ -111,7 +112,7 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
             _row(address(ctmDomainProxy), implOld, implNew)
         );
         // The proxy answers a non-admin by delegating to its implementation, which has no
-        // `implementation()` — a revert without data.
+        // `implementation()` — a revert without data, which the executor bubbles as it is.
         vm.expectRevert(bytes(""));
         vm.prank(governor);
         ctmExecutor2.applyInfrastructureUpgrade(infrastructure);
@@ -137,7 +138,8 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
     function test_sameCTMExecutorReplacementCanRunAnUpgrade() public {
         CTMUpgradeExecutor previous = ctmExecutor;
         CTMUpgradeExecutor replacement = _replacement();
-        Call[] memory calls = new Call[](2);
+        address notifier = chainContractAddress.serverNotifierAddress();
+        Call[] memory calls = new Call[](3);
         calls[0] = Call({
             target: address(chainContractAddress),
             value: 0,
@@ -148,12 +150,22 @@ contract CTMExecutorDomainsTest is CTMUpgradeExecutorFixture {
             value: 0,
             data: abi.encodeCall(Ownable.transferOwnership, (address(replacement)))
         });
+        calls[2] = Call({
+            target: notifier,
+            value: 0,
+            data: abi.encodeCall(Ownable2Step.transferOwnership, (address(replacement)))
+        });
         vm.prank(governor);
         previous.forward(calls);
         vm.prank(governor);
         replacement.acceptCTMOwnership();
+        Call[] memory acceptNotifier = new Call[](1);
+        acceptNotifier[0] = Call({target: notifier, value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
+        vm.prank(governor);
+        replacement.forward(acceptNotifier);
         assertEq(ctmProxyAdmin.owner(), address(replacement));
         assertEq(chainContractAddress.owner(), address(replacement));
+        _assertNotifierHeldBy(IChainTypeManager(address(chainContractAddress)), address(replacement));
 
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(governor);
