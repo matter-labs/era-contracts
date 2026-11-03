@@ -253,12 +253,13 @@ it (`ProxyUpgradeExecutorBase`):
 - After the engine returns, the executor requires its `owner` and `pendingOwner` unchanged
   (`UpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin` and, for a CTM executor,
   the owner, pending owner and proxy admin of the CTM and of its ServerNotifier unchanged
-  (`UpgradeEngineMovedDomainAuthority`: a hook cannot transfer, nominate or re-administer those
-  holders; a succession is a `forward`), and every row at its `implNew` again, so a hook that moves
-  a row's proxy is caught. The check compares holders and rows only: a hook that swaps the
-  implementation of a proxy that is not a row (the CTM and the ServerNotifier included), moves
-  another proxy to another `ProxyAdmin` or re-points the CTM at another ServerNotifier is engine
-  code the release review covers. Called directly with a real `ProxyAdmin`, an engine reverts
+  (`UpgradeEngineMovedDomainAuthority`: a hook cannot transfer or nominate those holders through
+  their setters, nor move those proxies with `changeProxyAdmin`; a succession is a `forward`), and
+  every row at its `implNew` again, so a hook that moves a row's proxy is caught. The check compares
+  what those getters return, and rows: a hook that swaps the implementation of, or `upgradeAndCall`s
+  into, a proxy that is not a row (the CTM and the ServerNotifier included) can change what they
+  return, and that, like moving another proxy to another `ProxyAdmin` or re-pointing the CTM at
+  another ServerNotifier, is engine code the release review covers. Called directly with a real `ProxyAdmin`, an engine reverts
   (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as the engine holds
   no authority or storage of its own.
 - A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
