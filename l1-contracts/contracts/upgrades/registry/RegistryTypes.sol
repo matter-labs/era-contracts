@@ -208,12 +208,10 @@ struct ProxyUpgradeTransitionManifest {
 
 /// @notice What a domain executor hands its transition's `upgradeEngine`. Built by the executor
 ///         from its own immutable bindings, never from the manifest or the caller.
-/// @dev The engine runs by delegatecall, so it cannot read these from the executor's immutables
-///      (an immutable in the engine is the ENGINE's bytecode) and must not read its own storage
-///      (that is the executor's): this struct is its only view of where it runs.
+/// @dev The engine runs by delegatecall and cannot read the executor's immutables: this struct is
+///      its view of where it runs.
 /// @param transition The `ProxyUpgradeTransition` being applied.
-/// @param upgradeEngine The engine itself (`address(this)` is the executor while it runs), so a
-///        release engine can read its own typed configuration through an external call.
+/// @param upgradeEngine The engine itself (`address(this)` is the executor while it runs).
 /// @param domain The executor's domain.
 /// @param proxyAdmin The executor's bound `ProxyAdmin`, owned by the executor.
 /// @param chainTypeManager The CTM executor's bound ChainTypeManager; zero in the `Core` domain.

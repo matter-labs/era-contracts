@@ -245,16 +245,20 @@ it (`ProxyUpgradeExecutorBase`):
   executor, the ecosystem `ProxyAdmin` for the core executor. Owner methods of governance-owned
   ecosystem contracts (Bridgehub, AssetRouter) are not reachable and stay declared external
   actions.
-- Running in the executor's storage, an engine must not read or write storage; a release engine
-  keeps its configuration in its own storage and reads it through an external call to
-  `context.upgradeEngine`. After the engine returns, the executor requires its `owner` and
-  `pendingOwner` unchanged (`UpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin`
-  and, for a CTM executor, the owner and pending owner of the CTM and its ServerNotifier unchanged
-  (`UpgradeEngineMovedDomainAuthority`: a hook cannot hand those holders' authority away; a
-  succession is a `forward`), and every row at its `implNew` again, so a hook that moves a row's
-  proxy is caught. The check compares holders only: a hook moving a non-row proxy to another
-  `ProxyAdmin` or re-pointing the CTM at another ServerNotifier is engine code the release review
-  covers. Called directly with a real `ProxyAdmin`, an engine reverts
+- Running in the executor's storage, an engine must not read or write storage. A release engine
+  keeps its configuration in immutables set by its constructor: they are part of its code, so they
+  read the same under the delegatecall. Only configuration an immutable cannot hold (a dynamic
+  array, say) goes in the engine's own storage, read through an external call to
+  `context.upgradeEngine`.
+- After the engine returns, the executor requires its `owner` and `pendingOwner` unchanged
+  (`UpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin` and, for a CTM executor,
+  the owner, pending owner and proxy admin of the CTM and of its ServerNotifier unchanged
+  (`UpgradeEngineMovedDomainAuthority`: a hook cannot transfer, nominate or re-administer those
+  holders; a succession is a `forward`), and every row at its `implNew` again, so a hook that moves
+  a row's proxy is caught. The check compares holders and rows only: a hook that swaps the
+  implementation of a proxy that is not a row (the CTM and the ServerNotifier included), moves
+  another proxy to another `ProxyAdmin` or re-points the CTM at another ServerNotifier is engine
+  code the release review covers. Called directly with a real `ProxyAdmin`, an engine reverts
   (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as the engine holds
   no authority or storage of its own.
 - A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
@@ -308,14 +312,17 @@ from the first release; both construct the final plan and enforce the same edge 
 
 ```mermaid
 flowchart TB
-    APPLIERS["CoreUpgradeExecutor / CTMUpgradeExecutor<br/>RegistryBootstrapMigration"]
+    EXECUTORS["CoreUpgradeExecutor / CTMUpgradeExecutor<br/>post-check: executor ownership and domain holders"]
+    ENGINE["pinned upgrade engine (delegatecall)<br/>hooks around the rows"]
     ROWS["ProxyUpgradeRowLib<br/>source-checked proxy swaps and post-state reads"]
     BOOT["RegistryBootstrapMigration<br/>bootstrap and completion checks"]
     AUTH["RegistryAuthorityLib<br/>ownership, bindings and notifier handover"]
     OBJECTS["Upgrade records / executors<br/>construction or validation paths"]
     CODE["ObjectAnchorLib<br/>nonempty code check"]
 
-    APPLIERS --> ROWS
+    EXECUTORS --> ENGINE
+    ENGINE --> ROWS
+    BOOT --> ROWS
     BOOT --> AUTH
     ROWS --> CODE
     AUTH --> CODE
@@ -603,6 +610,9 @@ applies it:
 - `ProxyUpgradeRowLib.applyRows` re-reads every row after the swaps and reverts unless each proxy
   runs its `implNew` — for both domains' proxy upgrade transitions and the bootstrap's `migrate()`
   alike.
+- After the pinned engine returns, the executor reads its ownership, the domain's holders and every
+  row's implementation again ([the engine](#follow-up-calls-the-pinned-upgrade-engine)), and the
+  engine's `_checkPostconditions` reads back the release's follow-up calls.
 - `CTMUpgradeExecutor.applyCTMUpgrade` ends by requiring that the CTM commits exactly this
   transition for its departure and has reached its target.
 - `RegistryBootstrapMigration.validateApplied()` — the bootstrap's completion check, the last call

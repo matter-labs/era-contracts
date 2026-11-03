@@ -44,40 +44,36 @@ import {FollowUpFailed, TimelockNotWired, UnexpectedTimelock} from "../../../../
 ///         follow-up call written as typed Solidity — re-pointing the CTM's post-v29 validator
 ///         timelock, an owner-only CTM setter the CTM executor holds the authority for — then a
 ///         postcondition that reads it back.
-/// @dev Configuration lives in the engine's OWN storage, written by its constructor, and the hooks
-///      read it through an external call to `_context.upgradeEngine`: while delegatecalled, every
-///      storage slot is the executor's.
+/// @dev Configuration lives in immutables (see {IProxyUpgradeEngine}).
 contract TimelockWiringEngine is DefaultProxyUpgradeEngine {
-    address public sourceTimelock;
-    address public targetTimelock;
+    address public immutable SOURCE_TIMELOCK;
+    address public immutable TARGET_TIMELOCK;
 
     /// @dev Test switch: a wrong engine that "forgets" its follow-up, to show the postcondition is
     ///      what catches that.
-    bool public skipWiring;
+    bool public immutable SKIP_WIRING;
 
     constructor(address _sourceTimelock, address _targetTimelock, bool _skipWiring) {
-        sourceTimelock = _sourceTimelock;
-        targetTimelock = _targetTimelock;
-        skipWiring = _skipWiring;
+        SOURCE_TIMELOCK = _sourceTimelock;
+        TARGET_TIMELOCK = _targetTimelock;
+        SKIP_WIRING = _skipWiring;
     }
 
     function _afterSwaps(ProxyUpgradeContext memory _context, ProxyUpgradeRow[] memory) internal override {
-        TimelockWiringEngine config = TimelockWiringEngine(_context.upgradeEngine);
-        if (config.skipWiring()) {
+        if (SKIP_WIRING) {
             return;
         }
         IChainTypeManager ctm = IChainTypeManager(_context.chainTypeManager);
         address live = ctm.validatorTimelockPostV29();
-        address target = config.targetTimelock();
         // Source-checked like a row: already wired is a replay, the reviewed source is wired,
         // anything else is a state this engine was not reviewed against.
-        if (live == target) {
+        if (live == TARGET_TIMELOCK) {
             return;
         }
-        if (live != config.sourceTimelock()) {
+        if (live != SOURCE_TIMELOCK) {
             revert UnexpectedTimelock(live);
         }
-        ctm.setValidatorTimelockPostV29(target);
+        ctm.setValidatorTimelockPostV29(TARGET_TIMELOCK);
     }
 
     function _checkPostconditions(
@@ -85,7 +81,7 @@ contract TimelockWiringEngine is DefaultProxyUpgradeEngine {
         ProxyUpgradeRow[] memory
     ) internal view override {
         address live = IChainTypeManager(_context.chainTypeManager).validatorTimelockPostV29();
-        if (live != TimelockWiringEngine(_context.upgradeEngine).targetTimelock()) {
+        if (live != TARGET_TIMELOCK) {
             revert TimelockNotWired(live);
         }
     }
@@ -114,12 +110,20 @@ contract HookOrderEngine is DefaultProxyUpgradeEngine {
     }
 }
 
-/// @notice A malicious engine: writes the executor's `Ownable` owner slot (slot 0) while
-///         delegatecalled. The executor's own check must refuse it.
+/// @notice A malicious engine: writes the executor's `Ownable` owner slot (slot 0) or its
+///         `Ownable2Step` pending owner slot (slot 1) while delegatecalled. The executor's own check
+///         must refuse it.
 contract OwnerClobberingEngine is DefaultProxyUpgradeEngine {
+    uint256 public immutable SLOT;
+
+    constructor(uint256 _slot) {
+        SLOT = _slot;
+    }
+
     function _afterSwaps(ProxyUpgradeContext memory, ProxyUpgradeRow[] memory) internal override {
+        uint256 slot = SLOT;
         assembly {
-            sstore(0, 0xdead)
+            sstore(slot, 0xdead)
         }
     }
 }
@@ -142,16 +146,19 @@ contract ProxyMovingEngine is DefaultProxyUpgradeEngine {
     }
 }
 
-/// @dev What {DomainHandingEngine} hands away.
+/// @dev What {DomainHandingEngine} hands away: the ownership of the `ProxyAdmin`, a pending
+///      ownership of the CTM or its ServerNotifier, or (`...Proxy`) the CTM's or the ServerNotifier's
+///      proxy, moved out from under the `ProxyAdmin`.
 enum HandedContract {
     ProxyAdmin,
     ChainTypeManager,
-    ServerNotifier
+    ServerNotifier,
+    ChainTypeManagerProxy,
+    ServerNotifierProxy
 }
 
-/// @notice A malicious engine: hands away part of the domain the executor lends it, the `ProxyAdmin`
-///         or (nominating a pending owner) the CTM or its ServerNotifier. The executor's own check
-///         must refuse it.
+/// @notice A malicious engine: hands away part of the domain the executor lends it. The executor's
+///         own check must refuse it.
 contract DomainHandingEngine is DefaultProxyUpgradeEngine {
     address public immutable NEW_HOLDER;
     HandedContract public immutable HANDED;
@@ -166,9 +173,17 @@ contract DomainHandingEngine is DefaultProxyUpgradeEngine {
             ProxyAdmin(_context.proxyAdmin).transferOwnership(NEW_HOLDER);
         } else if (HANDED == HandedContract.ChainTypeManager) {
             IOwnable(_context.chainTypeManager).transferOwnership(NEW_HOLDER);
-        } else {
+        } else if (HANDED == HandedContract.ServerNotifier) {
             address serverNotifier = IChainTypeManager(_context.chainTypeManager).serverNotifierAddress();
             IOwnable(serverNotifier).transferOwnership(NEW_HOLDER);
+        } else if (HANDED == HandedContract.ChainTypeManagerProxy) {
+            ProxyAdmin(_context.proxyAdmin).changeProxyAdmin(
+                ITransparentUpgradeableProxy(_context.chainTypeManager),
+                NEW_HOLDER
+            );
+        } else {
+            address serverNotifier = IChainTypeManager(_context.chainTypeManager).serverNotifierAddress();
+            ProxyAdmin(_context.proxyAdmin).changeProxyAdmin(ITransparentUpgradeableProxy(serverNotifier), NEW_HOLDER);
         }
     }
 }
@@ -379,12 +394,22 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
 
     /// @notice An engine that writes the executor's ownership is refused by the executor itself.
     function test_revertWhen_theEngineChangesTheExecutorsOwnership() public {
-        address engine = address(new OwnerClobberingEngine());
+        address engine = address(new OwnerClobberingEngine(0));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
         vm.expectRevert(abi.encodeWithSelector(UpgradeEngineChangedExecutorOwnership.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(ctmExecutor.owner(), governor);
+    }
+
+    /// @notice An engine that writes the executor's pending owner is refused by the executor itself.
+    function test_revertWhen_theEngineNominatesAnExecutorOwner() public {
+        address engine = address(new OwnerClobberingEngine(1));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineChangedExecutorOwnership.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(ctmExecutor.pendingOwner(), address(0));
     }
 
     /// @notice An engine that hands the CTM's `ProxyAdmin` away is refused by the executor itself.
@@ -418,6 +443,41 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(IOwnable(serverNotifier).pendingOwner(), address(0));
+    }
+
+    /// @notice An engine that moves the CTM's proxy out from under the `ProxyAdmin` is refused by the
+    ///         executor itself.
+    function test_revertWhen_theEngineMovesTheCtmProxyAdmin() public {
+        // As in a deployment, the CTM-domain ProxyAdmin administers the CTM (the shared fixture
+        // leaves it with an EOA).
+        vm.prank(admin);
+        ITransparentUpgradeableProxy(address(chainContractAddress)).changeAdmin(address(ctmProxyAdmin));
+
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManagerProxy));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(
+            ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(address(chainContractAddress))),
+            address(ctmProxyAdmin)
+        );
+    }
+
+    /// @notice An engine that moves the ServerNotifier's proxy out from under the `ProxyAdmin` fails
+    ///         the leg.
+    function test_revertWhen_theEngineMovesTheServerNotifierProxyAdmin() public {
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ServerNotifierProxy));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        ITransparentUpgradeableProxy serverNotifier = ITransparentUpgradeableProxy(
+            chainContractAddress.serverNotifierAddress()
+        );
+        vm.prank(governor);
+        // The executor's `getProxyAdmin` no longer reaches the proxy's `admin()` and falls through to
+        // the ServerNotifier, which has none: the `ProxyAdmin` reverts with empty data.
+        vm.expectRevert(bytes(""));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(ctmProxyAdmin.getProxyAdmin(serverNotifier), address(ctmProxyAdmin));
     }
 
     /// @notice With no ServerNotifier bound, the executor still compares the ProxyAdmin and CTM

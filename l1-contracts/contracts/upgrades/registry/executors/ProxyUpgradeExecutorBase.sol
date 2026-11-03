@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IProxyUpgradeEngine} from "../engines/IProxyUpgradeEngine.sol";
 import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
@@ -28,11 +29,11 @@ import {
 /// @notice What both domain executors share to apply a `ProxyUpgradeTransition`: the ONE
 ///         delegatecall they make, into the engine the transition pins, with the fixed
 ///         `IProxyUpgradeEngine.executeUpgrade` selector and arguments the executor builds itself.
-/// @dev The engine runs with the executor's authority and storage. What the executor still holds
-///      after it returns: its own ownership (owner and pending owner unchanged), the domain it lends
-///      the engine (the `ProxyAdmin`'s owner and, in a CTM domain, the owner and pending owner of the
-///      CTM and of its ServerNotifier unchanged; a succession is a `forward`, not a leg) and every
-///      row's proxy at its `implNew`.
+/// @dev The engine runs with the executor's authority and storage. What the executor checks after
+///      it returns: its own ownership (owner and pending owner unchanged), the holders of the domain
+///      it lends the engine (the `ProxyAdmin`'s owner and, in a CTM domain, the owner, pending owner
+///      and proxy admin of the CTM and of its ServerNotifier unchanged; a succession is a `forward`,
+///      not a leg) and every row's proxy at its `implNew`.
 ///      Anything else the engine does is what governance reviewed when it approved the transition,
 ///      and the engine's own postconditions.
 abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
@@ -100,8 +101,11 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
     /// @param _proxyAdmin The executor's bound `ProxyAdmin`.
     /// @param _chainTypeManager The executor's bound CTM, or zero in the `Core` domain.
     /// @param _serverNotifier The CTM's ServerNotifier as it was before the engine ran, or zero.
-    /// @return The hash of the `ProxyAdmin`'s owner and, with a CTM, the owner and pending owner of the
-    ///         CTM and of its ServerNotifier.
+    /// @return The hash of the `ProxyAdmin`'s owner and, with a CTM, the owner, pending owner and proxy
+    ///         admin of the CTM and of its ServerNotifier.
+    /// @dev A proxy `_proxyAdmin` no longer administers passes `getProxyAdmin`'s `admin()` query to its
+    ///      implementation: a moved CTM answers its own `admin()` and fails the comparison, a moved
+    ///      ServerNotifier has none and reverts the leg.
     function _domainHolders(
         ProxyAdmin _proxyAdmin,
         address _chainTypeManager,
@@ -111,11 +115,26 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
             return keccak256(abi.encode(_proxyAdmin.owner()));
         }
         IOwnable ctm = IOwnable(_chainTypeManager);
-        bytes32 holders = keccak256(abi.encode(_proxyAdmin.owner(), ctm.owner(), ctm.pendingOwner()));
+        bytes32 holders = keccak256(
+            abi.encode(
+                _proxyAdmin.owner(),
+                ctm.owner(),
+                ctm.pendingOwner(),
+                _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(_chainTypeManager))
+            )
+        );
         if (_serverNotifier == address(0)) {
             return holders;
         }
         IOwnable notifier = IOwnable(_serverNotifier);
-        return keccak256(abi.encode(holders, notifier.owner(), notifier.pendingOwner()));
+        return
+            keccak256(
+                abi.encode(
+                    holders,
+                    notifier.owner(),
+                    notifier.pendingOwner(),
+                    _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(_serverNotifier))
+                )
+            );
     }
 }

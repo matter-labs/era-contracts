@@ -22,8 +22,8 @@ import {ProxyUpgradeEngineAuthorityMismatch} from "../../../common/L1ContractErr
 ///      state first, skip what is already at its target, act on the reviewed source state, and
 ///      revert on anything else. {executeUpgrade} itself is not virtual, so the order cannot change.
 ///
-///      No state variables and no constructor: this code runs in the executor's storage (see
-///      {IProxyUpgradeEngine} for how a subclass keeps configuration).
+///      No state variables: this code runs in the executor's storage (see
+///      {IProxyUpgradeEngine}).
 contract DefaultProxyUpgradeEngine is IProxyUpgradeEngine {
     /// @inheritdoc IProxyUpgradeEngine
     /// @dev Refuses a caller that does not own `_context.proxyAdmin`, so a direct call naming a real
