@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "context": [".github/security-review-focus.md", ".github/security-review-focus-ci.md"],
+  "pathProfiles": [
+    {
+      "paths": ["l1-contracts/contracts/**", "l1-contracts/zkstack-out/**"],
+      "profiles": ["domains/smart-contracts", "domains/authorization"]
+    },
+    {
+      "paths": [
+        "l1-contracts/contracts/bridge/**",
+        "l1-contracts/contracts/core/**",
+        "l1-contracts/contracts/interop/**",
+        "l1-contracts/contracts/atomic-interop/**",
+        "l1-contracts/contracts/common/**",
+        "l1-contracts/contracts/l2-system/**",
+        "l1-contracts/contracts/transactionFilterer/**"
+      ],
+      "profiles": ["domains/bridge-cross-chain", "domains/protocol-state-transition"]
+    },
+    {
+      "paths": [
+        "l1-contracts/contracts/state-transition/**",
+        "l1-contracts/contracts/common/libraries/**",
+        "l1-contracts/contracts/core/message-root/**",
+        "l1-contracts/contracts/interop/**",
+        "l1-contracts/contracts/atomic-interop/**",
+        "tools/verifier-gen/**"
+      ],
+      "profiles": ["domains/protocol-state-transition", "domains/cryptography"]
+    },
+    {
+      "paths": [
+        "l1-contracts/contracts/upgrades/**",
+        "l1-contracts/contracts/l2-upgrades/**",
+        "l1-contracts/contracts/l2-system/**",
+        "l1-contracts/deploy-scripts/**",
+        "tools/zksync-os-genesis-gen/**",
+        "tools/upgrade-readiness-checker/**",
+        "protocol-ops/**"
+      ],
+      "profiles": ["domains/smart-contracts", "domains/authorization", "domains/protocol-state-transition"]
+    },
+    {
+      "paths": [
+        "l1-contracts/upgrade-envs/**",
+        "environments/**",
+        "configs/**",
+        "l1-contracts/script-config/**",
+        "l1-contracts/deploy-script-config-template/**",
+        "l1-contracts/scripts/registry-manifests/**"
+      ],
+      "profiles": ["domains/privileged-automation", "domains/protocol-state-transition"]
+    },
+    {
+      "paths": [
+        ".github/**",
+        ".githooks/**",
+        ".gitmodules",
+        "docker/**",
+        "protocol-ops/**",
+        "protocol-ops.sh",
+        "tools/**",
+        "l1-contracts/deploy-scripts/**",
+        "l1-contracts/remappings.txt",
+        "l1-contracts/hardhat.config.ts",
+        "**/scripts/**",
+        "**/*.sh",
+        "**/package.json",
+        "**/yarn.lock",
+        "**/Cargo.toml",
+        "**/Cargo.lock",
+        "**/foundry.toml",
+        "**/rust-toolchain.toml",
+        "**/Dockerfile*"
+      ],
+      "profiles": ["domains/ci-supply-chain", "domains/privileged-automation"]
+    }
+  ]
+}
