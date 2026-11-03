@@ -147,7 +147,9 @@ The three entrypoints and `forward` are owner-only, and governance owns both exe
 the only authorization; there is no binding between executors to configure or keep in sync. Every
 other owner operation of a domain — freezing a chain, moving a deadline, replacing a committed
 transition — is an ordinary call through the executor's owner-gated, event-logged `forward`; the
-executors carry no typed passthroughs for them. Freezing has a second route,
+executors carry no typed passthroughs for them. A release's pinned upgrade engine can make the same
+calls inside its domain's proxy leg; they are reviewed with the release, are not logged as
+`CallForwarded`, and cannot move the domain's ownership. Freezing has a second route,
 [below](#freezing-a-chain). An urgent fix of one domain is a proposal of the one leg it needs.
 
 A domain moves to a successor executor through the predecessor's `forward`; nothing else names an

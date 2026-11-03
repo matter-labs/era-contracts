@@ -355,8 +355,9 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
     function test_revertWhen_aCoreEngineCallsTheCtm() public {
         IProxyUpgradeTransition t = _coreTransition(_wiringEngine(false));
         vm.prank(governor);
-        // The Core context carries no CTM, so the hook's call lands on address(0) and fails.
-        vm.expectRevert();
+        // The Core context carries no CTM, so the hook's call lands on address(0): a call to a
+        // non-contract, which reverts with empty data.
+        vm.expectRevert(bytes(""));
         coreExecutor.applyL1Upgrade(t);
         assertEq(_liveImpl(ecosystemProxy, ecosystemProxyAdmin), implOld, "the swap rolled back");
     }
@@ -417,6 +418,27 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(IOwnable(serverNotifier).pendingOwner(), address(0));
+    }
+
+    /// @notice With no ServerNotifier bound, the executor still compares the ProxyAdmin and CTM
+    ///         holders.
+    function test_revertWhen_theEngineNominatesANewCtmOwnerWithNoServerNotifier() public {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(chainContractAddress.setServerNotifier, (address(0)))
+        });
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
+        assertEq(chainContractAddress.serverNotifierAddress(), address(0), "no notifier bound");
+
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManager));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(IOwnable(address(chainContractAddress)).pendingOwner(), address(0));
     }
 
     /// @notice In the Core domain the executor holds the ecosystem `ProxyAdmin`, and keeps it.

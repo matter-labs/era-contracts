@@ -434,6 +434,11 @@ Who can do what once the CTM domain is owned by `CTMUpgradeExecutor`. "Chain sid
 `onlyAdmin` / `onlyAdminOrChainTypeManager` path on the chain's own Admin facet;
 `onlyChainTypeManager` methods have no such path; governance reaches them, like every CTM owner
 method the executor has no entrypoint for, through the executor's owner-gated, logged `forward`.
+A release's pinned upgrade engine reaches the same methods from inside `applyInfrastructureUpgrade`,
+reviewed with the release and not logged as `CallForwarded`
+([above](#follow-up-calls-the-pinned-upgrade-engine)), so every `forward` cell below holds for it
+too, except the last row: the executor's post-check refuses an ownership move
+(`UpgradeEngineMovedDomainAuthority`).
 
 | CTM owner method                                                                                                          | Through the executors                                                                                                                               | Chain side                              |
 | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -452,7 +457,8 @@ method the executor has no entrypoint for, through the executor's owner-gated, l
 | `executeUpgrade` (arbitrary cut), legacy `setNewVersionUpgrade` / `setUpgradeDiamondCut`                                  | `forward` only — deliberately: the bypass the object-driven path exists to remove                                                                   | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                                                | `forward` only                                                                                                                                      | —                                       |
 
-The executors hold three more authorities, reached the same way outside their upgrade entrypoints:
+The executors hold three more authorities, reached the same way (`forward`, or the pinned engine
+inside a proxy leg):
 `CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
 (`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
 ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
