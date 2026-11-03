@@ -8,7 +8,6 @@ import {DeployCTMScript} from "deploy-scripts/ctm/DeployCTM.s.sol";
 import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
-import {PilfflonkVerifier} from "contracts/state-transition/verifiers/PilfflonkVerifier.sol";
 import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
 import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
@@ -62,7 +61,16 @@ contract MultiProofVerifierDeploymentTest is Test {
         CTMDeployedAddresses memory addresses = deployer.getAddresses();
 
         address snarkVerifier = addresses.multiProof.ziskSnarkVerifier;
-        assertEq(snarkVerifier.codehash, address(new PilfflonkVerifier()).codehash, "vendored pilfflonk verifier");
+        // Compare against the artifact the deploy reads: under coverage, a
+        // `new PilfflonkVerifier()` here would be the instrumented build.
+        string memory artifact = vm.readFile(
+            string.concat(vm.projectRoot(), "/out/PilfflonkVerifier.sol/PilfflonkVerifier.json")
+        );
+        assertEq(
+            snarkVerifier.code,
+            vm.parseJsonBytes(artifact, ".deployedBytecode.object"),
+            "vendored pilfflonk verifier"
+        );
         assertEq(
             address(ZiskVerifier(addresses.multiProof.ziskVerifier).SNARK_VERIFIER()),
             snarkVerifier,
