@@ -48,7 +48,8 @@ Finished, and described where it now lives:
   enforces only that every named contract is deployed code, and provenance is governance's approval of
   the exact deployed objects, verified off-chain before every vote. Described in
   [registry-driven-upgrades.md](registry-driven-upgrades.md#provenance-and-validation).
-- Batch 1 (below) is implemented; batch 2 is partially implemented.
+- Batch 1 (below) is implemented; batch 2 is partially implemented; batch 3's execution hook is
+  implemented, its migration of existing actions is not.
 
 ## Batch 1: finish the deletion that current contracts already enable — implemented
 
@@ -134,7 +135,18 @@ Exercise facet-only, verifier-only, timelock-only, notifier-only, core-only and 
 through the CURRENT objects. Test stale source state and wrong admin. Every address a prepare no longer reconstructs must be shown to come
 from a getter the deployed contracts expose.
 
-## Batch 3: move cross-contract follow-up work into audited execution
+## Batch 3: move cross-contract follow-up work into audited execution — hook implemented
+
+Landed: the pinned execution hook. Every `ProxyUpgradeTransition` pins an `upgradeEngine` that its
+domain's executor delegatecalls; a release with follow-up work subclasses
+`DefaultProxyUpgradeEngine` and writes the calls in its before-swap, after-swap and postcondition
+hooks, and the executor re-checks its ownership, the domain's holders and every row afterwards.
+Described in
+[registry-driven-upgrades.md](registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine);
+the gate below is exercised on the CTM fixture in `ProxyUpgradeEngine.t.sol`.
+
+Still open: the inventory below, and moving each upgrade-specific wiring action it finds out of the
+prepares and into a release engine. No release ships a subclass yet.
 
 Inventory all declared external actions and classify each by reason: bootstrap authorization,
 upgrade-specific wiring, governance self-upgrade, or Gateway operations.
