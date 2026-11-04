@@ -66,20 +66,28 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function runForTest(address bridgehub) public {
-        _runConfiguredTest(bridgehub, true);
+        _runConfiguredTest(bridgehub, vm.envString("CTM_CONFIG"), true);
+    }
+
+    /// @notice Like runForTest, with the config path passed in.
+    /// @dev For Foundry tests: Forge runs test suites concurrently, and `CTM_CONFIG` is shared between them.
+    /// @param _bridgehub The Bridgehub proxy.
+    /// @param _ctmConfigPath The CTM config path, relative to the project root.
+    function runForTestWithConfig(address _bridgehub, string memory _ctmConfigPath) public {
+        _runConfiguredTest(_bridgehub, _ctmConfigPath, true);
     }
 
     /// @notice Like runForTest but skips saveDiamondSelectors().
     function runForAnvilTest(address bridgehub) public {
-        _runConfiguredTest(bridgehub, false);
+        _runConfiguredTest(bridgehub, vm.envString("CTM_CONFIG"), false);
     }
 
-    function _runConfiguredTest(address bridgehub, bool shouldSaveSelectors) internal {
+    function _runConfiguredTest(address bridgehub, string memory _ctmConfigPath, bool shouldSaveSelectors) internal {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }
         runInner({
-            inputPath: vm.envString("CTM_CONFIG"),
+            inputPath: _ctmConfigPath,
             outputPath: vm.envString("CTM_OUTPUT"),
             bridgehub: bridgehub,
             reuseGovAndAdmin: false
