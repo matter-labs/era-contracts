@@ -6,6 +6,8 @@ import {Merkle} from "./Merkle.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SUPPORTED_PROOF_METADATA_VERSION} from "../Config.sol";
 import {MerklePathEmpty} from "../L1ContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
+import {L2Log, L2Message, ProofData, TxStatus} from "../Messaging.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 
 import {UnsupportedProofMetadataVersion} from "../../state-transition/L1StateTransitionErrors.sol";
 import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
@@ -13,25 +15,71 @@ import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
 
-struct ProofData {
-    uint256 settlementLayerChainId;
-    uint256 settlementLayerBatchNumber;
-    uint256 settlementLayerBatchRootMask;
-    uint256 batchLeafProofLen;
-    bytes32 batchSettlementRoot;
-    bytes32 chainIdLeaf;
-    uint256 ptr;
-    bool finalProofNode;
-}
-
 library MessageHashing {
     using UncheckedMath for uint256;
+
+    function getLeafHashFromMessage(L2Message memory _message) internal pure returns (bytes32 hashedLog) {
+        L2Log memory l2Log = _l2MessageToLog(_message);
+        hashedLog = getLeafHashFromLog(l2Log);
+    }
+
+    /// @dev Convert arbitrary-length message to the raw L2 log
+    function _l2MessageToLog(L2Message memory _message) internal pure returns (L2Log memory) {
+        return
+            L2Log({
+                l2ShardId: 0,
+                isService: true,
+                txNumberInBatch: _message.txNumberInBatch,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                key: bytes32(uint256(uint160(_message.sender))),
+                value: keccak256(_message.data)
+            });
+    }
+
+    function getL2LogFromL1ToL2Transaction(
+        uint16 _l2TxNumberInBatch,
+        bytes32 _l2TxHash,
+        TxStatus _status
+    ) internal pure returns (L2Log memory l2Log) {
+        // Bootloader sends an L2 -> L1 log only after processing the L1 -> L2 transaction.
+        // Thus, we can verify that the L1 -> L2 transaction was included in the L2 batch with specified status.
+        //
+        // The semantics of such L2 -> L1 log is always:
+        // - sender = L2_BOOTLOADER_ADDRESS
+        // - key = hash(L1ToL2Transaction)
+        // - value = status of the processing transaction (1 - success & 0 - fail)
+        // - isService = true (just a conventional value)
+        // - l2ShardId = 0 (means that L1 -> L2 transaction was processed in a rollup shard, other shards are not available yet anyway)
+        // - txNumberInBatch = number of transaction in the batch
+        l2Log = L2Log({
+            l2ShardId: 0,
+            isService: true,
+            txNumberInBatch: _l2TxNumberInBatch,
+            sender: L2_BOOTLOADER_ADDRESS,
+            key: _l2TxHash,
+            value: bytes32(uint256(_status))
+        });
+    }
+
+    function getLeafHashFromLog(L2Log memory _log) internal pure returns (bytes32 hashedLog) {
+        hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
+        );
+    }
 
     /// @dev Returns the leaf hash for a chain with batch number and batch root.
     /// @param batchRoot The root hash of the batch.
     /// @param batchNumber The number of the batch.
-    function batchLeafHash(bytes32 batchRoot, uint256 batchNumber) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber));
+    /// @param l1Timestamp The settlement-layer block timestamp at which the batch root was aggregated.
+    /// Bound into the leaf so the timestamp is provable via the same inclusion proof; see
+    /// {protocol-docs/message-root.md#v31-vs-v32-append-flows}.
+    function batchLeafHash(
+        bytes32 batchRoot,
+        uint256 batchNumber,
+        uint256 l1Timestamp
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(BATCH_LEAF_PADDING, batchRoot, batchNumber, l1Timestamp));
     }
 
     /// @dev Returns the leaf hash for a chain with chain root and chain id.
@@ -122,6 +170,7 @@ library MessageHashing {
         ProofMetadata memory proofMetadata = MessageHashing.parseProofMetadata(_proof);
         result.ptr = proofMetadata.proofStartIndex;
 
+        uint256 l1BatchTimestamp;
         {
             bytes32 batchSettlementRoot = Merkle.calculateRootMemory(
                 extractSlice(_proof, result.ptr, result.ptr + proofMetadata.logLeafProofLen),
@@ -135,8 +184,17 @@ library MessageHashing {
             if (proofMetadata.finalProofNode) {
                 return result;
             }
+            // Bound into the batch leaf below, so a wrong timestamp makes the reconstructed leaf
+            // mismatch the tree — that is what authenticates the proof-supplied value.
+            l1BatchTimestamp = uint256(_proof[result.ptr]);
+            ++result.ptr;
+
             // Now, we'll have to check that the Gateway included the message.
-            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(batchSettlementRoot, _batchNumber);
+            bytes32 localBatchLeafHash = MessageHashing.batchLeafHash(
+                batchSettlementRoot,
+                _batchNumber,
+                l1BatchTimestamp
+            );
 
             uint256 batchLeafProofMask = uint256(bytes32(_proof[result.ptr]));
             ++result.ptr;
@@ -172,9 +230,73 @@ library MessageHashing {
             batchLeafProofLen: proofMetadata.batchLeafProofLen,
             batchSettlementRoot: result.batchSettlementRoot,
             chainIdLeaf: result.chainIdLeaf,
+            l1BatchTimestamp: l1BatchTimestamp,
             ptr: result.ptr,
             finalProofNode: proofMetadata.finalProofNode
         });
+    }
+
+    /// @dev The batch-leaf Merkle path (mask + siblings) of a multi-hop proof's aggregation-hop
+    /// section, read positionally by {readAggregationHopPath}.
+    struct AggregationHopPath {
+        /// @dev The Merkle mask of the batch leaf inside the chain's batch tree.
+        uint256 batchLeafProofMask;
+        /// @dev The batch leaf's sibling path inside the chain's batch tree.
+        bytes32[] batchLeafSiblings;
+    }
+
+    /// @notice Reads the aggregation-hop batch-leaf Merkle path from a proof — the single accessor
+    /// for this section's word layout; external libraries must use it instead of parsing themselves.
+    /// @dev The returned words can be trusted ONLY after the same proof bytes passed the leaf
+    /// verifier (`proveL2LeafInclusionShared` / {_getProofData}). Reverts on `finalProofNode`
+    /// proofs, which carry no aggregation-hop section.
+    function readAggregationHopPath(bytes32[] calldata _proof) internal pure returns (AggregationHopPath memory path) {
+        ProofMetadata memory metadata = parseProofMetadata(_proof);
+        if (metadata.finalProofNode) {
+            revert InvalidProofLengthForFinalNode();
+        }
+        // Word layout after the leaf-to-batch-root section (see {_getProofData}):
+        // [l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings]...
+        uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen;
+        path.batchLeafProofMask = uint256(_proof[ptr + 1]);
+        path.batchLeafSiblings = extractSlice(_proof, ptr + 2, ptr + 2 + metadata.batchLeafProofLen);
+    }
+
+    /// @dev The settlement-layer batch reference of a multi-hop proof (the words following the
+    /// aggregation-hop section), read positionally by {readSettlementLayerReference}. The low half
+    /// of the packed batch-info word (`settlementLayerBatchRootMask`) is deliberately omitted: it
+    /// only steers the recursion inside {_getProofData} and no positional consumer needs it.
+    struct SettlementLayerReference {
+        /// @dev The settlement-layer block/batch number the chain-id leaf is proven under.
+        uint256 settlementLayerBatchNumber;
+        /// @dev The settlement-layer chain id.
+        uint256 settlementLayerChainId;
+        /// @dev The batch's settlement-layer inclusion timestamp (bound into the batch leaf).
+        uint256 l1BatchTimestamp;
+    }
+
+    /// @notice Reads the settlement-layer batch reference from a multi-hop proof — the single
+    /// accessor for this section's word layout; external libraries must use it instead of parsing
+    /// themselves.
+    /// @dev The returned words can be trusted ONLY after the same proof bytes passed the leaf
+    /// verifier (`proveL2LeafInclusionShared` / {_getProofData}). Reverts on `finalProofNode`
+    /// proofs, which carry no settlement-layer batch reference.
+    /// @param _proof The proof.
+    /// @return slReference The settlement-layer batch reference words.
+    function readSettlementLayerReference(
+        bytes32[] calldata _proof
+    ) internal pure returns (SettlementLayerReference memory slReference) {
+        ProofMetadata memory metadata = parseProofMetadata(_proof);
+        if (metadata.finalProofNode) {
+            revert InvalidProofLengthForFinalNode();
+        }
+        // Word layout after the leaf-to-batch-root section (see {_getProofData}):
+        // [l1Timestamp][batchLeafProofMask][batchLeafProofLen siblings][slPackedBatchInfo][slChainId]
+        uint256 ptr = metadata.proofStartIndex + metadata.logLeafProofLen;
+        slReference.l1BatchTimestamp = uint256(_proof[ptr]);
+        uint256 settlementLayerPackedBatchInfo = uint256(_proof[ptr + 2 + metadata.batchLeafProofLen]);
+        slReference.settlementLayerBatchNumber = settlementLayerPackedBatchInfo >> 128;
+        slReference.settlementLayerChainId = uint256(_proof[ptr + 3 + metadata.batchLeafProofLen]);
     }
 
     /// @notice Extracts slice from the proof.
@@ -188,7 +310,7 @@ library MessageHashing {
         uint256 _right
     ) internal pure returns (bytes32[] memory slice) {
         slice = new bytes32[](_right - _left);
-        for (uint256 i = _left; i < _right; i = i.uncheckedInc()) {
+        for (uint256 i = _left; i < _right; ++i) {
             slice[i - _left] = _proof[i];
         }
     }

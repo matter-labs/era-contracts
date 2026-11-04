@@ -1,0 +1,68 @@
+name: "Warm solc build cache"
+description: >
+  Restores the solc half of a previous commit's contract artifacts so `forge build` recompiles
+  only what changed, then drops artifacts whose source no longer exists.
+
+  Four PR-triggered workflows each compile l1-contracts from scratch (~440s apiece, ~29 minutes
+  of runner time per PR) and each saves to its own cache key. This shares one cross-commit cache
+  between them.
+
+  zksolc output is deliberately excluded: it is not reproducible across builds, so reusing a
+  cached `zkout` changes zkBytecodeHash and fails check-hashes. Only the solc side is reused;
+  every zkout is rebuilt.
+
+  On trusting a cache: this action only ever READS. The single writer is verify-merged-commit.yaml,
+  which builds with the cache disabled and saves only after the hash, selector and zkstack-out
+  checks pass. Nothing a `pull_request` run produces is ever offered to a later run.
+
+  That asymmetry is deliberate, and per-ref scoping alone is not enough to replace it. GitHub does
+  stop a fork PR from writing the base scope, but it lets a PR's later runs restore what its own
+  earlier runs saved — and a PR's own CI is the merge gate. A PR that wrote a forged artifact plus
+  a source manifest vouching for it could then push a clean-looking commit whose build restored the
+  forgery, skipped recompiling, and had check-hashes attest to bytecode that never came from those
+  sources. Moving the drift anchor out of the manifest and into git would not close it either: the
+  forged artifact belongs to a source that did not change, so no drift-based rule prunes it. The
+  writer is the only thing worth constraining.
+
+  A build that must not trust a cache simply does not use this action: verify-merged-commit.yaml
+  and the dispatch workflows that commit AllContractsHashes.json, selectors, zkstack-out and the
+  chain-state snapshots all omit it.
+
+runs:
+  using: composite
+  steps:
+    - name: Restore solc build cache from a previous commit
+      uses: actions/cache/restore@v4
+      with:
+        key: artifacts-l1-ci-solc-${{ github.sha }}
+        restore-keys: |
+          artifacts-l1-ci-solc-
+        path: |
+          da-contracts/cache-forge
+          da-contracts/out
+          l1-contracts/cache-forge
+          l1-contracts/out
+
+    # Forge never prunes artifacts for sources that are gone, and both calculate-hashes and
+    # `forge build --sizes` enumerate the artifact directories — so a cache from a commit that
+    # still had a contract would misreport on the commit that deleted it.
+    #
+    # Matching is per artifact on its full compilationTarget source path, not on the directory
+    # basename: forge names artifact directories after the source basename, this repo has 58
+    # duplicated basenames, and one directory can therefore hold artifacts from different sources
+    # (out/L1NativeTokenVault.sol/ holds both the production contract and the test file's
+    # contracts). A basename comparison keeps such a directory alive and its stale artifacts with
+    # it.
+    #
+    # Only the directories this action actually restores are scanned. zkout is never restored
+    # here — zksolc output is not reproducible across builds — and zksolc artifacts carry no
+    # compilationTarget to match on anyway.
+    - name: Drop artifacts whose source is gone or has changed
+      shell: bash
+      run: |
+        node "${{ github.action_path }}/prune-stale-artifacts.js" \
+          --manifest "$MANIFEST_PATH" \
+          "da-contracts:da-contracts/out" \
+          "l1-contracts:l1-contracts/out"
+      env:
+        MANIFEST_PATH: l1-contracts/cache-forge/.warm-solc-cache-sources.json

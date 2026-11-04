@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.20;
 
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2NativeTokenVault is INativeTokenVault {
+interface IL2NativeTokenVault is INativeTokenVaultBase {
     event FinalizeDeposit(
         address indexed l1Sender,
         address indexed l2Receiver,
@@ -25,5 +25,9 @@ interface IL2NativeTokenVault is INativeTokenVault {
 
     function l2TokenAddress(address _l1Token) external view returns (address);
 
-    function setLegacyTokenAssetId(address _l2TokenAddress) external;
+    /// @notice The base token asset ID
+    function BASE_TOKEN_ASSET_ID() external view returns (bytes32);
+
+    /// @notice The wrapped base token (WETH) address
+    function WETH_TOKEN() external view returns (address);
 }

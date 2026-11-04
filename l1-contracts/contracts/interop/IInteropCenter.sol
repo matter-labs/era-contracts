@@ -1,0 +1,196 @@
+// SPDX-License-Identifier: MIT
+// We use a floating point pragma here so it can be used within other projects that interact with the
+// ZKsync ecosystem without using our exact pragma version.
+pragma solidity ^0.8.21;
+
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
+import {AtomicFlowPreimage} from "../atomic-interop/IAtomicInterop.sol";
+
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Interface of the {InteropCenter}. See {protocol-docs/interop.md#zksync-interop-protocol}.
+interface IInteropCenter {
+    /// @notice Send-side metadata for an atomic bundle, parsed from the `atomicBundle` attribute.
+    /// Deliberately NOT part of the cross-chain {InteropBundle}: `bundleHash` must not depend on the
+    /// flowId preimage (circular — the preimage's leg hashes include this bundle's own hash). See
+    /// {protocol-docs/interop.md#atomic-bundles}.
+    struct AtomicSend {
+        AtomicFlowPreimage flowPreimage;
+        uint256 lowNullifierIndex;
+        bool isAtomic;
+    }
+
+    /// @notice Emitted once per sent bundle (`l2l1MsgHash` is zero for atomic bundles, which are not
+    /// published to L1).
+    event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
+
+    event NewAssetRouter(address indexed oldAssetRouter, address indexed newAssetRouter);
+
+    /// @notice Emitted when the interop protocol fee is updated.
+    event InteropFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
+
+    /// @notice Emitted when protocol fees (base token) are accumulated for the coinbase.
+    /// @param coinbase Address of the block producer (block.coinbase) that earned the fees.
+    /// @param amount Amount of base token accumulated (claimable via claimProtocolFees).
+    event ProtocolFeesAccumulated(address indexed coinbase, uint256 amount);
+
+    /// @notice Emitted when ZK fees are accumulated.
+    /// @param payer Address that paid the fees.
+    /// @param coinbase Address of the block producer (block.coinbase) that earned the fees.
+    /// @param amount Amount of ZK tokens accumulated (claimable via claimZKFees).
+    event FixedZKFeesAccumulated(address indexed payer, address indexed coinbase, uint256 amount);
+
+    /// @notice Emitted when a coinbase claims their accumulated protocol fees (base token).
+    /// @param coinbase Address of the coinbase claiming the fees.
+    /// @param receiver Address that received the fees.
+    /// @param amount Amount of base token claimed.
+    event ProtocolFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
+
+    /// @notice Emitted when a coinbase claims their accumulated ZK fees.
+    /// @param coinbase Address of the coinbase claiming the fees.
+    /// @param receiver Address that received the fees.
+    /// @param amount Amount of ZK tokens claimed.
+    event ZKFeesClaimed(address indexed coinbase, address indexed receiver, uint256 amount);
+
+    /// @notice Restrictions for parsing attributes.
+    /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
+    /// @param OnlyCallAttributes: Only call attributes are allowed.
+    /// @param OnlyBundleAttributes: Only bundle attributes are allowed.
+    /// @param CallAndBundleAttributes: Both call and bundle attributes are allowed.
+    enum AttributeParsingRestrictions {
+        OnlyInteropCallValue,
+        OnlyCallAttributes,
+        OnlyBundleAttributes,
+        CallAndBundleAttributes
+    }
+
+    /// @notice Returns the L1 chain ID.
+    function L1_CHAIN_ID() external view returns (uint256);
+
+    /// @notice Returns the operator-set fee in base token per interop call (when useFixedFee=false).
+    function interopProtocolFee() external view returns (uint256);
+
+    /// @notice Returns the fixed fee amount in ZK tokens per interop call (when useFixedFee=true).
+    function ZK_INTEROP_FEE() external view returns (uint256);
+
+    /// @notice Returns the ZK token asset ID.
+    function ZK_TOKEN_ASSET_ID() external view returns (bytes32);
+
+    /// @notice Returns the cached ZK token contract address.
+    function zkToken() external view returns (IERC20);
+
+    /// @notice Returns whether the given sender has already used the given salt for an interop bundle.
+    /// @param user The address that sends the interop bundle.
+    /// @param salt The user-provided salt.
+    function isInteropBundleSaltUsed(address user, bytes32 salt) external view returns (bool);
+
+    /// @notice Returns ZK token address if available, zero address otherwise.
+    /// @dev View function to check ZK token availability without modifying state.
+    /// @return The ZK token address or zero address if not available.
+    function getZKTokenAddress() external view returns (address);
+
+    /// @notice Returns the accumulated protocol fees (base token) for a coinbase.
+    /// @param coinbase Address of the coinbase.
+    /// @return Amount of accumulated base token fees.
+    function accumulatedProtocolFees(address coinbase) external view returns (uint256);
+
+    /// @notice Returns the accumulated ZK fees for a coinbase.
+    /// @param coinbase Address of the coinbase.
+    /// @return Amount of accumulated ZK token fees.
+    function accumulatedZKFees(address coinbase) external view returns (uint256);
+
+    /// @notice Sets the base token fee per interop call (used when useFixedFee=false).
+    /// @dev Can be set to 0 to disable base token fees for users.
+    /// @dev Only callable by the bootloader as a system transaction, operator-controlled.
+    /// @param _fee New fee amount in base token wei.
+    function setInteropFee(uint256 _fee) external;
+
+    /// @notice Allows a coinbase to claim their accumulated protocol fees (base token).
+    /// @dev Transfers all accumulated base token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimProtocolFees(address _receiver) external;
+
+    /// @notice Allows a coinbase to claim their accumulated ZK fees.
+    /// @dev Transfers all accumulated ZK token fees to the specified receiver.
+    /// @param _receiver Address to receive the fees.
+    function claimZKFees(address _receiver) external;
+
+    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
+    function pause() external;
+
+    /// @notice Unpauses the contract, re-enabling functions marked with `whenNotPaused`.
+    function unpause() external;
+
+    /// @notice One-shot initialization for the InteropCenter; must never run again after v31.
+    ///      See {protocol-docs/interop.md#initialization-and-versioning-notes}.
+    /// @param _l1ChainId The chain ID of L1.
+    /// @param _owner The owner address.
+    /// @param _zkTokenAssetId The ZK token asset ID.
+    function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
+
+    /// @notice Forwards a transaction from the gateway to a chain mailbox (from L1).
+    /// @dev Note, that `_canonicalTxHash` is provided by the chain and so should not be trusted to be unique,
+    /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the Gateway.
+    /// @param _chainId Target chain ID.
+    /// @param _canonicalTxHash Canonical L1 transaction hash.
+    /// @param _expirationTimestamp Deprecated, always 0.
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    /// @notice Sends an interop bundle.
+    /// @param _destinationChainId Chain ID to send to: an ERC-7930 address that MUST have an empty
+    ///                            address field, encoding an EVM destination chain ID.
+    /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
+    ///                      MUST have an empty ChainReference field (all calls go to
+    ///                      _destinationChainId, so a per-call chain ID would be redundant).
+    /// @param _bundleAttributes Attributes of the bundle.
+    /// @return bundleHash Hash of the sent bundle.
+    function sendBundle(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external payable returns (bytes32 bundleHash);
+
+    /// @notice Simulates {sendBundle} and reports the `bundleHash` it would produce for the same caller and
+    ///         inputs, without collecting value or committing to the atomic interop IMT.
+    /// @dev Quoter pattern: this ALWAYS reverts with `InteropPreviewHash(bundleHash)` — it never returns and
+    ///      can never commit state. This is deliberate: to make the hash byte-exact it runs the same stateful
+    ///      assembly as {sendBundle}, including the value-burning `initiateIndirectCall` for indirect legs;
+    ///      reverting guarantees that burn is rolled back no matter who calls it or from what context (so it
+    ///      cannot be weaponised to move funds). Invoke it via a static `eth_call` / `callStatic` and read the
+    ///      hash out of the revert reason. Callers derive the atomic `flowId` (which commits to `bundleHash`)
+    ///      from this value before the real send. Requires no `msg.value` and no `atomicBundle` attribute, and
+    ///      does not consume the `interopBundleSalt` uniqueness slot.
+    /// @param _destinationChainId Same as {sendBundle}.
+    /// @param _callStarters Same as {sendBundle}.
+    /// @param _bundleAttributes Same as {sendBundle}.
+    function previewBundleHash(
+        bytes calldata _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external;
+
+    /// @notice Simulates {sendMessage} and reports the `bundleHash` of the single-call bundle it would produce
+    ///         for the same caller and inputs. Same quoter contract as {previewBundleHash}: it ALWAYS reverts
+    ///         with `InteropPreviewHash(bundleHash)` and must be invoked via a static `eth_call` / `callStatic`.
+    /// @param _recipient Same as {sendMessage}.
+    /// @param _payload Same as {sendMessage}.
+    /// @param _attributes Same as {sendMessage}.
+    function previewMessageHash(
+        bytes calldata _recipient,
+        bytes calldata _payload,
+        bytes[] calldata _attributes
+    ) external;
+
+    /// @notice Parses the attributes of the call or bundle.
+    /// @param _attributes ERC-7786 Attributes of the call or bundle.
+    /// @param _restriction Restriction for parsing attributes.
+    function parseAttributes(
+        bytes[] calldata _attributes,
+        AttributeParsingRestrictions _restriction
+    ) external pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes);
+}

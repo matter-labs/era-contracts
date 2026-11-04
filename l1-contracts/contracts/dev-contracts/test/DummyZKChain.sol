@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {IEIP7702Checker} from "../../state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {MailboxFacet} from "../../state-transition/chain-deps/facets/Mailbox.sol";
 import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 
 contract DummyZKChain is MailboxFacet {
     constructor(
         address bridgeHubAddress,
-        uint256 _eraChainId,
-        uint256 _l1ChainId
-    ) MailboxFacet(_eraChainId, _l1ChainId) {
+        uint256 _l1ChainId,
+        address _chainAssetHandler,
+        IEIP7702Checker _eip7702Checker
+    ) MailboxFacet(_l1ChainId, _chainAssetHandler, _eip7702Checker, false) {
         s.bridgehub = bridgeHubAddress;
-    }
-
-    function getEraChainId() public view returns (uint256) {
-        return ERA_CHAIN_ID;
     }
 
     function setBridgeHubAddress(address bridgeHubAddress) public {

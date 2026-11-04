@@ -8,14 +8,14 @@ import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 contract L2WrappedBaseTokenStoreTest is Test {
     L2WrappedBaseTokenStore store;
 
-    address owner = address(0x1);
-    address admin = address(0x2);
-    address other = address(0x3);
-    address newAdmin = address(0x4);
-    address newPendingAdmin = address(0x5);
+    address owner;
+    address admin;
+    address other;
+    address newAdmin;
+    address newPendingAdmin;
     uint256 chainId = 100;
-    address l2WBaseToken = address(0xABC);
-    address newL2WBaseToken = address(0xDEF);
+    address l2WBaseToken;
+    address newL2WBaseToken;
 
     // Events
     event NewAdmin(address indexed oldAdmin, address indexed newAdmin);
@@ -23,6 +23,14 @@ contract L2WrappedBaseTokenStoreTest is Test {
     event NewWBaseTokenAddress(uint256 indexed chainId, address indexed l2WBaseTokenAddress);
 
     function setUp() public {
+        owner = makeAddr("owner");
+        admin = makeAddr("admin");
+        other = makeAddr("other");
+        newAdmin = makeAddr("newAdmin");
+        newPendingAdmin = makeAddr("newPendingAdmin");
+        l2WBaseToken = makeAddr("l2WBaseToken");
+        newL2WBaseToken = makeAddr("newL2WBaseToken");
+
         // Deploy the contract with owner and admin
         vm.startPrank(owner);
         store = new L2WrappedBaseTokenStore(owner, admin);

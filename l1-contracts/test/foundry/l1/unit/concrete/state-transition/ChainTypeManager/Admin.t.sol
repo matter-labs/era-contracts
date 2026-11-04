@@ -12,6 +12,7 @@ contract AdminTest is ChainTypeManagerTest {
     function test_setPendingAdmin() public {
         address newAdmin = makeAddr("newAdmin");
 
+        vm.prank(governor);
         vm.expectEmit(true, true, true, false);
         emit IChainTypeManager.NewPendingAdmin(address(0), newAdmin);
         chainContractAddress.setPendingAdmin(newAdmin);
@@ -20,10 +21,9 @@ contract AdminTest is ChainTypeManagerTest {
     function test_acceptPendingAdmin() public {
         address newAdmin = makeAddr("newAdmin");
 
+        vm.prank(governor);
         chainContractAddress.setPendingAdmin(newAdmin);
 
-        // Need this because in shared setup we start a prank as the governor
-        vm.stopPrank();
         vm.prank(newAdmin);
         vm.expectEmit(true, true, true, false);
         emit IChainTypeManager.NewPendingAdmin(newAdmin, address(0));
