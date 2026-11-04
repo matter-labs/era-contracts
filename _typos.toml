@@ -16,8 +16,6 @@ extend-exclude = [
     "*.json",
     "*.lock",
     ".git/",
-    # Typo inside (unaccessible vs inaccessible) fix before v30.
-    "/system-contracts/contracts/abstract/SystemContractBase.sol",
     "SECURITY.md"
 ]
 

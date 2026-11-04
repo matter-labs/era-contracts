@@ -1369,6 +1369,10 @@ mod tests {
                 cfg.zk_token_asset_id().is_some(),
                 "{env}: zk_token_asset_id is unset"
             );
+            assert!(
+                cfg.testnet_verifier().is_some(),
+                "{env}: testnet_verifier is unset"
+            );
             assert!(anvil_port(env).is_ok(), "{env}: no anvil port assigned");
         }
     }

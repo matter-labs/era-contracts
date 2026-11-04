@@ -6,6 +6,7 @@
 # Upgrade Board. The chains' ChainAdmins are owned by the EOA 0xeC6A5c56….
 
 l1_chain_id = 11155111
+testnet_verifier = true
 
 # The ZK token asset id the CTM's force-deployment data carries.
 zk_token_asset_id = "0x21e55cffc931f6d7b0b5b920bd47803ee382b94b8f82ec4c66025dfed5d897d4"
