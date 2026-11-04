@@ -77,7 +77,8 @@ jobs:
 
   test-bootloader:
     needs: [build, lint]
-    runs-on: ubuntu-latest
+    # librocksdb-sys 0.11 (rocksdb 8.1.1) does not compile with ubuntu-26.04's GCC.
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout the repository
