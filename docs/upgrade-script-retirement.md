@@ -137,7 +137,7 @@ from a getter the deployed contracts expose.
 
 ## Batch 3: move cross-contract follow-up work into audited execution — hook implemented
 
-Landed: the pinned execution hook. Every `ProxyUpgradeTransition` pins an `upgradeEngine` that its
+Landed: the pinned execution hook. Every `ProxyUpgradeTransition` pins a `proxyUpgradeEngine` that its
 domain's executor delegatecalls; a release with follow-up work subclasses
 `DefaultProxyUpgradeEngine` and writes the calls in its before-swap, after-swap and postcondition
 hooks, and the executor re-checks its ownership, the domain's holders and every row afterwards.

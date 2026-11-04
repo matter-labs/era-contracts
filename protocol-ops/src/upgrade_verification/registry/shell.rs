@@ -445,7 +445,7 @@ mod tests {
         let transition = TransitionManifest {
             fromRelease: Address::repeat_byte(0xF0),
             newRelease: Address::repeat_byte(0xF1),
-            upgradeEngine: Address::ZERO,
+            chainUpgradeEngine: Address::ZERO,
             oldProtocolVersionDeadline: U256::ZERO,
             upgradeTimestamp: U256::ZERO,
             l2Plan: AuthoredL2Plan {

@@ -8,7 +8,7 @@ import {ProxyUpgradeContext, ProxyUpgradeRow} from "../RegistryTypes.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The code a `ProxyUpgradeTransition` pins to apply itself. A domain executor
-///         DELEGATECALLS exactly {executeUpgrade} on its transition's `upgradeEngine`, so the
+///         DELEGATECALLS exactly {executeUpgrade} on its transition's `proxyUpgradeEngine`, so the
 ///         engine acts with the executor's authority: its `ProxyAdmin` and, in the CTM domain, the
 ///         CTM and the ServerNotifier. That is how an upgrade's follow-up calls (cross-contract
 ///         wiring after the swaps) become audited Solidity in a reviewed, pinned contract instead

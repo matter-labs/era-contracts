@@ -320,7 +320,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         }
         _recordedMember(ctmOutput, ctmSalt, release.diamondInit);
         _recordedMember(ctmOutput, ctmSalt, release.genesisUpgrade);
-        _recordedMember(ctmOutput, ctmSalt, manifest.upgradeEngine);
+        _recordedMember(ctmOutput, ctmSalt, manifest.chainUpgradeEngine);
         // The prepare deploys the composer either way; this L1-only fixture's plan names none.
         assertEq(manifest.l2Plan.delegateComposer, address(0), "an L1-only plan names no composer");
         uint256 ctmRows = manifest.ctmProxyUpgrades.length;
@@ -329,7 +329,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
                 _recordedMember(ctmOutput, ctmSalt, manifest.ctmProxyUpgrades[i].implNew);
             }
         }
-        _recordedMember(coreOutput, coreSalt, coreUpgrade.coreTransition().upgradeEngine());
+        _recordedMember(coreOutput, coreSalt, coreUpgrade.coreTransition().proxyUpgradeEngine());
         ProxyUpgradeRow[] memory coreRows = coreUpgrade.coreTransition().getManifest().proxyUpgrades;
         uint256 coreRowCount = coreRows.length;
         for (uint256 i = 0; i < coreRowCount; ++i) {
@@ -409,7 +409,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertEq(keccak256(shippedCut), _expectedUpgradeCutHash, "the shipped cut must be the committed one");
         Diamond.DiamondCutData memory cut = abi.decode(shippedCut, (Diamond.DiamondCutData));
         assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
-        assertEq(cut.initAddress, bootstrap.committedUpgradeEngine(), "the init target is the pinned engine");
+        assertEq(cut.initAddress, bootstrap.committedChainUpgradeEngine(), "the init target is the pinned engine");
         assertEq(
             this.decodeUpgradeInit(cut.initCalldata),
             address(bootstrap.bootstrapMigration()),

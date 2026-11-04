@@ -307,7 +307,7 @@ pub(crate) async fn verify<P: Provider>(
         result,
         &members,
         "the bootstrap migration",
-        manifest.upgradeEngine,
+        manifest.chainUpgradeEngine,
         BOOTSTRAP_ENGINES,
         &manifest.l2Plan,
     )
@@ -1276,7 +1276,7 @@ mod tests {
             ctmProxyUpgrades: Vec::new(),
             currentRelease: Address::repeat_byte(0x33),
             oldProtocolVersionDeadline: U256::from(3),
-            upgradeEngine: Address::repeat_byte(0x44),
+            chainUpgradeEngine: Address::repeat_byte(0x44),
             l2Plan: views::AuthoredL2Plan {
                 delegateBytecodeInfo: Default::default(),
                 extraBytecodeInfos: Vec::new(),
@@ -1875,7 +1875,7 @@ mod tests {
             ctmProxyUpgrades: proxy_upgrades,
             currentRelease: Address::repeat_byte(0x33),
             oldProtocolVersionDeadline: U256::ZERO,
-            upgradeEngine: Address::repeat_byte(0x44),
+            chainUpgradeEngine: Address::repeat_byte(0x44),
             l2Plan: views::AuthoredL2Plan {
                 delegateBytecodeInfo: Default::default(),
                 extraBytecodeInfos: Vec::new(),
@@ -2241,7 +2241,7 @@ mod tests {
                 views::ProxyUpgradeTransitionManifest {
                     domain: PROXY_UPGRADE_DOMAIN_CORE,
                     proxyUpgrades: rows,
-                    upgradeEngine: ENGINE,
+                    proxyUpgradeEngine: ENGINE,
                 },
             );
             let (reviewed_root, ctms_root) = self.message_root;

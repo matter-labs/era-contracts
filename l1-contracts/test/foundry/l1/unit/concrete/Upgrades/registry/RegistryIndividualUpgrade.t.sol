@@ -378,7 +378,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
                 TransitionManifest({
                     fromRelease: _fromRelease,
                     newRelease: _newRelease,
-                    upgradeEngine: defaultUpgrade,
+                    chainUpgradeEngine: defaultUpgrade,
                     oldProtocolVersionDeadline: 1000,
                     upgradeTimestamp: 0,
                     l2Plan: AuthoredL2Plan({
@@ -400,7 +400,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
                 ProxyUpgradeTransitionManifest({
                     domain: ProxyUpgradeDomain.CTM,
                     proxyUpgrades: _rows,
-                    upgradeEngine: address(proxyUpgradeEngine)
+                    proxyUpgradeEngine: address(proxyUpgradeEngine)
                 })
             );
     }

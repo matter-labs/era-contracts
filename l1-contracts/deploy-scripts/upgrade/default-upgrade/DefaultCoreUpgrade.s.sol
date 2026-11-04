@@ -130,7 +130,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         }
         // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
         // creation code this object's address is re-derived from.
-        address upgradeEngine = deployProxyUpgradeEngine();
+        address proxyUpgradeEngine = deployProxyUpgradeEngine();
         coreTransition = IProxyUpgradeTransition(
             deployViaCreate2AndNotify(
                 BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
@@ -138,7 +138,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                     ProxyUpgradeTransitionManifest({
                         domain: ProxyUpgradeDomain.Core,
                         proxyUpgrades: rows,
-                        upgradeEngine: upgradeEngine
+                        proxyUpgradeEngine: proxyUpgradeEngine
                     })
                 ),
                 "ProxyUpgradeTransition"

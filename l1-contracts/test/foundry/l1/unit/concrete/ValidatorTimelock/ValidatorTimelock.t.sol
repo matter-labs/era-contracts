@@ -332,7 +332,7 @@ contract ValidatorTimelockTest is Test {
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory cut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
-            initAddress: makeAddr("upgradeEngine"),
+            initAddress: makeAddr("chainUpgradeEngine"),
             initCalldata: hex"1234"
         });
         bytes memory forwarded = abi.encodeCall(

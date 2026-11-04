@@ -22,8 +22,8 @@ import {
     ProxyUpgradeEngineAuthorityMismatch,
     ProxyUpgradeRowMismatch,
     RegistryTargetHasNoCode,
-    UpgradeEngineChangedExecutorOwnership,
-    UpgradeEngineMovedDomainAuthority,
+    ProxyUpgradeEngineChangedExecutorOwnership,
+    ProxyUpgradeEngineMovedDomainAuthority,
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 import {
@@ -233,7 +233,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
                 ProxyUpgradeTransitionManifest({
                     domain: ProxyUpgradeDomain.CTM,
                     proxyUpgrades: inventory,
-                    upgradeEngine: _engine
+                    proxyUpgradeEngine: _engine
                 })
             );
     }
@@ -246,7 +246,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
                 ProxyUpgradeTransitionManifest({
                     domain: ProxyUpgradeDomain.Core,
                     proxyUpgrades: inventory,
-                    upgradeEngine: _engine
+                    proxyUpgradeEngine: _engine
                 })
             );
     }
@@ -269,8 +269,8 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
     function test_theTransitionPinsItsEngineInTheManifest() public {
         address engine = _wiringEngine(false);
         IProxyUpgradeTransition t = _ctmTransition(engine);
-        assertEq(t.upgradeEngine(), engine, "getter");
-        assertEq(t.getManifest().upgradeEngine, engine, "manifest");
+        assertEq(t.proxyUpgradeEngine(), engine, "getter");
+        assertEq(t.getManifest().proxyUpgradeEngine, engine, "manifest");
         // The engine is part of what `manifestHash` commits to.
         assertTrue(t.manifestHash() != _ctmTransition(address(proxyUpgradeEngine)).manifestHash(), "hash binds it");
     }
@@ -284,7 +284,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
             ProxyUpgradeTransitionManifest({
                 domain: ProxyUpgradeDomain.CTM,
                 proxyUpgrades: inventory,
-                upgradeEngine: address(0)
+                proxyUpgradeEngine: address(0)
             })
         );
     }
@@ -397,7 +397,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new OwnerClobberingEngine(0));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineChangedExecutorOwnership.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineChangedExecutorOwnership.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(ctmExecutor.owner(), governor);
     }
@@ -407,7 +407,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new OwnerClobberingEngine(1));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineChangedExecutorOwnership.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineChangedExecutorOwnership.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(ctmExecutor.pendingOwner(), address(0));
     }
@@ -417,7 +417,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ProxyAdmin));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(ctmProxyAdmin.owner(), address(ctmExecutor));
     }
@@ -427,7 +427,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManager));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(IOwnable(address(chainContractAddress)).pendingOwner(), address(0));
     }
@@ -440,7 +440,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address serverNotifier = chainContractAddress.serverNotifierAddress();
         assertEq(IOwnable(serverNotifier).owner(), address(ctmExecutor), "the executor holds the notifier");
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(IOwnable(serverNotifier).pendingOwner(), address(0));
     }
@@ -456,7 +456,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManagerProxy));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(
             ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(address(chainContractAddress))),
@@ -496,7 +496,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManager));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(IOwnable(address(chainContractAddress)).pendingOwner(), address(0));
     }
@@ -506,7 +506,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ProxyAdmin));
         IProxyUpgradeTransition t = _coreTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(UpgradeEngineMovedDomainAuthority.selector, engine));
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
         coreExecutor.applyL1Upgrade(t);
         assertEq(ecosystemProxyAdmin.owner(), address(coreExecutor));
     }
@@ -527,7 +527,7 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         IProxyUpgradeTransition t = _ctmTransition(address(proxyUpgradeEngine));
         ProxyUpgradeContext memory context = ProxyUpgradeContext({
             transition: address(t),
-            upgradeEngine: address(proxyUpgradeEngine),
+            proxyUpgradeEngine: address(proxyUpgradeEngine),
             domain: ProxyUpgradeDomain.CTM,
             proxyAdmin: address(ctmProxyAdmin),
             chainTypeManager: address(chainContractAddress)

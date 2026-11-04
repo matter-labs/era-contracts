@@ -12,9 +12,9 @@
 //! | release | `verifier` | one of [`VERIFIERS`], and each sub-verifier it names ([`sub_verifiers`]) — or the verifier already in force where the upgrade departs from ([`DepartingMembers`]) |
 //! | release | each L2 bytecode table row | the bytecode info of the contract its slot names |
 //! | release | `l2SystemProxyBytecodeInfo` | the bytecode info of [`SYSTEM_PROXY_SHELL`] |
-//! | transition | `upgradeEngine` | [`TRANSITION_ENGINES`] |
-//! | bootstrap migration | `upgradeEngine` | [`BOOTSTRAP_ENGINES`] |
-//! | proxy upgrade transition (either domain) | `upgradeEngine` | [`PROXY_UPGRADE_ENGINES`] |
+//! | transition | `chainUpgradeEngine` | [`TRANSITION_ENGINES`] |
+//! | bootstrap migration | `chainUpgradeEngine` | [`BOOTSTRAP_ENGINES`] |
+//! | proxy upgrade transition (either domain) | `proxyUpgradeEngine` | [`PROXY_UPGRADE_ENGINES`] |
 //! | transition, bootstrap migration | `l2Plan.delegateComposer` | the composer [`DELEGATE_COMPOSERS`] pairs with the plan's delegate |
 //! | transition, bootstrap migration | `l2Plan.delegateBytecodeInfo` | the bytecode info of one of [`L2_DELEGATES`] |
 //! | transition, bootstrap migration | each `l2Plan.extraBytecodeInfos` entry | the bytecode info of a reviewed contract |
@@ -628,7 +628,7 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
     plan: &AuthoredL2Plan,
 ) -> anyhow::Result<()> {
     let mut named = vec![(
-        format!("{label}: upgradeEngine"),
+        format!("{label}: chainUpgradeEngine"),
         engine,
         engines,
         "the prepare deploys the engine its object pins",
@@ -672,7 +672,7 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
     Ok(())
 }
 
-/// The `upgradeEngine` a `ProxyUpgradeTransition` pins against [`PROXY_UPGRADE_ENGINES`]: its
+/// The `proxyUpgradeEngine` a `ProxyUpgradeTransition` pins against [`PROXY_UPGRADE_ENGINES`]: its
 /// runtime must be a reviewed engine's (an unknown engine is an ERROR — it runs by delegatecall
 /// with the executor's whole authority), and, since the prepare deploys the engine its object
 /// pins, its construction must re-derive from the package's `[member_deployments]` record. A zero
@@ -685,7 +685,7 @@ pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
     label: &str,
     engine: Address,
 ) -> anyhow::Result<()> {
-    let member_label = format!("{label}: upgradeEngine");
+    let member_label = format!("{label}: proxyUpgradeEngine");
     if engine.is_zero() {
         result.report_error(&format!(
             "{member_label} is the zero address: the object's constructor refuses it \
@@ -1959,7 +1959,7 @@ mod tests {
         )
         .await;
         assert_eq!(result.errors, 2, "{:?}", result.error_messages);
-        assert!(result.has_error("upgradeEngine at"));
+        assert!(result.has_error("chainUpgradeEngine at"));
         assert!(result.has_error("l2Plan.delegateComposer at"));
     }
 

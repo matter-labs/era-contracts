@@ -99,8 +99,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         ///      migration pins its own rows).
         address ctmInfrastructureTransition;
         /// @dev The engine this edge commits, held only until the object that pins it exists.
-        ///      Read it through {committedUpgradeEngine}, never directly.
-        address upgradeEngine;
+        ///      Read it through {committedChainUpgradeEngine}, never directly.
+        address chainUpgradeEngine;
     }
 
     struct AdditionalConfig {
@@ -336,7 +336,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function deployUpgradeObjects() public virtual {
         _requireDeclaredKindHolds();
         if (upgradeKind() != UpgradeKind.InfrastructureOnly) {
-            upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
+            upgradeAddresses.chainUpgradeEngine = deployUsedUpgradeContract();
             deployCTMTransition();
         }
         deployCTMInfrastructureTransition();
@@ -382,12 +382,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(fromRelease != address(0), "CTM has no current release: the bootstrap edge must run first");
         address newRelease = ctmAddresses.stateTransition.currentRelease;
         require(newRelease != address(0), "new release not deployed");
-        address engine = committedUpgradeEngine();
+        address engine = committedChainUpgradeEngine();
         upgradeAddresses.ctmTransition = deployTransition(
             TransitionManifest({
                 fromRelease: fromRelease,
                 newRelease: newRelease,
-                upgradeEngine: engine,
+                chainUpgradeEngine: engine,
                 oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
                 upgradeTimestamp: 0,
                 l2Plan: authoredL2Plan()
@@ -426,14 +426,14 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             return;
         }
         // From the build ARTIFACT, for the same reason as the transition above.
-        address upgradeEngine = deployProxyUpgradeEngine();
+        address proxyUpgradeEngine = deployProxyUpgradeEngine();
         upgradeAddresses.ctmInfrastructureTransition = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
             abi.encode(
                 ProxyUpgradeTransitionManifest({
                     domain: ProxyUpgradeDomain.CTM,
                     proxyUpgrades: inventory,
-                    upgradeEngine: upgradeEngine
+                    proxyUpgradeEngine: proxyUpgradeEngine
                 })
             ),
             "ProxyUpgradeTransition"
@@ -612,18 +612,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice The upgrade engine this edge commits: this prepare's own deployment until the
     ///         object that pins it exists, and that object's pin from then on. Reading it back off
     ///         the object means the output cannot name an engine the committed edge does not pin.
-    function committedUpgradeEngine() public view virtual returns (address) {
+    function committedChainUpgradeEngine() public view virtual returns (address) {
         address transition = upgradeAddresses.ctmTransition;
         if (transition != address(0)) {
-            return ICTMTransition(transition).upgradeEngine();
+            return ICTMTransition(transition).chainUpgradeEngine();
         }
         if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
             // No chain crosses an infrastructure-only edge, so there is no engine to commit and
             // the output must not name one.
             return address(0);
         }
-        require(upgradeAddresses.upgradeEngine != address(0), "upgrade engine not deployed");
-        return upgradeAddresses.upgradeEngine;
+        require(upgradeAddresses.chainUpgradeEngine != address(0), "upgrade engine not deployed");
+        return upgradeAddresses.chainUpgradeEngine;
     }
 
     function bootstrapMigrationAddress() public view virtual returns (address) {
@@ -1049,7 +1049,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            committedUpgradeEngine()
+            committedChainUpgradeEngine()
         );
 
         // Serialize newly deployed upgrade addresses

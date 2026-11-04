@@ -11,8 +11,8 @@ import {IOwnable} from "../../../common/interfaces/IOwnable.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
     ProxyUpgradeDomainMismatch,
-    UpgradeEngineChangedExecutorOwnership,
-    UpgradeEngineMovedDomainAuthority
+    ProxyUpgradeEngineChangedExecutorOwnership,
+    ProxyUpgradeEngineMovedDomainAuthority
 } from "../../../common/L1ContractErrors.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
 import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
@@ -57,11 +57,11 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
             revert ProxyUpgradeDomainMismatch(uint8(_domain), uint8(manifest.domain));
         }
         // A codeless delegatecall target succeeds silently.
-        ObjectAnchorLib.requireCode(manifest.upgradeEngine);
+        ObjectAnchorLib.requireCode(manifest.proxyUpgradeEngine);
 
         ProxyUpgradeContext memory context = ProxyUpgradeContext({
             transition: address(_transition),
-            upgradeEngine: manifest.upgradeEngine,
+            proxyUpgradeEngine: manifest.proxyUpgradeEngine,
             domain: _domain,
             proxyAdmin: address(_proxyAdmin),
             chainTypeManager: _chainTypeManager
@@ -73,7 +73,7 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
             : IChainTypeManager(_chainTypeManager).serverNotifierAddress();
         bytes32 domainHoldersBefore = _domainHolders(_proxyAdmin, _chainTypeManager, serverNotifier);
         // slither-disable-next-line controlled-delegatecall
-        (bool success, bytes memory returnData) = manifest.upgradeEngine.delegatecall(
+        (bool success, bytes memory returnData) = manifest.proxyUpgradeEngine.delegatecall(
             abi.encodeCall(IProxyUpgradeEngine.executeUpgrade, (context, manifest.proxyUpgrades))
         );
         if (!success) {
@@ -85,10 +85,10 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
         }
         // The engine shares the executor's storage; it must not have touched who governs it.
         if (owner() != ownerBefore || pendingOwner() != pendingOwnerBefore) {
-            revert UpgradeEngineChangedExecutorOwnership(manifest.upgradeEngine);
+            revert ProxyUpgradeEngineChangedExecutorOwnership(manifest.proxyUpgradeEngine);
         }
         if (_domainHolders(_proxyAdmin, _chainTypeManager, serverNotifier) != domainHoldersBefore) {
-            revert UpgradeEngineMovedDomainAuthority(manifest.upgradeEngine);
+            revert ProxyUpgradeEngineMovedDomainAuthority(manifest.proxyUpgradeEngine);
         }
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(
             manifest.proxyUpgrades,

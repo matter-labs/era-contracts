@@ -21,7 +21,7 @@ interface IProxyUpgradeTransition is IManifestHash {
 
     /// @notice The `IProxyUpgradeEngine` the domain's executor delegatecalls to apply this object:
     ///         the rows plus any follow-up calls the upgrade needs, as audited code.
-    function upgradeEngine() external view returns (address);
+    function proxyUpgradeEngine() external view returns (address);
 
     /// @notice Every proxy participating in this upgrade, as complete typed rows (the slots marked
     ///         "not upgraded" are dropped).

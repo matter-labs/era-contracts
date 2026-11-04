@@ -270,7 +270,7 @@ abstract contract RegistryObjectsFixture is Test {
         CTMRelease _fromRelease,
         CTMRelease _newRelease,
         uint256 _upgradeTimestamp,
-        address _upgradeEngine,
+        address _chainUpgradeEngine,
         AuthoredL2Plan memory _plan
     ) internal returns (CTMTransition) {
         return
@@ -278,7 +278,7 @@ abstract contract RegistryObjectsFixture is Test {
                 TransitionManifest({
                     fromRelease: address(_fromRelease),
                     newRelease: address(_newRelease),
-                    upgradeEngine: _upgradeEngine,
+                    chainUpgradeEngine: _chainUpgradeEngine,
                     oldProtocolVersionDeadline: type(uint256).max,
                     upgradeTimestamp: _upgradeTimestamp,
                     l2Plan: _plan
@@ -294,7 +294,7 @@ abstract contract RegistryObjectsFixture is Test {
         CTMRelease _targetRelease,
         uint256 _oldProtocolVersion,
         uint256 _upgradeTimestamp,
-        address _upgradeEngine,
+        address _chainUpgradeEngine,
         AuthoredL2Plan memory _plan
     ) internal returns (BootstrapManifest memory) {
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
@@ -318,7 +318,7 @@ abstract contract RegistryObjectsFixture is Test {
                 ctmProxyUpgrades: rows,
                 currentRelease: address(_targetRelease),
                 oldProtocolVersionDeadline: type(uint256).max,
-                upgradeEngine: _upgradeEngine,
+                chainUpgradeEngine: _chainUpgradeEngine,
                 l2Plan: _plan,
                 upgradeTimestamp: _upgradeTimestamp,
                 ctmExecutor: _deployedStub("ctmExecutor"),

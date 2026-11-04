@@ -1013,7 +1013,7 @@ function buildRegistryManifest(
         },
         transition: {
           fromRelease: live.fromRelease,
-          upgradeEngine: { address: deployed.newDefaultUpgrade },
+          chainUpgradeEngine: { address: deployed.newDefaultUpgrade },
           // Schedule: immediately executable, old version stays usable indefinitely.
           oldProtocolVersionDeadline: ethers.constants.MaxUint256.toHexString(),
           upgradeTimestamp: 0,
@@ -1089,7 +1089,11 @@ function assertCommittedManifestMatchesLiveDeployment(
     ["ctm.ctmProxy", ctm?.ctmProxy, ctmProxy],
     ["ctm.transition.fromRelease", ctm?.transition?.fromRelease, live.fromRelease],
     ["ctm.release.verifier.address", ctm?.release?.verifier?.address, deployed.newVerifier],
-    ["ctm.transition.upgradeEngine.address", ctm?.transition?.upgradeEngine?.address, deployed.newDefaultUpgrade],
+    [
+      "ctm.transition.chainUpgradeEngine.address",
+      ctm?.transition?.chainUpgradeEngine?.address,
+      deployed.newDefaultUpgrade,
+    ],
     // No facet swaps in the manifest at all: the delta is DERIVED on-chain from the release pair.
     ["ctm.transition.facetSwaps", ctm?.transition?.facetSwaps === undefined, true],
     // CTM-domain rows are their own object's (`ctm.infrastructure.contracts`), never the transition's.
@@ -1159,9 +1163,9 @@ async function deployUpgradeObjectsFromManifest(
 
   const release = await deployObject("CTMRelease", releaseInitArgs(manifest, ctm));
   // Both proxy upgrade transitions pin the default engine: the manifest declares no follow-up call.
-  const upgradeEngine = await deployObject("DefaultProxyUpgradeEngine");
-  const coreTransition = await deployObject("ProxyUpgradeTransition", coreInitArgs(manifest, upgradeEngine));
-  const infrastructureArgs = ctmInfrastructureInitArgs(ctm, upgradeEngine);
+  const proxyUpgradeEngine = await deployObject("DefaultProxyUpgradeEngine");
+  const coreTransition = await deployObject("ProxyUpgradeTransition", coreInitArgs(manifest, proxyUpgradeEngine));
+  const infrastructureArgs = ctmInfrastructureInitArgs(ctm, proxyUpgradeEngine);
   const ctmInfrastructureTransition =
     infrastructureArgs === undefined ? undefined : await deployObject("ProxyUpgradeTransition", infrastructureArgs);
   return {

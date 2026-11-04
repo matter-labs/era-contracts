@@ -864,7 +864,7 @@ pub(super) async fn verify_transition<P: Provider>(
         result,
         members,
         label,
-        manifest.upgradeEngine,
+        manifest.chainUpgradeEngine,
         TRANSITION_ENGINES,
         &manifest.l2Plan,
     )
@@ -1015,7 +1015,7 @@ fn judge_release_validity(
 }
 
 /// A `ProxyUpgradeTransition`'s provenance and construction (the manifest its address commits to,
-/// `upgradeEngine` included), the engine it pins held to its role
+/// `proxyUpgradeEngine` included), the engine it pins held to its role
 /// ([`verify_proxy_upgrade_engine`]), and its domain held against `expected` — the domain of the
 /// leg that applies it (the core leg's executor applies only Core, the infrastructure leg's only
 /// CTM), fixed by the caller and never read from the object.
@@ -1075,7 +1075,7 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
         result,
         members,
         label,
-        manifest.upgradeEngine,
+        manifest.proxyUpgradeEngine,
     )
     .await?;
     if manifest.domain != expected.domain_tag() {
@@ -1879,7 +1879,7 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain,
             proxyUpgrades: rows,
-            upgradeEngine: engine(),
+            proxyUpgradeEngine: engine(),
         }
     }
 
@@ -1900,7 +1900,7 @@ mod tests {
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
         asserter.push_success(&Bytes::from(manifest.abi_encode()));
-        if !manifest.upgradeEngine.is_zero() {
+        if !manifest.proxyUpgradeEngine.is_zero() {
             asserter.push_success(&Bytes::from_static(engine_runtime));
         }
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
@@ -2022,7 +2022,7 @@ mod tests {
             let empty = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: vec![inert(); slots],
-                upgradeEngine: engine(),
+                proxyUpgradeEngine: engine(),
             };
             let (rows, result, reviewed, address) = verify_object(&empty, expected).await;
             assert_eq!(result.errors, 1, "{:?}", result.error_messages);
@@ -2036,7 +2036,7 @@ mod tests {
     }
 
     /// The mirror decodes a manifest as Solidity encodes it, POSITIONALLY: `(domain,
-    /// proxyUpgrades, upgradeEngine)`, the engine the third head word of the struct.
+    /// proxyUpgrades, proxyUpgradeEngine)`, the engine the third head word of the struct.
     #[test]
     fn a_proxy_upgrade_manifest_decodes_with_its_engine() {
         use alloy::dyn_abi::DynSolValue;
@@ -2061,7 +2061,7 @@ mod tests {
         assert_eq!(decoded.domain, PROXY_UPGRADE_DOMAIN_CTM);
         assert_eq!(decoded.proxyUpgrades.len(), 2);
         assert_eq!(decoded.proxyUpgrades[1].implNew, Address::repeat_byte(0x22));
-        assert_eq!(decoded.upgradeEngine, engine());
+        assert_eq!(decoded.proxyUpgradeEngine, engine());
         assert_eq!(
             decoded.abi_encode(),
             solidity,
@@ -2069,7 +2069,7 @@ mod tests {
         );
         let returned =
             ProxyUpgradeTransitionView::getManifestCall::abi_decode_returns(&solidity).unwrap();
-        assert_eq!(returned.upgradeEngine, engine());
+        assert_eq!(returned.proxyUpgradeEngine, engine());
     }
 
     /// The engine is part of what the object's address commits to: the same rows under another
@@ -2078,7 +2078,7 @@ mod tests {
     fn the_engine_is_part_of_the_construction() {
         let mut other = manifest(PROXY_UPGRADE_DOMAIN_CORE, L1_ECOSYSTEM_CONTRACTS.len());
         let genuine = canonical_create2_address(SALT, &transition_code(), &other.abi_encode());
-        other.upgradeEngine = STRANGER;
+        other.proxyUpgradeEngine = STRANGER;
         assert_ne!(
             canonical_create2_address(SALT, &transition_code(), &other.abi_encode()),
             genuine
@@ -2099,7 +2099,7 @@ mod tests {
         .await;
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
         assert!(
-            result.has_error("upgradeEngine"),
+            result.has_error("proxyUpgradeEngine"),
             "{:?}",
             result.error_messages
         );
@@ -2110,7 +2110,7 @@ mod tests {
         );
 
         let mut zero = manifest.clone();
-        zero.upgradeEngine = Address::ZERO;
+        zero.proxyUpgradeEngine = Address::ZERO;
         let (_, result, _, _) = verify_object_with(
             &zero,
             Inventory::CtmDomain,
@@ -2119,7 +2119,7 @@ mod tests {
         )
         .await;
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
-        assert!(result.has_error("upgradeEngine is the zero address"));
+        assert!(result.has_error("proxyUpgradeEngine is the zero address"));
 
         let (_, result, _, _) = verify_object_with(
             &manifest,
@@ -2130,7 +2130,7 @@ mod tests {
         .await;
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
         assert!(
-            result.has_error("upgradeEngine at"),
+            result.has_error("proxyUpgradeEngine at"),
             "{:?}",
             result.error_messages
         );
@@ -2325,12 +2325,12 @@ mod tests {
         let core = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()],
-            upgradeEngine: engine(),
+            proxyUpgradeEngine: engine(),
         };
         let infrastructure = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CTM,
             proxyUpgrades: vec![inert(); CTM_CONTRACTS.len()],
-            upgradeEngine: engine(),
+            proxyUpgradeEngine: engine(),
         };
         let at = |manifest: &ProxyUpgradeTransitionManifest| {
             canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode())
@@ -2504,7 +2504,7 @@ mod tests {
             let manifest = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: rows,
-                upgradeEngine: engine(),
+                proxyUpgradeEngine: engine(),
             };
             let object =
                 canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode());

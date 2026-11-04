@@ -426,15 +426,15 @@ and what one release adds:
   neutralizes; new ones also go into the genesis generator, so that upgraded and freshly created
   chains match.
 
-The on-chain side is generic. Two kinds of transition each pin a field named `upgradeEngine`, and
-they are different contracts run by different callers:
+The on-chain side is generic. Each kind of transition pins the engine that applies it, and the two
+are run by different callers:
 
-- a `CTMTransition`'s `upgradeEngine` is the diamond upgrade every chain delegatecalls when it
+- a `CTMTransition`'s `chainUpgradeEngine` is the diamond upgrade every chain delegatecalls when it
   crosses the version: `DefaultUpgrade`, unless the version script overrides
   `deployUsedUpgradeContract`, as v35's bootstrap edge does with `BootstrapUpgrade`;
-- a `ProxyUpgradeTransition`'s `upgradeEngine` is what the domain's executor delegatecalls to swap
-  that domain's L1 proxies and run the release's follow-up calls: `DefaultProxyUpgradeEngine` or a
-  release's subclass of it.
+- a `ProxyUpgradeTransition`'s `proxyUpgradeEngine` is what the domain's executor delegatecalls to
+  swap that domain's L1 proxies and run the release's follow-up calls: `DefaultProxyUpgradeEngine`
+  or a release's subclass of it.
 
 `l1-contracts/contracts/l2-upgrades/` holds `L2ComplexUpgrader`, which
 executes the L2 upgrade transaction, and the L2 upgrade contracts. A release also regenerates the

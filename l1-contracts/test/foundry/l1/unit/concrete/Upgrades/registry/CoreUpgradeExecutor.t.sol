@@ -127,7 +127,7 @@ contract CoreUpgradeExecutorTest is Test {
     function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (IProxyUpgradeTransition) {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.Core;
-        manifest.upgradeEngine = address(proxyUpgradeEngine);
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         if (_rows.length > 0) {
             manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = _rows[0];
@@ -242,7 +242,7 @@ contract CoreUpgradeExecutorTest is Test {
     function test_revertWhen_applyL1UpgradeWithACTMDomainTransition() public {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.CTM;
-        manifest.upgradeEngine = address(proxyUpgradeEngine);
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(
             address(bridgehubProxy),

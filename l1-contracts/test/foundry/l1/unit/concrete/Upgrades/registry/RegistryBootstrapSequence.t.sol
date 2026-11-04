@@ -103,7 +103,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     address internal notifierImplOld;
     address internal notifierImplNew;
     address internal genesisUpgradeAddr;
-    address internal upgradeEngine;
+    address internal chainUpgradeEngine;
     uint256 internal newVersion;
 
     function setUp() public {
@@ -134,8 +134,8 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
 
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
-        upgradeEngine = makeAddr("upgradeEngine");
-        vm.etch(upgradeEngine, hex"600043");
+        chainUpgradeEngine = makeAddr("chainUpgradeEngine");
+        vm.etch(chainUpgradeEngine, hex"600043");
 
         coreExecutor = new CoreUpgradeExecutor(governor, ecosystemProxyAdmin);
         ctmExecutor = new CTMUpgradeExecutor(governor, IChainTypeManager(address(chainContractAddress)), ctmProxyAdmin);
@@ -184,7 +184,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     function _deployCoreTransition() internal returns (IProxyUpgradeTransition) {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.Core;
-        manifest.upgradeEngine = address(proxyUpgradeEngine);
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(bridgehubProxy),
@@ -217,7 +217,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
                 ctmProxyUpgrades: upgrades,
                 currentRelease: address(genesisRelease),
                 oldProtocolVersionDeadline: type(uint256).max,
-                upgradeEngine: upgradeEngine,
+                chainUpgradeEngine: chainUpgradeEngine,
                 l2Plan: L2PlanFixtures.emptyPlan(),
                 upgradeTimestamp: 0,
                 ctmExecutor: address(ctmExecutor),
@@ -390,7 +390,7 @@ contract RegistryBootstrapSequenceTest is ChainTypeManagerTest {
     function test_revertWhen_theCoreTransitionIsACTMDomainObject() public {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.CTM;
-        manifest.upgradeEngine = address(proxyUpgradeEngine);
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: address(ctmDomainProxy),

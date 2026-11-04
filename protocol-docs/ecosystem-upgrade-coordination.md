@@ -86,7 +86,7 @@ external action.
 Each leg is owner-only and checks its object before acting:
 
 - `applyL1Upgrade` and `applyInfrastructureUpgrade` require the object to have code and to be of the
-  executor's own domain (`ProxyUpgradeDomainMismatch`), and the `upgradeEngine` it pins to have
+  executor's own domain (`ProxyUpgradeDomainMismatch`), and the `proxyUpgradeEngine` it pins to have
   code. They delegatecall that engine's `executeUpgrade` with a context built from the executor's
   own bindings; the engine requires every row's `implNew` to have code before the first swap,
   applies the rows through the executor's bound `ProxyAdmin`, each departing from its

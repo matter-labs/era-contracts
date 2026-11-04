@@ -1006,7 +1006,7 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: rows,
-            upgradeEngine: ENGINE,
+            proxyUpgradeEngine: ENGINE,
         }
     }
 
@@ -1260,7 +1260,7 @@ mod tests {
             ctmProxyUpgrades: rows,
             currentRelease: R36,
             oldProtocolVersionDeadline: U256::MAX,
-            upgradeEngine: Address::repeat_byte(0xEA),
+            chainUpgradeEngine: Address::repeat_byte(0xEA),
             l2Plan: AuthoredL2Plan {
                 delegateBytecodeInfo: Bytes::new(),
                 extraBytecodeInfos: Vec::new(),

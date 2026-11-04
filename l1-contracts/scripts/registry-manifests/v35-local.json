@@ -88,7 +88,7 @@
       },
       "transition": {
         "fromRelease": "0x785AA987912EC688272Ced8ad0A93Ef38c6ef3A6",
-        "upgradeEngine": {
+        "chainUpgradeEngine": {
           "address": "0xdFdE6B33f13de2CA1A75A6F7169f50541B14f75b"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
