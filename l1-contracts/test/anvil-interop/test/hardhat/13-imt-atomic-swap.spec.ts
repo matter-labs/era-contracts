@@ -9,7 +9,7 @@
 import { expect } from "chai";
 import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getInteropChainIds, getL2Chain, impersonateAndRun, createProvider } from "../../src/core/utils";
+import { getInteropChainIds, getL2Chain, createProvider } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import { getInteropSourcePrivateKey } from "../../src/core/accounts";
 import {
@@ -18,13 +18,12 @@ import {
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_ATOMIC_FLOW_MANAGER_ADDR,
-  L2_BOOTLOADER_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
-  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   ATOMIC_SEND_BUNDLE_GAS_LIMIT,
   DEFAULT_TX_GAS_LIMIT,
+  LegState,
 } from "../../src/core/const";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/core/data-encoding";
 import {
@@ -37,6 +36,7 @@ import {
 } from "../../src/helpers/balance-helpers";
 import {
   atomicBundleAttr,
+  ensureSettlementInteropRoot,
   expectBundleEvent,
   interopBundleSaltAttr,
   getInteropProtocolFee,
@@ -61,14 +61,6 @@ import {
 } from "../../src/helpers/imt-engine-lib";
 
 const TEST_TOKEN_DECIMALS = 18;
-
-/** Mirror of `LegState` in contracts/atomic-interop/IAtomicInterop.sol. */
-enum LegState {
-  Unset = 0,
-  Committed = 1,
-  Revertable = 2,
-  Reverted = 3,
-}
 
 /**
  * Handles to the atomic-interop built-ins on one L2 chain. They are predeployed and genesis-seeded
@@ -157,43 +149,6 @@ function bridgeCallStarter(source: ChainCtx, amount: BigNumber, recipient: strin
 /** Current chain timestamp on a provider (used only for logging / human-readable deadlines). */
 async function chainNow(provider: ethers.providers.JsonRpcProvider): Promise<number> {
   return (await provider.getBlock("latest")).timestamp;
-}
-
-/**
- * Ensures the settlement interop root for `settlementBlock` exists with the requested timestamp.
- * If an entry already exists with that timestamp, the helper leaves it unchanged. A different
- * timestamp is an error because settlement interop roots are write-once.
- */
-async function ensureSettlementInteropRoot(
-  provider: ethers.providers.JsonRpcProvider,
-  settlementBlock: number,
-  timestamp: number
-): Promise<void> {
-  const storage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), provider);
-  const existing: { root: string; timestamp: BigNumber } = await storage.interopRoots(
-    DEFAULT_SL_CHAIN_ID,
-    settlementBlock
-  );
-  if (existing.root !== ethers.constants.HashZero) {
-    const storedTs: BigNumber = existing.timestamp;
-    if (!storedTs.eq(timestamp)) {
-      throw new Error(
-        `settlement interop root (${DEFAULT_SL_CHAIN_ID}, ${settlementBlock}) already has timestamp ${storedTs}, wanted ${timestamp}`
-      );
-    }
-    return;
-  }
-  await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
-    await (
-      await storage.connect(signer).addSingleInteropRoot({
-        chainId: DEFAULT_SL_CHAIN_ID,
-        blockOrBatchNumber: settlementBlock,
-        timestamp,
-        sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`settlement-interop-root-${settlementBlock}`))],
-      })
-    ).wait();
-    expect((await storage.interopRoots(DEFAULT_SL_CHAIN_ID, settlementBlock)).timestamp.toNumber()).to.equal(timestamp);
-  });
 }
 
 describe("13 - IMT atomic swap A <-> B (bundle model)", function () {

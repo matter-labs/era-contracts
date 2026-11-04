@@ -19,7 +19,9 @@ the batch output, L1) only carries the difference, so changing the unit is an L2
    `INTEROP_FEE_UNITS_SLOT` (`l1-contracts/contracts/common/Config.sol`) in the same call that appends the leg to the
    interop commitment tree. A leg that is not counted is not in the tree, and so can never execute on its
    destination ({protocol-docs/atomicity/README.md}). `interopFeeUnits()` reads the counter; it starts at zero, both
-   at genesis and when an upgrade introduces it.
+   at genesis and when an upgrade introduces it. Expiring a leg ({protocol-docs/atomicity/expiry.md}) also inserts
+   into the destination's tree, but sends nothing, so it isn't counted: the expiry is permissionless, and counting it
+   would let anyone charge the destination's operator.
 2. **Proven batch output.** The ZKsync OS bootloader reads that slot of `InteropCenter` (`0x1000d`) at the start of
    the batch's first block and at the end of its last block, where it also snapshots the interop commitment tree root
    ({protocol-docs/atomicity/imt.md}), and commits `end − begin` (saturating) as `BatchOutput.interop_fee_units`, the

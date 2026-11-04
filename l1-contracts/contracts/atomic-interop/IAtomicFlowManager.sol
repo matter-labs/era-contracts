@@ -18,6 +18,13 @@ interface IAtomicFlowManager {
     /// bundle's recoverable calls — possibly none (see
     /// {protocol-docs/atomicity/recovery.md#nothing-recoverable--no-op-claim}).
     event FlowRefunded(bytes32 indexed flowId, bytes32 indexed bundleHash);
+    /// @notice Emitted with {FlowCommitted} when the committed leg's flow is expirable, so that expirable
+    /// transfers can be counted. See {protocol-docs/atomicity/expiry.md}.
+    event ExpirableFlowCommitted(bytes32 indexed flowId, bytes32 indexed bundleHash);
+    /// @notice Emitted when this chain, the destination, expires the leg of an expirable flow.
+    event FlowExpired(bytes32 indexed flowId, bytes32 indexed bundleHash, uint256 leafIndex);
+    /// @notice Emitted when a source leg is marked `Revertable` by its destination's expiry.
+    event FlowExpiryRefundAuthorized(bytes32 indexed flowId, bytes32 indexed bundleHash);
 
     /// @notice Records an atomic source leg: recomputes `flowId` from the supplied preimage, verifies
     /// the committing bundle is one of the flow's legs (declared with this chain as its source) and
@@ -61,6 +68,30 @@ interface IAtomicFlowManager {
     /// @param _flowId The flow the leg belongs to.
     /// @param _bundle The ABI-encoded {InteropBundle} of the source leg (hashes to the committed leg).
     function claimRefund(bytes32 _flowId, bytes calldata _bundle) external;
+
+    /// @notice Records the expiry of an expirable flow's leg on its destination: reverts unless the flow is
+    /// finalized as for {requireFlowFinalized}, is expirable and its expiry time has passed, then inserts the
+    /// leg's expiry value into the interop IMT. Callable only by the {InteropHandler}.
+    /// See {protocol-docs/atomicity/expiry.md#expiry-on-the-destination}.
+    /// @param _bundleHash The bundle hash of the expiring leg.
+    /// @param _finality The flow definition + its leg's inclusion proof.
+    /// @param _lowNullifierIndex The low-nullifier slot for the expiry value.
+    function recordExpiry(
+        bytes32 _bundleHash,
+        AtomicFinalityProof calldata _finality,
+        uint256 _lowNullifierIndex
+    ) external;
+
+    /// @notice Marks this chain's `Committed` leg of an expirable flow `Revertable`, proven by the expiry
+    /// its destination recorded. Permissionless. See {protocol-docs/atomicity/expiry.md#refund-on-the-source}.
+    /// @param _flow The flow definition ({AtomicFlow}).
+    /// @param _bundle The ABI-encoded {InteropBundle} of the flow's leg.
+    /// @param _expiry Inclusion proof of the leg's expiry value in the destination's IMT.
+    function authorizeExpiryRefund(
+        AtomicFlow calldata _flow,
+        bytes calldata _bundle,
+        ImtProof calldata _expiry
+    ) external;
 
     /// @notice Current source-leg state of a `(flowId, bundleHash)` on this chain.
     function legState(bytes32 _flowId, bytes32 _bundleHash) external view returns (LegState);

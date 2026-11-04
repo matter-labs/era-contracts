@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {CoreUpgrade_v36} from "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
+import {AuthoredL2Side, DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 
 /// @notice A same-minor PATCH prepare: it replaces `DiamondInit` and nothing else. The release is the immutable
@@ -33,5 +34,15 @@ contract CTMUpgradeForTests_v36_1 is CTMUpgradeForTests_v36 {
             return false;
         }
         return super._canReuseReleaseMember(_name, _live);
+    }
+
+    /// @dev Skips v36's L2 delegate composer: a patch carries no L2 leg (see {authorL2Side}).
+    function deployNewCTMContracts() public virtual override {
+        DefaultCTMUpgrade.deployNewCTMContracts();
+    }
+
+    /// @notice A patch carries no L2 leg, so it authors the L1-only side v36 overrides.
+    function authorL2Side() internal virtual override returns (AuthoredL2Side memory side) {
+        return side;
     }
 }

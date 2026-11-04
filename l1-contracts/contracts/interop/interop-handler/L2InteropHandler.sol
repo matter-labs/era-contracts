@@ -15,7 +15,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 /// @title L2InteropHandler
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev L2 system contract that serves as the entry-point for executing, verifying and unbundling interop bundles.
+/// @dev L2 system contract that serves as the entry-point for executing, verifying, unbundling and expiring interop bundles.
 /// The generic bundle logic lives in `InteropHandlerBase`; this contract wires in the L2 system-contract
 /// behaviour and the **atomic** execution model: L2->L2 interop is proven via the AtomicFlowManager's IMT
 /// (`AtomicFinalityProof`), not via L1 message inclusion (public L2->L2 interop was removed).
@@ -89,6 +89,24 @@ contract L2InteropHandler is InteropHandlerBase, IL2InteropHandler {
         IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).requireFlowFinalized(bundleHash, _finality);
 
         _markVerified(bundleHash);
+    }
+
+    /// @inheritdoc IL2InteropHandler
+    function expireAtomicBundle(
+        bytes calldata _bundle,
+        AtomicFinalityProof calldata _finality,
+        uint256 _lowNullifierIndex
+    ) external override {
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
+
+        _requireExecutable(bundleHash, status);
+        // As in {executeAtomicBundle}, the source chain is authenticated by the finality proof, not here.
+        _validateBundleDestinationContext(bundleHash, interopBundle, interopBundle.sourceChainId);
+
+        bundleStatus[bundleHash] = BundleStatus.Expired;
+        IAtomicFlowManager(L2_ATOMIC_FLOW_MANAGER_ADDR).recordExpiry(bundleHash, _finality, _lowNullifierIndex);
+
+        emit BundleExpired(bundleHash);
     }
 
     /*//////////////////////////////////////////////////////////////
