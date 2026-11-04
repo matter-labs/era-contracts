@@ -32,28 +32,9 @@ change is a single owner call that emits an event.
 
 `isTransactionAllowed` evaluates, in order:
 
-1. **Exempt sender.** If `exempt[sender]`, the transaction passes.
-2. **Deposits through the Bridgehub.** If `sender` is the L1 asset router, the transaction is a
-   token deposit (see [Deposit decoding](#deposit-decoding)). It must target the L2 asset router
-   with `l2Value == 0`; any other message of the router (for example registering a custom asset
-   handler) is rejected, as is a new-encoding deposit of an asset whose handler is not the native
-   token vault, since its transfer data is handler-defined. The depositor is decoded from the
-   calldata, and:
-   - an exempt depositor passes;
-   - in `WITHDRAWALS_ONLY` mode the deposit is rejected;
-   - otherwise both the token amount and `mintValue` must be within their caps.
-3. **Deposits through a legacy bridge.** If `sender` is registered in `legacyBridges` and the
-   calldata calls the legacy `finalizeDeposit`, the transaction is checked like (2). Other calls of
-   the bridge are generic calls. The decoded `l1Sender` is trusted as the depositor, so only
-   bridges that set it to their caller should be registered.
-4. **Generic calls.** `mintValue` must be within the base token cap. In `ALLOW_ALL` mode the call
-   then passes; in `WITHDRAWALS_ONLY` mode only calls to a `(contractL2, selector)` pair registered
-   in `withdrawalFunctions` pass, so users can still force a withdrawal from L1.
-5. **Pointed whitelisted hash.** A transaction rejected by (2)-(4) still passes if
-   `allowedTxHashes[getTxHash(sender, contractL2, l2Value, l2Calldata, refundRecipient)]` is set.
-   It is checked last because whitelisting a single transaction is rare, so the hash is computed
-   only for a rejected transaction; a deposit whose calldata cannot be decoded reverts before it.
-   `mintValue` is not hashed, because it includes the L1 base cost,
+1. **Pointed whitelisted hash.** If
+   `allowedTxHashes[getTxHash(sender, contractL2, l2Value, l2Calldata, refundRecipient)]` is set, the
+   transaction passes. `mintValue` is not hashed, because it includes the L1 base cost,
    which depends on the gas price at submission. The filter is a `view` function, so an entry is not
    consumed: the same transaction can be replayed until the admin removes it, each time with any
    `mintValue`, so an entry also lifts the base token cap for that sender. `sender` and
@@ -63,6 +44,24 @@ change is a single owner call that emits an event.
    be built from those, not from the user's raw request. Requests made directly through the Era
    Mailbox's legacy `requestL2Transaction` (used by Lido and other legacy integrators) do not go
    through the Bridgehub: there `sender` is the caller and `refundRecipient` is the raw argument.
+2. **Exempt sender.** If `exempt[sender]`, the transaction passes.
+3. **`WITHDRAWALS_ONLY` mode.** Only a call to a `(contractL2, selector)` pair registered in
+   `withdrawalFunctions` passes, with `mintValue` within the base token cap, so users can still force
+   a withdrawal from L1. Everything else is rejected, including every deposit, even one whose
+   depositor is exempt.
+4. **`ALLOW_ALL` mode.**
+   - **Deposits through the Bridgehub.** If `sender` is the L1 asset router, the transaction is a
+     token deposit (see [Deposit decoding](#deposit-decoding)). It must target the L2 asset router
+     with `l2Value == 0`; any other message of the router (for example registering a custom asset
+     handler) is rejected, as is a new-encoding deposit of an asset whose handler is not the native
+     token vault, since its transfer data is handler-defined. The depositor is decoded from the
+     calldata; an exempt depositor passes, otherwise both the token amount and `mintValue` must be
+     within their caps.
+   - **Deposits through a legacy bridge.** If `sender` is registered in `legacyBridges` and the
+     calldata calls the legacy `finalizeDeposit`, the transaction is checked like a Bridgehub
+     deposit. Other calls of the bridge are generic calls. The decoded `l1Sender` is trusted as the
+     depositor, so only bridges that set it to their caller should be registered.
+   - **Generic calls.** Any other call passes if `mintValue` is within the base token cap.
 
 A cap applies to a single deposit, and a cap of zero means the asset is not accepted. The cap of the
 base token bounds `mintValue`, i.e. all base token entering the chain through a non-exempt priority
@@ -104,7 +103,9 @@ withdrawals stay reachable through `withdrawalFunctions`.
 - **Third-party bridges and protocols.** Senders whose L1→L2 messages must keep working, such as
   Across's HubPool (which settles relayer refunds through priority operations), are either
   exempted or the restrictions that would affect them are enabled only after they close their
-  routes.
+  routes. In `WITHDRAWALS_ONLY` mode an exemption covers only the transactions the account sends
+  itself: its token deposits go through the asset router or a bridge and are rejected, so each one
+  needs a whitelisted hash, or the switch waits until the route is closed.
 - **Ecosystem senders.** Contracts such as `CTMDeploymentTracker` and `ChainRegistrationSender`
   send two-bridges requests to the L2 Bridgehub, which are generic calls and are rejected in
   `WITHDRAWALS_ONLY` unless their sender is exempt.

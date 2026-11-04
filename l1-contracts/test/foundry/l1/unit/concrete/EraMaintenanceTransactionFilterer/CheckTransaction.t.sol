@@ -146,11 +146,10 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
 
     /// @dev The exemption of a deposit is checked against the depositor decoded from the calldata, since the
     /// `sender` of every Bridgehub deposit is the L1 asset router.
-    function test_exemptDepositorBypassesAllRestrictions() public {
+    function test_exemptDepositorBypassesCaps() public {
         vm.prank(owner);
         filterer.setExempt(user, true);
         _setCap(baseTokenAssetId, 1);
-        _setCallMode(CallMode.WITHDRAWALS_ONLY);
 
         bytes32 otherAsset = keccak256("otherAsset");
         assertTrue(
@@ -174,6 +173,20 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
                 0,
                 _newDepositCalldata(makeAddr("other"), tokenAssetId, 1)
             )
+        );
+    }
+
+    /// @dev `WITHDRAWALS_ONLY` mode accepts only withdrawal calls, so the depositor of a deposit is not decoded and
+    /// its exemption does not apply.
+    function test_exemptDepositorRejectedInWithdrawalsOnlyMode() public {
+        vm.prank(owner);
+        filterer.setExempt(user, true);
+        _setCallMode(CallMode.WITHDRAWALS_ONLY);
+        assertFalse(
+            _allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, _newDepositCalldata(user, tokenAssetId, 1))
+        );
+        assertFalse(
+            _allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, _legacyDepositCalldata(user, l1Token, 1))
         );
     }
 
@@ -424,23 +437,14 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
         assertTrue(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, data));
     }
 
-    /// @dev The hash is checked after the deposit rules, so a whitelisted deposit with undecodable calldata
-    /// still reverts.
-    function test_revertWhen_allowedTxHashOfUndecodableDeposit() public {
+    /// @dev The hash is checked before the deposit is decoded, so a whitelisted deposit passes even when its
+    /// transfer data cannot be decoded.
+    function test_allowedTxHashPassesUndecodableDeposit() public {
         bytes memory data = abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, tokenAssetId, hex"01"));
         bytes32 txHash = _txHash(l1AssetRouter, L2_ASSET_ROUTER_ADDR, 0, data, user);
         vm.prank(owner);
         filterer.setAllowedTxHash(txHash, true);
-
-        vm.expectRevert();
-        filterer.isTransactionAllowed({
-            _sender: l1AssetRouter,
-            _contractL2: L2_ASSET_ROUTER_ADDR,
-            _mintValue: MINT_VALUE,
-            _l2Value: 0,
-            _l2Calldata: data,
-            _refundRecipient: user
-        });
+        assertTrue(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, data));
     }
 
     function test_getTxHashMatchesSpecifiedEncoding() public view {
