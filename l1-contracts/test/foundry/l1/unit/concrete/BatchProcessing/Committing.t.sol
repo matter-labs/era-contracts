@@ -38,6 +38,7 @@ import {
     MissingSystemLogs,
     TimeNotReached,
     TimestampError,
+    TxHashMismatch,
     UnexpectedSystemLog,
     ValueMismatch
 } from "contracts/common/L1ContractErrors.sol";
@@ -383,6 +384,28 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
 
         vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, wrongChainedPriorityHash, keccak256("")));
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            wrongNewCommitBatchInfoArray
+        );
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @dev With no pending upgrade the expected upgrade tx hash is zero, so a batch reporting one reverts.
+    function test_RevertWhen_CommittingWithUnexpectedUpgradeTxHash() public {
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(
+            Utils.createSystemLogsWithUpgradeTransactionForCTM(keccak256("upgrade tx"), l2DAValidatorOutputHash)
+        );
+        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
+        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
+
+        vm.blobhashes(defaultBlobVersionedHashes);
+        vm.prank(validator);
+
+        vm.expectRevert(TxHashMismatch.selector);
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
