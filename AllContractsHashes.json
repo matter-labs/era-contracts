@@ -1101,13 +1101,13 @@
   },
   {
     "contractName": "l1-contracts/EraMaintenanceTransactionFilterer",
-    "zkBytecodeHash": "0x01000307f810ed8e107f47713e89d0927096e95b0d7560cc2782458c2d47f2df",
+    "zkBytecodeHash": "0x01000323a8142d143ccd41ff59dbbde23d55a3bfc37131ed9973b992af6e566d",
     "zkBytecodePath": "/l1-contracts/zkout/EraMaintenanceTransactionFilterer.sol/EraMaintenanceTransactionFilterer.json",
-    "evmBytecodeHash": "0x9a7119e5e3095e6386b9056930a48d2c45d50e376ed6b241712cf8ce4549d5fa",
+    "evmBytecodeHash": "0xb30373f6fe9cd018b41292e335f451406ae5b85355e024d194653328cb201614",
     "evmBytecodePath": "/l1-contracts/out/EraMaintenanceTransactionFilterer.sol/EraMaintenanceTransactionFilterer.json",
-    "evmDeployedBytecodeHash": "0x1bdcf156147b6d5a69a9e89b57ecf11803a84b8ea882f6290be18bc7863d9910",
-    "evmDeployedBytecodeBlakeHash": "0xc5e0dccb2fe04b37893d55fa17671022ccfa38b35dfa77e95198fd56352103d6",
-    "evmDeployedBytecodeLength": 7664
+    "evmDeployedBytecodeHash": "0x07a8ab1aef86c33569a17943364248f3a4a9f30dc83655c29ef83c25c75aa8c3",
+    "evmDeployedBytecodeBlakeHash": "0x65a119202fb6e33ac0b6b03da41c9c996a2f4abb3a572e40e47c7a323bdb0a9b",
+    "evmDeployedBytecodeLength": 7666
   },
   {
     "contractName": "l1-contracts/EraMultiProofTestnetVerifier",
