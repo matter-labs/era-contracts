@@ -1,0 +1,24 @@
+# Permanent values for `testnet3`: the EraVM testnet ecosystem on Sepolia (chain 312, the Era testnet
+# that replaced chain 301), deployed at v0.31.1 in Sepolia block 11759177.
+#
+# The bridgehub, the CTM and the ChainAssetHandler are owned by a ProtocolUpgradeHandler (since
+# 2026-10; before that by a legacy `Governance.sol`), so governance calls go through its Emergency
+# Upgrade Board. The chains' ChainAdmins are owned by the EOA 0xeC6A5c56….
+
+l1_chain_id = 11155111
+
+# The ZK token asset id the CTM's force-deployment data carries.
+zk_token_asset_id = "0x21e55cffc931f6d7b0b5b920bd47803ee382b94b8f82ec4c66025dfed5d897d4"
+
+[permanent_contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+
+[core_contracts]
+bridgehub_proxy_addr = "0xF49C690785b9fE5261d786237348A66896e2F477"
+governance_kind = "puh"
+
+[[ctm_contracts.ctms]]
+proxy = "0x4d058d138F477c4b97B3D762f923811b20220078"
+is_zk_sync_os = false
+bytecodes_supplier = "0x9F04fAfbc1b4FED64DeBa32bd9817f26B6428305"
+rollup_da_manager = "0x2b66aF2af1D058Ca569ED567fFA8fcD7E91cC381"
