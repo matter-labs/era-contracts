@@ -3,13 +3,11 @@ pragma solidity 0.8.28;
 
 import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 
-/// @notice The v36 CTM upgrade — the first REGISTRY-DRIVEN edge after the v35 bootstrap, run by
-///         the base pipeline: a fresh release (facets, DiamondInit, upgrade engine) pinned by a
-///         write-once `CTMTransition`, committed by the governance call
-///         `CTMUpgradeExecutor.applyCTMUpgrade(transition)` the merge derives. Its L2 leg installs
-///         the built-ins whose code changed, derived on-chain from the release pair, and runs
-///         `L2DefaultUpgrade` after them.
-/// @dev The members differ from v35 in their metadata only, because shared sources they import changed.
+/// @notice The v36 CTM upgrade — the first REGISTRY-DRIVEN edge after the v35 bootstrap, run
+///         entirely by the base pipeline: a fresh release (facets, DiamondInit, upgrade engine)
+///         pinned by a write-once `CTMTransition`, committed by the governance call
+///         `CTMUpgradeExecutor.applyCTMUpgrade(transition)` the merge derives. Its L2 leg is the
+///         standard one, which runs `L2DefaultUpgrade`.
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade

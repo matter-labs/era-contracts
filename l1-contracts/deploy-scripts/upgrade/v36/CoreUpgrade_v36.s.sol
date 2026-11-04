@@ -10,8 +10,6 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 ///         their code differs from the live one) and pins them in a Core-domain
 ///         `ProxyUpgradeTransition`, which the merged bundle applies through
 ///         `CoreUpgradeExecutor.applyL1Upgrade`. This prepare emits no governance call of its own.
-/// @dev `L1MessageRoot` and `L1InteropHandler` change code; the others differ from v35 in their metadata only,
-///      because shared sources they import changed.
 // solhint-disable-next-line contract-name-capwords
 contract CoreUpgrade_v36 is DefaultCoreUpgrade {
     /// @inheritdoc DefaultCoreUpgrade

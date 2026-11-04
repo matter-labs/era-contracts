@@ -26,7 +26,7 @@ runPipelineUpgradeScenario({
   hops: [
     // The release's own edge: the CTM side runs the release's script, as protocol-ops prepares it by default; the
     // core side adds the fixture's harness-only `L1ChainAssetHandler` and `L1MessageRoot` to what the release
-    // declares (see `CoreUpgradeForTests_v36`). Its L2 leg is v36's standard one, which runs `L2DefaultUpgrade`.
+    // declares (see `CoreUpgradeForTests_v36`).
     {
       label: "release",
       upgradeInputTemplatePath: "test/anvil-interop/config/release-upgrade.toml",
