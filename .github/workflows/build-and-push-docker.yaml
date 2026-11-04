@@ -68,6 +68,9 @@ jobs:
           push: true
           platforms: linux/amd64
           file: docker/protocol/Dockerfile
+          # Read access to zksync-os-private, a git dependency of tools/zksync-os-genesis-gen.
+          secrets: |
+            git_token=${{ secrets.RELEASE_TOKEN }}
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max

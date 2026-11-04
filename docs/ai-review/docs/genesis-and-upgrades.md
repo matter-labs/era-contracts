@@ -2,9 +2,9 @@
 
 ## Relevant files
 
-- [Genesis tool](../tools/zksync-os-genesis-gen).
-- [L2 upgrade contracts](../l1-contracts/contracts/l2-upgrades)
-- [Deployment and upgrade preparation scripts](../l1-contracts/deploy-scripts)
+- [Genesis tool](../../../tools/zksync-os-genesis-gen).
+- [L2 upgrade contracts](../../../l1-contracts/contracts/l2-upgrades)
+- [Deployment and upgrade preparation scripts](../../../l1-contracts/deploy-scripts)
 
 ## Context
 
