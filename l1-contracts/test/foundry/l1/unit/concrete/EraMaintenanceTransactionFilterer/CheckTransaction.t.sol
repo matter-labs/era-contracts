@@ -424,6 +424,25 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
         assertTrue(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, data));
     }
 
+    /// @dev The hash is checked after the deposit rules, so a whitelisted deposit with undecodable calldata
+    /// still reverts.
+    function test_revertWhen_allowedTxHashOfUndecodableDeposit() public {
+        bytes memory data = abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, tokenAssetId, hex"01"));
+        bytes32 txHash = _txHash(l1AssetRouter, L2_ASSET_ROUTER_ADDR, 0, data, user);
+        vm.prank(owner);
+        filterer.setAllowedTxHash(txHash, true);
+
+        vm.expectRevert();
+        filterer.isTransactionAllowed({
+            _sender: l1AssetRouter,
+            _contractL2: L2_ASSET_ROUTER_ADDR,
+            _mintValue: MINT_VALUE,
+            _l2Value: 0,
+            _l2Calldata: data,
+            _refundRecipient: user
+        });
+    }
+
     function test_getTxHashMatchesSpecifiedEncoding() public view {
         bytes memory data = hex"deadbeef";
         bytes32 expected = keccak256(abi.encode(user, l2Contract, uint256(7), keccak256(data), owner));
