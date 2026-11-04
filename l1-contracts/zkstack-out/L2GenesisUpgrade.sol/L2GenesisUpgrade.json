@@ -1,0 +1,77 @@
+[
+  {
+    "type": "function",
+    "name": "genesisUpgrade",
+    "inputs": [
+      {
+        "name": "_isZKsyncOS",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_ctmDeployer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_fixedForceDeploymentsData",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_additionalForceDeploymentsData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "ForceDeployedContractsInitialized",
+    "inputs": [
+      {
+        "name": "isZKsyncOS",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "isGenesisUpgrade",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UpgradeComplete",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "InvalidChainId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
+  }
+]

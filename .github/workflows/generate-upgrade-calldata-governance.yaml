@@ -1,0 +1,68 @@
+name: "Upgrade Calldata: Governance"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - stage
+          - stage-interop-tests
+          - sepolia
+          - mainnet
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag (e.g. latest, v0.31.0)"
+        required: true
+        type: string
+      l1_rpc_url:
+        description: "L1 RPC URL for the target environment"
+        required: true
+        type: string
+      prepare_run_id:
+        description: "Run ID of the 'Upgrade Calldata: Prepare' workflow to download the governance TOML from"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENV_DIR: environments/${{ inputs.environment }}
+      WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
+      EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Seed WORK_DIR with the governance.toml from the prepare run so
+      # `protocol-ops.sh`'s Docker mount picks it up at /contracts/work/session/.
+      - name: Download governance TOML from prepare stage
+        uses: actions/download-artifact@v4
+        with:
+          name: governance-toml-${{ inputs.environment }}
+          path: ${{ github.workspace }}/protocol-ops-workdir
+          run-id: ${{ inputs.prepare_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Run ecosystem upgrade-governance (stages 0+1 on one fork)
+        run: |
+          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            ecosystem upgrade-governance \
+            --l1-rpc-url       "${{ inputs.l1_rpc_url }}" \
+            --ecosystem         /contracts/env/ecosystem.yaml \
+            --governance-toml   /contracts/work/session/governance.toml \
+            --out /contracts/work/session/safe
+
+      - name: Upload Safe bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-bundles-upgrade-governance-${{ inputs.environment }}
+          path: ${{ env.WORK_DIR }}/safe/
+          if-no-files-found: error
+          retention-days: 30

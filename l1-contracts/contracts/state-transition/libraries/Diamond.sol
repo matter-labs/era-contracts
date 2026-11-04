@@ -4,7 +4,18 @@ pragma solidity ^0.8.21;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
-import {AddressHasNoCode, DelegateCallFailed, FacetExists, NoFunctionsForDiamondCut, NonEmptyCalldata, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, UndefinedDiamondCutAction} from "../../common/L1ContractErrors.sol";
+import {
+    AddressHasNoCode,
+    DelegateCallFailed,
+    FacetExists,
+    NoFunctionsForDiamondCut,
+    NonEmptyCalldata,
+    RemoveFunctionFacetAddressNotZero,
+    RemoveFunctionFacetAddressZero,
+    ReplaceFunctionFacetAddressZero,
+    SelectorsMustAllHaveSameFreezability,
+    UndefinedDiamondCutAction
+} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -100,7 +111,7 @@ library Diamond {
         address initAddress = _diamondCut.initAddress;
         bytes memory initCalldata = _diamondCut.initCalldata;
         uint256 facetCutsLength = facetCuts.length;
-        for (uint256 i = 0; i < facetCutsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < facetCutsLength; ++i) {
             Action action = facetCuts[i].action;
             address facet = facetCuts[i].facet;
             bool isFacetFreezable = facetCuts[i].isFreezable;
@@ -141,7 +152,7 @@ library Diamond {
         _saveFacetIfNew(_facet);
 
         uint256 selectorsLength = _selectors.length;
-        for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             if (oldFacet.facetAddress != address(0)) {
@@ -165,7 +176,7 @@ library Diamond {
         }
 
         uint256 selectorsLength = _selectors.length;
-        for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             // it is impossible to replace the facet with zero address
@@ -191,7 +202,7 @@ library Diamond {
         }
 
         uint256 selectorsLength = _selectors.length;
-        for (uint256 i = 0; i < selectorsLength; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < selectorsLength; ++i) {
             bytes4 selector = _selectors[i];
             SelectorToFacet memory oldFacet = ds.selectorToFacet[selector];
             // Can't delete a non-existent facet
