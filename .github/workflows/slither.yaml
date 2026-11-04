@@ -5,7 +5,8 @@ on: pull_request
 jobs:
   slither:
     name: Slither check
-    runs-on: ubuntu-latest
+    # ubuntu-26.04 (ubuntu-latest since 2026-11-04) has no Python 3.8 build.
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout the repository

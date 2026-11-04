@@ -233,8 +233,9 @@ How the calls are executed depends on the governance:
   (`AdminFunctions.governanceExecuteCalls`);
 - the public ecosystems' `ProtocolUpgradeHandler` executes them as a proposal approved by the
   Security Council and Guardians, or through the emergency upgrade board;
-  `l1-contracts/deploy-scripts/upgrade/EmergencyStageUpgradeCalldata.s.sol` emits the per-stage
-  emergency calldata for the stage environment.
+  `emergencyUpgradeAllStages` of `l1-contracts/deploy-scripts/upgrade/EmergencyUpgradeCalldata.s.sol`
+  emits the three stages as one emergency proposal, when there is no timer between them and every
+  emergency board member is a 1-of-1 Safe of one EOA (mainnet's are not).
 
 `setNewVersionUpgrade` is the call that changes the protocol: from then on every chain of the CTM
 that is on exactly the old version may take the cut (a chain on any other version cannot), and

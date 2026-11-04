@@ -225,7 +225,7 @@ normal verification path. A live explorer verification remains a separate check.
 - [ZK Credo](https://github.com/zksync/credo)
 - [Twitter](https://twitter.com/zksync)
 - [Twitter for Devs](https://twitter.com/zkSyncDevs)
-- [Discord](https://join.zksync.dev/)
+- [Discord](https://discord.gg/zksync)
 - [Mirror](https://zksync.mirror.xyz/)
 
 ## Disclaimer
