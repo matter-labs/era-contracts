@@ -356,6 +356,15 @@ Note the version must be upstream Foundry, not the `foundry-zksync` fork: both r
 version, and building or generating `selectors` with the fork mismatches CI in both directions
 without saying so.
 
+The compiler is [Solar](https://github.com/paradigmxyz/solar), bundled with the pinned forge and
+selected by `solc = "solar"` in `l1-contracts/foundry.toml`, so `forge build` and `yarn test:foundry`
+use it with no flags. Its codegen differs from solc in documented places
+([SOLC_DIVERGENCE.md](https://github.com/paradigmxyz/solar/blob/main/docs/SOLC_DIVERGENCE.md)). The
+one that bites tests: Solar may re-read `block.chainid`, `block.number` and `block.timestamp` where a
+saved copy is used, so a value saved before `vm.chainId`/`vm.roll`/`vm.warp` and restored afterwards
+must be read through `getChainId()` (`test-utils/IVmChainId.sol`), `vm.getBlockNumber()` or
+`vm.getBlockTimestamp()`.
+
 Never bump the pin in a workflow directly — change it in `.github/foundry-versions.env` and
 regenerate whatever it invalidates. A bump changes solc metadata in every artifact, so
 `AllContractsHashes.json` always needs regenerating (`zkstack-out` and `selectors` are ABI-derived
@@ -532,12 +541,11 @@ yarn lint:ts --fix
 
 # Fix formatting issues
 yarn prettier:fix
-
-# Check solc warnings (needs forge; ~5s)
-yarn l1 solc-warnings
 ```
 
 ### solc warnings
+
+Not enforced while the build uses Solar: the check runs solc itself and has no Solar counterpart.
 
 `forge build` is not the warning gate: `ignored_error_codes` in `foundry.toml` only filters what it
 prints, and a full `l1-contracts` build exceeds solc's cap of 256 reported warnings, so later ones are
@@ -556,10 +564,9 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
 2. **Run the errors lint**, only if an error declaration changed: `cd l1-contracts && yarn errors-lint --fix`
 3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
-4. **Check solc warnings**: `yarn l1 solc-warnings`
-5. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
-6. **Verify no uncommitted changes**: `git status`
-7. **Commit and push**: only after all checks pass
+4. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
+5. **Verify no uncommitted changes**: `git status`
+6. **Commit and push**: only after all checks pass
 
 ### Common Linting Issues
 

@@ -5,7 +5,9 @@ out = "out"
 libs = ["./lib"]
 cache_path = "cache-forge"
 test = "test/foundry"
-solc_version = "0.8.28"
+# Solar (paradigmxyz/solar), bundled with the pinned forge. Its codegen differs from solc in places:
+# https://github.com/paradigmxyz/solar/blob/main/docs/SOLC_DIVERGENCE.md
+solc = "solar"
 evm_version = "prague"
 fs_permissions = [
     { access = "read", path = "./test/foundry/l1/integration/fixtures/" },

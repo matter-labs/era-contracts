@@ -114,9 +114,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      # No warm-solc-cache step on purpose: this build is the one that must not trust a cache.
-      # It is also the only writer of one — see the save step after the builds.
-
       # Removed before building so the check below also catches a deleted entry, not just a changed one.
       - name: Drop the committed zkstack-out
         working-directory: l1-contracts
@@ -125,19 +122,6 @@ jobs:
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: yarn build:foundry
-
-      # Saved here, before the checks and suites below, and deliberately so.
-      #
-      # What makes this cache trustworthy is that it came from a build with no cache at all, on a
-      # branch a PR cannot write to — not that this commit's tests were green. A failing check-hashes
-      # means the *committed* AllContractsHashes.json is stale, and a failing test means the code has
-      # a bug; neither says the artifacts misrepresent the sources they were built from, and the
-      # restore side revalidates per-source drift against the manifest anyway.
-      #
-      # Gating the save on the suites cost real time for no integrity gain: a base branch that is red
-      # for a day would hand out no cache at all, so every PR targeting it built cold in four jobs.
-      - name: Save the clean solc build cache
-        uses: ./.github/actions/save-solc-cache
 
       # The four checks whose answers come from the artifacts, so a cache could have shifted them.
       # Here they are answered by a build with no cache at all.

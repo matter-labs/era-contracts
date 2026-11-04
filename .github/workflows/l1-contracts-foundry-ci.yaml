@@ -28,9 +28,6 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Warm solc build cache
-        uses: ./.github/actions/warm-solc-cache
-
       - name: Build artifacts
         run: yarn l1 build:foundry
 
@@ -44,9 +41,6 @@ jobs:
       - name: Check deploy-scripts compile
         working-directory: ./l1-contracts
         run: forge build deploy-scripts
-
-      - name: Check solc warnings
-        run: yarn l1 solc-warnings
 
       - name: Create cache
         uses: actions/cache/save@v4
