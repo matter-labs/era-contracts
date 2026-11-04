@@ -10,12 +10,12 @@ import { ethers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
 
-// Both the CTM and a chain's diamond (IGetters) expose this.
-const SEMVER_ABI = ["function getSemverProtocolVersion() view returns (uint32, uint32, uint32)"];
-const BRIDGEHUB_ABI = [
-  "function chainTypeManager(uint256 chainId) view returns (address)",
-  "function getZKChain(uint256 chainId) view returns (address)",
-];
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const CTM_ABI = require("../zkstack-out/IChainTypeManager.sol/IChainTypeManager.json");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const GETTERS_ABI = require("../zkstack-out/IZKChain.sol/IZKChain.json");
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const BRIDGEHUB_ABI = require("../zkstack-out/L1Bridgehub.sol/L1Bridgehub.json");
 
 const REPO_ROOT = path.join(__dirname, "..", "..");
 const MANIFEST_PATH = path.join(REPO_ROOT, "release-tags.json");
@@ -196,7 +196,7 @@ async function checkDeployments(_manifest: Manifest, _requireOnchain: boolean) {
 async function checkOnchain(_deployment: Deployment, _label: string, _provider: ethers.providers.Provider) {
   // Only a mainnet CTM's version drift fails the run: the Sepolia CTMs move with every stage and testnet upgrade.
   const drift = _deployment.l1 == "mainnet" ? errors : warnings;
-  const ctmVersion = await semver(new ethers.Contract(_deployment.ctm, SEMVER_ABI, _provider));
+  const ctmVersion = await semver(new ethers.Contract(_deployment.ctm, CTM_ABI, _provider));
   if (ctmVersion != _deployment.protocolVersion) {
     drift.push(`${_label}: CTM is at ${ctmVersion}, release-tags.json says ${_deployment.protocolVersion}`);
   }
@@ -208,7 +208,7 @@ async function checkOnchain(_deployment: Deployment, _label: string, _provider: 
       errors.push(`${_label}: chain ${chainId} is registered under CTM ${chainCtm}`);
       continue;
     }
-    const diamond = new ethers.Contract(await bridgehub.getZKChain(chainId), SEMVER_ABI, _provider);
+    const diamond = new ethers.Contract(await bridgehub.getZKChain(chainId), GETTERS_ABI, _provider);
     const chainVersion = await semver(diamond);
     // A chain upgrades after its CTM, so a chain that lags is reported but does not fail the run.
     if (chainVersion != _deployment.protocolVersion) {

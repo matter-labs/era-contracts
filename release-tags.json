@@ -39,6 +39,18 @@
       "commit": "8ecd3f81663171b54a58262baf44f38f10d8615f",
       "branch": "release/era-mainnet-zip-18",
       "genesis": { "era": "0.33.0", "zksync-os": "0.31.2" }
+    },
+    {
+      "name": "era-v0.33.0",
+      "commit": "8ecd3f81663171b54a58262baf44f38f10d8615f",
+      "branch": "release/era-mainnet-zip-18",
+      "genesis": { "era": "0.33.0", "zksync-os": "0.31.2" }
+    },
+    {
+      "name": "v0.31.2",
+      "commit": "8ecd3f81663171b54a58262baf44f38f10d8615f",
+      "branch": "release/era-mainnet-zip-18",
+      "genesis": { "era": "0.33.0", "zksync-os": "0.31.2" }
     }
   ],
   "deployments": [
@@ -48,7 +60,8 @@
       "flavour": "era",
       "bridgehub": "0x303a465B659cBB0ab36eE643eA362c509EEb5213",
       "ctm": "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C",
-      "protocolVersion": "0.30.1",
+      "protocolVersion": "0.33.0",
+      "tag": "era-v0.33.0",
       "chains": [324]
     },
     {
@@ -57,7 +70,8 @@
       "flavour": "zksync-os",
       "bridgehub": "0x303a465B659cBB0ab36eE643eA362c509EEb5213",
       "ctm": "0x1adF137F59949c9081157D5de1e002D1C992071F",
-      "protocolVersion": "0.30.1",
+      "protocolVersion": "0.31.2",
+      "tag": "v0.31.2",
       "chains": []
     },
     {
@@ -113,6 +127,7 @@
       "bridgehub": "0xF49C690785b9fE5261d786237348A66896e2F477",
       "ctm": "0x4d058d138F477c4b97B3D762f923811b20220078",
       "protocolVersion": "0.33.0",
+      "tag": "era-v0.33.0",
       "chains": [312]
     }
   ]

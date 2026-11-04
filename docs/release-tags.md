@@ -28,7 +28,7 @@ the go-ahead from the release owner.
 A pushed tag is never moved. If a proposal is resubmitted with new calldata, tag the new proposal's number.
 
 The tagged commit must be on a `release/*` branch. That branch keeps the deployed bytecode: contract fixes go to the next
-release, not to the tagged branch.
+release, not to the tagged branch. The branch is never deleted, also not after it is merged into `main`: the check looks the commit up on it.
 
 ## What the check enforces
 

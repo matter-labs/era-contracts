@@ -10,6 +10,9 @@ on:
     paths:
       - "release-tags.json"
       - "l1-contracts/scripts/check-release-tags.ts"
+      - "l1-contracts/zkstack-out/IChainTypeManager.sol/IChainTypeManager.json"
+      - "l1-contracts/zkstack-out/IZKChain.sol/IZKChain.json"
+      - "l1-contracts/zkstack-out/L1Bridgehub.sol/L1Bridgehub.json"
       - "l1-contracts/package.json"
       - ".github/workflows/check-release-tags.yaml"
 
@@ -28,9 +31,9 @@ jobs:
           fetch-depth: 0
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.18.0
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install dependencies
