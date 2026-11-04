@@ -2,10 +2,21 @@
 
 pragma solidity 0.8.28;
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
-import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
-import {IncorrectTokenAddressFromNTV, InvalidNTVBurnData, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
+import {NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
+import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
+import {
+    AssetIdMismatch,
+    InvalidNTVBurnData,
+    UnsupportedEncodingVersion,
+    BadTransferDataLength,
+    EmptyData
+} from "../L1ContractErrors.sol";
+import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
+import {UnsafeBytes} from "./UnsafeBytes.sol";
+import {InteropCallStarter} from "../../common/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -46,6 +57,21 @@ library DataEncoding {
         }
 
         (amount, receiver, maybeTokenAddress) = abi.decode(_data, (uint256, address, address));
+    }
+
+    function encodeAssetRouterBridgehubDepositData(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (bytes memory) {
+        return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_assetId, _transferData));
+    }
+
+    function decodeAssetRouterBridgehubDepositData(
+        bytes calldata _dataWithVersion
+    ) internal pure returns (bytes32 assetId, bytes memory transferData) {
+        require(_dataWithVersion.length >= 33, BadTransferDataLength());
+        require(_dataWithVersion[0] == NEW_ENCODING_VERSION, UnsupportedEncodingVersion());
+        (assetId, transferData) = abi.decode(_dataWithVersion[1:], (bytes32, bytes));
     }
 
     /// @notice Abi.encodes the data required for bridgeMint on remote chain.
@@ -126,52 +152,33 @@ library DataEncoding {
         return keccak256(abi.encode(_chainId, L2_NATIVE_TOKEN_VAULT_ADDR, _tokenAddress));
     }
 
-    /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
-    /// @param _encodingVersion EncodingVersion.
+    /// @dev Encodes the transaction data hash using the latest encoding standard.
     /// @param _originalCaller The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
-    /// @param _nativeTokenVault The address of the token, only used if the encoding version is legacy.
     /// @param _transferData The encoded transfer data, which includes the deposit amount, the address of the L2 receiver, and potentially the token address.
     /// @return txDataHash The resulting encoded transaction data hash.
     function encodeTxDataHash(
-        bytes1 _encodingVersion,
         address _originalCaller,
         bytes32 _assetId,
-        address _nativeTokenVault,
         bytes memory _transferData
-    ) internal view returns (bytes32 txDataHash) {
-        if (_encodingVersion == LEGACY_ENCODING_VERSION) {
-            address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
-
-            // This is a double check to ensure that the used token for the legacy encoding is correct.
-            // This revert should never be emitted and in real life and should only serve as a guard in
-            // case of inconsistent state of Native Token Vault.
-            bytes32 expectedAssetId = encodeNTVAssetId(block.chainid, tokenAddress);
-            if (_assetId != expectedAssetId) {
-                revert IncorrectTokenAddressFromNTV(_assetId, tokenAddress);
-            }
-
-            (uint256 depositAmount, , ) = decodeBridgeBurnData(_transferData);
-            txDataHash = keccak256(abi.encode(_originalCaller, tokenAddress, depositAmount));
-        } else if (_encodingVersion == NEW_ENCODING_VERSION) {
-            // Similarly to calldata, the txDataHash is collision-resistant.
-            // In the legacy data hash, the first encoded variable was the address, which is padded with zeros during `abi.encode`.
-            txDataHash = keccak256(
-                bytes.concat(_encodingVersion, abi.encode(_originalCaller, _assetId, _transferData))
-            );
-        } else {
-            revert UnsupportedEncodingVersion();
-        }
+    ) internal pure returns (bytes32 txDataHash) {
+        // The txDataHash is collision-resistant with the removed legacy format: the legacy hash encoded an
+        // address as its first word, whose most significant bytes are always zero, so it can never collide
+        // with the `NEW_ENCODING_VERSION` (0x01) prefix used here.
+        txDataHash = keccak256(
+            bytes.concat(NEW_ENCODING_VERSION, abi.encode(_originalCaller, _assetId, _transferData))
+        );
     }
 
     /// @notice Decodes the token data by combining chain id, asset deployment tracker and asset data.
     function decodeTokenData(
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
+        if (_tokenData.length == 0) {
+            revert EmptyData();
+        }
         bytes1 encodingVersion = _tokenData[0];
-        if (encodingVersion == LEGACY_ENCODING_VERSION) {
-            (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
-        } else if (encodingVersion == NEW_ENCODING_VERSION) {
+        if (encodingVersion == NEW_ENCODING_VERSION) {
             return abi.decode(_tokenData[1:], (uint256, bytes, bytes, bytes));
         } else {
             revert UnsupportedEncodingVersion();
@@ -192,5 +199,105 @@ library DataEncoding {
         bytes memory _decimals
     ) internal pure returns (bytes memory) {
         return bytes.concat(NEW_ENCODING_VERSION, abi.encode(_chainId, _name, _symbol, _decimals));
+    }
+
+    /// @notice Checks if the assetId is correct.
+    /// @param _tokenOriginChainId The chain id of the token origin.
+    /// @param _assetId The asset id to check.
+    /// @param _originToken The origin token address.
+    function assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal pure {
+        bytes32 expectedAssetId = encodeNTVAssetId(_tokenOriginChainId, _originToken);
+        if (_assetId != expectedAssetId) {
+            // Make sure that a NativeTokenVault sent the message
+            revert AssetIdMismatch(expectedAssetId, _assetId);
+        }
+    }
+
+    function encodeAssetRouterFinalizeDepositData(
+        uint256 _messageSourceChainId,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (bytes memory) {
+        // solhint-disable-next-line func-named-parameters
+        return
+            abi.encodePacked(
+                IAssetRouterShared.finalizeDeposit.selector,
+                _messageSourceChainId,
+                _assetId,
+                _transferData
+            );
+    }
+
+    function decodeAssetRouterFinalizeDepositData(
+        bytes memory _l2ToL1message
+    )
+        internal
+        pure
+        returns (bytes4 functionSignature, uint256 _messageSourceChainId, bytes32 assetId, bytes memory transferData)
+    {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
+
+        // The data is expected to be at least 68 bytes long to contain assetId.
+        require(_l2ToL1message.length >= 68, WrongMsgLength(68, _l2ToL1message.length));
+        // slither-disable-next-line unused-return
+        (_messageSourceChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
+        (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
+        transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+    }
+
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of a registered,
+    /// NON-base-token asset (an ERC20 or the CTM/ZK asset). See {protocol-docs/interop.md#direct-vs-indirect-calls}.
+    /// @dev No base-token value rides the bundle (both value attributes are zero); the withdrawn amount is
+    /// carried inside `_transferData`. For the chain's base token use
+    /// `encodeInteropBaseTokenWithdrawalCallStarters` instead.
+    /// @param _assetId The asset being withdrawn — an ERC20 assetId or the CTM/ZK assetId, NOT a base-token assetId.
+    /// @param _transferData The bridgehub-burn/transfer data for the asset.
+    function encodeInteropWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal pure returns (InteropCallStarter[] memory callStarters) {
+        return _encodeInteropWithdrawalCallStarters(_assetId, _transferData, 0);
+    }
+
+    /// @notice Builds the single indirect-call `InteropCallStarter` for an L2->L1 withdrawal of the chain's
+    /// BASE token. See {protocol-docs/interop.md#direct-vs-indirect-calls}.
+    /// @dev The withdrawn amount rides as the `indirectCall` message value, so the caller of
+    /// `InteropCenter.sendBundle` MUST send `_amount` as the transaction value. `interopCallValue` stays zero
+    /// (`NonZeroValueToL1NotSupported`).
+    /// @param _assetId The base-token assetId of the withdrawn token.
+    /// @param _transferData The bridgehub-burn/transfer data for the base token; the amount it encodes must
+    /// match `_amount`.
+    /// @param _amount The withdrawn base-token amount, burned from the `sendBundle` transaction value.
+    function encodeInteropBaseTokenWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData,
+        uint256 _amount
+    ) internal pure returns (InteropCallStarter[] memory callStarters) {
+        return _encodeInteropWithdrawalCallStarters(_assetId, _transferData, _amount);
+    }
+
+    /// @dev Shared builder for the two withdrawal encoders above; `_indirectCallMessageValue` is the base-token
+    /// amount riding along the indirect call (zero for registered-asset withdrawals).
+    function _encodeInteropWithdrawalCallStarters(
+        bytes32 _assetId,
+        bytes memory _transferData,
+        uint256 _indirectCallMessageValue
+    ) private pure returns (InteropCallStarter[] memory callStarters) {
+        bytes[] memory callAttributes = new bytes[](2);
+        callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (_indirectCallMessageValue));
+        callAttributes[1] = abi.encodeCall(IERC7786Attributes.interopCallValue, (0));
+
+        callStarters = new InteropCallStarter[](1);
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
+            data: encodeAssetRouterBridgehubDepositData(_assetId, _transferData),
+            callAttributes: callAttributes
+        });
+    }
+
+    function getSelector(bytes memory _data) internal pure returns (bytes4) {
+        (uint32 functionSignatureUint, ) = UnsafeBytes.readUint32(_data, 0);
+        return bytes4(functionSignatureUint);
     }
 }

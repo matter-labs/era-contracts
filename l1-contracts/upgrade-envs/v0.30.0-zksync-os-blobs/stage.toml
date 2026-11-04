@@ -1,0 +1,82 @@
+era_chain_id = 270
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 1200
+# Note, that this is NOT the owner of the bridgehub, but the owner of the zksync os CTM.
+owner_address = "0xc66f0b45c05cf654eec093650fd67865e85e8566"
+
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+old_protocol_version = "0x1d00000001"
+
+priority_txs_l2_gas_limit = 2000000
+max_expected_l1_gas_price = 50000000000
+is_zk_sync_os = true
+redeploy_da_manager = true
+
+[contracts]
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0x55de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfbc"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+genesis_root = "0xc346a158cce093e99ab65a95c884a26629d0e4f8d00ae20bbca4bfc4b204eec2"
+genesis_rollup_leaf_index = 0
+genesis_batch_commitment = "0000000000000000000000000000000000000000000000000000000000000001"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
+default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
+evm_emulator_hash = "0x0000000000000000000000000000000000000000000000000000000000000001"
+bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+# Does not matter, a new one should be deployed
+rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
+
+# Does not matter
+governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
+
+latest_protocol_version = 0x1e00000000
+# Unused as bytecode supplier is not supported in this upgrade.
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
+
+# Note, that we actually dont contain the gateway on this env, but we need
+# for the script. We reuse era chain id.
+[gateway]
+chain_id = 123
+
+[zksync_os]
+sample_chain_id = 2702
+
+[state_transition]
+admin_facet_addr = "0x493EE7a0AbB24C0550BB57243ff3Fe93D169842B"
+default_upgrade_addr = "0xDA65afc634528bC2ef5149d811Acda864dD78Ab6"
+diamond_init_addr = "0x84B53B9F74921112681461275ac26363bF396D77"
+executor_facet_addr = "0x130a4150562aA510b79292100A9Af0C90244e085"
+genesis_upgrade_addr = "0x7Dde6ce8Ee4865f4BBD134d3BE827DBE5282100E"
+getters_facet_addr = "0xae5cbB5f70e134668a13d7C8EcEF5e9E6FffCF22"
+verifier_addr = "0x953d58723b3D643880d4951Ec540fc011d4D459b"
+
+[gateway.gateway_state_transition]
+chain_type_manager_proxy_addr = "0x018389676b80E677C9FAc34d04408A1F8489Bd66"
+rollup_da_manager = "0x5bbEbcB4f6fa0b6E05902402ED080FB4C44EC5D3"
+chain_type_manager_proxy_admin = "0x9f52db4aea9277517c6779d65f90fe03d7533730"
+rollup_sl_da_validator = "0x931661BAdBc221bd686446F17A0EA40aa5196779"
+admin_facet_addr = "0x108AdFfDDB323C56a64822fD186Ca4f86cC150E1"
+default_upgrade_addr = "0x69653a812038424290EFd0e7Ae8DcFB2Bbf9c9b2"
+diamond_init_addr = "0x0ba2a65bb5CaB6b4b4CA797C4Aa825118a6A2A63"
+executor_facet_addr = "0x662B6f997F7d5AB22159cDF1B47A73199f911dbD"
+genesis_upgrade_addr = "0x540E6ED9FC06dFCbf0a38Dcc7Ed7Ea3F56C551de"
+getters_facet_addr = "0xEE7f08400FDa3A46D32Ae78eBEC2D3841CeC53b7"
+verifier_addr = "0x9Cc4A8412Df560F2E77E3D85e14b7727d88cb043"

@@ -3,363 +3,366 @@
 pragma solidity 0.8.28;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
-
+import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
-import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
-import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL2AssetHandler} from "../interfaces/IL2AssetHandler.sol";
+import {IL2Bridgehub} from "../../core/bridgehub/IL2Bridgehub.sol";
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
-
-import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+
+import {InteropCallStarter} from "../../common/Messaging.sol";
+import {IAtomicRecoverable} from "../../atomic-interop/IAtomicRecoverable.sol";
+import {
+    L2_ATOMIC_FLOW_MANAGER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    AssetHandlerDoesNotExist,
+    AssetIdNotSupported,
+    EmptyAddress,
+    RecoverToL1NotSupported,
+    Unauthorized
+} from "../../common/L1ContractErrors.sol";
+import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
-/// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
-    /// @dev The address of the L2 legacy shared bridge.
-    address public immutable L2_LEGACY_SHARED_BRIDGE;
+/// @notice The L2 side of asset routing: routes L1 <-> L2 and L2 <-> L2 asset transfers to per-asset
+/// handlers. See {protocol-docs/bridging.md#asset-routing-burn--mint}.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IAtomicRecoverable {
+    /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
+    /// `_bridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
+    IL2Bridgehub private __DEPRECATED_BRIDGE_HUB;
 
-    /// @dev The asset id of the base token.
-    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+    /// @dev Chain ID of L1 for bridging reasons.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    uint256 public L1_CHAIN_ID;
+
+    /// @dev Chain ID of Era for legacy reasons.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    uint256 public ERA_CHAIN_ID;
 
     /// @dev The address of the L1 asset router counterpart.
-    address public immutable override L1_ASSET_ROUTER;
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    IL1AssetRouter public L1_ASSET_ROUTER;
 
-    /// @notice Checks that the message sender is the L1 Asset Router.
-    modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
-        if (_originChainId == L1_CHAIN_ID) {
-            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
-                revert InvalidCaller(msg.sender);
+    /// @dev Deprecated slot, retained to preserve the upgradeable storage layout.
+    /// Formerly `L2_LEGACY_SHARED_BRIDGE` (the L2 legacy shared bridge). No longer read or written.
+    // slither-disable-next-line uninitialized-state
+    address private __DEPRECATED_L2_LEGACY_SHARED_BRIDGE;
+
+    /// @dev The asset id of the base token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    bytes32 public BASE_TOKEN_ASSET_ID;
+
+    /// @notice Returns the bridgehub contract.
+    function _bridgehub() internal view virtual override returns (IBridgehubBase) {
+        return IBridgehubBase(L2_BRIDGEHUB_ADDR);
+    }
+
+    /// @notice Returns the native token vault address. Virtual for private interop override.
+    function _nativeTokenVaultAddr() internal view virtual returns (address) {
+        return L2_NATIVE_TOKEN_VAULT_ADDR;
+    }
+
+    /// @notice Returns the interop center address. Virtual for private interop override.
+    function _interopCenterAddr() internal view virtual returns (address) {
+        return L2_INTEROP_CENTER_ADDR;
+    }
+
+    /// @notice Returns the canonical atomic-flow manager address, the only caller allowed into
+    /// `recoverAtomicCall`. Chains without the atomic-flow stack have nothing deployed there, so the
+    /// auth gate never passes. Virtual for private interop override.
+    function _atomicFlowManagerAddr() internal view virtual returns (address) {
+        return L2_ATOMIC_FLOW_MANAGER_ADDR;
+    }
+
+    /// @notice Checks that the message sender is the asset-router counterpart for messages originating on L1.
+    modifier onlyAssetRouterCounterpart(uint256 _sourceChainId) {
+        if (_sourceChainId == L1_CHAIN_ID) {
+            // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
+            require(
+                AddressAliasHelper.undoL1ToL2Alias(msg.sender) == address(L1_ASSET_ROUTER),
+                Unauthorized(msg.sender)
+            );
+        } else {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Checks that the message sender is the L1 asset-router counterpart or this contract itself.
+    /// @dev Self-calls are used for interop flows where the destination L2AssetRouter re-enters its own finalize path.
+    modifier onlyAssetRouterCounterpartOrSelf(uint256 _sourceChainId) {
+        if (_sourceChainId == L1_CHAIN_ID) {
+            // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
+            if (
+                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
+                msg.sender != address(this)
+            ) {
+                revert Unauthorized(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
-        }
-        _;
-    }
-
-    /// @notice Checks that the message sender is the L1 Asset Router.
-    modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
-        if (_chainId == L1_CHAIN_ID) {
-            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
-                revert InvalidCaller(msg.sender);
+            if (msg.sender != address(this)) {
+                revert Unauthorized(msg.sender);
             }
-        } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
 
-    /// @notice Checks that the message sender is the legacy L2 bridge.
-    modifier onlyLegacyBridge() {
-        if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
-            revert InvalidCaller(msg.sender);
+    /// @notice Checks that the message sender is the interop center.
+    modifier onlyL2InteropCenter() {
+        require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @notice Checks that the message sender is the canonical atomic-flow manager.
+    modifier onlyAtomicFlowManager() {
+        require(msg.sender == _atomicFlowManagerAddr(), Unauthorized(msg.sender));
+        _;
+    }
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
         }
         _;
     }
 
-    modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
-        _;
-    }
-
-    /// @dev Disable the initialization to prevent Parity hack.
-    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
-    /// @param _l1AssetRouter The address of the L1 Bridge contract.
-    constructor(
+    /// @notice Initializes the contract.
+    /// @dev This function is used to initialize the contract with the initial values.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _eraChainId The chain id of Era.
+    /// @param _l1AssetRouter The address of the L1 asset router.
+    /// @param _baseTokenAssetId The asset id of the base token.
+    /// @param _aliasedOwner The address of the owner of the contract.
+    function initL2(
         uint256 _l1ChainId,
         uint256 _eraChainId,
-        address _l1AssetRouter,
-        address _legacySharedBridge,
+        IL1AssetRouter _l1AssetRouter,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) reentrancyGuardInitializer {
-        L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
-        if (_l1AssetRouter == address(0)) {
-            revert EmptyAddress();
-        }
-        L1_ASSET_ROUTER = _l1AssetRouter;
-        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
-        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+    ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
-        _transferOwnership(_aliasedOwner);
+        // solhint-disable-next-line func-named-parameters
+        updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _baseTokenAssetId, _aliasedOwner);
+        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+    }
+
+    /// @notice Updates the contract.
+    /// @dev This function is used to initialize the new implementation of L2AssetRouter on existing chains during
+    /// the upgrade.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _eraChainId The chain id of Era.
+    /// @param _l1AssetRouter The address of the L1 asset router.
+    /// @param _baseTokenAssetId The asset id of the base token.
+    /// @param _aliasedOwner The expected owner. If the current owner is different (e.g. a temporary
+    ///        multisig on a chain that predates decentralized governance), it will be reset.
+    function updateL2(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        IL1AssetRouter _l1AssetRouter,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) public onlyUpgrader {
+        require(address(_l1AssetRouter) != address(0), EmptyAddress());
+        L1_CHAIN_ID = _l1ChainId;
+        L1_ASSET_ROUTER = _l1AssetRouter;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        ERA_CHAIN_ID = _eraChainId;
+        // Reset the owner to the expected (aliased L1) governance; pre-v31 ZKsync OS testnets ran with a
+        // temporary multisig owner.
+        if (owner() != _aliasedOwner) {
+            _transferOwnership(_aliasedOwner);
+        }
     }
 
     /// @inheritdoc IL2AssetRouter
+    /// @dev WARNING: overwriting an already-set handler is dangerous in this release. Atomic-interop
+    /// timeout recovery ({recoverAtomicCall}) resolves the handler through this mutable mapping at
+    /// CLAIM time, not at burn time, so rotating the handler while burns are in flight misroutes their
+    /// recovery to the new handler (which may revert — blocking the refund — or no-op, consuming it).
+    /// Migrations should use a new asset id instead of re-pointing an existing one. See the
+    /// handler-rotation known issue in
+    /// protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations.
     function setAssetHandlerAddress(
-        uint256 _originChainId,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         address _assetHandlerAddress
-    ) external override onlyAssetRouterCounterpart(_originChainId) {
+    ) external override onlyAssetRouterCounterpart(_sourceChainId) {
         _setAssetHandler(_assetId, _assetHandlerAddress);
     }
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc AssetRouterBase
+    /// @dev WARNING: overwriting an already-set handler is dangerous in this release — see
+    /// {setAssetHandlerAddress}.
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
-    ) external override(AssetRouterBase, IAssetRouterBase) {
-        _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
+    ) external override {
+        _setAssetHandlerAddressThisChain(_nativeTokenVaultAddr(), _assetRegistrationData, _assetHandlerAddress);
     }
 
-    function setLegacyTokenAssetHandler(bytes32 _assetId) external override onlyNTV {
-        // Note, that it is an asset handler, but not asset deployment tracker,
-        // which is located on L1.
-        _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+    /// @inheritdoc AssetRouterBase
+    /// @dev Interop calls are delivered by the L2 interop handler system contract.
+    function _interopHandler() internal view override returns (address) {
+        return L2_INTEROP_HANDLER_ADDR;
+    }
+
+    /// @inheritdoc AssetRouterBase
+    /// @dev Interop is only initiated on L2s, so the source may not be L1; the sender must be this same
+    /// router (identical address on every ZK chain). See {protocol-docs/bridging.md#finalization-destination-side}.
+    function _isValidInteropSender(
+        uint256 _senderChainId,
+        address _senderAddress
+    ) internal view override returns (bool) {
+        return _senderChainId != L1_CHAIN_ID && _senderAddress == address(this);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            INITIATE BRIDGE Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc AssetRouterBase
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) public payable virtual override onlyL2InteropCenter {
+        _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
     /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalize the deposit and mint funds
-    /// @param _assetId The encoding of the asset on L2
-    /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
+    /// @inheritdoc AssetRouterBase
+    /// @dev Also callable by the aliased L1 asset router (L1 -> L2 deposits); the chain's own base-token
+    /// asset ID is rejected.
     function finalizeDeposit(
-        // solhint-disable-next-line no-unused-vars
-        uint256,
+        uint256 _sourceChainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    )
-        public
-        payable
-        override(AssetRouterBase, IAssetRouterBase)
-        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
-        nonReentrant
-    {
-        if (_assetId == BASE_TOKEN_ASSET_ID) {
-            revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
-        }
-        _finalizeDeposit(L1_CHAIN_ID, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
+    ) public payable override onlyAssetRouterCounterpartOrSelf(_sourceChainId) nonReentrant {
+        require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
+        _finalizeDeposit(_sourceChainId, _assetId, _transferData, _nativeTokenVaultAddr());
 
-        emit DepositFinalizedAssetRouter(L1_CHAIN_ID, _assetId, _transferData);
+        emit DepositFinalizedAssetRouter(_sourceChainId, _assetId, _transferData);
     }
 
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @dev IMPORTANT: this method will be deprecated in one of the future releases, so contracts
-    /// that rely on it must be upgradeable.
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    function withdraw(bytes32 _assetId, bytes memory _assetData) public override nonReentrant returns (bytes32) {
-        return _withdrawSender(_assetId, _assetData, msg.sender, true);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                     Internal & Helpers
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc AssetRouterBase
-    function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
-        assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).ensureTokenIsRegistered(_token);
-    }
-
-    /// @param _assetId The asset id of the withdrawn asset
-    /// @param _assetData The data that is passed to the asset handler contract
-    /// @param _sender The address of the sender of the message
-    /// @param _alwaysNewMessageFormat Whether to use the new message format compatible with Custom Asset Handlers
-    function _withdrawSender(
-        bytes32 _assetId,
-        bytes memory _assetData,
-        address _sender,
-        bool _alwaysNewMessageFormat
-    ) internal returns (bytes32 txHash) {
-        bytes memory l1bridgeMintData = _burn({
-            _chainId: L1_CHAIN_ID,
-            _nextMsgValue: 0,
-            _assetId: _assetId,
-            _originalCaller: _sender,
-            _transferData: _assetData,
-            _passValue: false,
-            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
-        });
-
-        bytes memory message;
-        if (_alwaysNewMessageFormat || L2_LEGACY_SHARED_BRIDGE == address(0)) {
-            message = _getAssetRouterWithdrawMessage(_assetId, l1bridgeMintData);
-            // slither-disable-next-line unused-return
-            txHash = L2ContractHelper.sendMessageToL1(message);
-        } else {
-            address l1Token = IBridgedStandardToken(
-                IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
-            ).originToken();
-            if (l1Token == address(0)) {
-                revert AssetIdNotSupported(_assetId);
-            }
-            // slither-disable-next-line unused-return
-            (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);
-            message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
-            txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
+    /// @inheritdoc IAtomicRecoverable
+    /// @dev Timeout-refund hook of the atomic interop flow: recognizes only `finalizeDeposit` calls and
+    /// reverses their burn via the NTV, refunding the original depositor. Returns `false` for any other
+    /// call so the {AtomicFlowManager} can skip non-recoverable bundle calls without reverting.
+    /// See {protocol-docs/bridging.md#atomic-recovery-hook}.
+    function recoverAtomicCall(
+        uint256 _destChainId,
+        bytes calldata _callData
+    ) external onlyAtomicFlowManager nonReentrant returns (bool recovered) {
+        // L2->L1 withdrawals are never revertable: `totalWithdrawalsToL1` must stay append-only.
+        // See {protocol-docs/bridging.md#security-notes}.
+        require(_destChainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        // IMPORTANT: every calldata format this router has EVER produced for atomic-bundle calls must
+        // stay recognized (and reversible) here forever. {AtomicFlowManager.claimRefund} flips the leg
+        // to `Reverted` regardless of the value returned below, so if an upgraded router stopped
+        // recognizing an in-flight burn's encoding, `false` would be returned, the claim would succeed
+        // as a no-op, and the burned funds would be stranded permanently. A future encoding change must
+        // therefore ADD a recognized format, never replace the old ones. See the per-bundle refund
+        // consumption known issue in
+        // protocol-docs/atomicity/security.md#known-issues-to-be-fixed-in-this-release.
+        if (_callData.length < 4 || bytes4(_callData[:4]) != AssetRouterBase.finalizeDeposit.selector) {
+            return false;
         }
 
-        emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
+        // Decode finalizeDeposit(sourceChainId, assetId, bridgeMintData); the source chain id is unused.
+        // slither-disable-next-line unused-return
+        (, bytes32 assetId, bytes memory mintData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
+        // Only the asset handler that performed the burn (see {AssetRouterBase._burn}) can reverse it —
+        // the mint data is in its own format — so recovery routes through the same `assetHandlerAddress`
+        // lookup rather than assuming the NTV. The handler is registered by the burn itself (`_burn`
+        // either found it registered or registered the NTV via `tryRegisterTokenFromBurnData`); the
+        // lookup is only correct as long as the registration has not been overwritten since — see the
+        // handler-rotation known issue in
+        // protocol-docs/atomicity/security.md#known-issues-and-accepted-limitations and the warnings on
+        // the `setAssetHandlerAddress*` entry points.
+        address assetHandler = assetHandlerAddress[assetId];
+        require(assetHandler != address(0), AssetHandlerDoesNotExist(assetId));
+        IL2AssetHandler(assetHandler).bridgeRecoverFailedTransfer(_destChainId, assetId, mintData);
+        return true;
     }
 
-    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
-    /// @param _assetId The encoding of the asset on L2 which is withdrawn.
-    /// @param _l1bridgeMintData The calldata used by l1 asset handler to unlock tokens for recipient.
-    function _getAssetRouterWithdrawMessage(
+    /// @notice Refunds a timed-out atomic-interop value leg, re-crediting the destination base-token asset
+    /// to the depositor.
+    /// @dev Manager-gated wrapper symmetric with {bridgehubDepositBaseToken} and the same-base
+    /// BaseTokenHolder path; forwards to the NTV, which dispatches through the existing failed-transfer
+    /// recovery logic.
+    /// @param _chainId The chain the asset was being bridged to at burn time.
+    /// @param _assetId The destination base-token asset id that was burned.
+    /// @param _receiver The original depositor to refund.
+    /// @param _amount The amount to recover.
+    function bridgehubRecoverBaseToken(
+        uint256 _chainId,
         bytes32 _assetId,
-        bytes memory _l1bridgeMintData
-    ) internal view returns (bytes memory) {
-        // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, block.chainid, _assetId, _l1bridgeMintData);
-    }
-
-    /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
-    function _getSharedBridgeWithdrawMessage(
-        address _l1Receiver,
-        address _l1Token,
+        address _receiver,
         uint256 _amount
-    ) internal pure returns (bytes memory) {
+    ) external onlyAtomicFlowManager nonReentrant {
+        require(_chainId != L1_CHAIN_ID, RecoverToL1NotSupported());
+        // Reuse the generic failed-transfer recovery. The base-token deposit (bridgehubDepositBaseToken)
+        // discarded its bridge-mint data, so reconstruct the minimal form: `bridgeRecoverFailedTransfer`
+        // refunds the mint data's `originalCaller` for `amount`, and the asset is already registered on
+        // this chain (it was burned from the depositor), so origin-token / erc20 metadata go unused.
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IL1ERC20Bridge.finalizeWithdrawal.selector, _l1Receiver, _l1Token, _amount);
+        bytes memory mintData = DataEncoding.encodeBridgeMintData(_receiver, _receiver, address(0), _amount, "");
+        IL2NativeTokenVault(_nativeTokenVaultAddr()).bridgeRecoverFailedTransfer(_chainId, _assetId, mintData);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            LEGACY FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Legacy finalizeDeposit.
-    /// @dev Finalizes the deposit and mint funds.
-    /// @param _l1Sender The address of token sender on L1.
-    /// @param _l2Receiver The address of token receiver on L2.
-    /// @param _l1Token The address of the token transferred.
-    /// @param _amount The amount of the token transferred.
-    /// @param _data The metadata of the token transferred.
-    function finalizeDeposit(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
+    /// @inheritdoc IL2CrossChainSender
+    function initiateIndirectCall(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
         bytes calldata _data
-    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {
-        _translateLegacyFinalizeDeposit({
-            _l1Sender: _l1Sender,
-            _l2Receiver: _l2Receiver,
-            _l1Token: _l1Token,
-            _amount: _amount,
-            _data: _data
+    ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
+        address ntvAddr = _nativeTokenVaultAddr();
+
+        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
+            _chainId: _chainId,
+            _originalCaller: _originalCaller,
+            _value: _value,
+            _data: _data,
+            _nativeTokenVault: ntvAddr
         });
-    }
 
-    function finalizeDepositLegacyBridge(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        bytes calldata _data
-    ) external onlyLegacyBridge {
-        _translateLegacyFinalizeDeposit({
-            _l1Sender: _l1Sender,
-            _l2Receiver: _l2Receiver,
-            _l1Token: _l1Token,
-            _amount: _amount,
-            _data: _data
+        // Echo the requested `interopCallValue` back so the InteropCenter's `IndirectCallValueMismatch`
+        // check passes. It is always zero for an indirect call; the bridged token amount travels in the
+        // `finalizeDeposit` calldata built above, not as call value.
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, _value);
+
+        // For an L2->L1 withdrawal the asset router on L1 lives at a different address than the common
+        // L2 one, so target the known L1 asset router; the finalizeDeposit calldata is identical.
+        address destinationAssetRouter = _chainId == L1_CHAIN_ID ? address(L1_ASSET_ROUTER) : request.l2Contract;
+        interopCallStarter = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(destinationAssetRouter),
+            data: request.l2Calldata,
+            callAttributes: attributes
         });
-    }
-
-    function _translateLegacyFinalizeDeposit(
-        address _l1Sender,
-        address _l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        bytes calldata _data
-    ) internal {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
-        // solhint-disable-next-line func-named-parameters
-        bytes memory data = DataEncoding.encodeBridgeMintData(_l1Sender, _l2Receiver, _l1Token, _amount, _data);
-        this.finalizeDeposit{value: msg.value}(L1_CHAIN_ID, assetId, data);
-    }
-
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
-    /// where tokens would be unlocked
-    /// @dev A compatibility method to support legacy functionality for the SDK.
-    /// @param _l1Receiver The account address that should receive funds on L1
-    /// @param _l2Token The L2 token address which is withdrawn
-    /// @param _amount The total amount of tokens to be withdrawn
-    function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external nonReentrant {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
-        _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
-    }
-
-    /// @notice Legacy withdraw.
-    /// @dev Finalizes the deposit and mint funds.
-    /// @param _l1Receiver The address of token receiver on L1.
-    /// @param _l2Token The address of token on L2.
-    /// @param _amount The amount of the token transferred.
-    /// @param _sender The original msg.sender.
-    function withdrawLegacyBridge(
-        address _l1Receiver,
-        address _l2Token,
-        uint256 _amount,
-        address _sender
-    ) external onlyLegacyBridge nonReentrant {
-        _withdrawLegacy(_l1Receiver, _l2Token, _amount, _sender);
-    }
-
-    function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
-        address l1Address = l1TokenAddress(_l2Token);
-        if (l1Address == address(0)) {
-            revert TokenNotLegacy();
-        }
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Address);
-        bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, _l2Token);
-        _withdrawSender(assetId, data, _sender, false);
-    }
-
-    /// @notice Legacy getL1TokenAddress.
-    /// @param _l2Token The address of token on L2.
-    /// @return The address of token on L1.
-    function l1TokenAddress(address _l2Token) public view returns (address) {
-        bytes32 assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2Token);
-        if (assetId == bytes32(0)) {
-            return address(0);
-        }
-        uint256 originChainId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(assetId);
-        if (originChainId != L1_CHAIN_ID) {
-            return address(0);
-        }
-
-        return IBridgedStandardToken(_l2Token).originToken();
-    }
-
-    /// @notice Legacy function used for backward compatibility to return L2 wrapped token
-    /// @notice address corresponding to provided L1 token address and deployed through NTV.
-    /// @dev However, the shared bridge can use custom asset handlers such that L2 addresses differ,
-    /// @dev or an L1 token may not have an L2 counterpart.
-    /// @param _l1Token The address of token on L1.
-    /// @return Address of an L2 token counterpart
-    function l2TokenAddress(address _l1Token) public view returns (address) {
-        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-        address currentlyDeployedAddress = l2NativeTokenVault.l2TokenAddress(_l1Token);
-
-        if (currentlyDeployedAddress != address(0)) {
-            return currentlyDeployedAddress;
-        }
-
-        // For backwards compatibility, the bridge smust return the address of the token even if it
-        // has not been deployed yet.
-        return l2NativeTokenVault.calculateCreate2TokenAddress(L1_CHAIN_ID, _l1Token);
-    }
-
-    /// @notice Returns the address of the L1 asset router.
-    /// @dev The old name is kept for backward compatibility.
-    function l1Bridge() external view returns (address) {
-        return L1_ASSET_ROUTER;
     }
 }

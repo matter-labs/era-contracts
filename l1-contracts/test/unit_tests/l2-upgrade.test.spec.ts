@@ -22,7 +22,8 @@ import { L2_BOOTLOADER_BYTECODE_HASH, L2_DEFAULT_ACCOUNT_BYTECODE_HASH } from ".
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
 import type { ProposedUpgrade, VerifierParams } from "../../src.ts/utils";
-import { ethTestConfig, EMPTY_STRING_KECCAK } from "../../src.ts/utils";
+import { ethTestConfig, EMPTY_STRING_KECCAK } from "../../src.ts/constants";
+
 import { diamondCut, Action, facetCut } from "../../src.ts/diamondCut";
 
 import type { CommitBatchInfo, StoredBatchInfo, CommitBatchInfoWithTimestamp } from "./utils";
@@ -41,7 +42,7 @@ import {
   makeExecutedEqualCommitted,
   getBatchStoredInfo,
   buildL2DARollupPubdataCommitment,
-  L2_TO_L1_MESSENGER,
+  L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
 } from "./utils";
 import { packSemver, unpackStringSemVer, addToProtocolVersion } from "../../scripts/utils";
 
@@ -387,7 +388,7 @@ describe("L2 upgrade test", function () {
     const bootloaderHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const defaultAccountHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
     const evmEmulatorHash = ethers.utils.hexlify(hashBytecode(ethers.utils.randomBytes(32)));
-    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("EraTestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
     const newVerifier = testnetVerifierContract.address;
     const newerVerifierParams = buildVerifierParams({
@@ -483,7 +484,7 @@ describe("L2 upgrade test", function () {
     const currentL2DefaultAccountBytecodeHash = await proxyGetters.getL2DefaultAccountBytecodeHash();
     const currentL2EvmEmulatorBytecodeHash = await proxyGetters.getL2EvmEmulatorBytecodeHash();
 
-    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("TestnetVerifier");
+    const testnetVerifierFactory = await hardhat.ethers.getContractFactory("EraTestnetVerifier");
     const testnetVerifierContract = await testnetVerifierFactory.deploy();
     const newVerifier = testnetVerifierContract.address;
     const newerVerifierParams = buildVerifierParams({
@@ -590,20 +591,23 @@ describe("L2 upgrade test", function () {
     expect(revertReason).to.contains("PreviousUpgradeNotFinalized");
   });
 
-  // TODO: restore test
-  // it("Should require that the next commit batches contains an upgrade tx", async () => {
-  //   if (!l2UpgradeTxHash) {
-  //     throw new Error("Can not perform this test without l2UpgradeTxHash");
-  //   }
+  it("Should require that the next committed batch contains an upgrade tx hash log", async () => {
+    if (!l2UpgradeTxHash) {
+      throw new Error("Can not perform this test without l2UpgradeTxHash");
+    }
 
-  //   const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
-  //     batchNumber: 3,
-  //   });
-  //   const revertReason = await getCallRevertReason(
-  //     proxyExecutor.commitBatchesSharedBridge(chainId, ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoNoUpgradeTx]))
-  //   );
-  //   expect(revertReason).to.contains("MissingSystemLogs");
-  // });
+    const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
+      batchNumber: 3,
+    });
+
+    const revertReason = await getCallRevertReason(
+      proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoNoUpgradeTx])
+      )
+    );
+    expect(revertReason).to.contains("MissingSystemLogs");
+  });
 
   it("Should ensure any additional upgrade logs go to the priority ops hash", async () => {
     if (!l2UpgradeTxHash) {
@@ -921,7 +925,7 @@ async function buildCommitBatchInfoWithCustomLogs(
   );
   systemLogs[SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY] = constructL2Log(
     true,
-    L2_TO_L1_MESSENGER,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     SYSTEM_LOG_KEYS.L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     l1DAOutputHash
   );
@@ -1004,7 +1008,7 @@ async function executeUpgrade(
       partialUpgrade.newProtocolVersion
     )
   ).wait();
-  return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+  return proxyAdmin.upgradeChainFromVersion(proxyAdmin.address, oldProtocolVersion, diamondCutData);
 }
 
 // we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but that is ok)
@@ -1072,5 +1076,5 @@ async function executeCustomUpgrade(
       partialUpgrade.newProtocolVersion
     )
   ).wait();
-  return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+  return proxyAdmin.upgradeChainFromVersion(proxyAdmin.address, oldProtocolVersion, diamondCutData);
 }

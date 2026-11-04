@@ -2,14 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub, L1Nullifier} from "../bridge/L1Nullifier.sol";
+import {IL1Bridgehub, L1Nullifier} from "../bridge/L1Nullifier.sol";
+import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 
 contract L1NullifierDev is L1Nullifier {
-    constructor(
-        IBridgehub _bridgehub,
-        uint256 _eraChainId,
-        address _eraDiamondProxy
-    ) L1Nullifier(_bridgehub, _eraChainId, _eraDiamondProxy) {}
+    constructor(IL1Bridgehub _bridgehub, IMessageRootBase _messageRoot) L1Nullifier(_bridgehub, _messageRoot) {}
 
     function setL2LegacySharedBridge(uint256 _chainId, address _l2Bridge) external {
         __DEPRECATED_l2BridgeAddress[_chainId] = _l2Bridge;
