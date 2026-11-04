@@ -58,12 +58,20 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/contracts/protocol-ops/target,id=protocol-ops-target,sharing=locked \
     cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
+# genesis-gen depends on the private zksync-os-private repo. The `git_token` build secret is
+# used only inside its two RUN steps and never lands in a layer.
 WORKDIR /contracts/tools/zksync-os-genesis-gen
 COPY --from=planner /recipes/genesis-gen.json recipe.json
 COPY tools/zksync-os-genesis-gen/rust-toolchain.toml ./
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=/contracts/tools/zksync-os-genesis-gen/target,id=genesis-gen-target,sharing=locked \
+    --mount=type=secret,id=git_token \
+    if [ -s /run/secrets/git_token ]; then \
+      export CARGO_NET_GIT_FETCH_WITH_CLI=true GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0="url.https://x-access-token:$(cat /run/secrets/git_token)@github.com/.insteadOf" \
+        GIT_CONFIG_VALUE_0=https://github.com/; \
+    fi && \
     cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
 WORKDIR /contracts/tools/wallets-gen
@@ -98,6 +106,12 @@ WORKDIR /contracts/tools/zksync-os-genesis-gen
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=/contracts/tools/zksync-os-genesis-gen/target,id=genesis-gen-target,sharing=locked \
+    --mount=type=secret,id=git_token \
+    if [ -s /run/secrets/git_token ]; then \
+      export CARGO_NET_GIT_FETCH_WITH_CLI=true GIT_CONFIG_COUNT=1 \
+        GIT_CONFIG_KEY_0="url.https://x-access-token:$(cat /run/secrets/git_token)@github.com/.insteadOf" \
+        GIT_CONFIG_VALUE_0=https://github.com/; \
+    fi && \
     cargo build --release --target ${RUST_TARGET} && \
     cp target/${RUST_TARGET}/release/zksync-os-genesis-gen ./
 
