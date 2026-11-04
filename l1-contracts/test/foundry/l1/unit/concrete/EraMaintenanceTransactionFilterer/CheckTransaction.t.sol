@@ -412,6 +412,18 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
         assertFalse(_allowed(user, l2Contract, MINT_VALUE, 1, data));
     }
 
+    /// @dev A whitelisted hash also lifts a deposit that the deposit rules reject.
+    function test_allowedTxHashPassesRejectedDeposit() public {
+        bytes memory data = _newDepositCalldata(user, tokenAssetId, TOKEN_CAP + 1);
+        _setCallMode(CallMode.WITHDRAWALS_ONLY);
+        assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, data));
+
+        bytes32 txHash = _txHash(l1AssetRouter, L2_ASSET_ROUTER_ADDR, 0, data, user);
+        vm.prank(owner);
+        filterer.setAllowedTxHash(txHash, true);
+        assertTrue(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, data));
+    }
+
     function test_getTxHashMatchesSpecifiedEncoding() public view {
         bytes memory data = hex"deadbeef";
         bytes32 expected = keccak256(abi.encode(user, l2Contract, uint256(7), keccak256(data), owner));

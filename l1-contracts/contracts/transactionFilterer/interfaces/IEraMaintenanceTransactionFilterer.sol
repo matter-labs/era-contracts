@@ -43,7 +43,7 @@ interface IEraMaintenanceTransactionFilterer is ITransactionFilterer {
     /// @dev The cap of the chain's base token bounds `mintValue` of every non-exempt L1->L2 transaction.
     function depositCap(bytes32 _assetId) external view returns (uint256);
 
-    /// @notice Whether the exact transaction with this `getTxHash` value is allowed regardless of other rules.
+    /// @notice Whether the exact transaction with this `getTxHash` value is allowed when the other rules reject it.
     function allowedTxHashes(bytes32 _txHash) external view returns (bool);
 
     /// @notice Whether calls to `_selector` on `_l2Contract` pass in `WITHDRAWALS_ONLY` mode.

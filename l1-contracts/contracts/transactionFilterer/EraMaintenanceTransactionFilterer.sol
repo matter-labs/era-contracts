@@ -170,20 +170,41 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         bytes calldata _l2Calldata,
         address _refundRecipient
     ) external view returns (bool) {
-        bytes32 txHash = getTxHash({
-            _sender: _sender,
-            _contractL2: _contractL2,
-            _l2Value: _l2Value,
-            _l2Calldata: _l2Calldata,
-            _refundRecipient: _refundRecipient
-        });
-        if (allowedTxHashes[txHash]) {
-            return true;
-        }
         if (exempt[_sender]) {
             return true;
         }
+        if (
+            _isAllowedByRules({
+                _sender: _sender,
+                _contractL2: _contractL2,
+                _mintValue: _mintValue,
+                _l2Value: _l2Value,
+                _l2Calldata: _l2Calldata
+            })
+        ) {
+            return true;
+        }
+        // Whitelisting a single transaction is rare, so its hash is computed only once the rules reject it.
+        return
+            allowedTxHashes[
+                getTxHash({
+                    _sender: _sender,
+                    _contractL2: _contractL2,
+                    _l2Value: _l2Value,
+                    _l2Calldata: _l2Calldata,
+                    _refundRecipient: _refundRecipient
+                })
+            ];
+    }
 
+    /// @dev The deposit and generic-call rules for a non-exempt sender.
+    function _isAllowedByRules(
+        address _sender,
+        address _contractL2,
+        uint256 _mintValue,
+        uint256 _l2Value,
+        bytes calldata _l2Calldata
+    ) internal view returns (bool) {
         if (_sender == L1_ASSET_ROUTER) {
             if (_contractL2 != L2_ASSET_ROUTER_ADDR || _l2Value != 0) {
                 return false;
@@ -215,6 +236,9 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         if (_hasSelector(_l2Calldata, AssetRouterBase.finalizeDeposit.selector)) {
             bytes memory transferData;
             (, assetId, transferData) = abi.decode(_l2Calldata[4:], (uint256, bytes32, bytes));
+            // Token deposits to an Era chain only use the native token vault. The other handler, the chain asset
+            // handler, only migrates chains to a settlement layer, which this filterer rejects. The check also keeps
+            // a custom handler registered later from passing data that decodeBridgeMintData would misread.
             if (IL1AssetRouter(L1_ASSET_ROUTER).assetHandlerAddress(assetId) != L1_NATIVE_TOKEN_VAULT) {
                 return false;
             }
