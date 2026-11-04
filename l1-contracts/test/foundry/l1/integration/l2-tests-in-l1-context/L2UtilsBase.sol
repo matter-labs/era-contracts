@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
+import {IVmChainId} from "test-utils/IVmChainId.sol";
 
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 
@@ -92,7 +93,7 @@ library L2UtilsBase {
         }
 
         {
-            uint256 prevChainId = block.chainid;
+            uint256 prevChainId = IVmChainId(VM_ADDRESS).getChainId();
             vm.chainId(_args.l1ChainId);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);

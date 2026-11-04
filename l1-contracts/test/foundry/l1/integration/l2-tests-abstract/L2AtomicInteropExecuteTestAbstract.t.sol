@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+import {IVmChainId} from "test-utils/IVmChainId.sol";
 import {AtomicFlowFixtures} from "../../unit/concrete/atomic-interop/AtomicFlowFixtures.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
@@ -341,7 +342,7 @@ abstract contract L2AtomicInteropExecuteTestAbstract is L2InteropTestUtils, Atom
         _sendAtomicLegWithRemotePeer(keccak256("atomic execute foreign-executor salt"), executorAttribute);
         AtomicFinalityProof memory finality = _commitRemoteLegAndBuildFinality();
 
-        uint256 sourceChainId = block.chainid;
+        uint256 sourceChainId = IVmChainId(address(vm)).getChainId();
         vm.chainId(destinationChainId);
 
         vm.expectRevert(

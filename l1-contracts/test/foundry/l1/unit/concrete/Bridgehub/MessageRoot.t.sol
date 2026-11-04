@@ -393,7 +393,7 @@ contract MessageRootTest is Test {
         assertEq(countBefore, 1, "interopRootLogId should be 1 (one block, one increment)");
 
         // Roll to a new block so the next _emitRoot call increments the counter.
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
 
         vm.prank(alphaChainSender);
         // Check all topics + data so the `l1Timestamp` field (bound into the batch leaf for atomic interop)
@@ -537,7 +537,7 @@ contract MessageRootTest is Test {
         uint256 count = l2MessageRoot.interopRootLogId();
 
         // Block N+1: two emissions — counter increments exactly once.
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(chainId1, 0);
         assertEq(l2MessageRoot.interopRootLogId(), count + 1, "block N+1 first emission: +1");
@@ -547,7 +547,7 @@ contract MessageRootTest is Test {
         assertEq(l2MessageRoot.interopRootLogId(), count + 1, "block N+1 second emission: still +1");
 
         // Block N+2: one emission — counter increments again.
-        vm.roll(block.number + 1);
+        vm.roll(vm.getBlockNumber() + 1);
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(chainId3, 0);
         assertEq(l2MessageRoot.interopRootLogId(), count + 2, "block N+2 first emission: +2");

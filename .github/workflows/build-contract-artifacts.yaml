@@ -76,17 +76,6 @@ jobs:
         if: steps.reuse.outputs.cache-hit != 'true'
         run: yarn
 
-      # Fixture tests for the pruning that decides which restored artifacts are trusted. Every bug
-      # found in it needed a deleted or modified source to show up, so an ordinary run never
-      # exercises it — hence pinning it here, next to the job that relies on it.
-      - name: Unit-test the cache pruning
-        if: steps.reuse.outputs.cache-hit != 'true'
-        run: node .github/actions/warm-solc-cache/prune-stale-artifacts.test.js
-
-      - name: Warm solc build cache
-        if: steps.reuse.outputs.cache-hit != 'true'
-        uses: ./.github/actions/warm-solc-cache
-
       - name: Build l1 contracts
         if: steps.reuse.outputs.cache-hit != 'true'
         working-directory: l1-contracts

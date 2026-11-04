@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.20;
 
+import {IVmChainId} from "test-utils/IVmChainId.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -254,7 +255,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
             baseTokenAssetId,
             ERA_CHAIN_ID + 1
         );
-        uint256 currentChainId = block.chainid;
+        uint256 currentChainId = IVmChainId(address(vm)).getChainId();
         vm.chainId(L1_CHAIN_ID);
         address chainAddress = chainTypeManager.createNewChain(ERA_CHAIN_ID + 1, chainAdmin);
         vm.chainId(currentChainId);

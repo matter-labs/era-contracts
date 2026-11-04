@@ -117,8 +117,8 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         uint256 indirectCallMessageValue = 50;
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         calls[0] = _indirectCall(0, indirectCallMessageValue, hex"");
-        // Stub without expectCall: both branches revert after the starter ran (bundle assembly precedes
-        // the explicit msg.value check, and a mocked call is intercepted before any value transfer).
+        // Stub without expectCall: both branches revert after the starter ran, because bundle assembly
+        // precedes the explicit msg.value check.
         vm.mockCall(
             L2_ASSET_ROUTER_ADDR,
             indirectCallMessageValue,
@@ -129,6 +129,9 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         // Too little value.
         uint256 tooLittle = indirectCallMessageValue - 10;
         vm.deal(address(this), tooLittle);
+        // Forge moves value on mocked calls, so the InteropCenter needs the shortfall to forward the
+        // starter's value and reach the explicit msg.value check.
+        vm.deal(address(L2_INTEROP_CENTER), indirectCallMessageValue - tooLittle);
         vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, indirectCallMessageValue, tooLittle));
         _send(calls, tooLittle);
 

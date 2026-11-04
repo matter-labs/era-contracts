@@ -142,7 +142,7 @@ contract CalldataDATest is Test {
     function test_RevertWhen_PubdataTooBig() public {
         uint256 blobsProvided = 1;
         uint256 maxBlobsSupported = 6;
-        bytes calldata pubdataInput = makeBytesArrayOfLength(BLOB_SIZE_BYTES + 33);
+        bytes memory pubdataInput = new bytes(BLOB_SIZE_BYTES + 33);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
         vm.expectRevert(abi.encodeWithSelector(PubdataLengthTooBig.selector, 126977, blobsProvided * BLOB_SIZE_BYTES));
@@ -152,7 +152,7 @@ contract CalldataDATest is Test {
     function test_RevertWhen_PubdataInputTooSmall() public {
         uint256 blobsProvided = 1;
         uint256 maxBlobsSupported = 6;
-        bytes calldata pubdataInput = makeBytesArrayOfLength(31);
+        bytes memory pubdataInput = new bytes(31);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
         vm.expectRevert(
@@ -202,15 +202,5 @@ contract CalldataDATest is Test {
         assertEq(blobCommitments[4], bytes32(0), "blobCommitment5");
         assertEq(blobCommitments[5], bytes32(0), "blobCommitment6");
         assertEq(pubdata, pubdataInputWithoutBlobCommitment, "pubdata");
-    }
-
-    /*//////////////////////////////////////////////////////////////////////////
-                                    Util Functions
-    //////////////////////////////////////////////////////////////////////////*/
-
-    function makeBytesArrayOfLength(uint256 len) internal pure returns (bytes calldata arr) {
-        assembly {
-            arr.length := len
-        }
     }
 }
