@@ -23,6 +23,7 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
+import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
 /// @notice v34 Era: moves an Era CTM from v0.33.0 to v0.34.0. From then on every batch needs a Boojum and an
@@ -141,10 +142,18 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
     // ======================== Calls ========================
 
     /// @dev No `DefaultCoreUpgrade` runs alongside to pause migrations, and the CTM's `setNewVersionUpgrade` reverts
-    ///      unless they are paused (`MigrationsNotPaused`): stage 0 pauses them, stage 2 unpauses. No stage-1
-    ///      re-pause: only an emergency execution unpauses in between, and testnet3 and mainnet take the normal path.
+    ///      unless they are paused (`MigrationsNotPaused`): stage 0 pauses them, stage 2 unpauses.
     function prepareVersionSpecificStage0GovernanceCallsL1() public view override returns (Call[] memory) {
         return preparePauseGatewayMigrationsCall();
+    }
+
+    /// @dev Re-pause before the check: every PUH unfreeze unpauses migrations, an emergency execution's included, and
+    ///      anyone can call `PUH.reinforceUnfreeze()`.
+    function prepareCheckMigrationsPausedCalls() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](2);
+        allCalls[0] = preparePauseGatewayMigrationsCall();
+        allCalls[1] = super.prepareCheckMigrationsPausedCalls();
+        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     function prepareVersionSpecificStage2GovernanceCallsL1() public view override returns (Call[] memory calls) {
