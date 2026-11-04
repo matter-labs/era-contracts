@@ -109,6 +109,9 @@ withdrawals stay reachable through `withdrawalFunctions`.
 - **Ecosystem senders.** Contracts such as `CTMDeploymentTracker` and `ChainRegistrationSender`
   send two-bridges requests to the L2 Bridgehub, which are generic calls and are rejected in
   `WITHDRAWALS_ONLY` unless their sender is exempt.
+- **Governance.** The ZK Nation `Guardians` contract cancels and proposes L2 governor proposals
+  through the Era Mailbox's `requestL2Transaction`. These are generic calls too, so it is exempted
+  before switching to `WITHDRAWALS_ONLY`.
 
 ## Design decisions
 

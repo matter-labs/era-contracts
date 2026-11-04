@@ -5,8 +5,8 @@ pragma solidity ^0.8.20;
 import {ITransactionFilterer} from "../../state-transition/chain-interfaces/ITransactionFilterer.sol";
 
 /// @notice Which generic (non-deposit) L1->L2 calls the filterer lets through.
-/// @dev `ALLOW_ALL`: every call passes. `WITHDRAWALS_ONLY`: only calls listed in `withdrawalFunctions`
-/// pass, and token deposits are rejected, also those of exempt depositors.
+/// @dev `ALLOW_ALL`: every call passes within the caps. `WITHDRAWALS_ONLY`: only calls listed in
+/// `withdrawalFunctions` pass, and token deposits are rejected, also those of exempt depositors.
 enum CallMode {
     ALLOW_ALL,
     WITHDRAWALS_ONLY

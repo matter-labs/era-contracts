@@ -80,6 +80,8 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         }
         _transferOwnership(_owner);
         chainId = _chainId;
+        // `ALLOW_ALL` is the zero value; it is set anyway so that the initial state is explicit.
+        _setCallMode(CallMode.ALLOW_ALL);
 
         bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
         if (baseTokenAssetId == bytes32(0)) {
@@ -98,8 +100,7 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
 
     /// @inheritdoc IEraMaintenanceTransactionFilterer
     function setCallMode(CallMode _callMode) external onlyOwner {
-        callMode = _callMode;
-        emit CallModeSet(_callMode);
+        _setCallMode(_callMode);
     }
 
     /// @inheritdoc IEraMaintenanceTransactionFilterer
@@ -134,6 +135,11 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
     function setLegacyBridge(address _l1Bridge, bool _isLegacyBridge) external onlyOwner {
         legacyBridges[_l1Bridge] = _isLegacyBridge;
         emit LegacyBridgeSet(_l1Bridge, _isLegacyBridge);
+    }
+
+    function _setCallMode(CallMode _callMode) internal {
+        callMode = _callMode;
+        emit CallModeSet(_callMode);
     }
 
     function _setDepositCap(bytes32 _assetId, uint256 _cap) internal {
@@ -194,8 +200,8 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
     }
 
     /// @dev The `WITHDRAWALS_ONLY` rules, for a transaction that is not whitelisted and whose sender is not exempt:
-    /// only a call to a registered withdrawal function passes, deposits included, and `_mintValue` must be within
-    /// the base token cap.
+    /// only a call to a registered withdrawal function with `_mintValue` within the base token cap passes; every
+    /// deposit is rejected.
     function _isAllowedInWithdrawalsOnlyMode(
         address _contractL2,
         uint256 _mintValue,

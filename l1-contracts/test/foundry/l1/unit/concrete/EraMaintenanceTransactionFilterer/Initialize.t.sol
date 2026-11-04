@@ -48,6 +48,8 @@ contract InitializeTest is EraMaintenanceTransactionFiltererTest {
 
     function test_initializeEmitsConfigurationEvents() public {
         vm.expectEmit(true, false, false, true);
+        emit IEraMaintenanceTransactionFilterer.CallModeSet(CallMode.ALLOW_ALL);
+        vm.expectEmit(true, false, false, true);
         emit IEraMaintenanceTransactionFilterer.DepositCapSet(baseTokenAssetId, type(uint256).max);
         vm.expectEmit(true, true, false, true);
         emit IEraMaintenanceTransactionFilterer.WithdrawalFunctionSet(
