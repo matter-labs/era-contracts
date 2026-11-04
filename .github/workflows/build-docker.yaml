@@ -75,6 +75,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # tools/zksync-os-genesis-gen depends on zksync-os-private, which pulls in
+      # zksync-airbender-private. Read-only, scoped to those two repos, valid for an hour.
+      - name: Mint token for private cargo dependencies
+        id: private-deps-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          owner: matter-labs
+          repositories: zksync-os-private,zksync-airbender-private
+          permission-contents: read
+
       - name: Build & Push Docker Image
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
@@ -82,9 +94,8 @@ jobs:
           push: ${{ github.event_name == 'workflow_dispatch' }}
           platforms: linux/amd64
           file: docker/protocol/Dockerfile
-          # Read access to zksync-os-private, a git dependency of tools/zksync-os-genesis-gen.
           secrets: |
-            git_token=${{ secrets.RELEASE_TOKEN }}
+            git_token=${{ steps.private-deps-token.outputs.token }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           # GitHub Actions buildx cache. `mode=max` caches every layer (not just
