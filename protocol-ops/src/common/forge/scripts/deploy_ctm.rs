@@ -100,6 +100,7 @@ pub struct L1StateTransitionOutput {
     pub verifier_addr: Address,
     pub airbender_verifier_addr: Option<Address>,
     pub zisk_verifier_addr: Option<Address>,
+    pub zisk_snark_verifier_addr: Option<Address>,
     pub zisk_testnet_verifier_addr: Option<Address>,
     pub multi_proof_verifier_addr: Option<Address>,
     pub genesis_upgrade_addr: Address,
@@ -145,5 +146,28 @@ mod tests {
 
         assert!(serialized.contains("multi_proof_verifier = false"));
         assert!(!serialized.contains("zisk_range_verifier_addr"));
+    }
+
+    #[test]
+    fn zisk_snark_verifier_survives_the_output_round_trip() {
+        let snark = Address::repeat_byte(0x55);
+        let output = format!(
+            r#"
+state_transition_proxy_addr = "{a}"
+verifier_addr = "{a}"
+zisk_verifier_addr = "{a}"
+zisk_snark_verifier_addr = "{snark}"
+genesis_upgrade_addr = "{a}"
+default_upgrade_addr = "{a}"
+bytecodes_supplier_addr = "{a}"
+"#,
+            a = Address::repeat_byte(0x11),
+        );
+
+        let read: L1StateTransitionOutput = toml::from_str(&output).unwrap();
+        assert_eq!(read.zisk_snark_verifier_addr, Some(snark));
+
+        let written = toml::to_string(&read).unwrap();
+        assert!(written.contains(&format!("zisk_snark_verifier_addr = \"{snark}\"")));
     }
 }
