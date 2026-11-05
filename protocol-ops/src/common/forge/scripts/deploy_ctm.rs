@@ -15,8 +15,6 @@ pub struct DeployCTMConfig {
     pub zk_token_asset_id: B256,
     pub multi_proof_verifier: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub zisk_plonk_verifier_addr: Option<Address>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub zisk_range_verifier_addr: Option<Address>,
 }
 
@@ -25,7 +23,6 @@ impl FileConfigTrait for DeployCTMConfig {}
 #[derive(Debug, Clone, Copy, Default)]
 pub struct MultiProofDeployCTMConfig {
     pub enabled: bool,
-    pub zisk_plonk_verifier_addr: Option<Address>,
     pub zisk_range_verifier_addr: Option<Address>,
 }
 
@@ -42,7 +39,6 @@ impl DeployCTMConfig {
             owner_address,
             zk_token_asset_id,
             multi_proof_verifier: multi_proof.enabled,
-            zisk_plonk_verifier_addr: multi_proof.zisk_plonk_verifier_addr,
             zisk_range_verifier_addr: multi_proof.zisk_range_verifier_addr,
             contracts: ContractsDeployCTMConfig {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,
@@ -104,6 +100,7 @@ pub struct L1StateTransitionOutput {
     pub verifier_addr: Address,
     pub airbender_verifier_addr: Option<Address>,
     pub zisk_verifier_addr: Option<Address>,
+    pub zisk_snark_verifier_addr: Option<Address>,
     pub zisk_testnet_verifier_addr: Option<Address>,
     pub multi_proof_verifier_addr: Option<Address>,
     pub genesis_upgrade_addr: Address,
@@ -117,7 +114,6 @@ mod tests {
 
     #[test]
     fn multiprover_fields_are_serialized_for_the_solidity_script() {
-        let plonk = Address::repeat_byte(0x11);
         let range = Address::repeat_byte(0x22);
         let config = DeployCTMConfig::new(
             Address::repeat_byte(0x33),
@@ -126,7 +122,6 @@ mod tests {
             B256::repeat_byte(0x44),
             MultiProofDeployCTMConfig {
                 enabled: true,
-                zisk_plonk_verifier_addr: Some(plonk),
                 zisk_range_verifier_addr: Some(range),
             },
         );
@@ -134,7 +129,6 @@ mod tests {
         let serialized = toml::to_string(&config).unwrap();
 
         assert!(serialized.contains("multi_proof_verifier = true"));
-        assert!(serialized.contains(&format!("zisk_plonk_verifier_addr = \"{plonk}\"")));
         assert!(serialized.contains(&format!("zisk_range_verifier_addr = \"{range}\"")));
     }
 
@@ -151,7 +145,29 @@ mod tests {
         let serialized = toml::to_string(&config).unwrap();
 
         assert!(serialized.contains("multi_proof_verifier = false"));
-        assert!(!serialized.contains("zisk_plonk_verifier_addr"));
         assert!(!serialized.contains("zisk_range_verifier_addr"));
+    }
+
+    #[test]
+    fn zisk_snark_verifier_survives_the_output_round_trip() {
+        let snark = Address::repeat_byte(0x55);
+        let output = format!(
+            r#"
+state_transition_proxy_addr = "{a}"
+verifier_addr = "{a}"
+zisk_verifier_addr = "{a}"
+zisk_snark_verifier_addr = "{snark}"
+genesis_upgrade_addr = "{a}"
+default_upgrade_addr = "{a}"
+bytecodes_supplier_addr = "{a}"
+"#,
+            a = Address::repeat_byte(0x11),
+        );
+
+        let read: L1StateTransitionOutput = toml::from_str(&output).unwrap();
+        assert_eq!(read.zisk_snark_verifier_addr, Some(snark));
+
+        let written = toml::to_string(&read).unwrap();
+        assert!(written.contains(&format!("zisk_snark_verifier_addr = \"{snark}\"")));
     }
 }

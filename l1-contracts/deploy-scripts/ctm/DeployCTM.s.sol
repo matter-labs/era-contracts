@@ -220,19 +220,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     /// @notice Deploys the multiproof verifier and its ZiSK components.
     /// @param _airbenderVerifier Deployed Airbender component.
     function deployMultiProofVerifiers(address _airbenderVerifier) internal {
-        // ZiskVerifier wraps a pre-deployed standalone snarkJS Plonk verifier
-        // (see verifiers/README.md for its generation and deployment) passed
-        // in by address.
-        require(
-            config.multiProof.ziskPlonkVerifierAddr != address(0),
-            "set zisk_plonk_verifier_addr to the deployed snarkJS Plonk verifier"
-        );
-        // Deploying it is a manual step outside this script, so the address it
-        // leaves behind is checked here rather than at the first settlement.
-        require(
-            config.multiProof.ziskPlonkVerifierAddr.code.length > 0,
-            "zisk_plonk_verifier_addr holds no code: deploy the snarkJS Plonk verifier first"
-        );
         // Single-VK lane: every proof, single batch or many, verifies through
         // the range verifier, which reconstructs the ZiSK public values from
         // its own pinned VKs. It defaults to the ZiskVerifier deployed below;
@@ -248,6 +235,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctmAddresses.multiProof.airbenderVerifier = _airbenderVerifier;
         ctmAddresses.multiProof.ziskVerifier = config.multiProof.ziskRangeVerifierAddr;
         if (ctmAddresses.multiProof.ziskVerifier == address(0)) {
+            // ZiskVerifier delegates the SNARK check to ZiSK's pilfflonk
+            // verifier, deployed here from the vendored source.
+            ctmAddresses.multiProof.ziskSnarkVerifier = deploySimpleContract("PilfflonkVerifier");
             ctmAddresses.multiProof.ziskVerifier = deploySimpleContract("ZiskVerifier");
         }
         if (config.testnetVerifier) {
@@ -366,6 +356,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 "state_transition",
                 "airbender_verifier_addr",
                 ctmAddresses.multiProof.airbenderVerifier
+            );
+        }
+        if (ctmAddresses.multiProof.ziskSnarkVerifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "zisk_snark_verifier_addr",
+                ctmAddresses.multiProof.ziskSnarkVerifier
             );
         }
         if (ctmAddresses.multiProof.ziskVerifier != address(0)) {

@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ProofSystem, DisabledProofSystems, PUBLIC_INPUT_SHIFT} from "contracts/common/Config.sol";
+import {
+    ProofSystem,
+    DisabledProofSystems,
+    PUBLIC_INPUT_SHIFT,
+    ZISK_SNARK_PROOF_LENGTH
+} from "contracts/common/Config.sol";
 
 import {Test} from "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {IZiskSnarkPlonkVerifier} from "contracts/state-transition/chain-interfaces/IZiskSnarkPlonkVerifier.sol";
+import {IZiskSnarkVerifier} from "contracts/state-transition/chain-interfaces/IZiskSnarkVerifier.sol";
 import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {NonZeroCarriedHash, ZiskVerificationFailed} from "contracts/common/L1ContractErrors.sol";
@@ -22,38 +27,37 @@ contract MockPassVerifier is IVerifier {
     }
 }
 
-/// @dev Stand-in for the snarkJS Plonk verifier that accepts iff the single
+/// @dev Stand-in for the pilfflonk verifier that accepts iff the single
 ///      public signal it is handed equals `EXPECTED_SIGNAL`. It lets the tests
 ///      assert the EXACT signal the on-chain reconstruction produces (the
 ///      digest formula, the sha256 preimage byte order and the field
 ///      reduction), and name a near-miss signal a real proof could never
 ///      carry. A wrong reconstruction hands a wrong signal and is rejected.
-contract ExpectSignalPlonkVerifier is IZiskSnarkPlonkVerifier {
+contract ExpectSignalSnarkVerifier is IZiskSnarkVerifier {
     uint256 public immutable EXPECTED_SIGNAL;
 
     constructor(uint256 _expectedSignal) {
         EXPECTED_SIGNAL = _expectedSignal;
     }
 
-    function verifyProof(uint256[24] calldata, uint256[1] calldata _pubSignals) external view returns (bool) {
+    function verifyProof(bytes32[69] calldata, uint256[1] calldata _pubSignals) external view returns (bool) {
         return _pubSignals[0] == EXPECTED_SIGNAL;
     }
 }
 
-/// @notice Range reconstruction with the zksync-os-zisk release 0.0.9 pins
-///         (ZiSK 1.3.2-alpha).
+/// @notice Range reconstruction with the zksync-os-zisk ZiSK 1.4.0-alpha pins.
 /// @dev Shares the four batch commitments with ZiskVerifierRealProofTest.
 contract MultiProofRangeVectorTest is Test {
     /// @dev Inner state-transition guest programVK: the first field of the
     ///      binding digest. It is NOT the aggregated proof's wire [0..32].
-    bytes32 internal constant INNER_PROGRAM_VK = 0x09ebc4f2e17b20d69b6f2850ddfe187ba5b0514abffbcf789823cc6e4e44ef02;
+    bytes32 internal constant INNER_PROGRAM_VK = 0x747be84de38d60d9b5816ddad433d41c9771825b630bddbc90cb1585dda69a6c;
     /// @dev Aggregator guest programVK: the aggregated proof's wire
     ///      public-values bytes [0..32].
     bytes32 internal constant AGGREGATOR_PROGRAM_VK =
-        0x9e2ea93a5e08c2ddb5b93323a593ada955dc74d00fac433d45c97da5b90e5e08;
+        0xe7f72bf4c1825a6f852e65fc872c810320218c63ed41cf9bb4345737a4ac31ec;
     /// @dev Vadcop-final root: the second field of the binding digest, and
     ///      wire public-values bytes [544..576].
-    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0x6b2490fba336fb00f0c8719a961de309a8db6f43a9bfb7575ca5f014d609b265;
+    bytes32 internal constant ROOT_C_VADCOP_FINAL = 0xe9414e134bb6945a148a79d44c8e850e5ef582a2b0e8dbfb2428ff0a515a6e66;
 
     /// @dev The four per-batch commitments (the first eight guest-public slots
     ///      of each per-batch ZiSK proof), in batch order.
@@ -69,7 +73,7 @@ contract MultiProofRangeVectorTest is Test {
     /// @dev keccak256(INNER_PROGRAM_VK || ROOT_C_VADCOP_FINAL || CHAINED_PI):
     ///      the aggregated proof carries it across the first eight guest-public
     ///      slots, public-values bytes [32..96].
-    bytes32 internal constant DIGEST = 0xec1bf9cd08fde7ce771e6ceb96064b0fa73b3a475e7f6da8675989c3c40b13a2;
+    bytes32 internal constant DIGEST = 0x5afe2e89a27ddd841b343cff7fb3a9f3c0dc18b0d6bc7d685fbfa55af59c9bd0;
 
     /// @dev BN254 scalar field modulus (must equal ZiskVerifier._RFIELD).
     uint256 internal constant RFIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
@@ -99,11 +103,9 @@ contract MultiProofRangeVectorTest is Test {
 
     function setUp() public {
         // The range verifier is the REAL ZiskVerifier. It reconstructs the ZiSK
-        // public values from its own pins; the Plonk stand-in accepts iff the
+        // public values from its own pins; the SNARK stand-in accepts iff the
         // reconstructed signal equals the one this vector implies.
-        ziskVerifier = new ZiskVerifier(
-            IZiskSnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(_expectedSignal())))
-        );
+        ziskVerifier = new ZiskVerifier(IZiskSnarkVerifier(address(new ExpectSignalSnarkVerifier(_expectedSignal()))));
         verifier = new MultiProofVerifier(IVerifier(address(new MockPassVerifier())), IVerifier(address(ziskVerifier)));
     }
 
@@ -134,7 +136,7 @@ contract MultiProofRangeVectorTest is Test {
         }
     }
 
-    /// @dev The single PLONK public signal the on-chain reconstruction must
+    /// @dev The single SNARK public signal the on-chain reconstruction must
     ///      produce for the pinned range: sha256 over the reconstructed
     ///      576-byte preimage (aggregatorProgramVK || guest publics carrying
     ///      DIGEST || rootCVadcopFinal), reduced mod the BN254 scalar field.
@@ -156,11 +158,11 @@ contract MultiProofRangeVectorTest is Test {
         return uint256(sha256(preimage)) % RFIELD;
     }
 
-    /// @dev Build a type-5 proof with an opaque 24-word ZiSK SNARK section (the
+    /// @dev Build a type-5 proof with an opaque ZiSK SNARK section (the
     ///      reconstruction never reads it).
     function _rangeProof(uint256 _previousHash) internal pure returns (uint256[] memory proof) {
         uint256 airbenderLen = 2;
-        proof = new uint256[](3 + airbenderLen + 24);
+        proof = new uint256[](3 + airbenderLen + ZISK_SNARK_PROOF_LENGTH);
         proof[0] = 5; // MULTI_PROOF_TYPE
         proof[1] = _previousHash;
         proof[2] = airbenderLen;
@@ -198,7 +200,7 @@ contract MultiProofRangeVectorTest is Test {
 
     /// @dev The contract's own reconstruction (chainedPI -> digest -> preimage
     ///      -> sha256 -> signal) reproduces the pinned vector exactly: the
-    ///      ExpectSignal Plonk stand-in accepts only that signal.
+    ///      ExpectSignal SNARK stand-in accepts only that signal.
     function test_bindingVector_reconstructsSignal_accepts() public view {
         assertTrue(verifier.verify(_publicInputs(), _rangeProof(0)));
     }
@@ -243,12 +245,12 @@ contract MultiProofRangeVectorTest is Test {
         assertTrue(spreadSignal != contiguousSignal, "slot width must change the signal");
 
         ZiskVerifier expectsSpread = new ZiskVerifier(
-            IZiskSnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(spreadSignal)))
+            IZiskSnarkVerifier(address(new ExpectSignalSnarkVerifier(spreadSignal)))
         );
         assertTrue(expectsSpread.verify(pis, _ziskSnarkWords()), "digest spread over guest publics");
 
         ZiskVerifier expectsContiguous = new ZiskVerifier(
-            IZiskSnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(contiguousSignal)))
+            IZiskSnarkVerifier(address(new ExpectSignalSnarkVerifier(contiguousSignal)))
         );
         assertFalse(expectsContiguous.verify(pis, _ziskSnarkWords()), "contiguous digest");
     }
@@ -259,16 +261,16 @@ contract MultiProofRangeVectorTest is Test {
     ///      because the reconstruction puts each pin in its own place.
     function test_swappedProgramVkPins_rejected() public {
         ZiskVerifier swappedExpectation = new ZiskVerifier(
-            IZiskSnarkPlonkVerifier(address(new ExpectSignalPlonkVerifier(_swappedPinSignal())))
+            IZiskSnarkVerifier(address(new ExpectSignalSnarkVerifier(_swappedPinSignal())))
         );
 
         assertTrue(_swappedPinSignal() != _expectedSignal(), "swap must change the signal");
         assertFalse(swappedExpectation.verify(_publicInputs(), _ziskSnarkWords()));
     }
 
-    /// @dev The 24 opaque SNARK words, as MultiProofVerifier hands them to the
+    /// @dev The opaque SNARK words, as MultiProofVerifier hands them to the
     ///      range verifier (the header is already stripped).
     function _ziskSnarkWords() internal pure returns (uint256[] memory words) {
-        words = new uint256[](24);
+        words = new uint256[](ZISK_SNARK_PROOF_LENGTH);
     }
 }

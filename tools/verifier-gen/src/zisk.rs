@@ -3,14 +3,10 @@
 //! Generates `ZiskVerifier.sol` from a JSON file that holds the two guest
 //! programVKs and rootCVadcopFinal, using a text template.
 //!
-//! The ZiSK SNARK uses a different proof system (snarkJS Plonk) than Airbender
-//! (boojum). snarkJS generates the inner Plonk verifier during
-//! `ziskup setup_snark` and regenerates it whenever the circuit changes. Where
-//! that lands depends on the install, so the render step reads the committed
-//! verification key instead. The adapt step below writes the result to a
-//! gitignored location for local builds and standalone deployment, and
-//! `ZiskVerifier` reaches the deployed instance by address through
-//! `IZiskSnarkPlonkVerifier`. See
+//! The ZiSK SNARK uses a different proof system (pilfflonk) than Airbender
+//! (boojum). Its verifier is ZiSK's own generated `PilfflonkVerifier`, vendored
+//! unmodified next to `ZiskVerifier`, which reaches the deployed instance by
+//! address through `IZiskSnarkVerifier`. See
 //! `l1-contracts/contracts/state-transition/verifiers/README.md`.
 //!
 //! This module generates the outer wrapper (`ZiskVerifier.sol`) that:
@@ -22,7 +18,7 @@
 //!   regen; one value serves the digest and public-values bytes [544..576])
 //! - Reconstructs the 576-byte public values from those pins and the batch
 //!   public inputs, then computes `sha256(publicValues) % RFIELD`
-//! - Calls the inner snarkJS PlonkVerifier for the actual SNARK check
+//! - Calls `PilfflonkVerifier` for the actual SNARK check
 
 use serde::Deserialize;
 use sha3::{Digest, Keccak256};

@@ -112,8 +112,8 @@ uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
 /// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
 uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
 
-/// @dev Number of words in the ZiSK BN254 PLONK proof and its padded testnet mock component.
-uint256 constant ZISK_SNARK_PROOF_LENGTH = 24;
+/// @dev Number of words in the ZiSK BN254 pilfflonk proof and its padded testnet mock component.
+uint256 constant ZISK_SNARK_PROOF_LENGTH = 69;
 
 // Enum ordinals are storage bit positions; append new systems without reordering.
 enum ProofSystem {

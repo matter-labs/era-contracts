@@ -97,6 +97,7 @@ struct CTMAdminAddresses {
 /// @notice Additional verifier addresses for a multiprover CTM deployment.
 struct MultiProofAddresses {
     address airbenderVerifier;
+    address ziskSnarkVerifier;
     address ziskVerifier;
     address ziskTestnetVerifier;
     address multiProofVerifier;

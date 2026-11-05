@@ -1,5 +1,6 @@
 tools/verifier-gen/data
 l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
+l1-contracts/contracts/state-transition/verifiers/PilfflonkVerifier.sol
 l1-contracts/lib
 lib
 node_modules/
