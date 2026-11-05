@@ -246,8 +246,9 @@ it (`ProxyUpgradeExecutorBase`):
   ecosystem contracts (Bridgehub, AssetRouter) are not reachable and stay declared external
   actions. Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
   like) also accept the owner of the contract's `ProxyAdmin`, so the core executor's engine can make
-  them while governance keeps ownership. A release can use that from the one after it ships those
-  implementations; a release that only wires needs a transition that allows zero rows.
+  them while governance keeps ownership. The release that ships those implementations can already
+  call them in `_afterSwaps`, on the contracts its rows upgrade; a release that only wires needs a
+  transition that allows zero rows.
 - Running in the executor's storage, an engine must not read or write storage. A release engine
   keeps its configuration in immutables set by its constructor: they are part of its code, so they
   read the same under the delegatecall. Only configuration an immutable cannot hold (a dynamic
