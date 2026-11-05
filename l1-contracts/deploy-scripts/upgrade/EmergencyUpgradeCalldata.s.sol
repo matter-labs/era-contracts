@@ -50,15 +50,15 @@ contract EmergencyUpgradeCalldata is Script {
 
     /// @notice Stage's ProtocolUpgradeHandler, for the stage-only scripts that inherit this one. The entry
     /// points here derive the handler from the env's bridgehub instead.
-    IProtocolUpgradeHandler constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
+    IProtocolUpgradeHandler internal constant PUH = IProtocolUpgradeHandler(0x8f08627524aeD610192132A425D6b9C32a1727EF);
     /// @notice Stage's permanent values, for the stage-only entry points.
-    string constant STAGE_PERMANENT_VALUES = "/upgrade-envs/permanent-values/stage.toml";
-    string constant TOML = "/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml";
-    bytes32 constant SALT = bytes32(0);
+    string internal constant STAGE_PERMANENT_VALUES = "/upgrade-envs/permanent-values/stage.toml";
+    string internal constant TOML = "/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml";
+    bytes32 internal constant SALT = bytes32(0);
     /// @notice `core_contracts.governance_kind` of an env whose bridgehub is owned by a ProtocolUpgradeHandler.
-    string constant PUH_GOVERNANCE_KIND = "puh";
+    string internal constant PUH_GOVERNANCE_KIND = "puh";
     /// @notice Governance stages in an `ecosystem.toml` (`governance_calls.stage{0,1,2}_calls`).
-    uint256 constant GOVERNANCE_STAGE_COUNT = 3;
+    uint256 internal constant GOVERNANCE_STAGE_COUNT = 3;
 
     /// @notice The emergency path of one ecosystem, as read on-chain.
     struct EmergencyBoard {
@@ -181,16 +181,24 @@ contract EmergencyUpgradeCalldata is Script {
         _requireOneOfOneSafe(_board.zkFoundationSafe, _board.owner);
         txs = new EmergencyTx[](gMembers.length + scMembers.length + 2);
 
-        _approveSet(txs, 0, gMembers, dom, EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH, id, "GUARDIANS");
-        _approveSet(
-            txs,
-            gMembers.length,
-            scMembers,
-            dom,
-            EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
-            id,
-            "SECURITY_COUNCIL"
-        );
+        _approveSet({
+            _txs: txs,
+            _at: 0,
+            _members: gMembers,
+            _dom: dom,
+            _typehash: EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
+            _id: id,
+            _label: "GUARDIANS"
+        });
+        _approveSet({
+            _txs: txs,
+            _at: gMembers.length,
+            _members: scMembers,
+            _dom: dom,
+            _typehash: EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
+            _id: id,
+            _label: "SECURITY_COUNCIL"
+        });
         uint256 zkIndex = gMembers.length + scMembers.length;
         txs[zkIndex] = EmergencyTx({
             label: "ZK_FOUNDATION",
@@ -332,6 +340,7 @@ contract EmergencyUpgradeCalldata is Script {
         }
     }
 
+    // solhint-disable quotes, func-named-parameters
     /// @dev `emergency-upgrade-board.json`, formatted the way prettier formats it.
     function _proposalJson(
         EmergencyBoard memory _board,
@@ -388,6 +397,7 @@ contract EmergencyUpgradeCalldata is Script {
         }
         json = string.concat(json, "  ]\n}\n");
     }
+    // solhint-enable quotes, func-named-parameters
 
     /// @dev Gnosis Safe "pre-approved hash" signature marker: r = owner, s = 0, v = 1. No key involved.
     function _marker(address _owner) internal pure returns (bytes memory) {

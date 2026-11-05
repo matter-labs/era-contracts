@@ -87,37 +87,37 @@ contract SafeStandIn {
 }
 
 contract EmergencyUpgradeCalldataTest is Test {
-    uint256 constant GUARDIANS_MEMBERS = 3;
-    uint256 constant GUARDIANS_THRESHOLD = 2;
-    uint256 constant COUNCIL_MEMBERS = 4;
-    uint256 constant COUNCIL_THRESHOLD = 3;
+    uint256 internal constant GUARDIANS_MEMBERS = 3;
+    uint256 internal constant GUARDIANS_THRESHOLD = 2;
+    uint256 internal constant COUNCIL_MEMBERS = 4;
+    uint256 internal constant COUNCIL_THRESHOLD = 3;
     /// @dev approveHash on every approving Guardian and Council member and on the ZK Foundation Safe, then execute.
-    uint256 constant TX_COUNT = GUARDIANS_THRESHOLD + COUNCIL_THRESHOLD + 2;
+    uint256 internal constant TX_COUNT = GUARDIANS_THRESHOLD + COUNCIL_THRESHOLD + 2;
     /// @dev `core_contracts.governance_kind` of an env whose bridgehub is owned by a ProtocolUpgradeHandler.
-    string constant PUH_GOVERNANCE_KIND = "puh";
+    string internal constant PUH_GOVERNANCE_KIND = "puh";
 
     /// @dev Inputs and output of the script, in `script-out/` (git-ignored, writable by scripts). Forge runs the
     /// tests in parallel, so each test names its own files (`_writeInputs`).
-    string permanentValues;
-    string ecosystemToml;
-    string outputJson;
+    string internal permanentValues;
+    string internal ecosystemToml;
+    string internal outputJson;
 
-    EmergencyUpgradeCalldata script;
-    address owner = makeAddr("owner");
-    address stranger = makeAddr("stranger");
+    EmergencyUpgradeCalldata internal script;
+    address internal owner = makeAddr("owner");
+    address internal stranger = makeAddr("stranger");
 
-    BridgehubStandIn bridgehub;
-    ProtocolUpgradeHandlerStandIn handler;
-    EmergencyUpgradeBoardStandIn board;
-    MultisigStandIn guardians;
-    MultisigStandIn council;
-    SafeStandIn[] guardianSafes;
-    SafeStandIn[] councilSafes;
-    SafeStandIn zkFoundationSafe;
+    BridgehubStandIn internal bridgehub;
+    ProtocolUpgradeHandlerStandIn internal handler;
+    EmergencyUpgradeBoardStandIn internal board;
+    MultisigStandIn internal guardians;
+    MultisigStandIn internal council;
+    SafeStandIn[] internal guardianSafes;
+    SafeStandIn[] internal councilSafes;
+    SafeStandIn internal zkFoundationSafe;
 
-    IProtocolUpgradeHandler.Call[] stage0;
-    IProtocolUpgradeHandler.Call[] stage1;
-    IProtocolUpgradeHandler.Call[] stage2;
+    IProtocolUpgradeHandler.Call[] internal stage0;
+    IProtocolUpgradeHandler.Call[] internal stage1;
+    IProtocolUpgradeHandler.Call[] internal stage2;
 
     function setUp() public {
         script = new EmergencyUpgradeCalldata();
@@ -168,33 +168,33 @@ contract EmergencyUpgradeCalldataTest is Test {
             abi.encode(IProtocolUpgradeHandler.UpgradeProposal({calls: calls, executor: address(board), salt: 0}))
         );
         for (uint256 i = 0; i < GUARDIANS_THRESHOLD; ++i) {
-            _assertApproveHash(
-                json,
-                i,
-                string.concat("GUARDIANS ", vm.toString(i + 1)),
-                guardianSafes[i],
-                EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
-                id
-            );
+            _assertApproveHash({
+                _json: json,
+                _index: i,
+                _label: string.concat("GUARDIANS ", vm.toString(i + 1)),
+                _safe: guardianSafes[i],
+                _typehash: EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
+                _id: id
+            });
         }
         for (uint256 i = 0; i < COUNCIL_THRESHOLD; ++i) {
-            _assertApproveHash(
-                json,
-                GUARDIANS_THRESHOLD + i,
-                string.concat("SECURITY_COUNCIL ", vm.toString(i + 1)),
-                councilSafes[i],
-                EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
-                id
-            );
+            _assertApproveHash({
+                _json: json,
+                _index: GUARDIANS_THRESHOLD + i,
+                _label: string.concat("SECURITY_COUNCIL ", vm.toString(i + 1)),
+                _safe: councilSafes[i],
+                _typehash: EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
+                _id: id
+            });
         }
-        _assertApproveHash(
-            json,
-            TX_COUNT - 2,
-            "ZK_FOUNDATION",
-            zkFoundationSafe,
-            EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH,
-            id
-        );
+        _assertApproveHash({
+            _json: json,
+            _index: TX_COUNT - 2,
+            _label: "ZK_FOUNDATION",
+            _safe: zkFoundationSafe,
+            _typehash: EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH,
+            _id: id
+        });
 
         bytes memory marker = abi.encodePacked(bytes32(uint256(uint160(owner))), bytes32(0), uint8(1));
         bytes memory expectedExecute = abi.encodeCall(
@@ -298,6 +298,7 @@ contract EmergencyUpgradeCalldataTest is Test {
         return bytes(string.concat("not a 1-of-1 Safe of the owner: ", vm.toString(_safe)));
     }
 
+    // solhint-disable quotes, func-named-parameters
     /// @dev The env's permanent values (naming `bridgehub`) and an ecosystem.toml with `stage0`, `stage1` and
     /// `stage2`, in files named after `_test`.
     function _writeInputs(string memory _test, string memory _governanceKind) internal {
@@ -330,6 +331,8 @@ contract EmergencyUpgradeCalldataTest is Test {
             )
         );
     }
+
+    // solhint-enable quotes, func-named-parameters
 
     function _removeInputs() internal {
         vm.removeFile(string.concat(vm.projectRoot(), permanentValues));
