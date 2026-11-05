@@ -328,14 +328,16 @@ Still to do:
   - Regenerate chain-states/${nextStateVersion} (the 'Regenerate Anvil Interop Chain States' workflow, or
     \`cd l1-contracts/test/anvil-interop && npx ts-node setup-and-dump-state.ts\`). Until then the interop
     tests have no states for ${nextStateVersion}; the upgrade test already runs ${anvilConfig.stateVersion} -> ${nextStateVersion}.
-  - Review the per-environment inputs copied into ${nextEnvDir}/ (owner, era_chain_id and addresses carry over).${
-    stillUsingOutgoing.length > 0
-      ? `
+  - Review the per-environment inputs copied into ${nextEnvDir}/ (owner, era_chain_id and addresses carry over).
+  - Point upgrade-envs/permanent-values/anvil-interop.toml (bridgehub, CTM, zk_token_asset_id) and
+    ${nextEnvDir}/anvil-interop.toml (owner, the CTM's create2_factory_salts key) at the new upgrade source's chain-states/${anvilConfig.stateVersion}/addresses.json (the release flow, yarn test:release-flow in l1-contracts/test/anvil-interop).${
+      stillUsingOutgoing.length > 0
+        ? `
   - Remove or update what still names ${repoPath(currentScriptsDir)}/: tests built on those scripts go (the
     build fails until they do), and docs describing the current release move on to the new one.
 ${stillUsingOutgoing.map((file) => `      ${file}`).join("\n")}`
-      : ""
-  }
+        : ""
+    }
   - Release-specific preparation (extra contracts, a per-chain initializer) goes into ${repoPath(nextScriptsDir)}/;
     protocol-ops and UpgradeTest_Local already run those scripts.
   - Run \`cd protocol-ops && cargo test\` and the upgrade tests (\`yarn ts-node run-upgrade-test.ts\` in

@@ -39,7 +39,8 @@ use clap::Parser;
 use serde::Deserialize;
 
 use crate::commands::ecosystem::bundle::{
-    contract_source_pathspecs, verify_bundle_integrity, DeployBundleMetadata, MANIFEST_FILE,
+    contract_source_pathspecs, image_contracts_commit, verify_bundle_integrity,
+    DeployBundleMetadata, MANIFEST_FILE,
 };
 use crate::common::env_config::{EnvConfig, DEFAULT_UPGRADE};
 use crate::common::ethereum::get_provider;
@@ -1547,7 +1548,7 @@ pub(crate) async fn check_bundle(
     let deployer = metadata
         .deployer_address
         .context("bundle metadata has no deployer_address")?;
-    if metadata.contracts_worktree_dirty {
+    if metadata.contracts_worktree_dirty == Some(true) {
         logger::warn(
             "the bundle was generated from a dirty worktree; signing it is refused \
              (contracts_worktree_dirty)",
@@ -1574,18 +1575,29 @@ pub(crate) async fn check_bundle(
 
 /// Refuses to sign unless the contracts checkout is exactly the generation's: at the bundle's
 /// `contracts_commit`, with no change to the contract sources and reviewed inputs
-/// (`contract_source_pathspecs`), from a bundle generated from a clean worktree. Signing runs the
+/// (`contract_source_pathspecs`), from a bundle generated from a clean worktree. The protocol-ops
+/// image has no git: there the checkout is the `image_commit` it was built from. Signing runs the
 /// checkout's reviewed inputs (env salts and owner, the allowlist, the build) against the plan.
 pub(crate) fn require_checkout_at(
     repository_root: &Path,
+    image_commit: Option<&str>,
     metadata: &DeployBundleMetadata,
 ) -> anyhow::Result<()> {
     anyhow::ensure!(
-        !metadata.contracts_worktree_dirty,
+        metadata.contracts_worktree_dirty != Some(true),
         "the bundle was generated from a worktree whose contract sources differed from {} \
          (contracts_worktree_dirty): it cannot be signed. Generate it again from a clean checkout",
         metadata.contracts_commit
     );
+    if let Some(image_commit) = image_commit {
+        anyhow::ensure!(
+            image_commit == metadata.contracts_commit,
+            "this protocol-ops image was built from {image_commit}, but the bundle was generated \
+             from {}: sign in the bundle's protocol_ops_image",
+            metadata.contracts_commit
+        );
+        return Ok(());
+    }
     let git = |args: &[&str]| -> anyhow::Result<String> {
         let output = Command::new("git")
             .args(args)
@@ -1673,7 +1685,11 @@ pub async fn run(args: CheckDeployerPlanArgs) -> anyhow::Result<()> {
         let bundle_dir = std::fs::canonicalize(bundle)
             .with_context(|| format!("deploy bundle not found: {}", bundle.display()))?;
         let metadata = verify_bundle_integrity(&bundle_dir)?;
-        require_checkout_at(&paths::contracts_root(), &metadata)?;
+        require_checkout_at(
+            &paths::contracts_root(),
+            image_contracts_commit().as_deref(),
+            &metadata,
+        )?;
         return check_bundle(&bundle_dir, &metadata, &args.l1_rpc_url).await;
     }
     let (Some(manifest), Some(ecosystem_toml), Some(deployer)) =
@@ -2563,7 +2579,7 @@ data = "{nominate}"
             upgrade: DEFAULT_UPGRADE.to_string(),
             env: "stage".to_string(),
             contracts_commit: git(&["rev-parse", "HEAD"]),
-            contracts_worktree_dirty: false,
+            contracts_worktree_dirty: Some(false),
             all_contracts_hashes_sha256: String::new(),
             l1: L1Provenance {
                 chain_id: Some(11155111),
@@ -2577,12 +2593,13 @@ data = "{nominate}"
                 foundry_zksync: None,
             },
             generated_by: None,
+            protocol_ops_image: None,
             files: BTreeMap::new(),
         };
-        require_checkout_at(repo.path(), &metadata).unwrap();
+        require_checkout_at(repo.path(), None, &metadata).unwrap();
 
         std::fs::write(&source, "edited after review\n").unwrap();
-        let error = require_checkout_at(repo.path(), &metadata)
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(
@@ -2592,21 +2609,34 @@ data = "{nominate}"
         assert!(error.contains("protocol-ops/src/allowlist.rs"), "{error}");
         std::fs::write(&source, "reviewed\n").unwrap();
 
-        metadata.contracts_worktree_dirty = true;
-        let error = require_checkout_at(repo.path(), &metadata)
+        metadata.contracts_worktree_dirty = Some(true);
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(error.contains("contracts_worktree_dirty"), "{error}");
 
-        metadata.contracts_worktree_dirty = false;
+        metadata.contracts_worktree_dirty = Some(false);
         metadata.contracts_commit = "0".repeat(40);
-        let error = require_checkout_at(repo.path(), &metadata)
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(
             error.contains("but the bundle was generated from"),
             "{error}"
         );
+
+        // In the image, without git, the checkout is the commit the image was built from.
+        let image = tempfile::tempdir().unwrap();
+        require_checkout_at(
+            image.path(),
+            Some(metadata.contracts_commit.as_str()),
+            &metadata,
+        )
+        .unwrap();
+        let error = require_checkout_at(image.path(), Some("abc"), &metadata)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("image was built from abc"), "{error}");
     }
 
     /// The CTM facts are the CTM proxy's EIP-1967 admin slot, its `L1_BYTECODES_SUPPLIER()` and its

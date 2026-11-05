@@ -72,7 +72,13 @@ against those artifacts and skips the reference build.
 cd l1-contracts/test/anvil-interop
 yarn test:upgrade             # the v35 bootstrap via protocol-ops on the frozen v0.34.0 states, then two registry-driven hops
 yarn test:upgrade-recurring   # the recurring registry-driven hop on the current-genesis states
+yarn test:release-flow        # the release's protocol-ops commands on the frozen v0.34.0 L1, as a release runs them
 ```
+
+`yarn test:release-flow` is step 3 of [the release flow](../../../.github/workflows/README.md#release-flow),
+from this checkout or, with `PROTOCOL_OPS_TAG` set, in that image (Linux, for the host network). It starts
+only the L1, which replaces whatever listens on its port: set `ANVIL_INTEROP_PORT_OFFSET` while other chains
+are up.
 
 `yarn test:upgrade` reviews each package the way governance would before replaying it:
 `protocol-ops ecosystem verify-package` against the live anvil L1, with `--env local`, the

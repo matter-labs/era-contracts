@@ -610,6 +610,22 @@ pub fn parse_gwei(value: &str) -> Result<u128, String> {
     }
 }
 
+/// A Safe file records the chain it was generated on (`chainId`); signing it for another chain
+/// would send valid calls there, since the same key works on every chain.
+fn ensure_safe_file_chain(root: &Value, rpc_chain_id: u64) -> anyhow::Result<()> {
+    let file_chain_id = match root.get("chainId") {
+        None => return Ok(()),
+        Some(Value::String(id)) => id.parse::<u64>().ok(),
+        Some(id) => id.as_u64(),
+    }
+    .ok_or_else(|| anyhow::anyhow!("Safe file has an invalid `chainId`"))?;
+    anyhow::ensure!(
+        file_chain_id == rpc_chain_id,
+        "Safe file is for chain {file_chain_id}, but the RPC is chain {rpc_chain_id}"
+    );
+    Ok(())
+}
+
 /// Replay a single Safe bundle file under one signer. Despite the file
 /// extension, this is **not** a Safe-UI flow: the file is a plain
 /// `transactions[]` JSON (Safe Transaction Builder–compatible for the multisig
@@ -651,6 +667,7 @@ pub async fn execute_one_bundle(
     provider
         .client()
         .set_poll_interval(std::time::Duration::from_millis(RECEIPT_POLL_INTERVAL_MS));
+    ensure_safe_file_chain(&root, provider.get_chain_id().await.context("eth_chainId")?)?;
 
     logger::info(format!(
         "Replaying {} tx(s) under broadcaster {:#x}",
@@ -1398,6 +1415,17 @@ fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn safe_file_must_be_for_the_rpc_chain() {
+        use super::ensure_safe_file_chain;
+        use serde_json::json;
+        assert!(ensure_safe_file_chain(&json!({"chainId": "11155111"}), 11155111).is_ok());
+        assert!(ensure_safe_file_chain(&json!({"chainId": 1}), 1).is_ok());
+        assert!(ensure_safe_file_chain(&json!({}), 1).is_ok());
+        assert!(ensure_safe_file_chain(&json!({"chainId": "11155111"}), 1).is_err());
+        assert!(ensure_safe_file_chain(&json!({"chainId": "x"}), 1).is_err());
+    }
+
     /// Reverts whose selector proves the effect already happened skip outright;
     /// `OperationMustBePending` (either spelling) is deferred to a Governance
     /// state check; everything else — including the `b926a6b0` value the old

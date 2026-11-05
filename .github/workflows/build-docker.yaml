@@ -1,10 +1,15 @@
 name: Build Docker Image
 
+# Builds the protocol-ops image the calldata workflows run and runs the release
+# flow in it; a dispatch also releases it (.github/workflows/README.md#release-flow).
+
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, draft-v31]
+    branches: [main, "draft**", "release**"]
+    # ready_for_review: the release flow below skips drafts.
+    types: [opened, reopened, synchronize, ready_for_review]
   workflow_dispatch:
     inputs:
       ref:
@@ -15,21 +20,26 @@ on:
         description: "Optional override of the default image tag name"
         type: string
         required: false
-      zk_governance_repo:
-        description: "owner/repo of the zk-governance checkout (e.g. zksync-association/zk-governance, or a personal fork)."
+      integration_tests_run_id:
+        description: "The zksync-os-integration-tests run (…/actions/runs/<id>) that tested this ref. The image is pushed only if it passed and its Cargo.lock pins this commit."
+        type: number
+        required: true
+      zk_governance_commit:
+        description: "Full zk-governance commit SHA the governance redeploy (PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard) is built from, if not the Dockerfile's ZK_GOVERNANCE_COMMIT; recorded in the image and its bundles."
         type: string
         required: false
-        default: "zksync-association/zk-governance"
-      zk_governance_ref:
-        description: "zk-governance branch/tag/SHA baked into the image. PUH/Guardians redeploy uses this checkout."
-        type: string
-        required: false
-        default: "kl/v31-puh-guardians-redeploy"
+
+# Releases run one at a time, so checking that a tag is free and pushing it can't race
+# (GitHub keeps one waiting run per group: a third dispatch replaces the waiting one).
+concurrency:
+  group: build-docker-${{ github.event_name }}-${{ github.event_name == 'workflow_dispatch' && 'release' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build-image:
     name: Build protocol ops Docker Image
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: read
       packages: write
@@ -42,30 +52,138 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref != '' && inputs.ref || github.sha }}
           submodules: recursive
+          persist-credentials: false
 
-      - name: Checkout zk-governance
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # zksync-os-integration-tests is private, out of GITHUB_TOKEN's reach.
+      - name: Authorize reading zksync-os-integration-tests
+        if: github.event_name == 'workflow_dispatch'
+        id: integration-tests-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          repository: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_repo || 'zksync-association/zk-governance' }}
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_ref || 'kl/v31-puh-guardians-redeploy' }}
-          submodules: recursive
-          path: zk-governance
+          app-id: ${{ secrets.MATTERLABS_BOTS_APP_ID }}
+          private-key: ${{ secrets.MATTERLABS_BOTS_PRIVATE_KEY }}
+          repositories: zksync-os-integration-tests
+          permission-actions: read
+          permission-contents: read
+
+      # Only the commit a passed integration-tests run pinned its era-contracts crates to is released
+      # (.github/workflows/README.md#release-flow, step 2).
+      - name: Release gate
+        if: github.event_name == 'workflow_dispatch'
+        id: gate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.integration-tests-token.outputs.token }}
+          RUN_ID: ${{ inputs.integration_tests_run_id }}
+        run: |
+          repo=matter-labs/zksync-os-integration-tests
+          run="$(gh api "repos/$repo/actions/runs/$RUN_ID")"
+          if ! jq -e '.path == ".github/workflows/integration-tests.yaml" and .conclusion == "success"' <<<"$run" >/dev/null; then
+            echo "::error::run $RUN_ID is not a passed integration-tests.yaml run of $repo"; exit 1
+          fi
+          tested="$(gh api -H 'Accept: application/vnd.github.raw' "repos/$repo/contents/Cargo.lock?ref=$(jq -r .head_sha <<<"$run")" |
+            python3 -c 'import sys, tomllib; print(*{p["source"].split("#")[-1] for p in tomllib.load(sys.stdin.buffer)["package"] if p.get("source", "").startswith("git+https://github.com/matter-labs/era-contracts")})')"
+          if [[ "$tested" != "$(git rev-parse HEAD)" ]]; then
+            echo "::error::run $RUN_ID tested era-contracts '$tested', this build is $(git rev-parse HEAD)"; exit 1
+          fi
+          echo "run_url=$(jq -r .html_url <<<"$run")" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
 
-      - name: Compute image tag
+      - name: Compute image tag and provenance
+        id: meta
         shell: bash
+        env:
+          IMAGE_TAG_OVERRIDE: ${{ inputs.image_tag_override }}
+          ZK_GOVERNANCE_COMMIT: ${{ inputs.zk_governance_commit }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag_override }}" ]; then
-            IMAGE_TAG="${{ inputs.image_tag_override }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "$IMAGE_TAG_OVERRIDE" ]; then
+            IMAGE_TAG="$IMAGE_TAG_OVERRIDE"
           elif [ "${{ github.event_name }}" = "pull_request" ]; then
             IMAGE_TAG="protocol-ops-$(git rev-parse --short HEAD)"
           else
             IMAGE_TAG=$(git rev-parse --short HEAD)-$(date +%s)
           fi
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          if [[ ! "$IMAGE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "::error::'$IMAGE_TAG' is not a docker tag"; exit 1
+          fi
+          echo "IMAGE_TAG=$IMAGE_TAG" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:$IMAGE_TAG" >> "$GITHUB_ENV"
           echo "Computed image tag: $IMAGE_TAG"
+          zk_governance_commit="${ZK_GOVERNANCE_COMMIT:-$(sed -n 's/^ARG ZK_GOVERNANCE_COMMIT=//p' docker/protocol/Dockerfile)}"
+          if [[ ! "$zk_governance_commit" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::zk_governance_commit must be a full commit SHA, got '$zk_governance_commit'"; exit 1
+          fi
+          echo "zk-governance commit: $zk_governance_commit"
+          {
+            echo "revision=$(git rev-parse HEAD)"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "zk_governance_commit=$zk_governance_commit"
+          } >> "$GITHUB_OUTPUT"
+
+      # Loaded, not pushed: the steps below test this exact image, then push it.
+      - name: Build Docker Image
+        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
+        with:
+          source: .
+          files: docker/protocol/docker-bake.hcl
+          targets: protocol
+          load: true
+          provenance: false
+          set: |
+            base.cache-from=type=gha,scope=protocol-ops-base
+            base.cache-to=type=gha,mode=max,scope=protocol-ops-base
+            protocol.cache-from=type=gha,scope=protocol-ops
+            protocol.cache-to=type=gha,mode=max,scope=protocol-ops
+            protocol.tags=${{ env.IMAGE }}
+            protocol.args.CONTRACTS_COMMIT=${{ steps.meta.outputs.revision }}
+            protocol.args.ZK_GOVERNANCE_COMMIT=${{ steps.meta.outputs.zk_governance_commit }}
+            protocol.labels.org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            protocol.labels.org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}
+            protocol.labels.org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+            protocol.labels.org.opencontainers.image.version=${{ env.IMAGE_TAG }}
+            protocol.labels.io.matter-labs.protocol-ops.tested-with=${{ steps.gate.outputs.run_url }}
+            protocol.labels.io.matter-labs.protocol-ops.zk-governance-commit=${{ steps.meta.outputs.zk_governance_commit }}
+
+      # verify-bootstrap holds the image's contract build against its AllContractsHashes.json.
+      # Not on PRs, whose hashes are regenerated last (docker/protocol/Dockerfile).
+      - name: Check the image's contract hashes
+        if: github.event_name == 'workflow_dispatch'
+        run: docker run --rm "$IMAGE" yarn calculate-hashes:check
+
+      # The ecosystem-upgrade workflows' commands, through protocol-ops.sh in this image, then a
+      # partner's chain commands, by `docker run` (docs/protocol-ops-for-partners.md). Not on
+      # drafts: it verifies the build against AllContractsHashes.json, which a PR regenerates last
+      # (docs/ai-review/docs/ci-green.md, "CI tiers").
+      - name: Install Foundry (the release flow's L1)
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+        uses: ./.github/actions/install-foundry
+
+      - name: Use Node.js
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 20
+          cache: yarn
+
+      # The harness's ABIs and the ChainAdmin it deploys come from the image's own build.
+      - name: Set up the release flow
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+        run: |
+          yarn install --frozen-lockfile
+          yarn --cwd l1-contracts/test/anvil-interop install --frozen-lockfile
+          container="$(docker create "$IMAGE")"
+          docker cp "$container:/contracts/l1-contracts/out" l1-contracts/out
+          docker rm "$container" >/dev/null
+
+      - name: Run the release flow in the image
+        if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+        timeout-minutes: 30
+        working-directory: l1-contracts/test/anvil-interop
+        env:
+          PROTOCOL_OPS_TAG: ${{ env.IMAGE_TAG }}
+        run: yarn test:release-flow
 
       - name: Login to GitHub Container Registry
         if: github.event_name == 'workflow_dispatch'
@@ -75,20 +193,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & Push Docker Image
-        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
-        with:
-          context: .
-          push: ${{ github.event_name == 'workflow_dispatch' }}
-          platforms: linux/amd64
-          file: docker/protocol/Dockerfile
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          # GitHub Actions buildx cache. `mode=max` caches every layer (not just
-          # the final ones), so cargo-chef cooks and forge builds are reused
-          # across runs whenever their inputs haven't changed. Cold first run is
-          # the same speed as before; warm runs drop dramatically (~25 min →
-          # ~5–10 min when only Rust source changes; ~3–5 min when only contracts
-          # change).
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Push Docker Image
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # A released tag is never moved: only a missing manifest means it is free.
+          if out="$(docker manifest inspect "$IMAGE" 2>&1)" ||
+            [[ "$out" != *"manifest unknown"* && "$out" != *"no such manifest"* ]]; then
+            echo "::error::$IMAGE exists, or the registry didn't say it doesn't"; exit 1
+          fi
+          docker push "$IMAGE"
+          digest=$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE")
+          echo "Pushed \`$IMAGE\` as \`$digest\`: pass \`protocol_ops_tag=${digest#*@}\` to the calldata workflows." >> "$GITHUB_STEP_SUMMARY"

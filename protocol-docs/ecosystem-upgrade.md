@@ -119,14 +119,11 @@ Only `upgrade-broadcast` sends transactions. The verify commands only read; ever
 touches L1 when its signer executes those bundles (with `upgrade-broadcast`, `dev execute-safe`,
 or the signer's multisig).
 
-The `generate-upgrade-calldata-*` workflows and the per-chain
-`generate-chain-{add-validator,remove-validator,set-upgrade-timestamp,upgrade}-calldata` workflows
-under `.github/workflows/` still drive the previous `protocol_ops` CLI (`--ecosystem`,
-`--chain <name>`, `--governance-toml-out`, `--new-protocol-version`, none of which exist any more)
-and have to be updated before they can run these phases; until then the commands are run by hand.
-`generate-chain-init-calldata` and `execute-deployer-safe-bundles` already use the current flags,
-but read the Bridgehub and the deployer from `environments/<env>/ecosystem.yaml`, which is
-committed only for `stage-interop-tests` (with a placeholder deployer).
+The workflows under `.github/workflows/` run these commands in a released `protocol-ops` image: phases
+1–2 and phase 3's fork checks through `generate-ecosystem-upgrade-calldata` and
+`deploy-ecosystem-upgrade` (phase 3 on L1 is run by hand), phase 6 through
+`generate-chain-{set-upgrade-timestamp,upgrade}-calldata`. The release flow
+that produces the image is in `.github/workflows/README.md`.
 
 `protocol_ops ecosystem rehearse-upgrade --env <env>` chains the prepare, a replay of every bundle
 on the fork and the upgrade's checks into one command and packs the deploy bundle;

@@ -26,6 +26,9 @@ jobs:
       - name: Lint errors
         run: yarn l1 errors-lint --check
 
+      - name: Test the deploy workflow's verify-only guard
+        run: node --test .github/tests/deploy-verify-only.test.cjs
+
   codespell:
     runs-on: ubuntu-latest
     steps:
