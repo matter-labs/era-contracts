@@ -62,7 +62,10 @@ upstream's `zisk-contracts/poseidon1/PilfflonkVerifier.sol` at ZiSK
 v1.4.0-alpha (commit `64a1f1664184e76053686745d50c6b9aaa51b034`), copied
 unmodified (sha256
 `13a14c51355acc520ace141112bb6b97b42f8e6db6490a2f85173bfdce85646a`). Upstream
-licenses it MIT OR Apache-2.0. Keep it byte-identical to upstream, so a review
+licenses it MIT OR Apache-2.0. The file carries only the SPDX line and our root
+`LICENSE-MIT` is Matter Labs' own, so ZiSK's MIT notice ships next to it as
+`PilfflonkVerifier.LICENSE-MIT`; refresh both from the same upstream commit on a
+rotation. Keep it byte-identical to upstream, so a review
 of a key rotation is a diff of two upstream files, and so lint and formatting
 skip it.
 
