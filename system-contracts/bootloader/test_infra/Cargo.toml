@@ -1,0 +1,26 @@
+[package]
+name = "test_infra"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "b5d75aab854ed279ca3d2618a044b111d32677ed" }
+zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "b5d75aab854ed279ca3d2618a044b111d32677ed" }
+zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "b5d75aab854ed279ca3d2618a044b111d32677ed" }
+zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "b5d75aab854ed279ca3d2618a044b111d32677ed" }
+zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "b5d75aab854ed279ca3d2618a044b111d32677ed" }
+zksync_vlog = { git = "https://github.com/matter-labs/zksync-era.git", rev = "b5d75aab854ed279ca3d2618a044b111d32677ed" }
+
+colored = "2.0"
+hex = "0.4"
+once_cell = "1.7"
+tracing = { version = "0.1.26", features = ["log"] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter", "time", "json"] }
+serde_json = "1.0.67"
+serde = { version = "1.0", features = ["derive"] }
+
+[patch.crates-io]
+vise = { git = "https://github.com/matter-labs/vise.git", rev = "8d800385a108eb598cbaa6c8bc8ab4ef3bf69011" }

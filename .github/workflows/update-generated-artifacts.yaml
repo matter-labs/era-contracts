@@ -1,6 +1,13 @@
-# One-click regen for everything pre-merge-checks.yaml validates: hashes +
-# selectors + zkstack-out, then chain states (sequential so the pushes don't race).
 name: Update All Generated Artifacts
+
+# Regenerates committed generated artifacts for a PR branch by reusing the
+# existing single-purpose workflows:
+#   1. update-hashes-on-demand.yaml  -> AllContractsHashes.json
+#   2. regenerate-chain-states.yaml  -> l1-contracts/test/anvil-interop/chain-states/
+#
+# This workflow must live on the default branch (main) so it can be triggered
+# from the Actions UI / `gh workflow run`, which unblocks re-enabling the
+# disabled 'state-generation-check' job in anvil-interop-ci.yaml.
 
 on:
   workflow_dispatch:
@@ -15,7 +22,7 @@ permissions:
 
 jobs:
   update-hashes:
-    name: Update hashes, selectors, zkstack-out
+    name: Update contract hashes
     uses: ./.github/workflows/update-hashes-on-demand.yaml
     with:
       pr_number: ${{ github.event.inputs.pr_number }}
@@ -23,6 +30,8 @@ jobs:
 
   regenerate-chain-states:
     name: Regenerate chain states
+    # Runs after update-hashes so both commits land sequentially on the same
+    # branch (avoids a non-fast-forward push race).
     needs: [update-hashes]
     uses: ./.github/workflows/regenerate-chain-states.yaml
     with:

@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {PriorityTreeSharedTest} from "./_PriorityTree_Shared.t.sol";
-import {PriorityOpsBatchInfo} from "contracts/dev-contracts/test/PriorityTreeTest.sol";
+import {PriorityOpsBatchInfo, PriorityTreeSharedTest} from "./_PriorityTree_Shared.t.sol";
 import {PriorityTreeCommitment} from "contracts/common/Config.sol";
 import {NotHistoricalRoot} from "contracts/state-transition/L1StateTransitionErrors.sol";
 

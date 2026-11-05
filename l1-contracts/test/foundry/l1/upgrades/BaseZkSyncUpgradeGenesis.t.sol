@@ -4,13 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {BaseZkSyncUpgradeGenesis} from "contracts/upgrades/BaseZkSyncUpgradeGenesis.sol";
-import {
-    PreviousUpgradeBatchNotCleared,
-    PreviousUpgradeNotFinalized,
-    ProtocolMajorVersionNotZero,
-    ProtocolVersionDeltaTooLarge,
-    ProtocolVersionTooSmall
-} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {PreviousUpgradeBatchNotCleared, PreviousUpgradeNotFinalized, ProtocolMajorVersionNotZero, ProtocolVersionDeltaTooLarge, ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
@@ -21,8 +15,6 @@ contract DummyBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeU
 
 contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
     DummyBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
-    address mockChainTypeManager = makeAddr("mockChainTypeManager");
-    address mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyBaseZkSyncUpgradeGenesis();
@@ -31,10 +23,6 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
 
         baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
-
-        // Set up CTM for verifier lookup
-        baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
-        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     // New protocol version is not greater than the current one
@@ -51,13 +39,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
 
         proposedUpgrade.newProtocolVersion = semVerNewProtocolVersion;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ProtocolVersionTooSmall.selector,
-                semVerCurrentProtocolVersion,
-                semVerNewProtocolVersion
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(ProtocolVersionTooSmall.selector));
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 
@@ -125,6 +107,7 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
+        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }

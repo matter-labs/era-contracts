@@ -9,12 +9,11 @@ import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
-import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
 import {SemVer} from "../../../common/libraries/SemVer.sol";
-import {L2DACommitmentScheme, PubdataContent} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -27,7 +26,6 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
-    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////
@@ -66,7 +64,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        return IL1Bridgehub(s.bridgehub).baseToken(s.chainId);
+        return IBridgehub(s.bridgehub).baseToken(s.chainId);
     }
 
     /// @inheritdoc IGetters
@@ -215,11 +213,6 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     }
 
     /// @inheritdoc IGetters
-    function getZKsyncOSMaxTxGasLimit() external view returns (uint64) {
-        return _getZKsyncOSMaxTxGasLimit();
-    }
-
-    /// @inheritdoc IGetters
     function isFunctionFreezable(bytes4 _selector) external view returns (bool) {
         Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
         if (ds.selectorToFacet[_selector].facetAddress == address(0)) {
@@ -244,24 +237,8 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         return s.settlementLayer;
     }
 
-    /// @inheritdoc IGetters
-    function getDAValidatorPair() external view returns (address, L2DACommitmentScheme) {
-        return (s.l1DAValidator, s.l2DACommitmentScheme);
-    }
-
-    /// @inheritdoc IGetters
-    function getPubdataContent() external view returns (PubdataContent) {
-        return s.pubdataContent;
-    }
-
-    /// @inheritdoc IGetters
-    function baseTokenSupportsTotalSupply() external view returns (bool) {
-        return s.baseTokenHasTotalSupply;
-    }
-
-    /// @inheritdoc IGetters
-    function getZKsyncOS() external view returns (bool) {
-        return s.zksyncOS;
+    function getDAValidatorPair() external view returns (address, address) {
+        return (s.l1DAValidator, s.l2DAValidator);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -275,7 +252,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         uint256 facetsLen = ds.facets.length;
         result = new Facet[](facetsLen);
 
-        for (uint256 i = 0; i < facetsLen; ++i) {
+        for (uint256 i = 0; i < facetsLen; i = i.uncheckedInc()) {
             address facetAddr = ds.facets[i];
             Diamond.FacetToSelectors memory facetToSelectors = ds.facetToSelectors[facetAddr];
 

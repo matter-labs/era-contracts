@@ -1,8 +1,6 @@
 # Compiler files
 cache/
-cache-forge-tests/
 out/
-out-tests/
 zkout/
 
 # Ignores development broadcast logs

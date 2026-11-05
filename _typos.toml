@@ -16,6 +16,8 @@ extend-exclude = [
     "*.json",
     "*.lock",
     ".git/",
+    # Typo inside (unaccessible vs inaccessible) fix before v30.
+    "/system-contracts/contracts/abstract/SystemContractBase.sol",
     "SECURITY.md"
 ]
 
@@ -25,6 +27,3 @@ FOT = "FOT"
 ue = "ue"
 # Valid Rust module naming convention for constants
 consts = "consts"
-IZ = "IZ"
-# "BA" is the B->A leg abbreviation in the atomic-interop swap tests (hBA, baProof, ...)
-BA = "BA"

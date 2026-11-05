@@ -8,9 +8,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
-import { encodeNTVAssetId, isCurrentNetworkLocal } from "../src.ts/utils";
-import { ETH_ADDRESS_IN_CONTRACTS } from "../src.ts/constants";
+import { ADDRESS_ONE, encodeNTVAssetId, isCurrentNetworkLocal } from "../src.ts/utils";
 import { getTokens } from "../src.ts/deploy-token";
+
+const ETH_TOKEN_ADDRESS = ADDRESS_ONE;
 
 const provider = web3Provider();
 const testConfigPath = path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant");
@@ -30,7 +31,7 @@ const getTokenAddress = async (name: string) => {
 
 // If base token is eth, we are ok, otherwise we need to check if token is deployed
 const checkTokenAddress = async (address: string) => {
-  if (address == ETH_ADDRESS_IN_CONTRACTS) {
+  if (address == ETH_TOKEN_ADDRESS) {
     return;
   } else if ((await provider.getCode(address)) == "0x") {
     throw new Error(`Token ${address} is not deployed`);
@@ -47,7 +48,7 @@ const chooseBaseTokenAddress = async (name?: string, address?: string) => {
   } else if (address) {
     return address;
   } else {
-    return ETH_ADDRESS_IN_CONTRACTS;
+    return ETH_TOKEN_ADDRESS;
   }
 };
 
@@ -103,7 +104,7 @@ async function main() {
       if (!(await deployer.bridgehubContract(deployWallet).assetIdIsRegistered(baseTokenAssetId))) {
         await deployer.registerTokenBridgehub(baseTokenAddress, cmd.useGovernance);
       }
-      if (baseTokenAddress != ETH_ADDRESS_IN_CONTRACTS) {
+      if (baseTokenAddress != ETH_TOKEN_ADDRESS) {
         await deployer.registerTokenInNativeTokenVault(baseTokenAddress);
       }
       await deployer.registerZKChain(

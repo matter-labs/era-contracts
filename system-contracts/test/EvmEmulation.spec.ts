@@ -35,8 +35,7 @@ describe("EvmEmulation tests", function () {
     expect(testValue).to.be.eq(101);
   });
 
-  // BLOBBASEFEE is currently unsupported by ZKsync's EVM bytecode interpreter.
-  // Re-enable only if interpreter support is added and the runner can validate the expected blob base fee.
+  // TODO: anvil-zksync uses old EVM emulator
   it.skip("Can use BLOBBASEFEE opcode", async () => {
     await enableEvmEmulation();
 
@@ -53,8 +52,7 @@ describe("EvmEmulation tests", function () {
     expect(testValue).to.be.eq(1);
   });
 
-  // BLOBHASH is currently unsupported by ZKsync's EVM bytecode interpreter.
-  // Re-enable only if interpreter support is added and the runner can validate the expected blob hash value.
+  // TODO: anvil-zksync uses old EVM emulator
   it.skip("Can use BLOBHASH opcode", async () => {
     await enableEvmEmulation();
 

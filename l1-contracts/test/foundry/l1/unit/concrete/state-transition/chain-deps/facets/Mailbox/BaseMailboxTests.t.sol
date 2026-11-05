@@ -6,15 +6,18 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {BaseTokenGasPriceDenominatorNotSet, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
         setupDiamondProxy();
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
+    }
+
+    function test_mailboxConstructor() public {
+        DummyZKChain h = new DummyZKChain(address(0), eraChainId, block.chainid);
+        assertEq(h.getEraChainId(), eraChainId);
     }
 
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
@@ -75,25 +78,5 @@ contract MailboxBaseTests is MailboxTest {
             mailboxFacet.l2TransactionBaseCost(gasPrice, l2GasLimit, l2GasPerPubdataByteLimit),
             l2TransactionBaseCost
         );
-    }
-
-    function test_requestL2TransactionToGatewayMailbox_RevertWhen_ExpirationTimestampNotZero() public {
-        uint256 chainId = 42;
-        utilsFacet.util_setChainId(eraChainId);
-
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, eraChainId),
-            abi.encode(true)
-        );
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(sender)
-        );
-
-        vm.prank(sender);
-        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, 0, 1));
-        IMailbox(address(mailboxFacet)).requestL2TransactionToGatewayMailbox(chainId, bytes32(0), 1);
     }
 }

@@ -27,16 +27,16 @@ export interface DiamondCut {
 
 export interface InitializeData {
   bridgehub: BigNumberish;
-  interopCenter: BigNumberish;
-  chainTypeManager: BigNumberish;
-  protocolVersion: BigNumberish;
+  verifier: BigNumberish;
   admin: BigNumberish;
-  validatorTimelock: BigNumberish;
-  baseTokenAssetId: string;
-  storedBatchZero: string;
+  genesisBatchHash: string;
+  genesisIndexRepeatedStorageChanges: BigNumberish;
+  genesisBatchCommitment: string;
+  allowList: BigNumberish;
   l2BootloaderBytecodeHash: string;
   l2DefaultAccountBytecodeHash: string;
   l2EvmEmulatorBytecodeHash: string;
+  priorityTxMaxGasLimit: BigNumberish;
 }
 
 export function facetCut(address: string, contract: Interface, action: Action, isFreezable: boolean): FacetCut {

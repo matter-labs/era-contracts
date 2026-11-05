@@ -14,14 +14,14 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
 
     function test_SettingInitialCutHash() public {
         bytes32 initialCutHash = keccak256(abi.encode(getDiamondCutData(address(diamondInit))));
-        address randomDiamondInit = makeAddr("randomDiamondInit");
+        address randomDiamondInit = address(0x303030303030303030303);
 
         assertEq(chainContractAddress.initialCutHash(), initialCutHash, "Initial cut hash is not correct");
 
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
-        address newGenesisUpgrade = makeAddr("newGenesisUpgrade");
+        address newGenesisUpgrade = address(0x02);
         bytes32 genesisBatchHash = bytes32(uint256(0x02));
         uint64 genesisIndexRepeatedStorageChanges = 2;
         bytes32 genesisBatchCommitment = bytes32(uint256(0x02));
@@ -35,7 +35,6 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             forceDeploymentsData: bytes("")
         });
 
-        vm.prank(governor);
         chainContractAddress.setChainCreationParams(newChainCreationParams);
 
         assertEq(chainContractAddress.initialCutHash(), newCutHash, "Initial cut hash update was not successful");

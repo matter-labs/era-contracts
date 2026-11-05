@@ -21,6 +21,14 @@ contract FullMerkleTest {
         tree.updateLeaf(_index, _item);
     }
 
+    function updateAllLeaves(bytes32[] memory _items) external {
+        tree.updateAllLeaves(_items);
+    }
+
+    function updateAllNodesAtHeight(uint256 _height, bytes32[] memory _items) external {
+        tree.updateAllNodesAtHeight(_height, _items);
+    }
+
     function root() external view returns (bytes32) {
         return tree.root();
     }
@@ -43,9 +51,5 @@ contract FullMerkleTest {
 
     function zeros(uint256 _index) external view returns (bytes32) {
         return tree._zeros[_index];
-    }
-
-    function merklePath(uint256 _index) external view returns (bytes32[] memory) {
-        return tree.merklePath(_index);
     }
 }

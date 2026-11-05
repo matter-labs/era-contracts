@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=16"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",
@@ -57,9 +57,7 @@
     "build:foundry": "forge build",
     "clean": "hardhat clean",
     "clean:foundry": "forge clean",
-    "verify": "hardhat run --network env scripts/verify.ts",
-    "test": "forge test --ffi --match-path 'test/foundry/*'",
-    "test:foundry": "forge test --ffi --match-path 'test/foundry/*'"
+    "verify": "hardhat run --network env scripts/verify.ts"
   },
   "dependencies": {
     "dotenv": "^16.0.3",

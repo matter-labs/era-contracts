@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
@@ -12,9 +13,6 @@ import {L2WrappedBaseTokenStore} from "../bridge/L2WrappedBaseTokenStore.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
-import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
 
 /// @title L1FixedForceDeploymentsHelper
 /// @author Matter Labs
@@ -34,7 +32,8 @@ abstract contract L1FixedForceDeploymentsHelper {
         address _wrappedBaseTokenStore,
         address _baseTokenAddress
     ) internal view returns (bytes memory) {
-        address sharedBridge = address(IL1Bridgehub(s.bridgehub).assetRouter());
+        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
+        address legacySharedBridge = IL1SharedBridgeLegacy(sharedBridge).l2BridgeAddress(s.chainId);
 
         address l2WBaseToken;
         if (_wrappedBaseTokenStore != address(0)) {
@@ -42,59 +41,42 @@ abstract contract L1FixedForceDeploymentsHelper {
         }
 
         // It is required for a base token to implement the following methods
-        TokenMetadata memory tokenData;
+        string memory baseTokenName;
+        string memory baseTokenSymbol;
         if (_baseTokenAddress == ETH_TOKEN_ADDRESS) {
-            tokenData = TokenMetadata({name: string("Ether"), symbol: string("ETH"), decimals: 18});
+            baseTokenName = string("Ether");
+            baseTokenSymbol = string("ETH");
         } else {
-            (string memory stringResult, bool success) = _safeCallTokenMetadataString(
+            (string memory stringResult, bool success) = _safeCallTokenMetadata(
                 _baseTokenAddress,
                 abi.encodeCall(IERC20Metadata.name, ())
             );
             if (success) {
-                tokenData.name = stringResult;
+                baseTokenName = stringResult;
             } else {
-                tokenData.name = string("Base Token");
+                baseTokenName = string("Base Token");
             }
 
-            (stringResult, success) = _safeCallTokenMetadataString(
+            (stringResult, success) = _safeCallTokenMetadata(
                 _baseTokenAddress,
                 abi.encodeCall(IERC20Metadata.symbol, ())
             );
             if (success) {
-                tokenData.symbol = stringResult;
+                baseTokenSymbol = stringResult;
             } else {
                 // "BT" is an acronym for "Base Token"
-                tokenData.symbol = string("BT");
-            }
-
-            uint256 uintResult;
-            (uintResult, success) = _safeCallTokenMetadataUint256(
-                _baseTokenAddress,
-                abi.encodeCall(IERC20Metadata.decimals, ())
-            );
-            if (success) {
-                tokenData.decimals = uintResult;
-            } else {
-                tokenData.decimals = 18;
+                baseTokenSymbol = string("BT");
             }
         }
 
-        INativeTokenVaultBase nativeTokenVault = IL1AssetRouter(sharedBridge).nativeTokenVault();
-        bytes32 baseTokenAssetId = s.baseTokenAssetId;
-        TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
-            assetId: baseTokenAssetId,
-            originChainId: nativeTokenVault.originChainId(baseTokenAssetId),
-            originToken: nativeTokenVault.originToken(baseTokenAssetId)
-        });
-
         ZKChainSpecificForceDeploymentsData
             memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
-                // The legacy shared bridge has been removed; this ABI placeholder is always address(0).
-                l2LegacySharedBridge: address(0),
+                baseTokenAssetId: s.baseTokenAssetId,
+                l2LegacySharedBridge: legacySharedBridge,
                 predeployedL2WethAddress: l2WBaseToken,
                 baseTokenL1Address: _baseTokenAddress,
-                baseTokenMetadata: tokenData,
-                baseTokenBridgingData: baseTokenBridgingData
+                baseTokenName: baseTokenName,
+                baseTokenSymbol: baseTokenSymbol
             });
         return abi.encode(additionalForceDeploymentsData);
     }
@@ -108,7 +90,7 @@ abstract contract L1FixedForceDeploymentsHelper {
     ///
     /// For all other cases, this function will panic and so such chains would not be
     /// deployable.
-    function _safeCallTokenMetadataBytes(address _token, bytes memory data) internal view returns (bytes memory, bool) {
+    function _safeCallTokenMetadata(address _token, bytes memory data) internal view returns (string memory, bool) {
         // We are not afraid if token returns large calldata, since it affects
         // only the deployment of the chain that uses such a malicious token.
         (bool callSuccess, bytes memory returnData) = _token.staticcall(data);
@@ -123,28 +105,7 @@ abstract contract L1FixedForceDeploymentsHelper {
             return ("", false);
         }
 
-        return (returnData, true);
-    }
-
-    function _safeCallTokenMetadataString(
-        address _token,
-        bytes memory data
-    ) internal view returns (string memory, bool) {
-        (bytes memory returnData, bool success) = _safeCallTokenMetadataBytes(_token, data);
-        if (!success) {
-            return ("", false);
-        }
-
         // Note, that the following line will panic in case the token has more non-standard behavior.
         return (abi.decode(returnData, (string)), true);
-    }
-
-    function _safeCallTokenMetadataUint256(address _token, bytes memory data) internal view returns (uint256, bool) {
-        (bytes memory returnData, bool success) = _safeCallTokenMetadataBytes(_token, data);
-        if (!success) {
-            return (0, false);
-        }
-
-        return (abi.decode(returnData, (uint256)), true);
     }
 }

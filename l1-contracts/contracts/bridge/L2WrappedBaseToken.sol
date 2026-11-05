@@ -12,15 +12,23 @@ import {BridgeMintNotImplemented, Unauthorized, WithdrawFailed, ZeroAddress} fro
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The canonical WETH-style wrapped-base-token implementation: unlike the legacy WETH9 it has no
-/// silent fallback and adds `receive`, `permit`, `depositTo` and `withdrawTo`. See {protocol-docs/bridging.md#base-token-handling}.
-/// @dev Still upgradeable for now; upgradeability will be removed later to make it trustless.
+/// @notice The canonical implementation of the WETH token.
+/// @dev The idea is to replace the legacy WETH9 (which has well-known issues) with something better.
+/// This implementation has the following differences from the WETH9:
+/// - It does not have a silent fallback method and will revert if it's called for a method it hasn't implemented.
+/// - It implements `receive` method to allow users to deposit ether directly.
+/// - It implements `permit` method to allow users to sign a message instead of calling `approve`.
+/// - It implements `depositTo` method to allow users to deposit to another address.
+/// - It implements `withdrawTo` method to allow users to withdraw to another address.
+///
+/// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
+/// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
 contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBridgedStandardToken {
     /// @dev Address of the L2 WETH Bridge.
     address public override l2Bridge;
 
     /// @dev Address of the L1 base token. It can be deposited to mint this L2 token.
-    address public l1Address;
+    address public override l1Address;
 
     /// @dev Address of the native token vault.
     address public override nativeTokenVault;
@@ -29,7 +37,9 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     bytes32 public baseTokenAssetId;
 
     modifier onlyBridge() {
-        require(msg.sender == l2Bridge, Unauthorized(msg.sender));
+        if (msg.sender != l2Bridge) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -39,7 +49,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         _disableInitializers();
     }
 
-    /// @dev Ether sent directly to the contract is deposited to the sender.
+    /// @dev Fallback function to allow receiving Ether.
     receive() external payable {
         depositTo(msg.sender);
     }
@@ -59,10 +69,16 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         address _l1Address,
         bytes32 _baseTokenAssetId
     ) external reinitializer(3) {
-        require(_l2Bridge != address(0), ZeroAddress());
+        if (_l2Bridge == address(0)) {
+            revert ZeroAddress();
+        }
 
-        require(_l1Address != address(0), ZeroAddress());
-        require(_baseTokenAssetId != bytes32(0), ZeroAddress());
+        if (_l1Address == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_baseTokenAssetId == bytes32(0)) {
+            revert ZeroAddress();
+        }
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
         nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -77,19 +93,25 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         emit Initialize(name_, symbol_, 18);
     }
 
-    /// @inheritdoc IBridgedStandardToken
-    /// @dev Always reverts: the wrapper cannot be bridge-minted; use `deposit`/`depositTo` instead.
+    /// @notice Function for minting tokens on L2, implemented only to be compatible with IL2StandardToken interface.
+    /// Always reverts instead of minting anything!
+    /// Note: Use `deposit`/`depositTo` methods instead.
     // solhint-disable-next-line no-unused-vars
-    function bridgeMint(address _to, uint256 _amount) external view override onlyBridge {
+    function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
         revert BridgeMintNotImplemented();
     }
 
-    /// @inheritdoc IBridgedStandardToken
-    /// @dev Burns the tokens and sends the same amount of ether to the bridge (msg.sender).
+    /// @dev Burn tokens from a given account and send the same amount of Ether to the bridge.
+    /// @param _from The account from which tokens will be burned.
+    /// @param _amount The amount that will be burned.
+    /// @notice Should be called by the bridge before withdrawing tokens to L1.
     function bridgeBurn(address _from, uint256 _amount) external override onlyBridge {
         _burn(_from, _amount);
+        // sends Ether to the bridge
         (bool success, ) = msg.sender.call{value: _amount}("");
-        require(success, WithdrawFailed());
+        if (!success) {
+            revert WithdrawFailed();
+        }
 
         emit BridgeBurn(_from, _amount);
     }
@@ -114,16 +136,15 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     function withdrawTo(address _to, uint256 _amount) public override {
         _burn(msg.sender, _amount);
         (bool success, ) = _to.call{value: _amount}("");
-        require(success, WithdrawFailed());
+        if (!success) {
+            revert WithdrawFailed();
+        }
     }
 
-    /// @inheritdoc IBridgedStandardToken
     function originToken() external view override returns (address) {
         return l1Address;
     }
 
-    /// @inheritdoc IBridgedStandardToken
-    /// @dev Returns the base token's asset ID — the wrapper has no asset ID of its own.
     function assetId() external view override returns (bytes32) {
         return baseTokenAssetId;
     }

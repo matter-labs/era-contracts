@@ -7,7 +7,7 @@ import { formatUnits, parseUnits } from "ethers/lib/utils";
 import { Deployer } from "../src.ts/deploy";
 import { GAS_MULTIPLIER, web3Provider } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
-import { ethTestConfig } from "../src.ts/constants";
+import { ethTestConfig } from "../src.ts/utils";
 
 const provider = web3Provider();
 

@@ -3,21 +3,12 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {
-    L2_BOOTLOADER_ADDRESS,
-    L2_SYSTEM_CONTEXT_ADDRESS,
-    L2_TO_L1_MESSENGER,
-    SystemLogKey,
-    Utils,
-    L2_DA_COMMITMENT_SCHEME
-} from "./Utils.sol";
-
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_DA_VALIDATOR_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils} from "./Utils.sol";
 
 // solhint-enable max-line-length
 
-contract UtilsTest is UtilsCallMockerTest {
-    function test_PackBatchTimestampAndBlockTimestamp() public virtual {
+contract UtilsTest is Test {
+    function test_PackBatchTimestampAndBlockTimestamp() public {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;
         bytes32 packedBytes = Utils.packBatchTimestampAndBlockTimestamp(batchTimestamp, blockTimestamp);
@@ -29,7 +20,7 @@ contract UtilsTest is UtilsCallMockerTest {
         );
     }
 
-    function test_ConstructL2Log() public virtual {
+    function test_ConstructL2Log() public {
         bytes memory l2Log = Utils.constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -50,10 +41,10 @@ contract UtilsTest is UtilsCallMockerTest {
         );
     }
 
-    function test_CreateSystemLogs() public virtual {
+    function test_CreateSystemLogs() public {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
-        assertEq(logs.length, 10, "logs length should be correct");
+        assertEq(logs.length, 9, "logs length should be correct");
 
         assertEq(
             logs[0],
@@ -126,8 +117,8 @@ contract UtilsTest is UtilsCallMockerTest {
             Utils.constructL2Log(
                 true,
                 L2_TO_L1_MESSENGER,
-                uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
-                bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
+                uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+                bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
             ),
             "log[6] should be correct"
         );
@@ -156,5 +147,5 @@ contract UtilsTest is UtilsCallMockerTest {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual override {}
+    function test() internal virtual {}
 }

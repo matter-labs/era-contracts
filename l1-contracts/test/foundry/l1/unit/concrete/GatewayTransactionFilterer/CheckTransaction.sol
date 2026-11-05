@@ -3,21 +3,21 @@ pragma solidity 0.8.28;
 
 import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shared.t.sol";
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-
-import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted} from "contracts/common/L1ContractErrors.sol";
 
 contract CheckTransactionTest is GatewayTransactionFiltererTest {
     function test_TransactionAllowedOnlyFromWhitelistedSenderWhichIsNotAssetRouter() public {
         bytes memory txCalladata = abi.encodeCall(
-            AssetRouterBase.finalizeDeposit,
+            IAssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), bytes("0x23456"))
         );
         vm.startPrank(owner);
         vm.mockCall(
             bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
+            abi.encodeWithSelector(IBridgehub.ctmAssetIdToAddress.selector),
             abi.encode(address(0)) // Return any address
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
@@ -52,15 +52,16 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
     }
 
     function test_TransactionAllowedFromWhitelistedSenderForChainBridging() public {
+        address stm = address(0x6060606);
         bytes memory txCalladata = abi.encodeCall(
-            AssetRouterBase.finalizeDeposit,
+            IAssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), bytes("0x23456"))
         );
         vm.startPrank(owner);
         vm.mockCall(
             bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
-            abi.encode(makeAddr("random")) // Return random address
+            abi.encodeWithSelector(IBridgehub.ctmAssetIdToAddress.selector),
+            abi.encode(stm) // Return random address
         );
 
         transactionFiltererProxy.grantWhitelist(assetRouter);
@@ -80,12 +81,12 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
 
     function test_TransactionFailsWithInvalidSelectorEvenIfTheSenderIsAR() public {
         bytes memory txCalladata = abi.encodeCall(
-            AssetRouterBase.setAssetHandlerAddressThisChain,
-            (bytes32("0x12345"), makeAddr("testAddress"))
+            IAssetRouterBase.setAssetHandlerAddressThisChain,
+            (bytes32("0x12345"), address(0x01234567890123456789))
         );
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(InvalidSelector.selector, AssetRouterBase.setAssetHandlerAddressThisChain.selector)
+            abi.encodeWithSelector(InvalidSelector.selector, IAssetRouterBase.setAssetHandlerAddressThisChain.selector)
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,

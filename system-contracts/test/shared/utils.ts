@@ -1,5 +1,3 @@
-import * as fs from "fs";
-
 import { Deployer } from "@matterlabs/hardhat-zksync-deploy";
 import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/types";
 import { BigNumber } from "ethers";
@@ -97,12 +95,6 @@ export function loadZasmBytecode(codeName: string, path: string): string {
   });
 }
 
-// Read contract artifacts
-export function readContract(path: string, fileName: string, contractName?: string) {
-  contractName = contractName || fileName;
-  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${contractName}.json`, { encoding: "utf-8" }));
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function deployContract(name: string, constructorArguments?: any[] | undefined): Promise<Contract> {
   const artifact = await loadArtifact(name);
@@ -141,11 +133,10 @@ export async function deployContractOnAddress(
   address: string,
   name: string,
   callConstructor: boolean = true,
-  input = "0x",
-  artifact?: ZkSyncArtifact
+  input = "0x"
 ) {
-  const artifactLoaded = artifact || (await loadArtifact(name));
-  await setCode(address, artifactLoaded.bytecode, callConstructor, input);
+  const artifact = await loadArtifact(name);
+  await setCode(address, artifact.bytecode, callConstructor, input);
 }
 
 export async function publishBytecode(bytecode: BytesLike) {
@@ -203,8 +194,8 @@ export async function setConstructingCodeHash(address: string, bytecode: string)
 export interface StateDiff {
   key: BytesLike;
   index: number;
-  initValue: bigint;
-  finalValue: bigint;
+  initValue: BigNumber;
+  finalValue: BigNumber;
 }
 
 export function encodeStateDiffs(stateDiffs: StateDiff[]): string {
@@ -233,40 +224,35 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
   const initial = [];
   const repeated = [];
   for (const stateDiff of stateDiffs) {
-    const addition = (stateDiff.finalValue - stateDiff.initValue + TWO_IN_256) % TWO_IN_256;
-    const subtraction = (stateDiff.initValue - stateDiff.finalValue + TWO_IN_256) % TWO_IN_256;
+    const addition = stateDiff.finalValue.sub(stateDiff.initValue).add(TWO_IN_256).mod(TWO_IN_256);
+    const subtraction = stateDiff.initValue.sub(stateDiff.finalValue).add(TWO_IN_256).mod(TWO_IN_256);
     let op = 3;
     let min = stateDiff.finalValue;
-    if (addition < min) {
+    if (addition.lt(min)) {
       min = addition;
       op = 1;
     }
-    if (subtraction < min) {
+    if (subtraction.lt(min)) {
       min = subtraction;
       op = 2;
     }
-    if (min >= 2n ** 248n) {
+    if (min.gte(BigNumber.from(2).pow(248))) {
       min = stateDiff.finalValue;
       op = 0;
     }
     let len = 0;
-    const minHex = min === 0n ? "0x00" : "0x" + (min.toString(16).length % 2 === 1 ? "0" : "") + min.toString(16);
+    const minHex = min.eq(0) ? "0x" : min.toHexString();
     if (op > 0) {
       len = (minHex.length - 2) / 2;
     }
     const metadata = (len << 3) + op;
     if (stateDiff.index === 0) {
       numInitial += 1;
-      initial.push(
-        ethers.utils.solidityPack(["bytes32", "uint8", "bytes"], [stateDiff.key, metadata, BigNumber.from(minHex)])
-      );
+      initial.push(ethers.utils.solidityPack(["bytes32", "uint8", "bytes"], [stateDiff.key, metadata, minHex]));
     } else {
       const enumerationIndexType = "uint" + (enumerationIndexSize * 8).toString();
       repeated.push(
-        ethers.utils.solidityPack(
-          [enumerationIndexType, "uint8", "bytes"],
-          [stateDiff.index, metadata, BigNumber.from(minHex)]
-        )
+        ethers.utils.solidityPack([enumerationIndexType, "uint8", "bytes"], [stateDiff.index, metadata, minHex])
       );
     }
   }

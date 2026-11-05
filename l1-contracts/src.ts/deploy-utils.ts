@@ -4,8 +4,14 @@ import { ethers } from "ethers";
 import { Interface } from "ethers/lib/utils";
 import { SingletonFactoryFactory } from "../typechain";
 
-import { encodeNTVAssetId, getAddressFromEnv, getNumberFromEnv } from "./utils";
-import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEPLOYER_SYSTEM_CONTRACT_ADDRESS, ADDRESS_ONE } from "./constants";
+import {
+  encodeNTVAssetId,
+  getAddressFromEnv,
+  getNumberFromEnv,
+  REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+  ADDRESS_ONE,
+} from "./utils";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IERC20Factory } from "../typechain/IERC20Factory";
 
@@ -197,8 +203,6 @@ export interface DeployedAddresses {
     CTMDeploymentTrackerProxy: string;
     MessageRootImplementation: string;
     MessageRootProxy: string;
-    InteropCenterImplementation: string;
-    InteropCenterProxy: string;
   };
   StateTransition: {
     StateTransitionProxy: string;

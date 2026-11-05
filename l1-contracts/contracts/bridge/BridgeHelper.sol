@@ -12,11 +12,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
  * @notice Helper library for working with native tokens on both L1 and L2.
  */
 library BridgeHelper {
-    /// @notice Retrieves and encodes token metadata (name, symbol, decimals) for bridging purposes.
-    /// @dev For ETH_TOKEN_ADDRESS, returns hardcoded ETH metadata.
-    /// @param _token The token address to query metadata from.
-    /// @param _originChainId The chain ID where the token originates.
-    /// @return Encoded token data containing name, symbol, decimals, and origin chain ID.
+    /// @dev Receives and parses (name, symbol, decimals) from the token contract
     function getERC20Getters(address _token, uint256 _originChainId) internal view returns (bytes memory) {
         bytes memory name;
         bytes memory symbol;

@@ -2,37 +2,29 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-// solhint-disable no-unused-import
-import {
-    L2DACommitmentScheme,
-    PubdataContent,
-    L2_TO_L1_LOG_SERIALIZE_SIZE,
-    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
-    L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
-    SUPPORTED_PROOF_METADATA_VERSION,
-    HARD_CODED_CHAIN_ID
-} from "system-contracts/contracts/Constants.sol";
-// solhint-enable no-unused-import
-
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
+
+/// @dev Bytes in raw L2 log
+/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBatch, address sender,
+/// bytes32 key, bytes32 value)
+uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 
 /// @dev The maximum length of the bytes array with L2 -> L1 logs
 uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
 
+/// @dev The value of default leaf hash for L2 -> L1 logs Merkle tree
+/// @dev An incomplete fixed-size tree is filled with this value to be a full binary tree
+/// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`
+bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
+
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
-/// @dev Denotes the type of the ZKsync Era transaction that came from L1.
+/// @dev Denotes the type of the ZKsync transaction that came from L1.
 uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 
-/// @dev Denotes the type of the ZKsync Era transaction that is used for system upgrades.
+/// @dev Denotes the type of the ZKsync transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
-
-/// @dev Denotes the type of the ZKsync OS transaction that came from L1.
-uint256 constant ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE = 127;
-
-/// @dev Denotes the type of the ZKsync OS transaction that is used for system upgrades.
-uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 
 /// @dev The maximal allowed difference between protocol minor versions in an upgrade. The 100 gap is needed
 /// in case a protocol version has been tested on testnet, but then not launched on mainnet, e.g.
@@ -40,21 +32,12 @@ uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 /// We are allowed to jump at most 100 minor versions at a time. The major version is always expected to be 0.
 uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 
-/// @dev By convention, tokens native to a chain are treated as if an infinite amount was deposited at the
-/// chain's inception, so their tracked balances start at this value and decrease as tokens are bridged out.
-/// Load-bearing on L1 as well: the removed pre-v32 asset tracker's L1 entry is read as the complement of
-/// this value (see {protocol-docs/bridging.md#populating-bridgedout-during-an-in-place-upgrade}).
-uint256 constant MAX_TOKEN_BALANCE = type(uint256).max;
-
-/// @dev Maximum time a priority transaction may remain unprocessed before Priority Mode (escape hatch) can be activated.
-/// Note: This is not the full user exit window. The effective exit window is`UPGRADE_NOTICE_PERIOD` - `PRIORITY_EXPIRATION`.
-uint256 constant PRIORITY_EXPIRATION = 4 days;
+/// @dev The amount of time in seconds the validator has to process the priority transaction
+/// NOTE: The constant is set to zero for the Alpha release period
+uint256 constant PRIORITY_EXPIRATION = 0 days;
 
 // @dev The chainId of Ethereum Mainnet
 uint256 constant MAINNET_CHAIN_ID = 1;
-
-// @dev The chainId of Ethereum Sepolia testnet
-uint256 constant SEPOLIA_CHAIN_ID = 11155111;
 
 /// @dev Timestamp - seconds since unix epoch. This value will be used on the mainnet.
 uint256 constant MAINNET_COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
@@ -68,26 +51,6 @@ uint256 constant COMMIT_TIMESTAMP_APPROXIMATION_DELTA = 1 hours;
 
 /// @dev Shift to apply to verify public input before verifying.
 uint256 constant PUBLIC_INPUT_SHIFT = 32;
-
-/// @dev Proof type used by the ZKsync OS PLONK verifier.
-uint256 constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
-
-/// @dev Proof type used by the proof-skipping ZKsync OS testnet verifier.
-uint256 constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
-
-/// @dev Number of proof words consumed by ZKsync OS metadata before the underlying PLONK proof.
-uint256 constant ZKSYNC_OS_PROOF_METADATA_LENGTH = 2;
-
-/// @dev Number of words expected in a proof-skipping ZKsync OS testnet proof.
-uint256 constant ZKSYNC_OS_MOCK_PROOF_LENGTH = 2;
-
-/// @dev Marker expected as the first word in a proof-skipping ZKsync OS testnet proof.
-uint256 constant ZKSYNC_OS_MOCK_PROOF_MAGIC = 13;
-
-/// @dev Padding value for empty/unused leaves in an {IndexedMerkleTree}. Deliberately NOT a valid
-/// `hashLeaf(IMTLeaf)` output, so an unused padded index can't be presented as a `{0,0,0}` low leaf to forge
-/// a non-inclusion proof. The off-chain imt-engine must use the same value.
-bytes32 constant IMT_EMPTY_LEAF_HASH = keccak256("zkSync:IndexedMerkleTree:emptyLeaf");
 
 /// @dev The maximum number of L2 gas that a user can request for an L2 transaction
 uint256 constant MAX_GAS_PER_TRANSACTION = 80_000_000;
@@ -119,41 +82,6 @@ uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
-
-/// @dev Minimum interval between token multiplier updates.
-uint256 constant PRICE_UPDATE_INTERVAL = 1 days;
-/// @dev Max allowed price increase per update, as a ratio (e.g. 13/10 = 1.3x).
-uint256 constant MAX_PRICE_CHANGE_NUMERATOR = 13;
-uint256 constant MAX_PRICE_CHANGE_DENOMINATOR = 10;
-/// @dev Reference L1 gas price used for price-change bound calculations.
-uint256 constant PRICE_REFERENCE_L1_GAS = 1 gwei;
-
-/// @dev The intrinsic cost of the L1->L2 transaction in computational L2 gas for ZKsync OS.
-uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
-
-/// @dev The floor cost(EIP-7623) of non-zero calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
-uint256 constant L1_TX_CALLDATA_FLOOR_PRICE_L2_GAS_ZKSYNC_OS = 40;
-
-/// @dev The maximal computational native limit for transaction in ZKsync OS.
-uint256 constant MAX_NATIVE_COMPUTATIONAL_ZKSYNC_OS = 1 << 35;
-
-/// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
-/// It includes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
-uint256 constant L1_TX_INTRINSIC_PUBDATA_ZKSYNC_OS = 351;
-
-/// @dev The native per gas ratio for l1 -> l2 txs, including upgrade/service/gateway transactions in ZKsync OS.
-/// This value is big enough to cover computational native resources usage for any operations.
-uint256 constant L1_TX_NATIVE_PER_GAS = 100_000_000;
-
-/// @dev The default ZKsync OS single-transaction gas limit (EIP-7825, 2^24). This is both the
-/// default per-tx gas cap and the lower bound for any chain-configured value: a chain may raise
-/// the cap above Ethereum's limit but must not set it below.
-uint64 constant ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT = uint64(1) << 24;
-
-/// @dev The upper bound for the ZKsync OS single-transaction gas limit (EIP-7825), matching the
-/// ZKsync OS block gas limit. It equals `type(uint64).max / 256` (`2^56 - 1`), the maximum gas
-/// representable once ZKsync OS scales gas into its `uint64` ergs counter (256 ergs/gas).
-uint64 constant ZKSYNC_OS_MAX_BLOCK_GAS_LIMIT = type(uint64).max / 256;
 
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
@@ -197,6 +125,9 @@ uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
 
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
 address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
+
+/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
+uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
 
 /// @dev The virtual address of the L1 settlement layer.
 address constant L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS = address(
@@ -248,75 +179,3 @@ bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
 
 /// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
 uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
-
-/// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
-L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
-
-/// @dev The start of the pause deposits time window. We pause when migrating to/from gateway.
-/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 0;
-
-/// @dev The delay from `pausedDepositsTimestamp` from which the migration is allowed. It equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
-/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET = 0;
-
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET = 0;
-
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET = 0;
-
-/// @dev Default overhead value in L1 gas for each batch during chain creation.
-uint32 constant DEFAULT_BATCH_OVERHEAD_L1_GAS = 1_000_000;
-
-/// @dev Default maximum amount of pubdata per batch during chain creation.
-uint32 constant DEFAULT_MAX_PUBDATA_PER_BATCH = 120_000;
-
-/// @dev Default maximum amount of L2 gas per batch during chain creation.
-uint32 constant DEFAULT_MAX_L2_GAS_PER_BATCH = 80_000_000;
-
-/// @dev Default maximum amount of pubdata for priority transactions during chain creation.
-uint32 constant DEFAULT_PRIORITY_TX_MAX_PUBDATA = 99_000;
-
-/// @dev Default minimum L2 gas price (in wei) for L1->L2 transactions during chain creation.
-uint64 constant DEFAULT_MINIMAL_L2_GAS_PRICE = 250_000_000;
-
-/// @notice The struct that describes whether users will be charged for pubdata for L1->L2 transactions.
-/// @param Rollup The users are charged for pubdata & it is priced based on the gas price on Ethereum.
-/// @param Validium The pubdata is considered free with regard to the L1 gas price.
-enum PubdataPricingMode {
-    Rollup,
-    Validium
-}
-
-/// @dev Default pubdata pricing mode during chain creation.
-PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Rollup;
-
-/// @dev Default maximum gas limit for priority transactions during chain creation.
-uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
-
-/// @dev The initial balance of the BaseTokenHolder contract (2^127 - 1).
-/// @dev Used to derive the real circulating supply: circulatingSupply = INITIAL - TotalSupplyBeforeMigration
-uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
-
-/// @dev The total number of supported interop attributes.
-uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 7;
-
-/// @dev Whether chain migrations between settlement layers are enabled in the current release.
-/// @dev Release-level switch (disabled in v32): lifting the ban requires a protocol upgrade, unlike
-/// the runtime `migrationPaused` flag. See {protocol-docs/chain-lifecycle.md#v32-chain-migrations-are-explicitly-disabled}.
-bool constant CHAIN_MIGRATIONS_ENABLED = false;
-
-/// @dev Migration number used when a chain migrates from L1 to a settlement layer.
-uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;
-
-/// @dev Migration number used when a chain returns from a settlement layer back to L1.
-uint256 constant MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1 = 2;
-
-/// @dev Iterated migrations are not supported; chain can migrate only to settlement layer and back once.
-uint256 constant MAX_ALLOWED_NUMBER_OF_MIGRATIONS = 2;
-
-/// @dev The mask that should be applied to the packed log data containing both the number of L2 and L1 transactions
-/// processed in the batch. Applying this mask is equivalent to calculating modulo 2**128.
-uint256 constant PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK = 0xffffffffffffffffffffffffffffffff;
-
-/// @dev Bit offset for extracting the upper 128 bits (L2 tx count) from the packed log value.
-uint256 constant PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS = 128;

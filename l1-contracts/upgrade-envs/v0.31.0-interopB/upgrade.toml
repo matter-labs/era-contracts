@@ -1,3 +1,0 @@
-# How the generate / replay / deploy pipeline handles this upgrade
-# (protocol-ops/src/common/upgrade_descriptor.rs): `upgrade-prepare-all` and PUVT.
-prepare = "prepare-all"

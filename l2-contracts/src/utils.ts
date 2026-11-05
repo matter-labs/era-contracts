@@ -3,8 +3,7 @@ import { artifacts } from "hardhat";
 import { Interface } from "ethers/lib/utils";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { ADDRESS_ONE } from "../../l1-contracts/src.ts/constants";
-import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { ADDRESS_ONE, getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 
@@ -137,7 +136,7 @@ export async function requestL2TransactionDirect(
   const ntv = IL1NativeTokenVaultFactory.connect(deployedAddresses.Bridges.NativeTokenVaultProxy, wallet);
   gasPrice ??= await bridgehub.provider.getGasPrice();
 
-  const expectedCost = await interopCenter.l2TransactionBaseCost(
+  const expectedCost = await bridgehub.l2TransactionBaseCost(
     chainId,
     gasPrice,
     l2GasLimit,
@@ -154,7 +153,7 @@ export async function requestL2TransactionDirect(
     const tx = await baseToken.approve(baseTokenBridge, expectedCost);
     await tx.wait();
   }
-  return await interopCenter.requestL2TransactionDirect(
+  return await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: l2Contract,
@@ -246,32 +245,25 @@ export async function getL1TxInfo(
   priorityTxMaxGasLimit: BigNumber,
   provider: ethers.providers.JsonRpcProvider
 ): Promise<TxInfo> {
-  const bridgehub = deployer.bridgehubContract(ethers.Wallet.createRandom().connect(provider));
-  const chainId = deployer.chainId;
+  const zksync = deployer.stateTransitionContract(ethers.Wallet.createRandom().connect(provider));
+  const l1Calldata = zksync.interface.encodeFunctionData("requestL2Transaction", [
+    to,
+    0,
+    l2Calldata,
+    priorityTxMaxGasLimit,
+    REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
+    [], // It is assumed that the target has already been deployed
+    refundRecipient,
+  ]);
 
-  const neededValue = await bridgehub.l2TransactionBaseCost(
-    chainId,
+  const neededValue = await zksync.l2TransactionBaseCost(
     gasPrice,
     priorityTxMaxGasLimit,
     REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT
   );
 
-  const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
-    {
-      chainId,
-      l2Contract: to,
-      mintValue: neededValue,
-      l2Value: 0,
-      l2Calldata,
-      l2GasLimit: priorityTxMaxGasLimit,
-      l2GasPerPubdataByteLimit: REQUIRED_L1_TO_L2_GAS_PER_PUBDATA_LIMIT,
-      factoryDeps: [], // It is assumed that the target has already been deployed
-      refundRecipient,
-    },
-  ]);
-
   return {
-    target: bridgehub.address,
+    target: zksync.address,
     data: l1Calldata,
     value: neededValue.toString(),
   };
