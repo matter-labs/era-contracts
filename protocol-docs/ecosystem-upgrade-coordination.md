@@ -86,10 +86,16 @@ external action.
 Each leg is owner-only and checks its object before acting:
 
 - `applyL1Upgrade` and `applyInfrastructureUpgrade` require the object to have code and to be of the
-  executor's own domain (`ProxyUpgradeDomainMismatch`), and every row's `implNew` to have code
-  before the first swap. They apply its rows through the executor's bound `ProxyAdmin`, each
-  departing from its `expectedOldImpl` or already at its `implNew`, then require every row's proxy
-  to run its `implNew`, and emit `L1UpgradeApplied` / `CTMInfrastructureUpgradeApplied`.
+  executor's own domain (`ProxyUpgradeDomainMismatch`), and the `proxyUpgradeEngine` it pins to have
+  code. They delegatecall that engine's `executeUpgrade` with a context built from the executor's
+  own bindings; the engine requires every row's `implNew` to have code before the first swap,
+  applies the rows through the executor's bound `ProxyAdmin`, each departing from its
+  `expectedOldImpl` or already at its `implNew`, runs the release's follow-up hooks and their
+  postconditions
+  ([the pinned upgrade engine](../docs/registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine)).
+  The executor then requires its own ownership and the holders of the domain it lent unchanged and
+  every row's proxy to run its `implNew`, and emits `L1UpgradeApplied` /
+  `CTMInfrastructureUpgradeApplied`.
 - `applyCTMUpgrade` requires the transition to have code and commits it
   (`setNewVersionUpgradeFromTransition`: transition, version and target release together). The
   commit's checks are the CTM's, so a commit sent through `forward` gets them too
@@ -141,7 +147,10 @@ The three entrypoints and `forward` are owner-only, and governance owns both exe
 the only authorization; there is no binding between executors to configure or keep in sync. Every
 other owner operation of a domain — freezing a chain, moving a deadline, replacing a committed
 transition — is an ordinary call through the executor's owner-gated, event-logged `forward`; the
-executors carry no typed passthroughs for them. Freezing has a second route,
+executors carry no typed passthroughs for them. A release's pinned upgrade engine can make the same
+calls inside its domain's proxy leg; they are reviewed with the release, are not logged as
+`CallForwarded`, and cannot transfer or nominate the domain's holders through their setters
+([what the executor checks](../docs/registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine)). Freezing has a second route,
 [below](#freezing-a-chain). An urgent fix of one domain is a proposal of the one leg it needs.
 
 A domain moves to a successor executor through the predecessor's `forward`; nothing else names an

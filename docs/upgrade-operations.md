@@ -68,11 +68,14 @@ architecture document).
   **`CTMUpgradeApplied(transition, oldVersion, newVersion)`** on the CTM executor: each must name an
   object governance approved, and the legs of one upgrade appear in one transaction — the execution
   of its governance proposal — in canonical order. `ProxyImplementationUpgraded(proxy, newImpl)`
-  follows each actual swap. A leg in any other transaction, or a proposal carrying only part of a
-  package's legs, is not the reviewed upgrade.
+  follows each actual swap: logged at the executor's address but emitted by the pinned engine, so
+  decode it with `DefaultProxyUpgradeEngine`'s ABI, not the executor's. A leg in any other
+  transaction, or a proposal carrying only part of a package's legs, is not the reviewed upgrade.
 - **`CallForwarded(target, value, data)`** on both executors. Every owner operation outside the
   upgrade entrypoints is a `forward` (see the authority matrix in the architecture document), so each
   event must match a call governance approved; anything else is a bypass of the object-driven path.
+  A pinned engine's follow-up calls inside a proxy leg emit no `CallForwarded`: they are the release's
+  reviewed code, run under that leg's event.
   The one exception is a chain's `Freeze` / `Unfreeze` without a `CallForwarded`: the Bridgehub's
   owner freezing directly, as the Security Council's freeze does
   ([freezing a chain](../protocol-docs/ecosystem-upgrade-coordination.md#freezing-a-chain)).
@@ -80,6 +83,8 @@ architecture document).
   CTM, both `ProxyAdmin`s, the ServerNotifier and the Bridgehub (whose owner can freeze the CTM's
   chains): expected only during executor succession or
   [governance self-migration](governance-self-migration.md).
+- **`AdminChanged`** on the CTM's and the ServerNotifier's proxies: expected only from the v35
+  ServerNotifier handover, which moves the notifier under the CTM-domain `ProxyAdmin`.
 
 ## Recovery
 

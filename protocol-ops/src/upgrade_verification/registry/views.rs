@@ -41,7 +41,7 @@ sol! {
         ProxyUpgradeRow[] ctmProxyUpgrades;
         address currentRelease;
         uint256 oldProtocolVersionDeadline;
-        address upgradeEngine;
+        address chainUpgradeEngine;
         AuthoredL2Plan l2Plan;
         uint256 upgradeTimestamp;
         address ctmExecutor;
@@ -117,7 +117,7 @@ sol! {
     struct TransitionManifest {
         address fromRelease;
         address newRelease;
-        address upgradeEngine;
+        address chainUpgradeEngine;
         uint256 oldProtocolVersionDeadline;
         uint256 upgradeTimestamp;
         AuthoredL2Plan l2Plan;
@@ -164,11 +164,16 @@ sol! {
     /// constructor argument of a `ProxyUpgradeTransition`, which is what its address commits to.
     /// `domain` is the `ProxyUpgradeDomain` enum as its underlying `uint8`
     /// ([`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CORE`] /
-    /// [`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CTM`]).
+    /// [`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CTM`]). `proxyUpgradeEngine` is
+    /// the `IProxyUpgradeEngine` the domain's executor delegatecalls to apply the rows (and any
+    /// follow-up calls a release engine adds), held to its role by
+    /// [`super::members::verify_proxy_upgrade_engine`]. Field ORDER is the Solidity struct's: the
+    /// decode and the construction re-derivation are positional.
     #[derive(Debug)]
     struct ProxyUpgradeTransitionManifest {
         uint8 domain;
         ProxyUpgradeRow[] proxyUpgrades;
+        address proxyUpgradeEngine;
     }
 
     /// One domain's write-once proxy inventory: the core leg's (`Core`) or the CTM
@@ -179,6 +184,7 @@ sol! {
         function getManifest() external view returns (ProxyUpgradeTransitionManifest memory);
         function domain() external view returns (uint8);
         function rows() external view returns (ProxyUpgradeRow[] memory);
+        function proxyUpgradeEngine() external view returns (address);
     }
 
     /// The live owner and outstanding nomination of an `Ownable2Step` contract, and the call

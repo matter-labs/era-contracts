@@ -146,8 +146,8 @@ contract ChainTypeManagerLegacyStorageTest is ChainTypeManagerTest {
         vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.newRelease, ()), abi.encode(newRelease));
         vm.mockCall(
             address(transition),
-            abi.encodeCall(ICTMTransition.upgradeEngine, ()),
-            abi.encode(makeAddr("upgradeEngine"))
+            abi.encodeCall(ICTMTransition.chainUpgradeEngine, ()),
+            abi.encode(makeAddr("chainUpgradeEngine"))
         );
         vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.validate, ()), "");
         L2UpgradePlan memory emptyPlan;

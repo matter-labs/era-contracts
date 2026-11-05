@@ -69,14 +69,14 @@ abstract contract RecurringCTMUpgradeForTests is DefaultCTMUpgrade {
     }
 
     /// @notice The engine this prepare DEPLOYED, before any object pinned it — zero when the hop
-    ///         deployed none. Distinct from `committedUpgradeEngine`, which reads the pin back.
-    function preparedUpgradeEngine() external view returns (address) {
-        return upgradeAddresses.upgradeEngine;
+    ///         deployed none. Distinct from `committedChainUpgradeEngine`, which reads the pin back.
+    function preparedChainUpgradeEngine() external view returns (address) {
+        return upgradeAddresses.chainUpgradeEngine;
     }
 
     /// @notice Where `deploySimpleContract("DefaultUpgrade")` WOULD land this run, so a test can
     ///         assert that an infrastructure-only hop left that address codeless.
-    function predictedUpgradeEngineAddress() external view returns (address) {
+    function predictedChainUpgradeEngineAddress() external view returns (address) {
         (address factory, bytes32 salt) = getCreate2FactoryParams();
         bytes memory bytecode = abi.encodePacked(
             getCreationCode("DefaultUpgrade"),
@@ -324,10 +324,10 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
 
         // ── No chain-version machinery was deployed at all ──
         assertEq(hop.preparedTransition(), address(0), "an infrastructure-only hop deploys no transition");
-        assertEq(hop.preparedUpgradeEngine(), address(0), "an infrastructure-only hop deploys no upgrade engine");
-        assertEq(hop.committedUpgradeEngine(), address(0), "no engine is committed, so none may be reported");
+        assertEq(hop.preparedChainUpgradeEngine(), address(0), "an infrastructure-only hop deploys no upgrade engine");
+        assertEq(hop.committedChainUpgradeEngine(), address(0), "no engine is committed, so none may be reported");
         assertEq(
-            hop.predictedUpgradeEngineAddress().code.length,
+            hop.predictedChainUpgradeEngineAddress().code.length,
             0,
             "nothing was deployed at the address an engine would have taken"
         );
@@ -424,8 +424,12 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
 
         address transition = hop.preparedTransition();
         assertTrue(transition != address(0), "a chain-release hop deploys a transition");
-        assertTrue(hop.preparedUpgradeEngine() != address(0), "a chain-release hop deploys an upgrade engine");
-        assertEq(hop.committedUpgradeEngine(), hop.preparedUpgradeEngine(), "the transition pins that engine");
+        assertTrue(hop.preparedChainUpgradeEngine() != address(0), "a chain-release hop deploys an upgrade engine");
+        assertEq(
+            hop.committedChainUpgradeEngine(),
+            hop.preparedChainUpgradeEngine(),
+            "the transition pins that engine"
+        );
         assertTrue(hop.getChainUpgradeDiamondCutData().length != 0, "chains crossing the edge take a cut");
         assertEq(
             ICTMTransition(transition).oldProtocolVersion(),

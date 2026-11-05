@@ -42,8 +42,12 @@ A protocol release is the combination of:
   also makes the new release the CTM's `currentRelease`, so chains created after the upgrade come up
   directly on the new version with the same genesis as the upgraded ones;
 - **release-specific one-time work**: new proxies, wiring calls, storage migrations, and
-  post-governance steps that a from-scratch deployment gets for free. Any governance or admin call
-  beyond the upgrade itself is a declared external action of the prepare output.
+  post-governance steps that a from-scratch deployment gets for free. Wiring the domain's executor
+  has the authority for (its `ProxyAdmin`, and in a CTM domain the CTM and the ServerNotifier) is
+  code in the release's pinned upgrade engine, which the executor runs inside the domain's proxy
+  leg ([the pinned upgrade engine](../docs/registry-driven-upgrades.md#follow-up-calls-the-pinned-upgrade-engine)).
+  Any other governance or admin call beyond the upgrade itself is a declared external action of the
+  prepare output.
 
 The objects and their rules are described in
 [docs/registry-driven-upgrades.md](../docs/registry-driven-upgrades.md#objects).
@@ -406,13 +410,15 @@ and what one release adds:
 
 - `default-upgrade/DefaultCoreUpgrade.s.sol` and `DefaultCTMUpgrade.s.sol` are the
   version-independent prepare pipeline: they deploy or reuse each implementation by code identity,
-  build the release and the transitions, and record every other call a version needs
-  as a declared external action (`declareExternalAction`).
+  build the release and the transitions, deploy each proxy upgrade transition's
+  `DefaultProxyUpgradeEngine` (`deployProxyUpgradeEngine()`), and record every other call a version
+  needs as a declared external action (`declareExternalAction`).
 - `v<N>/CoreUpgrade_v<N>.s.sol` and `CTMUpgrade_v<N>.s.sol` override only what the release changes:
   the implementations it deploys (`deployNew*Contracts`), the release members it replaces
   (`changedReleaseMembers()`), its kind (`upgradeKind()`: a chain release or an
-  infrastructure-only upgrade that moves no version), and its L2 side when L2 built-ins change
-  (`authorL2Side`). `yarn new-release` creates them, together with the release's
+  infrastructure-only upgrade that moves no version), its L2 side when L2 built-ins change
+  (`authorL2Side`), and its follow-up calls when it has any (`deployProxyUpgradeEngine()` returning
+  a subclass of `DefaultProxyUpgradeEngine`). `yarn new-release` creates them, together with the release's
   `upgrade-envs/<release>/` inputs, and moves protocol-ops' defaults to them.
 - `AdminFunctions.s.sol` drives the per-chain crossing in `protocol_ops`;
   `default-upgrade/DefaultChainUpgrade.s.sol` is the legacy cut-taking leg the tests use.
@@ -420,9 +426,17 @@ and what one release adds:
   neutralizes; new ones also go into the genesis generator, so that upgraded and freshly created
   chains match.
 
-The on-chain side is generic: a transition pins an upgrade engine (`DefaultUpgrade`, unless the
-version script overrides `deployUsedUpgradeContract`, as v35's bootstrap edge does with
-`BootstrapUpgrade`), and `l1-contracts/contracts/l2-upgrades/` holds `L2ComplexUpgrader`, which
+The on-chain side is generic. Each kind of transition pins the engine that applies it, and the two
+are run by different callers:
+
+- a `CTMTransition`'s `chainUpgradeEngine` is the diamond upgrade every chain delegatecalls when it
+  crosses the version: `DefaultUpgrade`, unless the version script overrides
+  `deployUsedUpgradeContract`, as v35's bootstrap edge does with `BootstrapUpgrade`;
+- a `ProxyUpgradeTransition`'s `proxyUpgradeEngine` is what the domain's executor delegatecalls to
+  swap that domain's L1 proxies and run the release's follow-up calls: `DefaultProxyUpgradeEngine`
+  or a release's subclass of it.
+
+`l1-contracts/contracts/l2-upgrades/` holds `L2ComplexUpgrader`, which
 executes the L2 upgrade transaction, and the L2 upgrade contracts. A release also regenerates the
 genesis config and `AllContractsHashes.json`.
 

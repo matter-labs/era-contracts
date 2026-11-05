@@ -59,7 +59,8 @@ use super::lifecycle::{
 };
 use super::member_construction::{MemberReview, ReviewedEnv};
 use super::members::{
-    verify_engine_and_l2_plan, verify_release_members, DepartingMembers, TRANSITION_ENGINES,
+    verify_engine_and_l2_plan, verify_proxy_upgrade_engine, verify_release_members,
+    DepartingMembers, TRANSITION_ENGINES,
 };
 use super::package::{LegKind, UpgradePackage};
 use super::provenance::{expect_code_identity, expect_code_present, tolerate};
@@ -140,6 +141,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 build,
                 result,
+                &members,
                 "the core transition",
                 leg.object,
                 Inventory::Ecosystem,
@@ -159,6 +161,7 @@ pub(crate) async fn verify<P: Provider>(
                 provider,
                 build,
                 result,
+                &members,
                 "the CTM infrastructure transition",
                 leg.object,
                 Inventory::CtmDomain,
@@ -861,7 +864,7 @@ pub(super) async fn verify_transition<P: Provider>(
         result,
         members,
         label,
-        manifest.upgradeEngine,
+        manifest.chainUpgradeEngine,
         TRANSITION_ENGINES,
         &manifest.l2Plan,
     )
@@ -1011,9 +1014,14 @@ fn judge_release_validity(
     ));
 }
 
-/// A `ProxyUpgradeTransition`'s provenance and construction, and its domain held against
-/// `expected` — the domain of the leg that applies it (the core leg's executor applies only Core,
-/// the infrastructure leg's only CTM), fixed by the caller and never read from the object.
+/// A `ProxyUpgradeTransition`'s provenance and construction (the manifest its address commits to,
+/// `proxyUpgradeEngine` included), the engine it pins held to its role
+/// ([`verify_proxy_upgrade_engine`]), and its domain held against `expected` — the domain of the
+/// leg that applies it (the core leg's executor applies only Core, the infrastructure leg's only
+/// CTM), fixed by the caller and never read from the object.
+///
+/// Reads, in order: the object's code, its `getManifest()`, then the engine's code (and whatever
+/// its construction check reads; nothing for the default engine, which takes no arguments).
 /// Returns the whole enum-indexed inventory it pins, for [`verify_inventory`], or `None` when it
 /// cannot be read or belongs to another domain (both reported).
 #[allow(clippy::too_many_arguments)]
@@ -1021,6 +1029,7 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
     result: &mut VerificationResult,
+    members: &MemberReview<'_>,
     label: &str,
     transition: Address,
     expected: Inventory,
@@ -1058,6 +1067,17 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
     ) {
         reviewed.insert(transition, label.to_string());
     }
+    // The engine the executor delegatecalls to apply the rows runs with the executor's whole
+    // authority, so it is held to its role like a transition's engine.
+    verify_proxy_upgrade_engine(
+        provider,
+        build,
+        result,
+        members,
+        label,
+        manifest.proxyUpgradeEngine,
+    )
+    .await?;
     if manifest.domain != expected.domain_tag() {
         result.report_error(&format!(
             "{label} at {transition} is a {}-domain object, but its leg applies {}-domain rows: \
@@ -1780,22 +1800,61 @@ mod tests {
 
     const SALT: B256 = B256::repeat_byte(0x5A);
     const TRANSITION_RUNTIME: &[u8] = b"the reviewed ProxyUpgradeTransition runtime";
+    const ENGINE_RUNTIME: &[u8] = b"the reviewed DefaultProxyUpgradeEngine runtime";
 
     fn transition_code() -> Vec<u8> {
         b"reviewed creation code of ProxyUpgradeTransition".to_vec()
+    }
+
+    fn engine_code() -> Vec<u8> {
+        b"reviewed creation code of DefaultProxyUpgradeEngine".to_vec()
+    }
+
+    /// Where the prepare deploys the default engine (no constructor arguments) under [`SALT`].
+    fn engine() -> Address {
+        canonical_create2_address(SALT, &engine_code(), &[])
+    }
+
+    /// The prepare's `[member_deployments]` record of [`engine`].
+    fn engine_records() -> MemberDeployments {
+        [(
+            engine(),
+            MemberDeploymentRecord {
+                contract: "DefaultProxyUpgradeEngine".to_string(),
+                create2_factory: DETERMINISTIC_CREATE2_FACTORY,
+                create2_salt: SALT,
+                constructor_args: Bytes::new(),
+            },
+        )]
+        .into_iter()
+        .collect()
+    }
+
+    /// The build artifacts of the transition object and the default engine.
+    fn object_artifacts() -> Vec<super::super::construction::TestArtifact> {
+        vec![
+            (
+                "ProxyUpgradeTransition.sol",
+                "ProxyUpgradeTransition",
+                transition_code(),
+                TRANSITION_RUNTIME.to_vec(),
+                Vec::new(),
+            ),
+            (
+                "DefaultProxyUpgradeEngine.sol",
+                "DefaultProxyUpgradeEngine",
+                engine_code(),
+                ENGINE_RUNTIME.to_vec(),
+                Vec::new(),
+            ),
+        ]
     }
 
     fn reviewed_build() -> ReviewedBuild {
         ReviewedBuild::from_artifacts(
             CodeIdentity::empty()
                 .with_contract("l1-contracts/ProxyUpgradeTransition", TRANSITION_RUNTIME),
-            vec![(
-                "ProxyUpgradeTransition.sol",
-                "ProxyUpgradeTransition",
-                transition_code(),
-                TRANSITION_RUNTIME.to_vec(),
-                Vec::new(),
-            )],
+            object_artifacts(),
         )
     }
 
@@ -1820,13 +1879,17 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain,
             proxyUpgrades: rows,
+            proxyUpgradeEngine: engine(),
         }
     }
 
-    /// Serves `manifest` from a genuinely constructed object and verifies it as `expected`.
-    async fn verify_object(
+    /// Serves `manifest` from a genuinely constructed object, its engine running `engine_runtime`,
+    /// and verifies it as `expected` with `records` as the package's member records.
+    async fn verify_object_with(
         manifest: &ProxyUpgradeTransitionManifest,
         expected: Inventory,
+        engine_runtime: &'static [u8],
+        records: &MemberDeployments,
     ) -> (
         Option<Vec<ProxyUpgradeRow>>,
         VerificationResult,
@@ -1837,13 +1900,18 @@ mod tests {
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
         asserter.push_success(&Bytes::from(manifest.abi_encode()));
+        if !manifest.proxyUpgradeEngine.is_zero() {
+            asserter.push_success(&Bytes::from_static(engine_runtime));
+        }
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
         let mut result = VerificationResult::default();
         let mut reviewed = BTreeMap::new();
+        let env = ReviewedEnv::default();
         let rows = verify_proxy_upgrade_transition(
             &provider,
             &reviewed_build(),
             &mut result,
+            &MemberReview::new(records, &env, None, None),
             "the object",
             address,
             expected,
@@ -1854,6 +1922,20 @@ mod tests {
         .unwrap();
         assert!(asserter.read_q().is_empty());
         (rows, result, reviewed, address)
+    }
+
+    /// Serves `manifest` from a genuinely constructed object, its engine the reviewed default
+    /// one, and verifies it as `expected` with the engine's record.
+    async fn verify_object(
+        manifest: &ProxyUpgradeTransitionManifest,
+        expected: Inventory,
+    ) -> (
+        Option<Vec<ProxyUpgradeRow>>,
+        VerificationResult,
+        BTreeMap<Address, String>,
+        Address,
+    ) {
+        verify_object_with(manifest, expected, ENGINE_RUNTIME, &engine_records()).await
     }
 
     /// A genuine object of the leg's domain: its construction re-derives (the constructor argument
@@ -1940,6 +2022,7 @@ mod tests {
             let empty = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: vec![inert(); slots],
+                proxyUpgradeEngine: engine(),
             };
             let (rows, result, reviewed, address) = verify_object(&empty, expected).await;
             assert_eq!(result.errors, 1, "{:?}", result.error_messages);
@@ -1950,6 +2033,107 @@ mod tests {
                 "its construction still verifies"
             );
         }
+    }
+
+    /// The mirror decodes a manifest as Solidity encodes it, POSITIONALLY: `(domain,
+    /// proxyUpgrades, proxyUpgradeEngine)`, the engine the third head word of the struct.
+    #[test]
+    fn a_proxy_upgrade_manifest_decodes_with_its_engine() {
+        use alloy::dyn_abi::DynSolValue;
+        let row = |byte: u8| {
+            DynSolValue::Tuple(vec![
+                DynSolValue::Address(Address::repeat_byte(byte)),
+                DynSolValue::Address(Address::repeat_byte(byte + 1)),
+                DynSolValue::Address(Address::repeat_byte(byte + 2)),
+                DynSolValue::Bool(true),
+            ])
+        };
+        let solidity = DynSolValue::Tuple(vec![
+            DynSolValue::Uint(U256::from(PROXY_UPGRADE_DOMAIN_CTM), 8),
+            DynSolValue::Array(vec![row(0x10), row(0x20)]),
+            DynSolValue::Address(engine()),
+        ])
+        .abi_encode();
+        // offset, then the struct's heads: domain, the rows' offset, the engine.
+        assert_eq!(&solidity[64 + 32 + 12..64 + 64], engine().as_slice());
+
+        let decoded = ProxyUpgradeTransitionManifest::abi_decode(&solidity).unwrap();
+        assert_eq!(decoded.domain, PROXY_UPGRADE_DOMAIN_CTM);
+        assert_eq!(decoded.proxyUpgrades.len(), 2);
+        assert_eq!(decoded.proxyUpgrades[1].implNew, Address::repeat_byte(0x22));
+        assert_eq!(decoded.proxyUpgradeEngine, engine());
+        assert_eq!(
+            decoded.abi_encode(),
+            solidity,
+            "re-encodes as the address commits to"
+        );
+        let returned =
+            ProxyUpgradeTransitionView::getManifestCall::abi_decode_returns(&solidity).unwrap();
+        assert_eq!(returned.proxyUpgradeEngine, engine());
+    }
+
+    /// The engine is part of what the object's address commits to: the same rows under another
+    /// engine are another object.
+    #[test]
+    fn the_engine_is_part_of_the_construction() {
+        let mut other = manifest(PROXY_UPGRADE_DOMAIN_CORE, L1_ECOSYSTEM_CONTRACTS.len());
+        let genuine = canonical_create2_address(SALT, &transition_code(), &other.abi_encode());
+        other.proxyUpgradeEngine = STRANGER;
+        assert_ne!(
+            canonical_create2_address(SALT, &transition_code(), &other.abi_encode()),
+            genuine
+        );
+    }
+
+    /// An engine running code no reviewed engine is — it would run by delegatecall with the
+    /// executor's whole authority — is a finding, as is a zero or an unrecorded one.
+    #[tokio::test]
+    async fn an_unknown_zero_or_unrecorded_engine_fails() {
+        let manifest = manifest(PROXY_UPGRADE_DOMAIN_CTM, CTM_CONTRACTS.len());
+        let (rows, result, reviewed, address) = verify_object_with(
+            &manifest,
+            Inventory::CtmDomain,
+            b"an engine no reviewed artifact is",
+            &engine_records(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(
+            result.has_error("proxyUpgradeEngine"),
+            "{:?}",
+            result.error_messages
+        );
+        assert!(rows.is_some(), "the rows are still handed on");
+        assert!(
+            reviewed.contains_key(&address),
+            "the object's own construction holds"
+        );
+
+        let mut zero = manifest.clone();
+        zero.proxyUpgradeEngine = Address::ZERO;
+        let (_, result, _, _) = verify_object_with(
+            &zero,
+            Inventory::CtmDomain,
+            ENGINE_RUNTIME,
+            &engine_records(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error("proxyUpgradeEngine is the zero address"));
+
+        let (_, result, _, _) = verify_object_with(
+            &manifest,
+            Inventory::CtmDomain,
+            ENGINE_RUNTIME,
+            &MemberDeployments::new(),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(
+            result.has_error("proxyUpgradeEngine at"),
+            "{:?}",
+            result.error_messages
+        );
     }
 
     // ───────────────────────── the release's own validate() ─────────────────────────
@@ -2141,10 +2325,12 @@ mod tests {
         let core = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()],
+            proxyUpgradeEngine: engine(),
         };
         let infrastructure = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CTM,
             proxyUpgrades: vec![inert(); CTM_CONTRACTS.len()],
+            proxyUpgradeEngine: engine(),
         };
         let at = |manifest: &ProxyUpgradeTransitionManifest| {
             canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode())
@@ -2162,6 +2348,7 @@ mod tests {
         for manifest in [&core, &infrastructure] {
             asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
             asserter.push_success(&Bytes::from(manifest.abi_encode()));
+            asserter.push_success(&Bytes::from_static(ENGINE_RUNTIME));
         }
         for answer in [
             Bytes::from_static(&[0x60]), // the core executor's code
@@ -2317,28 +2504,22 @@ mod tests {
             let manifest = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: rows,
+                proxyUpgradeEngine: engine(),
             };
             let object =
                 canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode());
+            let mut artifacts = object_artifacts();
+            artifacts.push((
+                "Row.sol",
+                contract,
+                creation.clone(),
+                ROW_RUNTIME.to_vec(),
+                Vec::new(),
+            ));
             let build = ReviewedBuild::from_artifacts(
                 CodeIdentity::empty()
                     .with_contract("l1-contracts/ProxyUpgradeTransition", TRANSITION_RUNTIME),
-                vec![
-                    (
-                        "ProxyUpgradeTransition.sol",
-                        "ProxyUpgradeTransition",
-                        transition_code(),
-                        TRANSITION_RUNTIME.to_vec(),
-                        Vec::new(),
-                    ),
-                    (
-                        "Row.sol",
-                        contract,
-                        creation.clone(),
-                        ROW_RUNTIME.to_vec(),
-                        Vec::new(),
-                    ),
-                ],
+                artifacts,
             )
             .with_constructor(contract, &[(parameter, "address")]);
             let records = [(
@@ -2365,15 +2546,17 @@ mod tests {
             let asserter = Asserter::new();
             asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
             asserter.push_success(&Bytes::from(self.manifest.abi_encode()));
+            asserter.push_success(&Bytes::from_static(ENGINE_RUNTIME));
             for answer in answers {
                 asserter.push_success(answer);
             }
             let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-            self.package.member_records = if recorded {
-                self.records.clone()
-            } else {
-                MemberDeployments::new()
-            };
+            // The engine is always recorded: only the row's record is what a run drives.
+            let mut records = engine_records();
+            if recorded {
+                records.extend(self.records.clone());
+            }
+            self.package.member_records = records;
             let mut result = VerificationResult::default();
             verify(
                 &provider,

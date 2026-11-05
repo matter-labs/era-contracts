@@ -15,7 +15,7 @@
     {
       "name": "ZKsyncOS",
       "isZKsyncOS": true,
-      "ctmProxy": "0x4B0fb505939d9DE14Ff4C0075bADfcBCDa4ADac1",
+      "ctmProxy": "0x171adB37D9783D93cCbb286062e1aDE81C11B8e0",
       "release": {
         "diamondInit": {
           "address": "0xaC9fCBA56E42d5960f813B9D0387F3D3bC003338"
@@ -87,8 +87,8 @@
         }
       },
       "transition": {
-        "fromRelease": "0x80F3aFe412cc9901d0e31B20100bA8C84bF82BD5",
-        "upgradeEngine": {
+        "fromRelease": "0xD049e209427c7A8839A7F8609f4E4628C94899E2",
+        "chainUpgradeEngine": {
           "address": "0xdFdE6B33f13de2CA1A75A6F7169f50541B14f75b"
         },
         "oldProtocolVersionDeadline": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",

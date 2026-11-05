@@ -50,7 +50,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @dev The reusable upgrade engine this deployment publishes. Not part of the CTM's address
     ///      set: the CTM holds no pointer to an engine, every transition pins the one it commits.
-    address internal deployedUpgradeEngine;
+    address internal deployedChainUpgradeEngine;
 
     /// @dev The CTM executor this deployment created (see {deployCTMUpgradeExecutor}).
     CTMExecutorDeployment internal ctmUpgradeExecutorDeployment;
@@ -158,7 +158,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // the same code through the CREATE2 factory lands on this very address. It must therefore
         // be the reusable implementation — a one-shot migration like `V32UpgradeZKsyncOS` would be
         // replayed by every upgrade that reused it.
-        deployedUpgradeEngine = deploySimpleContract("DefaultUpgrade");
+        deployedChainUpgradeEngine = deploySimpleContract("DefaultUpgrade");
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
@@ -464,7 +464,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         }
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "current_release_addr", ctmAddresses.stateTransition.currentRelease);
-        vm.serializeAddress("state_transition", "default_upgrade_addr", deployedUpgradeEngine);
+        vm.serializeAddress("state_transition", "default_upgrade_addr", deployedChainUpgradeEngine);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",

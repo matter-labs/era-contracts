@@ -86,7 +86,7 @@ impl ShellPathFixture {
             TransitionManifest {
                 fromRelease: FROM_RELEASE,
                 newRelease: NEW_RELEASE,
-                upgradeEngine: Address::ZERO,
+                chainUpgradeEngine: Address::ZERO,
                 oldProtocolVersionDeadline: U256::MAX,
                 upgradeTimestamp: U256::ZERO,
                 l2Plan: AuthoredL2Plan {
