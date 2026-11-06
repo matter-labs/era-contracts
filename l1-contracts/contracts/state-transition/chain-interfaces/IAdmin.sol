@@ -3,15 +3,16 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
+import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
-import {ZKChainCommitment} from "../../common/Config.sol";
+import {L2DACommitmentScheme, PubdataContent} from "../../common/Config.sol";
 
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZKChainBase {
+interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -33,6 +34,14 @@ interface IAdmin is IZKChainBase {
     /// @param _newPriorityTxMaxGasLimit The maximum number of L2 gas that a user can request for L1 -> L2 transactions
     function setPriorityTxMaxGasLimit(uint256 _newPriorityTxMaxGasLimit) external;
 
+    /// @notice Change the ZKsync OS single-transaction gas limit (EIP-7825).
+    /// @dev Only for ZKsync OS chains, callable on the active settlement layer instance. The limit is
+    /// part of the runtime chain config committed into each batch proof public input, so it can only
+    /// change when all committed batches are verified.
+    /// @param _newMaxTxGasLimit The new single-transaction gas limit; must not be below
+    /// `ZKSYNC_OS_DEFAULT_MAX_TX_GAS_LIMIT`
+    function setZKsyncOSMaxTxGasLimit(uint64 _newMaxTxGasLimit) external;
+
     /// @notice Change the fee params for L1->L2 transactions
     /// @param _newFeeParams The new fee params
     function changeFeeParams(FeeParams calldata _newFeeParams) external;
@@ -47,13 +56,35 @@ interface IAdmin is IZKChainBase {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
+    /// @notice Sets the transaction filterer used in Priority Mode.
+    /// By default, there is no transaction filtering in Priority Mode. This is the recommended setup.
+    /// However, for some chains (e.g., Prividium or Gateway), a custom filterer may be required
+    /// for correct system operation. This function allows ZK Governance to set it.
+    function setPriorityModeTransactionFilterer(address _priorityModeTransactionFilterer) external;
+
     /// @notice Allow EVM emulation on chain
     function allowEvmEmulation() external returns (bytes32 canonicalTxHash);
 
-    /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
-    /// @param _protocolVersion The current protocol version from which upgrade is executed
-    /// @param _cutData The diamond cut parameters that is executed in the upgrade
-    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
+    /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
+    function permanentlyAllowPriorityMode() external;
+
+    /// @notice Deactivate Priority Mode and return the chain to normal mode.
+    function deactivatePriorityMode() external;
+
+    /// @notice Activates the Priority Mode if the whitelisted operator fails
+    /// to process priority transactions within the allotted time.
+    /// @dev Priority Mode is an escape hatch mechanism in which anyone can settle batches (only with L1 -> L2 transactions).
+    /// @dev Priority Mode can be activated if:
+    ///      1. The Chain Admin has explicitly enabled the Priority Mode feature.
+    ///      2. A priority transaction has been outstanding for at least `PRIORITY_EXPIRATION` since it was requested.
+    function activatePriorityMode() external;
+
+    /// @inheritdoc IChainUpgrader
+    function upgradeChainFromVersion(
+        address _chainAddress,
+        uint256 _protocolVersion,
+        Diamond.DiamondCutData calldata _cutData
+    ) external override;
 
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the ChainTypeManager contract can execute the upgrade
@@ -78,13 +109,21 @@ interface IAdmin is IZKChainBase {
     /// @notice Returns address of the RollupDAManager of the ZK Chain.
     function getRollupDAManager() external view returns (address);
 
-    /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
-    /// @dev While in principle it is possible that updating only one of the addresses is needed,
+    /// @notice Set the L1 DA validator address as well as the L2 DA commitment scheme.
+    /// @dev While in principle it is possible that updating only one of the values is needed,
     /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
     /// That's why we change those together to prevent admins of chains from shooting themselves in the foot.
     /// @param _l1DAValidator The address of the L1 DA validator
-    /// @param _l2DAValidator The address of the L2 DA validator
-    function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external;
+    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment
+    function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external;
+
+    /// @notice Sets the pubdata content. Orthogonal to the DA commitment scheme: it selects whether
+    /// the whole pubdata (`FULL_PUBDATA`) or only the mandatory L2->L1 log region (`LOGS_ONLY`) is
+    /// committed. Committed into the ZKsync OS batch public input via the chain config hash, so it is
+    /// enforced by the batch proof. Callable only for ZKsync OS chains — the setting has no meaning on
+    /// Era-VM chains.
+    /// @param _pubdataContent The new pubdata content.
+    function setPubdataContent(PubdataContent _pubdataContent) external;
 
     /// @notice Makes the chain as permanent rollup.
     /// @dev This is a security feature needed for chains that should be
@@ -109,6 +148,9 @@ interface IAdmin is IZKChainBase {
     /// @notice Priority transaction max L2 gas limit changed
     event NewPriorityTxMaxGasLimit(uint256 oldPriorityTxMaxGasLimit, uint256 newPriorityTxMaxGasLimit);
 
+    /// @notice ZKsync OS single-transaction gas limit (EIP-7825) changed
+    event NewZKsyncOSMaxTxGasLimit(uint64 oldMaxTxGasLimit, uint64 newMaxTxGasLimit);
+
     /// @notice Fee params for L1->L2 transactions changed
     event NewFeeParams(FeeParams oldFeeParams, FeeParams newFeeParams);
 
@@ -117,6 +159,9 @@ interface IAdmin is IZKChainBase {
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
+
+    /// @notice The address of the transaction filterer contract used when Priority Mode is activated
+    event NewPriorityModeTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
 
     /// @notice BaseToken multiplier for L1->L2 transactions changed
     event NewBaseTokenMultiplier(
@@ -129,9 +174,6 @@ interface IAdmin is IZKChainBase {
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
 
-    /// @notice Emitted when the migration to the new settlement layer is complete.
-    event MigrationComplete();
-
     /// @notice Emitted when the contract is frozen.
     event Freeze();
 
@@ -141,29 +183,23 @@ interface IAdmin is IZKChainBase {
     /// @notice The EVM emulator has been enabled
     event EnableEvmEmulator();
 
-    /// @notice New pair of DA validators set
-    event NewL2DAValidator(address indexed oldL2DAValidator, address indexed newL2DAValidator);
+    /// @notice New L2 DA commitment scheme set
+    event NewL2DACommitmentScheme(
+        L2DACommitmentScheme indexed oldL2DACommitmentScheme,
+        L2DACommitmentScheme indexed newL2DACommitmentScheme
+    );
+
+    /// @notice New pubdata content set
+    event NewPubdataContent(PubdataContent indexed oldPubdataContent, PubdataContent indexed newPubdataContent);
+
     event NewL1DAValidator(address indexed oldL1DAValidator, address indexed newL1DAValidator);
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
-    /// @dev Similar to IL1AssetHandler interface, used to send chains.
-    function forwardedBridgeBurn(
-        address _settlementLayer,
-        address _originalCaller,
-        bytes calldata _data
-    ) external payable returns (bytes memory _bridgeMintData);
+    event PriorityModeAllowed();
 
-    /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
-    function forwardedBridgeRecoverFailedTransfer(
-        uint256 _chainId,
-        bytes32 _assetInfo,
-        address _originalCaller,
-        bytes calldata _chainData
-    ) external payable;
+    event PriorityModeDeactivated();
 
-    /// @dev Similar to IL1AssetHandler interface, used to receive chains.
-    function forwardedBridgeMint(bytes calldata _data, bool _contractAlreadyDeployed) external payable;
-
-    function prepareChainCommitment() external view returns (ZKChainCommitment memory commitment);
+    /// @notice Emitted when Priority Mode is activated for the chain.
+    event PriorityModeActivated();
 }

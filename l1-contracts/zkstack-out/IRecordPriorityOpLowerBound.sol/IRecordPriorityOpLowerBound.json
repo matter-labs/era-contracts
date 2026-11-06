@@ -1,0 +1,25 @@
+[
+  {
+    "type": "function",
+    "name": "run",
+    "inputs": [
+      {
+        "name": "_priorityOpLowerBound",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

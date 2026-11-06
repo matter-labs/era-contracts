@@ -4,127 +4,253 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage, console2 as console} from "forge-std/Test.sol";
+import {StdStorage, Test, console2 as console, stdStorage} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {
+    SETTLEMENT_LAYER_RELAY_SENDER,
+    ZKChainCommitment,
+    CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
+} from "contracts/common/Config.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
+import {
+    BridgehubBurnCTMAssetData,
+    BridgehubMintCTMAssetData,
+    IBridgehubBase
+} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SystemContractsArgs} from "./Utils.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
+import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+
+import {LogFinder} from "test-utils/LogFinder.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
+
+    function _pauseDeposits(uint256 _chainId) public {
+        pauseDepositsBeforeInitiatingMigration(L2_BRIDGEHUB_ADDR, _chainId);
+        // As the priority queue was not empty before migration, we wait until the chain migration window starts
+        vm.warp(block.timestamp + CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET);
+    }
 
     function test_gatewayShouldFinalizeDeposit() public {
         finalizeDeposit();
-        require(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)) == ctmAssetId, "ctmAssetId mismatch");
-        require(l2Bridgehub.ctmAssetIdFromChainId(mintChainId) == ctmAssetId, "ctmAssetIdFromChainId mismatch");
+        assertEq(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)), ctmAssetId, "ctmAssetId mismatch");
+        assertEq(l2Bridgehub.ctmAssetIdFromChainId(mintChainId), ctmAssetId, "ctmAssetIdFromChainId mismatch");
 
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+        assertFalse(GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
 
     function test_gatewayNonEmptyPriorityQueueMigration() public {
         ZKChainCommitment memory commitment = abi.decode(exampleChainCommitment, (ZKChainCommitment));
 
-        // Some non-zero value which would be the case if a chain existed before the
-        // priority tree was added
+        // Non-zero values, as for a chain that existed before the priority tree was added.
         commitment.priorityTree.startIndex = 101;
         commitment.priorityTree.nextLeafIndex = 102;
 
         finalizeDepositWithCustomCommitment(abi.encode(commitment));
 
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+        GettersFacet getters = GettersFacet(diamondProxy);
+
+        assertFalse(getters.isPriorityQueueActive(), "Priority queue must not be active");
+
+        // Priority tree state is copied verbatim from the commitment;
+        // getTotalPriorityTxs() == startIndex + _nextLeafIndex.
+        assertEq(getters.getPriorityTreeStartIndex(), 101, "priority tree startIndex must be 101");
+        assertEq(getters.getTotalPriorityTxs(), 101 + 102, "totalPriorityTxs must equal startIndex + nextLeafIndex");
+        assertTrue(getters.getPriorityTreeRoot() != bytes32(0), "priority tree root must be set after migration");
     }
 
-    function test_forwardToL2OnGateway() public {
-        // todo fix this test
+    function test_forwardToL2OnGateway_L2() public {
         finalizeDeposit();
+
+        address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
+        assertTrue(diamondProxy != address(0), "Diamond proxy should be deployed");
+
+        // Snapshot before vm.prank so the view calls do not consume the prank.
+        GettersFacet getters = GettersFacet(diamondProxy);
+        uint256 priorityCountBefore = getters.getTotalPriorityTxs();
+        uint256 queueSizeBefore = getters.getPriorityQueueSize();
+
+        vm.mockCall(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
+            abi.encode(1)
+        );
+
+        vm.recordLogs();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
-        l2Bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
+        l2InteropCenter.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        logs.requireOneFrom("NewPriorityRequestId(uint256,bytes32)", diamondProxy);
+        logs.requireOneFrom("NewRelayedPriorityTransaction(uint256,bytes32,uint64)", diamondProxy);
+
+        assertEq(getters.getTotalPriorityTxs(), priorityCountBefore + 1, "totalPriorityTxs must increment by 1");
+        assertEq(getters.getPriorityQueueSize(), queueSizeBefore + 1, "priorityQueueSize must increment by 1");
+
+        assertEq(
+            l2Bridgehub.getZKChain(mintChainId),
+            diamondProxy,
+            "Chain registration must be unchanged after forward"
+        );
     }
 
     function test_withdrawFromGateway() public {
-        // todo fix this test
         finalizeDeposit();
-        address newAdmin = address(0x1);
-        bytes memory newDiamondCut = abi.encode();
+
+        address diamondProxyBefore = l2Bridgehub.getZKChain(mintChainId);
+        assertTrue(diamondProxyBefore != address(0), "Diamond proxy should exist before withdrawal");
+
+        clearPriorityQueue(address(coreAddresses.bridgehub.proxies.bridgehub), mintChainId);
+        _pauseDeposits(mintChainId);
+        address newAdmin = makeAddr("newAdmin");
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
             chainId: mintChainId,
             ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
             chainData: abi.encode(chainTypeManager.protocolVersion())
         });
-        vm.prank(ownerWallet);
+
+        uint256 migrationNumberBefore = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(
+            mintChainId
+        );
+
         vm.mockCall(
-            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT),
+            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes(""))
+            abi.encode(bytes32(uint256(1)))
         );
-        l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
+
+        // The CTM-asset migration withdrawal rides the InteropCenter L2->L1 withdrawal-bundle path (see
+        // {protocol-docs/chain-lifecycle.md#role}); the bundle sender (ownerWallet) is the chain admin whose
+        // authorization the migration burn checks.
+        bytes32 withdrawalBundleSalt = keccak256("ctm-migration-withdrawal-salt");
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.interopBundleSalt, (withdrawalBundleSalt));
+        vm.recordLogs();
+        vm.prank(ownerWallet);
+        l2InteropCenter.sendBundle(
+            InteroperableAddress.formatEvmV1(L1_CHAIN_ID),
+            DataEncoding.encodeInteropWithdrawalCallStarters(ctmAssetId, abi.encode(data)),
+            bundleAttributes
+        );
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        _assertWithdrawalBundleSent(logs, withdrawalBundleSalt, migrationNumberBefore);
+
+        // MigrationStarted has 3 indexed params; migrationNumber lives in the data field.
+        Vm.Log memory migrationLog = logs.requireOneFrom(
+            "MigrationStarted(uint256,uint256,bytes32,uint256)",
+            L2_CHAIN_ASSET_HANDLER_ADDR
+        );
+        assertEq(uint256(migrationLog.topics[1]), mintChainId, "MigrationStarted: chainId mismatch");
+        assertEq(migrationLog.topics[2], ctmAssetId, "MigrationStarted: assetId mismatch");
+
+        uint256 migrationNumberAfter = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(mintChainId);
+        assertEq(migrationNumberAfter, migrationNumberBefore + 1, "migrationNumber must increment by 1");
+
+        // Registration is preserved on this settlement layer until the migration is finalized elsewhere.
+        assertEq(
+            l2Bridgehub.getZKChain(mintChainId),
+            diamondProxyBefore,
+            "Chain registration must be unchanged after withdraw"
+        );
     }
 
-    function finalizeDeposit() public {
-        finalizeDepositWithCustomCommitment(exampleChainCommitment);
-    }
-
-    function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
-        bytes memory chainData = chainCommitment;
-        bytes memory ctmData = abi.encode(
-            baseTokenAssetId,
-            ownerWallet,
-            chainTypeManager.protocolVersion(),
-            config.contracts.diamondCutData
+    /// @notice Verifies the `InteropBundleSent` withdrawal bundle emitted for the CTM-asset chain migration:
+    /// destination, sender commitment (bundle salt), and the single inner `finalizeDeposit` call.
+    function _assertWithdrawalBundleSent(
+        Vm.Log[] memory logs,
+        bytes32 _bundleSalt,
+        uint256 _migrationNumberBefore
+    ) internal view {
+        Vm.Log memory bundleLog = logs.requireOneFrom(
+            "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool,bytes32)))",
+            L2_INTEROP_CENTER_ADDR
         );
-        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
-            chainId: mintChainId,
-            baseTokenAssetId: baseTokenAssetId,
-            ctmData: ctmData,
-            chainData: chainData
-        });
-        vm.prank(aliasedL1AssetRouter);
-        l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
+        (, , InteropBundle memory sentBundle) = abi.decode(bundleLog.data, (bytes32, bytes32, InteropBundle));
+        assertEq(sentBundle.sourceChainId, block.chainid, "InteropBundleSent: source chain mismatch");
+        assertEq(sentBundle.destinationChainId, L1_CHAIN_ID, "InteropBundleSent: destination chain must be L1");
+        // The bundle salt commits to the sender — the equivalent of an `l2Sender == ownerWallet` check.
+        assertEq(
+            sentBundle.interopBundleSalt,
+            keccak256(abi.encodePacked(ownerWallet, _bundleSalt)),
+            "InteropBundleSent: bundle salt must commit to ownerWallet as the sender"
+        );
+        assertEq(sentBundle.calls.length, 1, "InteropBundleSent: withdrawal bundle must hold exactly one call");
+        InteropCall memory sentCall = sentBundle.calls[0];
+        assertEq(
+            sentCall.from,
+            L2_ASSET_ROUTER_ADDR,
+            "InteropBundleSent: call must originate from the L2 asset router"
+        );
+        assertEq(
+            sentCall.to,
+            address(l2AssetRouter.L1_ASSET_ROUTER()),
+            "InteropBundleSent: call must target the L1 asset router"
+        );
+        // Inner call: finalizeDeposit(sourceChainId, assetId, transferData=BridgehubMintCTMAssetData).
+        assertEq(
+            bytes32(DataEncoding.getSelector(sentCall.data)),
+            bytes32(AssetRouterBase.finalizeDeposit.selector),
+            "InteropBundleSent: inner call must be finalizeDeposit"
+        );
+        (uint256 sentSourceChainId, bytes32 sentAssetId, bytes memory sentAssetData) = abi.decode(
+            UnsafeBytes.readRemainingBytes(sentCall.data, 4),
+            (uint256, bytes32, bytes)
+        );
+        assertEq(sentSourceChainId, block.chainid, "InteropBundleSent: finalizeDeposit chainId mismatch");
+        assertEq(sentAssetId, ctmAssetId, "InteropBundleSent: assetId should match ctmAssetId");
+        BridgehubMintCTMAssetData memory sentMintData = abi.decode(sentAssetData, (BridgehubMintCTMAssetData));
+        assertEq(sentMintData.chainId, mintChainId, "InteropBundleSent: migrating chainId mismatch");
+        assertEq(
+            sentMintData.migrationNumber,
+            _migrationNumberBefore + 1,
+            "InteropBundleSent: mint data must carry the incremented migrationNumber"
+        );
     }
 
     function test_finalizeDepositWithRealChainData() public {
-        // Note: get this from real local txs
-        // Note: if the contracts were changed, this test might fail. Just comment it out.
-        bytes
-            memory data = hex"9c884fd1000000000000000000000000000000000000000000000000000000000000000917531d49af8763b6b62da9916d00fa378c1b4b7786eab4bdb643daaddd9d6426000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000014800000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010f52f431aa35dd80982e3c66614112503ca2c6e344745f4a2bcfc9bd7e09c75584000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000011c0000000000000000000000000000000000000000000000000000000000000112052f431aa35dd80982e3c66614112503ca2c6e344745f4a2bcfc9bd7e09c755840000000000000000000000002f9a6cbadd1b37615ce9cc71842c3b0748e9e4570000000000000000000000000000000000000000000000000000001c000000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000108000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000060000000000000000000000000c288eb67124c094529a0ae3270f56ec5e64c2b730000000000000000000000000000000000000000000000000000000000000e600000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000000000a600000000000000000000000000000000000000000000000000000000000000cc00000000000000000000000005a0c575ae5582d250979443d277008f7e32d99a100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000150e18b681000000000000000000000000000000000000000000000000000000001733894500000000000000000000000000000000000000000000000000000000fc57565f000000000000000000000000000000000000000000000000000000001cc5d1030000000000000000000000000000000000000000000000000000000021f603d700000000000000000000000000000000000000000000000000000000235d9eb50000000000000000000000000000000000000000000000000000000027ae4c16000000000000000000000000000000000000000000000000000000002878fe74000000000000000000000000000000000000000000000000000000003f42d5dd0000000000000000000000000000000000000000000000000000000041cf49bb000000000000000000000000000000000000000000000000000000004623c91d000000000000000000000000000000000000000000000000000000004dd18bf5000000000000000000000000000000000000000000000000000000005b898748000000000000000000000000000000000000000000000000000000006223258e0000000000000000000000000000000000000000000000000000000064b554ad0000000000000000000000000000000000000000000000000000000064bf8d66000000000000000000000000000000000000000000000000000000006e762e9800000000000000000000000000000000000000000000000000000000a9f6d94100000000000000000000000000000000000000000000000000000000b784610700000000000000000000000000000000000000000000000000000000be6f11cf00000000000000000000000000000000000000000000000000000000e76db86500000000000000000000000000000000000000000000000000000000000000000000000000000000379b31e7f4b22a023da84ad20b898c8038fb0492000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000003006d49e5b000000000000000000000000000000000000000000000000000000000ec6b0b700000000000000000000000000000000000000000000000000000000fe26699e0000000000000000000000000000000000000000000000000000000018e3a941000000000000000000000000000000000000000000000000000000001de72e340000000000000000000000000000000000000000000000000000000022c5cf230000000000000000000000000000000000000000000000000000000029b98c670000000000000000000000000000000000000000000000000000000033ce93fe000000000000000000000000000000000000000000000000000000003408e470000000000000000000000000000000000000000000000000000000003591c1a000000000000000000000000000000000000000000000000000000000396073820000000000000000000000000000000000000000000000000000000039d7d4aa0000000000000000000000000000000000000000000000000000000046657fe90000000000000000000000000000000000000000000000000000000052ef6b2c000000000000000000000000000000000000000000000000000000005a59033500000000000000000000000000000000000000000000000000000000631f4bac000000000000000000000000000000000000000000000000000000006a27e8b5000000000000000000000000000000000000000000000000000000006e9960c30000000000000000000000000000000000000000000000000000000074f4d30d0000000000000000000000000000000000000000000000000000000079823c9a000000000000000000000000000000000000000000000000000000007a0ed627000000000000000000000000000000000000000000000000000000007b30c8da000000000000000000000000000000000000000000000000000000008708474e00000000000000000000000000000000000000000000000000000000946ebad100000000000000000000000000000000000000000000000000000000960dcf240000000000000000000000000000000000000000000000000000000098acd7a6000000000000000000000000000000000000000000000000000000009cd939e4000000000000000000000000000000000000000000000000000000009d1b5a8100000000000000000000000000000000000000000000000000000000a1954fc500000000000000000000000000000000000000000000000000000000adfca15e00000000000000000000000000000000000000000000000000000000af6a2dcd00000000000000000000000000000000000000000000000000000000b22dd78e00000000000000000000000000000000000000000000000000000000b8c2f66f00000000000000000000000000000000000000000000000000000000bd7c541200000000000000000000000000000000000000000000000000000000c3bbd2d700000000000000000000000000000000000000000000000000000000cdffacc600000000000000000000000000000000000000000000000000000000d046815600000000000000000000000000000000000000000000000000000000d86970d800000000000000000000000000000000000000000000000000000000db1f0bf900000000000000000000000000000000000000000000000000000000dd655bb000000000000000000000000000000000000000000000000000000000e5355c7500000000000000000000000000000000000000000000000000000000e81e0ba100000000000000000000000000000000000000000000000000000000ea6c029c00000000000000000000000000000000000000000000000000000000ef3f0bae00000000000000000000000000000000000000000000000000000000f4ff5e2e00000000000000000000000000000000000000000000000000000000f5c1182c00000000000000000000000000000000000000000000000000000000facd743b00000000000000000000000000000000000000000000000000000000fd791f3c00000000000000000000000000000000000000000000000000000000000000000000000000000000dea3b08fd1b185a78fb83f923576e597750f1b80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000e042901c70000000000000000000000000000000000000000000000000000000012f43dab00000000000000000000000000000000000000000000000000000000eb6724190000000000000000000000000000000000000000000000000000000018b7fc2200000000000000000000000000000000000000000000000000000000263b7f8e000000000000000000000000000000000000000000000000000000006c0960f90000000000000000000000000000000000000000000000000000000079cf6165000000000000000000000000000000000000000000000000000000007efda2ae00000000000000000000000000000000000000000000000000000000b473318e00000000000000000000000000000000000000000000000000000000d077255100000000000000000000000000000000000000000000000000000000d07b90d100000000000000000000000000000000000000000000000000000000ddcc9eec00000000000000000000000000000000000000000000000000000000e4948f4300000000000000000000000000000000000000000000000000000000e896760d0000000000000000000000000000000000000000000000000000000000000000000000000000000023be442ccb5b2d6d3960691888719bc76093a31200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000040f23da4300000000000000000000000000000000000000000000000000000000e12a61370000000000000000000000000000000000000000000000000000000098f8196200000000000000000000000000000000000000000000000000000000cf02827d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000a9edb426784d7e4a8a02571d9a4481010bc0eb98000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010008cffa528a3e3ba642ba72c25ab4ce5663f9e8622d8fd883ebc113f49b7c010005f75d0c14b6da8400e091a9f5a895b693fc44d028c6d2f29e57d8b137d301000d417fc3c32f3bb837e09637cfa15303d685e44d1a5f1a04a3a3ea298fe400000000000000000000000000000000000000000000000000000000044aa200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f4240000000000000000000000000000000000000000000000000000000000001d4c00000000000000000000000000000000000000000000000000000000004c4b40000000000000000000000000000000000000000000000000000000000000182b8000000000000000000000000000000000000000000000000000000000ee6b28000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000280000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000087ef4adf518e6986b85e2fa3bf7047b353d8a8422a5af274abefd1c30a7a8b9800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000014000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000001fcd1aeeb5e3711b1d1ee7567c82ccc35ec73911e95efccbba41086a656a04c4000000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000004ae848202ab08b6303b34fe671aa187102485987c81a5623eea86bc531dc8ad7306a23e438ce807cd551f5d126dd9c48273c07ad26e9fa988329d10901626c68062f784161a84f8977c3f8fa83ced9efae70bc7eef93d29d06940084f00c73b952da0da7438a146b6c88e382df7fcc113f627e19966eef7676277106832574405";
-        address recipient = L2_ASSET_ROUTER_ADDR;
-        bytes32 assetId = 0x17531d49af8763b6b62da9916d00fa378c1b4b7786eab4bdb643daaddd9d6426;
-        stdstore
-            .target(L2_ASSET_ROUTER_ADDR)
-            .sig(IAssetRouterBase.assetHandlerAddress.selector)
-            .with_key(assetId)
-            .checked_write(L2_BRIDGEHUB_ADDR);
+        // Uses explicitly encoded commitment data rather than hardcoded hex that can become stale.
+        finalizeDeposit();
 
-        stdstore.target(L2_BRIDGEHUB_ADDR).sig(IBridgehub.ctmAssetIdToAddress.selector).with_key(assetId).checked_write(
-            address(chainTypeManager)
+        assertEq(
+            l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)),
+            ctmAssetId,
+            "CTM should be registered with correct asset ID"
         );
+        assertEq(l2Bridgehub.ctmAssetIdFromChainId(mintChainId), ctmAssetId, "CTM asset ID from chain ID should match");
 
-        (bool success, ) = recipient.call(data);
+        address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
+        assertTrue(diamondProxy != address(0), "Diamond proxy should be deployed");
+
+        address handlerAddress = IAssetRouterBase(L2_ASSET_ROUTER_ADDR).assetHandlerAddress(ctmAssetId);
+        assertTrue(handlerAddress != address(0), "Asset handler should be configured");
     }
 }

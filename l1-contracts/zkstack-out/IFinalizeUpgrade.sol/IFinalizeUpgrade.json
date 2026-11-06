@@ -1,0 +1,43 @@
+[
+  {
+    "type": "function",
+    "name": "initChains",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chains",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initTokens",
+    "inputs": [
+      {
+        "name": "l1NativeTokenVault",
+        "type": "address",
+        "internalType": "address payable"
+      },
+      {
+        "name": "tokens",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      {
+        "name": "chains",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

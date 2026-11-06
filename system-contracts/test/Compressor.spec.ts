@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { BigNumber } from "ethers";
 import { ethers, network } from "hardhat";
 import type { Wallet } from "zksync-ethers";
 import * as zksync from "zksync-ethers";
@@ -188,8 +187,8 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901234",
           index: 0,
-          initValue: BigNumber.from(0),
-          finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901234"),
+          initValue: 0n,
+          finalValue: 0x1234567890123456789012345678901234567890123456789012345678901234n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
@@ -205,8 +204,8 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901234",
           index: 0,
-          initValue: BigNumber.from(1),
-          finalValue: BigNumber.from(0),
+          initValue: 1n,
+          finalValue: 0n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
@@ -222,8 +221,8 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901234",
           index: 1,
-          initValue: BigNumber.from(1),
-          finalValue: BigNumber.from(0),
+          initValue: 1n,
+          finalValue: 0n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
@@ -239,18 +238,18 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901234",
           index: 1,
-          initValue: BigNumber.from(1),
-          finalValue: BigNumber.from(0),
+          initValue: 1n,
+          finalValue: 0n,
         },
         {
           key: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
           index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: TWO_IN_256.sub(2),
+          initValue: TWO_IN_256 / 2n,
+          finalValue: TWO_IN_256 - 2n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      stateDiffs[1].finalValue = TWO_IN_256.sub(1);
+      stateDiffs[1].finalValue = TWO_IN_256 - 1n;
       const compressedStateDiffs = compressStateDiffs(3, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 3, encodedStateDiffs, compressedStateDiffs)
@@ -262,18 +261,18 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901234",
           index: 255,
-          initValue: BigNumber.from(1),
-          finalValue: BigNumber.from(0),
+          initValue: 1n,
+          finalValue: 0n,
         },
         {
           key: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
           index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: BigNumber.from(1),
+          initValue: TWO_IN_256 / 2n,
+          finalValue: 1n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      stateDiffs[1].finalValue = BigNumber.from(0);
+      stateDiffs[1].finalValue = 0n;
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(2, 1, encodedStateDiffs, compressedStateDiffs)
@@ -285,12 +284,12 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901235",
           index: 255,
-          initValue: TWO_IN_256.div(2).sub(2),
-          finalValue: TWO_IN_256.div(2).sub(1),
+          initValue: TWO_IN_256 / 2n - 2n,
+          finalValue: TWO_IN_256 / 2n - 1n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      stateDiffs[0].finalValue = TWO_IN_256.div(2);
+      stateDiffs[0].finalValue = TWO_IN_256 / 2n;
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
@@ -302,12 +301,12 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
-          initValue: TWO_IN_256.div(4),
-          finalValue: TWO_IN_256.div(4).sub(5),
+          initValue: TWO_IN_256 / 4n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      stateDiffs[0].finalValue = TWO_IN_256.div(4).sub(1);
+      stateDiffs[0].finalValue = TWO_IN_256 / 4n - 1n;
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
@@ -319,8 +318,8 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
-          initValue: TWO_IN_256.div(4),
-          finalValue: TWO_IN_256.div(4).sub(5),
+          initValue: TWO_IN_256 / 4n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
@@ -338,22 +337,22 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
-          initValue: TWO_IN_256.div(4),
-          finalValue: TWO_IN_256.div(4).sub(5),
+          initValue: TWO_IN_256 / 4n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901239",
           index: 121,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(0),
+          initValue: TWO_IN_256 - 1n,
+          finalValue: 0n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
       stateDiffs.push({
         key: "0x0234567890123456789012345678901234567890123456789012345678901231",
         index: 0,
-        initValue: BigNumber.from(0),
-        finalValue: BigNumber.from(1),
+        initValue: 0n,
+        finalValue: 1n,
       });
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
@@ -366,22 +365,22 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
-          initValue: TWO_IN_256.div(4),
-          finalValue: TWO_IN_256.div(4).sub(5),
+          initValue: TWO_IN_256 / 4n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901239",
           index: 121,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(0),
+          initValue: TWO_IN_256 - 1n,
+          finalValue: 0n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
       stateDiffs.push({
         key: "0x0234567890123456789012345678901234567890123456789012345678901231",
         index: 1,
-        initValue: BigNumber.from(0),
-        finalValue: BigNumber.from(1),
+        initValue: 0n,
+        finalValue: 1n,
       });
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
@@ -394,32 +393,32 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901230",
           index: 0,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901231"),
-          finalValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901230"),
+          initValue: 0x1234567890123456789012345678901234567890123456789012345678901231n,
+          finalValue: 0x1234567890123456789012345678901234567890123456789012345678901230n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901232",
           index: 1,
-          initValue: TWO_IN_256.sub(1),
-          finalValue: BigNumber.from(1),
+          initValue: TWO_IN_256 - 1n,
+          finalValue: 1n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901234",
           index: 0,
-          initValue: TWO_IN_256.div(2),
-          finalValue: BigNumber.from(1),
+          initValue: TWO_IN_256 / 2n,
+          finalValue: 1n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 2323,
-          initValue: BigNumber.from("0x1234567890123456789012345678901234567890123456789012345678901237"),
-          finalValue: BigNumber.from("0x0239329298382323782378478237842378478237847237237872373272373272"),
+          initValue: 0x1234567890123456789012345678901234567890123456789012345678901237n,
+          finalValue: 0x0239329298382323782378478237842378478237847237237872373272373272n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901238",
           index: 2,
-          initValue: BigNumber.from(0),
-          finalValue: BigNumber.from(1),
+          initValue: 0n,
+          finalValue: 1n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);

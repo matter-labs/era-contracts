@@ -1,0 +1,32 @@
+name: "Save solc build cache"
+description: >
+  Records which Solidity sources this build came from, then saves the solc artifacts for later
+  commits to reuse.
+
+  The manifest is the half that makes the cache self-healing. A deleted source can be spotted from
+  the artifacts alone, but a contract removed from a file that still exists leaves an artifact whose
+  compilation target still resolves — and once that is saved under a SHA, the prefix key hands it to
+  every later commit, so check-hashes and check-zkstack-out would fail forever with no way to
+  recover. warm-solc-cache compares this manifest's git blob hashes and drops those artifacts on
+  restore.
+
+runs:
+  using: composite
+  steps:
+    - name: Record the sources this build came from
+      shell: bash
+      run: node "${{ github.action_path }}/../warm-solc-cache/write-source-manifest.js" "$MANIFEST_PATH"
+      env:
+        MANIFEST_PATH: l1-contracts/cache-forge/.warm-solc-cache-sources.json
+
+    # Kept inside the cached cache-forge directory so the manifest travels with the artifacts it
+    # describes, and so nothing that enumerates out/ ever sees it.
+    - name: Save solc build cache
+      uses: actions/cache/save@v4
+      with:
+        key: artifacts-l1-ci-solc-${{ github.sha }}
+        path: |
+          da-contracts/cache-forge
+          da-contracts/out
+          l1-contracts/cache-forge
+          l1-contracts/out

@@ -2,49 +2,88 @@
 
 pragma solidity 0.8.28;
 
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {console2 as console} from "forge-std/Script.sol";
+
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {
+    L2TransactionRequestDirect,
+    L2TransactionRequestTwoBridgesInner,
+    L2TransactionRequestTwoBridgesOuter
+} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
+
+import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSender.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {BridgehubL2TransactionRequest} from "contracts/common/Messaging.sol";
+import {
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {Utils} from "../Utils/Utils.sol";
 
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, NonEmptyMsgValue, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {
+    BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
+    ETH_TOKEN_ADDRESS,
+    HARD_CODED_CHAIN_ID,
+    MAINNET_CHAIN_ID,
+    MAX_NEW_FACTORY_DEPS,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    SEPOLIA_CHAIN_ID,
+    TWO_BRIDGES_MAGIC_VALUE
+} from "contracts/common/Config.sol";
+
+import {SecondBridgeAddressTooLow} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {
+    AssetIdAlreadyRegistered,
+    AssetIdNotSupported,
+    BridgeHubAlreadyRegistered,
+    CTMAlreadyRegistered,
+    CTMNotRegistered,
+    ChainIdIsHardcoded,
+    ChainIdTooBig,
+    MsgValueMismatch,
+    SharedBridgeNotSet,
+    SlotOccupied,
+    Unauthorized,
+    WrongMagicValue,
+    ZeroChainId
+} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
     address weth;
-    Bridgehub bridgeHub;
+    L1Bridgehub bridgehub;
+    IInteropCenter interopCenter;
     DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
     address public testTokenAddress;
     DummyChainTypeManagerWBH mockCTM;
     DummyZKChain mockChainContract;
-    DummySharedBridge mockSharedBridge;
-    DummySharedBridge mockSecondSharedBridge;
+    // These are real `L1AssetRouter` instances used as stand-in asset routers in the
+    // bridgehub tests; the legacy `DummySharedBridge` dev stub has been removed.
+    L1AssetRouter mockSharedBridge;
+    L1AssetRouter mockSecondSharedBridge;
     L1AssetRouter sharedBridge;
     address sharedBridgeAddress;
     address secondBridgeAddress;
@@ -52,8 +91,9 @@ contract ExperimentalBridgeTest is Test {
     L1AssetRouter secondBridge;
     TestnetERC20Token testToken;
     L1NativeTokenVault ntv;
-    IMessageRoot messageRoot;
+    IMessageRootBase messageRoot;
     L1Nullifier l1Nullifier;
+    SimpleExecutor simpleExecutor;
 
     bytes32 tokenAssetId;
 
@@ -68,7 +108,9 @@ contract ExperimentalBridgeTest is Test {
 
     address mockL2Contract;
 
+    uint256 l1ChainId;
     uint256 eraChainId;
+    uint256 gatewayChainId;
 
     address deployerAddress;
 
@@ -95,29 +137,46 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function setUp() public {
-        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        l1ChainId = 1;
         eraChainId = 320;
-        uint256 l1ChainId = block.chainid;
+        gatewayChainId = 506;
+        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
-        dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
-        bridgeHub = Bridgehub(address(dummyBridgehub));
+        dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
+        bridgehub = L1Bridgehub(address(dummyBridgehub));
+        interopCenter = new InteropCenter();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        interopCenter.initL2(l1ChainId, bridgeOwner, DataEncoding.encodeNTVAssetId(eraChainId, makeAddr("zkToken")));
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         weth = makeAddr("WETH");
-        mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid);
+        mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+        mockChainContract = new DummyZKChain(address(bridgehub), block.chainid, address(0), eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-        l1Nullifier = new L1Nullifier(bridgeHub, eraChainId, eraDiamondProxy);
+        l1Nullifier = new L1Nullifier(bridgehub, messageRoot);
         l1NullifierAddress = address(l1Nullifier);
 
-        mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
-        mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
+        mockSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        mockSecondSharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
 
-        ntv = _deployNTV(address(mockSharedBridge));
+        // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
+        ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
+        ntv.registerEthToken();
 
+        vm.prank(bridgeOwner);
         mockSecondSharedBridge.setNativeTokenVault(ntv);
 
         testToken = new TestnetERC20Token("ZKSTT", "ZkSync Test Token", 18);
@@ -125,33 +184,18 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
-        messageRoot = new MessageRoot(bridgeHub, l1ChainId);
-
-        sharedBridge = new L1AssetRouter(
-            mockL1WethAddress,
-            address(bridgeHub),
-            l1NullifierAddress,
-            eraChainId,
-            eraDiamondProxy
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), gatewayChainId, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
         );
-        address defaultOwner = sharedBridge.owner();
-        vm.prank(defaultOwner);
-        sharedBridge.transferOwnership(bridgeOwner);
-        vm.prank(bridgeOwner);
-        sharedBridge.acceptOwnership();
 
-        secondBridge = new L1AssetRouter(
-            mockL1WethAddress,
-            address(bridgeHub),
-            l1NullifierAddress,
-            eraChainId,
-            eraDiamondProxy
-        );
-        defaultOwner = secondBridge.owner();
-        vm.prank(defaultOwner);
-        secondBridge.transferOwnership(bridgeOwner);
-        vm.prank(bridgeOwner);
-        secondBridge.acceptOwnership();
+        sharedBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
+        secondBridge = _deployAssetRouter(mockL1WethAddress, eraDiamondProxy);
 
         sharedBridgeAddress = address(sharedBridge);
         secondBridgeAddress = address(secondBridge);
@@ -159,16 +203,16 @@ contract ExperimentalBridgeTest is Test {
         testToken6 = new TestnetERC20Token("USDC", "USD Coin", 6);
         testToken8 = new TestnetERC20Token("WBTC", "Wrapped Bitcoin", 8);
 
-        // test if the ownership of the bridgeHub is set correctly or not
-        defaultOwner = bridgeHub.owner();
+        // test if the ownership of the bridgehub is set correctly or not
+        address defaultOwner = bridgehub.owner();
 
         // Now, the `reentrancyGuardInitializer` should prevent anyone from calling `initialize` since we have called the constructor of the contract
         vm.expectRevert(SlotOccupied.selector);
-        bridgeHub.initialize(bridgeOwner);
+        bridgehub.initialize(bridgeOwner);
 
         vm.store(address(mockChainContract), LOCK_FLAG_ADDRESS, bytes32(uint256(1)));
         bytes32 bridgehubLocation = bytes32(uint256(36));
-        vm.store(address(mockChainContract), bridgehubLocation, bytes32(uint256(uint160(address(bridgeHub)))));
+        vm.store(address(mockChainContract), bridgehubLocation, bytes32(uint256(uint160(address(bridgehub)))));
         bytes32 baseTokenGasPriceNominatorLocation = bytes32(uint256(40));
         vm.store(address(mockChainContract), baseTokenGasPriceNominatorLocation, bytes32(uint256(1)));
         bytes32 baseTokenGasPriceDenominatorLocation = bytes32(uint256(41));
@@ -177,27 +221,54 @@ contract ExperimentalBridgeTest is Test {
 
         // Default owner calls transferOwnership
         vm.prank(defaultOwner);
-        bridgeHub.transferOwnership(bridgeOwner);
+        bridgehub.transferOwnership(bridgeOwner);
 
         // bridgeOwner calls acceptOwnership
         vm.prank(bridgeOwner);
-        bridgeHub.acceptOwnership();
+        bridgehub.acceptOwnership();
 
         // Ownership should have changed
-        assertEq(bridgeHub.owner(), bridgeOwner);
+        assertEq(bridgehub.owner(), bridgeOwner);
+
+        simpleExecutor = new SimpleExecutor();
     }
 
-    function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
+    /// @dev Deploys a real `L1AssetRouter` and transfers ownership to `bridgeOwner`,
+    /// mirroring the production ownership handover. Used everywhere the tests previously
+    /// relied on the (now removed) `DummySharedBridge` dev stub.
+    function _deployAssetRouter(
+        address _l1WethAddress,
+        address _eraDiamondProxy
+    ) internal returns (L1AssetRouter assetRouter) {
+        assetRouter = new L1AssetRouter(
+            _l1WethAddress,
+            address(bridgehub),
+            l1NullifierAddress,
+            eraChainId,
+            _eraDiamondProxy
+        );
+        address defaultOwner = assetRouter.owner();
+        vm.prank(defaultOwner);
+        assetRouter.transferOwnership(bridgeOwner);
+        vm.prank(bridgeOwner);
+        assetRouter.acceptOwnership();
+    }
+
+    function _deployNTVWithoutEthToken(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         L1NativeTokenVault ntvImpl = new L1NativeTokenVault(weth, _sharedBridgeAddr, l1Nullifier);
         TransparentUpgradeableProxy ntvProxy = new TransparentUpgradeableProxy(
             address(ntvImpl),
-            address(bridgeOwner),
+            address(deployerAddress),
             abi.encodeCall(ntvImpl.initialize, (bridgeOwner, address(0)))
         );
         addr = L1NativeTokenVault(payable(ntvProxy));
 
         vm.prank(bridgeOwner);
         L1AssetRouter(_sharedBridgeAddr).setNativeTokenVault(addr);
+    }
+
+    function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
+        addr = _deployNTVWithoutEthToken(_sharedBridgeAddr);
 
         addr.registerEthToken();
     }
@@ -214,14 +285,20 @@ contract ExperimentalBridgeTest is Test {
 
     function _initializeBridgehub() internal {
         vm.prank(bridgeOwner);
-        bridgeHub.setPendingAdmin(deployerAddress);
+        bridgehub.setPendingAdmin(deployerAddress);
         vm.prank(deployerAddress);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
         vm.startPrank(bridgeOwner);
-        bridgeHub.addChainTypeManager(address(mockCTM));
-        bridgeHub.addTokenAssetId(tokenAssetId);
-        bridgeHub.setAddresses(sharedBridgeAddress, ICTMDeploymentTracker(address(0)), messageRoot, address(0));
+        bridgehub.addChainTypeManager(address(mockCTM));
+        bridgehub.addTokenAssetId(tokenAssetId);
+        bridgehub.setAddresses(
+            sharedBridgeAddress,
+            ICTMDeploymentTracker(address(0)),
+            messageRoot,
+            address(0),
+            address(0)
+        );
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());
@@ -233,77 +310,77 @@ contract ExperimentalBridgeTest is Test {
     function test_newPendingAdminReplacesPrevious(address randomDeployer, address otherRandomDeployer) public {
         vm.assume(randomDeployer != address(0));
         vm.assume(otherRandomDeployer != address(0));
-        assertEq(address(0), bridgeHub.admin());
+        assertEq(address(0), bridgehub.admin());
         vm.assume(randomDeployer != otherRandomDeployer);
 
-        vm.prank(bridgeHub.owner());
-        bridgeHub.setPendingAdmin(randomDeployer);
+        vm.prank(bridgehub.owner());
+        bridgehub.setPendingAdmin(randomDeployer);
 
-        vm.prank(bridgeHub.owner());
-        bridgeHub.setPendingAdmin(otherRandomDeployer);
+        vm.prank(bridgehub.owner());
+        bridgehub.setPendingAdmin(otherRandomDeployer);
 
         vm.prank(otherRandomDeployer);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
-        assertEq(otherRandomDeployer, bridgeHub.admin());
+        assertEq(otherRandomDeployer, bridgehub.admin());
     }
 
     function test_onlyPendingAdminCanAccept(address randomDeployer, address otherRandomDeployer) public {
         vm.assume(randomDeployer != address(0));
         vm.assume(otherRandomDeployer != address(0));
-        assertEq(address(0), bridgeHub.admin());
+        assertEq(address(0), bridgehub.admin());
         vm.assume(randomDeployer != otherRandomDeployer);
 
-        vm.prank(bridgeHub.owner());
-        bridgeHub.setPendingAdmin(randomDeployer);
+        vm.prank(bridgehub.owner());
+        bridgehub.setPendingAdmin(randomDeployer);
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, otherRandomDeployer));
         vm.prank(otherRandomDeployer);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
-        assertEq(address(0), bridgeHub.admin());
+        assertEq(address(0), bridgehub.admin());
     }
 
     function test_onlyOwnerCanSetDeployer(address randomDeployer) public {
         vm.assume(randomDeployer != address(0));
-        assertEq(address(0), bridgeHub.admin());
+        assertEq(address(0), bridgehub.admin());
 
-        vm.prank(bridgeHub.owner());
-        bridgeHub.setPendingAdmin(randomDeployer);
+        vm.prank(bridgehub.owner());
+        bridgehub.setPendingAdmin(randomDeployer);
         vm.prank(randomDeployer);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
-        assertEq(randomDeployer, bridgeHub.admin());
+        assertEq(randomDeployer, bridgehub.admin());
     }
 
     function test_randomCallerCannotSetDeployer(address randomCaller, address randomDeployer) public {
-        if (randomCaller != bridgeHub.owner() && randomCaller != bridgeHub.admin()) {
+        if (randomCaller != bridgehub.owner() && randomCaller != bridgehub.admin()) {
             vm.prank(randomCaller);
             vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
-            bridgeHub.setPendingAdmin(randomDeployer);
+            bridgehub.setPendingAdmin(randomDeployer);
 
             // The deployer shouldn't have changed.
-            assertEq(address(0), bridgeHub.admin());
+            assertEq(address(0), bridgehub.admin());
         }
     }
 
     function test_addChainTypeManager(address randomAddressWithoutTheCorrectInterface) public {
         vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
-        bool isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        bool isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isCTMRegistered);
 
         vm.prank(bridgeOwner);
-        bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
+        bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
 
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isCTMRegistered);
 
         // An address that has already been registered, cannot be registered again (at least not before calling `removeChainTypeManager`).
         vm.prank(bridgeOwner);
         vm.expectRevert(CTMAlreadyRegistered.selector);
-        bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
+        bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
 
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isCTMRegistered);
     }
 
@@ -312,149 +389,100 @@ contract ExperimentalBridgeTest is Test {
         address randomAddressWithoutTheCorrectInterface
     ) public {
         vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
-        bool isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        bool isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(!isCTMRegistered);
 
         if (randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert(bytes("Ownable: caller is not the owner"));
 
-            bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
+            bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
         }
 
         vm.prank(bridgeOwner);
-        bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
+        bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
 
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isCTMRegistered);
 
         // An address that has already been registered, cannot be registered again (at least not before calling `removeChainTypeManager`).
         vm.prank(bridgeOwner);
         vm.expectRevert(CTMAlreadyRegistered.selector);
-        bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
+        bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
 
         // Definitely not by a random caller
         if (randomCaller != bridgeOwner) {
             vm.prank(randomCaller);
             vm.expectRevert("Ownable: caller is not the owner");
-            bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
+            bridgehub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
         }
 
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
+        isCTMRegistered = bridgehub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
         assertTrue(isCTMRegistered);
-    }
-
-    function test_removeChainTypeManager(address randomAddressWithoutTheCorrectInterface) public {
-        vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
-        bool isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-        assertTrue(!isCTMRegistered);
-
-        // A non-existent CTM cannot be removed
-        vm.prank(bridgeOwner);
-        vm.expectRevert(CTMNotRegistered.selector);
-        bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-        // Let's first register our particular chainTypeManager
-        vm.prank(bridgeOwner);
-        bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-        assertTrue(isCTMRegistered);
-
-        // Only an address that has already been registered, can be removed.
-        vm.prank(bridgeOwner);
-        bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-        assertTrue(!isCTMRegistered);
-
-        // An already removed CTM cannot be removed again
-        vm.prank(bridgeOwner);
-        vm.expectRevert(CTMNotRegistered.selector);
-        bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
     }
 
     function test_removeChainTypeManager_cannotBeCalledByRandomAddress(
-        address randomAddressWithoutTheCorrectInterface,
-        address randomCaller
+        address _chainTypeManager,
+        address _randomCaller
     ) public {
-        vm.assume(randomAddressWithoutTheCorrectInterface != address(0));
-        bool isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-        assertTrue(!isCTMRegistered);
+        vm.assume(_chainTypeManager != address(0));
+        vm.assume(_randomCaller != bridgeOwner);
 
-        if (randomCaller != bridgeOwner) {
-            vm.prank(randomCaller);
-            vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        // Removing a non-registered CTM is still owner-only.
+        vm.prank(_randomCaller);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        bridgehub.removeChainTypeManager(_chainTypeManager);
 
-            bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-        }
-
-        // A non-existent CTM cannot be removed
+        // Register the CTM so the second check covers the successful-removal path.
         vm.prank(bridgeOwner);
-        vm.expectRevert(CTMNotRegistered.selector);
-        bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
+        bridgehub.addChainTypeManager(_chainTypeManager);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
 
-        // Let's first register our particular chainTypeManager
+        vm.prank(_randomCaller);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        bridgehub.removeChainTypeManager(_chainTypeManager);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
+
         vm.prank(bridgeOwner);
-        bridgeHub.addChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-        assertTrue(isCTMRegistered);
-
-        // Only an address that has already been registered, can be removed.
-        vm.prank(bridgeOwner);
-        bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-        isCTMRegistered = bridgeHub.chainTypeManagerIsRegistered(randomAddressWithoutTheCorrectInterface);
-        assertTrue(!isCTMRegistered);
-
-        // An already removed CTM cannot be removed again
-        vm.prank(bridgeOwner);
-        vm.expectRevert(CTMNotRegistered.selector);
-        bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-
-        // Not possible by a randomcaller as well
-        if (randomCaller != bridgeOwner) {
-            vm.prank(randomCaller);
-            vm.expectRevert(bytes("Ownable: caller is not the owner"));
-            bridgeHub.removeChainTypeManager(randomAddressWithoutTheCorrectInterface);
-        }
+        bridgehub.removeChainTypeManager(_chainTypeManager);
+        assertFalse(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
     }
 
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(
+        bridgehub.setAddresses(
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
+            address(0),
             address(0)
         );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
-        assertTrue(!bridgeHub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
+        assertTrue(!bridgehub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
-        bridgeHub.addTokenAssetId(assetId);
+        bridgehub.addTokenAssetId(assetId);
 
         assertTrue(
-            bridgeHub.assetIdIsRegistered(assetId),
+            bridgehub.assetIdIsRegistered(assetId),
             "after call from the bridgeowner, this randomAddress should be a registered token"
         );
 
         if (randomAddress != address(testTokenAddress)) {
             assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(randomAddress));
-            vm.assume(!bridgeHub.assetIdIsRegistered(assetId));
+            vm.assume(!bridgehub.assetIdIsRegistered(assetId));
             // Testing to see if a random address can also be added or not
             vm.prank(bridgeOwner);
-            bridgeHub.addTokenAssetId(assetId);
-            assertTrue(bridgeHub.assetIdIsRegistered(assetId));
+            bridgehub.addTokenAssetId(assetId);
+            assertTrue(bridgehub.assetIdIsRegistered(assetId));
         }
 
         // An already registered token cannot be registered again
         vm.prank(bridgeOwner);
         vm.expectRevert(AssetIdAlreadyRegistered.selector);
-        bridgeHub.addTokenAssetId(assetId);
+        bridgehub.addTokenAssetId(assetId);
     }
 
     function test_addAssetId_cannotBeCalledByRandomAddress(
@@ -462,10 +490,11 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(
+        bridgehub.setAddresses(
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
+            address(0),
             address(0)
         );
         vm.stopPrank();
@@ -473,18 +502,18 @@ contract ExperimentalBridgeTest is Test {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
 
         vm.assume(randomCaller != bridgeOwner);
-        vm.assume(randomCaller != bridgeHub.admin());
+        vm.assume(randomCaller != bridgehub.admin());
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
-        bridgeHub.addTokenAssetId(assetId);
+        bridgehub.addTokenAssetId(assetId);
 
-        assertTrue(!bridgeHub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
+        assertTrue(!bridgehub.assetIdIsRegistered(assetId), "This random address is not registered as a token");
 
         vm.prank(bridgeOwner);
-        bridgeHub.addTokenAssetId(assetId);
+        bridgehub.addTokenAssetId(assetId);
 
         assertTrue(
-            bridgeHub.assetIdIsRegistered(assetId),
+            bridgehub.assetIdIsRegistered(assetId),
             "after call from the bridgeowner, this testTokenAddress should be a registered token"
         );
 
@@ -492,29 +521,30 @@ contract ExperimentalBridgeTest is Test {
         if (randomCaller != bridgeOwner) {
             vm.prank(bridgeOwner);
             vm.expectRevert(AssetIdAlreadyRegistered.selector);
-            bridgeHub.addTokenAssetId(assetId);
+            bridgehub.addTokenAssetId(assetId);
         }
     }
 
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
-        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
-        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
-        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
+        assertTrue(address(bridgehub.assetRouter()) == address(0), "Shared bridge is already there");
+        assertTrue(bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(address(0)), "Message root is already there");
 
         vm.prank(bridgeOwner);
-        bridgeHub.setAddresses(
+        bridgehub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot),
+            IMessageRootBase(randomMessageRoot),
+            address(0),
             address(0)
         );
 
-        assertTrue(bridgeHub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
+        assertTrue(address(bridgehub.assetRouter()) == randomAssetRouter, "Shared bridge is already there");
         assertTrue(
-            bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
+            bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
         );
-        assertTrue(bridgeHub.messageRoot() == IMessageRoot(randomMessageRoot), "Message root is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(randomMessageRoot), "Message root is already there");
     }
 
     function test_setAddresses_cannotBeCalledByRandomAddress(
@@ -523,20 +553,21 @@ contract ExperimentalBridgeTest is Test {
         address randomCTMDeployer,
         address randomMessageRoot
     ) public {
-        vm.assume(randomCaller != bridgeOwner);
+        vm.assume(randomCaller != bridgeOwner && randomCaller != L2_COMPLEX_UPGRADER_ADDR);
 
         vm.prank(randomCaller);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
-        bridgeHub.setAddresses(
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
+        bridgehub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot),
+            IMessageRootBase(randomMessageRoot),
+            address(0),
             address(0)
         );
 
-        assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
-        assertTrue(bridgeHub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
-        assertTrue(bridgeHub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
+        assertTrue(address(bridgehub.assetRouter()) == address(0), "Shared bridge is already there");
+        assertTrue(bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(address(0)), "Message root is already there");
     }
 
     uint256 newChainId;
@@ -553,11 +584,11 @@ contract ExperimentalBridgeTest is Test {
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
-        bridgeHub.pause();
+        bridgehub.pause();
         vm.prank(bridgeOwner);
-        bridgeHub.setPendingAdmin(deployerAddress);
+        bridgehub.setPendingAdmin(deployerAddress);
         vm.prank(deployerAddress);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
         // ntv.registerToken(address(testToken));
 
@@ -568,7 +599,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.expectRevert("Pausable: paused");
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -579,11 +610,11 @@ contract ExperimentalBridgeTest is Test {
         });
 
         vm.prank(bridgeOwner);
-        bridgeHub.unpause();
+        bridgehub.unpause();
 
         vm.expectRevert(CTMNotRegistered.selector);
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -605,14 +636,14 @@ contract ExperimentalBridgeTest is Test {
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
-        bridgeHub.setPendingAdmin(deployerAddress);
+        bridgehub.setPendingAdmin(deployerAddress);
         vm.prank(deployerAddress);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
         chainId = bound(chainId, 1, type(uint48).max);
         vm.expectRevert(CTMNotRegistered.selector);
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -634,14 +665,14 @@ contract ExperimentalBridgeTest is Test {
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
-        bridgeHub.setPendingAdmin(deployerAddress);
+        bridgehub.setPendingAdmin(deployerAddress);
         vm.prank(deployerAddress);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
         chainId = bound(chainId, type(uint48).max + uint256(1), type(uint256).max);
         vm.expectRevert(ChainIdTooBig.selector);
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -654,8 +685,58 @@ contract ExperimentalBridgeTest is Test {
         chainId = 0;
         vm.expectRevert(ZeroChainId.selector);
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _salt: salt,
+            _admin: admin,
+            _initData: bytes(""),
+            _factoryDeps: new bytes[](0)
+        });
+    }
+
+    function test_RevertWhen_hardcodedChainIdOnMainnet(
+        uint256 salt,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+
+        vm.chainId(MAINNET_CHAIN_ID);
+        vm.expectRevert(ChainIdIsHardcoded.selector);
+        vm.prank(deployerAddress);
+        bridgehub.createNewChain({
+            _chainId: HARD_CODED_CHAIN_ID,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _salt: salt,
+            _admin: admin,
+            _initData: bytes(""),
+            _factoryDeps: new bytes[](0)
+        });
+    }
+
+    function test_RevertWhen_hardcodedChainIdOnSepolia(
+        uint256 salt,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+
+        vm.chainId(SEPOLIA_CHAIN_ID);
+        vm.expectRevert(ChainIdIsHardcoded.selector);
+        vm.prank(deployerAddress);
+        bridgehub.createNewChain({
+            _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
             _salt: salt,
@@ -676,17 +757,17 @@ contract ExperimentalBridgeTest is Test {
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
-        bridgeHub.setPendingAdmin(deployerAddress);
+        bridgehub.setPendingAdmin(deployerAddress);
         vm.prank(deployerAddress);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
         vm.startPrank(bridgeOwner);
-        bridgeHub.addChainTypeManager(address(mockCTM));
+        bridgehub.addChainTypeManager(address(mockCTM));
         vm.stopPrank();
 
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotSupported.selector, tokenAssetId));
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -707,18 +788,18 @@ contract ExperimentalBridgeTest is Test {
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
-        bridgeHub.setPendingAdmin(deployerAddress);
+        bridgehub.setPendingAdmin(deployerAddress);
         vm.prank(deployerAddress);
-        bridgeHub.acceptAdmin();
+        bridgehub.acceptAdmin();
 
         vm.startPrank(bridgeOwner);
-        bridgeHub.addChainTypeManager(address(mockCTM));
-        bridgeHub.addTokenAssetId(tokenAssetId);
+        bridgehub.addChainTypeManager(address(mockCTM));
+        bridgehub.addTokenAssetId(tokenAssetId);
         vm.stopPrank();
 
         vm.expectRevert(SharedBridgeNotSet.selector);
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -740,13 +821,13 @@ contract ExperimentalBridgeTest is Test {
 
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
-        stdstore.target(address(bridgeHub)).sig("chainTypeManager(uint256)").with_key(chainId).checked_write(
+        stdstore.target(address(bridgehub)).sig("chainTypeManager(uint256)").with_key(chainId).checked_write(
             address(mockCTM)
         );
 
         vm.expectRevert(BridgeHubAlreadyRegistered.selector);
         vm.prank(deployerAddress);
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -770,12 +851,19 @@ contract ExperimentalBridgeTest is Test {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
+        // `newChainAddress` gets a vm.mockCall below, and forge's own addresses cannot be mocked:
+        // with newChainAddress = address(vm), the Bridgehub's getZKsyncOS() call is intercepted as a
+        // cheatcode instead of returning the mocked `false`, so it takes the ZKsyncOS branch and
+        // emits NewInteropRoot before NewChain — failing the expectEmit with
+        // "NewInteropRoot != expected NewChain". Precompiles cannot be mocked usefully either.
+        // Excluding them keeps this about the Bridgehub rather than about what the fuzzer picked.
+        assumeAddressIsNot(newChainAddress, AddressType.ZeroAddress, AddressType.Precompile, AddressType.ForgeAddress);
 
         _initializeBridgehub();
 
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -787,7 +875,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.prank(mockCTM.owner());
 
-        // bridgeHub.createNewChain => chainTypeManager.createNewChain => this function sets the stateTransition mapping
+        // bridgehub.createNewChain => chainTypeManager.createNewChain => this function sets the stateTransition mapping
         // of `chainId`, let's emulate that using foundry cheatcodes or let's just use the extra function we introduced in our mockCTM
         mockCTM.setZKChain(chainId, address(mockChainContract));
 
@@ -805,11 +893,15 @@ contract ExperimentalBridgeTest is Test {
             ),
             abi.encode(newChainAddress)
         );
+        // The Bridgehub seeds the fresh chain's genesis root right after registration by pulling
+        // from the chain's getters; `newChainAddress` is a fuzzed address, so mock the VM flag to
+        // the EraVM no-op branch.
+        vm.mockCall(newChainAddress, abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(false));
 
-        vm.expectEmit(true, true, true, true, address(bridgeHub));
+        vm.expectEmit(true, true, true, true, address(bridgehub));
         emit NewChain(chainId, address(mockCTM), admin);
 
-        bridgeHub.createNewChain({
+        bridgehub.createNewChain({
             _chainId: chainId,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
@@ -822,157 +914,9 @@ contract ExperimentalBridgeTest is Test {
         vm.stopPrank();
         vm.clearMockedCalls();
 
-        assertTrue(bridgeHub.chainTypeManager(chainId) == address(mockCTM));
-        assertTrue(bridgeHub.baseTokenAssetId(chainId) == tokenAssetId);
-        assertTrue(bridgeHub.getZKChain(chainId) == newChainAddress);
-    }
-
-    function test_proveL2MessageInclusion(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes memory randomData
-    ) public {
-        mockChainId = _setUpZKChainForChainId(mockChainId);
-
-        // Now the following statements should be true as well:
-        assertTrue(bridgeHub.chainTypeManager(mockChainId) == address(mockCTM));
-        assertTrue(bridgeHub.getZKChain(mockChainId) == address(mockChainContract));
-
-        // Creating a random L2Message::l2Message so that we pass the correct parameters to `proveL2MessageInclusion`
-        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
-
-        // Since we have used random data for the `bridgeHub.proveL2MessageInclusion` function which basically forwards the call
-        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
-        vm.mockCall(
-            address(mockChainContract),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                mockChainContract.proveL2MessageInclusion.selector,
-                mockBatchNumber,
-                mockIndex,
-                l2Message,
-                mockProof
-            ),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgeHub.proveL2MessageInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _message: l2Message,
-                _proof: mockProof
-            })
-        );
-        vm.clearMockedCalls();
-    }
-
-    function test_proveL2LogInclusion(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint8 randomL2ShardId,
-        bool randomIsService,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes32 randomKey,
-        bytes32 randomValue
-    ) public {
-        mockChainId = _setUpZKChainForChainId(mockChainId);
-
-        // Now the following statements should be true as well:
-        assertTrue(bridgeHub.chainTypeManager(mockChainId) == address(mockCTM));
-        assertTrue(bridgeHub.getZKChain(mockChainId) == address(mockChainContract));
-
-        // Creating a random L2Log::l2Log so that we pass the correct parameters to `proveL2LogInclusion`
-        L2Log memory l2Log = _createMockL2Log({
-            randomL2ShardId: randomL2ShardId,
-            randomIsService: randomIsService,
-            randomTxNumInBatch: randomTxNumInBatch,
-            randomSender: randomSender,
-            randomKey: randomKey,
-            randomValue: randomValue
-        });
-
-        // Since we have used random data for the `bridgeHub.proveL2LogInclusion` function which basically forwards the call
-        // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
-        vm.mockCall(
-            address(mockChainContract),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                mockChainContract.proveL2LogInclusion.selector,
-                mockBatchNumber,
-                mockIndex,
-                l2Log,
-                mockProof
-            ),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgeHub.proveL2LogInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _log: l2Log,
-                _proof: mockProof
-            })
-        );
-        vm.clearMockedCalls();
-    }
-
-    function test_proveL1ToL2TransactionStatus(
-        uint256 randomChainId,
-        bytes32 randomL2TxHash,
-        uint256 randomL2BatchNumber,
-        uint256 randomL2MessageIndex,
-        uint16 randomL2TxNumberInBatch,
-        bytes32[] memory randomMerkleProof,
-        bool randomResultantBool,
-        bool txStatusBool
-    ) public {
-        randomChainId = _setUpZKChainForChainId(randomChainId);
-
-        TxStatus txStatus;
-
-        if (txStatusBool) {
-            txStatus = TxStatus.Failure;
-        } else {
-            txStatus = TxStatus.Success;
-        }
-
-        vm.mockCall(
-            address(mockChainContract),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                mockChainContract.proveL1ToL2TransactionStatus.selector,
-                randomL2TxHash,
-                randomL2BatchNumber,
-                randomL2MessageIndex,
-                randomL2TxNumberInBatch,
-                randomMerkleProof,
-                txStatus
-            ),
-            abi.encode(randomResultantBool)
-        );
-
-        assertTrue(
-            bridgeHub.proveL1ToL2TransactionStatus({
-                _chainId: randomChainId,
-                _l2TxHash: randomL2TxHash,
-                _l2BatchNumber: randomL2BatchNumber,
-                _l2MessageIndex: randomL2MessageIndex,
-                _l2TxNumberInBatch: randomL2TxNumberInBatch,
-                _merkleProof: randomMerkleProof,
-                _status: txStatus
-            }) == randomResultantBool
-        );
+        assertTrue(bridgehub.chainTypeManager(chainId) == address(mockCTM));
+        assertTrue(bridgehub.baseTokenAssetId(chainId) == tokenAssetId);
+        assertTrue(bridgehub.getZKChain(chainId) == newChainAddress);
     }
 
     function test_l2TransactionBaseCost(
@@ -997,7 +941,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            bridgeHub.l2TransactionBaseCost(mockChainId, mockGasPrice, mockL2GasLimit, mockL2GasPerPubdataByteLimit) ==
+            bridgehub.l2TransactionBaseCost(mockChainId, mockGasPrice, mockL2GasLimit, mockL2GasPerPubdataByteLimit) ==
                 mockL2TxnCost
         );
         vm.clearMockedCalls();
@@ -1030,14 +974,14 @@ contract ExperimentalBridgeTest is Test {
 
         l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
 
-        assertTrue(bridgeHub.baseTokenAssetId(l2TxnReqDirect.chainId) != ETH_TOKEN_ASSET_ID);
+        assertTrue(bridgehub.baseTokenAssetId(l2TxnReqDirect.chainId) != ETH_TOKEN_ASSET_ID);
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, true, address(0));
 
-        assertTrue(bridgeHub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
-        console.log(IL1AssetRouter(bridgeHub.assetRouter()).assetHandlerAddress(ETH_TOKEN_ASSET_ID));
-        assertTrue(bridgeHub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
+        assertTrue(bridgehub.baseTokenAssetId(l2TxnReqDirect.chainId) == ETH_TOKEN_ASSET_ID);
+        console.log(bridgehub.assetRouter().assetHandlerAddress(ETH_TOKEN_ASSET_ID));
+        assertTrue(bridgehub.baseToken(l2TxnReqDirect.chainId) == ETH_TOKEN_ADDRESS);
 
-        assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
+        assertTrue(bridgehub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
         canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
         vm.mockCall(
@@ -1048,8 +992,8 @@ contract ExperimentalBridgeTest is Test {
 
         mockChainContract.setFeeParams();
         mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
-        mockChainContract.setBridgeHubAddress(address(bridgeHub));
-        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
+        mockChainContract.setBridgeHubAddress(address(bridgehub));
+        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgehub));
     }
 
     function test_requestL2TransactionDirect_RevertWhen_incorrectETHParams(
@@ -1084,7 +1028,7 @@ contract ExperimentalBridgeTest is Test {
         vm.deal(randomCaller, msgValue);
         vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, mockMintValue, msgValue));
         vm.prank(randomCaller);
-        bridgeHub.requestL2TransactionDirect{value: msgValue}(l2TxnReqDirect);
+        bridgehub.requestL2TransactionDirect{value: msgValue}(l2TxnReqDirect);
     }
 
     function test_requestL2TransactionDirect_ETHCase(
@@ -1103,6 +1047,8 @@ contract ExperimentalBridgeTest is Test {
 
         address randomCaller = makeAddr("RANDOM_CALLER");
         mockChainId = bound(mockChainId, 1, type(uint48).max);
+        // Base-token burns require a non-zero amount, so the mint value must be positive for a successful request.
+        mockMintValue = bound(mockMintValue, 1, type(uint128).max);
 
         (L2TransactionRequestDirect memory l2TxnReqDirect, bytes32 hash) = _prepareETHL2TransactionDirectRequest({
             mockChainId: mockChainId,
@@ -1120,12 +1066,13 @@ contract ExperimentalBridgeTest is Test {
         gasPrice = bound(gasPrice, 1_000, 50_000_000);
         vm.txGasPrice(gasPrice * 1 gwei);
         vm.prank(randomCaller);
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         assertTrue(resultantHash == hash);
     }
 
-    function test_requestL2TransactionDirect_NonETHCase(
+    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be reused in the future
+    function test_requestL2TransactionDirect_NonETHCase7702(
         uint256 mockChainId,
         uint256 mockMintValue,
         address mockL2Contract,
@@ -1140,7 +1087,8 @@ contract ExperimentalBridgeTest is Test {
         _useFullSharedBridge();
         _initializeBridgehub();
 
-        address randomCaller = makeAddr("RANDOM_CALLER");
+        uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
+        address payable randomCaller = payable(vm.addr(randomCallerPk));
         mockChainId = bound(mockChainId, 1, type(uint48).max);
 
         vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
@@ -1155,14 +1103,14 @@ contract ExperimentalBridgeTest is Test {
             mockL2GasLimit: mockL2GasLimit,
             mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
             mockFactoryDeps: mockFactoryDeps,
-            mockRefundRecipient: address(0)
+            mockRefundRecipient: randomCaller
         });
 
         l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
 
         _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
 
-        assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
+        assertTrue(bridgehub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
         vm.mockCall(
@@ -1173,29 +1121,30 @@ contract ExperimentalBridgeTest is Test {
 
         mockChainContract.setFeeParams();
         mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
-        mockChainContract.setBridgeHubAddress(address(bridgeHub));
-        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
+        mockChainContract.setBridgeHubAddress(address(bridgehub));
+        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgehub));
 
         gasPrice = bound(gasPrice, 1_000, 50_000_000);
         vm.txGasPrice(gasPrice * 1 gwei);
 
         vm.deal(randomCaller, 1 ether);
-        vm.prank(randomCaller);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, 0, randomCaller.balance));
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         // Now, let's call the same function with zero msg.value
         testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
         assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
 
+        bytes memory calldataForExecutor = abi.encodeWithSelector(
+            bridgehub.requestL2TransactionDirect.selector,
+            l2TxnReqDirect
+        );
+
+        vm.recordLogs(); // start recording all logs
+
         vm.prank(randomCaller);
-        testToken.transfer(address(this), l2TxnReqDirect.mintValue);
-        assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
         testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
-
-        resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
-
-        assertEq(canonicalHash, resultantHash);
+        assertEq(testToken.allowance(randomCaller, sharedBridgeAddress), l2TxnReqDirect.mintValue);
+        vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
+        SimpleExecutor(randomCaller).execute(address(bridgehub), 0, calldataForExecutor);
     }
 
     function test_requestTransactionTwoBridgesChecksMagicValue(
@@ -1215,6 +1164,8 @@ contract ExperimentalBridgeTest is Test {
         vm.assume(magicValue != TWO_BRIDGES_MAGIC_VALUE);
 
         chainId = bound(chainId, 1, type(uint48).max);
+        // Base-token burns require a non-zero amount; bound the mint value so the flow reaches the magic-value check.
+        mintValue = bound(mintValue, 1, type(uint128).max);
 
         L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
@@ -1230,9 +1181,9 @@ contract ExperimentalBridgeTest is Test {
         l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
 
         _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
-        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
+        assertTrue(bridgehub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
 
-        assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+        assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
         uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
         address randomCaller = makeAddr("RANDOM_CALLER");
@@ -1248,13 +1199,13 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             secondBridgeAddress,
-            abi.encodeWithSelector(IL1AssetRouter.bridgehubDeposit.selector),
+            abi.encodeWithSelector(IL1CrossChainSender.bridgehubDeposit.selector),
             abi.encode(request)
         );
 
         vm.expectRevert(abi.encodeWithSelector(WrongMagicValue.selector, TWO_BRIDGES_MAGIC_VALUE, magicValue));
         vm.prank(randomCaller);
-        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
 
     function test_requestL2TransactionTwoBridgesWrongBridgeAddress(
@@ -1288,15 +1239,15 @@ contract ExperimentalBridgeTest is Test {
         l2TxnReq2BridgeOut.chainId = _setUpZKChainForChainId(l2TxnReq2BridgeOut.chainId);
 
         _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, true, address(0));
-        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
+        assertTrue(bridgehub.baseToken(l2TxnReq2BridgeOut.chainId) == ETH_TOKEN_ADDRESS);
 
-        assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
+        assertTrue(bridgehub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
 
         uint256 callerMsgValue = l2TxnReq2BridgeOut.mintValue + l2TxnReq2BridgeOut.secondBridgeValue;
         address randomCaller = makeAddr("RANDOM_CALLER");
         vm.deal(randomCaller, callerMsgValue);
 
-        mockChainContract.setBridgeHubAddress(address(bridgeHub));
+        mockChainContract.setBridgeHubAddress(address(bridgehub));
 
         bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
 
@@ -1320,7 +1271,7 @@ contract ExperimentalBridgeTest is Test {
             address(secondBridgeAddressValue),
             l2TxnReq2BridgeOut.secondBridgeValue,
             abi.encodeWithSelector(
-                IL1AssetRouter.bridgehubDeposit.selector,
+                IL1CrossChainSender.bridgehubDeposit.selector,
                 l2TxnReq2BridgeOut.chainId,
                 randomCaller,
                 l2TxnReq2BridgeOut.l2Value,
@@ -1338,149 +1289,7 @@ contract ExperimentalBridgeTest is Test {
             )
         );
         vm.prank(randomCaller);
-        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
-    }
-
-    function test_requestL2TransactionTwoBridges_ERC20ToNonBase(
-        uint256 chainId,
-        uint256 mintValue,
-        uint256 l2Value,
-        uint256 l2GasLimit,
-        uint256 l2GasPerPubdataByteLimit,
-        address l2Receiver,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
-        _useFullSharedBridge();
-        _initializeBridgehub();
-        vm.assume(mintValue > 0);
-
-        // create another token, to avoid base token
-        TestnetERC20Token erc20Token = new TestnetERC20Token("ZKESTT", "ZkSync ERC Test Token", 18);
-        address erc20TokenAddress = address(erc20Token);
-        l2Value = bound(l2Value, 1, type(uint256).max);
-        bytes memory secondBridgeCalldata = abi.encode(erc20TokenAddress, l2Value, l2Receiver);
-
-        chainId = _setUpZKChainForChainId(chainId);
-
-        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
-            chainId: chainId,
-            mintValue: mintValue,
-            l2Value: 0, // not used
-            l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
-            refundRecipient: address(0),
-            secondBridgeValue: 0, // not used cause we are using ERC20
-            secondBridgeCalldata: secondBridgeCalldata
-        });
-
-        address randomCaller = makeAddr("RANDOM_CALLER");
-        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
-        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, false, address(testToken));
-        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == address(testToken));
-        assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
-        mockChainContract.setBridgeHubAddress(address(bridgeHub));
-
-        vm.mockCall(
-            address(mockChainContract),
-            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-            abi.encode(canonicalHash)
-        );
-
-        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
-        erc20Token.mint(randomCaller, l2Value);
-
-        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
-        assertEq(erc20Token.balanceOf(randomCaller), l2Value);
-
-        vm.startPrank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
-        erc20Token.approve(secondBridgeAddress, l2Value);
-        vm.stopPrank();
-        vm.prank(randomCaller);
-        bytes32 resultHash = bridgeHub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
-        assertEq(resultHash, canonicalHash);
-
-        assertEq(erc20Token.balanceOf(randomCaller), 0);
-        assertEq(testToken.balanceOf(randomCaller), 0);
-        assertEq(erc20Token.balanceOf(address(ntv)), l2Value);
-        assertEq(testToken.balanceOf(address(ntv)), l2TxnReq2BridgeOut.mintValue);
-
-        l2TxnReq2BridgeOut.secondBridgeValue = 1;
-        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
-        vm.startPrank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, 0));
-        bridgeHub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
-        vm.stopPrank();
-    }
-
-    function test_requestL2TransactionTwoBridges_ETHToNonBase(
-        uint256 chainId,
-        uint256 mintValue,
-        uint256 msgValue,
-        uint256 l2GasLimit,
-        uint256 l2GasPerPubdataByteLimit,
-        address refundRecipient,
-        uint256 secondBridgeValue,
-        address l2Receiver,
-        uint256 randomValue
-    ) public useRandomToken(randomValue) {
-        _useFullSharedBridge();
-        _initializeBridgehub();
-        vm.assume(mintValue > 0);
-
-        secondBridgeValue = bound(secondBridgeValue, 1, type(uint256).max);
-        bytes memory secondBridgeCalldata = abi.encode(ETH_TOKEN_ADDRESS, 0, l2Receiver);
-
-        chainId = _setUpZKChainForChainId(chainId);
-
-        L2TransactionRequestTwoBridgesOuter memory l2TxnReq2BridgeOut = _createMockL2TransactionRequestTwoBridgesOuter({
-            chainId: chainId,
-            mintValue: mintValue,
-            l2Value: 0,
-            l2GasLimit: l2GasLimit,
-            l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
-            refundRecipient: refundRecipient,
-            secondBridgeValue: secondBridgeValue,
-            secondBridgeCalldata: secondBridgeCalldata
-        });
-
-        _setUpBaseTokenForChainId(l2TxnReq2BridgeOut.chainId, false, address(testToken));
-        assertTrue(bridgeHub.baseToken(l2TxnReq2BridgeOut.chainId) == address(testToken));
-        assertTrue(bridgeHub.getZKChain(l2TxnReq2BridgeOut.chainId) == address(mockChainContract));
-
-        address randomCaller = makeAddr("RANDOM_CALLER");
-
-        mockChainContract.setBridgeHubAddress(address(bridgeHub));
-
-        {
-            bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
-
-            vm.mockCall(
-                address(mockChainContract),
-                abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
-                abi.encode(canonicalHash)
-            );
-        }
-
-        if (msgValue != secondBridgeValue) {
-            vm.deal(randomCaller, msgValue);
-            vm.expectRevert(
-                abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, msgValue)
-            );
-            vm.prank(randomCaller);
-            bridgeHub.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
-        }
-
-        testToken.mint(randomCaller, l2TxnReq2BridgeOut.mintValue);
-        assertEq(testToken.balanceOf(randomCaller), l2TxnReq2BridgeOut.mintValue);
-        vm.prank(randomCaller);
-        testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
-
-        vm.deal(randomCaller, l2TxnReq2BridgeOut.secondBridgeValue);
-        vm.prank(randomCaller);
-        bridgeHub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
 
     /////////////////////////////////////////////////////////
@@ -1515,40 +1324,6 @@ contract ExperimentalBridgeTest is Test {
         l2Req.secondBridgeCalldata = secondBridgeCalldata;
 
         return l2Req;
-    }
-
-    function _createMockL2Message(
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes memory randomData
-    ) internal pure returns (L2Message memory) {
-        L2Message memory l2Message;
-
-        l2Message.txNumberInBatch = randomTxNumInBatch;
-        l2Message.sender = randomSender;
-        l2Message.data = randomData;
-
-        return l2Message;
-    }
-
-    function _createMockL2Log(
-        uint8 randomL2ShardId,
-        bool randomIsService,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes32 randomKey,
-        bytes32 randomValue
-    ) internal pure returns (L2Log memory) {
-        L2Log memory l2Log;
-
-        l2Log.l2ShardId = randomL2ShardId;
-        l2Log.isService = randomIsService;
-        l2Log.txNumberInBatch = randomTxNumInBatch;
-        l2Log.sender = randomSender;
-        l2Log.key = randomKey;
-        l2Log.value = randomValue;
-
-        return l2Log;
     }
 
     function _createNewChainInitData(
@@ -1597,15 +1372,15 @@ contract ExperimentalBridgeTest is Test {
         mockChainId = bound(mockChainId, 1, type(uint48).max);
         mockChainIdInRange = mockChainId;
 
-        if (!bridgeHub.chainTypeManagerIsRegistered(address(mockCTM))) {
+        if (!bridgehub.chainTypeManagerIsRegistered(address(mockCTM))) {
             vm.prank(bridgeOwner);
-            bridgeHub.addChainTypeManager(address(mockCTM));
+            bridgehub.addChainTypeManager(address(mockCTM));
         }
 
         // We need to set the chainTypeManager of the mockChainId to mockCTM
-        // There is no function to do that in the bridgeHub
+        // There is no function to do that in the bridgehub
         // So, perhaps we will have to manually set the values in the chainTypeManager mapping via a foundry cheatcode
-        assertTrue(!(bridgeHub.chainTypeManager(mockChainId) == address(mockCTM)));
+        assertTrue(!(bridgehub.chainTypeManager(mockChainId) == address(mockCTM)));
 
         dummyBridgehub.setCTM(mockChainId, address(mockCTM));
         dummyBridgehub.setZKChain(mockChainId, address(mockChainContract));
@@ -1620,7 +1395,7 @@ contract ExperimentalBridgeTest is Test {
 
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, token);
 
-        stdstore.target(address(bridgeHub)).sig("baseTokenAssetId(uint256)").with_key(mockChainId).checked_write(
+        stdstore.target(address(bridgehub)).sig("baseTokenAssetId(uint256)").with_key(mockChainId).checked_write(
             baseTokenAssetId
         );
     }
@@ -1678,149 +1453,5 @@ contract ExperimentalBridgeTest is Test {
         }
 
         return shortArray;
-    }
-
-    /////////////////////////////////////////////////////////
-    // OLDER (HIGH-LEVEL MOCKED) TESTS
-    ////////////////////////////////////////////////////////
-
-    function test_proveL2MessageInclusion_old(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes memory randomData
-    ) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.addChainTypeManager(address(mockCTM));
-        vm.stopPrank();
-
-        L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
-
-        vm.mockCall(
-            address(bridgeHub),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                bridgeHub.proveL2MessageInclusion.selector,
-                mockChainId,
-                mockBatchNumber,
-                mockIndex,
-                l2Message,
-                mockProof
-            ),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgeHub.proveL2MessageInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _message: l2Message,
-                _proof: mockProof
-            })
-        );
-    }
-
-    function test_proveL2LogInclusion_old(
-        uint256 mockChainId,
-        uint256 mockBatchNumber,
-        uint256 mockIndex,
-        bytes32[] memory mockProof,
-        uint8 randomL2ShardId,
-        bool randomIsService,
-        uint16 randomTxNumInBatch,
-        address randomSender,
-        bytes32 randomKey,
-        bytes32 randomValue
-    ) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.addChainTypeManager(address(mockCTM));
-        vm.stopPrank();
-
-        L2Log memory l2Log = _createMockL2Log({
-            randomL2ShardId: randomL2ShardId,
-            randomIsService: randomIsService,
-            randomTxNumInBatch: randomTxNumInBatch,
-            randomSender: randomSender,
-            randomKey: randomKey,
-            randomValue: randomValue
-        });
-
-        vm.mockCall(
-            address(bridgeHub),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                bridgeHub.proveL2LogInclusion.selector,
-                mockChainId,
-                mockBatchNumber,
-                mockIndex,
-                l2Log,
-                mockProof
-            ),
-            abi.encode(true)
-        );
-
-        assertTrue(
-            bridgeHub.proveL2LogInclusion({
-                _chainId: mockChainId,
-                _batchNumber: mockBatchNumber,
-                _index: mockIndex,
-                _log: l2Log,
-                _proof: mockProof
-            })
-        );
-    }
-
-    function test_proveL1ToL2TransactionStatus_old(
-        uint256 randomChainId,
-        bytes32 randomL2TxHash,
-        uint256 randomL2BatchNumber,
-        uint256 randomL2MessageIndex,
-        uint16 randomL2TxNumberInBatch,
-        bytes32[] memory randomMerkleProof,
-        bool randomResultantBool
-    ) public {
-        vm.startPrank(bridgeOwner);
-        bridgeHub.addChainTypeManager(address(mockCTM));
-        vm.stopPrank();
-
-        TxStatus txStatus;
-
-        if (randomChainId % 2 == 0) {
-            txStatus = TxStatus.Failure;
-        } else {
-            txStatus = TxStatus.Success;
-        }
-
-        vm.mockCall(
-            address(bridgeHub),
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                bridgeHub.proveL1ToL2TransactionStatus.selector,
-                randomChainId,
-                randomL2TxHash,
-                randomL2BatchNumber,
-                randomL2MessageIndex,
-                randomL2TxNumberInBatch,
-                randomMerkleProof,
-                txStatus
-            ),
-            abi.encode(randomResultantBool)
-        );
-
-        assertTrue(
-            bridgeHub.proveL1ToL2TransactionStatus({
-                _chainId: randomChainId,
-                _l2TxHash: randomL2TxHash,
-                _l2BatchNumber: randomL2BatchNumber,
-                _l2MessageIndex: randomL2MessageIndex,
-                _l2TxNumberInBatch: randomL2TxNumberInBatch,
-                _merkleProof: randomMerkleProof,
-                _status: txStatus
-            }) == randomResultantBool
-        );
     }
 }

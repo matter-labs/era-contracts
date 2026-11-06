@@ -18,9 +18,6 @@ interface IChainAdminOwnable {
         bytes data;
     }
 
-    /// @notice Emitted when the expected upgrade timestamp for a specific protocol version is set.
-    event UpdateUpgradeTimestamp(uint256 indexed _protocolVersion, uint256 _upgradeTimestamp);
-
     /// @notice Emitted when the call is executed from the contract.
     event CallExecuted(Call _call, bool _success, bytes _returnData);
 
@@ -28,8 +25,6 @@ interface IChainAdminOwnable {
     event NewTokenMultiplierSetter(address _oldTokenMultiplierSetter, address _newTokenMultiplierSetter);
 
     function setTokenMultiplierSetter(address _tokenMultiplierSetter) external;
-
-    function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external;
 
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable;
 

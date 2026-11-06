@@ -9,4 +9,6 @@ pragma solidity ^0.8.20;
  */
 interface IL2NativeTokenVault {
     function tokenAddress(bytes32 _assetId) external view returns (address);
+
+    function setAddresses(uint256 _baseTokenOriginChainId) external;
 }

@@ -1,0 +1,261 @@
+//! `ecosystem upgrade-broadcast` — multi-bundle EOA dispatcher.
+//!
+//! Reads the `manifest.json` produced by `upgrade-prepare-all` and replays
+//! every bundle file in order against any RPC (anvil fork OR real L1), each
+//! under the matching signer's private key. The bundles are Safe Transaction
+//! Builder–compatible JSON, but this command never touches Safe UI: every tx
+//! is signed locally with the supplied EOA key and submitted via
+//! `eth_sendRawTransaction`. That covers both deployer-EOA bundles and any
+//! signer that happens to be a single-key EOA (stage's securityCouncil is
+//! one such case — see `permanent-values/stage.toml`).
+//!
+//! Multisig-signer bundles are out of scope here: those need signatures
+//! collected through Safe UI (or another off-chain coordination flow) and
+//! the resulting `execTransaction` submitted separately.
+
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+
+use alloy::primitives::{Address, B256};
+use alloy::signers::local::PrivateKeySigner;
+use anyhow::Context;
+use clap::Parser;
+use serde::Deserialize;
+
+use crate::commands::dev::execute_safe::{
+    execute_one_bundle, execute_one_bundle_unlocked, ResumeJournal,
+};
+use crate::common::logger;
+
+#[derive(Debug, Clone, Parser)]
+pub struct UpgradeBroadcastArgs {
+    /// Path to a `manifest.json` produced by `ecosystem upgrade-prepare-all`.
+    /// The manifest's `bundles[]` are dispatched in `index` order; each bundle
+    /// file is resolved relative to the manifest's directory.
+    #[clap(long)]
+    pub manifest: PathBuf,
+
+    /// L1 RPC URL. Use a real Sepolia/mainnet endpoint for production
+    /// deployment, or an anvil fork URL for a dry run. The RPC is shared
+    /// across every bundle in the manifest.
+    #[clap(long, default_value = "http://localhost:8545")]
+    pub l1_rpc_url: String,
+
+    /// Per-signer private key in `0xADDR=0xHEX` form. Repeat the flag once
+    /// per distinct `target` in the manifest. The address must match the
+    /// bundle's `target`; the key is only used to sign that bundle's txs.
+    /// Example: `--key 0x8f08…7EF=$DEPLOYER_KEY --key 0x5555…643c=$SC_KEY`.
+    /// Required unless `--unlocked` is set.
+    #[clap(long = "key", value_name = "ADDR=KEY")]
+    pub keys: Vec<String>,
+
+    /// Fork-rehearsal mode: dispatch every bundle via `eth_sendTransaction`
+    /// with `from = bundle.target` instead of locally signing. Requires the
+    /// RPC to be an anvil started with `--auto-impersonate` (or to have
+    /// every bundle's `target` pre-impersonated via `anvil_impersonateAccount`).
+    /// `--key` is ignored in this mode. Refuses to run against any chain id
+    /// other than mainnet/Sepolia/L1-fork without an explicit override —
+    /// safety net to avoid accidental impersonation attempts on real prod.
+    #[clap(long)]
+    pub unlocked: bool,
+
+    /// Optional path to accumulate executed-tx logs across every bundle in the
+    /// manifest. Same shape `dev execute-safe --out` produces. Consumed by
+    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
+    /// can reconstruct CREATE2 / TUPP deployments from a fork rehearsal.
+    #[clap(long)]
+    pub out: Option<PathBuf>,
+
+    /// Broadcast only the bundles whose `target` has a `--key` supplied, and
+    /// silently skip the rest. Use this for a REAL deploy where you sign only
+    /// the deployer's (Camp-A) bundles and leave the governance / legacy-Gov
+    /// (Camp-B) bundles for their own multisig ceremony. Without it, a missing
+    /// key for any bundle is a hard pre-flight error (the default, safest for
+    /// a full replay). Ignored under `--unlocked`.
+    #[clap(long)]
+    pub skip_unkeyed: bool,
+
+    /// Gas-price ceiling (gwei, decimals allowed: `0.5`) for the stuck-tx bump
+    /// loop, forwarded to the per-bundle sender. The cap also applies to the
+    /// first broadcast, so a cap below the 1 gwei floor is the price every tx pays.
+    #[clap(
+        long = "max-gas-price-gwei",
+        value_name = "GWEI",
+        value_parser = crate::commands::dev::execute_safe::parse_gwei,
+        default_value = crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI
+    )]
+    pub max_gas_price_wei: u128,
+}
+
+#[derive(Debug, Deserialize)]
+struct Manifest {
+    bundles: Vec<ManifestBundle>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ManifestBundle {
+    file: String,
+    index: u32,
+    target: Address,
+}
+
+pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
+    let manifest_path = args
+        .manifest
+        .canonicalize()
+        .with_context(|| format!("manifest not found: {}", args.manifest.display()))?;
+    let manifest_dir = manifest_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("manifest path has no parent dir"))?
+        .to_path_buf();
+
+    let raw = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("read {}", manifest_path.display()))?;
+    let mut manifest: Manifest = serde_json::from_str(&raw).context("parse manifest.json")?;
+
+    // Trust the manifest's index ordering — `prepare-all` writes bundles in
+    // execution order, but we sort defensively in case future versions emit
+    // them out of order (the index is the source of truth either way).
+    manifest.bundles.sort_by_key(|b| b.index);
+    if manifest.bundles.is_empty() {
+        anyhow::bail!("manifest.bundles is empty");
+    }
+
+    let key_map = if args.unlocked {
+        if !args.keys.is_empty() {
+            logger::info("--unlocked is set; ignoring --key flags".to_string());
+        }
+        HashMap::new()
+    } else {
+        parse_keys(&args.keys)?
+    };
+
+    // Pre-flight: in keyed mode every required signer must have a key
+    // supplied — unless `--skip-unkeyed`, where unkeyed bundles are skipped
+    // (deployer-only real deploy; governance bundles run their own ceremony).
+    // Fail before we send any tx — partial broadcast on real L1 is the worst
+    // outcome.
+    if !args.unlocked && !args.skip_unkeyed {
+        let mut missing: Vec<Address> = Vec::new();
+        for bundle in &manifest.bundles {
+            if !key_map.contains_key(&bundle.target) && !missing.contains(&bundle.target) {
+                missing.push(bundle.target);
+            }
+        }
+        if !missing.is_empty() {
+            anyhow::bail!(
+                "no `--key` supplied for signer(s): {}. Pass their keys, or `--skip-unkeyed` to broadcast only the keyed (e.g. deployer) bundles.",
+                missing
+                    .iter()
+                    .map(|a| format!("{a:#x}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+    }
+
+    logger::step(format!(
+        "Broadcasting {} bundle(s) from {} to {} ({})",
+        manifest.bundles.len(),
+        manifest_path.display(),
+        args.l1_rpc_url,
+        if args.unlocked {
+            "unlocked / anvil-impersonate"
+        } else {
+            "EOA-signed"
+        },
+    ));
+
+    // One journal for the whole run: a resume must see every bundle's prior
+    // receipts, and a claim made while executing one bundle must hold for the
+    // next (see `ResumeJournal`).
+    let mut journal = ResumeJournal::load(args.out.as_deref())?;
+    let max_gas_price_wei = args.max_gas_price_wei;
+    let mut broadcast = 0usize;
+    let mut skipped = 0usize;
+    for bundle in &manifest.bundles {
+        // In keyed mode with --skip-unkeyed, skip bundles we hold no key for.
+        if !args.unlocked && args.skip_unkeyed && !key_map.contains_key(&bundle.target) {
+            logger::info(format!(
+                "Skipping bundle {} (target {:#x}, {}) — no key supplied",
+                bundle.index, bundle.target, bundle.file,
+            ));
+            skipped += 1;
+            continue;
+        }
+        let bundle_path = manifest_dir.join(&bundle.file);
+        logger::info(format!(
+            "Bundle {} / {} (target {:#x}, file {})",
+            bundle.index,
+            manifest.bundles.len(),
+            bundle.target,
+            bundle.file,
+        ));
+        if args.unlocked {
+            execute_one_bundle_unlocked(
+                &bundle_path,
+                &args.l1_rpc_url,
+                bundle.target,
+                &mut journal,
+            )
+            .await
+            .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
+        } else {
+            let key = &key_map[&bundle.target];
+            execute_one_bundle(
+                &bundle_path,
+                &args.l1_rpc_url,
+                key,
+                &mut journal,
+                max_gas_price_wei,
+            )
+            .await
+            .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
+        }
+        broadcast += 1;
+    }
+
+    logger::success(format!(
+        "Broadcast {broadcast} bundle(s){}",
+        if skipped > 0 {
+            format!(", skipped {skipped} unkeyed")
+        } else {
+            String::new()
+        }
+    ));
+    Ok(())
+}
+
+/// Parse `--key 0xADDR=0xHEX` args into an `Address → key` map. Validates
+/// each key by deriving the address it controls and checking it matches the
+/// declared address — catches the common mistake of pasting the wrong
+/// signer's key (the broadcast would otherwise produce txs from an
+/// unauthorized sender, all of which would silently fail their auth checks
+/// on real L1).
+fn parse_keys(raw: &[String]) -> anyhow::Result<HashMap<Address, String>> {
+    let mut map: HashMap<Address, String> = HashMap::new();
+    for entry in raw {
+        let (addr_str, key_str) = entry
+            .split_once('=')
+            .ok_or_else(|| anyhow::anyhow!("--key must be in form `0xADDR=0xHEX`, got: {entry}"))?;
+        let declared: Address = addr_str
+            .parse()
+            .with_context(|| format!("--key address `{addr_str}` is not a valid address"))?;
+        let pk_b256: B256 = key_str
+            .parse()
+            .with_context(|| format!("--key for {declared:#x} is not a valid 32-byte hex"))?;
+        let wallet = PrivateKeySigner::from_bytes(&pk_b256)
+            .with_context(|| format!("--key for {declared:#x} is not a valid signer"))?;
+        let derived = wallet.address();
+        if derived != declared {
+            anyhow::bail!(
+                "--key for {declared:#x} actually signs as {derived:#x}; refuse to broadcast under the wrong sender",
+            );
+        }
+        if map.insert(declared, key_str.to_string()).is_some() {
+            anyhow::bail!("duplicate --key for {declared:#x}");
+        }
+    }
+    Ok(map)
+}

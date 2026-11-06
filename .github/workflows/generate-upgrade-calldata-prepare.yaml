@@ -1,0 +1,96 @@
+name: "Upgrade Calldata: Prepare"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - stage
+          - stage-interop-tests
+          - sepolia
+          - mainnet
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag (e.g. latest, v0.31.0)"
+        required: true
+        type: string
+      l1_rpc_url:
+        description: "L1 RPC URL for the target environment"
+        required: true
+        type: string
+      deployer_address:
+        description: "Deployer EOA that will sign the new-contract deployment txs"
+        required: true
+        type: string
+
+      # TODO(v30-removal): remove these inputs once v30 upgrades are no longer
+      # supported. On v31+ ecosystems, protocol_ops auto-resolves all of these
+      # from L1 on-chain state.
+      bytecodes_supplier_addr:
+        description: "[v30 only] L1 BytecodesSupplier address"
+        required: false
+        type: string
+      rollup_da_manager_addr:
+        description: "[v30 only] L1 RollupDAManager address"
+        required: false
+        type: string
+      is_zk_sync_os:
+        description: "[v30 only] Whether chains use ZKsync OS (true/false)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENV_DIR: environments/${{ inputs.environment }}
+      WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
+      EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ecosystem upgrade no-governance-prepare
+        run: |
+          mkdir -p "$WORK_DIR"
+          # TODO(v30-removal): the three v30-only override flags are appended
+          # conditionally — protocol-ops auto-resolves them from L1 on v31+.
+          extra=()
+          if [ -n "${{ inputs.bytecodes_supplier_addr }}" ]; then
+            extra+=(--bytecodes-supplier-address "${{ inputs.bytecodes_supplier_addr }}")
+          fi
+          if [ -n "${{ inputs.rollup_da_manager_addr }}" ]; then
+            extra+=(--rollup-da-manager-address "${{ inputs.rollup_da_manager_addr }}")
+          fi
+          if [ -n "${{ inputs.is_zk_sync_os }}" ]; then
+            extra+=(--is-zk-sync-os "${{ inputs.is_zk_sync_os }}")
+          fi
+          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            ecosystem upgrade-prepare \
+            --l1-rpc-url            "${{ inputs.l1_rpc_url }}" \
+            --ecosystem              /contracts/env/ecosystem.yaml \
+            --deployer-address       "${{ inputs.deployer_address }}" \
+            --governance-toml-out    /contracts/work/session/governance.toml \
+            --out  /contracts/work/session/safe \
+            "${extra[@]}"
+
+      - name: Upload Safe bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-bundles-upgrade-prepare-${{ inputs.environment }}
+          path: ${{ env.WORK_DIR }}/safe/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload governance TOML (consumed by upgrade-governance workflow)
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-toml-${{ inputs.environment }}
+          path: ${{ env.WORK_DIR }}/governance.toml
+          if-no-files-found: error
+          retention-days: 30

@@ -1,21 +1,34 @@
 name: "Chain Remove Validator Calldata"
 
-# Registration stub, same pattern as `generate-ecosystem-upgrade-calldata.yaml`
-# (#2264) and `deploy-ecosystem-upgrade.yaml` (#2358): `workflow_dispatch` only
-# lists workflows whose file exists on the DEFAULT branch, so the file has to be
-# here for the job to be dispatchable at all. The implementation, inputs
-# included, lives on the draft/release branches (e.g. draft/v0.35.0), and
-# differs between them. Dispatch it on the branch of the release you operate:
-#
-#   gh workflow run generate-chain-remove-validator-calldata.yaml --ref <draft-or-release-branch> -f ...
-#
-# This body only ever runs if someone dispatches it on `main`, where there is
-# nothing for it to do.
-#
-# The real workflow runs `protocol-ops chain remove-validator`.
-
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [stage, stage-interop-tests, sepolia, mainnet]
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag"
+        required: true
+        type: string
+      l1_rpc_url:
+        description: "L1 RPC URL"
+        required: true
+        type: string
+      chain_name:
+        description: "Chain name (key in ecosystem.yaml `chains:`)"
+        required: true
+        type: string
+      validator_address:
+        description: "Validator EOA to revoke all batch-operator roles from"
+        required: true
+        type: string
+      access_control_restriction:
+        description: "AccessControlRestriction address (leave default for Ownable ChainAdmin)"
+        required: false
+        type: string
+        default: "0x0000000000000000000000000000000000000000"
 
 permissions:
   contents: read
@@ -23,9 +36,27 @@ permissions:
 jobs:
   remove-validator:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENV_DIR: environments/${{ inputs.environment }}
+      WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
+      EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
     steps:
       - uses: actions/checkout@v4
-      - name: Explain that the implementation lives on the draft branch
+      - name: Run remove-validator
         run: |
-          echo "This is the dispatch-registration stub on the default branch."
-          echo "Dispatch it with --ref <draft-or-release-branch> (e.g. draft/v0.35.0) to run it."
+          mkdir -p "$WORK_DIR"
+          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            chain remove-validator \
+            --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
+            --ecosystem                  /contracts/env/ecosystem.yaml \
+            --chain                      "${{ inputs.chain_name }}" \
+            --validator-address          "${{ inputs.validator_address }}" \
+            --access-control-restriction "${{ inputs.access_control_restriction }}" \
+            --out /contracts/work/session/safe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safe-bundles-chain-remove-validator-${{ inputs.chain_name }}-${{ inputs.environment }}
+          path: ${{ env.WORK_DIR }}/safe/
+          if-no-files-found: error
+          retention-days: 30

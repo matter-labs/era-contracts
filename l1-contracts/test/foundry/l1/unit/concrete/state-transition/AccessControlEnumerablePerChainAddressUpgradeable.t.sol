@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
-import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {DefaultAdminTransferNotAllowed, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 
 // Mock implementation for testing
 contract MockAccessControlEnumerable is AccessControlEnumerablePerChainAddressUpgradeable {
@@ -15,10 +15,10 @@ contract MockAccessControlEnumerable is AccessControlEnumerablePerChainAddressUp
 contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
     MockAccessControlEnumerable accessControl;
 
-    address chainAddress1 = address(0x1);
-    address chainAddress2 = address(0x2);
-    address account1 = address(0x3);
-    address account2 = address(0x4);
+    address chainAddress1;
+    address chainAddress2;
+    address account1;
+    address account2;
     bytes32 role1 = keccak256("ROLE_1");
     bytes32 role2 = keccak256("ROLE_2");
 
@@ -34,6 +34,10 @@ contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
     bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
     function setUp() public {
+        chainAddress1 = makeAddr("chainAddress1");
+        chainAddress2 = makeAddr("chainAddress2");
+        account1 = makeAddr("account1");
+        account2 = makeAddr("account2");
         accessControl = new MockAccessControlEnumerable();
     }
 
