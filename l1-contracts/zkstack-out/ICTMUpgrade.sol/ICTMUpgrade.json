@@ -57,6 +57,11 @@
             "name": "zkTokenAssetId",
             "type": "bytes32",
             "internalType": "bytes32"
+          },
+          {
+            "name": "multiProofVerifier",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }
