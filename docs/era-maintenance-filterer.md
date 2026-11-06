@@ -72,7 +72,9 @@ including forced withdrawals.
 registered withdrawal function brings in up to the base token cap, and whatever the L2 call does
 not spend is refunded on L2. Switching to `WITHDRAWALS_ONLY` therefore goes together with lowering
 the base token cap to about the fee of a withdrawal. A forced withdrawal does not need its value in
-`mintValue`, since `l2Value` can come from the sender's existing L2 balance.
+`mintValue`, since `l2Value` can come from the sender's existing L2 balance. The sender is the L1
+caller itself for an EOA or an EIP-7702 account and its alias for a contract, so a contract's forced
+withdrawal spends its alias's balance.
 
 ## Deposit decoding
 
@@ -100,6 +102,12 @@ withdrawals stay reachable through `withdrawalFunctions`.
   its `withdraw(address,address,uint256)` is registered with `setWithdrawalFunction`.
 - **Custom bridges.** Each custom bridge is registered with `setLegacyBridge`, and its L2
   `withdraw` with `setWithdrawalFunction`.
+- **Tokens native to L2.** The L2 native token vault burns a token bridged from L1 without an
+  allowance, but takes a token native to L2 (such as ZK) with `transferFrom`, so its withdrawal
+  needs an `approve` of the vault first. For its holders to force a withdrawal in
+  `WITHDRAWALS_ONLY` mode, the token's `approve` is registered with `setWithdrawalFunction`.
+- **Wrapped base token.** Holders of L2 WETH unwrap it before withdrawing the base token, so its
+  `withdraw(uint256)` is registered with `setWithdrawalFunction`.
 - **Third-party bridges and protocols.** Senders whose L1→L2 messages must keep working, such as
   Across's HubPool (which settles relayer refunds through priority operations), are either
   exempted or the restrictions that would affect them are enabled only after they close their

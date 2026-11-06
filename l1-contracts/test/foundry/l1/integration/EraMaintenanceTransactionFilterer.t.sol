@@ -22,10 +22,14 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
+import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IL2SharedBridgeLegacyFunctions} from "contracts/bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {LogFinder} from "test-utils/LogFinder.sol";
 import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -55,6 +59,7 @@ contract EraMaintenanceTransactionFiltererIntegrationTest is
     uint256 internal constant MINT_VALUE = 250000000000100;
     uint256 internal constant L2_GAS_LIMIT = 1000000;
     uint256 internal constant TOKEN_CAP = 1000;
+    uint256 internal constant STUCK_ETH = 100 ether;
 
     EraMaintenanceTransactionFilterer internal filterer;
     TestnetERC20Token internal token;
@@ -242,12 +247,47 @@ contract EraMaintenanceTransactionFiltererIntegrationTest is
         filterer.setDepositCaps(assetIds, caps);
     }
 
-    function _priorityRequestSelector() internal returns (bytes4) {
-        (, , , L2CanonicalTransaction memory transaction, ) = abi.decode(
+    /// @dev Caps the base token at `MINT_VALUE`, about the fee, and switches to `WITHDRAWALS_ONLY` mode.
+    function _enterWithdrawalsOnlyMode() internal {
+        _setDepositCap(baseTokenAssetId, MINT_VALUE);
+        vm.prank(chainAdmin);
+        filterer.setCallMode(CallMode.WITHDRAWALS_ONLY);
+    }
+
+    /// @dev Sends `user`'s L1 -> L2 call paying only `MINT_VALUE`: `_l2Value` comes from the sender's L2 balance.
+    /// With `_fromEoa`, `user` is also `tx.origin`, as an EOA calling the Bridgehub directly.
+    function _requestL2Call(address _l2Contract, uint256 _l2Value, bytes memory _l2Calldata, bool _fromEoa) internal {
+        vm.deal(user, MINT_VALUE);
+        vm.recordLogs();
+        if (_fromEoa) {
+            vm.prank(user, user);
+        } else {
+            vm.prank(user);
+        }
+        addresses.bridgehub.requestL2TransactionDirect{value: MINT_VALUE}(
+            L2TransactionRequestDirect({
+                chainId: eraZKChainId,
+                mintValue: MINT_VALUE,
+                l2Contract: _l2Contract,
+                l2Value: _l2Value,
+                l2Calldata: _l2Calldata,
+                l2GasLimit: L2_GAS_LIMIT,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: address(0)
+            })
+        );
+    }
+
+    function _priorityRequestTransaction() internal returns (L2CanonicalTransaction memory transaction) {
+        (, , , transaction, ) = abi.decode(
             _priorityRequestLog().data,
             (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[])
         );
-        return bytes4(transaction.data);
+    }
+
+    function _priorityRequestSelector() internal returns (bytes4) {
+        return bytes4(_priorityRequestTransaction().data);
     }
 
     function test_tokenDepositWithinCapPasses() public {
@@ -351,43 +391,87 @@ contract EraMaintenanceTransactionFiltererIntegrationTest is
     /// @dev A forced base token withdrawal from L1 still reaches the priority queue in `WITHDRAWALS_ONLY` mode,
     /// with the base token capped near the fee level, while a plain base token deposit is rejected.
     function test_forcedWithdrawalPassesInWithdrawalsOnlyMode() public {
-        bytes32[] memory assetIds = new bytes32[](1);
-        assetIds[0] = baseTokenAssetId;
-        uint256[] memory caps = new uint256[](1);
-        caps[0] = MINT_VALUE;
-        vm.startPrank(chainAdmin);
-        filterer.setDepositCaps(assetIds, caps);
-        filterer.setCallMode(CallMode.WITHDRAWALS_ONLY);
-        vm.stopPrank();
+        _enterWithdrawalsOnlyMode();
 
         bytes memory withdrawal = abi.encodeCall(IBaseToken.withdraw, (user));
-        vm.deal(user, MINT_VALUE);
-        vm.recordLogs();
-        vm.prank(user);
-        addresses.bridgehub.requestL2TransactionDirect{value: MINT_VALUE}(
-            L2TransactionRequestDirect({
-                chainId: eraZKChainId,
-                mintValue: MINT_VALUE,
-                l2Contract: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-                l2Value: 0,
-                l2Calldata: withdrawal,
-                l2GasLimit: L2_GAS_LIMIT,
-                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                factoryDeps: new bytes[](0),
-                refundRecipient: address(0)
-            })
-        );
-        Vm.Log memory log = _priorityRequestLog();
-        (, , , L2CanonicalTransaction memory transaction, ) = abi.decode(
-            log.data,
-            (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[])
-        );
+        _requestL2Call(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 0, withdrawal, false);
+        L2CanonicalTransaction memory transaction = _priorityRequestTransaction();
         assertEq(address(uint160(transaction.to)), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
         assertEq(keccak256(transaction.data), keccak256(withdrawal));
         assertEq(transaction.reserved[0], MINT_VALUE);
 
         vm.expectRevert(TransactionNotAllowed.selector);
         _depositBaseToken(0);
+    }
+
+    /// @dev ETH stuck on L2 is withdrawn by paying only the fee on L1: the cap applies to `mintValue`, and `l2Value`
+    /// is not part of it. The bootloader mints `mintValue` minus the fee to the sender and takes `l2Value` from the
+    /// sender's L2 balance (`processL1Tx` and `executeL1Tx` in `bootloader.yul`). An EOA's L1 -> L2 transaction
+    /// comes from its own address, so that balance is the stuck one.
+    function test_forcedWithdrawalOfStuckEthFromEoa() public {
+        _enterWithdrawalsOnlyMode();
+
+        bytes memory withdrawal = abi.encodeCall(IBaseToken.withdraw, (user));
+        _requestL2Call(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, STUCK_ETH, withdrawal, true);
+        L2CanonicalTransaction memory transaction = _priorityRequestTransaction();
+        assertEq(address(uint160(transaction.from)), user);
+        assertEq(address(uint160(transaction.to)), L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        assertEq(transaction.value, STUCK_ETH);
+        assertEq(transaction.reserved[0], MINT_VALUE);
+        assertEq(keccak256(transaction.data), keccak256(withdrawal));
+    }
+
+    /// @dev A contract's L1 -> L2 transaction comes from its alias, so a forced withdrawal moves the alias's L2
+    /// balance, not one at the contract's own address.
+    function test_forcedWithdrawalFromContractComesFromAlias() public {
+        _enterWithdrawalsOnlyMode();
+
+        _requestL2Call(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            STUCK_ETH,
+            abi.encodeCall(IBaseToken.withdraw, (user)),
+            false
+        );
+        assertEq(address(uint160(_priorityRequestTransaction().from)), AddressAliasHelper.applyL1ToL2Alias(user));
+    }
+
+    /// @dev Both L2 asset router withdrawal functions pass in `WITHDRAWALS_ONLY` mode, for any amount: deposit caps
+    /// don't apply to withdrawals. On L2 they burn a token bridged from L1 without an allowance
+    /// (`L2ForcedWithdrawalTestAbstract`).
+    function test_forcedTokenWithdrawalPassesInWithdrawalsOnlyMode() public {
+        _enterWithdrawalsOnlyMode();
+        address l2Token = makeAddr("l2Token");
+        uint256 stuckAmount = TOKEN_CAP + 1;
+
+        bytes[] memory withdrawals = new bytes[](2);
+        withdrawals[0] = abi.encodeCall(
+            IL2AssetRouter.withdraw,
+            (tokenAssetId, DataEncoding.encodeBridgeBurnData(stuckAmount, user, l2Token))
+        );
+        withdrawals[1] = abi.encodeCall(IL2SharedBridgeLegacy.withdraw, (user, l2Token, stuckAmount));
+        for (uint256 i = 0; i < withdrawals.length; ++i) {
+            _requestL2Call(L2_ASSET_ROUTER_ADDR, 0, withdrawals[i], true);
+            L2CanonicalTransaction memory transaction = _priorityRequestTransaction();
+            assertEq(address(uint160(transaction.from)), user);
+            assertEq(address(uint160(transaction.to)), L2_ASSET_ROUTER_ADDR);
+            assertEq(keccak256(transaction.data), keccak256(withdrawals[i]));
+        }
+    }
+
+    /// @dev A token native to L2 needs an `approve` of the L2 native token vault before its withdrawal
+    /// (`L2ForcedWithdrawalTestAbstract`). `WITHDRAWALS_ONLY` mode rejects that call until the chain admin allows it.
+    function test_l2NativeTokenApproveNeedsAllowingInWithdrawalsOnlyMode() public {
+        _enterWithdrawalsOnlyMode();
+        address l2NativeToken = makeAddr("l2NativeToken");
+        bytes memory approval = abi.encodeCall(IERC20.approve, (L2_NATIVE_TOKEN_VAULT_ADDR, TOKEN_CAP));
+
+        vm.expectRevert(TransactionNotAllowed.selector);
+        _requestL2Call(l2NativeToken, 0, approval, true);
+
+        vm.prank(chainAdmin);
+        filterer.setWithdrawalFunction(l2NativeToken, IERC20.approve.selector, true);
+        _requestL2Call(l2NativeToken, 0, approval, true);
+        assertEq(keccak256(_priorityRequestTransaction().data), keccak256(approval));
     }
 
     function _priorityRequestLog() internal returns (Vm.Log memory) {
