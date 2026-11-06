@@ -250,9 +250,10 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
         if (newGenesisEngine != oldGenesisEngine) {
             _recordedMember(ctmOutput, ctmSalt, newGenesisEngine);
         }
-        _recordedMember(ctmOutput, ctmSalt, transition.upgradeEngine());
+        _recordedMember(ctmOutput, ctmSalt, transition.chainUpgradeEngine());
 
         if (address(coreUpgrade.coreTransition()) != address(0)) {
+            _recordedMember(coreOutput, coreSalt, coreUpgrade.coreTransition().proxyUpgradeEngine());
             ProxyUpgradeRow[] memory rows = coreUpgrade.coreTransition().rows();
             for (uint256 i = 0; i < rows.length; ++i) {
                 _recordedMember(coreOutput, coreSalt, rows[i].implNew);
@@ -304,7 +305,11 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
         assertEq(transition.fromRelease(), releaseBeforeUpgrade, "the edge departs from the previous release");
         assertEq(transition.newRelease(), release, "the CTM serves the release the transition pins");
         assertEq(release, ctmUpgrade.getAddresses().stateTransition.currentRelease, "release must be the pipeline's");
-        assertEq(transition.upgradeEngine(), ctmUpgrade.committedUpgradeEngine(), "the engine the prepare reports");
+        assertEq(
+            transition.chainUpgradeEngine(),
+            ctmUpgrade.committedChainUpgradeEngine(),
+            "the engine the prepare reports"
+        );
 
         // Authority stays in the registry model: governance owns the executor, which stays bound to the CTM.
         address executor = IOwnable(ctm).owner();

@@ -50,7 +50,7 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
             _vm: vm,
             _outputPath: outputPath,
             _upgradeCutData: getChainUpgradeDiamondCutData(),
-            _defaultUpgrade: committedUpgradeEngine(),
+            _defaultUpgrade: committedChainUpgradeEngine(),
             _eip7702Checker: getAddresses().admin.eip7702Checker,
             _registry: TrimmedUpgradeOutput.Registry({
                 ctmTransition: upgradeAddresses.ctmTransition,
