@@ -45,6 +45,7 @@ import {
     RegistryDuplicateProxyRow,
     RegistrySelfEdgeProxyRow,
     RegistryDuplicateSelector,
+    RegistryEmptyFacetSet,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     RegistryMemberHasNoFixedAddress,
@@ -1508,7 +1509,7 @@ contract StorageRegistriesTest is Test {
         ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets = new GenesisFacet[](0);
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
+        vm.expectRevert(RegistryEmptyFacetSet.selector);
         new CTMRelease(manifest);
     }
 

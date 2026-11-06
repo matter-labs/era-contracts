@@ -414,6 +414,8 @@ error RegistryDuplicateFacetRow(address facet);
 error RegistryDuplicateProxyRow(address proxy);
 // 0x22345d26
 error RegistryDuplicateSelector(bytes4 selector);
+// 0x82b6bf88
+error RegistryEmptyFacetSet();
 // 0xba5f0dd8
 error RegistryEmptySelectors(address facet);
 // 0xd79000b2

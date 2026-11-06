@@ -12,6 +12,7 @@ import {
     L2BytecodeInfoLength,
     RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
+    RegistryEmptyFacetSet,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     ReleaseForceDeploymentMismatch,
@@ -52,7 +53,7 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         // The one facet-set check kept: an empty set would describe an unusable chain and derive
         // a remove-everything delta in any transition departing toward it.
         if (_manifest.genesisFacets.length == 0) {
-            revert RegistryEmptySelectors(address(0));
+            revert RegistryEmptyFacetSet();
         }
         _requireUniqueFacetRows(_manifest.genesisFacets);
         // The L2 table is an enum-indexed inventory: the length check makes every slot an
@@ -77,30 +78,37 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         return getManifest().protocolVersion;
     }
 
+    /// @inheritdoc ICTMRelease
     function diamondInit() external view returns (address) {
         return getManifest().diamondInit;
     }
 
+    /// @inheritdoc ICTMRelease
     function verifier() external view returns (address) {
         return getManifest().verifier;
     }
 
+    /// @inheritdoc ICTMRelease
     function genesisFacets() external view returns (GenesisFacet[] memory) {
         return getManifest().genesisFacets;
     }
 
+    /// @inheritdoc ICTMRelease
     function fixedForceDeploymentsData() external view returns (bytes memory) {
         return getManifest().genesis.fixedForceDeploymentsData;
     }
 
+    /// @inheritdoc ICTMRelease
     function l2BytecodeInfos() external view returns (bytes[] memory) {
         return getManifest().l2BytecodeInfos;
     }
 
+    /// @inheritdoc ICTMRelease
     function l2SystemProxyBytecodeInfo() external view returns (bytes memory) {
         return getManifest().l2SystemProxyBytecodeInfo;
     }
 
+    /// @inheritdoc ICTMRelease
     function genesisParams() external view returns (address, bytes32, uint64) {
         ReleaseManifest memory m = getManifest();
         return (m.genesisUpgrade, m.genesis.genesisBatchHash, m.genesis.genesisIndexRepeatedStorageChanges);
