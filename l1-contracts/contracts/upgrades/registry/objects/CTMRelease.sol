@@ -9,6 +9,7 @@ import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/I
 import {FixedForceDeploymentsData} from "../../../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {
     GenesisBatchHashZero,
+    L2BytecodeInfoLength,
     RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
     RegistryEmptySelectors,
@@ -17,6 +18,7 @@ import {
     ReleaseL2RowHasNoSystemProxy,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
+import {BYTECODE_INFO_LENGTH} from "../../../common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
 import {L2EcosystemContract, L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 
@@ -61,6 +63,7 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
             revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
         _requireNoWrappedBaseTokenRow(_manifest.l2BytecodeInfos);
+        _requireCanonicalBytecodeInfos(_manifest.l2BytecodeInfos, _manifest.l2SystemProxyBytecodeInfo);
         _requireForceDeploymentsMatchTable(_manifest);
     }
 
@@ -174,6 +177,29 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
     function _requireNoWrappedBaseTokenRow(bytes[] memory _table) private pure {
         if (_table[uint256(L2EcosystemContract.L2WrappedBaseToken)].length != 0) {
             revert ReleaseL2RowHasNoSystemProxy(uint256(L2EcosystemContract.L2WrappedBaseToken));
+        }
+    }
+
+    /// @dev Every non-empty table row and the shell must be canonical `BYTECODE_INFO_LENGTH`
+    ///      descriptors: L2 force-deploys them through `L2GenesisForceDeploymentsHelper`, which
+    ///      refuses any other length, so a descriptor with trailing bytes would pass every L1 check
+    ///      and revert the L2 protocol upgrade transaction of every chain that crosses the edge.
+    function _requireCanonicalBytecodeInfos(bytes[] memory _table, bytes memory _shell) private pure {
+        if (_shell.length != 0) {
+            _requireBytecodeInfoLength(_shell);
+        }
+        uint256 length = _table.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (_table[i].length != 0) {
+                _requireBytecodeInfoLength(_table[i]);
+            }
+        }
+    }
+
+    /// @param _bytecodeInfo A ZKsync OS bytecode descriptor.
+    function _requireBytecodeInfoLength(bytes memory _bytecodeInfo) private pure {
+        if (_bytecodeInfo.length != BYTECODE_INFO_LENGTH) {
+            revert L2BytecodeInfoLength(_bytecodeInfo.length, BYTECODE_INFO_LENGTH);
         }
     }
 

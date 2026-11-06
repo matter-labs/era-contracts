@@ -1049,7 +1049,9 @@ contract StorageRegistriesTest is Test {
         // for it is unexecutable and must refuse to derive — at transition construction, before
         // anything is committed.
         ReleaseManifest memory releaseManifest = _newReleaseManifest();
-        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.BeaconProxy)] = hex"dd03";
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.BeaconProxy)] = L2PlanFixtures.bytecodeInfo(
+            hex"dd03"
+        );
         CTMRelease rowRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _transitionManifest();
@@ -1066,7 +1068,9 @@ contract StorageRegistriesTest is Test {
     ///      table row in its slot is refused like any other bytecode-identity member.
     function test_revertWhen_transitionDerivesRowForTheDelegate() public {
         ReleaseManifest memory releaseManifest = _newReleaseManifest();
-        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2DefaultUpgrade)] = hex"dd04";
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2DefaultUpgrade)] = L2PlanFixtures.bytecodeInfo(
+            hex"dd04"
+        );
         CTMRelease rowRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _transitionManifest();
@@ -1524,6 +1528,32 @@ contract StorageRegistriesTest is Test {
                 uint256(L2EcosystemContract.L2WrappedBaseToken)
             )
         );
+        new CTMRelease(manifest);
+    }
+
+    /// @dev OZ N-11. L2 force-deploys only canonical `BYTECODE_INFO_LENGTH` descriptors, so a table
+    ///      row with trailing bytes is refused where the release is built.
+    function test_revertWhen_releaseTableRowIsNotCanonical() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = bytes.concat(
+            L2PlanFixtures.bytecodeInfo(hex"dd07"),
+            hex"00"
+        );
+        L2PlanFixtures.syncForceDeployments(manifest);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(L2BytecodeInfoLength.selector, BYTECODE_INFO_LENGTH + 1, BYTECODE_INFO_LENGTH)
+        );
+        new CTMRelease(manifest);
+    }
+
+    /// @dev OZ N-11, the shell: every table member is deployed behind it, so it is held to the same
+    ///      length.
+    function test_revertWhen_releaseSystemProxyShellIsNotCanonical() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.l2SystemProxyBytecodeInfo = hex"5e11";
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeInfoLength.selector, 2, BYTECODE_INFO_LENGTH));
         new CTMRelease(manifest);
     }
 
