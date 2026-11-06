@@ -25,7 +25,7 @@ use anyhow::Context;
 use clap::Parser;
 use serde::Deserialize;
 
-use crate::commands::ecosystem::bundle::verify_bundle_integrity;
+use crate::commands::ecosystem::bundle::{image_contracts_commit, verify_bundle_integrity};
 use crate::commands::ecosystem::deployer_plan::require_checkout_at;
 use crate::common::ethereum::get_provider;
 use crate::common::{logger, paths};
@@ -483,7 +483,11 @@ fn load_bundle(
     let bundle_dir = std::fs::canonicalize(bundle)
         .with_context(|| format!("deploy bundle not found: {}", bundle.display()))?;
     let metadata = verify_bundle_integrity(&bundle_dir)?;
-    require_checkout_at(repository_root, &metadata)?;
+    require_checkout_at(
+        repository_root,
+        image_contracts_commit().as_deref(),
+        &metadata,
+    )?;
     let chain_id = metadata
         .l1
         .chain_id
@@ -1977,7 +1981,7 @@ mod tests {
                 upgrade: DEFAULT_UPGRADE.to_string(),
                 env: "stage".to_string(),
                 contracts_commit,
-                contracts_worktree_dirty: false,
+                contracts_worktree_dirty: Some(false),
                 all_contracts_hashes_sha256: String::new(),
                 l1: L1Provenance {
                     chain_id: Some(11155111),
@@ -1991,6 +1995,7 @@ mod tests {
                     foundry_zksync: None,
                 },
                 generated_by: None,
+                protocol_ops_image: None,
                 files: files
                     .iter()
                     .map(|(relative, content)| {

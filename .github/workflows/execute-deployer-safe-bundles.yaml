@@ -1,10 +1,11 @@
 name: "Execute Deployer Safe Bundles"
 
 # Apply Safe Transaction Builder bundles whose `target` is the ecosystem
-# deployer EOA (i.e. bundles emitted by the chain-init workflow and the
-# ecosystem upgrade-prepare workflow). The deployer's private key is pulled
-# from a per-environment secret and used to sign every tx in the bundle via
-# `protocol-ops dev execute-safe`.
+# deployer EOA (e.g. the chain-init workflow's, when the deployer signs all of
+# them; any other target is refused). The deployer's private key is pulled from
+# the secret of the environment's L1 and used to sign every tx in the bundle via
+# `protocol-ops dev execute-safe`. Ecosystem upgrade bundles go through
+# `deploy-ecosystem-upgrade.yaml` instead.
 #
 # The workflow downloads bundles produced by a prior "generate" workflow
 # run, so it's typically dispatched after a generate workflow has been
@@ -14,16 +15,12 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Target environment (selects DEPLOYER_PRIVATE_KEY_* secret + env dir)"
+        description: "Target environment; its L1 selects the DEPLOYER_PRIVATE_KEY_{SEPOLIA,MAINNET} secret"
         required: true
         type: choice
-        options:
-          - stage
-          - stage-interop-tests
-          - sepolia
-          - mainnet
+        options: [stage, testnet, mainnet]
       protocol_ops_tag:
-        description: "protocol-ops Docker image tag (e.g. latest, v0.31.0)"
+        description: "protocol-ops image released by build-docker.yaml: sha256:<digest>, or a tag"
         required: true
         type: string
       l1_rpc_url:
@@ -35,7 +32,7 @@ on:
         required: true
         type: string
       artifact_name:
-        description: "Name of the uploaded Safe-bundle artifact (e.g. safe-bundles-chain-init-my_chain-sepolia)"
+        description: "Name of the uploaded Safe-bundle artifact (e.g. safe-bundles-chain-init-270-testnet)"
         required: true
         type: string
 
@@ -48,19 +45,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      ENV_DIR: environments/${{ inputs.environment }}
       BUNDLE_DIR: bundles
+      # `dev execute-safe` reads the bundles inside the container.
+      EXTRA_MOUNTS: ${{ github.workspace }}/bundles:/contracts/bundles
+      PROTOCOL_OPS_REQUIRE_RELEASE: "1"
+      PROTOCOL_OPS_TAG: ${{ inputs.protocol_ops_tag }}
+      L1_RPC_URL: ${{ inputs.l1_rpc_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install yq + jq
-        run: |
-          sudo wget -qO /usr/local/bin/yq \
-            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq jq
+        with:
+          persist-credentials: false
 
       - name: Download Safe-bundle artifact
         uses: actions/download-artifact@v4
@@ -70,16 +65,41 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: ${{ inputs.source_run_id }}
 
-      - name: Resolve deployer address from ecosystem.yaml
+      - name: Select deployer private key + resolve its address
         id: deployer
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          ARTIFACT_NAME: ${{ inputs.artifact_name }}
+          KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
-          addr=$(yq -er '.deployer' "$ENV_DIR/ecosystem.yaml")
-          if [[ -z "$addr" || "$addr" == "null" ]]; then
-            echo "error: ecosystem.yaml in $ENV_DIR has no .deployer field — set it or pass the deployer explicitly" >&2
+          # The chain workflows name their artifacts `…-<environment>`: a bundle
+          # generated for one L1 must not be signed with the other's key, on it.
+          if [[ "$ARTIFACT_NAME" != *-"$ENVIRONMENT" ]]; then
+            echo "error: artifact $ARTIFACT_NAME is not for $ENVIRONMENT" >&2
             exit 1
           fi
-          echo "addr=$addr" >> "$GITHUB_OUTPUT"
-          echo "Deployer (from $ENV_DIR/ecosystem.yaml): $addr"
+          # Deployer secrets are per L1, as in deploy-ecosystem-upgrade.yaml.
+          case "$ENVIRONMENT" in
+            mainnet)       l1=1        secret=MAINNET key="$KEY_MAINNET" ;;
+            stage|testnet) l1=11155111 secret=SEPOLIA key="$KEY_SEPOLIA" ;;
+          esac
+          rpc_chain=$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast chain-id --rpc-url "$L1_RPC_URL")
+          if [[ "$rpc_chain" != "$l1" ]]; then
+            echo "error: l1_rpc_url is chain $rpc_chain, but $ENVIRONMENT is on L1 $l1" >&2
+            exit 1
+          fi
+          if [[ -z "$key" ]]; then
+            echo "error: DEPLOYER_PRIVATE_KEY_$secret secret is empty" >&2
+            exit 1
+          fi
+          echo "::add-mask::$key"
+          addr=$(bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" cast wallet address --private-key "$key")
+          {
+            echo "addr=$addr"
+            echo "secret=$secret"
+          } >> "$GITHUB_OUTPUT"
+          echo "Deployer (from DEPLOYER_PRIVATE_KEY_$secret): $addr"
 
       - name: Verify every bundle targets the deployer
         env:
@@ -109,41 +129,23 @@ jobs:
           fi
           echo "All bundles target the deployer EOA."
 
-      - name: Select deployer private key
-        id: key
+      - name: Execute bundles in manifest order
         env:
-          KEY_STAGE: ${{ secrets.DEPLOYER_PRIVATE_KEY_STAGE }}
+          SECRET: ${{ steps.deployer.outputs.secret }}
           KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
           KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
         run: |
-          case "${{ inputs.environment }}" in
-            stage)   key="$KEY_STAGE" ;;
-            sepolia) key="$KEY_SEPOLIA" ;;
-            mainnet) key="$KEY_MAINNET" ;;
-            *)       echo "unknown environment" >&2; exit 1 ;;
-          esac
-          if [[ -z "$key" ]]; then
-            echo "error: DEPLOYER_PRIVATE_KEY_${{ inputs.environment }} secret is empty" >&2
-            exit 1
-          fi
-          # Don't echo the key into $GITHUB_OUTPUT (GH redacts, but keep it
-          # in $GITHUB_ENV which is scoped to this job only).
-          echo "DEPLOYER_KEY=$key" >> "$GITHUB_ENV"
-          echo "::add-mask::$key"
-
-      - name: Execute bundles in manifest order
-        run: |
-          # Iterate manifest.json in declared order; `dev execute-safe` is
-          # idempotent per-bundle (each call is a discrete tx batch under
-          # the deployer key), so a failure mid-way can be resumed by
-          # rerunning with the same artifact — txs already landed will
-          # short-circuit in subsequent runs.
+          # The key selected above, read again rather than kept in $GITHUB_ENV.
+          if [[ "$SECRET" == MAINNET ]]; then key="$KEY_MAINNET"; else key="$KEY_SEPOLIA"; fi
+          # Iterate manifest.json in declared order. There is no receipt journal
+          # (`--out`), so a rerun after a partial failure skips only CREATE2
+          # deploys whose address already has code: check what mined first.
           manifest="$BUNDLE_DIR/manifest.json"
           jq -r '.bundles[].file' "$manifest" | while read -r file; do
             echo ">>> dev execute-safe $file"
-            bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" \
               dev execute-safe \
-              --safe-file "$BUNDLE_DIR/$file" \
-              --l1-rpc-url "${{ inputs.l1_rpc_url }}" \
-              --private-key "$DEPLOYER_KEY"
+              --safe-file "/contracts/bundles/$file" \
+              --l1-rpc-url "$L1_RPC_URL" \
+              --private-key "$key"
           done

@@ -1,6 +1,6 @@
 name: Build Docker Base Image
 
-# Builds + pushes the `protocol-ops-base` image consumed by `build-docker.yaml`.
+# Builds + pushes the `protocol-ops-base` image consumed by `build-and-push-docker.yaml`.
 # Rebuilt only on Dockerfile.base / workflow changes, weekly cron, or manual
 # dispatch — none of which fire per-PR — so the main image build can `FROM` it
 # and skip ~10 min of toolchain installs each run.

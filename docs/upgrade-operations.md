@@ -120,8 +120,8 @@ a migration is refused before either pause is consulted.
 The deployer EOA signs the prepare's deployer Safe files (`upgrade-broadcast`). Neither the bundle's
 digests (`verify-bundle`) nor `verify-bootstrap`, which reads deployed objects, constrain that
 transaction list, so `protocol_ops ecosystem check-deployer-plan` holds it to the deploy checkout
-and to L1 before the key is used. Every call of a bundle whose signer is the deployer must send no
-value and be either
+(in the protocol-ops image, the image) and to L1 before the key is used. Every call of a bundle
+whose signer is the deployer must send no value and be either
 
 - a CREATE2 deployment through the env's `create2_factory_addr` (the deterministic deployment
   proxy), under the env's `[contracts] create2_factory_salt` or a `[create2_factory_salts]` entry,
@@ -166,16 +166,17 @@ upgrade kind. The env's `l1_chain_id` must equal the bundle's `l1.chain_id` and 
 A bundle in which the deployer signs nothing passes. A release input declaring
 `redeploy_zk_governance = true` is refused: the PUH/Guardians redeploy deploys under its own salt
 from zk-governance artifacts, which the check does not know yet. Signing (`replay-bundle --key`, and
-`check-deployer-plan --bundle`, which the deploy workflow runs) also requires this checkout to be
-the bundle's `contracts_commit` with no change to the contract sources and reviewed inputs the
-generation tracks, its `lib/` submodules at their pins, a bundle not marked
-`contracts_worktree_dirty`, and the build to be read from this checkout. `etherscan-verify` and
+`check-deployer-plan --bundle`, which the deploy workflow runs) also requires a bundle not marked
+`contracts_worktree_dirty` and the build to be read from the checkout. In the protocol-ops image the
+image must have been built from the bundle's `contracts_commit` (`PROTOCOL_OPS_CONTRACTS_COMMIT`);
+elsewhere the checkout must be at that commit with no change to the contract sources and reviewed
+inputs the generation tracks, and its `lib/` submodules at their pins. `etherscan-verify` and
 `etherscan-check` require the same.
 
 It runs in the generate workflow's `verify-bundle-handoff` job and in every `replay-bundle` except
-`--verify-only`; the deploy workflow runs it after selecting the L1 RPC and before the step that
-reads the deployer key, and refuses to run on a commit other than the bundle's `contracts_commit`.
-The anvil upgrade test runs it on every prepare it replays. `upgrade-broadcast` and
+`--verify-only`; the deploy workflow runs it in the bundle's image after selecting the L1 RPC and
+before the step that reads the deployer key. The anvil upgrade test runs it on every prepare it
+replays, and the release flow runs it in the image. `upgrade-broadcast` and
 `dev execute-safe` check nothing: sign a bundle with `replay-bundle --key`, or run the check first.
 
 **Proposal (not configured): a protected environment for the deploy job.** Anyone with write access

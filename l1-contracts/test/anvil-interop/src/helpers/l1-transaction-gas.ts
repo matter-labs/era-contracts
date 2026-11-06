@@ -9,7 +9,7 @@ export function l1GasOverrides(osakaGasLimit: ethers.BigNumberish): { gasLimit?:
 }
 
 export type L1TransactionGasContext = {
-  phase: "prepare" | "governance" | "chain-upgrade";
+  phase: "prepare" | "governance" | "chain-upgrade" | "chain-operation";
   bundle: string;
   index: number;
   target: string;
