@@ -9,6 +9,10 @@ import {StateTransitionDeployedAddresses, DAContracts} from "contracts/common/St
 /// verifiers exported it as the legacy `IS_TESTNET_VERIFIER` constant.
 uint32 constant FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG = 34;
 
+/// @dev First protocol version with the Airbender + ZiSK multi-proof verifier and the per-chain
+/// `setProofSystemStatus` switch.
+uint32 constant FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF = 34;
+
 struct BridgehubContracts {
     address bridgehub;
     address messageRoot;

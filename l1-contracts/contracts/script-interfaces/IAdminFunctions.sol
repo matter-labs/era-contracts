@@ -105,6 +105,9 @@ interface IAdminFunctions {
         uint8 pubdataContent;
         bool shouldSetDaValidatorPair;
         bool shouldSetPubdataContent;
+        /// @dev Keep ZiSK enabled when the upgrade takes the chain into v34. By default that upgrade
+        /// disables it, so a chain on a multi-proof verifier opts in to the ZiSK proof explicitly.
+        bool enableZisk;
     }
 
     function upgradeChainFromCTM(ChainUpgradeParams calldata params) external;

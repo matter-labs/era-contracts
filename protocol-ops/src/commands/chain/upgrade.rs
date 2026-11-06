@@ -63,6 +63,10 @@ struct DaPair {
 /// between the cut and a separate DA transaction the chain would commit batches
 /// under a DA setup its new version no longer settles.
 ///
+/// A chain entering v34 also gets ZiSK disabled in the same multicall, unless
+/// `--enable-zisk`: it starts with ZiSK enabled, and a chain on a multi-proof
+/// verifier would otherwise need a ZiSK proof for its first v34 batch.
+///
 /// Pass `--chain-id` to target a single chain. Omit it to loop over every
 /// chain registered on the bridgehub (not with `--da-mode`, which describes one
 /// chain) — each chain's bundle lands under
@@ -107,6 +111,11 @@ pub struct ChainUpgradeArgs {
     /// refused rather than prepared.
     #[clap(long, default_value_t = false, help_heading = "DA")]
     pub acknowledge_unrecommended_noda: bool,
+
+    /// Keep ZiSK enabled when the upgrade takes the chain into v34. Without it the bundle disables
+    /// ZiSK in the same transaction as the cut. Upgrades that start at v34 or later never touch it.
+    #[clap(long, default_value_t = false)]
+    pub enable_zisk: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -248,6 +257,7 @@ async fn run_one(
                 pubdataContent: da_move.pubdata_content.unwrap_or_default() as u8,
                 shouldSetDaValidatorPair: da_move.pair.is_some(),
                 shouldSetPubdataContent: da_move.pubdata_content.is_some(),
+                enableZisk: args.enable_zisk,
             },
         })
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)

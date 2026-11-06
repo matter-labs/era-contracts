@@ -336,21 +336,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("Owners updated");
     }
 
-    function saveOutput(string memory outputPath) internal virtual {
-        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
-        string memory bridges = vm.serializeAddress(
-            "bridges",
-            "shared_bridge_proxy_addr",
-            coreAddresses.bridges.proxies.l1AssetRouter
-        );
-        // TODO(EVM-744): this has to be renamed to chain type manager
-        vm.serializeAddress(
-            "state_transition",
-            "state_transition_proxy_addr",
-            ctmAddresses.stateTransition.proxies.chainTypeManager
-        );
-        vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+    /// @notice Adds the multi-proof components to the `state_transition` output object; an
+    ///         Airbender-only deployment adds nothing.
+    function serializeMultiProofAddresses() internal {
         if (ctmAddresses.multiProof.airbenderVerifier != address(0)) {
             vm.serializeAddress(
                 "state_transition",
@@ -382,6 +370,24 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 ctmAddresses.multiProof.multiProofVerifier
             );
         }
+    }
+
+    function saveOutput(string memory outputPath) internal virtual {
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", coreAddresses.bridgehub.proxies.bridgehub);
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", coreAddresses.bridges.proxies.l1Nullifier);
+        string memory bridges = vm.serializeAddress(
+            "bridges",
+            "shared_bridge_proxy_addr",
+            coreAddresses.bridges.proxies.l1AssetRouter
+        );
+        // TODO(EVM-744): this has to be renamed to chain type manager
+        vm.serializeAddress(
+            "state_transition",
+            "state_transition_proxy_addr",
+            ctmAddresses.stateTransition.proxies.chainTypeManager
+        );
+        vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        serializeMultiProofAddresses();
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", ctmAddresses.stateTransition.defaultUpgrade);
         vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);

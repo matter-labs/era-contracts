@@ -100,6 +100,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         ///      `IS_TESTNET_VERIFIER`, so the call reverts on a production one, and probing for that
         ///      would need the try/catch this repo forbids.
         bool testnetVerifier;
+        /// @dev Whether the new verifier is the Airbender + ZiSK multi-proof one. Unlike the testnet flag
+        ///      it is an opt-in, not a property of the deployed verifier: a CTM enters multi-proof through
+        ///      an upgrade, so before that upgrade there is nothing to introspect.
+        bool multiProofVerifier;
     }
 
     // The output of the script
@@ -126,7 +130,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         string memory _outputPath,
         address governance,
         bytes32 zkTokenAssetId,
-        bool testnetVerifier
+        bool testnetVerifier,
+        bool multiProofVerifier
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -138,7 +143,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             newConfigPath: newConfigPath,
             governance: governance,
             zkTokenAssetId: zkTokenAssetId,
-            testnetVerifier: testnetVerifier
+            testnetVerifier: testnetVerifier,
+            multiProofVerifier: multiProofVerifier
         });
 
         console.log("Initialized config from %s", newConfigPath);
@@ -187,6 +193,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
             IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
         );
+        // Every chain adopts the new version's verifier during its upgrade, so leaving the flag off for a
+        // multi-proof CTM would silently move all of its chains back to Airbender-only.
+        require(
+            permanentConfig.multiProofVerifier ||
+                !UpgradeUtils.resolveMultiProofVerifier(
+                    IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
+                ),
+            "CTM runs a multi-proof verifier: set multi_proof_verifier to keep it"
+        );
+        config.multiProof.enabled = permanentConfig.multiProofVerifier;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -198,7 +214,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         string memory newConfigPath,
         address governance,
         bytes32 zkTokenAssetId,
-        bool testnetVerifier
+        bool testnetVerifier,
+        bool multiProofVerifier
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -211,7 +228,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             bytecodesSupplier: bytecodesSupplier,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId,
-            testnetVerifier: testnetVerifier
+            testnetVerifier: testnetVerifier,
+            multiProofVerifier: multiProofVerifier
         });
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 
@@ -263,7 +281,8 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             _outputPath: _params.outputPath,
             governance: _params.governance,
             zkTokenAssetId: _params.zkTokenAssetId,
-            testnetVerifier: _params.testnetVerifier
+            testnetVerifier: _params.testnetVerifier,
+            multiProofVerifier: _params.multiProofVerifier
         });
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
@@ -961,6 +980,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             ctmAddresses.stateTransition.implementations.chainTypeManager
         );
         vm.serializeAddress("state_transition", "verifier_addr", ctmAddresses.stateTransition.verifiers.verifier);
+        serializeMultiProofAddresses();
         vm.serializeAddress("state_transition", "admin_facet_addr", ctmAddresses.stateTransition.facets.adminFacet);
         vm.serializeAddress("state_transition", "mailbox_facet_addr", ctmAddresses.stateTransition.facets.mailboxFacet);
         vm.serializeAddress(

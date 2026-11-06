@@ -381,11 +381,13 @@ pub struct UpgradePrepareAllArgs {
     /// proxy = "0x..."
     /// bytecodes_supplier = "0x..."           # optional
     /// rollup_da_manager  = "0x..."           # optional
+    /// multi_proof_verifier = true            # optional, default false
     /// ```
     #[clap(long, conflicts_with_all = [
         "ctm_proxy",
         "bytecodes_supplier_address",
         "rollup_da_manager_address",
+        "multi_proof_verifier",
     ])]
     pub ctm_config: Option<PathBuf>,
 
@@ -398,6 +400,11 @@ pub struct UpgradePrepareAllArgs {
     /// representative ZK chain on the CTM when omitted.
     #[clap(long)]
     pub rollup_da_manager_address: Option<Address>,
+
+    /// Give the `--ctm-proxy` CTM the Airbender + ZiSK multi-proof verifier. With `--env`, the
+    /// CTM's `multi_proof_verifier` in permanent-values decides instead.
+    #[clap(long, default_value_t = false, requires = "ctm_proxy")]
+    pub multi_proof_verifier: bool,
 
     /// Also redeploy the zk-governance set (ProtocolUpgradeHandler impl,
     /// Guardians, SecurityCouncil, EmergencyUpgradeBoard) from the sibling
@@ -426,6 +433,8 @@ struct CtmConfigEntry {
     bytecodes_supplier: Option<Address>,
     #[serde(default)]
     rollup_da_manager: Option<Address>,
+    #[serde(default)]
+    multi_proof_verifier: bool,
 }
 
 #[derive(Serialize)]
@@ -646,6 +655,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             proxy,
             bytecodes_supplier: args.bytecodes_supplier_address,
             rollup_da_manager: args.rollup_da_manager_address,
+            multi_proof_verifier: args.multi_proof_verifier,
         }]
     } else if let Some(ref cfg) = env_cfg {
         let entries = cfg.ctms();
@@ -672,6 +682,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 proxy: e.proxy,
                 bytecodes_supplier: e.bytecodes_supplier,
                 rollup_da_manager: e.rollup_da_manager,
+                multi_proof_verifier: e.multi_proof_verifier,
             })
             .collect::<Vec<_>>();
         ctms
@@ -1182,6 +1193,7 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<Vec<CtmInputs>> {
             proxy: e.proxy,
             bytecodes_supplier: e.bytecodes_supplier,
             rollup_da_manager: e.rollup_da_manager,
+            multi_proof_verifier: e.multi_proof_verifier,
         })
         .collect();
 

@@ -6,7 +6,11 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKsyncOSVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSVerifier.sol";
-import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "../../utils/Types.sol";
+import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE} from "contracts/common/Config.sol";
+import {
+    FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF,
+    FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG
+} from "../../utils/Types.sol";
 
 /// @dev Getter that v32/v33 testnet verifiers exported as a public constant; pre-v34 production
 /// verifiers don't have it.
@@ -43,6 +47,21 @@ library UpgradeUtils {
         }
         require(data.length == 32, "unexpected testnet-verifier flag returndata");
         return abi.decode(data, (bool));
+    }
+
+    /// @notice Resolves whether the verifier the given CTM reports for its current protocol version is
+    /// the Airbender + ZiSK multi-proof one.
+    /// @dev No release before v34 has a multi-proof verifier. From v34 every ZKsync OS verifier exports
+    /// `getProofMode`, and only a multi-proof one demands the combined proof while nothing is disabled.
+    function resolveMultiProofVerifier(IChainTypeManager _ctm) internal view returns (bool) {
+        uint256 packedProtocolVersion = _ctm.protocolVersion();
+        (, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(packedProtocolVersion));
+        if (minor < FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF) {
+            return false;
+        }
+        address verifier = _ctm.protocolVersionVerifier(packedProtocolVersion);
+        require(verifier != address(0), "verifier not set for the current protocol version");
+        return IZKsyncOSVerifier(verifier).getProofMode(0) == ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE;
     }
 
     /// @notice Merge array of Call arrays into single Call array
