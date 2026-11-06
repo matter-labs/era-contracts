@@ -14,11 +14,13 @@ use std::collections::BTreeMap;
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
 
-use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
+use crate::common::external_actions::ExternalAction;
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::ReviewedBuild;
+use super::declared_calls::{judge_declared_calls, DerivedRun};
+use super::ecosystem_binding::{bind_to_reviewed_ecosystem, EcosystemClaims};
 use super::format_semver;
 use super::genesis::GenesisImage;
 use super::lifecycle::{
@@ -167,7 +169,7 @@ pub(crate) async fn verify<P: Provider>(
         None => {}
     }
     // The forward runs through the CTM executor alone; no core executor is involved.
-    verify_lifecycle_construction(
+    let bindings = verify_lifecycle_construction(
         provider,
         build,
         result,
@@ -184,6 +186,21 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
+    bind_to_reviewed_ecosystem(
+        provider,
+        result,
+        env.bridgehub(),
+        &EcosystemClaims {
+            reported_bridgehub: package.reported_bridgehub,
+            ctms: std::iter::once(forward.ctm)
+                .chain(bindings.ctm)
+                .chain(package.reported_ctm)
+                .collect(),
+            core_proxy_admin: None,
+            ctm_proxy_admin: bindings.ctm.zip(bindings.ctm_proxy_admin),
+        },
+    )
+    .await;
     verify_executor_owners(
         provider,
         result,
@@ -448,8 +465,9 @@ pub(super) fn judge_replacement_state(result: &mut VerificationResult, facts: &R
     }
 }
 
-/// The calldata verdict: the forward runs through the executor that owns the CTM, and every other
-/// call of the bundle is a declared governance external action reaching neither of them.
+/// The calldata verdict: the forward runs through the executor that owns the CTM, no other call
+/// reaches either of them, and every call — the forward included — is held to the declared-calls
+/// rule ([`judge_declared_calls`]).
 ///
 /// `ctm_owner` is the CTM's live owner (`None` when unreadable, already reported).
 pub(super) fn judge_replacement_calls(
@@ -472,14 +490,11 @@ pub(super) fn judge_replacement_calls(
         None => {}
     }
 
-    let mut extras = 0usize;
+    let mut accounted: Vec<(usize, &GovernanceCall)> = Vec::with_capacity(calls.len());
     for (index, call) in calls.iter().enumerate() {
-        if index == forward.index {
-            continue;
-        }
-        let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
-        if call.target == forward.executor || call.target == forward.ctm {
-            extras += 1;
+        if index != forward.index && (call.target == forward.executor || call.target == forward.ctm)
+        {
+            let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
             result.report_error(&format!(
                 "the bundle calls {} (selector 0x{selector}) besides the replacement's forward: \
                  the CTM and its executor take exactly the reviewed forward, so an extra call to \
@@ -488,30 +503,19 @@ pub(super) fn judge_replacement_calls(
             ));
             continue;
         }
-        match declared
-            .iter()
-            .find(|action| action.phase == GOVERNANCE_PHASE && action.is_call(call))
-        {
-            Some(action) => result.print_info(&format!(
-                "  bundle -> declared external action `{}` on {} (selector 0x{selector})",
-                action.label, call.target
-            )),
-            None => {
-                extras += 1;
-                result.report_error(&format!(
-                    "the bundle calls {} (selector 0x{selector}), which is neither the \
-                     replacement's forward nor a declared governance external action: the bundle \
-                     carries an instruction no part of this review accounts for",
-                    call.target
-                ));
-            }
-        }
+        accounted.push((index, call));
     }
-    if extras == 0 {
-        result.report_ok(
-            "every other submitted call is a declared external action outside the CTM domain",
-        );
-    }
+    judge_declared_calls(
+        &accounted,
+        declared,
+        &DerivedRun {
+            at: Some(forward.index..forward.index + 1),
+            name: "the forward",
+            member: "the replacement's forward",
+            declared: true,
+        },
+        result,
+    );
 }
 
 /// The CTM's reads of a live transition — `oldProtocolVersion`, `newProtocolVersion`,
@@ -700,26 +704,7 @@ mod tests {
             let fixture = ShellPathFixture::new(change_logic);
             fixture.replacement_reads();
             let provider = ProviderBuilder::new().connect_mocked_client(fixture.asserter.clone());
-            let mut forward = recovered(0);
-            forward.replacement = TRANSITION;
-            let package = ReplacementPackage {
-                reported_replaced: Some(forward.expected),
-                reported_replacement: Some(TRANSITION),
-                reported_ctm_transition: Some(TRANSITION),
-                reported_release: Some(NEW_RELEASE),
-                reported_ctm_executor: Some(forward.executor),
-                reported_ctm: Some(forward.ctm),
-                forward,
-                ctm_key: "zksync_os".to_string(),
-                reported_ctm_proxy_admin: None,
-                calls: vec![the_forward()],
-                external_actions: declared_forward(),
-                create2_salts: Vec::new(),
-                reported_old_version: None,
-                reported_new_version: None,
-                executor_records: Default::default(),
-                member_records: Default::default(),
-            };
+            let package = shell_package(TRANSITION, NEW_RELEASE);
             let mut result = VerificationResult::default();
             verify(
                 &provider,
@@ -746,6 +731,81 @@ mod tests {
             outcomes.iter().all(|(_, consumed)| *consumed),
             "both controls must reach the shell check"
         );
+    }
+
+    /// The replacement package the shell fixture's reads describe.
+    fn shell_package(transition: Address, new_release: Address) -> ReplacementPackage {
+        let mut forward = recovered(0);
+        forward.replacement = transition;
+        ReplacementPackage {
+            reported_replaced: Some(forward.expected),
+            reported_replacement: Some(transition),
+            reported_ctm_transition: Some(transition),
+            reported_release: Some(new_release),
+            reported_ctm_executor: Some(forward.executor),
+            reported_ctm: Some(forward.ctm),
+            forward,
+            ctm_key: "zksync_os".to_string(),
+            reported_ctm_proxy_admin: None,
+            reported_bridgehub: None,
+            calls: vec![the_forward()],
+            external_actions: declared_forward(),
+            create2_salts: Vec::new(),
+            reported_old_version: None,
+            reported_new_version: None,
+            executor_records: Default::default(),
+            member_records: Default::default(),
+        }
+    }
+
+    /// F1, through the real path: the forward's CTM is held against the reviewed Bridgehub's
+    /// registry, so one the Bridgehub never registered — or one built over another Bridgehub —
+    /// is an error of its own. Everything else the fixture leaves unverified, alike in every run.
+    #[tokio::test]
+    async fn a_forward_ctm_outside_the_reviewed_ecosystem_fails() {
+        use super::super::shell_path_tests::{
+            ShellPathFixture, GOVERNANCE, NEW_RELEASE, TRANSITION,
+        };
+        use alloy::providers::ProviderBuilder;
+        const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+
+        let run = |binding: (bool, Address)| async move {
+            let fixture = ShellPathFixture::new(false);
+            fixture.replacement_reads_bound(Some(binding));
+            let provider = ProviderBuilder::new().connect_mocked_client(fixture.asserter.clone());
+            let mut result = VerificationResult::default();
+            verify(
+                &provider,
+                &fixture.build,
+                fixture.genesis.image.as_ref().ok(),
+                &shell_package(TRANSITION, NEW_RELEASE),
+                Some(GOVERNANCE),
+                &[],
+                &ReviewedEnv::for_test(None, Some(BRIDGEHUB)),
+                &mut result,
+            )
+            .await
+            .unwrap();
+            assert!(
+                fixture.asserter.read_q().is_empty(),
+                "every answer was read"
+            );
+            result
+        };
+        let control = run((true, BRIDGEHUB)).await;
+        assert!(!control.has_error("reviewed Bridgehub"));
+
+        let unregistered = run((false, BRIDGEHUB)).await;
+        assert_eq!(unregistered.errors, control.errors + 1);
+        assert!(unregistered.has_error(&format!(
+            "the CTM {CTM} is not registered on the reviewed Bridgehub {BRIDGEHUB}"
+        )));
+
+        let elsewhere = run((true, STRANGER)).await;
+        assert_eq!(elsewhere.errors, control.errors + 1);
+        assert!(elsewhere.has_error(&format!(
+            "the CTM {CTM} is built over Bridgehub {STRANGER}, not the reviewed {BRIDGEHUB}"
+        )));
     }
 
     // A CTM at v0.36.0 on release R36, with v0.34.0 -> v0.35.0 (T34, R34 -> R35) and
@@ -1044,12 +1104,13 @@ mod tests {
 
     #[test]
     fn a_declared_call_outside_the_ctm_domain_rides_along() {
-        let mut declared = declared_forward();
-        declared.push(ExternalAction::governance(
+        // The merge's order: its extras are declared ahead of the prepare's forward.
+        let mut declared = vec![ExternalAction::governance(
             "an unrelated wiring",
             "governance",
             &other(STRANGER),
-        ));
+        )];
+        declared.extend(declared_forward());
         let result = judge_calls(
             &recovered(1),
             vec![other(STRANGER), the_forward()],
@@ -1093,7 +1154,90 @@ mod tests {
                 &declared,
                 Some(CTM_EXECUTOR),
             );
-            assert_eq!(result.errors, 1, "an extra call to {target} must fail");
+            // The authority call, and its now-unmatched declaration.
+            assert_eq!(result.errors, 2, "an extra call to {target} must fail");
         }
+    }
+
+    // ── declared external actions: one for one, in declared order, every one present ──
+
+    fn value_transfer() -> GovernanceCall {
+        GovernanceCall {
+            target: STRANGER,
+            value: U256::from(1_000_000_000_000_000_000u128),
+            data: Vec::new(),
+        }
+    }
+
+    fn with_extras(extras: &[GovernanceCall]) -> Vec<ExternalAction> {
+        let mut declared: Vec<ExternalAction> = extras
+            .iter()
+            .map(|c| ExternalAction::governance("extra", "governance", c))
+            .collect();
+        declared.extend(declared_forward());
+        declared
+    }
+
+    /// Finding 4: a declared value transfer carried twice beside the forward.
+    #[test]
+    fn a_declared_action_carried_twice_fails() {
+        let x = value_transfer();
+        let result = judge_calls(
+            &recovered(2),
+            vec![x.clone(), x.clone(), the_forward()],
+            &with_extras(std::slice::from_ref(&x)),
+            Some(CTM_EXECUTOR),
+        );
+        assert!(
+            result.has_error("more often than it is declared"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn a_declared_action_missing_from_the_bundle_fails() {
+        let result = judge_calls(
+            &recovered(0),
+            vec![the_forward()],
+            &with_extras(&[value_transfer()]),
+            Some(CTM_EXECUTOR),
+        );
+        assert!(
+            result.has_error("never carries"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    /// The merge puts its extras ahead of the forward; one moved behind it is out of order.
+    #[test]
+    fn a_declared_action_moved_behind_the_forward_fails() {
+        let x = value_transfer();
+        let result = judge_calls(
+            &recovered(0),
+            vec![the_forward(), x.clone()],
+            &with_extras(std::slice::from_ref(&x)),
+            Some(CTM_EXECUTOR),
+        );
+        assert!(
+            result.has_error("out of their declared order"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, 1);
+    }
+
+    #[test]
+    fn an_undeclared_forward_fails() {
+        let result = judge_calls(&recovered(0), vec![the_forward()], &[], Some(CTM_EXECUTOR));
+        assert!(
+            result.has_error("is not declared"),
+            "{:?}",
+            result.error_messages
+        );
+        assert_eq!(result.errors, 1);
     }
 }

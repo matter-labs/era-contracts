@@ -30,7 +30,7 @@ use crate::upgrade_verification::constants::{
 use crate::upgrade_verification::paths::repo_relative_path;
 use crate::upgrade_verification::report::VerificationResult;
 
-use super::views::{BridgehubView, CtmView, FixedForceDeploymentsData, ReleaseManifest};
+use super::views::{BridgehubView, FixedForceDeploymentsData, ReleaseManifest};
 
 /// The genesis config the prepare reads (`Utils.genesisConfigPath`).
 pub(crate) const ZKSYNC_OS_GENESIS_CONFIG_PATH: &str = "configs/genesis/zksync-os/latest.json";
@@ -59,13 +59,13 @@ pub(crate) struct ReviewedGenesis {
 pub(crate) struct ExpectedForceDeployments {
     /// The L1 RPC's chain id.
     pub(crate) l1_chain_id: Result<U256, String>,
-    /// The CTM's Bridgehub's `assetRouter()`.
+    /// The reviewed Bridgehub's `assetRouter()`.
     pub(crate) l1_asset_router: Result<Address, String>,
     /// The REVIEWED governance, unaliased.
     pub(crate) governance: Result<Address, String>,
-    /// The CTM's Bridgehub's `MAX_NUMBER_OF_ZK_CHAINS()`.
+    /// The reviewed Bridgehub's `MAX_NUMBER_OF_ZK_CHAINS()`.
     pub(crate) max_number_of_zk_chains: Result<U256, String>,
-    /// The CTM's Bridgehub's `chainRegistrationSender()`, unaliased.
+    /// The reviewed Bridgehub's `chainRegistrationSender()`, unaliased.
     pub(crate) chain_registration_sender: Result<Address, String>,
     /// The reviewed env's permanent-values `zk_token_asset_id`.
     pub(crate) zk_token_asset_id: B256,
@@ -87,16 +87,17 @@ impl ExpectedForceDeployments {
         }
     }
 
-    /// Reads the live expectations: the L1 chain id and, through `ctm`'s Bridgehub, the asset
-    /// router, the chain cap and the chain registration sender. `governance` is the reviewed
-    /// governance (`None` names `governance_source` as what is missing).
+    /// Reads the live expectations: the L1 chain id and, through the reviewed Bridgehub
+    /// ([`super::ecosystem_binding`]), the asset router, the chain cap and the chain registration
+    /// sender. `governance` is the reviewed governance (`None` names `governance_source` as what
+    /// is missing).
     ///
-    /// Reads, in order: `eth_chainId`, the CTM's `BRIDGE_HUB()`, the Bridgehub's `assetRouter()`,
+    /// Reads, in order: `eth_chainId`, the Bridgehub's `assetRouter()`,
     /// `MAX_NUMBER_OF_ZK_CHAINS()` and `chainRegistrationSender()`.
     pub(crate) async fn read_live<P: Provider>(
         &mut self,
         provider: &P,
-        ctm: Option<Address>,
+        bridgehub: Option<Address>,
         governance: Option<Address>,
         governance_source: &str,
     ) {
@@ -107,21 +108,10 @@ impl ExpectedForceDeployments {
             .map_err(|e| format!("the L1 chain id could not be read ({e})"));
         self.governance = governance
             .ok_or_else(|| format!("no reviewed governance: {governance_source} is required"));
-        let bridgehub = match ctm {
-            None => Err(
-                "the package names no CTM (`chain_type_manager_proxy`), so its \
-                         Bridgehub cannot be read"
-                    .to_string(),
-            ),
-            Some(ctm) => CtmView::new(ctm, provider)
-                .BRIDGE_HUB()
-                .call()
-                .await
-                .map_err(|e| format!("the CTM's BRIDGE_HUB() could not be read ({e})")),
-        };
         let bridgehub = match bridgehub {
-            Ok(bridgehub) => BridgehubView::new(bridgehub, provider),
-            Err(why) => {
+            Some(bridgehub) => BridgehubView::new(bridgehub, provider),
+            None => {
+                let why = "no reviewed Bridgehub to read it from".to_string();
                 self.l1_asset_router = Err(why.clone());
                 self.max_number_of_zk_chains = Err(why.clone());
                 self.chain_registration_sender = Err(why);
@@ -1135,19 +1125,17 @@ mod tests {
         );
     }
 
-    /// The live reads, in the order they query: the chain id, the CTM's Bridgehub and its three
-    /// getters. Without a CTM nothing past the chain id is read, and each Bridgehub field says
-    /// why it is unavailable.
+    /// The live reads, in the order they query: the chain id, then the reviewed Bridgehub's three
+    /// getters — never a Bridgehub the package's CTM names. Without a reviewed Bridgehub nothing
+    /// past the chain id is read, and each Bridgehub field says why it is unavailable.
     #[tokio::test]
-    async fn the_live_expectations_are_read_through_the_ctms_bridgehub() {
+    async fn the_live_expectations_are_read_through_the_reviewed_bridgehub() {
         use alloy::providers::ProviderBuilder;
         use alloy::transports::mock::Asserter;
-        const CTM: Address = Address::repeat_byte(0xC7);
         const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
 
         let asserter = Asserter::new();
         asserter.push_success(&alloy::primitives::U64::from(L1_CHAIN_ID));
-        asserter.push_success(&Bytes::from(BRIDGEHUB.abi_encode()));
         asserter.push_success(&Bytes::from(ASSET_ROUTER.abi_encode()));
         asserter.push_success(&Bytes::from(U256::from(MAX_CHAINS).abi_encode()));
         asserter.push_success(&Bytes::from(REGISTRATION_SENDER.abi_encode()));
@@ -1155,7 +1143,7 @@ mod tests {
         let mut live = ExpectedForceDeployments::unread(ZK_TOKEN);
         live.read_live(
             &provider,
-            Some(CTM),
+            Some(BRIDGEHUB),
             Some(GOVERNANCE),
             "the test's governance",
         )
@@ -1179,7 +1167,7 @@ mod tests {
             live.max_number_of_zk_chains.as_ref().err(),
             live.chain_registration_sender.as_ref().err(),
         ] {
-            assert!(missing.unwrap().contains("names no CTM"));
+            assert!(missing.unwrap().contains("no reviewed Bridgehub"));
         }
         assert!(live
             .governance

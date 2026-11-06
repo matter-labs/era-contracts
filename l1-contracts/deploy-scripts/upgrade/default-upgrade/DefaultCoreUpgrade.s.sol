@@ -129,13 +129,27 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         }
         // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
         // creation code this object's address is re-derived from.
+        address proxyUpgradeEngine = deployProxyUpgradeEngine();
         coreTransition = IProxyUpgradeTransition(
             deployViaCreate2AndNotify(
                 BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
-                abi.encode(ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: rows})),
+                abi.encode(
+                    ProxyUpgradeTransitionManifest({
+                        domain: ProxyUpgradeDomain.Core,
+                        proxyUpgrades: rows,
+                        proxyUpgradeEngine: proxyUpgradeEngine
+                    })
+                ),
                 "ProxyUpgradeTransition"
             )
         );
+    }
+
+    /// @notice The engine the core transition pins: the code `CoreUpgradeExecutor` delegatecalls
+    ///         to apply it. The default applies the rows and nothing else; a version whose upgrade
+    ///         needs follow-up calls deploys its `DefaultProxyUpgradeEngine` subclass instead.
+    function deployProxyUpgradeEngine() internal virtual returns (address) {
+        return deploySimpleContract("DefaultProxyUpgradeEngine");
     }
 
     /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a

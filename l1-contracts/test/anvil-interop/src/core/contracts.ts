@@ -36,6 +36,8 @@ const ARTIFACTS = {
   ICTMTransition: "ICTMTransition.sol/ICTMTransition.json",
   IProxyUpgradeTransition: "IProxyUpgradeTransition.sol/IProxyUpgradeTransition.json",
   DefaultUpgrade: "DefaultUpgrade.sol/DefaultUpgrade.json",
+  // The engine a `ProxyUpgradeTransition` pins; its executor delegatecalls it to apply the rows.
+  DefaultProxyUpgradeEngine: "DefaultProxyUpgradeEngine.sol/DefaultProxyUpgradeEngine.json",
   DiamondInit: "DiamondInit.sol/DiamondInit.json",
   EIP7702Checker: "EIP7702Checker.sol/EIP7702Checker.json",
   ZKsyncOSTestnetVerifier: "ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
