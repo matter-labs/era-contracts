@@ -38,8 +38,6 @@ pub struct CtmInputs {
     pub bytecodes_supplier: Option<Address>,
     /// Override for the rollup DA manager address.
     pub rollup_da_manager: Option<Address>,
-    /// Give the CTM the Airbender + ZiSK multi-proof verifier.
-    pub multi_proof_verifier: bool,
 }
 
 /// Inputs to the prepare phase. The CLI handler builds this from clap args.
@@ -351,7 +349,6 @@ impl<'a> UpgradeInner<'a> {
                         chainRegistrationSender: chain_registration_sender,
                         zkTokenAssetId: inputs.zk_token_asset_id,
                         testnetVerifier: inputs.testnet_verifier,
-                        multiProofVerifier: ctm.multi_proof_verifier,
                     },
                 }
                 .abi_encode(),

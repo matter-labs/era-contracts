@@ -100,10 +100,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         ///      `IS_TESTNET_VERIFIER`, so the call reverts on a production one, and probing for that
         ///      would need the try/catch this repo forbids.
         bool testnetVerifier;
-        /// @dev Whether the new verifier is the Airbender + ZiSK multi-proof one. Unlike the testnet flag
-        ///      it is an opt-in, not a property of the deployed verifier: a CTM enters multi-proof through
-        ///      an upgrade, so before that upgrade there is nothing to introspect.
-        bool multiProofVerifier;
     }
 
     // The output of the script
@@ -130,8 +126,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         string memory _outputPath,
         address governance,
         bytes32 zkTokenAssetId,
-        bool testnetVerifier,
-        bool multiProofVerifier
+        bool testnetVerifier
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -143,8 +138,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             newConfigPath: newConfigPath,
             governance: governance,
             zkTokenAssetId: zkTokenAssetId,
-            testnetVerifier: testnetVerifier,
-            multiProofVerifier: multiProofVerifier
+            testnetVerifier: testnetVerifier
         });
 
         console.log("Initialized config from %s", newConfigPath);
@@ -193,16 +187,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
             IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
         );
-        // Every chain adopts the new version's verifier during its upgrade, so leaving the flag off for a
-        // multi-proof CTM would silently move all of its chains back to Airbender-only.
-        require(
-            permanentConfig.multiProofVerifier ||
-                !UpgradeUtils.resolveMultiProofVerifier(
-                    IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
-                ),
-            "CTM runs a multi-proof verifier: set multi_proof_verifier to keep it"
-        );
-        config.multiProof.enabled = permanentConfig.multiProofVerifier;
+        // Every CTM gets the multi-proof verifier, so each chain can choose ZiSK on its own. A chain with
+        // ZiSK disabled, which is what the chain tooling sets by default, still settles Airbender-only proofs.
+        config.multiProof.enabled = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -214,8 +201,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         string memory newConfigPath,
         address governance,
         bytes32 zkTokenAssetId,
-        bool testnetVerifier,
-        bool multiProofVerifier
+        bool testnetVerifier
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -228,8 +214,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             bytecodesSupplier: bytecodesSupplier,
             create2FactorySalt: create2FactorySalt,
             zkTokenAssetId: zkTokenAssetId,
-            testnetVerifier: testnetVerifier,
-            multiProofVerifier: multiProofVerifier
+            testnetVerifier: testnetVerifier
         });
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath());
 
@@ -281,8 +266,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
             _outputPath: _params.outputPath,
             governance: _params.governance,
             zkTokenAssetId: _params.zkTokenAssetId,
-            testnetVerifier: _params.testnetVerifier,
-            multiProofVerifier: _params.multiProofVerifier
+            testnetVerifier: _params.testnetVerifier
         });
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
