@@ -1,0 +1,22 @@
+[profile.default]
+src = "src"
+test = "test"
+libs = ["../../lib"]
+# The PoC imports the protocol contracts and libraries straight from l1-contracts.
+allow_paths = ["../../l1-contracts"]
+solc_version = "0.8.28"
+evm_version = "prague"
+optimizer = true
+optimizer_runs = 200
+# The tests generate real proofs through prove.py.
+ffi = true
+# bb's generated verifiers exceed the 24 KB limit; the PoC only runs them in tests.
+code_size_limit = 1000000
+gas_limit = 2000000000
+fs_permissions = [{ access = "read-write", path = "../work" }]
+remappings = [
+  "forge-std/=../../lib/forge-std/src/",
+  "era/=../../l1-contracts/contracts/",
+  "@openzeppelin/contracts-v4/=../../lib/openzeppelin-contracts-v4/contracts/",
+  "@openzeppelin/contracts-upgradeable-v4/=../../lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+]

@@ -9,3 +9,6 @@ l1-contracts/node_modules
 l1-contracts/snapshots/*
 
 lib/*
+
+# ZKIP-lite PoC: experimental, outside the protocol contracts
+zkip-poc

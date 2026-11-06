@@ -15,3 +15,6 @@ protocol-ops/target-linux
 
 l1-contracts/lib
 lib/
+
+# ZKIP-lite PoC
+zkip-poc
