@@ -149,7 +149,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     address internal genesisUpgradeAddr;
     /// @dev The pinned init target of the committed cut. This fixture never executes the cut (the
     ///      CTM only commits its hash), so a distinct etched stand-in is all the pin needs.
-    address internal upgradeEngine;
+    address internal chainUpgradeEngine;
     /// @dev The pinned delegate-calldata composer of a plan-bearing manifest: a test-only stand-in
     ///      returning `DELEGATE_CALLDATA` regardless of its inputs, so this suite can pin a real
     ///      composer without a version-specific L2 migration behind it.
@@ -184,8 +184,8 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
         genesisUpgradeAddr = makeAddr("genesisUpgrade");
         vm.etch(genesisUpgradeAddr, hex"600042");
-        upgradeEngine = makeAddr("upgradeEngine");
-        vm.etch(upgradeEngine, hex"600043");
+        chainUpgradeEngine = makeAddr("chainUpgradeEngine");
+        vm.etch(chainUpgradeEngine, hex"600043");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
 
         // Both domain executors, governance-owned; the edge checks each one's authority shape.
@@ -297,7 +297,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
                 ctmProxyUpgrades: upgrades,
                 currentRelease: address(genesisRelease),
                 oldProtocolVersionDeadline: type(uint256).max,
-                upgradeEngine: upgradeEngine,
+                chainUpgradeEngine: chainUpgradeEngine,
                 l2Plan: _l2Plan,
                 upgradeTimestamp: 0,
                 ctmExecutor: address(ctmExecutor),
@@ -337,7 +337,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         return
             Diamond.DiamondCutData({
                 facetCuts: new Diamond.FacetCut[](0),
-                initAddress: upgradeEngine,
+                initAddress: chainUpgradeEngine,
                 initCalldata: abi.encodeCall(IBootstrapUpgrade.upgradeFromBootstrap, (address(_migration)))
             });
     }
@@ -554,7 +554,7 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
         );
         // The same bytes, read back field by field.
         assertEq(cut.facetCuts.length, 0, "the bootstrap cut carries no facet cuts");
-        assertEq(cut.initAddress, upgradeEngine, "the init target is the pinned engine");
+        assertEq(cut.initAddress, chainUpgradeEngine, "the init target is the pinned engine");
         assertEq(this.decodeUpgradeInit(cut.initCalldata), address(composed), "the init names this object");
 
         // The inputs the engine reads at execution.
@@ -1003,13 +1003,13 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
     /// @dev The engine is the code the committed cut delegatecalls into on every chain: a codeless
     ///      one would make every chain's upgrade a no-op delegatecall that silently "succeeds".
     ///      Held on the execution path, so the object still constructs and serves the address.
-    function test_revertWhen_upgradeEngineHasNoCode() public {
+    function test_revertWhen_chainUpgradeEngineHasNoCode() public {
         RegistryBootstrapMigration authorized = _deployAndAuthorize(_manifest());
         uint256 oldVersion = chainContractAddress.protocolVersion();
-        assertEq(authorized.upgradeCut().initAddress, upgradeEngine, "the engine is served like any other member");
+        assertEq(authorized.upgradeCut().initAddress, chainUpgradeEngine, "the engine is served like any other member");
 
-        vm.etch(upgradeEngine, "");
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeEngine));
+        vm.etch(chainUpgradeEngine, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, chainUpgradeEngine));
         authorized.migrate();
         assertFalse(authorized.executed(), "a refused edge must stay unspent");
         assertEq(chainContractAddress.upgradeCutHash(oldVersion), bytes32(0), "a refused edge commits no cut");
@@ -1033,9 +1033,9 @@ contract RegistryBootstrapMigrationTest is ChainTypeManagerTest {
 
     // ─────────────────────────── manifest shape ───────────────────────────
 
-    function test_revertWhen_upgradeEngineIsZero() public {
+    function test_revertWhen_chainUpgradeEngineIsZero() public {
         BootstrapManifest memory manifest = _manifest();
-        manifest.upgradeEngine = address(0);
+        manifest.chainUpgradeEngine = address(0);
 
         vm.expectRevert(ZeroAddress.selector);
         new RegistryBootstrapMigration(manifest);

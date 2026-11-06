@@ -7,12 +7,11 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ICTMTransition} from "../objects/ICTMTransition.sol";
 import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
 import {ICTMUpgradeExecutor} from "./ICTMUpgradeExecutor.sol";
-import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
+import {ProxyUpgradeExecutorBase} from "./ProxyUpgradeExecutorBase.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {TransitionNotCommitted, Unauthorized, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {OutdatedProtocolVersion} from "../../../state-transition/L1StateTransitionErrors.sol";
 import {ObjectAnchorLib} from "../libraries/ObjectAnchorLib.sol";
-import {ProxyUpgradeRowLib} from "../libraries/ProxyUpgradeRowLib.sol";
 import {ProxyUpgradeDomain} from "../RegistryTypes.sol";
 
 /// @title CTMUpgradeExecutor
@@ -22,12 +21,13 @@ import {ProxyUpgradeDomain} from "../RegistryTypes.sol";
 ///         `ProxyAdmin`, applies CTM-domain `ProxyUpgradeTransition` objects, commits write-once
 ///         `CTMTransition` objects on the CTM, and runs the per-chain `upgradeChain`. See
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @dev Fixed logic, no generic delegatecall. The transition it commits is the exact deployed
+/// @dev Fixed logic. Its one delegatecall is into the engine an approved infrastructure transition
+///      pins ({ProxyUpgradeExecutorBase}); there is no generic one. The transition it commits is the exact deployed
 ///      object governance approved, never a proxy. Every other owner operation of the CTM (freezing
 ///      a chain, moving a deadline, replacing a committed transition, ...) goes through the
 ///      owner-gated, event-logged `forward`; freezing and unfreezing a chain the CTM also takes
 ///      from the Bridgehub's owner directly ({ChainTypeManager-freezeChain}).
-contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
+contract CTMUpgradeExecutor is ProxyUpgradeExecutorBase, ICTMUpgradeExecutor {
     using ObjectAnchorLib for address;
 
     /// @notice The one ChainTypeManager this executor governs. Transitions carry no CTM pointer;
@@ -43,7 +43,7 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
         address _initialOwner,
         IChainTypeManager _ctm,
         ProxyAdmin _ctmProxyAdmin
-    ) UpgradeExecutorBase(_initialOwner) {
+    ) ProxyUpgradeExecutorBase(_initialOwner) {
         if (address(_ctm) == address(0) || address(_ctmProxyAdmin) == address(0)) {
             revert ZeroAddress();
         }
@@ -62,7 +62,12 @@ contract CTMUpgradeExecutor is UpgradeExecutorBase, ICTMUpgradeExecutor {
 
     /// @inheritdoc ICTMUpgradeExecutor
     function applyInfrastructureUpgrade(IProxyUpgradeTransition _infrastructureTransition) external onlyOwner {
-        ProxyUpgradeRowLib.applyTransition(CTM_PROXY_ADMIN, _infrastructureTransition, ProxyUpgradeDomain.CTM);
+        _applyProxyUpgradeTransition(
+            CTM_PROXY_ADMIN,
+            _infrastructureTransition,
+            ProxyUpgradeDomain.CTM,
+            address(CHAIN_TYPE_MANAGER)
+        );
         emit CTMInfrastructureUpgradeApplied(address(_infrastructureTransition));
     }
 

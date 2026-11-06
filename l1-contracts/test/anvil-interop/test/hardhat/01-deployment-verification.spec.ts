@@ -1,39 +1,12 @@
-import { execFileSync } from "child_process";
-import * as fs from "fs";
-import * as path from "path";
 import { expect } from "chai";
 import type { providers } from "ethers";
 import { Contract, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getAbi, getBytecode, getSolidityContractName, getSoliditySourceFileName } from "../../src/core/contracts";
+import { getAbi, getBytecode } from "../../src/core/contracts";
 import type { ContractName } from "../../src/core/contracts";
 import { createProvider, getL2RpcUrl } from "../../src/core/utils";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../../src/core/predeploys";
 import { L2_BRIDGEHUB_ADDR, TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../../src/core/const";
-
-/** The Solidity source under `contractsDir` that defines each contract, found by its file name, which must be unique. */
-function findSoliditySources(contractsDir: string, contractNames: readonly ContractName[]): string[] {
-  const pathsByFileName = new Map<string, string[]>();
-  const walk = (dir: string): void => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const entryPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(entryPath);
-      } else {
-        pathsByFileName.set(entry.name, [...(pathsByFileName.get(entry.name) ?? []), entryPath]);
-      }
-    }
-  };
-  walk(contractsDir);
-  return contractNames.map((contractName) => {
-    const fileName = getSoliditySourceFileName(contractName);
-    const matches = pathsByFileName.get(fileName) ?? [];
-    if (matches.length !== 1) {
-      throw new Error(`Expected exactly one ${fileName} under ${contractsDir}, found ${matches.length}`);
-    }
-    return matches[0];
-  });
-}
 
 describe("01 - Deployment Verification", function () {
   this.timeout(0);
@@ -182,42 +155,12 @@ describe("01 - Deployment Verification", function () {
       ...expectedContracts.map(({ contractName }) => contractName),
       "L2ChainAssetHandlerDev",
     ];
-    // Read from the state the run that started the chains wrote, so reruns against kept chains agree.
-    const fromSnapshots = runner.loadState().startedFrom !== "freshDeploy";
-    const reference = fromSnapshots ? "anvil-interop profile build" : "installed forge-output artifact";
+    // Snapshots and fresh deployments install every predeploy from the same out/ build.
+    const reference = "out/ artifact";
 
     before(() => {
-      if (!fromSnapshots) {
-        // A fresh deployment installs every predeploy from the profile's forge output.
-        for (const contractName of artifactNames) {
-          expectedBytecodes.set(contractName, getBytecode(contractName));
-        }
-        return;
-      }
-      // Snapshots use the metadata-free anvil-interop profile. Build matching references in
-      // isolated output/cache directories so coverage's default-profile artifacts stay intact.
-      const root = path.resolve(__dirname, "../../../..");
-      // Compile only the predeploys' sources and their imports, not the whole project.
-      const sources = findSoliditySources(path.join(root, "contracts"), artifactNames);
-      const output = path.join(
-        root,
-        "test/anvil-interop/outputs",
-        `predeploy-identity${process.env.ANVIL_INTEROP_RUN_SUFFIX || ""}`
-      );
-      const buildArgs = ["--out", path.join(output, "out"), "--cache-path", path.join(output, "cache")];
-      const options = {
-        cwd: root,
-        env: { ...process.env, FOUNDRY_PROFILE: "anvil-interop" },
-        encoding: "utf8" as const,
-        maxBuffer: 32 * 1024 * 1024,
-      };
-      execFileSync("forge", ["build", ...sources, ...buildArgs], options);
       for (const contractName of artifactNames) {
-        const solidityName = getSolidityContractName(contractName);
-        expectedBytecodes.set(
-          contractName,
-          execFileSync("forge", ["inspect", solidityName, "deployedBytecode", ...buildArgs], options).trim()
-        );
+        expectedBytecodes.set(contractName, getBytecode(contractName));
       }
     });
 

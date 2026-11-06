@@ -35,10 +35,10 @@ import {ReleaseMemberProbe} from "./ReleaseMemberProbe.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 /// @notice The ecosystem (core) side of a registry-driven upgrade prepare, run before the CTM
-///         prepare: deploys every ecosystem implementation whose code differs from the live one
-///         (and reuses the rest) and pins the swaps in a write-once Core-domain
-///         `ProxyUpgradeTransition`. It emits NO executor call of its own — the merge derives
-///         `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)` from the addresses it reports.
+///         prepare: deploys every ecosystem implementation the version declares changed, reuses
+///         the rest (see {_canReuseEcosystemImplementation}) and pins the swaps in a write-once
+///         Core-domain `ProxyUpgradeTransition`. It emits NO executor call of its own — the merge
+///         derives `CoreUpgradeExecutor.applyL1Upgrade(coreTransition)` from the addresses it reports.
 ///         Anything a version script still needs governance to do is declared as an external
 ///         action and listed in the output.
 /// @dev Version scripts inherit and declare what they change ({changedEcosystemImplementations});
@@ -130,13 +130,27 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         }
         // From the build ARTIFACT, so a reviewer's own build of the same commit reproduces the
         // creation code this object's address is re-derived from.
+        address proxyUpgradeEngine = deployProxyUpgradeEngine();
         coreTransition = IProxyUpgradeTransition(
             deployViaCreate2AndNotify(
                 BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
-                abi.encode(ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: rows})),
+                abi.encode(
+                    ProxyUpgradeTransitionManifest({
+                        domain: ProxyUpgradeDomain.Core,
+                        proxyUpgrades: rows,
+                        proxyUpgradeEngine: proxyUpgradeEngine
+                    })
+                ),
                 "ProxyUpgradeTransition"
             )
         );
+    }
+
+    /// @notice The engine the core transition pins: the code `CoreUpgradeExecutor` delegatecalls
+    ///         to apply it. The default applies the rows and nothing else; a version whose upgrade
+    ///         needs follow-up calls deploys its `DefaultProxyUpgradeEngine` subclass instead.
+    function deployProxyUpgradeEngine() internal virtual returns (address) {
+        return deploySimpleContract("DefaultProxyUpgradeEngine");
     }
 
     /// @notice The enum-indexed ecosystem inventory: one slot per `L1EcosystemContract` member, a
@@ -301,7 +315,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @notice Deploys every ecosystem implementation the inventory can install
-    ///         ({_coreProxyUpgradeRows}) whose code differs from the live one, and reuses the rest.
+    ///         ({_coreProxyUpgradeRows}) that the version declares changed, and reuses the rest.
     function deployNewEcosystemContractsL1() public virtual {
         BridgehubAddresses storage bridgehubAddresses = coreAddresses.bridgehub;
         bridgehubAddresses.implementations.bridgehub = _deployEcosystemImplementation(
@@ -343,15 +357,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     }
 
     /// @notice The ecosystem implementations this version SETS OUT to change, by `deploySimpleContract`
-    ///         name. The prepare refuses to replace a live implementation not named here — the same
-    ///         rule as `DefaultCTMUpgrade.changedReleaseMembers`, for the same reason. Empty by
-    ///         default: a version that changes no ecosystem contract reuses all of them.
+    ///         name. The prepare redeploys every implementation named here and refuses to replace a
+    ///         live one not named here — the same rule as `DefaultCTMUpgrade.changedReleaseMembers`,
+    ///         for the same reason. Empty by default: a version that changes no ecosystem contract
+    ///         reuses all of them.
     function changedEcosystemImplementations() internal view virtual returns (string[] memory) {
         return new string[](0);
     }
 
-    /// @notice The implementation `_proxy` runs after this upgrade: its live one when that already
-    ///         runs the code the current sources produce, a fresh deployment otherwise.
+    /// @notice The implementation `_proxy` runs after this upgrade: its live one when it may stay (see
+    ///         {_canReuseEcosystemImplementation}), a fresh deployment otherwise.
     function _deployEcosystemImplementation(string memory _name, address _proxy) internal returns (address) {
         if (_proxy == address(0)) {
             return address(0);
@@ -366,12 +381,15 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return deploySimpleContract(_name);
     }
 
-    /// @notice Whether the live `_live` already runs the code `_name` deploys with this run's
-    ///         constructor arguments (runtime codehash, immutables included; see {ReleaseMemberProbe}).
+    /// @notice Whether the live `_live` may stay `_name`'s implementation: `_name` is not declared
+    ///         changed and `_live` already runs the code `_name` deploys with this run's constructor
+    ///         arguments (runtime codehash, immutables included; see {ReleaseMemberProbe}).
+    /// @dev A declared change is always redeployed: the build has no CBOR metadata, so a
+    ///      constructor-only change leaves the runtime codehash as it was.
     /// @dev Virtual so a fixture whose live ecosystem was deployed from the current sources can
     ///      simulate the older build a production edge departs from.
     function _canReuseEcosystemImplementation(string memory _name, address _live) internal virtual returns (bool) {
-        if (_live == address(0) || _live.code.length == 0) {
+        if (_live == address(0) || _live.code.length == 0 || _isDeclaredEcosystemChange(_name)) {
             return false;
         }
         if (address(implementationProbe) == address(0)) {
@@ -384,15 +402,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     /// @notice Refuses a replacement this version did not declare (see
     ///         {changedEcosystemImplementations}).
     function _requireDeclaredEcosystemChange(string memory _name, address _live) internal view {
-        if (_live == address(0) || _live.code.length == 0) {
+        if (_live == address(0) || _live.code.length == 0 || _isDeclaredEcosystemChange(_name)) {
             return;
-        }
-        string[] memory declared = changedEcosystemImplementations();
-        uint256 length = declared.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (compareStrings(declared[i], _name)) {
-                return;
-            }
         }
         console.log("Undeclared ecosystem implementation change:", _name);
         console.log("  live:", _live);
@@ -407,6 +418,18 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
                 "the live code."
             )
         );
+    }
+
+    /// @notice Whether this version names `_name` in {changedEcosystemImplementations}.
+    function _isDeclaredEcosystemChange(string memory _name) internal view returns (bool) {
+        string[] memory declared = changedEcosystemImplementations();
+        uint256 length = declared.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (compareStrings(declared[i], _name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function getOwnerAddress() public virtual returns (address) {

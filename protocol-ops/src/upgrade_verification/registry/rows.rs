@@ -6,9 +6,10 @@
 //!
 //! 1. Is its proxy the contract its SLOT names? Slot `i` of an inventory is enum member `i`
 //!    (`L1EcosystemContract`, `CTMContract`), and that member's proxy is discovered from live state
-//!    the package does not supply: the ecosystem's through the Bridgehub and the getters it exposes,
-//!    the CTM domain's through the CTM ([`discover_slot_proxy`]). A row whose proxy is another
-//!    contract would install the slot's implementation behind the wrong proxy.
+//!    the package does not supply: the ecosystem's through the REVIEWED Bridgehub and the getters
+//!    it exposes ([`super::ecosystem_binding`]), the CTM domain's through the CTM, which is held to
+//!    that Bridgehub's registry ([`discover_slot_proxy`]). A row whose proxy is another contract
+//!    would install the slot's implementation behind the wrong proxy.
 //! 2. Does it depart from the implementation that is LIVE? It is read through the applying
 //!    domain's bound `ProxyAdmin`, the one `ProxyUpgradeRowLib` applies it through: a transparent
 //!    proxy answers `implementation()` only to its own admin, and every proxy a row may name sits
@@ -36,6 +37,7 @@ use crate::upgrade_verification::constants::{
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{ReviewedBuild, REVIEWED_PROXY};
+use super::ecosystem_binding::ReviewedBridgehub;
 use super::member_construction::{expect_member_construction, ArgContext, Member, MemberReview};
 use super::package::ReportedSingletons;
 use super::provenance::{expect_code_identity, tolerate};
@@ -269,16 +271,19 @@ pub(super) struct InventoryReview<'a> {
     pub(super) rows: &'a [ProxyUpgradeRow],
     /// The `ProxyAdmin` the domain applies its rows through.
     pub(super) domain_admin: Address,
-    /// Where the slots' proxies are discovered from: the Bridgehub for the ecosystem, the CTM for
-    /// its domain. `None` when it could not be established (already reported); every slot is
-    /// then unverified.
+    /// Where the slots' proxies are discovered from: the reviewed Bridgehub for the ecosystem, the
+    /// CTM for its domain. `None` when it could not be established (already reported); every slot
+    /// is then unverified.
     pub(super) anchor: Option<Address>,
     /// A slot whose proxy is not yet under `domain_admin`, so its departure cannot be read through
     /// it (the bootstrap's ServerNotifier before its handover, reported by the caller).
     pub(super) departure_unreadable: Option<usize>,
-    /// What the package reports for the Bridgehub and the CTM domain's singletons: the last
-    /// fallbacks a new `ChainTypeManager` implementation's immutables are held against.
+    /// What the package reports for the CTM domain's singletons: the last fallbacks a new
+    /// `ChainTypeManager` implementation's immutables are held against.
     pub(super) reported: ReportedSingletons,
+    /// The reviewed Bridgehub, the value a new `ChainTypeManager` implementation's `BRIDGE_HUB`
+    /// is held against when the live CTM does not answer its own.
+    pub(super) reviewed_bridgehub: Option<&'a ReviewedBridgehub>,
 }
 
 /// An implementation whose code identity passed, for its construction check: a participating
@@ -527,13 +532,18 @@ impl CtmImmutable {
         }
     }
 
-    /// The value the review establishes without the live CTM: for a CTM-domain singleton the
-    /// participating inventory row of its slot, else the proxy the package reports for it. None
-    /// for the Bridgehub, which the implementation's construction record is held against the
-    /// reviewed one for ([`super::member_construction`]).
+    /// The value the review establishes without the live CTM: the reviewed Bridgehub for the
+    /// Bridgehub (never the package's `bridgehub_proxy_addr`); for a CTM-domain singleton the participating inventory row of its slot, else the proxy the
+    /// package reports for it.
     fn fallback(self, review: &InventoryReview<'_>) -> Fallback {
         match self {
-            Self::BridgeHub => Fallback::None,
+            Self::BridgeHub => match review.reviewed_bridgehub {
+                Some(reviewed) => Fallback::Known(
+                    reviewed.address,
+                    format!("the reviewed Bridgehub ({})", reviewed.source),
+                ),
+                None => Fallback::None,
+            },
             _ => {
                 let Some((member, field, reported)) = self.slot(&review.reported) else {
                     return Fallback::None;
@@ -993,6 +1003,7 @@ mod tests {
                 anchor: Some(CTM),
                 departure_unreadable,
                 reported: Default::default(),
+                reviewed_bridgehub: None,
             },
         )
         .await
@@ -1036,6 +1047,68 @@ mod tests {
         .await;
         assert_eq!(result.errors, 1);
         assert!(result.ensure_success().is_err());
+    }
+
+    /// F1 (inverts the external review's forged-anchor repro): discovered through the reviewed
+    /// Bridgehub, whose `messageRoot()` answers the real MessageRoot, an `L1MessageRoot` row naming
+    /// the asset router — departing from its live implementation onto reviewed L1MessageRoot code —
+    /// fails its slot. The ecosystem twin of [`a_row_naming_another_proxy_than_its_slot_fails`].
+    #[tokio::test]
+    async fn an_ecosystem_row_relabelling_another_proxy_fails_against_the_reviewed_bridgehub() {
+        const REVIEWED_BRIDGEHUB: Address = Address::repeat_byte(0xB0);
+        const MESSAGE_ROOT: Address = Address::repeat_byte(0x3A);
+        const ASSET_ROUTER: Address = Address::repeat_byte(0xA5);
+        const LIVE_ROUTER_IMPL: Address = Address::repeat_byte(0x01);
+        const MESSAGE_ROOT_RUNTIME: &[u8] = b"the reviewed L1MessageRoot runtime";
+        let build = ReviewedBuild::from_artifacts(
+            CodeIdentity::empty(),
+            vec![(
+                "L1MessageRoot.sol",
+                "L1MessageRoot",
+                Vec::new(),
+                MESSAGE_ROOT_RUNTIME.to_vec(),
+                Vec::new(),
+            )],
+        );
+        let mut rows = vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()];
+        let slot = L1_ECOSYSTEM_CONTRACTS
+            .iter()
+            .position(|m| *m == "L1MessageRoot")
+            .unwrap();
+        rows[slot] = ProxyUpgradeRow {
+            proxy: ASSET_ROUTER,
+            expectedOldImpl: LIVE_ROUTER_IMPL,
+            implNew: NEW,
+            callInitializeUpgrade: false,
+        };
+        let asserter = Asserter::new();
+        asserter.push_success(&addr(MESSAGE_ROOT)); // the reviewed Bridgehub's messageRoot()
+        asserter.push_success(&addr(LIVE_ROUTER_IMPL)); // ProxyAdmin.getProxyImplementation
+        asserter.push_success(&Bytes::from_static(MESSAGE_ROOT_RUNTIME)); // implNew's code
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        verify_inventory(
+            &provider,
+            &build,
+            &mut result,
+            &InventoryReview {
+                inventory: Inventory::Ecosystem,
+                rows: &rows,
+                domain_admin: DOMAIN_ADMIN,
+                anchor: Some(REVIEWED_BRIDGEHUB),
+                departure_unreadable: None,
+                reported: Default::default(),
+                reviewed_bridgehub: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(asserter.read_q().is_empty());
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(result.has_error(&format!(
+            "names proxy {ASSET_ROUTER}, but the live L1MessageRoot is {MESSAGE_ROOT}: the row \
+             would install L1MessageRoot's implementation behind another contract"
+        )));
     }
 
     /// The CTM's own slot is discovered as the CTM itself: no read.
@@ -1085,8 +1158,9 @@ mod tests {
     }
 
     /// [`run_ctm_row_with`] for a row installing `implementation`, then — when `construction`
-    /// names the records and the reviewer's inputs — every identified implementation's
-    /// construction ([`verify_inventory_construction`]), which reads nothing here.
+    /// names the records and the reviewer's inputs, whose Bridgehub is then the reviewed one —
+    /// every identified implementation's construction ([`verify_inventory_construction`]), which
+    /// reads nothing here.
     async fn run_ctm_row_reviewed(
         validator_row: Option<Address>,
         reported: ReportedSingletons,
@@ -1145,6 +1219,7 @@ mod tests {
                 anchor: Some(CTM),
                 departure_unreadable: None,
                 reported,
+                reviewed_bridgehub: construction.and_then(|(_, env)| env.bridgehub()),
             },
         )
         .await;
@@ -1539,6 +1614,7 @@ mod tests {
                 anchor: None,
                 departure_unreadable: None,
                 reported: Default::default(),
+                reviewed_bridgehub: None,
             },
         )
         .await
@@ -1606,6 +1682,7 @@ mod tests {
                         anchor: Some(DISCOVERED),
                         departure_unreadable: None,
                         reported: Default::default(),
+                        reviewed_bridgehub: None,
                     },
                 )
                 .await
@@ -1699,6 +1776,7 @@ mod tests {
                 anchor: Some(CTM),
                 departure_unreadable: None,
                 reported: Default::default(),
+                reviewed_bridgehub: None,
             },
         )
         .await
@@ -1775,6 +1853,57 @@ mod tests {
         assert_eq!(result.errors, 2, "{:?}", result.error_messages);
         assert!(result.has_error("the new implementation's PERMISSIONLESS_VALIDATOR is"));
         assert!(result.has_error("ChainTypeManager._permissionlessValidator is"));
+    }
+
+    /// F1: a live CTM that does not answer its `BRIDGE_HUB()` leaves the new implementation's held
+    /// to the reviewed Bridgehub — never the package's `bridgehub_proxy_addr` — through its getter
+    /// and through its record alike.
+    #[tokio::test]
+    async fn an_unanswered_bridge_hub_falls_back_to_the_reviewed_bridgehub() {
+        let env = ReviewedEnv::for_test(None, Some(VALIDATOR));
+        let unanswered = |arriving: Address| {
+            move |immutable: CtmImmutable| match immutable {
+                CtmImmutable::BridgeHub => (Some(arriving), None),
+                _ => (Some(VALIDATOR), Some(VALIDATOR)),
+            }
+        };
+        let reported = ReportedSingletons {
+            bridgehub: Some(OTHER),
+            ..Default::default()
+        };
+        let (implementation, records) =
+            recorded("ChainTypeManager", ctm_args(VALIDATOR, VALIDATOR));
+        let result = run_ctm_row_reviewed(
+            None,
+            reported,
+            unanswered(VALIDATOR),
+            &[],
+            implementation,
+            Some((&records, &env)),
+        )
+        .await;
+        assert_eq!(result.errors, 0, "{:?}", result.error_messages);
+
+        // Built over the package's Bridgehub instead.
+        let (implementation, records) = recorded(
+            "ChainTypeManager",
+            (OTHER, VALIDATOR, VALIDATOR, VALIDATOR).abi_encode_params(),
+        );
+        let result = run_ctm_row_reviewed(
+            None,
+            reported,
+            unanswered(OTHER),
+            &[],
+            implementation,
+            Some((&records, &env)),
+        )
+        .await;
+        assert_eq!(result.errors, 2, "{:?}", result.error_messages);
+        assert!(result.has_error(&format!(
+            "the new implementation's BRIDGE_HUB is {OTHER}, but the reviewed Bridgehub (env \
+             test's bridgehub_proxy_addr) is {VALIDATOR}"
+        )));
+        assert!(result.has_error("ChainTypeManager._bridgehub is"));
     }
 
     /// The implementation behind a proxy only the package reports — the v35 bootstrap's

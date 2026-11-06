@@ -395,7 +395,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     ///         so they cannot disagree with each other.
     /// @param _transition The write-once transition governance approved.
     /// @dev The cut is DERIVED here rather than supplied: it is a pure function of the transition
-    ///      (`upgradeEngine.upgradeFromTransition(transition)` over no facet cuts), so passing it
+    ///      (`chainUpgradeEngine.upgradeFromTransition(transition)` over no facet cuts), so passing it
     ///      would only add a second, unverifiable copy of data this contract can compute.
     /// @dev The transition is the one governance approved through the owner (the bound
     ///      `CTMUpgradeExecutor`); its construction is verified off-chain, not here — see
