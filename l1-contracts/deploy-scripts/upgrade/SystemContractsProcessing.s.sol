@@ -67,6 +67,9 @@ library SystemContractsProcessing {
     function _fillFixedAddressCoreContracts(L2EcosystemContract[] memory ids) private pure {
         // L2WrappedBaseToken must retain its implementation across the upgrade, so it is
         // intentionally NOT in this list: neither force-deployed nor published as a factory dep.
+        // Its release table row stays empty (`CTMRelease` refuses a filled one), so existing chains
+        // keep the implementation they have, while new chains get the one their genesis image
+        // builds: chains created at different releases can run different wrapper code.
         uint256 i = 0;
         ids[i++] = L2EcosystemContract.L2Bridgehub;
         ids[i++] = L2EcosystemContract.L2AssetRouter;
