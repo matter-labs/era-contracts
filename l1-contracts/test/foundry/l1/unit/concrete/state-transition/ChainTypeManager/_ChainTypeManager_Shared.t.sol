@@ -5,6 +5,10 @@ pragma solidity ^0.8.21;
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Call} from "contracts/governance/Common.sol";
+import {IUpgradeExecutorBase} from "contracts/governance/IUpgradeExecutorBase.sol";
+import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
@@ -399,6 +403,37 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
         // So, we mock that behavior again.
         vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.getZKChain, chainId), abi.encode(_chainAddress));
+    }
+
+    /// @notice Points `_ctm` at a real ServerNotifier (the suite's `serverNotifier` is codeless) and
+    ///         hands it to `_executor`, as on a live CTM domain. Call while `governor` owns `_ctm`
+    ///         and `_executor`.
+    /// @param _ctm The CTM the notifier serves.
+    /// @param _executor The CTM executor that takes the notifier.
+    /// @param _proxyAdmin The admin of the notifier's proxy.
+    /// @return notifier The notifier, owned by `_executor`.
+    function _handARealServerNotifierTo(
+        ChainTypeManager _ctm,
+        IUpgradeExecutorBase _executor,
+        address _proxyAdmin
+    ) internal returns (ServerNotifier notifier) {
+        notifier = ServerNotifier(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new ServerNotifier()),
+                    _proxyAdmin,
+                    abi.encodeCall(ServerNotifier.initialize, (governor))
+                )
+            )
+        );
+        Call[] memory accept = new Call[](1);
+        accept[0] = Call({target: address(notifier), value: 0, data: abi.encodeCall(Ownable2Step.acceptOwnership, ())});
+        vm.startPrank(governor);
+        notifier.setChainTypeManager(IChainTypeManager(address(_ctm)));
+        _ctm.setServerNotifier(address(notifier));
+        notifier.transferOwnership(address(_executor));
+        _executor.forward(accept);
+        vm.stopPrank();
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////

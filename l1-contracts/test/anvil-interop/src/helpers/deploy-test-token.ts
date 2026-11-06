@@ -5,7 +5,6 @@ import { ethers, Wallet, ContractFactory } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
 import { TEST_TOKEN_DECIMALS, TEST_TOKEN_MINT_AMOUNT_UNITS } from "../core/const";
 import { getAbi, getCreationBytecode } from "../core/contracts";
-import { forgeOutRoot } from "../core/artifacts";
 import { getInteropSourcePrivateKey } from "../core/accounts";
 import * as fs from "fs";
 import * as path from "path";
@@ -53,12 +52,10 @@ export async function deployTestTokens(): Promise<void> {
   const privateKey = getInteropSourcePrivateKey();
 
   // Load TestnetERC20Token artifact
-  const artifactPath = path.join(forgeOutRoot(), "TestnetERC20Token.sol/TestnetERC20Token.json");
+  const artifactPath = path.join(__dirname, "../../../../out/TestnetERC20Token.sol/TestnetERC20Token.json");
 
   if (!fs.existsSync(artifactPath)) {
-    throw new Error(
-      `TestnetERC20Token artifact not found at ${artifactPath}. Run 'forge build' under this run's FOUNDRY_PROFILE first.`
-    );
+    throw new Error(`TestnetERC20Token artifact not found at ${artifactPath}. Run 'forge build' first.`);
   }
 
   const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));

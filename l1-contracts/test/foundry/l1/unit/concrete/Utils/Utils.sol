@@ -86,7 +86,7 @@ library Utils {
         TransitionManifest memory manifest = TransitionManifest({
             fromRelease: _fromRelease,
             newRelease: _newRelease,
-            upgradeEngine: address(0),
+            chainUpgradeEngine: address(0),
             oldProtocolVersionDeadline: type(uint256).max,
             upgradeTimestamp: 0,
             l2Plan: AuthoredL2Plan({

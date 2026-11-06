@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -43,6 +44,9 @@ import {L2PlanFixtures} from "./L2PlanFixtures.sol";
 /// @dev Departs from the state the base fixture's first hop leaves behind (0.32.0 on the v32
 ///      release), so every scenario starts from a chain whose routing a REAL release describes.
 contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUpgradeTestBase {
+    /// @dev The engine every transition fixture pins: the rows and nothing else.
+    DefaultProxyUpgradeEngine internal proxyUpgradeEngine = new DefaultProxyUpgradeEngine();
+
     // keccak256("eip1967.proxy.implementation") - 1
     bytes32 internal constant EIP1967_IMPLEMENTATION_SLOT =
         0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
@@ -374,7 +378,7 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
                 TransitionManifest({
                     fromRelease: _fromRelease,
                     newRelease: _newRelease,
-                    upgradeEngine: defaultUpgrade,
+                    chainUpgradeEngine: defaultUpgrade,
                     oldProtocolVersionDeadline: 1000,
                     upgradeTimestamp: 0,
                     l2Plan: AuthoredL2Plan({
@@ -393,7 +397,11 @@ contract RegistryIndividualUpgradeTest is ChainTypeManagerTest, RegistryDrivenUp
     function _infrastructure(ProxyUpgradeRow[] memory _rows) internal returns (ProxyUpgradeTransition) {
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: _rows})
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.CTM,
+                    proxyUpgrades: _rows,
+                    proxyUpgradeEngine: address(proxyUpgradeEngine)
+                })
             );
     }
 

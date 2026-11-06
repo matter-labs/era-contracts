@@ -231,6 +231,17 @@ pub mod access_control_default_admin_rules {
 }
 pub use access_control_default_admin_rules::AccessControlDefaultAdminRulesAbi;
 
+// `zkstack-out` does not export `RollupDAManager`, so only the getter protocol-ops reads is mirrored.
+pub mod rollup_da_manager {
+    alloy::sol!(
+        #[sol(rpc)]
+        interface RollupDAManagerAbi {
+            function isPairAllowed(address _l1DAValidator, uint8 _l2DACommitmentScheme) external view returns (bool);
+        }
+    );
+}
+pub use rollup_da_manager::RollupDAManagerAbi;
+
 pub mod i_core_upgrade_prepare {
     alloy::sol!(
         #[sol(rpc)]

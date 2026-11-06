@@ -357,9 +357,10 @@ version, and building or generating `selectors` with the fork mismatches CI in b
 without saying so.
 
 Never bump the pin in a workflow directly — change it in `.github/foundry-versions.env` and
-regenerate whatever it invalidates. A bump changes solc metadata in every artifact, so
-`AllContractsHashes.json` always needs regenerating (`zkstack-out` and `selectors` are ABI-derived
-and unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
+regenerate whatever it invalidates. The build carries no CBOR metadata, so a bump changes bytecode
+only if it changes the solc version or the settings Foundry passes to it; run the hash check and
+regenerate `AllContractsHashes.json` if it fails (`zkstack-out` and `selectors` are ABI-derived and
+unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
 committed anvil-interop chain states; regenerate those too if a bump changes it.
 
 One anvil is pinned separately: [`.github/amsterdam-anvil.env`](.github/amsterdam-anvil.env), for
@@ -378,8 +379,7 @@ yarn l1 build:foundry
 ```bash
 # Run l1-contracts foundry tests
 cd l1-contracts
-yarn test:foundry                    # everything but the suites below
-yarn test:foundry:previous-release   # the suites on the frozen previous-release state, built without metadata
+yarn test:foundry
 ```
 
 ### Running Anvil Interop Tests
@@ -404,7 +404,7 @@ After modifying mock system contracts (e.g., `MockL1MessengerHook`, `MockMintBas
 
 ```bash
 cd l1-contracts
-FOUNDRY_PROFILE=anvil-interop forge build
+forge build
 cd test/anvil-interop
 npx ts-node setup-and-dump-state.ts
 ```
@@ -486,14 +486,17 @@ cd l1-contracts && npx solhint path/to/Changed.sol
 Each step once, in this order:
 
 1. Make the tree compile — contracts, deploy scripts, tests, TypeScript.
-2. `cd l1-contracts && yarn test:foundry && yarn test:foundry:previous-release` — the whole suite, green.
+2. `cd l1-contracts && yarn test:foundry` — the whole suite, green.
 3. `cd l1-contracts && yarn errors-lint --fix` — **only if** an error declaration was added or removed.
 4. `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix` from the repository root.
 5. Commit.
 6. Only then, regenerate artifacts.
 
 Tests come before formatting, never after. Formatting cannot break a test, so a green suite stays
-green; the reverse order makes you re-run the suite after every fix-up.
+green; the reverse order makes you re-run the suite after every fix-up. `yarn lint:sol --fix` is
+not only formatting: solhint's fixer rewrites code. It must be a no-op on `.sol` files at step 4;
+if it changes one, review the change, then run `forge build` and the tests covering that file again
+before committing.
 
 ### Subagents and parallel branches
 
@@ -554,9 +557,9 @@ name (`uint256,`), and a contract with a payable `fallback` gets a `receive` run
 
 ### Pre-Push Checklist
 
-1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry && yarn test:foundry:previous-release`
+1. **Run foundry tests**: `cd l1-contracts && yarn test:foundry`
 2. **Run the errors lint**, only if an error declaration changed: `cd l1-contracts && yarn errors-lint --fix`
-3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix`
+3. **Run linting fixes**, one pass: `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix` (a `.sol` change by `lint:sol --fix` means re-testing, see Order of Work)
 4. **Check solc warnings**: `yarn l1 solc-warnings`
 5. **Review what you're about to push** when it addresses review comments or changes behavior: run `/ai-review` (Codex: `$ai-review`). Fix what it confirms. After two rounds, leave anything still open to a human.
 6. **Verify no uncommitted changes**: `git status`

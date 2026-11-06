@@ -58,14 +58,13 @@
 
 use std::collections::HashMap;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use alloy::dyn_abi::{DynSolType, Specifier};
 use alloy::json_abi::Param;
 use alloy::primitives::{keccak256, Address, Bytes, B256};
 use alloy::sol_types::SolValue;
 
-use crate::common::paths::l1_contracts_forge_out;
 use crate::upgrade_verification::constants::ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR;
 use crate::upgrade_verification::paths::repo_relative_path;
 use crate::upgrade_verification::report::VerificationResult;
@@ -281,7 +280,7 @@ fn load_one(
     let raw = std::fs::read_to_string(&path).map_err(|e| {
         format!(
             "cannot read {} ({e}): build the reviewed commit first (`cd l1-contracts && forge \
-             build`, under this run's FOUNDRY_PROFILE), because deriving an object's address needs the creation-code BYTES and \
+             build`), because deriving an object's address needs the creation-code BYTES and \
              comparing a member's code needs the deployed BYTES, while AllContractsHashes.json \
              records only their hashes",
             path.display()
@@ -428,7 +427,7 @@ fn immutable_ranges(
 }
 
 fn artifact_path(file: &str, short_name: &str) -> PathBuf {
-    repo_relative_path(Path::new("l1-contracts").join(l1_contracts_forge_out()))
+    repo_relative_path("l1-contracts/out")
         .join(file)
         .join(format!("{short_name}.json"))
 }

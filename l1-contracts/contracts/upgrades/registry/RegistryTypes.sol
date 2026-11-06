@@ -132,7 +132,7 @@ struct AuthoredL2Plan {
 ///         field: it is the two releases' own versions ({ReleaseManifest.protocolVersion}).
 ///         Infrastructure changes live on {ProxyUpgradeTransitionManifest}; see
 ///         {protocol-docs/ecosystem-upgrade-coordination.md}.
-/// @param upgradeEngine The diamond cut's init delegatecall target implementing
+/// @param chainUpgradeEngine The diamond cut's init delegatecall target implementing
 ///        `upgradeFromTransition` — the registry-model name for what deploy tooling calls the
 ///        per-version "default upgrade" contract (`DefaultUpgrade` and its versioned subclasses).
 /// @param oldProtocolVersionDeadline When the departing version stops being usable.
@@ -141,7 +141,7 @@ struct AuthoredL2Plan {
 struct TransitionManifest {
     address fromRelease;
     address newRelease;
-    address upgradeEngine;
+    address chainUpgradeEngine;
     uint256 oldProtocolVersionDeadline;
     uint256 upgradeTimestamp;
     AuthoredL2Plan l2Plan;
@@ -197,9 +197,31 @@ enum ProxyUpgradeDomain {
 ///        intended change having been written into one (see {ProxyUpgradeRowLib.toRows}). In the CTM
 ///        domain only the TUPPs under the CTM `ProxyAdmin` can apply; ecosystem singletons are not
 ///        expressible there.
+/// @param proxyUpgradeEngine The `IProxyUpgradeEngine` the domain's executor delegatecalls to apply
+///        this transition: `DefaultProxyUpgradeEngine` (the rows and nothing else) or a release's
+///        subclass of it that adds the upgrade's follow-up calls as audited code. Never zero.
 struct ProxyUpgradeTransitionManifest {
     ProxyUpgradeDomain domain;
     ProxyUpgradeRow[] proxyUpgrades;
+    address proxyUpgradeEngine;
+}
+
+/// @notice What a domain executor hands its transition's `proxyUpgradeEngine`. Built by the executor
+///         from its own immutable bindings, never from the manifest or the caller.
+/// @dev The engine runs by delegatecall and cannot read the executor's immutables: this struct is
+///      its view of where it runs.
+/// @param transition The `ProxyUpgradeTransition` being applied.
+/// @param proxyUpgradeEngine The engine itself (`address(this)` is the executor while it runs).
+/// @param domain The executor's domain.
+/// @param proxyAdmin The executor's bound `ProxyAdmin`, owned by the executor.
+/// @param chainTypeManager The CTM executor's bound ChainTypeManager; zero in the `Core` domain.
+// solhint-disable-next-line gas-struct-packing
+struct ProxyUpgradeContext {
+    address transition;
+    address proxyUpgradeEngine;
+    ProxyUpgradeDomain domain;
+    address proxyAdmin;
+    address chainTypeManager;
 }
 
 /// @param ctm The ChainTypeManager proxy this migration bootstraps.
@@ -215,7 +237,7 @@ struct ProxyUpgradeTransitionManifest {
 /// @param currentRelease The genesis release the edge installs as the CTM's `currentRelease`. The
 ///        version the CTM moves to is this release's own ({ReleaseManifest.protocolVersion}).
 /// @param oldProtocolVersionDeadline Until when the departing version stays usable.
-/// @param upgradeEngine The bootstrap engine (`BootstrapUpgrade`), the committed cut's init
+/// @param chainUpgradeEngine The bootstrap engine (`BootstrapUpgrade`), the committed cut's init
 ///        target. The cut carries NO facet cuts and NO authored calldata: the facet
 ///        delta cannot be derived at construction (the departing version predates releases, so
 ///        there is no `fromRelease` to diff against), so the engine removes each chain's live
@@ -246,7 +268,7 @@ struct BootstrapManifest {
     ProxyUpgradeRow[] ctmProxyUpgrades;
     address currentRelease;
     uint256 oldProtocolVersionDeadline;
-    address upgradeEngine;
+    address chainUpgradeEngine;
     AuthoredL2Plan l2Plan;
     uint256 upgradeTimestamp;
     address ctmExecutor;

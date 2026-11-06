@@ -8,16 +8,6 @@ library BytecodeUtils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     // solhint-disable-next-line const-name-snakecase
     Vm internal constant vm = Vm(VM_ADDRESS);
-    // Builds into its own output directory (l1-contracts/foundry.toml).
-    string internal constant ANVIL_INTEROP_PROFILE = "anvil-interop";
-
-    /// @notice The forge output directory of the profile in effect, relative to the project root.
-    function forgeOutDir() internal view returns (string memory) {
-        return
-            compareStrings(vm.envOr("FOUNDRY_PROFILE", string("")), ANVIL_INTEROP_PROFILE)
-                ? "/../l1-contracts/out-anvil-interop/"
-                : "/../l1-contracts/out/";
-    }
 
     /**
      * @dev Read foundry bytecodes
@@ -30,7 +20,7 @@ library BytecodeUtils {
         return bytecode;
     }
 
-    /// @notice Read L1 creation bytecode from {forgeOutDir}.
+    /// @notice Read L1 creation bytecode from `out/`.
     function readBytecodeL1(string memory _fileName, string memory _contractName) internal view returns (bytes memory) {
         return readFoundryBytecodeL1(_fileName, _contractName);
     }
@@ -40,7 +30,7 @@ library BytecodeUtils {
         string memory contractName
     ) private view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        string memory path = string.concat(forgeOutDir(), fileName, "/", contractName, ".json");
+        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
         return readFoundryBytecode(path);
     }
 
@@ -53,13 +43,13 @@ library BytecodeUtils {
         return vm.parseJsonBytes(json, ".deployedBytecode.object");
     }
 
-    /// @notice Read L1 deployed bytecode from {forgeOutDir}.
+    /// @notice Read L1 deployed bytecode from `out/`.
     function readDeployedBytecodeL1(
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        string memory path = string.concat(forgeOutDir(), _fileName, "/", _contractName, ".json");
+        string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
         return readFoundryDeployedBytecode(path);
     }
 
@@ -73,9 +63,8 @@ library BytecodeUtils {
     /// @notice Read and hash deployed bytecode (keccak256) in one call.
     /// @dev Deploy registry objects from {readBytecodeL1} on the SAME artifact this reads. A hash
     ///      taken here while the object is deployed from a script's own compiled copy diverges
-    ///      whenever the two compilations do (the CBOR metadata records the compilation's
-    ///      remappings, which is enough), and a review that cannot reproduce an object's creation
-    ///      code cannot re-derive its address.
+    ///      whenever the two compilations do, and a review that cannot reproduce an object's
+    ///      creation code cannot re-derive its address.
     function getDeployedBytecodeHash(
         string memory _fileName,
         string memory _contractName
