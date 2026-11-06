@@ -21,6 +21,7 @@ alloy::sol! {
     function execute(Operation _operation);
     function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp);
     function upgradeChainFromVersion(address _chain, uint256 _oldProtocolVersion, DiamondCutData _cut);
+    function setProofSystemStatus(uint8 _proofSystem, bool _enabled);
 }
 
 /// The v0.33.0 stage upgrade: the committed emergency proposal and its runbook.
@@ -694,6 +695,28 @@ fn upgrade_timestamps_name_a_version_or_a_chain() {
     assert_eq!(
         decode::annotation(&server_notifier).as_deref(),
         Some("chain 499 at timestamp 1")
+    );
+}
+
+#[test]
+fn proof_system_switches_name_the_system_and_the_state() {
+    let disable = setProofSystemStatusCall {
+        _proofSystem: 2,
+        _enabled: false,
+    }
+    .abi_encode();
+    assert_eq!(
+        decode::annotation(&disable).as_deref(),
+        Some("ZiSK disabled")
+    );
+    let enable_other = setProofSystemStatusCall {
+        _proofSystem: 1,
+        _enabled: true,
+    }
+    .abi_encode();
+    assert_eq!(
+        decode::annotation(&enable_other).as_deref(),
+        Some("proof system 1 enabled")
     );
 }
 

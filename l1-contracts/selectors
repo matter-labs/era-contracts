@@ -3541,7 +3541,7 @@ IAdminFunctions
 |----------+---------------------------------------------------------------------------------------+------------|
 | Function | updateValidator(address,address,address,uint256,address,bool)                         | 0xc4e12219 |
 |----------+---------------------------------------------------------------------------------------+------------|
-| Function | upgradeChainFromCTM((address,address,address,address,uint8,uint8,bool,bool))          | 0x6a868d5f |
+| Function | upgradeChainFromCTM((address,address,address,address,uint8,uint8,bool,bool,bool))     | 0x301d091b |
 ╰----------+---------------------------------------------------------------------------------------+------------╯
 
 IAssetHandler

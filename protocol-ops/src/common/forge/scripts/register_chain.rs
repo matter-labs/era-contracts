@@ -20,6 +20,7 @@ pub struct NewChainParams {
     pub execute_operator: Address,
     pub token_multiplier_setter: Option<Address>,
     pub da_mode: DAValidatorType,
+    pub enable_zisk: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -58,6 +59,7 @@ impl RegisterChainL1Config {
                 validator_sender_operator_blobs_eth: chain_params.commit_operator,
                 validator_sender_operator_prove: chain_params.prove_operator,
                 validator_sender_operator_execute: chain_params.execute_operator,
+                enable_zisk: chain_params.enable_zisk,
             },
             owner_address: chain_params.owner,
             contracts: Create2Addresses {
@@ -83,6 +85,9 @@ pub struct ChainL1Config {
     pub base_token_gas_price_multiplier_denominator: u64,
     pub governance_security_council_address: Address,
     pub governance_min_delay: u64,
+    /// Leave ZiSK enabled on the new chain; `RegisterZKChain` disables it otherwise.
+    #[serde(default)]
+    pub enable_zisk: bool,
 }
 
 // ── Output types ─────────────────────────────────────────────────────────────

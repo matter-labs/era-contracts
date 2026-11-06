@@ -36,7 +36,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2DACommitmentScheme, PubdataContent} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, ProofSystem, PubdataContent} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
@@ -48,6 +48,11 @@ bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPL
 ///      2-arg signature; calling the v31 variant against them hits the DiamondProxy
 ///      fallback and reverts with `"F"`.
 uint256 constant V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD = uint256(31) << 32;
+
+/// @dev Protocol version threshold (packed `major << 32`) at which the Admin facet gained
+///      `setProofSystemStatus`. A chain crossing it comes out with ZiSK enabled, since nothing
+///      ever set its disable bit, so the chain upgrade disables it unless the chain opts in.
+uint256 constant V34_PROOF_SYSTEM_STATUS_THRESHOLD = uint256(34) << 32;
 
 /// @notice Legacy 2-arg Admin interface used when the chain being upgraded is
 ///         still on a pre-v31 protocol version (so its Admin facet only has
@@ -667,7 +672,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// @notice Upgrade a chain by reading the diamond cut directly from the CTM, together with the
-    ///         DA configuration the new version requires of it.
+    ///         DA configuration the new version requires of it and, on entering v34, ZiSK disabled.
     /// @dev Reads the diamond cut from the CTM's storage to avoid TOML parsing
     ///      issues with large hex strings.
     ///
@@ -708,11 +713,20 @@ contract AdminFunctions is Script, IAdminFunctions {
             ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
             : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
 
+        // Only the upgrade that first installs `setProofSystemStatus` disables ZiSK: a later one
+        // must not undo a chain's decision to enable it.
+        bool shouldDisableZisk = !_params.enableZisk &&
+            currentProtocolVersion < V34_PROOF_SYSTEM_STATUS_THRESHOLD &&
+            newProtocolVersion >= V34_PROOF_SYSTEM_STATUS_THRESHOLD;
+
         uint256 callCount = 1;
         if (_params.shouldSetDaValidatorPair) {
             ++callCount;
         }
         if (_params.shouldSetPubdataContent) {
+            ++callCount;
+        }
+        if (shouldDisableZisk) {
             ++callCount;
         }
         Call[] memory calls = new Call[](callCount);
@@ -737,6 +751,16 @@ contract AdminFunctions is Script, IAdminFunctions {
                 target: _chainAddress,
                 value: 0,
                 data: abi.encodeCall(IAdmin.setPubdataContent, (PubdataContent(_params.pubdataContent)))
+            });
+        }
+        // After the cut, which installs the setter; in the same transaction, so the chain never
+        // settles a batch of the new version while it demands a ZiSK proof.
+        if (shouldDisableZisk) {
+            console.log("AdminFunctions: disabling ZiSK");
+            calls[next++] = Call({
+                target: _chainAddress,
+                value: 0,
+                data: abi.encodeCall(IAdmin.setProofSystemStatus, (ProofSystem.Zisk, false))
             });
         }
 

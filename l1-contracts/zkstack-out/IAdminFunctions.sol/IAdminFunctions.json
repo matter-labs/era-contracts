@@ -872,6 +872,11 @@
             "name": "shouldSetPubdataContent",
             "type": "bool",
             "internalType": "bool"
+          },
+          {
+            "name": "enableZisk",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }

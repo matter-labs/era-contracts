@@ -335,11 +335,6 @@
             "internalType": "struct MultiProofConfig",
             "components": [
               {
-                "name": "enabled",
-                "type": "bool",
-                "internalType": "bool"
-              },
-              {
                 "name": "ziskRangeVerifierAddr",
                 "type": "address",
                 "internalType": "address"
