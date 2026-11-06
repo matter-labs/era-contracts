@@ -168,9 +168,12 @@ ENV DEBIAN_FRONTEND=noninteractive \
     FOUNDRY_OFFLINE=true \
     XDG_CONFIG_HOME=/etc/xdg
 
-# Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.js)
+# Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.js). git reads
+# earlier cuts for `etherscan-check --also-commit` from a checkout's .git mounted at
+# /contracts/.git, owned by the host's user.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates bash openssl jq curl gnupg && \
+      ca-certificates bash openssl jq curl gnupg git && \
+    git config --system --add safe.directory /contracts && \
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
     npm i -g yarn@${YARN_VERSION} && \
@@ -210,7 +213,7 @@ RUN forge --version && cast --version && anvil --version && protocol_ops --help 
     wallets-gen --help && upgrade-readiness-checker --help && \
     node --version && yarn --version
 
-# Provenance recorded in deploy bundles (the image has no git). Last, so a new
+# Provenance recorded in deploy bundles (the image has no repository). Last, so a new
 # commit only invalidates this layer.
 ARG ZK_GOVERNANCE_COMMIT
 ARG CONTRACTS_COMMIT=""

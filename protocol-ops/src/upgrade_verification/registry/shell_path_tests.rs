@@ -1,7 +1,7 @@
 //! Shared RPC fixture for the two shell-check call-site regressions. The transport is mocked to
 //! isolate wiring in the real upgrade/replacement verifiers, not to simulate a valid ecosystem:
 //! unrelated construction/genesis reads deliberately remain unverifiable in BOTH controls. Only
-//! the arriving shell's logic differs, so it must contribute exactly one additional error.
+//! the arriving shell's code differs, so it must contribute exactly one additional error.
 
 use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::sol_types::SolValue;
@@ -33,21 +33,13 @@ pub(super) struct ShellPathFixture {
 
 impl ShellPathFixture {
     pub(super) fn new(change_logic: bool) -> Self {
-        let mut image = reviewed_genesis_image().expect("the reviewed genesis image must load");
+        let image = reviewed_genesis_image().expect("the reviewed genesis image must load");
         let departing = image.code[&L2_BRIDGEHUB_ADDR].clone();
         let mut arriving = departing.to_vec();
-        // The real SystemContractProxy's CBOR tail ends in an ipfs digest, solc version and
-        // length. Change a digest byte in BOTH controls: metadata alone must still pass.
-        let metadata_len =
-            u16::from_be_bytes(arriving[arriving.len() - 2..].try_into().unwrap()) as usize;
-        assert!(metadata_len > 20 && metadata_len + 2 < arriving.len());
-        let metadata_hash_byte = arriving.len() - 20;
-        arriving[metadata_hash_byte] ^= 1;
         if change_logic {
             arriving[0] ^= 1;
         }
         let arriving = Bytes::from(arriving);
-        image.code.insert(NEW_RELEASE, arriving.clone());
         Self {
             asserter: Asserter::new(),
             build: ReviewedBuild::from_parts(&[]),
@@ -86,7 +78,7 @@ impl ShellPathFixture {
             TransitionManifest {
                 fromRelease: FROM_RELEASE,
                 newRelease: NEW_RELEASE,
-                upgradeEngine: Address::ZERO,
+                chainUpgradeEngine: Address::ZERO,
                 oldProtocolVersionDeadline: U256::MAX,
                 upgradeTimestamp: U256::ZERO,
                 l2Plan: AuthoredL2Plan {
@@ -138,7 +130,6 @@ impl ShellPathFixture {
                 .abi_encode(),
             ));
         }
-        self.address(SUPPLIER); // Both bytecodes are available in the reviewed image.
     }
 
     /// The reads of a transition-only upgrade, in the order `upgrade::verify` makes them.

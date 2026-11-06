@@ -14,3 +14,9 @@ error OverheadForTransactionMustBeEqualToTxSlotOverhead(uint256 overheadForTrans
 error InvalidBlobCommitmentsLength();
 
 error InvalidBlobHashesLength();
+
+error UnexpectedTimelock(address live);
+
+error TimelockNotWired(address live);
+
+error FollowUpFailed();

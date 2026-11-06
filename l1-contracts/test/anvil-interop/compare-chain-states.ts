@@ -1,8 +1,8 @@
 /**
  * Compare two chain-state directories, ignoring non-deterministic Anvil fields.
  *
- * With FOUNDRY_PROFILE=anvil-interop (cbor_metadata=false), bytecode and CREATE2
- * addresses are fully deterministic. The remaining non-deterministic fields include:
+ * The build carries no CBOR metadata, so bytecode and CREATE2 addresses are fully
+ * deterministic. The remaining non-deterministic fields include:
  *   - Block-level: timestamp, basefee, prevrandao, difficulty
  *   - Account balances: minor variations from basefee-dependent gas costs
  *   - Priority-operation timestamps and gas-sensitive priority-tree hashes

@@ -18,15 +18,12 @@ Both run in a released `ghcr.io/matter-labs/protocol-ops` image
 ([release flow](../.github/workflows/README.md#release-flow)), locally and in CI
 alike — CI is only a wrapper around the commands below.
 
-**Step 1 output is a handoff, not a recipe.** Solidity output is not byte-stable
-across build environments (the default foundry profile embeds path-dependent CBOR
-metadata), so the bytecode — and therefore every CREATE2 address and all the
-governance calldata — belongs to the build that compiled it, the released image's.
-Re-running step 1 with another build does not "reproduce" the addresses; it
-produces a different, equally valid upgrade. What travels is the **deploy bundle**: the deployer
-transactions carry the CREATE2 init code verbatim, so whoever broadcasts them
-deploys that exact bytecode at the addresses the reviewed `ecosystem.toml` names,
-without compiling anything. See
+**Step 1 output is a handoff, not a recipe.** The build carries no CBOR metadata,
+so a reviewer's build of the same commit with the pinned toolchain produces the
+same bytecode, CREATE2 addresses and governance calldata. What travels is still
+the **deploy bundle**: the deployer transactions carry the CREATE2 init code
+verbatim, so whoever broadcasts them deploys exactly the reviewed bytecode at the
+addresses the reviewed `ecosystem.toml` names, without compiling anything. See
 [Deploying + verifying from a deploy bundle](#deploying--verifying-from-a-deploy-bundle).
 
 ```
@@ -42,7 +39,7 @@ without compiling anything. See
  prepare/ bundles ──▶ upgrade-broadcast (deployer key, --skip-unkeyed) ──▶ transactions.txt
                                           │
                                           ▼
-                              forge verify-contract (Etherscan)
+                    etherscan-verify (each contract as it lands) ──▶ etherscan-check
 ```
 
 Then `ecosystem verify-bootstrap` (the registry verifier) holds `ecosystem.toml`
@@ -141,8 +138,30 @@ security council and a three-day `minDelay()`) has a v31 config pair
 `manifest.bundles[].target` is the deployer EOA) to a real L1 — the legacy-Gov /
 ProtocolUpgradeHandler (Camp-B) bundles are the governance ceremony and are run
 separately by their multisig, so `--skip-unkeyed` drops them. Every deployer tx
-is broadcast **one at a time** and confirmed, then the deployed contracts are
-verified on Etherscan.
+is broadcast **one at a time** and confirmed. Each deployed contract is verified
+on Etherscan as soon as its code lands, and the run then checks that Etherscan
+shows this checkout's sources for every one of them.
+
+**Why verification follows the broadcast.** The build carries no CBOR metadata,
+so the bytecode does not bind its verified source: anyone can verify our
+bytecode with altered comments, and Etherscan keeps the first verification of an
+address, with no self-service way to replace it (until then, it shows one of
+identical code elsewhere; every address is submitted all the same).
+`protocol_ops ecosystem etherscan-verify --l1-rpc-url` therefore runs next to the
+broadcast and submits each contract the moment its code is on L1. If it exits with
+an error, the broadcast stops before its next transaction (`upgrade-broadcast
+--halt-when`); a resumed deploy's verifier first submits what already landed. A
+contract Etherscan refuses does not stop the broadcast: the verifier reports it once
+the broadcast is over.
+`protocol_ops ecosystem etherscan-check` then holds what Etherscan shows for every
+address to this checkout: the contract name and every source file, byte for byte.
+A similar match (another address's verification) is held to the same sources:
+Etherscan lets only whitelisted accounts replace it. A re-cut of the release
+keeps a contract whose code and salt did not change, and Etherscan then shows
+the sources of the cut that deployed it: name that cut's `contracts_commit` with
+`--also-commit` (the workflow's `etherscan_earlier_commits`); it must be an
+ancestor of this checkout. For every address that fails, `etherscan-check`
+prints what to do.
 
 The sender (`submit_and_confirm` in
 `protocol-ops/src/commands/dev/execute_safe.rs`) is robust to real-L1 hazards:
@@ -191,6 +210,17 @@ po() { ./protocol-ops.sh --tag "$TAG" "$@"; }
 # Hold every deployer call against the image's build before the key signs anything.
 po ecosystem check-deployer-plan --bundle "$BUNDLE" --l1-rpc-url <l1-rpc>
 
+# Start verifying on Etherscan before the broadcast: each contract step 1 logged
+# (`forge verify-contract <address> <Contract> [--constructor-args <hex>]`, from the
+# CREATE2 init code it deployed) is submitted as soon as its code is on L1. If the
+# verifier fails, the broadcast stops before its next transaction.
+export ETHERSCAN_API_KEY   # protocol-ops.sh passes it into the image
+# Left by an earlier run, either would stop the verifier or the broadcast at once.
+rm -f "$RESULT/broadcast-done" "$RESULT/verifier-failed"
+(po ecosystem etherscan-verify --bundle "$BUNDLE" --l1-rpc-url <l1-rpc> \
+  --stop-when "$RESULT/broadcast-done" || touch "$RESULT/verifier-failed") &
+verifier=$!
+
 # Broadcast the deployer bundles → writes $RESULT/transactions.txt.
 DEPLOYER_ADDR=$(po cast wallet address --private-key "$DEPLOYER_KEY")
 po ecosystem upgrade-broadcast \
@@ -199,28 +229,21 @@ po ecosystem upgrade-broadcast \
   --key "${DEPLOYER_ADDR}=${DEPLOYER_KEY}" \
   --skip-unkeyed \
   --max-gas-price-gwei 500 \
-  --out "$RESULT/deploy-executed.json"
+  --out "$RESULT/deploy-executed.json" \
+  --halt-when "$RESULT/verifier-failed"
 
-# Verify on Etherscan, in the image: its artifacts are the deployed ones. Step 1 logged
-# `forge verify-contract <address> <Contract> [--constructor-args <hex>]` for every contract, from
-# the CREATE2 init code it deployed, so nothing is guessed. Each line is parsed and its fields
-# passed to forge as arguments, never evaluated; a line of any other shape is not run.
-export ETHERSCAN_API_KEY   # protocol-ops.sh passes it into the image
-CHAIN="$(jq -r '.l1.chain_id | if . == 1 then "mainnet" elif . == 11155111 then "sepolia" else error("no explorer") end' "$BUNDLE/bundle-metadata.json")"
-verify_line='^forge verify-contract (0x[0-9a-fA-F]{40}) ([A-Za-z_][A-Za-z0-9_]*)( --constructor-args (0x[0-9a-fA-F]*))?$'
-grep 'forge verify-contract' "$BUNDLE/extra-verification-logs.txt" |
-  sed 's/^.*forge verify-contract/forge verify-contract/' | sort -u |
-  while IFS= read -r line; do
-    if [[ ! "$line" =~ $verify_line ]]; then
-      echo "not run: $line"
-      continue
-    fi
-    args=(verify-contract "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")
-    if [ -n "${BASH_REMATCH[3]}" ]; then
-      args+=(--constructor-args "${BASH_REMATCH[4]}")
-    fi
-    po forge "${args[@]}" --chain "$CHAIN" --watch --retries 8 --delay 20 || true
-  done
+# The broadcast is over: the verifier makes a last pass and reports what it could not submit.
+touch "$RESULT/broadcast-done"
+wait "$verifier"
+
+# It did not wait for Etherscan's verdicts: submit the whole bundle again, waiting for each.
+po ecosystem etherscan-verify --bundle "$BUNDLE"
+
+# Etherscan must show the bundle commit's sources for every deployed address. On a re-cut, add
+# `--also-commit <contracts_commit>` for each earlier cut of the release on this L1; the image reads
+# them from this checkout's history: EXTRA_MOUNTS="$EXTRA_MOUNTS $PWD/.git:/contracts/.git:ro" (a
+# clone's: a worktree's .git is a file naming a path the image does not have).
+po ecosystem etherscan-check --bundle "$BUNDLE"
 ```
 
 **In CI:** run the **`Ecosystem Upgrade: Deploy + Verify`** workflow
@@ -232,9 +255,9 @@ successful manual run of `generate-ecosystem-upgrade-calldata.yaml`, and its
 metadata must also identify that exact run and environment, and name the image it
 was generated in (`protocol_ops_image.digest`): the job pulls that digest, checks
 that the image was built from the bundle's `contracts_commit`, checks that commit
-out, and runs every command, broadcast and Etherscan verify included, in that image.
-Diagnostic artifacts from failed generation runs and bundles without an image
-digest are rejected before any secret is selected.
+out, and runs every command, broadcast and Etherscan verify and check included,
+in that image. Diagnostic artifacts from failed generation runs and bundles
+without an image digest are rejected before any secret is selected.
 
 Before any step reads the deployer key, the job runs `protocol_ops ecosystem
 check-deployer-plan --bundle` in that image against the selected L1
@@ -247,7 +270,9 @@ Which L1 it signs against comes from the bundle's `bundle-metadata.json`
 `cast chain-id` against that RPC to equal the bundle's chain ID. It also refuses
 to start if the key's address isn't the deployer the bundle was prepared for,
 since `--skip-unkeyed` would otherwise drop every bundle and report success
-having deployed nothing. `ETHERSCAN_API_KEY` is optional (verify only).
+having deployed nothing. `ETHERSCAN_API_KEY` is needed with `run_verify` (the
+default): the verifier starts before the deployer key is loaded, and the source
+check fails the run whenever Etherscan does not show this checkout's sources.
 
 > A single deployer bundle can revert mid-way (e.g. RPC 429). The broadcast is
 > idempotent, so retry it with the same journal — already-deployed /

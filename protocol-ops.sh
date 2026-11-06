@@ -42,8 +42,8 @@
 #                      target/release binary.
 #   ETHERSCAN_API_KEY, GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID,
 #   RUNNER_OS        — Docker mode: passed into the container when set
-#                      (`forge verify-contract`; the run a deploy bundle
-#                      records as `generated_by`).
+#                      (`etherscan-verify`, `etherscan-check`; the run a
+#                      deploy bundle records as `generated_by`).
 #
 set -euo pipefail
 
@@ -205,7 +205,7 @@ else
   run_args=("${rewritten[@]}")
 fi
 
-# Passed through when set: the Etherscan key (`forge verify-contract`) and the
+# Passed through when set: the Etherscan key (`etherscan-verify`, `etherscan-check`) and the
 # GitHub Actions run a deploy bundle records as `generated_by`.
 for var in ETHERSCAN_API_KEY GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_RUN_ID RUNNER_OS; do
   if [[ -n "${!var:-}" ]]; then

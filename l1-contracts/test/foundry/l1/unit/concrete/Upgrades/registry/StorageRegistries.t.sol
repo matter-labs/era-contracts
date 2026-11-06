@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
 import {Test} from "forge-std/Test.sol";
 
 import {ProxyUpgradeTransition} from "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol";
@@ -85,6 +86,9 @@ import {
 ///         explicit routing + inline mandatory pins; transitions derive their facet delta
 ///         from the `(fromRelease, newRelease)` pair at initialization.
 contract StorageRegistriesTest is Test {
+    /// @dev The engine every transition fixture pins: the rows and nothing else.
+    DefaultProxyUpgradeEngine internal proxyUpgradeEngine = new DefaultProxyUpgradeEngine();
+
     ProxyUpgradeTransition internal coreTransition;
     CTMRelease internal fromRelease;
     CTMRelease internal newRelease;
@@ -101,7 +105,7 @@ contract StorageRegistriesTest is Test {
     address internal facetFrozen; // carried over unchanged, freezable
     address internal genesisUpgrade;
     address internal verifier;
-    address internal upgradeEngine;
+    address internal chainUpgradeEngine;
     address internal coreImplNew;
     /// @dev The pinned delegate-calldata composer of the default transition: a test-only stand-in
     ///      returning `DELEGATE_CALLDATA` regardless of its inputs, so this suite can pin a real
@@ -141,7 +145,7 @@ contract StorageRegistriesTest is Test {
         facetFrozen = address(new MockSelfDescribingFacet(_selectors1(bytes4(uint32(0x20)))));
         genesisUpgrade = _deployedStub("genesisUpgrade");
         verifier = _deployedStub("verifier");
-        upgradeEngine = _deployedStub("upgradeEngine");
+        chainUpgradeEngine = _deployedStub("chainUpgradeEngine");
         coreImplNew = _deployedStub("coreImplNew");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         bridgehub = makeAddr("bridgehub");
@@ -168,6 +172,7 @@ contract StorageRegistriesTest is Test {
         // One participating slot in the enum-indexed inventory — every other slot's zero
         // `implNew` is the explicit "not upgraded" statement and produces no row.
         manifest.domain = ProxyUpgradeDomain.Core;
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = ProxyUpgradeRow({
             proxy: address(0xB001),
@@ -265,7 +270,7 @@ contract StorageRegistriesTest is Test {
             TransitionManifest({
                 fromRelease: address(fromRelease),
                 newRelease: address(newRelease),
-                upgradeEngine: upgradeEngine,
+                chainUpgradeEngine: chainUpgradeEngine,
                 oldProtocolVersionDeadline: type(uint256).max,
                 upgradeTimestamp: 1234567,
                 l2Plan: _l2Plan()
@@ -326,7 +331,7 @@ contract StorageRegistriesTest is Test {
         assertEq(transition.oldProtocolVersion(), OLD_VERSION);
         assertEq(transition.fromRelease(), address(fromRelease));
         assertEq(transition.newRelease(), address(newRelease));
-        assertEq(transition.upgradeEngine(), upgradeEngine);
+        assertEq(transition.chainUpgradeEngine(), chainUpgradeEngine);
 
         // Derived, not authored — and stored as final cuts: a FULL REINSTALL, removals first.
         // One Remove cut per departing facet (facet address zero per Diamond semantics), one Add
@@ -792,7 +797,7 @@ contract StorageRegistriesTest is Test {
         new CTMTransition(manifest);
 
         manifest = _transitionManifest();
-        manifest.upgradeEngine = address(0);
+        manifest.chainUpgradeEngine = address(0);
         vm.expectRevert(ZeroAddress.selector);
         new CTMTransition(manifest);
     }
@@ -856,7 +861,8 @@ contract StorageRegistriesTest is Test {
     function test_revertWhen_aCtmInventoryChangesNothing() public {
         ProxyUpgradeTransitionManifest memory manifest = ProxyUpgradeTransitionManifest({
             domain: ProxyUpgradeDomain.CTM,
-            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT)
+            proxyUpgrades: new ProxyUpgradeRow[](CTM_CONTRACT_COUNT),
+            proxyUpgradeEngine: address(proxyUpgradeEngine)
         });
         vm.expectRevert(RegistryUnknownKey.selector);
         new ProxyUpgradeTransition(manifest);
@@ -883,7 +889,11 @@ contract StorageRegistriesTest is Test {
         }
         vm.assume(participating != 0);
         ProxyUpgradeRow[] memory rows = new ProxyUpgradeTransition(
-            ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: slots})
+            ProxyUpgradeTransitionManifest({
+                domain: ProxyUpgradeDomain.Core,
+                proxyUpgrades: slots,
+                proxyUpgradeEngine: address(proxyUpgradeEngine)
+            })
         ).rows();
         assertEq(rows.length, participating, "one row per participating slot");
         uint256 next = 0;
@@ -1554,8 +1564,8 @@ contract StorageRegistriesTest is Test {
         // every chain's upgrade a no-op delegatecall that silently "succeeds".
         CTMTransition committed = new CTMTransition(_transitionManifest());
 
-        vm.etch(upgradeEngine, "");
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeEngine));
+        vm.etch(chainUpgradeEngine, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, chainUpgradeEngine));
         committed.validate();
     }
 
@@ -1697,6 +1707,7 @@ contract StorageRegistriesTest is Test {
     /// @dev Two participating CTM-domain slots: the CTM itself and the ServerNotifier.
     function _ctmManifestWithTwoRows() internal returns (ProxyUpgradeTransitionManifest memory manifest) {
         manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = _ctmInventoryWithTwoRows();
     }
 
