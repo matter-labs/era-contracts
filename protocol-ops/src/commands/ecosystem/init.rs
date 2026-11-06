@@ -45,9 +45,6 @@ pub struct EcosystemInitArgs {
     /// Use testnet verifier (default: true)
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
-    /// Deploy the Airbender + ZiSK multi-proof verifier lane.
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
-    pub multi_proof_verifier: bool,
     /// Optional pre-deployed ZiSK range verifier override.
     #[clap(long, help_heading = "Advanced input")]
     pub zisk_range_verifier_addr: Option<Address>,
@@ -89,7 +86,6 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         sender: sender.address,
         owner: owner.address,
         with_testnet_verifier: args.with_testnet_verifier,
-        multi_proof_verifier: args.multi_proof_verifier,
         zisk_range_verifier_addr: args.zisk_range_verifier_addr,
         zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
@@ -140,7 +136,6 @@ pub async fn ecosystem_init(
         owner: owner.address,
         reuse_gov_and_admin: true,
         with_testnet_verifier: input.with_testnet_verifier,
-        multi_proof_verifier: input.multi_proof_verifier,
         zisk_range_verifier_addr: input.zisk_range_verifier_addr,
         zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_salt: input.create2_factory_salt,
@@ -160,7 +155,6 @@ pub struct EcosystemInitInput {
     pub sender: Address,
     pub owner: Address,
     pub with_testnet_verifier: bool,
-    pub multi_proof_verifier: bool,
     pub zisk_range_verifier_addr: Option<Address>,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,

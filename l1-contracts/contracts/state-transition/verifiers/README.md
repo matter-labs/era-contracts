@@ -92,10 +92,10 @@ This command only generates `ZiskVerifier`.
 
 ## Deploying and wiring
 
-With `multi_proof_verifier = true` in `config-deploy-ctm.toml`, `DeployCTM`
-deploys `PilfflonkVerifier`, then `ZiskVerifier` over it, and wires
-`ZiskVerifier` into `MultiProofVerifier`. The output records both, as
-`zisk_snark_verifier_addr` and `zisk_verifier_addr`.
+`DeployCTM`, and every CTM upgrade through it, deploys `PilfflonkVerifier`,
+then `ZiskVerifier` over it, and wires `ZiskVerifier` into
+`MultiProofVerifier`. The output records both, as `zisk_snark_verifier_addr`
+and `zisk_verifier_addr`.
 
 An operator may instead supply a range verifier of their own through
 `zisk_range_verifier_addr`. Deployment rejects an address without code, and it
@@ -103,9 +103,8 @@ then deploys neither `PilfflonkVerifier` nor `ZiskVerifier`.
 
 ## The Airbender side
 
-The same `multi_proof_verifier = true` deploy also deploys `ZKsyncOSVerifier`
-and wires it as the Airbender inner verifier of `MultiProofVerifier`. That
-verifier holds the PLONK
+The same deploy also deploys `ZKsyncOSVerifier` and wires it as the Airbender
+inner verifier of `MultiProofVerifier`. That verifier holds the PLONK
 sub-verifier, and both multi-proof wrappers expose `PLONK_VERIFIER()` through
 it, so the deployment and upgrade tooling reads a single sub-verifier.
 

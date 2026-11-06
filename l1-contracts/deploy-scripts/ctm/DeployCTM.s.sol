@@ -209,12 +209,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         delete ctmAddresses.multiProof;
         (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.testnetVerifier);
-        address airbenderVerifier = deploySimpleContract(verifierName);
-        if (config.multiProof.enabled) {
-            deployMultiProofVerifiers(airbenderVerifier);
-        } else {
-            ctmAddresses.stateTransition.verifiers.verifier = airbenderVerifier;
-        }
+        deployMultiProofVerifiers(deploySimpleContract(verifierName));
     }
 
     /// @notice Deploys the multiproof verifier and its ZiSK components.
@@ -336,16 +331,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         console.log("Owners updated");
     }
 
-    /// @notice Adds the multi-proof components to the `state_transition` output object; an
-    ///         Airbender-only deployment adds nothing.
+    /// @notice Adds the multi-proof components to the `state_transition` output object.
     function serializeMultiProofAddresses() internal {
-        if (ctmAddresses.multiProof.airbenderVerifier != address(0)) {
-            vm.serializeAddress(
-                "state_transition",
-                "airbender_verifier_addr",
-                ctmAddresses.multiProof.airbenderVerifier
-            );
-        }
+        vm.serializeAddress("state_transition", "airbender_verifier_addr", ctmAddresses.multiProof.airbenderVerifier);
         if (ctmAddresses.multiProof.ziskSnarkVerifier != address(0)) {
             vm.serializeAddress(
                 "state_transition",
@@ -353,9 +341,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 ctmAddresses.multiProof.ziskSnarkVerifier
             );
         }
-        if (ctmAddresses.multiProof.ziskVerifier != address(0)) {
-            vm.serializeAddress("state_transition", "zisk_verifier_addr", ctmAddresses.multiProof.ziskVerifier);
-        }
+        vm.serializeAddress("state_transition", "zisk_verifier_addr", ctmAddresses.multiProof.ziskVerifier);
         if (ctmAddresses.multiProof.ziskTestnetVerifier != address(0)) {
             vm.serializeAddress(
                 "state_transition",
@@ -363,13 +349,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 ctmAddresses.multiProof.ziskTestnetVerifier
             );
         }
-        if (ctmAddresses.multiProof.multiProofVerifier != address(0)) {
-            vm.serializeAddress(
-                "state_transition",
-                "multi_proof_verifier_addr",
-                ctmAddresses.multiProof.multiProofVerifier
-            );
-        }
+        vm.serializeAddress(
+            "state_transition",
+            "multi_proof_verifier_addr",
+            ctmAddresses.multiProof.multiProofVerifier
+        );
     }
 
     function saveOutput(string memory outputPath) internal virtual {
