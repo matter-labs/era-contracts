@@ -428,6 +428,8 @@ error RegistryTargetHasNoCode(address target);
 error RegistryUnknownKey();
 // 0xfad1d610
 error ReleaseForceDeploymentMismatch(uint256 member);
+// 0x549a5e01
+error ReleaseL2RowHasNoSystemProxy(uint256 member);
 // 0xc99ade52
 error ReleaseProtocolVersionMismatch(uint256 protocolVersion, uint256 releaseProtocolVersion);
 // 0x667d17de

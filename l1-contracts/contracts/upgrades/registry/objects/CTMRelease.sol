@@ -14,6 +14,7 @@ import {
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     ReleaseForceDeploymentMismatch,
+    ReleaseL2RowHasNoSystemProxy,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
@@ -59,6 +60,7 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         if (_manifest.l2BytecodeInfos.length != L2_ECOSYSTEM_CONTRACT_COUNT) {
             revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
+        _requireNoWrappedBaseTokenRow(_manifest.l2BytecodeInfos);
         _requireForceDeploymentsMatchTable(_manifest);
     }
 
@@ -161,6 +163,17 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         bytes memory expected = row.length == 0 ? bytes("") : abi.encode(row, _shell);
         if (keccak256(_field) != keccak256(expected)) {
             revert ReleaseForceDeploymentMismatch(uint256(_member));
+        }
+    }
+
+    /// @dev `L2WrappedBaseToken` sits at its fixed address as a plain implementation that every
+    ///      chain's wrapped-base-token proxy points at, not behind a system proxy. A table row for it
+    ///      would derive a system-proxy upgrade there, whose `upgradeTo` reverts on L2 and with it
+    ///      the protocol upgrade transaction of every chain that crosses the edge. Upgrades leave
+    ///      the implementation untouched (`SystemContractsProcessing`), so the row stays empty.
+    function _requireNoWrappedBaseTokenRow(bytes[] memory _table) private pure {
+        if (_table[uint256(L2EcosystemContract.L2WrappedBaseToken)].length != 0) {
+            revert ReleaseL2RowHasNoSystemProxy(uint256(L2EcosystemContract.L2WrappedBaseToken));
         }
     }
 

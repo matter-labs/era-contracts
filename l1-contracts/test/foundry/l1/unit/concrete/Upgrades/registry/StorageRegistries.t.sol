@@ -50,6 +50,7 @@ import {
     RegistryMemberHasNoFixedAddress,
     RegistryTargetHasNoCode,
     ReleaseForceDeploymentMismatch,
+    ReleaseL2RowHasNoSystemProxy,
     RegistryUnknownKey,
     TransitionDeadlineBeforeUpgrade,
     TransitionDeadlineZero,
@@ -1504,6 +1505,25 @@ contract StorageRegistriesTest is Test {
         manifest.genesisFacets = new GenesisFacet[](0);
 
         vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
+        new CTMRelease(manifest);
+    }
+
+    /// @dev OZ L-02. `L2WrappedBaseToken` sits at its fixed address as a plain implementation, not
+    ///      behind a system proxy, so a row for it would derive an L2 upgrade that reverts on every
+    ///      chain; the release refuses it at construction.
+    function test_revertWhen_releaseFillsTheWrappedBaseTokenRow() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2WrappedBaseToken)] = L2PlanFixtures.bytecodeInfo(
+            hex"dd06"
+        );
+        L2PlanFixtures.syncForceDeployments(manifest);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ReleaseL2RowHasNoSystemProxy.selector,
+                uint256(L2EcosystemContract.L2WrappedBaseToken)
+            )
+        );
         new CTMRelease(manifest);
     }
 
