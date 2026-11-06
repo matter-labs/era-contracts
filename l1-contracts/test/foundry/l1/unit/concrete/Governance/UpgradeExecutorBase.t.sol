@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 import {UpgradeExecutorBase} from "contracts/governance/UpgradeExecutorBase.sol";
-import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {RegistryTargetHasNoCode, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 /// @dev A contract whose owner-gated function stands in for the owner-gated entrypoints
 ///      (CTM, ProxyAdmin, ...) whose ownership the executor holds in production.
@@ -138,6 +138,37 @@ contract UpgradeExecutorBaseTest is Test {
         executor.forward(calls);
 
         assertEq(target.value(), 0, "the first call must be rolled back with the batch");
+    }
+
+    function test_revertWhen_forwardCallsATargetWithoutCode() public {
+        // A call with calldata to a codeless address would otherwise succeed silently: a mistyped
+        // target, or a CREATE2 address whose deployment was never sent, would pass as executed.
+        address neverDeployed = makeAddr("neverDeployed");
+        Call[] memory calls = new Call[](2);
+        calls[0] = _setValueCall(target, 3, 0);
+        calls[1] = Call({target: neverDeployed, value: 0, data: abi.encodeCall(OwnedTarget.setValue, (1))});
+
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, neverDeployed));
+        vm.prank(governance);
+        executor.forward(calls);
+
+        assertEq(target.value(), 0, "the batch must roll back with the codeless call");
+    }
+
+    function test_forwardSendsValueToAnAccountWithoutCode() public {
+        // A value-only call carries no calldata to lose, so it stays allowed, as in the
+        // ProtocolUpgradeHandler's own execution.
+        address recipient = makeAddr("recipient");
+        vm.deal(address(executor), 1 ether);
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: recipient, value: 0.4 ether, data: ""});
+
+        vm.expectEmit(true, true, true, true, address(executor));
+        emit CallForwarded(recipient, 0.4 ether, "");
+        vm.prank(governance);
+        executor.forward(calls);
+
+        assertEq(recipient.balance, 0.4 ether);
     }
 
     /*//////////////////////////////////////////////////////////////

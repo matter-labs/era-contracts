@@ -106,6 +106,10 @@ impl ShellPathFixture {
             self.unrelated_read(); // Arriving genesis/member verification is isolated out.
             self.code(true); // Departing release's runtime.
         }
+        // Both releases' proof modes (`judge_proof_mode_kept`) are tested separately: an unreadable
+        // departing mode is the same warning in every control.
+        self.unrelated_read(); // Departing release's `verifier()`.
+        self.unrelated_read(); // Arriving release's `verifier()`.
         self.unrelated_read(); // Derived facet cuts.
         self.unrelated_read(); // Derived L2 plan.
         for version in [OLD_VERSION, NEW_VERSION] {

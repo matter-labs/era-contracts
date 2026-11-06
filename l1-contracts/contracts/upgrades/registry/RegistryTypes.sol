@@ -14,7 +14,9 @@ import {IComplexUpgrader} from "../../state-transition/l2-deps/IComplexUpgrader.
 /// @dev They live here rather than next to their contracts because they are the reviewable
 ///      artifact of the whole model — see {protocol-docs/README.md} and {docs/registry-driven-upgrades.md}.
 
-/// @notice One facet installed on every chain created from a CTM release.
+/// @notice One facet of a CTM release: installed on every chain created from the release, and the
+///         facet set every chain upgraded to it ends up routing, since a transition derives its
+///         facet cuts from the two releases' rows. The "genesis" prefix is historical.
 /// @dev The facet's selector routing is NOT stored: every facet is self-describing
 ///      (`ISelfDescribingFacet.selectors()`), and a stored copy would only be a second,
 ///      unverified source that could disagree with it. Consumers (genesis installation,

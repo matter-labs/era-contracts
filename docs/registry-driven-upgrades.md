@@ -196,6 +196,16 @@ be smuggled in, and the enum — being the same one deployment uses — is the s
 to end. `ProxyUpgradeRowLib.toRows` flattens the array into the `ProxyUpgradeRow[]` the executors
 apply, dropping the inert slots, so the executors never recompile when the inventory grows.
 
+**The slot is a label the chain does not bind.** On chain a row applies to whatever proxy its
+`proxy` field names, provided the applying executor's `ProxyAdmin` administers it: a row placed in
+another member's slot applies just the same, and the duplicate-row check compares proxies, not
+slots. That a slot names its own member is established by package verification, which resolves
+each slot's proxy from live state (the Bridgehub for the ecosystem domain, the CTM for the CTM
+domain) and refuses a row naming any other contract. Rows also apply in enum order, so a row's
+`initializeUpgrade` runs with the lower-numbered slots already upgraded and the higher-numbered
+ones not yet: a reinitializer may depend only on lower-numbered members, which is part of
+reviewing every new `initializeUpgrade`.
+
 **What the length check does not give you.** It guarantees the SLOTS exist, not that preparation
 populated every intended change: an inert slot is the same bytes whether the upgrade deliberately
 leaves the contract alone or whether nobody wrote its row builder. Nothing on-chain can tell those
@@ -474,6 +484,14 @@ inside a proxy leg):
 `CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
 (`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
 ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
+
+The `ValidatorTimelock` also keeps its own owner (governance): the bootstrap swaps only its
+implementation, through the CTM-domain `ProxyAdmin`, and never moves its `Ownable2Step` ownership.
+Its owner methods — `setExecutionDelay`, `setChainExecutionDelay` (the only way to lower a delay a
+chain admin raised) and the MultisigCommitter's shared-signing-set methods (`addSharedValidator`,
+`removeSharedValidator`, `setSharedSigningThreshold`, `useCustomSigningSet`) — are therefore called
+by governance directly, not through an executor. A chain admin can only raise its own chain's delay
+(`increaseChainExecutionDelay`).
 
 ## Provenance and validation
 
@@ -943,7 +961,12 @@ Governance nominates the migration as CTM owner and transfers the CTM-domain `Pr
 same transaction (the CTM through `CTMUpgradeExecutor.acceptCTMOwnership()`, which admits the
 executor's owner or the CTM's current owner, here the migration). Authority is never parked. That
 needs the `ProxyAdmin` transfer, which is one-step, to run only inside the bundle that runs
-`migrate()`: the migration has no other way to hand the `ProxyAdmin` on, or back.
+`migrate()`: the migration has no other way to hand the `ProxyAdmin` on, or back. The bundle is
+therefore ONE governance proposal, executed in one transaction, and is never split into separate
+proposals: a `ProxyAdmin` handed over in a transaction of its own, ahead of a `migrate()` that can
+no longer pass (a stale `expectedOldImpl` or protocol version), would stay with the migration for
+good, and no proxy of the CTM domain could be upgraded again. The CTM itself is only nominated, so
+governance can always nominate someone else.
 
 `validate()` runs on the execution path and requires that the migration holds both ownerships, that
 the CTM sits at the departing version, that the ServerNotifier handover completed, that every
@@ -958,6 +981,11 @@ executor whose ownership moved after deployment would receive its domain on beha
 it now. The rows are then applied with the shared row semantics: every proxy at its
 `expectedOldImpl` (or already at `implNew`) and every `implNew` deployed code, before the first
 swap. `migrate()` runs once (`BootstrapAlreadyExecuted`).
+
+What `validate()` holds is the CTM domain. It does not read the core proxies: the manifest names no
+core transition, and the core leg — `applyL1Upgrade` of the transition the sequence pins — is
+ordered by the bundle, earlier in the same transaction, and checked off chain by package
+verification. `migrate()` relies on that order rather than on a state check of its own.
 
 Three properties that look like omissions but are not:
 

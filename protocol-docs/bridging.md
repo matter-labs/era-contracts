@@ -251,6 +251,11 @@ for any asset that still has a legacy amount.
   `depositTo`/`withdrawTo`. Its `bridgeMint` always reverts (use `deposit`); `bridgeBurn` burns and returns
   ether to the bridge. It carries the _base token's_ asset ID — the wrapper has no asset ID of its own.
   Still upgradeable for now; upgradeability will be removed later to make it trustless.
+  Each chain's wrapper is a `TransparentUpgradeableProxy` over the implementation at
+  `L2_WRAPPED_BASE_TOKEN_IMPL_ADDR`, which protocol upgrades never touch (since v31): a release's L2
+  table leaves its row empty, and `CTMRelease` refuses a filled one. New chains get the implementation
+  their genesis image builds, so chains created at different releases can run different wrapper code at
+  that address. Changing an existing chain's wrapper is a per-chain action by that proxy's admin.
 
 ## L2 Asset Tracker
 

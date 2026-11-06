@@ -9,13 +9,17 @@ import {ISelfDescribingFacet} from "../../../state-transition/chain-interfaces/I
 import {FixedForceDeploymentsData} from "../../../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {
     GenesisBatchHashZero,
+    L2BytecodeInfoLength,
     RegistryDuplicateFacetRow,
     RegistryDuplicateSelector,
+    RegistryEmptyFacetSet,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     ReleaseForceDeploymentMismatch,
+    ReleaseL2RowHasNoSystemProxy,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
+import {BYTECODE_INFO_LENGTH} from "../../../common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {GenesisFacet, ReleaseManifest} from "../RegistryTypes.sol";
 import {L2EcosystemContract, L2_ECOSYSTEM_CONTRACT_COUNT} from "../libraries/ContractIdentifiers.sol";
 
@@ -49,7 +53,7 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         // The one facet-set check kept: an empty set would describe an unusable chain and derive
         // a remove-everything delta in any transition departing toward it.
         if (_manifest.genesisFacets.length == 0) {
-            revert RegistryEmptySelectors(address(0));
+            revert RegistryEmptyFacetSet();
         }
         _requireUniqueFacetRows(_manifest.genesisFacets);
         // The L2 table is an enum-indexed inventory: the length check makes every slot an
@@ -59,6 +63,8 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         if (_manifest.l2BytecodeInfos.length != L2_ECOSYSTEM_CONTRACT_COUNT) {
             revert RegistryInventoryLengthMismatch(L2_ECOSYSTEM_CONTRACT_COUNT, _manifest.l2BytecodeInfos.length);
         }
+        _requireNoWrappedBaseTokenRow(_manifest.l2BytecodeInfos);
+        _requireCanonicalBytecodeInfos(_manifest.l2BytecodeInfos, _manifest.l2SystemProxyBytecodeInfo);
         _requireForceDeploymentsMatchTable(_manifest);
     }
 
@@ -72,30 +78,37 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         return getManifest().protocolVersion;
     }
 
+    /// @inheritdoc ICTMRelease
     function diamondInit() external view returns (address) {
         return getManifest().diamondInit;
     }
 
+    /// @inheritdoc ICTMRelease
     function verifier() external view returns (address) {
         return getManifest().verifier;
     }
 
+    /// @inheritdoc ICTMRelease
     function genesisFacets() external view returns (GenesisFacet[] memory) {
         return getManifest().genesisFacets;
     }
 
+    /// @inheritdoc ICTMRelease
     function fixedForceDeploymentsData() external view returns (bytes memory) {
         return getManifest().genesis.fixedForceDeploymentsData;
     }
 
+    /// @inheritdoc ICTMRelease
     function l2BytecodeInfos() external view returns (bytes[] memory) {
         return getManifest().l2BytecodeInfos;
     }
 
+    /// @inheritdoc ICTMRelease
     function l2SystemProxyBytecodeInfo() external view returns (bytes memory) {
         return getManifest().l2SystemProxyBytecodeInfo;
     }
 
+    /// @inheritdoc ICTMRelease
     function genesisParams() external view returns (address, bytes32, uint64) {
         ReleaseManifest memory m = getManifest();
         return (m.genesisUpgrade, m.genesis.genesisBatchHash, m.genesis.genesisIndexRepeatedStorageChanges);
@@ -164,16 +177,51 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         }
     }
 
-    /// @dev One row per facet address. A repeated address describes a routing no diamond can hold
-    ///      (`Diamond.diamondCut` would re-add selectors already routed). Checked at construction,
-    ///      against a mistake in an authored manifest; `validate()` refuses the same repetition
-    ///      through the selectors it repeats ({_requireNoDuplicateSelectors}).
+    /// @dev `L2WrappedBaseToken` sits at its fixed address as a plain implementation that every
+    ///      chain's wrapped-base-token proxy points at, not behind a system proxy. A table row for it
+    ///      would derive a system-proxy upgrade there, whose `upgradeTo` reverts on L2 and with it
+    ///      the protocol upgrade transaction of every chain that crosses the edge. Upgrades leave
+    ///      the implementation untouched (`SystemContractsProcessing`), so the row stays empty.
+    function _requireNoWrappedBaseTokenRow(bytes[] memory _table) private pure {
+        if (_table[uint256(L2EcosystemContract.L2WrappedBaseToken)].length != 0) {
+            revert ReleaseL2RowHasNoSystemProxy(uint256(L2EcosystemContract.L2WrappedBaseToken));
+        }
+    }
+
+    /// @dev Every non-empty table row and the shell must be canonical `BYTECODE_INFO_LENGTH`
+    ///      descriptors: L2 force-deploys them through `L2GenesisForceDeploymentsHelper`, which
+    ///      refuses any other length, so a descriptor with trailing bytes would pass every L1 check
+    ///      and revert the L2 protocol upgrade transaction of every chain that crosses the edge.
+    function _requireCanonicalBytecodeInfos(bytes[] memory _table, bytes memory _shell) private pure {
+        if (_shell.length != 0) {
+            _requireBytecodeInfoLength(_shell);
+        }
+        uint256 length = _table.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (_table[i].length != 0) {
+                _requireBytecodeInfoLength(_table[i]);
+            }
+        }
+    }
+
+    /// @param _bytecodeInfo A ZKsync OS bytecode descriptor.
+    function _requireBytecodeInfoLength(bytes memory _bytecodeInfo) private pure {
+        if (_bytecodeInfo.length != BYTECODE_INFO_LENGTH) {
+            revert L2BytecodeInfoLength(_bytecodeInfo.length, BYTECODE_INFO_LENGTH);
+        }
+    }
+
+    /// @dev One row per facet address, none of them zero. A repeated address describes a routing no
+    ///      diamond can hold (`Diamond.diamondCut` would re-add selectors already routed), and a zero
+    ///      address can never hold code. Checked at construction, against a mistake in an authored
+    ///      manifest; `validate()` refuses both too (the repetition through the selectors it repeats,
+    ///      {_requireNoDuplicateSelectors}), but only once the release is consumed.
     function _requireUniqueFacetRows(GenesisFacet[] memory _facets) private pure {
         uint256 length = _facets.length;
         for (uint256 i = 0; i < length; ++i) {
             address facet = _facets[i].facet;
             if (facet == address(0)) {
-                continue;
+                revert ZeroAddress();
             }
             for (uint256 j = 0; j < i; ++j) {
                 if (_facets[j].facet == facet) {
