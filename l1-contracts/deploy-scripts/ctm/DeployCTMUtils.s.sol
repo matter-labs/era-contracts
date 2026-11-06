@@ -41,7 +41,6 @@ struct Config {
 ///         their own struct so that `Config` stays within the stack budget the
 ///         optimizer-free coverage build allows.
 struct MultiProofConfig {
-    bool enabled;
     address ziskRangeVerifierAddr;
 }
 
@@ -95,9 +94,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
 
-        if (toml.keyExists("$.multi_proof_verifier")) {
-            config.multiProof.enabled = toml.readBool("$.multi_proof_verifier");
-        }
         // When set, deploy uses this verifier instead of deploying the default ZiskVerifier.
         if (toml.keyExists("$.zisk_range_verifier_addr")) {
             config.multiProof.ziskRangeVerifierAddr = toml.readAddress("$.zisk_range_verifier_addr");

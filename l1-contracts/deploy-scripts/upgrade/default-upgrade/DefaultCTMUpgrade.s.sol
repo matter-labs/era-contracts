@@ -187,9 +187,6 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy, ICTMUpgrade {
         config.testnetVerifier = UpgradeUtils.resolveTestnetVerifier(
             IChainTypeManager(ctmAddresses.stateTransition.proxies.chainTypeManager)
         );
-        // Every CTM gets the multi-proof verifier, so each chain can choose ZiSK on its own. A chain with
-        // ZiSK disabled, which is what the chain tooling sets by default, still settles Airbender-only proofs.
-        config.multiProof.enabled = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
