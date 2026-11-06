@@ -186,23 +186,28 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         if (allowedTxHashes[txHash] || exempt[_sender]) {
             return true;
         }
-        if (callMode == CallMode.WITHDRAWALS_ONLY) {
-            return _isAllowedInWithdrawalsOnlyMode(_contractL2, _mintValue, _l2Calldata);
+
+        if (_sender == L1_ASSET_ROUTER) {
+            if (_contractL2 != L2_ASSET_ROUTER_ADDR || _l2Value != 0) {
+                return false;
+            }
+            return _isDepositAllowed(_mintValue, _l2Calldata);
         }
-        return
-            _isAllowedInAllowAllMode({
-                _sender: _sender,
-                _contractL2: _contractL2,
-                _mintValue: _mintValue,
-                _l2Value: _l2Value,
-                _l2Calldata: _l2Calldata
-            });
+        if (
+            legacyBridges[_sender] && _hasSelector(_l2Calldata, IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector)
+        ) {
+            return _isDepositAllowed(_mintValue, _l2Calldata);
+        }
+
+        if (callMode == CallMode.WITHDRAWALS_ONLY) {
+            return _isCallAllowedInWithdrawalsOnlyMode(_contractL2, _mintValue, _l2Calldata);
+        }
+        return _isWithinCap(_baseTokenAssetId(), _mintValue);
     }
 
-    /// @dev The `WITHDRAWALS_ONLY` rules, for a transaction that is not whitelisted and whose sender is not exempt:
-    /// only a call to a registered withdrawal function with `_mintValue` within the base token cap passes; every
-    /// deposit is rejected.
-    function _isAllowedInWithdrawalsOnlyMode(
+    /// @dev The `WITHDRAWALS_ONLY` rule for a call that is not a deposit: only a call to a registered withdrawal
+    /// function with `_mintValue` within the base token cap passes.
+    function _isCallAllowedInWithdrawalsOnlyMode(
         address _contractL2,
         uint256 _mintValue,
         bytes calldata _l2Calldata
@@ -213,39 +218,12 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
             _isWithinCap(_baseTokenAssetId(), _mintValue);
     }
 
-    /// @dev The `ALLOW_ALL` rules, for a transaction that is not whitelisted and whose sender is not exempt:
-    /// deposits are checked against the caps, any other call against the base token cap.
-    function _isAllowedInAllowAllMode(
-        address _sender,
-        address _contractL2,
-        uint256 _mintValue,
-        uint256 _l2Value,
-        bytes calldata _l2Calldata
-    ) internal view returns (bool) {
-        if (_sender == L1_ASSET_ROUTER) {
-            if (_contractL2 != L2_ASSET_ROUTER_ADDR || _l2Value != 0) {
-                return false;
-            }
-            return _isDepositAllowedInAllowAllMode(_mintValue, _l2Calldata);
-        }
-
-        if (
-            legacyBridges[_sender] && _hasSelector(_l2Calldata, IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector)
-        ) {
-            return _isDepositAllowedInAllowAllMode(_mintValue, _l2Calldata);
-        }
-
-        return _isWithinCap(_baseTokenAssetId(), _mintValue);
-    }
-
-    /// @dev Decodes a deposit in either `finalizeDeposit` encoding and checks it against the caps, unless its
-    /// depositor is exempt. Only called by `_isAllowedInAllowAllMode` for a sender that sends deposits: the L1 asset
-    /// router (whose target and `l2Value` it has already checked) or a legacy bridge. The legacy encoding carries the
-    /// L1 token address, so the asset id is derived as an L1-native NTV token.
-    function _isDepositAllowedInAllowAllMode(
-        uint256 _mintValue,
-        bytes calldata _l2Calldata
-    ) internal view returns (bool) {
+    /// @dev Decodes a deposit in either `finalizeDeposit` encoding. An exempt depositor passes in either mode;
+    /// any other deposit is rejected in `WITHDRAWALS_ONLY` mode and checked against the caps in `ALLOW_ALL` mode.
+    /// Only called for a sender that sends deposits: the L1 asset router (whose target and `l2Value` are already
+    /// checked) or a legacy bridge. The legacy encoding carries the L1 token address, so the asset id is derived as
+    /// an L1-native NTV token.
+    function _isDepositAllowed(uint256 _mintValue, bytes calldata _l2Calldata) internal view returns (bool) {
         address depositor;
         bytes32 assetId;
         uint256 amount;
@@ -272,7 +250,10 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         if (exempt[depositor]) {
             return true;
         }
-        return _isWithinCap(_baseTokenAssetId(), _mintValue) && _isWithinCap(assetId, amount);
+        return
+            callMode == CallMode.ALLOW_ALL &&
+            _isWithinCap(_baseTokenAssetId(), _mintValue) &&
+            _isWithinCap(assetId, amount);
     }
 
     function _isWithinCap(bytes32 _assetId, uint256 _amount) internal view returns (bool) {

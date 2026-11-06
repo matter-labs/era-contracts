@@ -45,23 +45,20 @@ change is a single owner call that emits an event.
    Mailbox's legacy `requestL2Transaction` (used by Lido and other legacy integrators) do not go
    through the Bridgehub: there `sender` is the caller and `refundRecipient` is the raw argument.
 2. **Exempt sender.** If `exempt[sender]`, the transaction passes.
-3. **`WITHDRAWALS_ONLY` mode.** Only a call to a `(contractL2, selector)` pair registered in
-   `withdrawalFunctions` passes, with `mintValue` within the base token cap, so users can still force
-   a withdrawal from L1. Everything else is rejected, including every deposit, even one whose
-   depositor is exempt.
-4. **`ALLOW_ALL` mode.**
-   - **Deposits through the Bridgehub.** If `sender` is the L1 asset router, the transaction is a
-     token deposit (see [Deposit decoding](#deposit-decoding)). It must target the L2 asset router
-     with `l2Value == 0`; any other message of the router (for example registering a custom asset
-     handler) is rejected, as is a new-encoding deposit of an asset whose handler is not the native
-     token vault, since its transfer data is handler-defined. The depositor is decoded from the
-     calldata; an exempt depositor passes, otherwise both the token amount and `mintValue` must be
-     within their caps.
-   - **Deposits through a legacy bridge.** If `sender` is registered in `legacyBridges` and the
-     calldata calls the legacy `finalizeDeposit`, the transaction is checked like a Bridgehub
-     deposit. Other calls of the bridge are generic calls. The decoded `l1Sender` is trusted as the
-     depositor, so only bridges that set it to their caller should be registered.
-   - **Generic calls.** Any other call passes if `mintValue` is within the base token cap.
+3. **Deposits.** The depositor is decoded from the calldata (see [Deposit decoding](#deposit-decoding)).
+   An exempt depositor passes in either mode. Any other deposit is rejected in `WITHDRAWALS_ONLY`
+   mode, and in `ALLOW_ALL` mode both its token amount and `mintValue` must be within their caps.
+   - **Through the Bridgehub.** If `sender` is the L1 asset router, the transaction is a token
+     deposit. It must target the L2 asset router with `l2Value == 0`; any other message of the router
+     (for example registering a custom asset handler) is rejected, as is a new-encoding deposit of an
+     asset whose handler is not the native token vault, since its transfer data is handler-defined.
+   - **Through a legacy bridge.** If `sender` is registered in `legacyBridges` and the calldata calls
+     the legacy `finalizeDeposit`, the transaction is checked like a Bridgehub deposit. Other calls of
+     the bridge are generic calls. The decoded `l1Sender` is trusted as the depositor, so only bridges
+     that set it to their caller should be registered.
+4. **Generic calls.** Any other call passes if `mintValue` is within the base token cap. In
+   `WITHDRAWALS_ONLY` mode it must also call a `(contractL2, selector)` pair registered in
+   `withdrawalFunctions`, so users can still force a withdrawal from L1.
 
 A cap applies to a single deposit, and a cap of zero means the asset is not accepted. The cap of the
 base token bounds `mintValue`, i.e. all base token entering the chain through a non-exempt priority
@@ -111,9 +108,8 @@ withdrawals stay reachable through `withdrawalFunctions`.
 - **Third-party bridges and protocols.** Senders whose L1→L2 messages must keep working, such as
   Across's HubPool (which settles relayer refunds through priority operations), are either
   exempted or the restrictions that would affect them are enabled only after they close their
-  routes. In `WITHDRAWALS_ONLY` mode an exemption covers only the transactions the account sends
-  itself: its token deposits go through the asset router or a bridge and are rejected, so each one
-  needs a whitelisted hash, or the switch waits until the route is closed.
+  routes. An exemption covers the transactions the account sends itself and, in either mode, the
+  token deposits it makes through the asset router or a registered legacy bridge.
 - **Ecosystem senders.** Contracts such as `CTMDeploymentTracker` and `ChainRegistrationSender`
   send two-bridges requests to the L2 Bridgehub, which are generic calls and are rejected in
   `WITHDRAWALS_ONLY` unless their sender is exempt.

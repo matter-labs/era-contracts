@@ -176,18 +176,50 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
         );
     }
 
-    /// @dev `WITHDRAWALS_ONLY` mode accepts only withdrawal calls, so the depositor of a deposit is not decoded and
-    /// its exemption does not apply.
-    function test_exemptDepositorRejectedInWithdrawalsOnlyMode() public {
-        vm.prank(owner);
+    /// @dev An exempt depositor keeps depositing in `WITHDRAWALS_ONLY` mode, through the asset router in both
+    /// encodings and through a legacy bridge, while the deposits of other depositors are rejected.
+    function test_exemptDepositorPassesInWithdrawalsOnlyMode() public {
+        vm.startPrank(owner);
         filterer.setExempt(user, true);
+        filterer.setLegacyBridge(lidoL1Bridge, true);
+        vm.stopPrank();
         _setCallMode(CallMode.WITHDRAWALS_ONLY);
-        assertFalse(
-            _allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, _newDepositCalldata(user, tokenAssetId, 1))
+        _setCap(baseTokenAssetId, 1);
+        _setCap(lidoAssetId, TOKEN_CAP);
+
+        assertTrue(
+            _allowed(
+                l1AssetRouter,
+                L2_ASSET_ROUTER_ADDR,
+                MINT_VALUE,
+                0,
+                _newDepositCalldata(user, tokenAssetId, TOKEN_CAP + 1)
+            )
         );
-        assertFalse(
-            _allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, _legacyDepositCalldata(user, l1Token, 1))
+        assertTrue(
+            _allowed(
+                l1AssetRouter,
+                L2_ASSET_ROUTER_ADDR,
+                MINT_VALUE,
+                0,
+                _legacyDepositCalldata(user, l1Token, TOKEN_CAP + 1)
+            )
         );
+        assertTrue(_allowed(lidoL1Bridge, lidoL2Bridge, MINT_VALUE, 0, _legacyDepositCalldata(user, lidoL1Token, 1)));
+
+        address other = makeAddr("other");
+        assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, 1, 0, _newDepositCalldata(other, tokenAssetId, 1)));
+        assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, 1, 0, _legacyDepositCalldata(other, l1Token, 1)));
+        assertFalse(_allowed(lidoL1Bridge, lidoL2Bridge, 1, 0, _legacyDepositCalldata(other, lidoL1Token, 1)));
+    }
+
+    /// @dev In `WITHDRAWALS_ONLY` mode a message of the L1 asset router is still checked as a deposit, so it does
+    /// not pass as a withdrawal call even if its selector is registered.
+    function test_assetRouterMessageNotAWithdrawalCallInWithdrawalsOnlyMode() public {
+        _setCallMode(CallMode.WITHDRAWALS_ONLY);
+        bytes memory withdrawal = abi.encodeCall(IL2AssetRouter.withdraw, (tokenAssetId, hex""));
+        assertTrue(_allowed(user, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, withdrawal));
+        assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, MINT_VALUE, 0, withdrawal));
     }
 
     function test_assetRouterMessageToOtherL2ContractRejected() public view {

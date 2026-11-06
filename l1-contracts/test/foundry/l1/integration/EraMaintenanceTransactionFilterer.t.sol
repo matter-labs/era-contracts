@@ -373,6 +373,20 @@ contract EraMaintenanceTransactionFiltererIntegrationTest is
         addresses.bridgehub.requestL2TransactionTwoBridges{value: MINT_VALUE}(request);
     }
 
+    /// @dev The `sender` of a Bridgehub deposit is the L1 asset router, so the exemption is checked against the
+    /// depositor decoded from the calldata, which keeps an exempt account depositing in `WITHDRAWALS_ONLY` mode.
+    function test_exemptDepositorDepositsInWithdrawalsOnlyMode() public {
+        _enterWithdrawalsOnlyMode();
+        vm.prank(chainAdmin);
+        filterer.setExempt(user, true);
+
+        uint256 balanceBefore = token.balanceOf(address(addresses.l1NativeTokenVault));
+        vm.recordLogs();
+        assertNotEq(_depositToken(TOKEN_CAP + 1), bytes32(0));
+        assertEq(token.balanceOf(address(addresses.l1NativeTokenVault)), balanceBefore + TOKEN_CAP + 1);
+        assertEq(_priorityRequestSelector(), IL2SharedBridgeLegacyFunctions.finalizeDeposit.selector);
+    }
+
     function test_baseTokenDepositCappedOnMintValue() public {
         assertNotEq(_depositBaseToken(1 ether), bytes32(0));
 
