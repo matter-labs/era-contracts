@@ -1512,6 +1512,16 @@ contract StorageRegistriesTest is Test {
         new CTMRelease(manifest);
     }
 
+    /// @dev OZ N-08. A zero facet address can never hold code, so it is refused where the release
+    ///      is built, like the other members, rather than at its first use by `validate()`.
+    function test_revertWhen_releaseNamesAZeroFacet() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets[1].facet = address(0);
+
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMRelease(manifest);
+    }
+
     /// @dev OZ L-02. `L2WrappedBaseToken` sits at its fixed address as a plain implementation, not
     ///      behind a system proxy, so a row for it would derive an L2 upgrade that reverts on every
     ///      chain; the release refuses it at construction.

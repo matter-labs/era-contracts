@@ -203,16 +203,17 @@ contract CTMRelease is ICTMRelease, ManifestStorage {
         }
     }
 
-    /// @dev One row per facet address. A repeated address describes a routing no diamond can hold
-    ///      (`Diamond.diamondCut` would re-add selectors already routed). Checked at construction,
-    ///      against a mistake in an authored manifest; `validate()` refuses the same repetition
-    ///      through the selectors it repeats ({_requireNoDuplicateSelectors}).
+    /// @dev One row per facet address, none of them zero. A repeated address describes a routing no
+    ///      diamond can hold (`Diamond.diamondCut` would re-add selectors already routed), and a zero
+    ///      address can never hold code. Checked at construction, against a mistake in an authored
+    ///      manifest; `validate()` refuses both too (the repetition through the selectors it repeats,
+    ///      {_requireNoDuplicateSelectors}), but only once the release is consumed.
     function _requireUniqueFacetRows(GenesisFacet[] memory _facets) private pure {
         uint256 length = _facets.length;
         for (uint256 i = 0; i < length; ++i) {
             address facet = _facets[i].facet;
             if (facet == address(0)) {
-                continue;
+                revert ZeroAddress();
             }
             for (uint256 j = 0; j < i; ++j) {
                 if (_facets[j].facet == facet) {
