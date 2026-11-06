@@ -943,7 +943,12 @@ Governance nominates the migration as CTM owner and transfers the CTM-domain `Pr
 same transaction (the CTM through `CTMUpgradeExecutor.acceptCTMOwnership()`, which admits the
 executor's owner or the CTM's current owner, here the migration). Authority is never parked. That
 needs the `ProxyAdmin` transfer, which is one-step, to run only inside the bundle that runs
-`migrate()`: the migration has no other way to hand the `ProxyAdmin` on, or back.
+`migrate()`: the migration has no other way to hand the `ProxyAdmin` on, or back. The bundle is
+therefore ONE governance proposal, executed in one transaction, and is never split into separate
+proposals: a `ProxyAdmin` handed over in a transaction of its own, ahead of a `migrate()` that can
+no longer pass (a stale `expectedOldImpl` or protocol version), would stay with the migration for
+good, and no proxy of the CTM domain could be upgraded again. The CTM itself is only nominated, so
+governance can always nominate someone else.
 
 `validate()` runs on the execution path and requires that the migration holds both ownerships, that
 the CTM sits at the departing version, that the ServerNotifier handover completed, that every
