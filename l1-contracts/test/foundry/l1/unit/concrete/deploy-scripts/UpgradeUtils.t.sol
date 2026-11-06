@@ -4,9 +4,14 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {UpgradeUtils} from "deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
-import {FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG} from "deploy-scripts/utils/Types.sol";
+import {
+    FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF,
+    FIRST_PROTOCOL_VERSION_WITH_VERIFIER_FLAG
+} from "deploy-scripts/utils/Types.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {ZKsyncOSVerifier} from "contracts/state-transition/verifiers/ZKsyncOSVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -123,6 +128,56 @@ contract UpgradeUtilsResolveTestnetVerifierTest is Test {
 
     function test_revertsWhenCTMHasNoVerifierForCurrentVersion() public {
         IChainTypeManager ctm = _flagVersionCTM(address(0));
+        vm.expectRevert(bytes("verifier not set for the current protocol version"));
+        harness.resolve(ctm);
+    }
+}
+
+/// @notice External wrapper so reverts inside the internal library function are assertable.
+contract ResolveMultiProofVerifierHarness {
+    function resolve(IChainTypeManager _ctm) external view returns (bool) {
+        return UpgradeUtils.resolveMultiProofVerifier(_ctm);
+    }
+}
+
+/// @notice Unit tests for UpgradeUtils.resolveMultiProofVerifier.
+contract UpgradeUtilsResolveMultiProofVerifierTest is Test {
+    ResolveMultiProofVerifierHarness internal harness;
+    address internal multiProofVerifier;
+
+    function setUp() public {
+        harness = new ResolveMultiProofVerifierHarness();
+        multiProofVerifier = address(new MultiProofVerifier(IVerifier(address(0)), IVerifier(address(0))));
+    }
+
+    function _ctmWith(uint32 _minor, address _verifier) internal returns (IChainTypeManager) {
+        return IChainTypeManager(address(new MockCTMVersion(uint256(SemVer.packSemVer(0, _minor, 0)), _verifier)));
+    }
+
+    function test_multiProofVerifier_resolvesTrue() public {
+        assertTrue(harness.resolve(_ctmWith(FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF, multiProofVerifier)));
+    }
+
+    function test_multiProofTestnetVerifier_resolvesTrue() public {
+        address wrapper = address(new MultiProofTestnetVerifier(IVerifier(multiProofVerifier)));
+        assertTrue(harness.resolve(_ctmWith(FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF, wrapper)));
+    }
+
+    function test_airbenderOnlyVerifiers_resolveFalse() public {
+        address production = address(new ZKsyncOSVerifier(IVerifier(address(0))));
+        address testnet = address(new ZKsyncOSTestnetVerifier(IVerifier(address(0))));
+        assertFalse(harness.resolve(_ctmWith(FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF, production)));
+        assertFalse(harness.resolve(_ctmWith(FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF, testnet)));
+    }
+
+    function test_preMultiProofVersion_resolvesFalseWithoutAskingTheVerifier() public {
+        // Pre-v34 verifiers have no `getProofMode`, so the version alone must decide.
+        IChainTypeManager ctm = _ctmWith(FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF - 1, makeAddr("codeless verifier"));
+        assertFalse(harness.resolve(ctm));
+    }
+
+    function test_revertsWhenCTMHasNoVerifierForCurrentVersion() public {
+        IChainTypeManager ctm = _ctmWith(FIRST_PROTOCOL_VERSION_WITH_MULTI_PROOF, address(0));
         vm.expectRevert(bytes("verifier not set for the current protocol version"));
         harness.resolve(ctm);
     }
