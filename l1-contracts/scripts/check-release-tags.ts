@@ -21,6 +21,7 @@ const REPO_ROOT = path.join(__dirname, "..", "..");
 const MANIFEST_PATH = path.join(REPO_ROOT, "release-tags.json");
 const REMOTE = "origin";
 const RELEASE_BRANCH_PREFIX = "release/";
+const MAIN_BRANCH = "main";
 
 // Every tag that matches this is a release tag and must be recorded in the manifest.
 const RELEASE_TAG_PATTERN = /^(v\d|era-v\d|zkos-v?\d|zip-\d)/;
@@ -121,8 +122,13 @@ function checkTags(_manifest: Manifest) {
     }
     if (!tag.branch.startsWith(RELEASE_BRANCH_PREFIX)) {
       errors.push(`\`${tag.name}\`: branch \`${tag.branch}\` is not a \`${RELEASE_BRANCH_PREFIX}*\` branch`);
-    } else if (!gitSucceeds("merge-base", "--is-ancestor", commit, `refs/remotes/${REMOTE}/${tag.branch}`)) {
-      errors.push(`\`${tag.name}\`: ${commit} is not on \`${tag.branch}\``);
+    } else if (gitSucceeds("rev-parse", "--verify", "--quiet", `refs/remotes/${REMOTE}/${tag.branch}`)) {
+      if (!gitSucceeds("merge-base", "--is-ancestor", commit, `refs/remotes/${REMOTE}/${tag.branch}`)) {
+        errors.push(`\`${tag.name}\`: ${commit} is not on \`${tag.branch}\``);
+      }
+    } else if (!gitSucceeds("merge-base", "--is-ancestor", commit, `refs/remotes/${REMOTE}/${MAIN_BRANCH}`)) {
+      // A release branch merged into main with a merge commit may be deleted: its commits stay on main.
+      errors.push(`\`${tag.name}\`: \`${tag.branch}\` does not exist and ${commit} is not on \`${MAIN_BRANCH}\``);
     }
     for (const flavour of FLAVOURS) {
       const expected = tag.genesis[flavour];

@@ -27,15 +27,16 @@ the go-ahead from the release owner.
 
 A pushed tag is never moved. If a proposal is resubmitted with new calldata, tag the new proposal's number.
 
-The tagged commit must be on a `release/*` branch. That branch keeps the deployed bytecode: contract fixes go to the next
-release, not to the tagged branch. The branch is never deleted, also not after it is merged into `main`: the check looks the commit up on it.
+The tagged commit must be on a `release/*` branch. That branch keeps the deployed bytecode: contract fixes go to the
+next release, not to the tagged branch. Merge the branch into `main` with a merge commit, not a squash: GitHub deletes a
+merged PR's head branch, and the check then looks for the tagged commit on `main`.
 
 ## What the check enforces
 
 For each tag in `tags`:
 
 - the tag exists and points at the recorded `commit`;
-- the commit is on the recorded `release/*` branch;
+- the commit is on the recorded `release/*` branch, or on `main` once that branch is merged and deleted;
 - `configs/genesis/{era,zksync-os}/latest.json` at the commit declare the recorded `genesis` versions;
 - the version in a `v` / `era-v` tag name equals that flavour's genesis version.
 
@@ -62,8 +63,8 @@ Sepolia CTM that moves is a warning until its entry is updated.
 
 Open a PR with the change. The workflow runs on it, and the on-chain part runs too when the PR is not from a fork.
 
-Run the check locally with the command below. It reads the local tags and the `origin/release/*` branches, so fetch
-them first.
+Run the check locally with the command below. It reads the local tags and the `origin/release/*` and `origin/main`
+branches, so fetch them first.
 
 ```bash
 cd l1-contracts
