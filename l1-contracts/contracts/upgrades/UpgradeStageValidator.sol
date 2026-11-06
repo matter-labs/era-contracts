@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 /// @title Rules to validate that different upgrade stages have passed.
 /// @author Matter Labs
@@ -13,7 +12,7 @@ import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHan
 /// next upgrade stage.
 contract UpgradeStageValidator {
     /// @notice Address of bridgehub.
-    IL1Bridgehub public immutable BRIDGEHUB;
+    IBridgehub public immutable BRIDGEHUB;
 
     /// @notice Address of chain type manager.
     IChainTypeManager public immutable CHAIN_TYPE_MANAGER;
@@ -31,26 +30,26 @@ contract UpgradeStageValidator {
         }
 
         CHAIN_TYPE_MANAGER = IChainTypeManager(chainTypeManager);
-        BRIDGEHUB = IL1Bridgehub(CHAIN_TYPE_MANAGER.BRIDGE_HUB());
+        BRIDGEHUB = IBridgehub(CHAIN_TYPE_MANAGER.BRIDGE_HUB());
         NEW_PROTOCOL_VERSION = newProtocolVersion;
     }
 
     /// @notice Check if migrations are paused
-    function checkMigrationsPaused() external view {
-        if (!IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
+    function checkMigrationsPaused() external {
+        if (!BRIDGEHUB.migrationPaused()) {
             revert MigrationsNotPaused();
         }
     }
 
     /// @notice Check if migrations are unpaused
-    function checkMigrationsUnpaused() external view {
-        if (IChainAssetHandlerBase(BRIDGEHUB.chainAssetHandler()).migrationPaused()) {
+    function checkMigrationsUnpaused() external {
+        if (BRIDGEHUB.migrationPaused()) {
             revert MigrationPaused();
         }
     }
 
     /// @notice Check if the upgrade data was sent to the CTM.
-    function checkProtocolUpgradePresence() external view {
+    function checkProtocolUpgradePresence() external {
         uint256 protocolVersion = CHAIN_TYPE_MANAGER.protocolVersion();
 
         if (protocolVersion != NEW_PROTOCOL_VERSION) {

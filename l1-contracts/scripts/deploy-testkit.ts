@@ -9,7 +9,7 @@ import { Deployer } from "../src.ts/deploy";
 
 import { web3Provider } from "./utils";
 
-import { ethTestConfig } from "../src.ts/constants";
+import { ethTestConfig } from "../src.ts/utils";
 
 async function main() {
   const program = new Command();

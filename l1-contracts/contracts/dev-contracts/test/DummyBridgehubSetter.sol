@@ -2,14 +2,18 @@
 
 pragma solidity 0.8.28;
 
-import {L1Bridgehub} from "../../core/bridgehub/L1Bridgehub.sol";
+import {Bridgehub} from "../../bridgehub/Bridgehub.sol";
 
-contract DummyBridgehubSetter is L1Bridgehub {
+contract DummyBridgehubSetter is Bridgehub {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
     /// @notice Constructor
-    constructor(address _owner, uint256 _maxNumberOfZKChains) L1Bridgehub(_owner, _maxNumberOfZKChains) {}
+    constructor(
+        uint256 _l1ChainId,
+        address _owner,
+        uint256 _maxNumberOfZKChains
+    ) Bridgehub(_l1ChainId, _owner, _maxNumberOfZKChains) {}
 
     function setZKChain(uint256 _chainId, address _zkChain) external {
         _registerNewZKChain(_chainId, _zkChain, true);

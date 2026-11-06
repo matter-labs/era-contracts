@@ -2,16 +2,30 @@
 
 pragma solidity 0.8.28;
 
-import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
-import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
-import {ConfirmTransferResultData} from "../../common/Messaging.sol";
+import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 
-/// @title L1 Nullifier contract interface
+/// @param chainId The chain ID of the transaction to check.
+/// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
+/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+/// @param l2sender The address of the message sender on L2 (base token system contract address or asset handler)
+/// @param l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
+/// @param message The L2 withdraw data, stored in an L2 -> L1 message.
+/// @param merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
+struct FinalizeL1DepositParams {
+    uint256 chainId;
+    uint256 l2BatchNumber;
+    uint256 l2MessageIndex;
+    address l2Sender;
+    uint16 l2TxNumberInBatch;
+    bytes message;
+    bytes32[] merkleProof;
+}
+
+/// @title L1 Bridge contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Tracks initiated L1 -> L2 deposits so users can claim funds back if the L2 execution fails.
-/// See {protocol-docs/bridging.md#l1nullifier-and-failed-deposit-recovery}.
 interface IL1Nullifier {
     event BridgehubDepositFinalized(
         uint256 indexed chainId,
@@ -19,19 +33,43 @@ interface IL1Nullifier {
         bytes32 indexed l2DepositTxHash
     );
 
-    function BRIDGE_HUB() external view returns (IL1Bridgehub);
+    function isWithdrawalFinalized(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex
+    ) external view returns (bool);
 
-    function l1AssetRouter() external view returns (IL1AssetRouter);
+    function claimFailedDepositLegacyErc20Bridge(
+        address _depositSender,
+        address _l1Token,
+        uint256 _amount,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
 
-    function l1InteropHandler() external view returns (address);
+    function claimFailedDeposit(
+        uint256 _chainId,
+        address _depositSender,
+        address _l1Token,
+        uint256 _amount,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
+
+    function finalizeDeposit(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
+
+    function BRIDGE_HUB() external view returns (IBridgehub);
+
+    function legacyBridge() external view returns (IL1ERC20Bridge);
 
     function depositHappened(uint256 _chainId, bytes32 _l2TxHash) external view returns (bytes32);
 
-    /// @notice Records an initiated deposit (`depositHappened`), forwarded by the asset router as part of
-    /// the Bridgehub's `requestL2TransactionTwoBridges` flow. Rejects duplicates.
-    /// @param _chainId The chain ID of the ZK chain to which to confirm the deposit.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
-    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
     function bridgehubConfirmL2TransactionForwarded(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function l1NativeTokenVault() external view returns (IL1NativeTokenVault);
@@ -40,14 +78,15 @@ interface IL1Nullifier {
 
     function setL1AssetRouter(address _l1AssetRouter) external;
 
-    function setL1InteropHandler(address _l1InteropHandler) external;
+    function chainBalance(uint256 _chainId, address _token) external view returns (uint256);
 
-    /// @notice Confirms the result of an initiated deposit (successful or failed) with a status proof,
-    /// clears the recorded deposit and forwards the result to the asset router.
-    /// @param _confirmTransferResultData The data to confirm the deposit result.
-    function bridgeConfirmTransferResult(ConfirmTransferResultData calldata _confirmTransferResultData) external;
+    function l2BridgeAddress(uint256 _chainId) external view returns (address);
 
-    /// @notice Withdraws funds from an initiated deposit that failed when finalizing on L2.
+    function transferTokenToNTV(address _token) external;
+
+    function nullifyChainBalanceByNTV(uint256 _chainId, address _token) external;
+
+    /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
     /// @param _chainId The ZK chain id to which deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
@@ -57,6 +96,7 @@ interface IL1Nullifier {
     /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
     /// @param _l2TxNumberInBatch The L2 transaction number in a batch, in which the log was sent.
     /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction with deposit finalization.
+    /// @dev Processes claims of failed deposit, whether they originated from the legacy bridge or the current system.
     function bridgeRecoverFailedTransfer(
         uint256 _chainId,
         address _depositSender,
@@ -66,6 +106,26 @@ interface IL1Nullifier {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
         uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) external;
+
+    /// @notice Legacy function to finalize withdrawal via the same
+    /// interface as the old L1SharedBridge.
+    /// @dev Note, that we need to keep this interface, since the `L2AssetRouter`
+    /// will continue returning the previous address as the `l1SharedBridge`. The value
+    /// returned by it is used in the SDK for finalizing withdrawals.
+    /// @param _chainId The chain ID of the transaction to check
+    /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
+    /// @param _message The L2 withdraw data, stored in an L2 -> L1 message
+    /// @param _merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization
+    function finalizeWithdrawal(
+        uint256 _chainId,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
 }

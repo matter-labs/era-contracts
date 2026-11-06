@@ -10,14 +10,8 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
-import {
-    AccessToFallbackDenied,
-    AccessToFunctionDenied,
-    NoCallsProvided,
-    NotARestriction,
-    RestrictionWasAlreadyPresent,
-    RestrictionWasNotPresent
-} from "contracts/common/L1ContractErrors.sol";
+import {AccessToFallbackDenied, AccessToFunctionDenied, NoCallsProvided, NotARestriction, RestrictionWasAlreadyPresent, RestrictionWasNotPresent} from "contracts/common/L1ContractErrors.sol";
+import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainAdminTest is Test {
     ChainAdmin internal chainAdmin;
@@ -120,6 +114,17 @@ contract ChainAdminTest is Test {
         vm.expectRevert(abi.encodeWithSelector(RestrictionWasNotPresent.selector, dummyRestriction));
         chainAdmin.removeRestriction(address(dummyRestriction));
         vm.stopPrank();
+    }
+
+    function test_setUpgradeTimestamp(uint256 semverMinorVersionMultiplier, uint256 timestamp) public {
+        (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
+        uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
+
+        vm.expectEmit(true, false, false, true);
+        emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
+
+        vm.prank(address(chainAdmin));
+        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp);
     }
 
     function test_multicallRevertNoCalls() public {

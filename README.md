@@ -11,10 +11,7 @@ This repository contains both L1 and L2 ZKsync smart contracts.
 
 ## Documentation
 
-Documentation for these contracts lives in [`protocol-docs/`](protocol-docs/README.md): the
-[system architecture](protocol-docs/system/README.md), and the guides for
-[deploying](protocol-docs/ecosystem-deployment.md) and [upgrading](protocol-docs/ecosystem-upgrade.md)
-an ecosystem.
+Documentation for these contracts is maintained in the [zksync-era repository](https://github.com/matter-labs/zksync-era/blob/main/docs/src/specs/contracts).
 
 ## Disclaimer
 
@@ -37,7 +34,7 @@ See [LICENSE-MIT](LICENSE-MIT) for details.
 - [Discord](https://discord.gg/zksync)
 - [Mirror](https://zksync.mirror.xyz/)
 
-## Security Disclaimer
+## Disclaimer
 
 ZKsync Era has been through lots of testing and audits. Although it is live, it is still in alpha state and will go
 through more audits and bug bounties programs. We would love to hear our community's thoughts and suggestions about it!

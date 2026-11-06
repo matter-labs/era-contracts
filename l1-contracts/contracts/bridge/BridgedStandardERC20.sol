@@ -10,15 +10,17 @@ import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
 import {NonSequentialVersion, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
+import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The ERC20 token implementation, that is used in the "default" ERC20 bridge. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, ERC1967Upgrade {
-    /// @dev Records which of the `name`/`symbol`/`decimals` getters the origin token actually
-    /// implemented; the missing ones are mimicked by reverting.
+    /// @dev Describes whether there is a specific getter in the token.
+    /// @notice Used to explicitly separate which getters the token has and which it does not.
+    /// @notice Different tokens in L1 can implement or not implement getter function as `name`/`symbol`/`decimals`,
+    /// @notice Our goal is to store all the getters that L1 token implements, and for others, we keep it as an unimplemented method.
     struct ERC20Getters {
         bool ignoreName;
         bool ignoreSymbol;
@@ -27,12 +29,13 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
 
     ERC20Getters private availableGetters;
 
-    /// @dev The value returned by the `decimals` getter. Stored here (unlike `name`/`symbol`) because the
-    /// standard OpenZeppelin token keeps `decimals` as a constant rather than a storage variable.
+    /// @dev The decimals of the token, that are used as a value for `decimals` getter function.
+    /// @notice A private variable is used only for decimals, but not for `name` and `symbol`, because standard
+    /// @notice OpenZeppelin token represents `name` and `symbol` as storage variables and `decimals` as constant.
     uint8 private decimals_;
 
-    /// @dev Deprecated address of the L2 bridge that was used as trustee to mint/burn tokens; use the
-    /// L2AssetRouter and L2NativeTokenVault instead.
+    /// @notice The l2Bridge now is deprecated, use the L2AssetRouter and L2NativeTokenVault instead.
+    /// @dev Address of the L2 bridge that is used as trustee who can mint/burn tokens
     address public override l2Bridge;
 
     /// @dev Address of the token on its origin chain that can be deposited to mint this bridged token
@@ -44,26 +47,30 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @dev The assetId of the token.
     bytes32 public assetId;
 
-    /// @dev Also lazily migrates legacy tokens (deployed before the NTV existed, only on L2s): sets
-    /// `nativeTokenVault` to the canonical address and derives the asset ID on first use.
+    /// @dev This also sets the native token vault to the default value if it is not set.
+    /// It is not set only on the L2s for legacy tokens.
     modifier onlyNTV() {
         address ntv = nativeTokenVault;
         if (ntv == address(0)) {
             ntv = L2_NATIVE_TOKEN_VAULT_ADDR;
             nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
             assetId = DataEncoding.encodeNTVAssetId(
-                L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L1_CHAIN_ID(),
+                INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L1_CHAIN_ID(),
                 originToken
             );
         }
-        require(msg.sender == ntv, Unauthorized(msg.sender));
+        if (msg.sender != ntv) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
     modifier onlyNextVersion(uint8 _version) {
         // The version should be incremented by 1. Otherwise, the governor risks disabling
         // future reinitialization of the token by providing too large a version.
-        require(_version == _getInitializedVersion() + 1, NonSequentialVersion());
+        if (_version != _getInitializedVersion() + 1) {
+            revert NonSequentialVersion();
+        }
         _;
     }
 
@@ -80,7 +87,9 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
     function bridgeInitialize(bytes32 _assetId, address _originToken, bytes calldata _data) external initializer {
-        require(_originToken != address(0), ZeroAddress());
+        if (_originToken == address(0)) {
+            revert ZeroAddress();
+        }
         originToken = _originToken;
         assetId = _assetId;
 
@@ -97,9 +106,15 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         string memory decodedName;
         string memory decodedSymbol;
 
-        // The L1 bridge didn't validate the return types of the token's `name`/`symbol`/`decimals`, so
-        // decode defensively: Solidity can only "try-decode" via an external self-call whose failure is
-        // caught, marking the getter as unavailable.
+        // L1 bridge didn't check if the L1 token return values with proper types for `name`/`symbol`/`decimals`
+        // That's why we need to try to decode them, and if it works out, set the values as getters.
+
+        // NOTE: Solidity doesn't have a convenient way to try to decode a value:
+        // - Decode them manually, i.e. write a function that will validate that data in the correct format
+        // and return decoded value and a boolean value - whether it was possible to decode.
+        // - Use the standard abi.decode method, but wrap it into an external call in which error can be handled.
+        // We use the second option here.
+
         try this.decodeString(nameBytes) returns (string memory nameString) {
             decodedName = nameString;
         } catch {
@@ -145,7 +160,9 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         // It is expected that this token is deployed as a beacon proxy, so we'll
         // allow the governor of the beacon to reinitialize the token.
         address beaconAddress = _getBeacon();
-        require(msg.sender == UpgradeableBeacon(beaconAddress).owner(), Unauthorized(msg.sender));
+        if (msg.sender != UpgradeableBeacon(beaconAddress).owner()) {
+            revert Unauthorized(msg.sender);
+        }
 
         __ERC20_init_unchained(_newName, _newSymbol);
         __ERC20Permit_init(_newName);
@@ -154,34 +171,34 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         emit BridgeInitialize(originToken, _newName, _newSymbol, decimals_);
     }
 
-    /// @inheritdoc IBridgedStandardToken
+    /// @dev Mint tokens to a given account.
+    /// @param _to The account that will receive the created tokens.
+    /// @param _amount The amount that will be created.
+    /// @notice Should be called by bridge after depositing tokens from L1.
     function bridgeMint(address _to, uint256 _amount) external override onlyNTV {
         _mint(_to, _amount);
         emit BridgeMint(_to, _amount);
     }
 
-    /// @inheritdoc IBridgedStandardToken
+    /// @dev Burn tokens from a given account.
+    /// @param _from The account from which tokens will be burned.
+    /// @param _amount The amount that will be burned.
+    /// @notice Should be called by bridge before withdrawing tokens to L1.
     function bridgeBurn(address _from, uint256 _amount) external override onlyNTV {
         _burn(_from, _amount);
         emit BridgeBurn(_from, _amount);
     }
 
-    /// @notice Decodes a string from ABI-encoded bytes.
-    /// @param _input The ABI-encoded bytes containing a string.
-    /// @return result The decoded string.
+    /// @dev External function to decode a string from bytes.
     function decodeString(bytes calldata _input) external pure returns (string memory result) {
         (result) = abi.decode(_input, (string));
     }
 
-    /// @notice Decodes a uint8 from ABI-encoded bytes.
-    /// @param _input The ABI-encoded bytes containing a uint8.
-    /// @return result The decoded uint8 value.
+    /// @dev External function to decode a uint8 from bytes.
     function decodeUint8(bytes calldata _input) external pure returns (uint8 result) {
         (result) = abi.decode(_input, (uint8));
     }
 
-    /// @notice Returns the token name, reverts if name getter is disabled.
-    /// @return The token name string.
     function name() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         // solhint-disable-next-line reason-string, gas-custom-errors
@@ -189,8 +206,6 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         return super.name();
     }
 
-    /// @notice Returns the token symbol, reverts if symbol getter is disabled.
-    /// @return The token symbol string.
     function symbol() public view override returns (string memory) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         // solhint-disable-next-line reason-string, gas-custom-errors
@@ -198,12 +213,20 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         return super.symbol();
     }
 
-    /// @notice Returns the token decimals, reverts if decimals getter is disabled.
-    /// @return The number of decimals for the token.
     function decimals() public view override returns (uint8) {
         // If method is not available, behave like a token that does not implement this method - revert on call.
         // solhint-disable-next-line reason-string, gas-custom-errors
         if (availableGetters.ignoreDecimals) revert();
         return decimals_;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            LEGACY FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Returns the address of the token on its native chain.
+    /// Legacy for the l2 bridge.
+    function l1Address() public view override returns (address) {
+        return originToken;
     }
 }

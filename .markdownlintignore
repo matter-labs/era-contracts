@@ -1,7 +1,5 @@
 # root
 node_modules
-CLAUDE.md
-AGENTS.md
 
 # l1-contracts
 l1-contracts/node_modules
@@ -11,10 +9,6 @@ l1-contracts-foundry/lib
 
 # l2-contracts
 l2-contracts/node_modules
-
-# protocol-ops
-protocol-ops/target
-protocol-ops/target-linux
 
 # system-contracts
 system-contracts/node_modules

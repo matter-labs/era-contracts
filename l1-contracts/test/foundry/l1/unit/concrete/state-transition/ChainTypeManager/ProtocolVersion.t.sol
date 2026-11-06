@@ -5,6 +5,7 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ProtocolIdNotGreater} from "contracts/common/L1ContractErrors.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 contract ProtocolVersion is ChainTypeManagerTest {
     function setUp() public {
@@ -31,8 +32,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
             getDiamondCutData(diamondInit),
             oldProtocolVersion,
             1000,
-            newProtocolVersionSemVer,
-            testnetVerifier
+            newProtocolVersionSemVer
         );
         vm.stopPrank();
 
@@ -49,7 +49,6 @@ contract ProtocolVersion is ChainTypeManagerTest {
         assertEq(newProtocolVersion, newProtocolVersionSemVer);
         assertEq(newProtocolVersionDeadline, type(uint256).max);
         assertEq(oldProtocolVersionDeadline, 1000);
-        assertEq(chainContractAddress.protocolVersionVerifier(newProtocolVersionSemVer), testnetVerifier);
     }
 
     // protocolVersionIsActive
@@ -62,7 +61,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
         _mockMigrationPausedFromBridgehub();
 
         vm.startPrank(governor);
-        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1, testnetVerifier);
+        chainContractAddress.setNewVersionUpgrade(getDiamondCutData(diamondInit), 0, 0, 1);
         vm.stopPrank();
 
         assertEq(chainContractAddress.protocolVersionIsActive(1), true);
@@ -100,7 +99,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
 
         _mockGetZKChainFromBridgehub(chainAddress);
 
-        vm.prank(governor);
+        vm.prank(governor); // In the ChainTypeManagerTest contract, governor is set as the owner of chainContractAddress
         chainContractAddress.executeUpgrade(chainId, getDiamondCutDataWithCustomFacets(address(0), customFacetCuts));
     }
 
@@ -124,8 +123,7 @@ contract ProtocolVersion is ChainTypeManagerTest {
             getDiamondCutDataWithCustomFacets(address(0), customFacetCuts),
             0,
             0,
-            1,
-            testnetVerifier
+            1
         );
 
         vm.expectRevert(ProtocolIdNotGreater.selector);

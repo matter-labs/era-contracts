@@ -5,35 +5,26 @@ import {Vm} from "forge-std/Test.sol";
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {EVENT_INDEX, L2_DA_COMMITMENT_SCHEME, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../../Utils/Utils.sol";
+import {L2_DA_VALIDATOR_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../../Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-import {
-    DEFAULT_L2_LOGS_TREE_ROOT_HASH,
-    POINT_EVALUATION_PRECOMPILE_ADDR,
-    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER
-} from "contracts/common/Config.sol";
-import {L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, POINT_EVALUATION_PRECOMPILE_ADDR, PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-
-import {
-    IExecutor,
-    SystemLogKey,
-    TOTAL_BLOBS_IN_COMMITMENT
-} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
-import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-contract RevertBatchesTest is ChainTypeManagerTest {
+contract revertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
     uint256 internal currentTimestamp;
-    CommitBatchInfo internal newCommitBatchInfo;
+    IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;
     uint256[] internal proofInput;
@@ -53,7 +44,6 @@ contract RevertBatchesTest is ChainTypeManagerTest {
     // Facets exposing the diamond
     AdminFacet internal adminFacet;
     ExecutorFacet internal executorFacet;
-    CommitterFacet internal committerFacet;
     GettersFacet internal gettersFacet;
 
     function setUp() public {
@@ -80,7 +70,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
         });
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
-        newCommitBatchInfo = CommitBatchInfo({
+        newCommitBatchInfo = IExecutor.CommitBatchInfo({
             batchNumber: 1,
             timestamp: uint64(currentTimestamp),
             indexRepeatedStorageChanges: 0,
@@ -99,7 +89,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             {
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (false, chainId, l1CtmDeployer, forceDeploymentsData, "0x")
+                    (chainId, l1CtmDeployer, forceDeploymentsData, "0x")
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -111,23 +101,20 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(0));
         }
 
-        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
-
         newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector),
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
             abi.encode(newChainAddress)
         );
 
         executorFacet = ExecutorFacet(address(newChainAddress));
-        committerFacet = CommitterFacet(address(newChainAddress));
         gettersFacet = GettersFacet(address(newChainAddress));
         adminFacet = AdminFacet(address(newChainAddress));
 
         vm.stopPrank();
         vm.prank(newChainAdmin);
-        adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
+        adminFacet.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
     }
 
     function test_SuccessfulBatchReverting() public {
@@ -170,7 +157,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
         );
 
-        CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.timestamp = uint64(currentTimestamp);
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
         correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
@@ -193,7 +180,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             blobHashes
         );
 
-        CommitBatchInfo[] memory correctCommitBatchInfoArray = new CommitBatchInfo[](1);
+        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
         correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
@@ -205,33 +192,28 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        committerFacet.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+        executorFacet.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        // Two events are emitted per committed batch: BlockCommit, followed by the protocol-version report.
-        assertEq(entries.length, 2 + EVENT_INDEX);
-        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(
-            entries[EVENT_INDEX + 1].topics[0],
-            keccak256("ReportCommittedBatchProtocolVersion(uint64,uint256,bytes32)")
-        );
-        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
-        assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
+        assertEq(entries.length, 1);
+        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
 
         uint256 totalBatchesCommitted = gettersFacet.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 1,
-            batchHash: entries[EVENT_INDEX].topics[2],
+            batchHash: entries[0].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
-            commitment: entries[EVENT_INDEX].topics[3]
+            commitment: entries[0].topics[3]
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);

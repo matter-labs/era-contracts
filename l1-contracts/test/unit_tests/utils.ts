@@ -10,15 +10,14 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
-import { PubdataPricingMode } from "../../src.ts/utils";
 import {
   ADDRESS_ONE,
+  PubdataPricingMode,
   EMPTY_STRING_KECCAK,
   STORED_BATCH_INFO_ABI_STRING,
   COMMIT_BATCH_INFO_ABI_STRING,
   PRIORITY_OPS_BATCH_INFO_ABI_STRING,
-} from "../../src.ts/constants";
-
+} from "../../src.ts/utils";
 import { packSemver } from "../../scripts/utils";
 import { keccak256, hexConcat, defaultAbiCoder } from "ethers/lib/utils";
 
@@ -41,17 +40,6 @@ export const PUBDATA_CHUNK_PUBLISHER_ADDRESS = "0x000000000000000000000000000000
 
 export const SYSTEM_UPGRADE_TX_TYPE = 254;
 
-export enum L2DACommitmentScheme {
-  NONE,
-  EMPTY_NO_DA,
-  PUBDATA_KECCAK256,
-  BLOBS_AND_PUBDATA_KECCAK256,
-  BLOBS_ZKSYNC_OS,
-}
-
-// Default L2 DA commitment scheme for tests
-export const L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
-
 export function randomAddress() {
   return ethers.utils.hexlify(ethers.utils.randomBytes(20));
 }
@@ -66,7 +54,7 @@ export enum SYSTEM_LOG_KEYS {
   // it is the only one that is emitted before the system contracts are upgraded.
   PREV_BATCH_HASH_KEY,
   L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-  USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
+  USED_L2_DA_VALIDATOR_ADDRESS_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY,
 }
 
@@ -265,8 +253,8 @@ export function createSystemLogs(
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(L2_DA_COMMITMENT_SCHEME), 32)
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR
     ),
   ];
 }
@@ -313,8 +301,8 @@ export function createSystemLogsWithUpgrade(
     constructL2Log(
       true,
       L2_TO_L1_MESSENGER,
-      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
-      ethers.utils.hexZeroPad(ethers.utils.hexlify(L2_DA_COMMITMENT_SCHEME), 32)
+      SYSTEM_LOG_KEYS.USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+      process.env.CONTRACTS_L2_DA_VALIDATOR_ADDR || ethers.constants.AddressZero
     ),
     constructL2Log(
       true,
@@ -560,8 +548,7 @@ export function encodeCommitBatchesData(
     [STORED_BATCH_INFO_ABI_STRING, `${COMMIT_BATCH_INFO_ABI_STRING}[]`],
     [storedBatchInfo, commitBatchInfos]
   );
-  // Commit wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION).
-  const commitData = hexConcat(["0x01", encodedCommitDataWithoutVersion]);
+  const commitData = hexConcat(["0x00", encodedCommitDataWithoutVersion]);
   return [commitBatchInfos[0].batchNumber, commitBatchInfos[commitBatchInfos.length - 1].batchNumber, commitData];
 }
 
@@ -574,8 +561,7 @@ export function encodeProveBatchesData(
     [STORED_BATCH_INFO_ABI_STRING, `${STORED_BATCH_INFO_ABI_STRING}[]`, "uint256[]"],
     [prevBatch, committedBatches, proof]
   );
-  // Prove wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION).
-  const proveData = hexConcat(["0x01", encodedProveDataWithoutVersion]);
+  const proveData = hexConcat(["0x00", encodedProveDataWithoutVersion]);
   return [committedBatches[0].batchNumber, committedBatches[committedBatches.length - 1].batchNumber, proveData];
 }
 
@@ -583,25 +569,10 @@ export function encodeExecuteBatchesData(
   batchesData: Array<StoredBatchInfo>,
   priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>
 ): [BigNumberish, BigNumberish, string] {
-  const emptyInteropRoots = batchesData.map(() => []);
-  // The wire data is the abi-encoding of one `BatchDecoder.DecodedExecuteData` struct.
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
-    [
-      "tuple(" +
-        `${STORED_BATCH_INFO_ABI_STRING}[] batchesData, ` +
-        `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[] priorityOpsData, ` +
-        "tuple(uint256 chainId, uint256 blockOrBatchNumber, uint256 timestamp, bytes32[] sides)[][] dependencyRoots" +
-        ")",
-    ],
-    [
-      {
-        batchesData,
-        priorityOpsData: priorityOpsBatchInfo,
-        dependencyRoots: emptyInteropRoots,
-      },
-    ]
+    [`${STORED_BATCH_INFO_ABI_STRING}[]`, `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`],
+    [batchesData, priorityOpsBatchInfo]
   );
-  // Execute wire encoding version (BatchDecoder.SUPPORTED_ENCODING_VERSION_EXECUTE).
-  const executeData = hexConcat(["0x02", encodedExecuteDataWithoutVersion]);
+  const executeData = hexConcat(["0x00", encodedExecuteDataWithoutVersion]);
   return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];
 }

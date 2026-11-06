@@ -2,11 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {
-    PriorityOpsBatchInfo,
-    PriorityTree,
-    PriorityTreeCommitment
-} from "../../state-transition/libraries/PriorityTree.sol";
+import {PriorityOpsBatchInfo, PriorityTree, PriorityTreeCommitment} from "../../state-transition/libraries/PriorityTree.sol";
 
 contract PriorityTreeTest {
     PriorityTree.Tree priorityTree;

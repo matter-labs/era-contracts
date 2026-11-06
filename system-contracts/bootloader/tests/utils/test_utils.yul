@@ -43,11 +43,6 @@ function testing_testWillFailWith(message) {
     storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(message))
     setTestHook(102)
 }
-
-function testing_testTransactionWillFailWith(message) {
-    storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(message))
-    setTestHook(105)
-}
 function testing_totalTests(tests) {
     storeTestHookParam(0, $llvm_NoInline_llvm$_unoptimized(tests))
     setTestHook(103)

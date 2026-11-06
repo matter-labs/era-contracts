@@ -2,39 +2,50 @@
 
 pragma solidity ^0.8.24;
 
-import {StoredInteropRoot} from "../../common/Messaging.sol";
+// import {Unauthorized} from "./SystemContractErrors.sol";
+// import {BOOTLOADER_FORMAL_ADDRESS} from "./Constants.sol";
 
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice Dev stand-in for the L2 InteropRootStorage: stores imported interop roots without the
- * bootloader-only access control, mirroring the production `interopRoots` read ABI.
+ * @notice InteropRootStorage contract for imported L2 interop roots.
+ * @dev
  */
 contract DummyL2InteropRootStorage {
-    mapping(uint256 chainId => mapping(uint256 batchNumber => StoredInteropRoot)) internal storedInteropRoots;
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 interopRoot)) public interopRoots;
+    mapping(bytes32 interopRoot => uint256 batchNumber) public batchNumberFrominteropRoot;
+    mapping(bytes32 interopRoot => uint256 chainId) public chainIdFrominteropRoot;
 
-    event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, uint256 timestamp, bytes32[] sides);
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] interopRootSides)) public interopRootSides;
+    uint256 public pendingMessageRootIdsLength;
+    struct PendingMessageRootId {
+        uint256 chainId;
+        uint256 batchNumber;
+    }
+    mapping(uint256 index => PendingMessageRootId) public pendingMessageRootIds;
+    // mapping(bytes32 interopRoot => uint256 batchNumber) public batchNumberFrominteropRoot;
 
-    /// @notice Mirrors `L2InteropRootStorage.latestInteropRootTimestamp`: the maximum creation
-    /// timestamp over all imported roots per chain.
-    mapping(uint256 chainId => uint256 timestamp) public latestInteropRootTimestamp;
+    event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, bytes32[] sides);
 
-    function interopRoots(uint256 chainId, uint256 batchNumber) external view returns (StoredInteropRoot memory) {
-        return storedInteropRoots[chainId][batchNumber];
+    function addInteropRoot(uint256 chainId, uint256 batchNumber, bytes32[] memory sides) external {
+        emit InteropRootAdded(chainId, batchNumber, sides);
+        if (sides.length == 1) {
+            interopRoots[chainId][batchNumber] = sides[0];
+            batchNumberFrominteropRoot[sides[0]] = batchNumber;
+            chainIdFrominteropRoot[sides[0]] = chainId;
+        } else {
+            // interopRootSides[chainId][batchNumber] = sides;
+            // pendingMessageRootIds[pendingMessageRootIdsLength] = PendingMessageRootId({
+            //     chainId: chainId,
+            //     batchNumber: batchNumber
+            // });
+            // pendingMessageRootIdsLength++;
+        }
     }
 
-    function addInteropRootWithTimestamp(
-        uint256 chainId,
-        uint256 batchNumber,
-        uint256 timestamp,
-        bytes32[] memory sides
-    ) external {
-        emit InteropRootAdded(chainId, batchNumber, timestamp, sides);
-        if (sides.length == 1) {
-            storedInteropRoots[chainId][batchNumber] = StoredInteropRoot({root: sides[0], timestamp: timestamp});
-            if (timestamp > latestInteropRootTimestamp[chainId]) {
-                latestInteropRootTimestamp[chainId] = timestamp;
-            }
-        }
+    function addThisChainInteropRoot(uint256 batchNumber, bytes32[] memory sides) external {
+        interopRoots[block.chainid][batchNumber] = sides[0];
+        batchNumberFrominteropRoot[sides[0]] = batchNumber;
+        chainIdFrominteropRoot[sides[0]] = block.chainid;
     }
 }
