@@ -12,9 +12,9 @@
 //! | release | `verifier` | one of [`VERIFIERS`], and each sub-verifier it names ([`sub_verifiers`]) — or the verifier already in force where the upgrade departs from ([`DepartingMembers`]) |
 //! | release | each L2 bytecode table row | the bytecode info of the contract its slot names |
 //! | release | `l2SystemProxyBytecodeInfo` | the bytecode info of [`SYSTEM_PROXY_SHELL`] |
-//! | transition | `upgradeEngine` | [`TRANSITION_ENGINES`] |
-//! | proxy upgrade transition (either domain) | `upgradeEngine` | [`PROXY_UPGRADE_ENGINES`] |
-//! | transition | `l2Plan.delegateComposer` | [`DELEGATE_COMPOSERS`] |
+//! | transition | `chainUpgradeEngine` | [`TRANSITION_ENGINES`] |
+//! | proxy upgrade transition (either domain) | `proxyUpgradeEngine` | [`PROXY_UPGRADE_ENGINES`] |
+//! | transition | `l2Plan.delegateComposer` | the composer [`DELEGATE_COMPOSERS`] pairs with the plan's delegate |
 //! | transition | `l2Plan.delegateBytecodeInfo` | the bytecode info of one of [`L2_DELEGATES`] |
 //! | transition | each `l2Plan.extraBytecodeInfos` entry | the bytecode info of a reviewed contract |
 //! | proxy upgrade transition (either domain) | each row's `implNew` | the contract of the row's slot ([`super::rows`]) |
@@ -89,10 +89,15 @@ pub(crate) const TRANSITION_ENGINES: &[&str] = &["DefaultUpgrade"];
 /// proxy upgrade needs follow-up calls deploys a `DefaultProxyUpgradeEngine` subclass instead, and
 /// admits it here, so its follow-up calls are reviewed code.
 pub(crate) const PROXY_UPGRADE_ENGINES: &[&str] = &["DefaultProxyUpgradeEngine"];
-/// The `IL2DelegateCalldataComposer`s an authored L2 plan may name.
-pub(crate) const DELEGATE_COMPOSERS: &[&str] = &["L2DefaultDelegateCalldataComposer"];
+/// Each L2 upgrade delegate an authored L2 plan may name, with the `IL2DelegateCalldataComposer`
+/// that composes its calldata. A plan naming a delegate without a composer cannot be constructed
+/// (`L2PlanLib.build` reverts with `L2PlanDelegateNeedsComposer`).
+pub(crate) const DELEGATE_COMPOSERS: &[(&str, &str)] =
+    &[("L2DefaultUpgrade", "L2DefaultDelegateCalldataComposer")];
 /// The L2 upgrade delegates an authored L2 plan may name.
 pub(crate) const L2_DELEGATES: &[&str] = &["L2DefaultUpgrade"];
+/// The composers an authored L2 plan may name.
+const COMPOSERS: &[&str] = &["L2DefaultDelegateCalldataComposer"];
 /// The system-proxy shell every L2 table member sits behind.
 pub(crate) const SYSTEM_PROXY_SHELL: &str = "SystemContractProxy";
 /// The contract the removed v31 GWAssetTracker's table row pins (`SystemContractsProcessing`).
@@ -603,16 +608,20 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
     plan: &AuthoredL2Plan,
 ) -> anyhow::Result<()> {
     let mut named = vec![(
-        format!("{label}: upgradeEngine"),
+        format!("{label}: chainUpgradeEngine"),
         engine,
         TRANSITION_ENGINES,
         "the prepare deploys the engine its object pins",
     )];
+    let delegate = (!plan.delegateBytecodeInfo.is_empty())
+        .then(|| delegate_contract(build, &plan.delegateBytecodeInfo))
+        .flatten();
+    let composers = composers_for(delegate);
     if !plan.delegateComposer.is_zero() {
         named.push((
             format!("{label}: l2Plan.delegateComposer"),
             plan.delegateComposer,
-            DELEGATE_COMPOSERS,
+            composers,
             "the prepare deploys the composer its plan names",
         ));
     }
@@ -643,7 +652,7 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
     Ok(())
 }
 
-/// The `upgradeEngine` a `ProxyUpgradeTransition` pins against [`PROXY_UPGRADE_ENGINES`]: its
+/// The `proxyUpgradeEngine` a `ProxyUpgradeTransition` pins against [`PROXY_UPGRADE_ENGINES`]: its
 /// runtime must be a reviewed engine's (an unknown engine is an ERROR — it runs by delegatecall
 /// with the executor's whole authority), and, since the prepare deploys the engine its object
 /// pins, its construction must re-derive from the package's `[member_deployments]` record. A zero
@@ -656,7 +665,7 @@ pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
     label: &str,
     engine: Address,
 ) -> anyhow::Result<()> {
-    let member_label = format!("{label}: upgradeEngine");
+    let member_label = format!("{label}: proxyUpgradeEngine");
     if engine.is_zero() {
         result.report_error(&format!(
             "{member_label} is the zero address: the object's constructor refuses it \
@@ -692,6 +701,33 @@ pub(super) async fn verify_proxy_upgrade_engine<P: Provider>(
         },
     )
     .await
+}
+
+/// The reviewed contract `info` is the ZKsync OS bytecode info of, when it is one of
+/// [`L2_DELEGATES`]; whether it is (and what else it may be) is reported by
+/// [`judge_authored_l2_bytecodes`].
+fn delegate_contract(build: &ReviewedBuild, info: &[u8]) -> Option<&'static str> {
+    let key = decode_bytecode_info(info)?;
+    let name = build.identity().name_of_bytecode_info(&key)?;
+    let short = name.rsplit('/').next().unwrap_or(name);
+    L2_DELEGATES
+        .iter()
+        .copied()
+        .find(|delegate| *delegate == short)
+}
+
+/// The composers a plan delegating to `delegate` may name: the one [`DELEGATE_COMPOSERS`] pairs
+/// with it, or any reviewed composer when the delegate is not identified (that is reported on its
+/// own).
+fn composers_for(delegate: Option<&str>) -> &'static [&'static str] {
+    match delegate.and_then(|delegate| {
+        DELEGATE_COMPOSERS
+            .iter()
+            .position(|(paired, _)| *paired == delegate)
+    }) {
+        Some(i) => std::slice::from_ref(&DELEGATE_COMPOSERS[i].1),
+        None => COMPOSERS,
+    }
 }
 
 /// The authored delegate and extra bytecode infos of an L2 plan against the reviewed build.
@@ -839,7 +875,7 @@ mod tests {
             VERIFIERS,
             TRANSITION_ENGINES,
             PROXY_UPGRADE_ENGINES,
-            DELEGATE_COMPOSERS,
+            COMPOSERS,
         ]
         .concat();
         for verifier in VERIFIERS.iter().chain(&[
@@ -1871,7 +1907,7 @@ mod tests {
         )
         .await;
         assert_eq!(result.errors, 2, "{:?}", result.error_messages);
-        assert!(result.has_error("upgradeEngine at"));
+        assert!(result.has_error("chainUpgradeEngine at"));
         assert!(result.has_error("l2Plan.delegateComposer at"));
     }
 
@@ -1884,6 +1920,38 @@ mod tests {
         assert_eq!(result.errors, 1);
         let result = run_engine(&[UNKNOWN_RUNTIME], &empty).await;
         assert_eq!(result.errors, 1);
+    }
+
+    /// Every delegate a plan may name has its composer, and every composer a pairing names is
+    /// one a plan may name.
+    #[test]
+    fn every_delegate_is_paired_with_a_reviewed_composer() {
+        for delegate in L2_DELEGATES {
+            let paired = composers_for(Some(delegate));
+            assert_eq!(paired.len(), 1, "{delegate} has no composer of its own");
+            assert!(COMPOSERS.contains(&paired[0]));
+        }
+        for (delegate, composer) in DELEGATE_COMPOSERS {
+            assert!(L2_DELEGATES.contains(delegate), "{delegate}");
+            assert!(COMPOSERS.contains(composer), "{composer}");
+        }
+    }
+
+    /// The `L2DefaultUpgrade` delegate takes its calldata from the reviewed default composer
+    /// alone: a composer running other reviewed code fails, naming the one it must be.
+    #[tokio::test]
+    async fn a_delegate_needs_its_own_composer() {
+        let result = run_engine(
+            &[DEFAULT_UPGRADE_RUNTIME, DEFAULT_UPGRADE_RUNTIME],
+            &plan(composer(), encoded(DELEGATE_INFO), Vec::new()),
+        )
+        .await;
+        assert_eq!(result.errors, 1, "{:?}", result.error_messages);
+        assert!(
+            result.has_error("L2DefaultDelegateCalldataComposer"),
+            "{:?}",
+            result.error_messages
+        );
     }
 
     #[tokio::test]

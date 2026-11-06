@@ -95,7 +95,7 @@ test("a core manifest encodes a Core-domain transition manifest, the row in its 
   const args = coreInitArgs({ core: { contracts: { L1MessageRoot: entry } } }, ENGINE);
   assertTransitionManifestShape(args, "core init args");
   assert.equal(args.domain, proxyUpgradeDomain("Core"));
-  assert.equal(args.upgradeEngine, ENGINE, "the transition pins the engine it is given");
+  assert.equal(args.proxyUpgradeEngine, ENGINE, "the transition pins the engine it is given");
   assert.equal(args.proxyUpgrades.length, proxyUpgradeSlots("L1EcosystemContract", {}).length);
   const row = args.proxyUpgrades[proxyUpgradeSlotIndex("L1EcosystemContract", "L1MessageRoot")];
   assertRowShape(row, "core L1MessageRoot row");
@@ -107,7 +107,7 @@ test("CTM infrastructure rows encode a CTM-domain transition manifest indexed by
   const args = ctmInfrastructureInitArgs({ infrastructure: { contracts: { ServerNotifier: entry } } }, ENGINE);
   assertTransitionManifestShape(args, "CTM infrastructure init args");
   assert.equal(args.domain, proxyUpgradeDomain("CTM"));
-  assert.equal(args.upgradeEngine, ENGINE, "the transition pins the engine it is given");
+  assert.equal(args.proxyUpgradeEngine, ENGINE, "the transition pins the engine it is given");
   assert.equal(args.proxyUpgrades.length, proxyUpgradeSlots("CTMContract", {}).length);
   args.proxyUpgrades.forEach((row: { implNew: string }, i: number) => {
     assertRowShape(row, `CTMContract[${i}]`);

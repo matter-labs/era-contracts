@@ -2,6 +2,8 @@ import { execFileSync } from "child_process";
 import { randomBytes } from "crypto";
 import * as fs from "fs";
 import { join, relative } from "path";
+import type { SemVer } from "./current-release";
+import { GENESIS_PATH, UPGRADE_ENVS_DIR, releaseEnvDir, versionString } from "./current-release";
 
 // Starts a new protocol release on the current branch: moves every place that names "the current release"
 // to the next minor version, so the default upgrade (protocol-ops' `upgrade-prepare-all` defaults) and the
@@ -25,7 +27,7 @@ import { join, relative } from "path";
 //      over, every CREATE2 and legacy-Gov salt is regenerated, so the new release's
 //      deployments do not resolve to the previous release's addresses, and the per-release switch
 //      `redeploy_zk_governance` is dropped.
-//      The current release is the one `upgrade-envs/v<major>.<minor>.0-<name>/` dir of the genesis version:
+//      The current release is the one `upgrade-envs/v<major>.<minor>.<patch>-<name>/` dir of the genesis version:
 //      protocol-ops (its prepare defaults, `--env` resolution) and the generate workflow read it from these two,
 //      so they move with them.
 //   3. `l1-contracts/test/anvil-interop/config/anvil-config.json`: the outgoing `stateVersion` becomes the
@@ -47,23 +49,15 @@ import { join, relative } from "path";
 // (their tests, docs); the build fails until the tests are gone.
 
 const ROOT = join(__dirname, "..");
-const GENESIS_PATH = join(ROOT, "configs/genesis/zksync-os/latest.json");
-const UPGRADE_ENVS_DIR = join(ROOT, "l1-contracts/upgrade-envs");
 const ANVIL_CONFIG_PATH = join(ROOT, "l1-contracts/test/anvil-interop/config/anvil-config.json");
 const CHAIN_STATES_DIR = join(ROOT, "l1-contracts/test/anvil-interop/chain-states");
 const HASHES_PATH = join(ROOT, "AllContractsHashes.json");
 const UPGRADE_SCRIPTS_DIR = join(ROOT, "l1-contracts/deploy-scripts/upgrade");
 const FULL_FLOW_TEST_PATH = join(ROOT, "l1-contracts/test/foundry/l1/integration/UpgradeTest_Local.t.sol");
 
-function versionString(version: SemVer): string {
-  return `v${version.major}.${version.minor}.${version.patch}`;
-}
-
 const RELEASE_NAME_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const VERSION_BLOCK_RE =
   /("protocol_semantic_version":\s*\{\s*"major":\s*)(\d+)(,\s*"minor":\s*)(\d+)(,\s*"patch":\s*)(\d+)/;
-
-type SemVer = { major: number; minor: number; patch: number };
 
 const SALT_KEYS = ["create2_factory_salt", "legacy_gov_salt"];
 // Per-release switches: a release declares them for itself, so the copy for the next one drops them.
@@ -175,20 +169,8 @@ function main(): void {
   const next: SemVer = { major: current.major, minor: current.minor + 1, patch: 0 };
   write(GENESIS_PATH, genesis.replace(VERSION_BLOCK_RE, `$1${next.major}$3${next.minor}$5${next.patch}`));
 
-  // 2. Local upgrade input, from the current release's: the one upgrade-env dir of the genesis version, the
-  // same one protocol-ops resolves (`current_release` in protocol-ops/src/common/forge/scripts/mod.rs).
-  const currentPrefix = `v${current.major}.${current.minor}.0-`;
-  const currentEnvDirs = fs
-    .readdirSync(UPGRADE_ENVS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith(currentPrefix))
-    .map((entry) => entry.name);
-  if (currentEnvDirs.length !== 1) {
-    throw new Error(
-      `genesis is at ${versionString(current)}, so ${relative(ROOT, UPGRADE_ENVS_DIR)} must hold exactly one ` +
-        `${currentPrefix}<name> directory; found ${JSON.stringify(currentEnvDirs)}`
-    );
-  }
-  const currentEnvDir = `upgrade-envs/${currentEnvDirs[0]}`;
+  // 2. Local upgrade input, from the current release's.
+  const currentEnvDir = `upgrade-envs/${releaseEnvDir(current)}`;
   const nextEnvDir = `upgrade-envs/${versionString(next)}-${name}`;
   const nextEnvDirAbs = join(UPGRADE_ENVS_DIR, nextEnvDir.replace("upgrade-envs/", ""));
   if (fs.existsSync(nextEnvDirAbs)) {

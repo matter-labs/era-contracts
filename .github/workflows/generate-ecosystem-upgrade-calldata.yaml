@@ -2,7 +2,7 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 
 # Generic over the `upgrade` input: `upgrade-envs/<upgrade>/upgrade.toml` says how that upgrade is
 # prepared and checked (protocol-ops/src/common/upgrade_descriptor.rs). The notes below describe
-# the default, the current release: the one `upgrade-envs/v<major>.<minor>.0-<name>/` of the
+# the default, the current release: the one `upgrade-envs/v<major>.<minor>.<patch>-<name>/` of the
 # version in configs/genesis/zksync-os/latest.json (`upgrade-prepare-all` + `verify-bootstrap`,
 # the registry verifier; only the release's own upgrade directory can use `prepare-all`).
 
@@ -260,7 +260,7 @@ on:
   workflow_dispatch:
     inputs:
       upgrade:
-        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. BLANK = the current release (the upgrade-envs/v<major>.<minor>.0-* dir of configs/genesis/zksync-os/latest.json's version), the release's prepare-all + verify-bootstrap flow; a forge-script upgrade runs its declared script and checks."
+        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. BLANK = the current release (the upgrade-envs/v<major>.<minor>.<patch>-* dir of configs/genesis/zksync-os/latest.json's version), the release's prepare-all + verify-bootstrap flow; a forge-script upgrade runs its declared script and checks."
         required: false
         default: ""
         type: string
@@ -361,18 +361,12 @@ jobs:
           GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
-          # BLANK = the current release: the one upgrade-envs/v<major>.<minor>.0-<name>/ of the
-          # genesis version, the upgrade protocol-ops defaults to (`current_release`).
+          # BLANK = the current release, the upgrade protocol-ops defaults to (scripts/current-release.ts).
           UPGRADE="$INPUT_UPGRADE"
           if [ -z "$UPGRADE" ]; then
-            PREFIX="$(jq -r '.protocol_semantic_version | "v\(.major).\(.minor).0-"' configs/genesis/zksync-os/latest.json)"
-            shopt -s nullglob
-            CURRENT=(l1-contracts/upgrade-envs/"$PREFIX"*/)
-            shopt -u nullglob
-            if [ "${#CURRENT[@]}" -ne 1 ]; then
-              echo "::error::configs/genesis/zksync-os/latest.json is at ${PREFIX%.0-}, so upgrade-envs/ must hold exactly one ${PREFIX}<name> directory; found ${#CURRENT[@]}"; exit 1
-            fi
-            UPGRADE="$(basename "${CURRENT[0]}")"
+            UPGRADE="$(yarn -s ts-node scripts/current-release.ts)" || {
+              echo "::error::cannot resolve the current release (see the error above)"; exit 1
+            }
           fi
           # The upgrade is a directory name under upgrade-envs/; never a path. Matched as a whole
           # string (no newline either), since it goes into $GITHUB_ENV.

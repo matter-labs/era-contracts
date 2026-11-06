@@ -45,7 +45,6 @@ import {
 } from "contracts/upgrades/registry/RegistryTypes.sol";
 import {CTM_CONTRACT_COUNT, CTMContract} from "contracts/upgrades/registry/libraries/ContractIdentifiers.sol";
 import {ExternalActionsLib} from "./ExternalActionsLib.sol";
-import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
 
 /// @notice The L2 side a version authors for its edge: the plan's authored input and the deployed
 ///         bytecodes to publish. The registry objects construct the L2 payload on-chain from what
@@ -79,13 +78,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @dev Deployed on first use; see {ReleaseMemberProbe} for why it is a separate contract.
     ReleaseMemberProbe internal releaseMemberProbe;
 
-    /// @notice The successor `CTMUpgradeExecutor` this run deployed when the version replaces the
-    ///         CTM executor ({replacesCTMUpgradeExecutor}); zero otherwise.
-    CTMUpgradeExecutor public successorCTMUpgradeExecutor;
-
-    /// @dev How {deploySuccessorCTMUpgradeExecutor} constructed it, for the output record.
-    CTMExecutorDeployment internal successorExecutorDeployment;
-
     struct UpgradeDeployedAddresses {
         /// @dev The core prepare's Core-domain transition (an input, see `CTMUpgradeParams`).
         address coreTransition;
@@ -95,8 +87,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         ///      the upgrade swaps no CTM-domain implementation.
         address ctmInfrastructureTransition;
         /// @dev The engine this edge commits, held only until the object that pins it exists.
-        ///      Read it through {committedUpgradeEngine}, never directly.
-        address upgradeEngine;
+        ///      Read it through {committedChainUpgradeEngine}, never directly.
+        address chainUpgradeEngine;
     }
 
     struct AdditionalConfig {
@@ -323,17 +315,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         CTM-domain infrastructure transition when a CTM-domain implementation changes.
     function deployUpgradeObjects() public virtual {
         _requireDeclaredKindHolds();
-        if (!_liveCTMUpgradeExecutorRunsThisBuild()) {
-            require(
-                replacesCTMUpgradeExecutor(),
-                "the live CTMUpgradeExecutor differs from this build but this version does not declare its "
-                "replacement: override `replacesCTMUpgradeExecutor()`, or the local build differs from the one "
-                "that produced the live code"
-            );
-            deploySuccessorCTMUpgradeExecutor();
-        }
         if (upgradeKind() != UpgradeKind.InfrastructureOnly) {
-            upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
+            upgradeAddresses.chainUpgradeEngine = deployUsedUpgradeContract();
             deployCTMTransition();
         }
         deployCTMInfrastructureTransition();
@@ -379,12 +362,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(fromRelease != address(0), "CTM has no current release: it predates the registry model");
         address newRelease = ctmAddresses.stateTransition.currentRelease;
         require(newRelease != address(0), "new release not deployed");
-        address engine = committedUpgradeEngine();
+        address engine = committedChainUpgradeEngine();
         upgradeAddresses.ctmTransition = deployTransition(
             TransitionManifest({
                 fromRelease: fromRelease,
                 newRelease: newRelease,
-                upgradeEngine: engine,
+                chainUpgradeEngine: engine,
                 oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
                 upgradeTimestamp: 0,
                 l2Plan: authoredL2Plan()
@@ -423,14 +406,14 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             return;
         }
         // From the build ARTIFACT, for the same reason as the transition above.
-        address upgradeEngine = deployProxyUpgradeEngine();
+        address proxyUpgradeEngine = deployProxyUpgradeEngine();
         upgradeAddresses.ctmInfrastructureTransition = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
             abi.encode(
                 ProxyUpgradeTransitionManifest({
                     domain: ProxyUpgradeDomain.CTM,
                     proxyUpgrades: inventory,
-                    upgradeEngine: upgradeEngine
+                    proxyUpgradeEngine: proxyUpgradeEngine
                 })
             ),
             "ProxyUpgradeTransition"
@@ -604,18 +587,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice The upgrade engine this edge commits: this prepare's own deployment until the
     ///         object that pins it exists, and that object's pin from then on. Reading it back off
     ///         the object means the output cannot name an engine the committed edge does not pin.
-    function committedUpgradeEngine() public view virtual returns (address) {
+    function committedChainUpgradeEngine() public view virtual returns (address) {
         address transition = upgradeAddresses.ctmTransition;
         if (transition != address(0)) {
-            return ICTMTransition(transition).upgradeEngine();
+            return ICTMTransition(transition).chainUpgradeEngine();
         }
         if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
             // No chain crosses an infrastructure-only edge, so there is no engine to commit and
             // the output must not name one.
             return address(0);
         }
-        require(upgradeAddresses.upgradeEngine != address(0), "upgrade engine not deployed");
-        return upgradeAddresses.upgradeEngine;
+        require(upgradeAddresses.chainUpgradeEngine != address(0), "upgrade engine not deployed");
+        return upgradeAddresses.chainUpgradeEngine;
     }
 
     /// @notice The CTM-domain inventory of this edge, indexed by `CTMContract` — ONE definition,
@@ -629,73 +612,9 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         return _ctmProxyUpgradeRows();
     }
 
-    /// @notice Whether this version's build changes `CTMUpgradeExecutor`, so that a CTM still on the
-    ///         previous executor gets a successor. The default declares no change.
-    /// @dev A successor is deployed only where the live executor's runtime code differs from this
-    ///      build's ({_liveCTMUpgradeExecutorRunsThisBuild}); an undeclared difference is refused.
-    ///      The run then reports the successor as `ctm_upgrade_executor_addr` (the CTM legs target it)
-    ///      next to `ctm_predecessor_executor_addr`, and the merge derives the handover of the CTM, its
-    ///      `ProxyAdmin` and the ServerNotifier ({ExecutorSuccessionLib.ctmCalls}) and places it
-    ///      before the legs.
-    function replacesCTMUpgradeExecutor() internal view virtual returns (bool) {
-        return false;
-    }
-
-    /// @notice Whether the live executor already runs the `CTMUpgradeExecutor` this build deploys
-    ///         over the same constructor arguments (runtime codehash, immutables included; see
-    ///         {ReleaseMemberProbe}).
-    function _liveCTMUpgradeExecutorRunsThisBuild() internal virtual returns (bool) {
-        CTMUpgradeExecutor live = CTMUpgradeExecutor(payable(predecessorCTMUpgradeExecutor()));
-        if (address(releaseMemberProbe) == address(0)) {
-            // Plain CREATE, never broadcast: it lives only inside this run's simulation.
-            releaseMemberProbe = new ReleaseMemberProbe();
-        }
-        // From the script's own creation code, as both the deployment and the successor below are.
-        bytes memory initCode = abi.encodePacked(
-            type(CTMUpgradeExecutor).creationCode,
-            abi.encode(live.owner(), live.CHAIN_TYPE_MANAGER(), live.CTM_PROXY_ADMIN())
-        );
-        return address(live).codehash == releaseMemberProbe.codehashOfInitCode(initCode);
-    }
-
-    /// @notice Deploys the successor `CTMUpgradeExecutor`, bound to the same CTM and CTM-domain
-    ///         `ProxyAdmin` and owned by the same governance as the live one.
-    /// @dev Rides the CREATE2 factory like every prepare deployment.
-    function deploySuccessorCTMUpgradeExecutor() public virtual {
-        CTMUpgradeExecutor predecessor = CTMUpgradeExecutor(payable(predecessorCTMUpgradeExecutor()));
-        (, bytes32 salt) = getCreate2FactoryParams();
-        address governance = predecessor.owner();
-        address ctm = address(predecessor.CHAIN_TYPE_MANAGER());
-        address ctmProxyAdmin = address(predecessor.CTM_PROXY_ADMIN());
-        successorCTMUpgradeExecutor = CTMUpgradeExecutor(
-            payable(
-                deployViaCreate2AndNotify(
-                    type(CTMUpgradeExecutor).creationCode,
-                    abi.encode(governance, IChainTypeManager(ctm), ctmProxyAdmin),
-                    "CTMUpgradeExecutor"
-                )
-            )
-        );
-        successorExecutorDeployment = CTMExecutorDeployment({
-            ctmExecutor: address(successorCTMUpgradeExecutor),
-            create2Salt: salt,
-            initialOwner: governance,
-            chainTypeManager: ctm,
-            ctmProxyAdmin: ctmProxyAdmin
-        });
-    }
-
-    /// @notice The `CTMUpgradeExecutor` this upgrade's CTM legs target: the successor this run
-    ///         deployed when the version replaces the executor, else the live one.
+    /// @notice The CTM domain's bound `CTMUpgradeExecutor`: the CTM's owner. This upgrade's CTM legs
+    ///         are applied through it.
     function boundCTMUpgradeExecutor() public view virtual returns (address) {
-        if (address(successorCTMUpgradeExecutor) != address(0)) {
-            return address(successorCTMUpgradeExecutor);
-        }
-        return predecessorCTMUpgradeExecutor();
-    }
-
-    /// @notice The CTM domain's live `CTMUpgradeExecutor`: the CTM's owner.
-    function predecessorCTMUpgradeExecutor() public view virtual returns (address) {
         address ctm = ctmAddresses.stateTransition.proxies.chainTypeManager;
         address executor = IOwnable(ctm).owner();
         require(executor.code.length != 0, "CTM owner is not a contract: the CTM predates the registry model");
@@ -1041,7 +960,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            committedUpgradeEngine()
+            committedChainUpgradeEngine()
         );
 
         // Serialize newly deployed upgrade addresses
@@ -1054,12 +973,6 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             discoveredRepresentativeZkChain.l1DAValidator
         );
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
-        // Same key as `DeployCTM`; the merge hands this notifier over in a CTM executor succession.
-        vm.serializeAddress(
-            "deployed_addresses",
-            "server_notifier_proxy_addr",
-            ctmAddresses.stateTransition.proxies.serverNotifier
-        );
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "l1_rollup_da_manager",
@@ -1091,18 +1004,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             "ctm_infrastructure_transition_addr",
             upgradeAddresses.ctmInfrastructureTransition
         );
-        // Nonzero only when this run replaces the executor: the merge hands the domain from it to
-        // `ctm_upgrade_executor_addr` before the legs.
-        vm.serializeAddress(
-            "registry",
-            "ctm_predecessor_executor_addr",
-            address(successorCTMUpgradeExecutor) == address(0) ? address(0) : predecessorCTMUpgradeExecutor()
-        );
-        // The bound executor is named whenever this run deployed an object for it to apply or a
-        // successor for the domain to be handed to. The merge derives this CTM's executor calls on it.
+        // The bound executor is named whenever this run deployed an object for it to apply. The
+        // merge derives this CTM's executor calls on it.
         bool executorKnown = upgradeAddresses.ctmTransition != address(0) ||
-            upgradeAddresses.ctmInfrastructureTransition != address(0) ||
-            address(successorCTMUpgradeExecutor) != address(0);
+            upgradeAddresses.ctmInfrastructureTransition != address(0);
         string memory registry = vm.serializeAddress(
             "registry",
             "ctm_upgrade_executor_addr",
@@ -1126,12 +1031,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     ///         {UpgradeExecutorsRecord}). A recurring prepare deploys none and records nothing.
     /// @return recorded Whether this run deployed one.
     /// @return json The serialized record.
-    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {
-        if (successorExecutorDeployment.ctmExecutor == address(0)) {
-            return (false, "");
-        }
-        return (true, UpgradeExecutorsRecord.serializeCTM(successorExecutorDeployment));
-    }
+    function upgradeExecutorsRecord() internal virtual returns (bool recorded, string memory json) {}
 
     function getCTMAddress() public view returns (address) {
         return newConfig.ctm;

@@ -277,7 +277,7 @@ abstract contract RegistryDrivenUpgradeTestBase is ChainTypeManagerTest {
             TransitionManifest({
                 fromRelease: _fromRelease,
                 newRelease: release,
-                upgradeEngine: defaultUpgrade,
+                chainUpgradeEngine: defaultUpgrade,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: 0,
                 l2Plan: l2Plan

@@ -1,6 +1,3 @@
-# The Era chain's id, which the PUH/Guardians redeploy keeps (`redeploy_zk_governance`).
-era_chain_id = 6565
-
 # The localhost ZK token asset ID: the value protocol-ops pins on a local L1 when no env is given
 # (`LOCAL_ZK_TOKEN_ASSET_ID`), so a package prepared on anvil verifies with `--env local`. On
 # mainnet this would be DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).

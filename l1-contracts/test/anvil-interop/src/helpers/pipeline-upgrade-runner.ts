@@ -38,7 +38,6 @@ import {
   assertCtmTransitionApplied,
   assertLegsApplied,
   discoverDomainExecutors,
-  executorSuccessionCalls,
   findLegExecution,
   readProxyAdmin,
   keepL1SettledChains,
@@ -48,7 +47,6 @@ import {
   upgradeLegCall,
   upgradeLegSelectors,
 } from "./upgrade-test-utils";
-import type { ExecutorSuccession } from "./upgrade-test-utils";
 import type { GovernanceCall, MergedGovernanceOutput } from "./governance-bundle";
 import { assertBundleIs, assertRegistryHopBundle, upgradeLegsOf } from "./governance-bundle";
 import { l1GasOverrides, recordL1TransactionGas } from "./l1-transaction-gas";
@@ -172,8 +170,8 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     // ── What a reviewer reads from the deployment's outputs, rebuilt from its config ──
     fs.mkdirSync(harnessDir, { recursive: true });
     const deploymentSalt = readFixtureDeploymentSalt();
-    const fixtureExecutorRecords = path.join(harnessDir, "fixture-executor-records.toml");
-    await writeFixtureExecutorRecords(l1Provider, fixtureExecutorRecords, executors, deploymentSalt);
+    const executorRecords = path.join(harnessDir, "fixture-executor-records.toml");
+    await writeFixtureExecutorRecords(l1Provider, executorRecords, executors, deploymentSalt);
     const reviewedBuildHashes = path.join(harnessDir, "reviewed-build-hashes.json");
     writeReviewedBuildHashes(reviewedBuildHashes);
     const zkTokenAssetId: string = JSON.parse(fs.readFileSync(path.join(stateDir, "addresses.json"), "utf8")).zkToken
@@ -182,11 +180,8 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
     // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
     // forward the way a production env file does.
     let eip7702Checker: string | undefined = await fixtureEip7702Checker(l1Provider, deploymentSalt);
-    // A hop that replaces an executor records the successor in its own package; later hops run
-    // through it, so their review takes the record from there.
-    let executorRecords = fixtureExecutorRecords;
     for (const hop of scenario.hops) {
-      const result = await runRecurringHop(scenario, hop, {
+      eip7702Checker = await runRecurringHop(scenario, hop, {
         l1Provider,
         rpcUrl: l1Chain.rpcUrl,
         l1Addresses,
@@ -198,8 +193,6 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
         reviewedBuildHashes,
         zkTokenAssetId,
       });
-      eip7702Checker = result.eip7702Checker;
-      executorRecords = result.executorRecords ?? executorRecords;
     }
   } finally {
     if (keepChains) {
@@ -353,7 +346,7 @@ async function runRecurringHop(
     /** The ZK token asset id the live release pins, which the hop's releases keep. */
     zkTokenAssetId: string;
   }
-): Promise<{ eip7702Checker?: string; executorRecords?: string }> {
+): Promise<string | undefined> {
   console.log(`\n══ Registry-driven hop: ${hop.label} ══`);
   const { l1Provider, upgradeChainAddresses } = ctx;
   const ctm = new ethers.Contract(ctx.ctmAddresses.chainTypeManager, getAbi("IChainTypeManager"), l1Provider);
@@ -398,11 +391,7 @@ async function runRecurringHop(
     }
     const merged = parseToml(fs.readFileSync(mergedEcosystemToml, "utf8")) as MergedGovernanceOutput & {
       core: {
-        registry?: {
-          core_transition_addr?: string;
-          core_upgrade_executor_addr?: string;
-          core_predecessor_executor_addr?: string;
-        };
+        registry?: { core_transition_addr?: string; core_upgrade_executor_addr?: string };
       };
       ctms: {
         zksync_os: {
@@ -410,7 +399,6 @@ async function runRecurringHop(
             ctm_transition_addr?: string;
             ctm_infrastructure_transition_addr?: string;
             ctm_upgrade_executor_addr?: string;
-            ctm_predecessor_executor_addr?: string;
           };
         };
       };
@@ -431,75 +419,27 @@ async function runRecurringHop(
     const transitionAddr = transitionLeg.object;
     const executorAddr = transitionLeg.executor;
 
-    // The executors that hold the domains now, found through custody rather than taken from the
-    // prepare. A domain whose executor this hop replaces is handed to the successor first, and its
-    // legs target the successor; every other leg targets the custodian.
-    const ecosystemProxyAdmin = await readProxyAdmin(l1Provider, ctx.l1Addresses.messageRoot);
-    const executors = await discoverDomainExecutors(l1Provider, ctx.ctmAddresses.chainTypeManager, ecosystemProxyAdmin);
-    const reportedPredecessor = (address: string | undefined) =>
-      address && address !== ethers.constants.AddressZero ? ethers.utils.getAddress(address) : undefined;
-    const successions: ExecutorSuccession[] = [];
-    const corePredecessor = reportedPredecessor(coreRegistry.core_predecessor_executor_addr);
-    if (corePredecessor) {
-      successions.push({
-        kind: "core",
-        predecessor: corePredecessor,
-        successor: ethers.utils.getAddress(coreRegistry.core_upgrade_executor_addr!),
-        proxyAdmin: ecosystemProxyAdmin,
-      });
-    }
-    const ctmPredecessor = reportedPredecessor(ctmRegistry.ctm_predecessor_executor_addr);
-    if (ctmPredecessor) {
-      const successor = ethers.utils.getAddress(ctmRegistry.ctm_upgrade_executor_addr!);
-      successions.push({
-        kind: "ctm",
-        predecessor: ctmPredecessor,
-        successor,
-        ctm: ctx.ctmAddresses.chainTypeManager,
-        ctmProxyAdmin: await new ethers.Contract(successor, getAbi("CTMUpgradeExecutor"), l1Provider).CTM_PROXY_ADMIN(),
-        serverNotifier: await ctm.serverNotifierAddress(),
-      });
-    }
-    for (const s of successions) {
-      const custodian = s.kind === "core" ? executors.coreExecutor : executors.ctmExecutor;
-      if (s.predecessor.toLowerCase() !== custodian.toLowerCase()) {
-        throw new Error(
-          `the prepare hands the ${s.kind} domain over from ${s.predecessor}, but custody names ${custodian}`
-        );
-      }
-      console.log(`  ${s.kind} executor succession: ${s.predecessor} -> ${s.successor}`);
-    }
-    const expectedLegExecutor = (kind: string): string => {
-      const domain = kind === "core" ? "core" : "ctm";
-      const succession = successions.find((s) => s.kind === domain);
-      if (succession) {
-        return succession.successor;
-      }
-      return domain === "core" ? executors.coreExecutor : executors.ctmExecutor;
-    };
+    // The executors the legs must target, found through custody rather than taken from the prepare.
+    const executors = await discoverDomainExecutors(
+      l1Provider,
+      ctx.ctmAddresses.chainTypeManager,
+      await readProxyAdmin(l1Provider, ctx.l1Addresses.messageRoot)
+    );
     for (const leg of reportedLegs) {
-      const expected = expectedLegExecutor(leg.kind);
-      if (leg.executor.toLowerCase() !== expected.toLowerCase()) {
-        throw new Error(`the prepare names ${leg.executor} for the ${leg.kind} leg, but expected ${expected}`);
+      const custodian = leg.kind === "core" ? executors.coreExecutor : executors.ctmExecutor;
+      if (leg.executor.toLowerCase() !== custodian.toLowerCase()) {
+        throw new Error(`the prepare names ${leg.executor} for the ${leg.kind} leg, but custody names ${custodian}`);
       }
-    }
-    const successionCalls = executorSuccessionCalls(successions);
-    // The carried-over records are passed as an operator passes the previous run's: on a
-    // succession they describe the predecessors, which the review sets aside for the successors'
-    // records the package carries. They cover both domains and the next hop takes this package's
-    // instead, so a hop replaces both or neither.
-    if (successions.length !== 0 && successions.length !== 2) {
-      throw new Error(`hop ${hop.label} replaces one domain executor; the harness carries records for both`);
     }
     for (const leg of reportedLegs) {
       console.log(`  ${leg.kind.padEnd(18)} ${leg.object} via ${leg.executor}`);
     }
 
     // ── The tooling claim, checked on the artifact ──
-    const legs = assertRegistryHopBundle(merged, upgradeLegSelectors(), reportedLegs, successionCalls);
+    const legs = assertRegistryHopBundle(merged, upgradeLegSelectors(), reportedLegs);
     console.log(
-      `  ✓ the merged bundle is exactly ${successionCalls.length} succession call(s) then the ` +
-        `${legs.map((leg) => leg.kind).join(" -> ")} leg run, with no other call and no external actions`
+      `  ✓ the merged bundle is exactly the ${legs.map((leg) => leg.kind).join(" -> ")} leg run, ` +
+        "with no other call and no external actions"
     );
 
     verifyPackageAsReviewed({
@@ -563,26 +503,7 @@ async function runRecurringHop(
         data: call.data,
       })
     );
-    assertBundleIs(
-      executedCalls,
-      [...successionCalls, ...reportedLegs.map(upgradeLegCall)],
-      "the operation Governance executed"
-    );
-    // Each domain now sits with the executor its legs targeted.
-    const executorsAfter = await discoverDomainExecutors(
-      l1Provider,
-      ctx.ctmAddresses.chainTypeManager,
-      ecosystemProxyAdmin
-    );
-    for (const [domain, held] of [
-      ["core", executorsAfter.coreExecutor],
-      ["ctm", executorsAfter.ctmExecutor],
-    ] as const) {
-      const expected = expectedLegExecutor(domain);
-      if (held.toLowerCase() !== expected.toLowerCase()) {
-        throw new Error(`after the hop the ${domain} domain is held by ${held}, expected ${expected}`);
-      }
-    }
+    assertBundleIs(executedCalls, reportedLegs.map(upgradeLegCall), "the operation Governance executed");
     const applied = await assertLegsApplied(l1Provider, execution, reportedLegs, rowSnapshots);
     const ctmExecutorIface = new ethers.utils.Interface(getAbi("CTMUpgradeExecutor"));
     const transitionAppliedLog = execution.logs.find(
@@ -614,11 +535,11 @@ async function runRecurringHop(
       ctx.ctmAddresses.chainTypeManager,
       transitionAddr,
       oldVersion,
-      executorsAfter.ctmExecutor
+      executors.ctmExecutor
     );
     console.log(
       `  ✓ CTM commits ${transitionAddr} for ${oldVersion.toHexString()} and runs its release; ` +
-        `domain held by ${executorsAfter.ctmExecutor}`
+        `domain held by ${executors.ctmExecutor}`
     );
     const transition = new ethers.Contract(transitionAddr, getAbi("ICTMTransition"), l1Provider);
     const newRelease: string = await transition.newRelease();
@@ -671,17 +592,7 @@ async function runRecurringHop(
       `✅ Registry-driven hop ${hop.label} verified: one governance execution of ${legs.length} leg(s), ` +
         `chains at ${hop.expectedProtocolVersion}\n`
     );
-    // The package records the successors this hop installed; kept beside the fixture's records,
-    // since this hop's inputs are removed when it ends.
-    let executorRecords: string | undefined;
-    if (successions.length !== 0) {
-      executorRecords = path.join(path.dirname(ctx.executorRecords), `executor-records-${hop.label}.toml`);
-      fs.copyFileSync(mergedEcosystemToml, executorRecords);
-    }
-    return {
-      eip7702Checker: readReportedEip7702Checker(mergedEcosystemToml) ?? ctx.eip7702Checker,
-      executorRecords,
-    };
+    return readReportedEip7702Checker(mergedEcosystemToml) ?? ctx.eip7702Checker;
   } finally {
     inputs.cleanup();
   }
@@ -1005,8 +916,46 @@ export async function runEcosystemUpgradeScripts(params: {
   );
 
   if (params.executeBundles) {
+    checkDeployerPlan(prepareOutDir, params.upgradeHarnessInputs, params.rpcUrl);
     await executeSafeBundles(prepareOutDir, params.rpcUrl, "prepare");
   }
+}
+
+/**
+ * `protocol-ops ecosystem check-deployer-plan` on the prepare's deployer bundles, before they are
+ * replayed: the check the deploy workflow runs before it signs. The harness is the reviewer here:
+ * governance and the core salt are its own inputs, and the CTM prepare draws a random salt when the
+ * env declares none, so that salt is taken from the CTM prepare's output. The CTMs' ProxyAdmin and
+ * BytecodesSupplier are read from the L1 the bundles are about to be replayed on.
+ */
+function checkDeployerPlan(prepareOutDir: string, inputs: UpgradeHarnessInputs, rpcUrl: string): void {
+  const ecosystemToml = path.join(inputs.protocolOpsOutDir, "ecosystem.toml");
+  const merged = parseToml(fs.readFileSync(ecosystemToml, "utf8")) as {
+    ctms?: Record<string, { create2_factory_salt?: string }>;
+  };
+  const ctmSalts = Object.values(merged.ctms ?? {}).flatMap((ctm) =>
+    ctm.create2_factory_salt ? [ctm.create2_factory_salt] : []
+  );
+  const reviewedBuildHashes = path.join(inputs.protocolOpsOutDir, "reviewed-build-hashes.json");
+  writeReviewedBuildHashes(reviewedBuildHashes);
+  console.log("\n── check-deployer-plan: holding the deployer's calls to the reviewed build ──");
+  runProtocolOps([
+    "ecosystem",
+    "check-deployer-plan",
+    "--manifest",
+    path.join(prepareOutDir, "manifest.json"),
+    "--ecosystem-toml",
+    ecosystemToml,
+    "--deployer",
+    ANVIL_DEFAULT_ACCOUNT_ADDR,
+    "--l1-rpc-url",
+    rpcUrl,
+    "--governance",
+    inputs.governance,
+    "--contract-hashes",
+    reviewedBuildHashes,
+    ...[inputs.create2FactorySalt, ...ctmSalts].flatMap((salt) => ["--create2-salt", salt]),
+  ]);
 }
 
 export async function runEcosystemGovernanceUpgrade(params: {
@@ -1112,6 +1061,8 @@ export function prepareUpgradeHarnessInputs(
   /** The template's `rollup_da_manager` when it names one; otherwise protocol-ops resolves the CTM's own. */
   rollupDaManagerAddress?: string;
   create2FactorySalt: string;
+  /** The governance owner the upgrade input names (`owner_address`). */
+  governance: string;
   ctmProxyAddress: string;
   cleanup: () => void;
 } {
@@ -1127,7 +1078,6 @@ export function prepareUpgradeHarnessInputs(
   if (!primaryChainId) throw new Error(`No chains loaded for ${hop.label}`);
 
   let permanentValues = fs.readFileSync(path.join(l1ContractsDir, scenario.permanentValuesTemplatePath), "utf8");
-  permanentValues = replaceTomlBareValue(permanentValues, "era_chain_id", String(primaryChainId));
   permanentValues = replaceTomlStringValue(permanentValues, "bridgehub_proxy_addr", state.l1Addresses.bridgehub);
   permanentValues = replaceTomlStringValue(permanentValues, "ctm_proxy_addr", state.ctmAddresses.chainTypeManager);
   // Every prepare deploys under a salt of its own, as production rotates `[contracts]
@@ -1175,6 +1125,7 @@ export function prepareUpgradeHarnessInputs(
     upgradeInputArg: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
     rollupDaManagerAddress: nonZeroAddress(permanentValuesToml.ctm_contracts?.rollup_da_manager),
     create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
+    governance: state.l1Addresses.governance,
     ctmProxyAddress: state.ctmAddresses.chainTypeManager,
     // Kept alongside the chains: debugging a run needs the INPUTS that produced it (the
     // merged prepare TOML is also what `protocol-ops ecosystem verify-package` consumes),

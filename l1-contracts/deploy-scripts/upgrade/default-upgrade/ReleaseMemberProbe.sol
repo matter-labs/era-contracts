@@ -24,17 +24,11 @@ contract ReleaseMemberProbe {
     ///         hashing the artifact (an artifact's `deployedBytecode` has its immutable slots
     ///         zeroed).
     function codehashOf(string memory _name, bytes memory _constructorArgs) external returns (bytes32) {
-        return codehashOfInitCode(abi.encodePacked(ContractsBytecodesLib.getCreationCodeEVM(_name), _constructorArgs));
-    }
-
-    /// @notice The runtime codehash `_initCode` deploys to, for a contract the prepare deploys from its
-    ///         own compiled `type(X).creationCode` rather than from a build artifact (the executors).
-    /// @param _initCode Creation code with its constructor arguments appended.
-    function codehashOfInitCode(bytes memory _initCode) public returns (bytes32) {
+        bytes memory initCode = abi.encodePacked(ContractsBytecodesLib.getCreationCodeEVM(_name), _constructorArgs);
         address probe;
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            probe := create(0, add(_initCode, 0x20), mload(_initCode))
+            probe := create(0, add(initCode, 0x20), mload(initCode))
         }
         // solhint-disable-next-line gas-custom-errors
         require(probe != address(0), "release member code probe failed to deploy");

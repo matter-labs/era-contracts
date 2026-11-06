@@ -1,7 +1,7 @@
 //! Per-env config loader.
 //!
 //! Most ecosystem and gov commands need the same per-env addresses (bridgehub,
-//! CTM list with overrides, era chain id, deployer/owner, create2 factory).
+//! CTM list with overrides, deployer/owner, create2 factory).
 //! Rather than asking the user to pass every flag explicitly, commands that
 //! flatten an [`crate::common::EcosystemArgs`] expose `--env <name>` which
 //! reads `upgrade-envs/permanent-values/<env>.toml` (and the release upgrade input
@@ -12,7 +12,7 @@
 //!
 //! Layout (relative to `l1-contracts/`):
 //!
-//!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2, era_chain_id)
+//!   upgrade-envs/permanent-values/<env>.toml      (bridgehub, ctms, create2)
 //!   <current upgrade-env dir>/<env>.toml          (owner, salts)
 //!
 //! Older releases' inputs contain unquoted hex literals (e.g. `old_protocol_version =
@@ -53,10 +53,6 @@ pub struct PermanentValues {
     /// against it as a basic "right network" sanity check.
     #[serde(default)]
     pub l1_chain_id: Option<u64>,
-    /// The Era chain's id, which the PUH/Guardians redeploy keeps
-    /// ([`crate::commands::ecosystem::zk_governance`]).
-    #[serde(default)]
-    pub era_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<B256>,
     pub testnet_verifier: Option<bool>,
@@ -311,11 +307,6 @@ impl EnvConfig {
     /// so a caller cannot silently fall back to another owner (e.g. the deployer).
     pub fn owner_address(&self) -> anyhow::Result<Option<Address>> {
         Ok(self.release_input()?.owner_address)
-    }
-
-    /// The env's `era_chain_id`, a permanent value.
-    pub fn era_chain_id(&self) -> Option<u64> {
-        self.permanent.era_chain_id
     }
 
     /// Whether this release replaces the ecosystem's governance set — see
@@ -670,6 +661,27 @@ mod tests {
         assert!(envs > 0, "no permanent values in {}", dir.display());
     }
 
+    /// Every env declares a non-zero `bridgehub_proxy_addr`: it is the reviewed Bridgehub every
+    /// registry package verified with `--env` is bound to (`registry::ecosystem_binding`).
+    #[test]
+    fn every_env_declares_a_bridgehub() {
+        let dir = resolve_l1_contracts_path()
+            .unwrap()
+            .join(PERMANENT_VALUES_DIR);
+        let mut envs = 0;
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
+                continue;
+            }
+            let env = path.file_stem().unwrap().to_str().unwrap();
+            let cfg = EnvConfig::load(env).unwrap_or_else(|e| panic!("load {env}: {e}"));
+            assert_ne!(cfg.bridgehub(), Address::ZERO, "{env}");
+            envs += 1;
+        }
+        assert!(envs > 0, "no permanent values in {}", dir.display());
+    }
+
     /// The `local` env pins the ZK token a prepare on a local L1 without `--env` pins
     /// (`L1Network::Localhost`), so a package prepared on anvil verifies with `--env local`.
     #[test]
@@ -719,7 +731,6 @@ mod tests {
         .expect("permanent values alone still load");
         assert_ne!(cfg.bridgehub(), Address::ZERO);
         assert!(cfg.owner_address().is_err());
-        assert!(cfg.era_chain_id().is_some(), "a permanent value");
         assert!(cfg.create2_factory_salt_for_upgrade().is_err());
         assert!(cfg.create2_factory_salt_for_upgrade_per_ctm().is_err());
     }

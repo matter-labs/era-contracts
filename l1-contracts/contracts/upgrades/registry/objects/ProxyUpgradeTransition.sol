@@ -19,7 +19,7 @@ import {ProxyUpgradeDomain, ProxyUpgradeRow, ProxyUpgradeTransitionManifest} fro
 ///      what governance reviewed before approving this object; the object's own job is to refuse a
 ///      malformed inventory at construction. A target that is not a deployed contract at all is
 ///      refused where the rows are applied ({ProxyUpgradeRowLib.applyRows}), and so is a codeless
-///      `upgradeEngine` ({ProxyUpgradeExecutorBase}).
+///      `proxyUpgradeEngine` ({ProxyUpgradeExecutorBase}).
 contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
     /// @notice Pins the full manifest.
     /// @param _manifest The manifest to pin. Its inventory length is checked against the member
@@ -36,7 +36,7 @@ contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
         }
         ProxyUpgradeRowLib.validateRows(participating);
         // Every transition names the code that applies it; there is no implicit default.
-        if (_manifest.upgradeEngine == address(0)) {
+        if (_manifest.proxyUpgradeEngine == address(0)) {
             revert ZeroAddress();
         }
     }
@@ -52,8 +52,8 @@ contract ProxyUpgradeTransition is IProxyUpgradeTransition, ManifestStorage {
     }
 
     /// @inheritdoc IProxyUpgradeTransition
-    function upgradeEngine() external view returns (address) {
-        return getManifest().upgradeEngine;
+    function proxyUpgradeEngine() external view returns (address) {
+        return getManifest().proxyUpgradeEngine;
     }
 
     /// @inheritdoc IProxyUpgradeTransition

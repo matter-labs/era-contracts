@@ -34,7 +34,7 @@ interface ICTMTransition is ICommittedUpgrade, IManifestHash {
 
     /// @notice The upgrade-execution contract the committed cut delegatecalls
     ///         (`upgradeFromTransition`). Transition-scoped machinery — named explicitly.
-    function upgradeEngine() external view returns (address);
+    function chainUpgradeEngine() external view returns (address);
 
     function oldProtocolVersionDeadline() external view returns (uint256);
 

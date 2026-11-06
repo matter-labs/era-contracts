@@ -27,7 +27,7 @@ use crate::commands::ecosystem::upgrade_full::UpgradeFull;
 use crate::commands::ecosystem::upgrade_inner::{CtmInputs, PrepareInputs, UpgradeInner};
 use crate::common::abi::AdminFunctionsAbi;
 use crate::common::env_config::EnvConfig;
-use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
+use crate::common::external_actions::{Accounted, DeclaredCalls, ExternalAction};
 use crate::common::forge::scripts::{
     current_release, CurrentRelease, ADMIN_FUNCTIONS_INVOCATION, UPGRADE_CORE_OUTPUT_PATH,
 };
@@ -40,9 +40,6 @@ use crate::common::wallets::Wallet;
 use crate::common::SharedRunArgs;
 use crate::upgrade_verification::registry::applied;
 use crate::upgrade_verification::registry::package::RegistryPackage;
-use crate::upgrade_verification::registry::succession::{
-    core_succession_in, ctm_succession_in, Successions,
-};
 use crate::upgrade_verification::report::VerificationResult;
 
 // ── upgrade-governance (the one governance bundle on a fork) ──────────────
@@ -216,25 +213,10 @@ fn check_bundle_provenance(
     use crate::common::governance_calls::decode_calls;
     let calls =
         decode_calls(&gov.calls).with_context(|| format!("{source}: decode governance calls"))?;
-    let for_phase: Vec<&ExternalAction> = declared
-        .iter()
-        .filter(|a| a.phase == GOVERNANCE_PHASE)
-        .collect();
-    // Matched one-for-one rather than by set membership, so a bundle cannot carry a declared call
-    // twice over while a second declaration goes unemitted.
-    let mut claimed = vec![false; for_phase.len()];
-    let mut order = Vec::with_capacity(calls.len());
-    for call in &calls {
-        let matched = for_phase
-            .iter()
-            .enumerate()
-            .position(|(i, action)| !claimed[i] && action.is_call(call));
-        match matched {
-            Some(i) => {
-                claimed[i] = true;
-                order.push(i);
-            }
-            None => anyhow::bail!(
+    let account = DeclaredCalls::match_calls(&calls, declared);
+    for (call, accounted) in calls.iter().zip(&account.calls) {
+        if !matches!(accounted, Accounted::Declared(_)) {
+            anyhow::bail!(
                 "{source}: the governance bundle carries a call no declared external action \
                  accounts for — target {:#x}, value {}, selector 0x{}. Every emitted call must be \
                  a declared action (see ExternalActionsLib); the executor legs are derived by the \
@@ -242,19 +224,19 @@ fn check_bundle_provenance(
                 call.target,
                 call.value,
                 hex::encode(&call.data[..call.data.len().min(4)])
-            ),
+            );
         }
     }
-    if let Some(i) = claimed.iter().position(|c| !c) {
+    if let Some(&i) = account.unclaimed.first() {
         anyhow::bail!(
             "{source}: declares a governance external action it never emits — {}",
-            for_phase[i].describe()
+            account.actions[i].describe()
         );
     }
     // The verifier holds the merged bundle's external actions to their declared order, so a
     // prepare that emits them in another one is refused here rather than there.
     anyhow::ensure!(
-        order.windows(2).all(|pair| pair[0] < pair[1]),
+        account.in_order,
         "{source}: emits its declared governance external actions in another order than it \
          declares them"
     );
@@ -393,40 +375,6 @@ fn derive_executor_legs(
     Ok(legs)
 }
 
-/// The executor succession the merged bundle carries right before its legs, DERIVED from the
-/// prepare summaries: when a prepare replaced its domain's executor it reports the predecessor
-/// (`core_predecessor_executor_addr` / `ctm_predecessor_executor_addr`, nonzero) beside the
-/// successor its legs target (`core_upgrade_executor_addr` / `ctm_upgrade_executor_addr`) and
-/// records how it built the successor (`[upgrade_executors]`). The calls are those of
-/// `ExecutorSuccessionLib` — the core handover first, then the CTM's — over the contracts the
-/// successor was built over and, for a CTM, the prepare's ServerNotifier (see
-/// [`crate::upgrade_verification::registry::succession`], which the verifier re-derives them
-/// with). An inconsistent report (a predecessor without a successor or a record, a record of
-/// another executor, a record disagreeing with the prepare's own addresses, no ServerNotifier) is
-/// refused, as is a second CTM succession.
-fn derive_executor_succession(
-    core: &toml::value::Table,
-    ctms: &[(Address, &toml::value::Table)],
-) -> anyhow::Result<Successions> {
-    let core_succession = core_succession_in(core).context("core prepare")?;
-    let mut ctm_succession = None;
-    for (proxy, body) in ctms {
-        if let Some(succession) =
-            ctm_succession_in(body).with_context(|| format!("CTM prepare {proxy:#x}"))?
-        {
-            anyhow::ensure!(
-                ctm_succession.is_none(),
-                "two CTM prepares replace a CTM executor; one upgrade drives exactly one CTM"
-            );
-            ctm_succession = Some(succession);
-        }
-    }
-    Ok(Successions {
-        core: core_succession,
-        ctm: ctm_succession,
-    })
-}
-
 /// Replay the governance bundle of one or more prepared TOMLs, in the order given.
 ///
 /// Each TOML's `[governance_calls] calls` is one `governanceExecuteCalls` (legacy Governance) or
@@ -458,7 +406,7 @@ pub async fn replay_governance_calls(
         )
         .await
         .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
-        expect_applied(&runner.rpc_url, toml_path, governance_addr)
+        expect_applied(&runner.rpc_url, toml_path, governance_addr, bridgehub)
             .await
             .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
     }
@@ -466,12 +414,14 @@ pub async fn replay_governance_calls(
 }
 
 /// When `governance_toml` is a registry package, holds the fork state after its bundle against
-/// everything the package must have left ([`applied::verify_applied`]); any unmet expectation
-/// fails. A TOML that is not a registry package is left alone.
+/// everything the package must have left ([`applied::verify_applied`]), its core rows' slots
+/// discovered through `bridgehub`; any unmet expectation fails. A TOML that is not a registry
+/// package is left alone.
 async fn expect_applied(
     rpc_url: &str,
     governance_toml: &Path,
     governance: Address,
+    bridgehub: Address,
 ) -> anyhow::Result<()> {
     let Some(package) = RegistryPackage::load_if_registry(governance_toml)? else {
         logger::info(format!(
@@ -483,7 +433,7 @@ async fn expect_applied(
     logger::step("Checking the state the bundle left");
     let provider = crate::common::ethereum::get_provider(rpc_url)?;
     let mut result = VerificationResult::default();
-    applied::verify_applied(&provider, &package, governance, &mut result).await;
+    applied::verify_applied(&provider, &package, governance, bridgehub, &mut result).await;
     result
         .ensure_success()
         .context("the replayed bundle executed but did not leave the state its package describes")
@@ -1188,15 +1138,13 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// single ecosystem TOML at `dst`.
 ///
 /// The merger COMPOSES nothing. The one bundle is, in order: the extras, the core prepare's
-/// declared calls, the DERIVED executor succession when a prepare replaced an executor
-/// ([`derive_executor_succession`]: the core handover, then the CTM's), the DERIVED executor legs
-/// ([`derive_executor_legs`]: one contiguous run in canonical order, none for a replacement,
-/// targeting the successors), then the CTM prepare's declared calls. The succession and the legs
-/// form one contiguous run. Every call other than a derived one is declared in `external_actions`
-/// with phase `governance`; a prepare bundle carrying a call the artifact does not name fails the
-/// merge (`check_bundle_provenance`). The derived calls need no summary table of their own: the
-/// verifier recovers the legs from the calldata, re-derives the succession, and reconciles both
-/// with `[core.registry]`, `[ctms.*.registry]` and the `[upgrade_executors]` records. Shape:
+/// declared calls, the DERIVED executor legs ([`derive_executor_legs`]: one contiguous run in
+/// canonical order, none for a replacement), then the CTM
+/// prepare's declared calls. Every call other than a leg is declared in `external_actions` with
+/// phase `governance`; a prepare bundle carrying a call the artifact does not name fails the
+/// merge (`check_bundle_provenance`). The legs need no summary table of their own: the verifier
+/// recovers them from the calldata and reconciles them with `[core.registry]` and
+/// `[ctms.*.registry]`. Shape:
 ///
 /// ```toml
 /// [[external_actions]]            # every governance/admin call that is NOT an executor leg,
@@ -1207,8 +1155,8 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 /// value = "0"
 /// data = "0x…"
 ///
-/// [governance_calls]              # the one bundle: extras, core actions, the DERIVED
-/// calls = "0x..."                 # succession and legs, CTM actions
+/// [governance_calls]              # the one bundle: extras, core actions, the DERIVED legs,
+/// calls = "0x..."                 # CTM actions
 ///
 /// [test_upgrade_calls]            # the CTM prepare's simulator probes, when it wrote any
 /// test_create_chain_zkos = "0x..."
@@ -1271,11 +1219,10 @@ fn write_merged_ecosystem_toml(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] calls is\n\
          # the one governance bundle of {} prepare TOML(s) — the merger's extras,\n\
-         # the core prepare's calls, the derived executor succession (when an\n\
-         # executor is replaced) and executor legs (applyL1Upgrade ->\n\
+         # the core prepare's calls, the derived executor legs (applyL1Upgrade ->\n\
          # applyInfrastructureUpgrade -> applyCTMUpgrade) and the CTM prepare's calls,\n\
          # never composed here; `external_actions` names every call in it that is\n\
-         # not derived.\n\
+         # not an executor leg.\n\
          # [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.zksync_os]\n\
          # mirrors the ZKsyncOS CTM prepare output\n\
@@ -1361,18 +1308,13 @@ fn merge_prepare_outputs(
         external_actions: core_actions,
     } = core;
     check_bundle_provenance("core prepare", &core_gov, &core_actions)?;
-    let ctm_bodies: Vec<(Address, &toml::value::Table)> = ctms
-        .iter()
-        .map(|(proxy, ctm)| (*proxy, &ctm.body))
-        .collect();
-    let legs = derive_executor_legs(&core_body, &ctm_bodies)?;
-    let succession = derive_executor_succession(&core_body, &ctm_bodies)?;
-    // A replacement derives no leg, and hands no domain to a successor.
-    anyhow::ensure!(
-        succession.is_empty() || !legs.is_empty(),
-        "a prepare reports an executor succession, but the package is a transition replacement, \
-         which carries none: replace an executor in an ordinary upgrade"
-    );
+    let legs = derive_executor_legs(
+        &core_body,
+        &ctms
+            .iter()
+            .map(|(proxy, ctm)| (*proxy, &ctm.body))
+            .collect::<Vec<_>>(),
+    )?;
     let misc_body = match core_body.remove("misc") {
         Some(Value::Table(table)) => Some(table),
         Some(other) => anyhow::bail!(
@@ -1393,12 +1335,7 @@ fn merge_prepare_outputs(
         core_gov.calls,
     ];
 
-    // The derived succession and legs sit, as one run, after the core prepare's declared actions
-    // and before the CTM's.
-    chunks.push(format!(
-        "0x{}",
-        hex::encode(encode_calls(&succession.calls()))
-    ));
+    // The derived legs sit after the core prepare's declared actions and before the CTM's.
     chunks.push(format!("0x{}", hex::encode(encode_calls(&legs))));
 
     // `UpgradeInner::prepare` rejects any non-ZKsync-OS CTM, so every CTM that
@@ -1637,6 +1574,7 @@ pub fn run_execution_script(
 mod tests {
     use super::*;
     use crate::common::env_config::GovernanceKind;
+    use crate::common::external_actions::GOVERNANCE_PHASE;
 
     /// A PUH-governed env is not by itself a reason to replace its governance set: only the
     /// release's own declaration is. Every recurring preparation used to take the first for the
@@ -2041,6 +1979,15 @@ mod tests {
             let is_declared = declared.iter().any(|a| a.is_call(c));
             assert_eq!(is_declared, !(2..5).contains(&i), "call {i}");
         }
+        // The calls beside the legs ARE the declarations, one for one and in declared order: the
+        // rule the verifier holds every package kind to.
+        let beside_the_legs: Vec<&GovernanceCall> = bundle
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !(2..5).contains(i))
+            .map(|(_, call)| call)
+            .collect();
+        assert!(DeclaredCalls::match_calls(beside_the_legs, &declared).is_exact());
         assert!(doc.get("operation").is_none());
     }
 
@@ -2076,305 +2023,6 @@ mod tests {
         assert_eq!(package.legs[1].object, TRANSITION);
     }
 
-    // ───────────────────────── executor succession ─────────────────────────
-
-    const CORE_PREDECESSOR: Address = Address::repeat_byte(0xd0);
-    const CTM_PREDECESSOR: Address = Address::repeat_byte(0xd7);
-    const ECO_ADMIN: Address = Address::repeat_byte(0xa0);
-    const CTM_PROXY: Address = Address::repeat_byte(0x77);
-    const CTM_ADMIN: Address = Address::repeat_byte(0xa7);
-    const NOTIFIER: Address = Address::repeat_byte(0x5e);
-
-    fn sub_table(body: &mut toml::value::Table, key: &str) -> toml::value::Table {
-        match body.remove(key) {
-            Some(toml::Value::Table(table)) => table,
-            _ => toml::value::Table::new(),
-        }
-    }
-
-    fn insert_path(body: &mut toml::value::Table, path: &[&str], value: toml::Value) {
-        match path {
-            [last] => {
-                body.insert(last.to_string(), value);
-            }
-            [first, rest @ ..] => {
-                let mut table = sub_table(body, first);
-                insert_path(&mut table, rest, value);
-                body.insert(first.to_string(), toml::Value::Table(table));
-            }
-            [] => unreachable!(),
-        }
-    }
-
-    /// A core prepare that replaced the core executor (`CORE_EXECUTOR` is the successor), as
-    /// `DefaultCoreUpgrade` writes it.
-    fn core_body_with_succession(transition: Option<Address>) -> toml::value::Table {
-        let mut body = core_body(transition);
-        let salt = toml::Value::String(format!("{:#x}", B256::repeat_byte(0x5a)));
-        insert_path(
-            &mut body,
-            &["registry", "core_predecessor_executor_addr"],
-            address_value(CORE_PREDECESSOR),
-        );
-        for (key, value) in [
-            ("address", address_value(CORE_EXECUTOR)),
-            ("create2_salt", salt),
-            ("initial_owner", address_value(Address::repeat_byte(0x60))),
-            ("proxy_admin", address_value(ECO_ADMIN)),
-        ] {
-            insert_path(
-                &mut body,
-                &["upgrade_executors", "core_executor", key],
-                value,
-            );
-        }
-        body
-    }
-
-    /// A CTM prepare that replaced the CTM executor (`CTM_EXECUTOR` is the successor).
-    fn ctm_body_with_succession(entries: &[(&str, Address)]) -> toml::value::Table {
-        let mut body = ctm_body(entries);
-        let salt = toml::Value::String(format!("{:#x}", B256::repeat_byte(0x6b)));
-        insert_path(
-            &mut body,
-            &["registry", "ctm_predecessor_executor_addr"],
-            address_value(CTM_PREDECESSOR),
-        );
-        insert_path(
-            &mut body,
-            &["state_transition", "chain_type_manager_proxy"],
-            address_value(CTM_PROXY),
-        );
-        insert_path(
-            &mut body,
-            &["deployed_addresses", "transparent_proxy_admin"],
-            address_value(CTM_ADMIN),
-        );
-        insert_path(
-            &mut body,
-            &["deployed_addresses", "server_notifier_proxy_addr"],
-            address_value(NOTIFIER),
-        );
-        for (key, value) in [
-            ("address", address_value(CTM_EXECUTOR)),
-            ("create2_salt", salt),
-            ("initial_owner", address_value(Address::repeat_byte(0x60))),
-            ("chain_type_manager", address_value(CTM_PROXY)),
-            ("ctm_proxy_admin", address_value(CTM_ADMIN)),
-        ] {
-            insert_path(
-                &mut body,
-                &["upgrade_executors", "ctm_executor", key],
-                value,
-            );
-        }
-        body
-    }
-
-    /// `ExecutorSuccessionLib`'s calls, transcribed independently of the merge's encoder:
-    /// `forward((address,uint256,bytes)[])` over `(target, 0, data)` tuples.
-    fn transcribed_forward(target: Address, inner: &[(Address, Vec<u8>)]) -> GovernanceCall {
-        use alloy::sol_types::SolValue;
-        let tuples: Vec<(Address, alloy::primitives::U256, Bytes)> = inner
-            .iter()
-            .map(|(t, d)| (*t, alloy::primitives::U256::ZERO, Bytes::from(d.clone())))
-            .collect();
-        let mut data =
-            alloy::primitives::keccak256(b"forward((address,uint256,bytes)[])")[..4].to_vec();
-        data.extend((tuples,).abi_encode_params());
-        GovernanceCall {
-            target,
-            value: alloy::primitives::U256::ZERO,
-            data,
-        }
-    }
-
-    fn selector_call(signature: &str, argument: Option<Address>) -> Vec<u8> {
-        let mut data = alloy::primitives::keccak256(signature.as_bytes())[..4].to_vec();
-        if let Some(argument) = argument {
-            data.extend_from_slice(&[0u8; 12]);
-            data.extend_from_slice(argument.as_slice());
-        }
-        data
-    }
-
-    fn transcribed_succession() -> Vec<GovernanceCall> {
-        let transfer = |to| selector_call("transferOwnership(address)", Some(to));
-        vec![
-            transcribed_forward(CORE_PREDECESSOR, &[(ECO_ADMIN, transfer(CORE_EXECUTOR))]),
-            transcribed_forward(
-                CTM_PREDECESSOR,
-                &[
-                    (CTM_PROXY, transfer(CTM_EXECUTOR)),
-                    (CTM_ADMIN, transfer(CTM_EXECUTOR)),
-                    (NOTIFIER, transfer(CTM_EXECUTOR)),
-                ],
-            ),
-            GovernanceCall {
-                target: CTM_EXECUTOR,
-                value: alloy::primitives::U256::ZERO,
-                data: selector_call("acceptCTMOwnership()", None),
-            },
-            transcribed_forward(
-                CTM_EXECUTOR,
-                &[(NOTIFIER, selector_call("acceptOwnership()", None))],
-            ),
-        ]
-    }
-
-    /// With both executors replaced, the derived succession — core handover first, then the
-    /// CTM's — sits right after the core prepare's declared calls and right before the legs,
-    /// which target the successors. The succession calls are derived, never external actions, and
-    /// the merged package loads with the same succession the verifier re-derives.
-    #[test]
-    fn the_merged_bundle_runs_the_succession_right_before_the_legs() {
-        let extra = call(0xe1, &[0x01]);
-        let core = call(0xc1, &[0x02]);
-        let ctm = call(0xd1, &[0x03]);
-        let doc = merge_prepare_outputs(
-            prepare_output(
-                core_body_with_succession(Some(CORE_TRANSITION)),
-                std::slice::from_ref(&core),
-            ),
-            vec![(
-                CTM_PROXY,
-                prepare_output(
-                    ctm_body_with_succession(&[("ctm_transition_addr", TRANSITION)]),
-                    std::slice::from_ref(&ctm),
-                ),
-            )],
-            &[ExtraGovernanceCall {
-                label: "extra",
-                authority: "protocol governance",
-                call: extra.clone(),
-            }],
-        )
-        .unwrap();
-
-        let mut expected = vec![extra, core];
-        expected.extend(transcribed_succession());
-        expected.extend([core_leg(), transition_leg(), ctm]);
-        let bundle = merged_bundle(&doc);
-        assert_eq!(bundle, expected);
-        let declared: Vec<ExternalAction> = doc["external_actions"].clone().try_into().unwrap();
-        for (i, c) in bundle.iter().enumerate() {
-            let is_declared = declared.iter().any(|a| a.is_call(c));
-            assert_eq!(is_declared, !(2..8).contains(&i), "call {i}");
-        }
-
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("ecosystem.toml");
-        fs::write(&path, toml::to_string(&doc).unwrap()).unwrap();
-        let RegistryPackage::Upgrade(package) = RegistryPackage::load(&path).unwrap() else {
-            panic!("a merged package with legs must load as an upgrade");
-        };
-        assert_eq!(package.succession.calls(), transcribed_succession());
-        assert_eq!(package.legs[0].index, 6);
-    }
-
-    /// A core-only succession: one handover call between the core prepare's calls and the legs.
-    #[test]
-    fn a_core_succession_alone_is_one_call_before_the_legs() {
-        let doc = merge_prepare_outputs(
-            prepare_output(core_body_with_succession(Some(CORE_TRANSITION)), &[]),
-            vec![(
-                CTM_PROXY,
-                prepare_output(ctm_body(&[("ctm_transition_addr", TRANSITION)]), &[]),
-            )],
-            &[],
-        )
-        .unwrap();
-        assert_eq!(
-            merged_bundle(&doc),
-            vec![
-                transcribed_succession()[0].clone(),
-                core_leg(),
-                transition_leg()
-            ]
-        );
-    }
-
-    /// The merge refuses a succession it cannot derive exactly: no record of the successor, a
-    /// record of another executor, a record over another CTM than the prepare names, no
-    /// ServerNotifier, a predecessor without a successor, and one beside a replacement.
-    #[test]
-    fn an_inconsistent_succession_fails_the_merge() {
-        let merge = |core: toml::value::Table, ctm: toml::value::Table| {
-            merge_prepare_outputs(
-                prepare_output(core, &[]),
-                vec![(CTM_PROXY, prepare_output(ctm, &[]))],
-                &[],
-            )
-            .map(|_| ())
-            .map_err(|e| format!("{e:#}"))
-        };
-        let transition = [("ctm_transition_addr", TRANSITION)];
-        let ctm_with = |path: &[&str], value: Address| {
-            let mut body = ctm_body_with_succession(&transition);
-            insert_path(&mut body, path, address_value(value));
-            body
-        };
-        let mut no_core_record = core_body_with_succession(Some(CORE_TRANSITION));
-        no_core_record.remove("upgrade_executors");
-        let stranger = Address::repeat_byte(0x99);
-        // (case, core body, CTM body, what the refusal names)
-        let cases = [
-            (
-                "no core record",
-                no_core_record,
-                ctm_body(&transition),
-                "no [upgrade_executors.core_executor]",
-            ),
-            (
-                "record of another executor",
-                core_body(Some(CORE_TRANSITION)),
-                ctm_with(&["upgrade_executors", "ctm_executor", "address"], stranger),
-                "describes another executor",
-            ),
-            (
-                "record over another CTM",
-                core_body(Some(CORE_TRANSITION)),
-                ctm_with(&["state_transition", "chain_type_manager_proxy"], stranger),
-                "a contract the successor is not bound to",
-            ),
-            (
-                "no ServerNotifier",
-                core_body(Some(CORE_TRANSITION)),
-                ctm_with(
-                    &["deployed_addresses", "server_notifier_proxy_addr"],
-                    Address::ZERO,
-                ),
-                "names no ServerNotifier",
-            ),
-            (
-                // No CTM leg either, so the refusal is the succession's, not a leg's.
-                "no successor",
-                core_body(Some(CORE_TRANSITION)),
-                {
-                    let mut body = ctm_body_with_succession(&[]);
-                    insert_path(
-                        &mut body,
-                        &["registry", "ctm_upgrade_executor_addr"],
-                        address_value(Address::ZERO),
-                    );
-                    body
-                },
-                "handed from its executor to no successor",
-            ),
-        ];
-        for (case, core, ctm, needle) in cases {
-            let err = merge(core, ctm).expect_err(case);
-            assert!(err.contains(needle), "{case}: {err}");
-        }
-
-        let replacement = ctm_body_with_succession(&[
-            ("replacement_transition_addr", Address::repeat_byte(0x7b)),
-            ("ctm_transition_addr", Address::repeat_byte(0x7b)),
-        ]);
-        let err = merge(core_body(None), replacement).expect_err("succession beside a replacement");
-        assert!(err.contains("transition replacement"), "{err}");
-    }
-
     /// After a replay, a governance TOML that is no registry package has no post-state to check
     /// and reads nothing; a registry package is held against the fork, so one whose state cannot
     /// be read fails the command.
@@ -2391,7 +2039,7 @@ mod tests {
             ),
         )
         .unwrap();
-        expect_applied(UNREACHABLE, &plain, Address::ZERO)
+        expect_applied(UNREACHABLE, &plain, Address::ZERO, Address::ZERO)
             .await
             .expect("a TOML that is no registry package is not read back");
 
@@ -2403,7 +2051,7 @@ mod tests {
         .unwrap();
         let package = dir.path().join("ecosystem.toml");
         fs::write(&package, toml::to_string(&doc).unwrap()).unwrap();
-        let err = expect_applied(UNREACHABLE, &package, Address::ZERO)
+        let err = expect_applied(UNREACHABLE, &package, Address::ZERO, Address::ZERO)
             .await
             .expect_err("an unreadable post-state is not a landed one");
         assert!(

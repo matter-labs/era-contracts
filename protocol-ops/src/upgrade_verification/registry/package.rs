@@ -13,9 +13,7 @@
 //!   `CTMUpgradeExecutor.applyInfrastructureUpgrade(infrastructureTransition)`,
 //!   `CTMUpgradeExecutor.applyCTMUpgrade(transition)` — each present only when its object is.
 //!   Everything executable is a function of those objects, so the package's reviewable content is
-//!   their addresses and the executors they are sent to. When the upgrade replaces an executor,
-//!   the run is preceded by the derived EXECUTOR SUCCESSION that hands the domain to the successor
-//!   the legs target ([`super::succession`]).
+//!   their addresses and the executors they are sent to.
 //! * a transition REPLACEMENT: one `CTMUpgradeExecutor.forward` carrying
 //!   `ChainTypeManager.replaceUpgradeTransition` (see
 //!   `protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition`), and no
@@ -39,7 +37,6 @@ use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
 use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCallsTable};
 
 use super::records::{member_records_in, records_in};
-use super::succession::Successions;
 use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView};
 
 /// `Ownable2Step.transferOwnership(address)` — the nomination a bundle would smuggle past a
@@ -304,17 +301,17 @@ pub(crate) struct UpgradePackage {
     pub(crate) reported_ctm_transition: Option<Address>,
     /// `[ctms.*.registry] ctm_upgrade_executor_addr`, reconciled with the CTM legs' target.
     pub(crate) reported_ctm_executor: Option<Address>,
-    /// `[ctms.*.state_transition] chain_type_manager_proxy` — the CTM this package upgrades, the
-    /// independently reviewed value the CTM executor's `CHAIN_TYPE_MANAGER` is held against
-    /// (an executor names its CTM only as an immutable, so without it that binding is unverified,
-    /// which the verifier reports as an error rather than comparing the read value with itself).
+    /// `[ctms.*.state_transition] chain_type_manager_proxy` — the CTM this package upgrades, held
+    /// against the reviewed Bridgehub's registry (`ecosystem_binding`), and the value the CTM
+    /// executor's `CHAIN_TYPE_MANAGER` is held against (an executor names its CTM only as an
+    /// immutable, so without it that binding is unverified, which the verifier reports as an
+    /// error rather than comparing the read value with itself).
     pub(crate) reported_ctm: Option<Address>,
     /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — likewise for the executor's
     /// `CTM_PROXY_ADMIN`.
     pub(crate) reported_ctm_proxy_admin: Option<Address>,
     /// The ecosystem's Bridgehub and the CTM domain's singletons as the prepares report them. The
-    /// Bridgehub is where the ecosystem inventory's slots are discovered when the package names no
-    /// CTM to read it from.
+    /// Bridgehub is only held against the reviewed one (`ecosystem_binding`), never used as a root.
     pub(crate) reported_singletons: ReportedSingletons,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
@@ -336,11 +333,6 @@ pub(crate) struct UpgradePackage {
     pub(crate) executor_records: UpgradeExecutorsRecord,
     /// The `[member_deployments]` records of the package's prepares (see [`super::records`]).
     pub(crate) member_records: MemberDeployments,
-    /// The executor successions the prepares report (`[core.registry]
-    /// core_predecessor_executor_addr`, `[ctms.*.registry] ctm_predecessor_executor_addr`), whose
-    /// derived calls must sit right before the legs ([`super::succession`]). Empty when the
-    /// upgrade replaces no executor.
-    pub(crate) succession: Successions,
 }
 
 impl UpgradePackage {
@@ -366,7 +358,6 @@ impl UpgradePackage {
                 .and_then(|ctm| ctm_address(root, ctm, section, key))
         };
         let lifecycle = lifecycle_inputs_in(root);
-        let succession = successions_in(root, ctm_key.as_deref())?;
         let package = Self {
             reported_core_transition: address_at(
                 root,
@@ -387,7 +378,6 @@ impl UpgradePackage {
             executor_records: records_in(root, &ecosystem_toml.display().to_string())?,
             member_records: member_records_in(root, &ecosystem_toml.display().to_string())?,
             lifecycle,
-            succession,
             ctm_key,
             calls,
             legs,
@@ -421,9 +411,8 @@ impl UpgradePackage {
 
     /// Every leg against its summary, both ways: a reported object must have its leg (a missing
     /// leg leaves a reviewed object unapplied), a leg must have its reported object, and both must
-    /// name the same object and executor. Then no call may reach an executor — a predecessor of a
-    /// succession included — other than through its legs or as one of the derived succession
-    /// calls (whose order, contiguity and multiplicity the verifier judges).
+    /// name the same object and executor. Then no call may reach an executor other than through
+    /// its legs.
     fn reconcile(&self) -> anyhow::Result<()> {
         for kind in LegKind::CANONICAL_ORDER {
             let field = kind.summary_field();
@@ -470,33 +459,22 @@ impl UpgradePackage {
                 ),
             }
         }
-        let succession_calls = self.succession.calls();
         let executors: Vec<Address> = self
             .legs
             .iter()
             .map(|leg| leg.executor)
             .chain(self.lifecycle.core_executor)
             .chain(self.reported_ctm_executor)
-            .chain(
-                self.succession
-                    .executors()
-                    .into_iter()
-                    .map(|(executor, _)| executor),
-            )
             .collect();
         for (index, call) in self.calls.iter().enumerate() {
-            if !executors.contains(&call.target)
-                || self.legs.iter().any(|leg| leg.index == index)
-                || succession_calls.contains(call)
-            {
+            if !executors.contains(&call.target) || self.legs.iter().any(|leg| leg.index == index) {
                 continue;
             }
             anyhow::bail!(
                 "unknown selector on an executor: call {index} reaches the executor {} with \
                  selector 0x{}, which is none of the entrypoints an upgrade drives \
-                 (applyL1Upgrade, applyInfrastructureUpgrade, applyCTMUpgrade) nor a call of the \
-                 executor succession the prepares report. An executor takes exactly the upgrade's \
-                 legs and its derived succession, so any other call to one — a `forward`, a \
+                 (applyL1Upgrade, applyInfrastructureUpgrade, applyCTMUpgrade). An executor \
+                 takes exactly the upgrade's legs, so any other call to one — a `forward`, a \
                  nomination — is authority the review never saw",
                 call.target,
                 alloy::hex::encode(call.data.get(..4).unwrap_or_default())
@@ -523,8 +501,9 @@ pub(crate) struct LifecycleInputs {
     pub(crate) core_proxy_admin: Option<Address>,
 }
 
-/// The ecosystem's Bridgehub and the CTM domain's singleton proxies as the prepares report them —
-/// the last fallbacks a new `ChainTypeManager` implementation's immutables are held against.
+/// The ecosystem's Bridgehub — held against the reviewed one — and the CTM domain's singleton
+/// proxies as the prepares report them, the last fallbacks a new `ChainTypeManager`
+/// implementation's immutables are held against.
 #[derive(Debug, Default, Clone, Copy)]
 pub(crate) struct ReportedSingletons {
     /// `[core.upgrade_addresses.bridgehub] bridgehub_proxy_addr`.
@@ -574,33 +553,6 @@ fn lifecycle_inputs_in(root: &toml::Value) -> LifecycleInputs {
         )
         .filter(|a| !a.is_zero()),
     }
-}
-
-/// The executor successions a merged package's `[core]` and `[ctms.<ctm_key>]` describe
-/// ([`super::succession`]); an inconsistent one is refused rather than verified as the nearest.
-fn successions_in(root: &toml::Value, ctm_key: Option<&str>) -> anyhow::Result<Successions> {
-    let core = table(root, &["core"]).and_then(toml::Value::as_table);
-    let ctm = ctm_key
-        .and_then(|key| table(root, &["ctms", key]))
-        .and_then(toml::Value::as_table);
-    Successions::in_bodies(core, ctm)
-}
-
-/// A replacement hands no domain to a successor executor: it is one `forward` on the live
-/// executor. A succession reported beside it is refused, since the replacement verifier would
-/// not review it.
-fn refuse_succession(kind: &str, root: &toml::Value, ctm_key: &str) -> anyhow::Result<()> {
-    let successions = successions_in(root, Some(ctm_key))?;
-    if let Some(succession) = successions.iter().next() {
-        anyhow::bail!(
-            "mixed kinds: the package reports a {} executor succession ({} -> {}), but a {kind} \
-             package carries none: replace an executor in an ordinary upgrade",
-            succession.domain_name(),
-            succession.predecessor,
-            succession.successor
-        );
-    }
-    Ok(())
 }
 
 fn read_toml(ecosystem_toml: &Path) -> anyhow::Result<toml::Value> {
@@ -773,6 +725,9 @@ pub(crate) struct ReplacementPackage {
     /// `[ctms.*.deployed_addresses] transparent_proxy_admin` — the CTM executor's
     /// `CTM_PROXY_ADMIN` is held against it.
     pub(crate) reported_ctm_proxy_admin: Option<Address>,
+    /// `[core.upgrade_addresses.bridgehub] bridgehub_proxy_addr`, when the package carries a core
+    /// section: held against the reviewed Bridgehub.
+    pub(crate) reported_bridgehub: Option<Address>,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
     /// The prepare's declared external actions (the forward is one of them).
@@ -799,7 +754,6 @@ impl ReplacementPackage {
         calls: Vec<GovernanceCall>,
     ) -> anyhow::Result<Self> {
         let ctm_key = sole_ctm_key(root)?;
-        refuse_succession("replacement", root, &ctm_key)?;
         // A replacement repairs one committed edge through `forward`; an ecosystem or
         // infrastructure object beside it would be deployed and never applied.
         refuse_unapplied_objects(&[
@@ -832,6 +786,7 @@ impl ReplacementPackage {
                 "deployed_addresses",
                 "transparent_proxy_admin",
             ),
+            reported_bridgehub: ReportedSingletons::in_package(root, None).bridgehub,
             calls,
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, Some(&ctm_key)),
@@ -1421,124 +1376,6 @@ mod tests {
         assert_eq!(package.reported_ctm_executor, Some(CTM_EXECUTOR));
         assert_eq!(package.reported_ctm, Some(CTM_PROXY));
         assert_eq!(package.reported_ctm_proxy_admin, Some(CTM_ADMIN));
-    }
-
-    // ───────────────────────── executor succession ─────────────────────────
-
-    const CORE_PREDECESSOR: Address = Address::repeat_byte(0xD0);
-    const CTM_PREDECESSOR: Address = Address::repeat_byte(0xD7);
-    const NOTIFIER: Address = Address::repeat_byte(0x5E);
-
-    /// `body` with both domains' executors replaced, as the v36 prepares report it: each
-    /// predecessor beside its successor, the successors' `[upgrade_executors]` records over the
-    /// domain contracts the summaries name, and the CTM's ServerNotifier.
-    fn with_succession(body: String) -> String {
-        let salt = B256::repeat_byte(0x5A);
-        body.replace(
-            &format!("core_upgrade_executor_addr = \"{CORE_EXECUTOR}\"\n"),
-            &format!(
-                "core_upgrade_executor_addr = \"{CORE_EXECUTOR}\"\n\
-                 core_predecessor_executor_addr = \"{CORE_PREDECESSOR}\"\n"
-            ),
-        )
-        .replace(
-            &format!("ctm_upgrade_executor_addr = \"{CTM_EXECUTOR}\"\n"),
-            &format!(
-                "ctm_upgrade_executor_addr = \"{CTM_EXECUTOR}\"\n\
-                 ctm_predecessor_executor_addr = \"{CTM_PREDECESSOR}\"\n"
-            ),
-        )
-        .replace(
-            &format!("transparent_proxy_admin = \"{CTM_ADMIN}\"\n"),
-            &format!(
-                "transparent_proxy_admin = \"{CTM_ADMIN}\"\n\
-                 server_notifier_proxy_addr = \"{NOTIFIER}\"\n"
-            ),
-        ) + &format!(
-            "[core.upgrade_executors.core_executor]\n\
-             address = \"{CORE_EXECUTOR}\"\n\
-             create2_salt = \"{salt}\"\n\
-             initial_owner = \"{STRANGER}\"\n\
-             proxy_admin = \"{ECO_ADMIN}\"\n\
-             [ctms.zksync_os.upgrade_executors.ctm_executor]\n\
-             address = \"{CTM_EXECUTOR}\"\n\
-             create2_salt = \"{salt}\"\n\
-             initial_owner = \"{STRANGER}\"\n\
-             chain_type_manager = \"{CTM_PROXY}\"\n\
-             ctm_proxy_admin = \"{CTM_ADMIN}\"\n"
-        )
-    }
-
-    fn expected_successions() -> Successions {
-        use super::super::succession::{ExecutorSuccession, SuccessionDomain};
-        Successions {
-            core: Some(ExecutorSuccession {
-                predecessor: CORE_PREDECESSOR,
-                successor: CORE_EXECUTOR,
-                domain: SuccessionDomain::Core {
-                    proxy_admin: ECO_ADMIN,
-                },
-            }),
-            ctm: Some(ExecutorSuccession {
-                predecessor: CTM_PREDECESSOR,
-                successor: CTM_EXECUTOR,
-                domain: SuccessionDomain::Ctm {
-                    ctm: CTM_PROXY,
-                    ctm_proxy_admin: CTM_ADMIN,
-                    server_notifier: NOTIFIER,
-                },
-            }),
-        }
-    }
-
-    /// A package replacing both executors loads its succession from `[core]` and `[ctms.*]`, and
-    /// the succession calls — which reach executors, predecessors included — are admitted beside
-    /// the legs (their position is the verifier's to judge).
-    #[test]
-    fn a_package_with_a_succession_loads_it_and_admits_its_calls() {
-        let successions = expected_successions();
-        let mut calls = successions.calls();
-        calls.extend([core_leg(), infrastructure_leg(), transition_leg()]);
-        let RegistryPackage::Upgrade(package) =
-            load_str(&with_succession(Summary::all().toml(&calls))).expect("loads")
-        else {
-            panic!("a package with a succession is an upgrade");
-        };
-        assert_eq!(package.succession, successions);
-        assert_eq!(package.legs.len(), 3);
-        assert_eq!(
-            package.legs[0].index, 4,
-            "the legs follow the four succession calls"
-        );
-    }
-
-    /// Any other call to a predecessor is authority the review never saw.
-    #[test]
-    fn another_call_to_a_predecessor_is_refused() {
-        let mut calls = expected_successions().calls();
-        calls.extend([core_leg(), infrastructure_leg(), transition_leg()]);
-        calls.push(call(CORE_PREDECESSOR, vec![0xde, 0xad, 0xbe, 0xef]));
-        let err = load_str(&with_succession(Summary::all().toml(&calls)))
-            .expect_err("a stray call to a predecessor must be refused");
-        assert!(
-            format!("{err:#}").contains("unknown selector on an executor"),
-            "{err:#}"
-        );
-    }
-
-    /// A succession whose record names another executor than the successor is refused at load.
-    #[test]
-    fn a_succession_whose_record_names_another_executor_is_refused() {
-        let body = with_succession(Summary::all().toml(&[core_leg()])).replacen(
-            &format!("address = \"{CORE_EXECUTOR}\""),
-            &format!("address = \"{STRANGER}\""),
-            1,
-        );
-        let err = load_str(&body).expect_err("an inconsistent record must be refused");
-        assert!(
-            format!("{err:#}").contains("describes another executor"),
-            "{err:#}"
-        );
     }
 
     // ───────────────────────── transition replacements ─────────────────────────

@@ -47,35 +47,32 @@ pub struct VerifyBootstrapArgs {
     #[clap(long = "create2-salt")]
     pub create2_salts: Vec<B256>,
 
-    /// A file carrying `[upgrade_executors]` records, repeatable: the run that deployed the
-    /// executors the package's legs target — the forge output of `ecosystem init` / `ctm init`
-    /// (`DeployL1CoreContracts`, `DeployCTM`) or the package of an earlier upgrade. Each executor
-    /// is re-derived from the salt and ORIGINAL constructor arguments its record states, so one
-    /// whose owner moved since its deployment still verifies; an executor with no record is
-    /// unverified — an error. Adds to the records the package carries; two different records of
-    /// one executor are refused. A package that hands a domain to a successor carries the
-    /// successor's record, and a record of the predecessor it replaces is set aside.
+    /// A file carrying `[upgrade_executors]` records, repeatable: the forge output of `ecosystem
+    /// init` / `ctm init` (`DeployL1CoreContracts`, `DeployCTM`). Each executor is re-derived
+    /// from the salt and ORIGINAL constructor arguments its record states, so one whose owner
+    /// moved since its deployment still verifies; an executor with no record is unverified — an
+    /// error. Adds to the records the package carries; two different records of one executor are
+    /// refused.
     #[clap(long = "executor-record")]
     pub executor_records: Vec<PathBuf>,
 
     /// The upgrade env (`stage`, `mainnet`, ...) whose reviewed
-    /// `upgrade-envs/permanent-values/<env>.toml` the package is held against. Every release the
-    /// package installs pins that file's `zk_token_asset_id` in its genesis force deployments, so
-    /// a package with a transition leg is refused without it; a replacement installs no release
-    /// and does not need it. The env's `testnet_verifier`, `bridgehub_proxy_addr` and each CTM's
-    /// `rollup_da_manager` are also what the constructor arguments of every member the package
-    /// newly installs are held against (its `l1_chain_id` must equal the RPC's), and it selects
-    /// the ZiSK backend pins that apply: without it, a `_isTestnet` argument is unverified, and so
-    /// is every argument that comes from the Bridgehub unless `--expected-bridgehub` names it.
+    /// `upgrade-envs/permanent-values/<env>.toml` the package is held against — required for every
+    /// package. Its `bridgehub_proxy_addr` is the reviewed Bridgehub the package is bound to (see
+    /// `--expected-bridgehub`). Every release the package installs pins its `zk_token_asset_id` in
+    /// its genesis force deployments. Its `testnet_verifier` and each CTM's `rollup_da_manager`
+    /// are also what the constructor arguments of every member the package newly installs are
+    /// held against (its `l1_chain_id` must equal the RPC's), and it selects the ZiSK backend pins
+    /// that apply: without it, a `_isTestnet` argument is unverified. Only a harness that names
+    /// the Bridgehub with `--expected-bridgehub` runs without it, and then a package installing a
+    /// release is still refused unless `--expected-zk-token-asset-id` names the id it must pin.
     #[clap(long)]
     pub env: Option<String>,
 
-    /// The Bridgehub of the ecosystem the package upgrades, in place of the env's
-    /// `bridgehub_proxy_addr`. The constructor arguments of every member the package installs
-    /// are held against it and against what is discovered through it, and the package's CTM and
-    /// `bridgehub_proxy_addr` must agree with it. Only for an ecosystem the env file does not
-    /// describe — a harness's scratch L1; the report says which one was used. Without it or
-    /// `--env`, every argument that comes from the Bridgehub is unverified.
+    /// The reviewed Bridgehub of the ecosystem the package targets: every ecosystem slot is
+    /// discovered through it and every CTM the package drives must be registered on it. Defaults
+    /// to the --env's permanent-values bridgehub_proxy_addr; only a harness whose L1 is not the
+    /// env's passes it (the report warns when it differs from the env's).
     #[clap(long)]
     pub expected_bridgehub: Option<Address>,
 

@@ -91,8 +91,8 @@ flowchart TB
     INFRA -.->|"rows"| PROXIES
     TRANS -.->|"fromRelease"| FROM
     TRANS -.->|"newRelease"| TO
-    TRANS -.->|"upgradeEngine"| ENGINE
-    TRANS -.->|"optional l2Plan.delegateComposer"| COMPOSER
+    TRANS -.->|"chainUpgradeEngine"| ENGINE
+    TRANS -.->|"l2Plan.delegateComposer, with a delegate"| COMPOSER
 ```
 
 The two release boxes are instances of the same `CTMRelease` type, and the two inventory boxes of
@@ -162,11 +162,11 @@ All are storage-backed, built once from a manifest they take in the constructor,
 `manifestHash = keccak256(abi.encode(manifest))`. The struct definitions and their field docs are
 in `l1-contracts/contracts/upgrades/registry/RegistryTypes.sol`.
 
-| Contract                 | Holds                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTMRelease`             | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                                                                                                                                   |
-| `CTMTransition`          | version edge, `fromRelease`, `newRelease`, `upgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                                                                                                                               |
-| `ProxyUpgradeTransition` | its `domain` and that domain's enum-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows: `Core` for the SHARED singletons (bridges, Bridgehub, MessageRoot, …), `CTM` for the CTM-domain proxies, incl. the CTM itself. One instance per changed domain per upgrade; an inventory with no participating row is rejected. Also pins its `upgradeEngine` ([below](#follow-up-calls-the-pinned-upgrade-engine)). |
+| Contract                 | Holds                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTMRelease`             | `diamondInit`, `verifier`, `GenesisFacet[]` (address + freezability), `fixedForceDeploymentsData`, genesis params incl. the genesis upgrade, `l2BytecodeInfos` (the `L2EcosystemContract`-indexed implementation table), one shared `l2SystemProxyBytecodeInfo` shell                                                                                                                                                        |
+| `CTMTransition`          | version edge, `fromRelease`, `newRelease`, `chainUpgradeEngine`, `oldProtocolVersionDeadline`, `upgradeTimestamp`, `AuthoredL2Plan`; **derived and stored:** `Diamond.FacetCut[]` and the L2 force deployments                                                                                                                                                                                                               |
+| `ProxyUpgradeTransition` | its `domain` and that domain's enum-indexed inventory of `(proxy, expectedOldImpl, implNew)` rows: `Core` for the SHARED singletons (bridges, Bridgehub, MessageRoot, …), `CTM` for the CTM-domain proxies, incl. the CTM itself. One instance per changed domain per upgrade; an inventory with no participating row is rejected. Also pins its `proxyUpgradeEngine` ([below](#follow-up-calls-the-pinned-upgrade-engine)). |
 
 ### Enum-indexed proxy inventories
 
@@ -221,7 +221,7 @@ diff, never a wrong byte in offchain-authored data.
 A reinitializer reaches only its own proxy. Work BETWEEN contracts after a swap — re-pointing the
 CTM at a new contract, wiring the ServerNotifier, anything `setAddresses`-shaped — used to be a
 declared governance call, which a reviewer of contracts never sees. Every
-`ProxyUpgradeTransition` therefore pins an `upgradeEngine`, and the domain's executor applies the
+`ProxyUpgradeTransition` therefore pins a `proxyUpgradeEngine`, and the domain's executor applies the
 transition by DELEGATECALLING exactly `IProxyUpgradeEngine.executeUpgrade(context, inventory)` on
 it (`ProxyUpgradeExecutorBase`):
 
@@ -236,17 +236,26 @@ it (`ProxyUpgradeExecutorBase`):
   executor's authority — the CTM, the CTM-domain `ProxyAdmin` and the ServerNotifier for a CTM
   executor, the ecosystem `ProxyAdmin` for the core executor. Owner methods of governance-owned
   ecosystem contracts (Bridgehub, AssetRouter) are not reachable and stay declared external
-  actions.
-- Running in the executor's storage, an engine must not read or write storage; a release engine
-  keeps its configuration in its own storage and reads it through an external call to
-  `context.upgradeEngine`. After the engine returns, the executor requires its `owner` and
-  `pendingOwner` unchanged (`UpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin`
-  and, for a CTM executor, the owner and pending owner of the CTM and its ServerNotifier unchanged
-  (`UpgradeEngineMovedDomainAuthority`: a hook cannot hand those holders' authority away; a
-  succession is a `forward`), and every row at its `implNew` again, so a hook that moves a row's
-  proxy is caught. The check compares holders only: a hook moving a non-row proxy to another
-  `ProxyAdmin` or re-pointing the CTM at another ServerNotifier is engine code the release review
-  covers. Called directly with a real `ProxyAdmin`, an engine reverts
+  actions. Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
+  like) also accept the owner of the contract's `ProxyAdmin`, so the core executor's engine can make
+  them while governance keeps ownership. The release that ships those implementations can already
+  call them in `_afterSwaps`, on the contracts its rows upgrade; a release that only wires needs a
+  transition that allows zero rows.
+- Running in the executor's storage, an engine must not read or write storage. A release engine
+  keeps its configuration in immutables set by its constructor: they are part of its code, so they
+  read the same under the delegatecall. Only configuration an immutable cannot hold (a dynamic
+  array, say) goes in the engine's own storage, read through an external call to
+  `context.proxyUpgradeEngine`.
+- After the engine returns, the executor requires its `owner` and `pendingOwner` unchanged
+  (`ProxyUpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin` and, for a CTM executor,
+  the owner, pending owner and proxy admin of the CTM and of its ServerNotifier unchanged
+  (`ProxyUpgradeEngineMovedDomainAuthority`: a hook cannot transfer or nominate those holders through
+  their setters, nor move those proxies with `changeProxyAdmin`; a succession is a `forward`), and
+  every row at its `implNew` again, so a hook that moves a row's proxy is caught. The check compares
+  what those getters return, and rows: a hook that swaps the implementation of, or `upgradeAndCall`s
+  into, a proxy that is not a row (the CTM and the ServerNotifier included) can change what they
+  return, and that, like moving another proxy to another `ProxyAdmin` or re-pointing the CTM at
+  another ServerNotifier, is engine code the release review covers. Called directly with a real `ProxyAdmin`, an engine reverts
   (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as the engine holds
   no authority or storage of its own.
 - A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
@@ -300,14 +309,16 @@ rules.
 
 ```mermaid
 flowchart TB
-    APPLIERS["CoreUpgradeExecutor / CTMUpgradeExecutor"]
+    EXECUTORS["CoreUpgradeExecutor / CTMUpgradeExecutor<br/>post-check: executor ownership and domain holders"]
+    ENGINE["pinned upgrade engine (delegatecall)<br/>hooks around the rows"]
     ROWS["ProxyUpgradeRowLib<br/>source-checked proxy swaps and post-state reads"]
     SHAPE["Fresh-deployment authority checks<br/>DeployOwnershipHandOff.t.sol"]
     AUTH["RegistryAuthorityLib<br/>ownership and bindings"]
     OBJECTS["Upgrade records / executors<br/>construction or validation paths"]
     CODE["ObjectAnchorLib<br/>nonempty code check"]
 
-    APPLIERS --> ROWS
+    EXECUTORS --> ENGINE
+    ENGINE --> ROWS
     SHAPE --> AUTH
     ROWS --> CODE
     AUTH --> CODE
@@ -428,6 +439,11 @@ Who can do what once the CTM domain is owned by `CTMUpgradeExecutor`. "Chain sid
 `onlyAdmin` / `onlyAdminOrChainTypeManager` path on the chain's own Admin facet;
 `onlyChainTypeManager` methods have no such path; governance reaches them, like every CTM owner
 method the executor has no entrypoint for, through the executor's owner-gated, logged `forward`.
+A release's pinned upgrade engine reaches the same methods from inside `applyInfrastructureUpgrade`,
+reviewed with the release and not logged as `CallForwarded`
+([above](#follow-up-calls-the-pinned-upgrade-engine)), so every `forward` cell below holds for it
+too, except the last row: the executor's post-check refuses an ownership move
+(`ProxyUpgradeEngineMovedDomainAuthority`).
 
 | CTM owner method                                                                                    | Through the executors                                                                                                                               | Chain side                              |
 | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -445,7 +461,8 @@ method the executor has no entrypoint for, through the executor's owner-gated, l
 | `executeUpgrade` (arbitrary cut)                                                                    | `forward` only — deliberately: the bypass the object-driven path exists to remove                                                                   | —                                       |
 | CTM / ProxyAdmin `transferOwnership` (executor succession)                                          | `forward` only                                                                                                                                      | —                                       |
 
-The executors hold three more authorities, reached the same way outside their upgrade entrypoints:
+The executors hold three more authorities, reached the same way (`forward`, or the pinned engine
+inside a proxy leg):
 `CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
 (`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
 ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
@@ -467,6 +484,12 @@ those cuts by delegatecall; a counterfeit built from adversarial creation code c
 approved manifest, pass `validate()` and still route security-critical selectors wherever its author
 chose. Objects therefore carry no codehash of themselves or of their members: a hash supplied
 beside the address it describes can only agree with itself.
+
+Every package kind is verified against one reviewed Bridgehub, the env's `bridgehub_proxy_addr` or
+`--expected-bridgehub`, and every ecosystem lookup below starts there. What the package names is
+held against it: its `bridgehub_proxy_addr` must be it, every CTM it drives must be registered on it
+and built over it, and the executors' `ProxyAdmin`s must be the ones administering the Bridgehub and
+the CTM.
 
 The verification answers three questions for every object a package names:
 
@@ -505,9 +528,9 @@ keccak256)`) — it is the identity check, which proves their code but not the v
    implementation behind a proxy the package introduces, a proxy that must run the reviewed
    `TransparentUpgradeableProxy` with the CTM-domain `ProxyAdmin` in its EIP-1967 admin slot — is
    re-derived from its record and the reviewed creation code, and each recorded argument is held against the live source the prepare
-   read it from (the L1 chain id, the Bridgehub and the proxies discovered through it, the chain
-   cap, the asset router's WETH token and owner, the rollup DA manager of a chain on the CTM, the
-   CTM's own immutables, the sub-verifiers the walk read) or the env's permanent values
+   read it from (the L1 chain id, the reviewed Bridgehub and the proxies discovered through it, the
+   chain cap, the asset router's WETH token and owner, the rollup DA manager of a chain on the CTM,
+   the CTM's own immutables, the sub-verifiers the walk read) or the env's permanent values
    (`testnet_verifier`), never against anything the package supplies. The Bridgehub is the
    reviewer's (the env's `bridgehub_proxy_addr`, or `--expected-bridgehub`); the package's CTM and
    `bridgehub_proxy_addr` must agree with it. A member the departing release already names was reviewed when it was installed and
@@ -515,20 +538,24 @@ keccak256)`) — it is the identity check, which proves their code but not the v
    from, which an earlier build produced. `ZiskVerifier`'s snarkJS Plonk backend is built outside
    this repository, so it is held to the runtime codehash pinned in
    `tools/verifier-gen/data/ZiSK_plonk_backend.toml` instead. Every proxy row must also name the
-   proxy of its slot, discovered on chain from the Bridgehub or the CTM. Code the build does not
-   produce for the role is a finding.
+   proxy of its slot, discovered on chain from the reviewed Bridgehub or from a CTM registered on
+   it. Code the build does not produce for the role is a finding.
 3. **Do the governance calls execute those objects, and nothing else?** For an upgrade the bundle
    carries the executor legs its objects need, each re-encoded from the reviewed executor and
    object, exactly once and as one contiguous run in canonical order (core, CTM infrastructure, CTM
-   transition); every other call is a declared external action, and none may reach the executors,
-   the objects, the CTM or either `ProxyAdmin`.
+   transition), and no other call may reach the executors, the objects, the CTM or either
+   `ProxyAdmin`. For every package kind, the calls other than the executor legs ARE the package's
+   governance-phase declarations: one for one, in declared order, every declaration present; a
+   replacement's `forward` is declared like any other call.
 
 The tool's full checklist, including what it deliberately does not check, is in
 [`ai-review/docs/protocol-ops.md`](ai-review/docs/protocol-ops.md).
 
 Its limits, stated so they are not mistaken for coverage: the salt is a package input, so an
 attacker free to choose both a salt and a counterfeit deployment faces the standard ~2^80 CREATE2
-address-collision bound rather than a 160-bit preimage; the derivation binds an object to its
+address-collision bound rather than a 160-bit preimage; the reviewed Bridgehub is an input too, so
+a review run against the wrong env reviews the wrong ecosystem, while the package's own Bridgehub
+and CTM are cross-checked against it, never trusted; the derivation binds an object to its
 MANIFEST, never to what the manifest's members RUN — a genuine object built from a manifest naming
 an attacker's facet verifies perfectly, which is why question 2 holds every member to the reviewed
 build; the values in a CARRIED-OVER member's immutable slots are the ones an earlier review
@@ -568,6 +595,9 @@ applies it:
 
 - `ProxyUpgradeRowLib.applyRows` re-reads every row after the swaps and reverts unless each proxy
   runs its `implNew` — for both domains' proxy upgrade transitions alike.
+- After the pinned engine returns, the executor reads its ownership, the domain's holders and every
+  row's implementation again ([the engine](#follow-up-calls-the-pinned-upgrade-engine)), and the
+  engine's `_checkPostconditions` reads back the release's follow-up calls.
 - `CTMUpgradeExecutor.applyCTMUpgrade` ends by requiring that the CTM commits exactly this
   transition for its departure and has reached its target.
 
@@ -680,7 +710,7 @@ chain below v35 cannot cross: its version has no committed transition, and the l
 path that brought pre-v35 chains across was removed in v36.
 
 **Where the cut is composed.** The cut is a pure function of the transition — an
-`upgradeEngine.upgradeFromTransition(transition)` init over no facet cuts — constructed by
+`chainUpgradeEngine.upgradeFromTransition(transition)` init over no facet cuts — constructed by
 `CTMUpgradeComposer.buildUpgradeCutData(ICTMTransition)`. Prepare and the CTM use this same
 function. The CTM commits the transition address (`setNewVersionUpgradeFromTransition`)
 and derives the cut on read (`upgradeCutForVersion`). Cut bytes never travel in governance calls or to the chain: the chain's Admin facet takes only the departing version and
@@ -702,7 +732,8 @@ object: the version edge and schedule from the transition, the verifier of its T
 the CTM's live `currentRelease()`), and the L2 protocol upgrade transaction composed from its L2
 plan with the executing chain’s ID and Bridgehub. The delegate composer builds final
 chain-specific calldata directly, in one pass; tooling reads that same transaction through
-`ICTMTransition.l2UpgradeTx(bridgehub, chainId)`, which forwards to the per-release engine.
+`ICTMTransition.l2UpgradeTx(bridgehub, chainId)`, which forwards to the per-release engine. What a
+node must do to follow an edge is [Node integration](../protocol-docs/node-upgrade-integration.md).
 There is no intermediate proposal struct, selector resolution or re-diffing at execution time.
 
 The transition's third derived read is for reviewers: `ICTMTransition.releaseDiff()` compares the two
@@ -780,7 +811,10 @@ L1 members — must carry the departing release's L2 description over to the tar
 implementation table and shared proxy shell, the force-deployment blob, the genesis upgrade (it
 composes a new chain's L2 genesis transaction) and the genesis batch. Existing chains receive no L2
 transaction on such an edge, so a new chain created at the target release must start from the same
-L2 state they are in (`L1OnlyEdgeChangesL2State`). An edge that changes the L2 description must
+L2 state they are in (`L1OnlyEdgeChangesL2State`). A minor edge without an L2 side runs only on
+nodes that accept its all-zero transaction
+([node integration](../protocol-docs/node-upgrade-integration.md#requirements), requirement 3);
+until then it has no working path on ZKsync OS. An edge that changes the L2 description must
 carry an L2 side — at least an authored delegate that brings existing chains there — and so is a
 minor edge. The prepare rebuilds the L2 bytecode and reuses the live genesis upgrade only when its
 code is identical, so such an edge is built from a tree in which they compile to the departing
@@ -798,7 +832,8 @@ before chains may upgrade. Both are the transition's, and both are chain-side �
 [the coordination document](../protocol-docs/ecosystem-upgrade-coordination.md#the-chain-schedule).
 
 **L2 plan.** `L2PlanLib.build` checks the remaining input constraints: canonical bytecode-info
-lengths, a delegate whenever deployments or a composer exist, and the execution limit on the
+lengths, a delegate whenever deployments or a composer exist, a composer whenever there is a
+delegate (`L2DefaultUpgrade` has no fallback for empty calldata), and the execution limit on the
 constructed factory-dependency count. Deployment addresses, types, delegate membership and
 factory-dependency membership follow from construction rather than caller-supplied fields.
 
@@ -847,6 +882,8 @@ Gateway deployer takes a pre-deployed release address instead (`GatewayCTMDeploy
   coordination spec.
 - [Upgrade operations](upgrade-operations.md) — the ServerNotifier's place in the CTM domain,
   executor succession, monitoring, recovery and the incident-only migration pauses.
+- [Node integration](../protocol-docs/node-upgrade-integration.md) — what a ZKsync OS node must do
+  to follow an edge; a rollout gate.
 - [Upgrade scripts runbook](../l1-contracts/deploy-scripts/upgrade/README.md) — prepare, compose,
   verify, replay, chain crossing.
 - [Script retirement plan](upgrade-script-retirement.md) — what tooling still decides, and the

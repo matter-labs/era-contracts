@@ -15,9 +15,6 @@ import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgr
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
-import {ExecutorSuccessionLib} from "../../../../deploy-scripts/upgrade/default-upgrade/ExecutorSuccessionLib.sol";
-import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
-import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {LogFinder} from "./utils/LogFinder.sol";
@@ -266,49 +263,13 @@ abstract contract UpgradeIntegrationTestBase is Test {
     }
 
     /// @dev The one governance bundle the protocol-ops merge writes from the per-script TOMLs
-    ///      (`upgrade.rs::write_merged_ecosystem_toml`): the core prepare's calls, the handover to any
-    ///      successor executor, the executor legs derived from the objects the prepares report, then
-    ///      the CTM prepare's calls.
+    ///      (`upgrade.rs::write_merged_ecosystem_toml`): the core prepare's calls, the executor legs derived from
+    ///      the objects the prepares report, then the CTM prepare's calls.
     function _mergeCoreAndCTMGovernanceCalls() internal returns (Call[] memory calls) {
-        Call[][] memory parts = new Call[][](4);
+        Call[][] memory parts = new Call[][](3);
         parts[0] = coreUpgrade.prepareDefaultGovernanceCalls();
-        parts[3] = ctmUpgrade.prepareDefaultGovernanceCalls();
-        parts[1] = _executorSuccession();
-        parts[2] = _executorLegs();
-        calls = UpgradeUtils.mergeCallsArray(parts);
-    }
-
-    /// @dev The executor succession the merge derives when a prepare reports a predecessor
-    ///      ({ExecutorSuccessionLib}): the core domain first, then the CTM domain.
-    function _executorSuccession() private view returns (Call[] memory calls) {
-        string memory coreOutput = vm.readFile(string.concat(vm.projectRoot(), CORE_OUTPUT));
-        string memory ctmOutput = vm.readFile(string.concat(vm.projectRoot(), CTM_OUTPUT));
-        Call[][] memory parts = new Call[][](2);
-        parts[0] = new Call[](0);
-        parts[1] = new Call[](0);
-        address corePredecessor = coreOutput.readAddress("$.registry.core_predecessor_executor_addr");
-        if (corePredecessor != address(0)) {
-            address coreSuccessor = coreOutput.readAddress("$.registry.core_upgrade_executor_addr");
-            parts[0] = ExecutorSuccessionLib.coreCalls(
-                corePredecessor,
-                coreSuccessor,
-                address(CoreUpgradeExecutor(payable(coreSuccessor)).PROXY_ADMIN())
-            );
-        }
-        address ctmPredecessor = ctmOutput.readAddress("$.registry.ctm_predecessor_executor_addr");
-        if (ctmPredecessor != address(0)) {
-            CTMUpgradeExecutor ctmSuccessor = CTMUpgradeExecutor(
-                payable(ctmOutput.readAddress("$.registry.ctm_upgrade_executor_addr"))
-            );
-            IChainTypeManager ctm = ctmSuccessor.CHAIN_TYPE_MANAGER();
-            parts[1] = ExecutorSuccessionLib.ctmCalls(
-                ctmPredecessor,
-                address(ctmSuccessor),
-                address(ctm),
-                address(ctmSuccessor.CTM_PROXY_ADMIN()),
-                ctm.serverNotifierAddress()
-            );
-        }
+        parts[2] = ctmUpgrade.prepareDefaultGovernanceCalls();
+        parts[1] = _executorLegs();
         calls = UpgradeUtils.mergeCallsArray(parts);
     }
 

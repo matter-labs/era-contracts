@@ -40,7 +40,7 @@ Other one-off scripts of shipped upgrades live on their release branches, not he
 ## 1. Inputs
 
 Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (the current release's are in its
-`upgrade-envs/v<major>.<minor>.0-<name>/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
+`upgrade-envs/v<major>.<minor>.<patch>-<name>/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
 Keep inputs minimal — the prepare reads the departing version, the live implementations, the
 CTM's owner and the ecosystem `ProxyAdmin`'s owner from L1. One input cannot be derived and must
 be carried forward from the previous prepare's output: `[contracts] eip7702_checker`
@@ -60,13 +60,9 @@ On one anvil fork of L1, in this order:
    runs the code the current sources produce and redeployed only when the version declares it
    changed, then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
    implementation), pinning the `DefaultProxyUpgradeEngine` it deploys (`deployProxyUpgradeEngine()`
-   is the override point for a release engine with follow-up calls). When the live
-   `CoreUpgradeExecutor`'s runtime code differs from this build, the run deploys a successor
-   (refusing unless the version declares `replacesCoreUpgradeExecutor()`) and records it in
-   `[upgrade_executors]`. Output `[registry]`: `core_transition_addr` (zero when none),
-   `core_upgrade_executor_addr` — the successor, else the executor read from the live ecosystem
-   `ProxyAdmin`'s owner — and `core_predecessor_executor_addr` (the live executor when replaced,
-   else zero).
+   is the override point for a release engine with follow-up calls). Output `[registry]`:
+   `core_transition_addr` (zero when none) and `core_upgrade_executor_addr` — the executor read
+   from the live ecosystem `ProxyAdmin`'s owner.
 3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
    reused when it already runs the code the current sources produce and redeployed only when the
    version names it in `changedReleaseMembers()`; the release itself is new on every version bump
@@ -75,19 +71,15 @@ On one anvil fork of L1, in this order:
    CTM-domain implementation changed. The prepare refuses an upgrade with no core transition, no
    CTM-domain object and no transition. The CTM executor is read on-chain (the CTM's owner, bound
    to it). Output `[registry]`: `ctm_transition_addr`, `ctm_infrastructure_transition_addr` (each
-   zero when none), `ctm_release_addr`, `ctm_upgrade_executor_addr` (nonzero whenever one of
-   those objects exists) and `ctm_predecessor_executor_addr`. As on the core side, the CTM-domain
-   transition pins the engine, and a CTM executor whose code differs from this build gets a
-   successor (`replacesCTMUpgradeExecutor()`), which `ctm_upgrade_executor_addr` then names.
+   zero when none), `ctm_release_addr` and `ctm_upgrade_executor_addr` (nonzero whenever one of
+   those objects exists). As on the core side, the CTM-domain transition pins the engine.
 4. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
    PUH/Guardians redeploy (`zk_governance.rs`). `yarn new-release` drops the key, so a release declares it
-   only on purpose.
+   only on purpose; the deployer plan check refuses such a release until it learns the redeploy's
+   salt and artifacts ([Deployer signing](../../../docs/upgrade-operations.md#deployer-signing)).
 5. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
-   `acceptOwnership` normalization) → the core prepare's declared calls → the executor
-   succession, when a prepare reports a predecessor (the handover calls of
-   `ExecutorSuccessionLib`: core, then CTM; see the
-   [operations document](../../../docs/upgrade-operations.md#executor-succession)) → the executor legs,
+   `acceptOwnership` normalization) → the core prepare's declared calls → the executor legs,
    derived from the `[registry]` objects and executors the prepares reported, one contiguous run in
    canonical order (`applyL1Upgrade(core_transition_addr)`,
    `applyInfrastructureUpgrade(ctm_infrastructure_transition_addr)`,
@@ -122,7 +114,7 @@ merger's extras.
 cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
   --ecosystem-toml <env-out>/ecosystem.toml --l1-rpc-url <rpc> --expected-governance-owner 0x... \
   --env <env> \
-  --executor-record <the ecosystem/ctm init outputs, or the earlier package, that deployed the executors> \
+  --executor-record <the ecosystem/ctm init outputs, or the v35 bootstrap package, that deployed the executors> \
   [--create2-salt <a salt the package does not record>]
 ```
 
@@ -134,8 +126,7 @@ decides from the package itself which kind it is: an upgrade driven through the 
 legs, or the replacement of a committed transition (prepared by `DefaultTransitionReplacement`). It
 checks every object's construction (the write-once objects from their manifests — under the salts each prepare leg records in its output
 (`create2_factory_salt`) — and the executors from the `[upgrade_executors]` record of the run that
-deployed them, without which an executor is unverified; a package that hands a domain to a successor
-carries the successor's record and sets aside a passed record of the predecessor), that every object and every member it
+deployed them, without which an executor is unverified), that every object and every member it
 names runs the reviewed build's code for its role, that every member the package newly installs
 re-derives from its `[member_deployments]` record with each constructor argument equal to the live or
 env value the prepare took it from (without a record it is unverified), that `ZiskVerifier`'s Plonk
@@ -157,6 +148,23 @@ after Glamsterdam single deploys exceed it on their own (their state gas is outs
 
 ```sh
 cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manifest.json --l1-rpc-url <rpc> --key 0x<addr>=0x<key>
+```
+
+`upgrade-broadcast` checks nothing it signs: run the deployer plan check first
+([what it admits](../../../docs/upgrade-operations.md#deployer-signing)). For a deploy bundle, sign
+with `replay-bundle` instead, which refuses a checkout other than the bundle's clean
+`contracts_commit`, then runs the check, then broadcasts:
+
+```sh
+cargo run -p protocol_ops -- ecosystem replay-bundle --bundle <bundle> --rpc <rpc> --key 0x<key>
+```
+
+For a prepare output that is not packed into a bundle, run the check against the env's reviewed
+inputs before the `upgrade-broadcast` above:
+
+```sh
+cargo run -p protocol_ops -- ecosystem check-deployer-plan --manifest <out>/manifest.json \
+  --ecosystem-toml <env-out>/ecosystem.toml --deployer 0x<addr> --env <env> --l1-rpc-url <rpc>
 ```
 
 ## 6. Governance
@@ -207,7 +215,8 @@ Gotchas:
 
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the
-  handler names when the calldata is emitted.
+  handler names when the calldata is emitted. The deployer plan check refuses such a release for
+  now (step 5).
 
 Companions:
 
@@ -246,10 +255,38 @@ after v35, the restriction's default admin sets it for the new one
 (`setRequiredRoleForCall(chainAddress, 0x03129ad9, role)`); until then only the default admin can
 send the crossing.
 
-Server and monitoring consumers must read the final transaction through
-`transition.l2UpgradeTx(bridgehub, chainId)`. This view uses the same chain-context composition as execution; there is no
+**Node pre-flight.** A node follows a registry-driven edge as
+[Node integration](../../../protocol-docs/node-upgrade-integration.md) requires; a zksync-os-server
+release without it stops on the chain's first `UpgradeTimestampUpdated` of such an edge. Before any
+`chain set-upgrade-timestamp`, confirm that every node of every chain that will cross runs a server
+release that meets that page, and schedule a chain only once all of its nodes do. Server and
+monitoring consumers read the final transaction through `transition.l2UpgradeTx(bridgehub, chainId)`,
+which uses the same chain-context composition as execution; there is no
 `getL2UpgradeTxData(bridgehub, chainId, zksyncOS, data)`, so its external consumers must be updated
 and verified before rollout.
+
+**After a transition replacement.** `replaceUpgradeTransition` changes what a chain departing that
+version crosses
+([replacing a committed transition](../../../protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition)).
+Before it executes, check that no chain still on that version has a schedule
+(`ServerNotifier.protocolVersionToUpgradeTimestamp(chainId, oldVersion)`) that has already passed:
+its nodes may have executed the replaced edge's L2 transaction, which is not the one its crossing
+would record. After it executes, the admin of every chain that had scheduled that departure re-runs
+`chain set-upgrade-timestamp`; nodes resolve the edge at execution
+([requirement 4](../../../protocol-docs/node-upgrade-integration.md#requirements)).
+
+**DA during a crossing.** `chain upgrade` leaves the chain's DA setup as it is unless
+`--da-mode <mode> --l1-da-validator <address>` names the one it moves to, set in the same multicall;
+`--l2-da-commitment-scheme` overrides the scheme the mode derives and is refused without
+`--da-mode`. The bundle sets the pubdata content only when the mode changes it, so a permanent rollup
+can move its pair in the same multicall. From v33 on, `chain upgrade` refuses to prepare a crossing
+after which the chain (with what the bundle sets, and its live DA pair and `getPubdataContent()` for
+the rest) commits full pubdata and delivers nothing, which does not prove; commits full pubdata
+through an L1 DA validator that does not check its delivery; commits the log region and delivers
+nothing L1 checks, unless `--acknowledge-unrecommended-noda` is passed; or commits full pubdata
+while priced as a validium. A blobs or calldata scheme is checked only through a pair the chain's
+`RollupDAManager` allows; `pubdata-keccak256` takes any external DA validator on trust, but not a
+rollup one or the no-DA validator the chain runs today.
 
 ## Preparing the scripts for a new upgrade
 

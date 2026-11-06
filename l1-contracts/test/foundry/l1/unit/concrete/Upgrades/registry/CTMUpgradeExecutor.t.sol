@@ -79,7 +79,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
 
     uint256 internal newVersion;
     address internal chainAddress;
-    address internal upgradeEngineAddr;
+    address internal chainUpgradeEngineAddr;
 
     /// @dev Dummy EVM bytecode of the L2 upgrade delegate every fixture transition carries as its
     ///      one Unsafe extra (see {L2PlanFixtures}); published on the fixture supplier in `setUp`.
@@ -114,10 +114,10 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        // The pinned upgradeEngine stand-in must carry real code — a transition's `validate()`
+        // The pinned chainUpgradeEngine stand-in must carry real code — a transition's `validate()`
         // rejects codeless members — so etch it.
-        upgradeEngineAddr = makeAddr("upgradeEngine");
-        vm.etch(upgradeEngineAddr, hex"600043");
+        chainUpgradeEngineAddr = makeAddr("chainUpgradeEngine");
+        vm.etch(chainUpgradeEngineAddr, hex"600043");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         // Transitions depart from the CTM's release, so the fixture CTM was initialized on a real
         // one ({_fixtureGenesisRelease}) rather than the suite's mocked stand-in.
@@ -211,7 +211,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
                 // genesis'd with (its current release), as the executor's release-edge pin requires.
                 fromRelease: _fromRelease,
                 newRelease: address(release),
-                upgradeEngine: upgradeEngineAddr,
+                chainUpgradeEngine: chainUpgradeEngineAddr,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
                 l2Plan: L2PlanFixtures.delegatePlan(_delegateCode, address(delegateComposer))
@@ -248,7 +248,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
                 ProxyUpgradeTransitionManifest({
                     domain: ProxyUpgradeDomain.Core,
                     proxyUpgrades: inventory,
-                    upgradeEngine: address(proxyUpgradeEngine)
+                    proxyUpgradeEngine: address(proxyUpgradeEngine)
                 })
             );
     }
@@ -264,7 +264,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
                 ProxyUpgradeTransitionManifest({
                     domain: ProxyUpgradeDomain.CTM,
                     proxyUpgrades: inventory,
-                    upgradeEngine: address(proxyUpgradeEngine)
+                    proxyUpgradeEngine: address(proxyUpgradeEngine)
                 })
             );
     }

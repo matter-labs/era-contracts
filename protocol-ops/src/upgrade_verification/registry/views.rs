@@ -41,9 +41,8 @@ sol! {
 
     /// The CTM domain's executor. `forward` is declared so the verifier can ENCODE the owner-gated
     /// call through which governance acts on the CTM domain (a replacement's
-    /// `replaceUpgradeTransition`, an executor succession's handover); `acceptCTMOwnership` for a
-    /// successor's acceptance of the CTM ([`super::succession`]); the two `apply*` entrypoints so it
-    /// can independently re-encode an upgrade's CTM legs and compare them byte for byte.
+    /// `replaceUpgradeTransition`); the two `apply*` entrypoints so it can independently re-encode
+    /// an upgrade's CTM legs and compare them byte for byte.
     #[sol(rpc)]
     contract CTMUpgradeExecutorView {
         function CHAIN_TYPE_MANAGER() external view returns (address);
@@ -51,7 +50,6 @@ sol! {
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
         function forward(ForwardedCall[] calldata _calls) external payable;
-        function acceptCTMOwnership() external;
         function applyInfrastructureUpgrade(address _infrastructureTransition) external;
         function applyCTMUpgrade(address _transition) external;
     }
@@ -68,7 +66,7 @@ sol! {
     struct TransitionManifest {
         address fromRelease;
         address newRelease;
-        address upgradeEngine;
+        address chainUpgradeEngine;
         uint256 oldProtocolVersionDeadline;
         uint256 upgradeTimestamp;
         AuthoredL2Plan l2Plan;
@@ -102,14 +100,12 @@ sol! {
     }
 
     /// The ecosystem-domain executor the shared `ProxyAdmin` lands under. `applyL1Upgrade` is
-    /// declared so the verifier can independently re-encode an upgrade's core leg; `forward` to
-    /// encode an executor succession's handover ([`super::succession`]).
+    /// declared so the verifier can independently re-encode an upgrade's core leg.
     #[sol(rpc)]
     contract CoreUpgradeExecutorView {
         function PROXY_ADMIN() external view returns (address);
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
-        function forward(ForwardedCall[] calldata _calls) external payable;
         function applyL1Upgrade(address _coreTransition) external;
     }
 
@@ -117,7 +113,7 @@ sol! {
     /// constructor argument of a `ProxyUpgradeTransition`, which is what its address commits to.
     /// `domain` is the `ProxyUpgradeDomain` enum as its underlying `uint8`
     /// ([`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CORE`] /
-    /// [`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CTM`]). `upgradeEngine` is
+    /// [`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CTM`]). `proxyUpgradeEngine` is
     /// the `IProxyUpgradeEngine` the domain's executor delegatecalls to apply the rows (and any
     /// follow-up calls a release engine adds), held to its role by
     /// [`super::members::verify_proxy_upgrade_engine`]. Field ORDER is the Solidity struct's: the
@@ -126,7 +122,7 @@ sol! {
     struct ProxyUpgradeTransitionManifest {
         uint8 domain;
         ProxyUpgradeRow[] proxyUpgrades;
-        address upgradeEngine;
+        address proxyUpgradeEngine;
     }
 
     /// One domain's write-once proxy inventory: the core leg's (`Core`) or the CTM
@@ -137,18 +133,15 @@ sol! {
         function getManifest() external view returns (ProxyUpgradeTransitionManifest memory);
         function domain() external view returns (uint8);
         function rows() external view returns (ProxyUpgradeRow[] memory);
-        function upgradeEngine() external view returns (address);
+        function proxyUpgradeEngine() external view returns (address);
     }
 
-    /// The live owner and outstanding nomination of an `Ownable2Step` lifecycle object.
-    /// `transferOwnership` and `acceptOwnership` are declared to ENCODE an executor succession's
-    /// handover ([`super::succession`]); on a one-step `Ownable` (a `ProxyAdmin`)
-    /// `transferOwnership` has the same selector.
+    /// The live owner and outstanding nomination of an `Ownable2Step` contract, and the call
+    /// through which the nominee takes it.
     #[sol(rpc)]
     contract Ownable2StepView {
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
-        function transferOwnership(address newOwner) external;
         function acceptOwnership() external;
     }
 
@@ -238,12 +231,14 @@ sol! {
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
-    /// The chain registry a CTM's chains are enumerated from, the live values a release's force
-    /// deployments are held against, the ecosystem proxies an inventory's
-    /// slots must name, and the owner a CTM also takes its chain freezes from.
+    /// The chain registry a CTM's chains are enumerated from, the CTM registry every CTM a package
+    /// drives must be in, the live values a release's force deployments are held against, the
+    /// ecosystem proxies an inventory's slots must name, and the owner a CTM also takes its chain
+    /// freezes from.
     #[sol(rpc)]
     contract BridgehubView {
         function owner() external view returns (address);
+        function chainTypeManagerIsRegistered(address _chainTypeManager) external view returns (bool);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
         function chainTypeManager(uint256 _chainId) external view returns (address);
         function assetRouter() external view returns (address);

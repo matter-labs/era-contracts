@@ -21,33 +21,36 @@
 //!
 //! **Does the signed transaction invoke the reviewed upgrade at the intended addresses, in the
 //! intended order?** is answered by [`verify_upgrade_calls`]: each leg is re-encoded from the
-//! reviewed executor and object — preceded, when the upgrade replaces an executor, by the derived
-//! executor succession ([`super::succession`]) — and the run must appear EXACTLY ONCE, CONTIGUOUS,
-//! in canonical order; every other call must be a declared governance external action, matched one
-//! for one and in declared order, that reaches none of the upgrade's authorities. With no
-//! coordinator on chain, this ordered bundle check is what keeps the core rows ahead of the CTM
-//! infrastructure and the infrastructure ahead of the transition commit; the one governance
-//! execution keeps them atomic. The legs' INTERNAL calls are NOT re-derived — the executors
-//! derive them on chain from the same pinned objects, from audited code.
+//! reviewed executor and object and the run must appear EXACTLY ONCE, CONTIGUOUS, in canonical
+//! order; every other call must reach none of the upgrade's authorities and is held to the
+//! declared-calls rule ([`super::declared_calls`]). With no coordinator on
+//! chain, this ordered bundle check is what keeps the core rows ahead of the CTM infrastructure
+//! and the infrastructure ahead of the transition commit; the one governance execution keeps them
+//! atomic. The legs' INTERNAL calls are NOT re-derived — the executors derive them on chain from
+//! the same pinned objects, from audited code.
 //!
 //! Everything else this module does is the part the objects cannot answer for themselves: that
 //! the executors the legs run through are the reviewed ones (their construction,
 //! [`super::lifecycle`]; they set immutables, so no codehash identifies them) and bound to the
-//! independently reviewed CTM and ProxyAdmins, that governance owns them with no nomination
-//! outstanding, that the live state the upgrade departs from is the state it claims, and that the
-//! ecosystem is READY for it (the L2 bytecodes published).
+//! reviewed ecosystem — the CTM registered on the reviewed Bridgehub, the ProxyAdmins the ones
+//! administering its proxies ([`super::ecosystem_binding`]) — that governance owns them with no
+//! nomination outstanding and still holds the CTM's ValidatorTimelock, that the live state the
+//! upgrade departs from is the state it claims, and that the ecosystem is READY for it (the L2
+//! bytecodes published).
 
 use std::collections::BTreeMap;
 
 use alloy::primitives::{Address, B256, U256};
 use alloy::providers::Provider;
-use alloy::sol_types::SolValue;
+use alloy::sol_types::{SolCall, SolValue};
 
 use crate::common::external_actions::{ExternalAction, GOVERNANCE_PHASE};
 use crate::common::governance_calls::GovernanceCall;
 use crate::upgrade_verification::report::VerificationResult;
 
 use super::construction::{expect_canonical_construction, ReviewedBuild};
+use super::declared_calls::{judge_declared_calls, DerivedRun};
+use super::ecosystem_binding::{bind_to_reviewed_ecosystem, EcosystemClaims};
 use super::genesis::{judge_release_genesis, ReviewedGenesis};
 use super::lifecycle::{
     verify_executor_owners, verify_lifecycle_construction, CoreExecutorReview, CtmExecutorReview,
@@ -64,10 +67,9 @@ use super::rows::{
     participating, verify_inventory, verify_inventory_construction, Inventory, InventoryReview,
 };
 use super::shell::verify_shell_kept;
-use super::succession::{verify_succession_preconditions, SuccessionDomain};
 use super::views::{
     BridgehubView, BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CommittedUpgradeView,
-    CtmView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
+    CtmView, Ownable2StepView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -75,12 +77,13 @@ use super::{format_semver, render_derived_payloads};
 ///
 /// Reads, in order: each leg's object (core, infrastructure, transition — the transition preceded
 /// by the live genesis expectations); the executors' construction
-/// ([`verify_lifecycle_construction`]) and owners ([`verify_executor_owners`]); the CTM's and the
-/// CTM-domain ProxyAdmin's owners and the CTM's pending owner (CTM legs), the ecosystem
-/// ProxyAdmin's owner (core leg); the CTM's version and release (transition leg); the
-/// inventories' slots and departures; the transition's readiness and its system-proxy shell. The
-/// members' construction reads the sources their recorded arguments are held against as it needs
-/// them ([`super::member_construction`]).
+/// ([`verify_lifecycle_construction`]), their binding to the reviewed ecosystem
+/// ([`bind_to_reviewed_ecosystem`]) and their owners ([`verify_executor_owners`]); the CTM's and
+/// the CTM-domain ProxyAdmin's owners, the CTM's pending owner and the ValidatorTimelock's owners
+/// ([`verify_validator_timelock_owner`]) (CTM legs), the ecosystem ProxyAdmin's owner (core leg);
+/// the CTM's version and release (transition leg); the inventories' slots and departures; the
+/// transition's readiness and its system-proxy shell. The members' construction reads the sources
+/// their recorded arguments are held against as it needs them ([`super::member_construction`]).
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify<P: Provider>(
     provider: &P,
@@ -180,7 +183,7 @@ pub(crate) async fn verify<P: Provider>(
                 .force_deployments
                 .read_live(
                     provider,
-                    package.reported_ctm,
+                    env.bridgehub().map(|bridgehub| bridgehub.address),
                     expected_governance_owner,
                     "--expected-governance-owner",
                 )
@@ -206,20 +209,12 @@ pub(crate) async fn verify<P: Provider>(
 
     // ── 2. Authority: the executors the legs run through, and the owner they answer to ──
     result.print_info("\n== Bound authority ==");
-    // A succession's successor is under review even when no leg of its domain runs: the bundle
-    // hands it the domain.
-    let core_succession = package.succession.core.as_ref();
-    let ctm_succession = package.succession.ctm.as_ref();
-    let core_executor = package
-        .leg(LegKind::Core)
-        .map(|leg| leg.executor)
-        .or(core_succession.map(|s| s.successor));
+    let core_executor = package.leg(LegKind::Core).map(|leg| leg.executor);
     let ctm_executor = package
         .legs
         .iter()
         .find(|leg| leg.kind.is_ctm())
-        .map(|leg| leg.executor)
-        .or(ctm_succession.map(|s| s.successor));
+        .map(|leg| leg.executor);
     if ctm_executor.is_some() {
         for (field, reported, what) in [
             (
@@ -261,14 +256,26 @@ pub(crate) async fn verify<P: Provider>(
         &mut reviewed,
     )
     .await?;
-    // A predecessor answers to the same governance as its successor, with nothing outstanding: a
-    // nominee accepting before the bundle runs would take the domain the succession moves.
+    bind_to_reviewed_ecosystem(
+        provider,
+        result,
+        env.bridgehub(),
+        &EcosystemClaims {
+            reported_bridgehub: package.reported_singletons.bridgehub,
+            ctms: bindings
+                .ctm
+                .into_iter()
+                .chain(package.reported_ctm)
+                .collect(),
+            core_proxy_admin: bindings.core_proxy_admin,
+            ctm_proxy_admin: bindings.ctm.zip(bindings.ctm_proxy_admin),
+        },
+    )
+    .await;
     let executors: Vec<(&str, Address)> = core_executor
         .map(|address| ("the core executor", address))
         .into_iter()
         .chain(ctm_executor.map(|address| ("the CTM executor", address)))
-        .chain(core_succession.map(|s| ("the predecessor core executor", s.predecessor)))
-        .chain(ctm_succession.map(|s| ("the predecessor CTM executor", s.predecessor)))
         .collect();
     verify_executor_owners(
         provider,
@@ -279,13 +286,9 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await;
 
-    // The authority each domain must already HOLD. An upgrade normally hands nothing over — it
-    // executes on authority the previous edge established, so authority that has since drifted is
-    // a finding now rather than a revert mid-bundle. The one exception is an executor succession:
-    // there the PREDECESSOR must hold the domain now, and be bound like the successor it hands the
-    // domain to ([`verify_succession_preconditions`]).
-    verify_succession_preconditions(provider, result, &package.succession, &bindings).await?;
-    if let (Some(ctm_executor), None) = (ctm_executor, ctm_succession) {
+    // The authority each domain must already HOLD. An upgrade hands nothing over — it executes on authority the previous edge established, so authority that has since
+    // drifted is a finding now rather than a revert mid-bundle.
+    if let Some(ctm_executor) = ctm_executor {
         if let (Some(ctm), Some(ctm_admin)) = (bindings.ctm, bindings.ctm_proxy_admin) {
             // An executor names its CTM only as an immutable, so the reviewer is told which CTM
             // the CTM legs land on rather than left to infer it.
@@ -324,11 +327,19 @@ pub(crate) async fn verify<P: Provider>(
                 )),
                 None => {}
             }
+            if let Some(governance) = expected_governance_owner {
+                verify_validator_timelock_owner(
+                    provider,
+                    result,
+                    ctm,
+                    (governance, "the reviewed governance"),
+                    (&package.calls, &package.external_actions),
+                )
+                .await;
+            }
         }
     }
-    if let (Some(core_executor), Some(core_admin), None) =
-        (core_executor, bindings.core_proxy_admin, core_succession)
-    {
+    if let (Some(core_executor), Some(core_admin)) = (core_executor, bindings.core_proxy_admin) {
         expect_owned_by(
             provider,
             result,
@@ -365,6 +376,7 @@ pub(crate) async fn verify<P: Provider>(
                         domain_admin,
                         anchor: bindings.ctm,
                         reported: package.reported_singletons,
+                        reviewed_bridgehub: env.bridgehub(),
                     },
                 )
                 .await?;
@@ -379,7 +391,6 @@ pub(crate) async fn verify<P: Provider>(
     if let Some(rows) = core_rows.as_ref().filter(|rows| participating(rows) > 0) {
         match bindings.core_proxy_admin {
             Some(domain_admin) => {
-                let anchor = ecosystem_anchor(provider, result, package, &bindings).await;
                 let outcome = verify_inventory(
                     provider,
                     build,
@@ -388,8 +399,9 @@ pub(crate) async fn verify<P: Provider>(
                         inventory: Inventory::Ecosystem,
                         rows,
                         domain_admin,
-                        anchor,
+                        anchor: env.bridgehub().map(|bridgehub| bridgehub.address),
                         reported: Default::default(),
+                        reviewed_bridgehub: env.bridgehub(),
                     },
                 )
                 .await?;
@@ -614,48 +626,13 @@ fn judge_chains_below_v35(result: &mut VerificationResult, chains: &[ChainVersio
     }
 }
 
-/// Where the ecosystem inventory's slots are discovered: the Bridgehub of the CTM the package
-/// upgrades (bound or reported), or — for a core-only package naming no CTM — the core prepare's
-/// `bridgehub_proxy_addr`. `None` (reported) when neither is available.
-async fn ecosystem_anchor<P: Provider>(
-    provider: &P,
-    result: &mut VerificationResult,
-    package: &UpgradePackage,
-    bindings: &LifecycleBindings,
-) -> Option<Address> {
-    if let Some(ctm) = bindings.ctm.or(package.reported_ctm) {
-        return tolerate(
-            CtmView::new(ctm, provider).BRIDGE_HUB().call().await,
-            result,
-            "the CTM's BRIDGE_HUB(), through which the ecosystem rows' proxies are discovered",
-        );
-    }
-    match package.reported_singletons.bridgehub {
-        Some(bridgehub) => {
-            result.print_info(&format!(
-                "  the package names no CTM, so the ecosystem rows' proxies are discovered \
-                 through the core prepare's bridgehub_proxy_addr {bridgehub}"
-            ));
-            Some(bridgehub)
-        }
-        None => {
-            result.report_error(
-                "the package names neither a CTM nor the core prepare's bridgehub_proxy_addr, so \
-                 the ecosystem rows' proxies cannot be discovered",
-            );
-            None
-        }
-    }
-}
-
-/// Every address the upgrade's calls may legitimately reach only through its run, each with the
-/// role a reviewer reads it under: the objects this run established, the executors (a
-/// succession's predecessors and successors included), the objects the legs apply, the CTM, both
-/// domains' ProxyAdmins (bound and reported) and the ServerNotifier a CTM succession hands over.
+/// Every address the upgrade's calls may legitimately reach only through its legs, each with the
+/// role a reviewer reads it under: the objects this run established, the executors, the objects
+/// the legs apply, the CTM and both domains' ProxyAdmins (bound and reported).
 ///
-/// The run — the derived succession, then the legs — is the complete list of what the upgrade
-/// needs from these; a call to any of them outside it is authority the review never saw, so
-/// [`verify_upgrade_calls`] refuses it whether the package declares it or not.
+/// The run of legs is the complete list of what the upgrade needs from these; a call to any of
+/// them outside it is authority the review never saw, so [`verify_upgrade_calls`] refuses it
+/// whether the package declares it or not.
 fn upgrade_authorities(
     package: &UpgradePackage,
     bindings: &LifecycleBindings,
@@ -698,32 +675,6 @@ fn upgrade_authorities(
         package.lifecycle.core_proxy_admin,
         "the ecosystem ProxyAdmin the package names",
     );
-    for (executor, what) in package.succession.executors() {
-        note(Some(executor), what);
-    }
-    for succession in package.succession.iter() {
-        match succession.domain {
-            SuccessionDomain::Core { proxy_admin } => note(
-                Some(proxy_admin),
-                "the ecosystem ProxyAdmin the core succession hands over",
-            ),
-            SuccessionDomain::Ctm {
-                ctm,
-                ctm_proxy_admin,
-                server_notifier,
-            } => {
-                note(Some(ctm), "the CTM the CTM succession hands over");
-                note(
-                    Some(ctm_proxy_admin),
-                    "the CTM-domain ProxyAdmin the CTM succession hands over",
-                );
-                note(
-                    Some(server_notifier),
-                    "the ServerNotifier the CTM succession hands over",
-                );
-            }
-        }
-    }
     authorities
 }
 
@@ -732,32 +683,27 @@ fn upgrade_authorities(
 /// Governance signs the legs: each is re-ENCODED here from the reviewed executor and object (the
 /// prepare summaries, which the loader reconciled with the calldata) and the expected run —
 /// core, then CTM infrastructure, then CTM transition, each only when present — must appear in
-/// the bundle EXACTLY ONCE as ONE CONTIGUOUS run. When the upgrade replaces an executor, the run
-/// STARTS with the executor succession, re-derived from the same summaries
-/// ([`super::succession`]): the core handover, then the CTM's, immediately before the legs that
-/// target the successors. A run out of canonical order, interrupted by another call, missing a
-/// succession call, or naming another executor or object is an ERROR: with no coordinator, the
-/// order the bundle states IS the order the domains apply in.
+/// the bundle EXACTLY ONCE as ONE CONTIGUOUS run. A run out of canonical order, interrupted by
+/// another call, or naming another executor or object is an ERROR: with no coordinator, the order
+/// the bundle states IS the order the domains apply in.
 ///
 /// Every other call is held to two rules. A call reaching any of `authorities` — the executors,
 /// the objects, the CTM, either ProxyAdmin — is an ERROR whether declared or not: the run is the
-/// complete list of what the upgrade needs from them. Every remaining call must be one of the
-/// declared governance external actions, matched ONE FOR ONE and in DECLARED ORDER (the order the
-/// prepares emitted them in, `ExternalActionsLib.callsForPhase`), and every declared one must
-/// appear: an undeclared, duplicated, reordered or missing action is an ERROR.
+/// complete list of what the upgrade needs from them. Every remaining call is held to the
+/// declared-calls rule ([`judge_declared_calls`]).
 pub(super) fn verify_upgrade_calls(
     package: &UpgradePackage,
     authorities: &BTreeMap<Address, String>,
     result: &mut VerificationResult,
 ) {
     let calls = &package.calls;
-    let legs: Vec<(String, GovernanceCall)> = LegKind::CANONICAL_ORDER
+    let expected: Vec<(LegKind, GovernanceCall)> = LegKind::CANONICAL_ORDER
         .into_iter()
         .filter_map(|kind| {
             let object = package.reported_object(kind)?;
             let executor = package.reported_executor(kind)?;
             Some((
-                format!("{} on {executor}", kind.entrypoint()),
+                kind,
                 GovernanceCall {
                     target: executor,
                     value: U256::ZERO,
@@ -767,33 +713,21 @@ pub(super) fn verify_upgrade_calls(
         })
         .collect();
 
-    if legs.len() != package.legs.len() {
+    if expected.len() != package.legs.len() {
         result.report_error(&format!(
             "the bundle carries {} executor leg(s) but the package reports the object and executor \
              of {}: a leg the summaries do not account for cannot be re-encoded from reviewed \
              values",
             package.legs.len(),
-            legs.len()
+            expected.len()
         ));
     }
 
-    // The run: the derived succession (core, then CTM), then the legs.
-    let succession: Vec<(String, GovernanceCall)> = package
-        .succession
-        .iter()
-        .flat_map(|s| {
-            s.describe_calls()
-                .into_iter()
-                .map(move |described| format!("{} succession: {described}", s.domain_name()))
-                .zip(s.calls())
-        })
-        .collect();
-    let succession_len = succession.len();
-    let expected: Vec<(String, GovernanceCall)> = succession.into_iter().chain(legs).collect();
-
-    // ── the run ──
-    let runs: Vec<usize> = if expected.len() == succession_len {
-        // No leg to anchor a run on: already reported above or by the caller.
+    // ── the run of legs ──
+    let matches = |call: &GovernanceCall, expected: &GovernanceCall| {
+        call.target == expected.target && call.value == expected.value && call.data == expected.data
+    };
+    let runs: Vec<usize> = if expected.is_empty() {
         Vec::new()
     } else {
         calls
@@ -803,38 +737,29 @@ pub(super) fn verify_upgrade_calls(
                 window
                     .iter()
                     .zip(&expected)
-                    .all(|(call, (_, expected))| call == expected)
+                    .all(|(call, (_, expected))| matches(call, expected))
             })
             .map(|(at, _)| at)
             .collect()
     };
-    let mut run_indices: Vec<usize> = package.legs.iter().map(|leg| leg.index).collect();
-    let mut run_start = package.legs.iter().map(|leg| leg.index).min();
     match runs.as_slice() {
         [at] => {
-            run_indices = (*at..at + expected.len()).collect();
-            run_start = Some(*at);
-            if succession_len > 0 {
-                result.report_ok(&format!(
-                    "the bundle carries the {succession_len} derived executor succession call(s) \
-                     immediately before the reviewed legs, re-derived from the prepare summaries"
-                ));
-            }
             result.report_ok(&format!(
                 "the bundle carries the {} reviewed leg(s) as one contiguous run in canonical \
-                 order (core -> CTM infrastructure -> CTM transition), at calls {}..{} of {}",
-                expected.len() - succession_len,
-                at + succession_len,
+                 order (core -> CTM infrastructure -> CTM transition), at calls {at}..{} of {}",
+                expected.len(),
                 at + expected.len(),
                 calls.len()
             ));
-            for (described, _) in &expected {
+            for (kind, call) in &expected {
                 result.print_info(&format!(
-                    "    · {described} (authority: the executor's owner, governance)"
+                    "    · {} on {} (authority: the executor's owner, governance)",
+                    kind.entrypoint(),
+                    call.target
                 ));
             }
         }
-        [] => report_broken_run(package, expected.len() - succession_len, result),
+        [] => report_broken_run(package, expected.len(), result),
         many => result.report_error(&format!(
             "the bundle carries the reviewed run of legs {} times (at calls {many:?}): the second \
              application is not a bundle the merge produces",
@@ -843,30 +768,41 @@ pub(super) fn verify_upgrade_calls(
     }
 
     // ── every other call ──
+    let leg_indices: Vec<usize> = package.legs.iter().map(|leg| leg.index).collect();
+    let run_start = package.legs.iter().map(|leg| leg.index).min();
     let mut others: Vec<(usize, &GovernanceCall)> = Vec::new();
     for (index, call) in calls.iter().enumerate() {
-        if run_indices.contains(&index) {
+        if leg_indices.contains(&index) {
             continue;
         }
         match authorities.get(&call.target) {
             Some(what) => result.report_error(&format!(
                 "call {index} reaches {what} ({}) with selector 0x{} outside the run of legs: the \
-                 upgrade's authorities take exactly its run — the derived executor succession and \
-                 the legs — so an extra call to one — a nomination, a `forward`, a second \
-                 application — is authority the review never saw, whether or not the package \
-                 declares it",
+                 upgrade's authorities take exactly its legs, so an extra call to one — a \
+                 nomination, a `forward`, a second application — is authority the review never \
+                 saw, whether or not the package declares it",
                 call.target,
                 alloy::hex::encode(call.data.get(..4).unwrap_or_default())
             )),
             None => others.push((index, call)),
         }
     }
-    judge_external_actions(&others, &package.external_actions, run_start, result);
+    let run_end = package.legs.iter().map(|leg| leg.index + 1).max();
+    judge_declared_calls(
+        &others,
+        &package.external_actions,
+        &DerivedRun {
+            at: run_start.zip(run_end).map(|(start, end)| start..end),
+            name: "the legs",
+            member: "a leg of this upgrade",
+            declared: false,
+        },
+        result,
+    );
 }
 
 /// Names why the expected run is not in the bundle: the legs out of canonical order, the legs
-/// not contiguous, the executor succession not immediately before them, or a leg whose
-/// re-encoding the bundle does not carry. `expected` counts the legs alone.
+/// not contiguous, or a leg whose re-encoding the bundle does not carry.
 fn report_broken_run(package: &UpgradePackage, expected: usize, result: &mut VerificationResult) {
     let legs = &package.legs;
     if expected == 0 {
@@ -902,113 +838,12 @@ fn report_broken_run(package: &UpgradePackage, expected: usize, result: &mut Ver
         ));
         return;
     }
-    let succession = package.succession.calls();
-    if let (false, Some(first)) = (succession.is_empty(), legs.first()) {
-        let before = first.index.checked_sub(succession.len());
-        if before.map(|start| &package.calls[start..first.index]) != Some(&succession[..]) {
-            result.report_error(&format!(
-                "the executor succession is not where it must be: the {} call(s) re-derived from \
-                 the prepare summaries ({}) must sit immediately before the first leg (call {}), \
-                 in order and unaltered, but the bundle does not carry them there — a missing, \
-                 extra, reordered or altered handover leaves the legs running through an \
-                 executor that does not hold its domain",
-                succession.len(),
-                package
-                    .succession
-                    .iter()
-                    .map(|s| format!("{} {} -> {}", s.domain_name(), s.predecessor, s.successor))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                first.index
-            ));
-            return;
-        }
-    }
     result.report_error(&format!(
         "the bundle's {} call(s) do not contain the {expected} reviewed leg(s), re-encoded from \
          the reviewed executors and objects, as one run: governance would sign a bundle the \
          reviewed upgrade does not describe",
         package.calls.len()
     ));
-}
-
-/// The calls outside the run against the declared governance external actions: one for one, in
-/// declared order, every declaration present. `run_start` is where the legs begin, to report on
-/// which side of them each action runs.
-fn judge_external_actions(
-    others: &[(usize, &GovernanceCall)],
-    declared: &[ExternalAction],
-    run_start: Option<usize>,
-    result: &mut VerificationResult,
-) {
-    let declared: Vec<&ExternalAction> = declared
-        .iter()
-        .filter(|action| action.phase == GOVERNANCE_PHASE)
-        .collect();
-    let mut claimed = vec![false; declared.len()];
-    let mut order: Vec<usize> = Vec::with_capacity(others.len());
-    let mut accounted = true;
-    for (index, call) in others {
-        let selector = alloy::hex::encode(call.data.get(..4).unwrap_or_default());
-        match (0..declared.len()).find(|&i| !claimed[i] && declared[i].is_call(call)) {
-            Some(i) => {
-                claimed[i] = true;
-                order.push(i);
-                let side = match run_start {
-                    Some(start) if *index < start => "before",
-                    Some(_) => "after",
-                    None => "beside",
-                };
-                result.print_info(&format!(
-                    "  call {index} -> declared external action `{}` on {} (selector \
-                     0x{selector}), {side} the legs",
-                    declared[i].label, call.target
-                ));
-            }
-            None if declared.iter().any(|action| action.is_call(call)) => {
-                accounted = false;
-                result.report_error(&format!(
-                    "call {index} to {} (selector 0x{selector}) repeats a declared governance \
-                     external action more often than it is declared: each declaration accounts \
-                     for exactly one call",
-                    call.target
-                ));
-            }
-            None => {
-                accounted = false;
-                result.report_error(&format!(
-                    "call {index} to {} (selector 0x{selector}) is neither a leg of this upgrade \
-                     nor a declared governance external action: the bundle carries an \
-                     instruction no part of this review accounts for",
-                    call.target
-                ));
-            }
-        }
-    }
-    for (i, action) in declared.iter().enumerate() {
-        if !claimed[i] {
-            accounted = false;
-            result.report_error(&format!(
-                "the package declares a governance external action the bundle never carries — {}: \
-                 the declaration a reviewer reads describes a call governance would not sign",
-                action.describe()
-            ));
-        }
-    }
-    if order.windows(2).any(|pair| pair[0] > pair[1]) {
-        accounted = false;
-        result.report_error(
-            "the declared governance external actions appear out of their declared order: the \
-             prepares emit them in declaration order, so a reordered bundle is not the one they \
-             produced",
-        );
-    }
-    if accounted && !others.is_empty() {
-        result.report_ok(
-            "every call outside the run of legs is a declared governance external action, one \
-             for one and in declared order, to a target outside the upgrade's authorities",
-        );
-    }
 }
 
 /// The transition as the departing-state check reads it: the manifest its address commits to, and
@@ -1127,7 +962,7 @@ pub(super) async fn verify_transition<P: Provider>(
         result,
         members,
         label,
-        manifest.upgradeEngine,
+        manifest.chainUpgradeEngine,
         &manifest.l2Plan,
     )
     .await?;
@@ -1276,7 +1111,7 @@ fn judge_release_validity(
 }
 
 /// A `ProxyUpgradeTransition`'s provenance and construction (the manifest its address commits to,
-/// `upgradeEngine` included), the engine it pins held to its role
+/// `proxyUpgradeEngine` included), the engine it pins held to its role
 /// ([`verify_proxy_upgrade_engine`]), and its domain held against `expected` — the domain of the
 /// leg that applies it (the core leg's executor applies only Core, the infrastructure leg's only
 /// CTM), fixed by the caller and never read from the object.
@@ -1336,7 +1171,7 @@ pub(super) async fn verify_proxy_upgrade_transition<P: Provider>(
         result,
         members,
         label,
-        manifest.upgradeEngine,
+        manifest.proxyUpgradeEngine,
     )
     .await?;
     if manifest.domain != expected.domain_tag() {
@@ -1487,6 +1322,151 @@ pub(super) async fn expect_owned_by<P: Provider>(
     }
 }
 
+/// The CTM's ValidatorTimelock (`validatorTimelockPostV29()`, a `MultisigCommitter` on a fresh CTM)
+/// stays with governance across every edge: its owner decides who commits, proves and executes
+/// the CTM's chains' batches, and no edge hands it to an executor. It must be owned by the
+/// reviewed governance with no nomination outstanding — or have nominated it, with the bundle
+/// carrying governance's declared `acceptOwnership()` on it (the merge's normalization when the
+/// prepare's ownership pre-step nominated governance). A timelock held by the account that owns a
+/// legacy `Governance.sol` governance is a WARN, as at the merge-base: the same principals control
+/// it, without governance's timelock in front of them (an `ecosystem init` deployment hands it to
+/// `owner_address`, which owns its `Governance`). A nomination of the owner itself moves nothing.
+///
+/// Of what the bundle does to the timelock this checks only the `acceptOwnership()`, which reverts
+/// the whole bundle unless governance is nominated; the state the bundle leaves is checked after a
+/// replay ([`super::applied`]).
+///
+/// `governance` is the reviewed governance and how the report names it; `bundle` the calls
+/// governance signs and the package's declared external actions.
+///
+/// Reads, in order: the CTM's `validatorTimelockPostV29()`, the timelock's `owner()` and
+/// `pendingOwner()`, then — only for a timelock neither governance holds nor accepts — governance's
+/// `owner()` ([`governance_controller`]).
+pub(super) async fn verify_validator_timelock_owner<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    ctm: Address,
+    (governance, governance_label): (Address, &str),
+    (calls, declared): (&[GovernanceCall], &[ExternalAction]),
+) {
+    let Some(timelock) = tolerate(
+        CtmView::new(ctm, provider)
+            .validatorTimelockPostV29()
+            .call()
+            .await,
+        result,
+        "the CTM's validatorTimelockPostV29()",
+    ) else {
+        return;
+    };
+    if timelock.is_zero() {
+        result.report_error(
+            "the CTM names no ValidatorTimelock (validatorTimelockPostV29() is the zero address): \
+             who commits its chains' batches cannot be held against governance",
+        );
+        return;
+    }
+    let view = Ownable2StepView::new(timelock, provider);
+    let owner = tolerate(
+        view.owner().call().await,
+        result,
+        "the ValidatorTimelock's owner",
+    );
+    let pending = tolerate(
+        view.pendingOwner().call().await,
+        result,
+        "the ValidatorTimelock's pending owner",
+    );
+    let (Some(owner), Some(pending)) = (owner, pending) else {
+        return;
+    };
+    let accept = GovernanceCall {
+        target: timelock,
+        value: U256::ZERO,
+        data: Ownable2StepView::acceptOwnershipCall {}.abi_encode(),
+    };
+    let carried = calls.iter().any(|call| {
+        call.target == accept.target && call.value == accept.value && call.data == accept.data
+    });
+    let accepted = carried
+        && declared
+            .iter()
+            .any(|action| action.phase == GOVERNANCE_PHASE && action.is_call(&accept));
+    let label = format!("the ValidatorTimelock {timelock}");
+    if carried && pending != governance {
+        result.report_error(&format!(
+            "the bundle carries `acceptOwnership()` on {label}, but its pending owner is \
+             {pending}, not {governance_label} ({governance}): the call reverts, and with it the \
+             whole bundle"
+        ));
+    }
+    let outstanding = !pending.is_zero() && pending != owner && pending != governance;
+    if owner == governance {
+        if outstanding {
+            result.report_error(&format!(
+                "{label} is owned by {governance_label} but has a pending owner {pending}: a \
+                 nomination is outstanding that could take the timelock, and with it who commits \
+                 the CTM's chains' batches, from governance"
+            ));
+        } else {
+            result.report_ok(&format!(
+                "{label} is owned by {governance_label} ({governance}) with no nomination \
+                 outstanding"
+            ));
+        }
+    } else if pending == governance && accepted {
+        result.report_ok(&format!(
+            "{label} is owned by {owner} and has nominated {governance_label} ({governance}); the \
+             bundle carries governance's declared `acceptOwnership()` on it"
+        ));
+    } else if governance_controller(provider, governance).await == Some(owner) {
+        if outstanding {
+            result.report_error(&format!(
+                "{label} is owned by {owner}, the owner of {governance_label} ({governance}), but \
+                 has a pending owner {pending}: a nomination is outstanding that could take the \
+                 timelock, and with it who commits the CTM's chains' batches, from both"
+            ));
+        } else {
+            result.report_warn(&format!(
+                "{label} is owned by {owner}, which owns {governance_label} ({governance}) rather \
+                 than being it: the same principals control who commits the CTM's chains' \
+                 batches, but without governance's timelock in front of them. Expected on a \
+                 legacy `Governance.sol` ecosystem (`ecosystem init` hands the timelock to \
+                 `owner_address`)"
+            ));
+        }
+    } else if pending == governance {
+        result.report_error(&format!(
+            "{label} is owned by {owner} and has nominated {governance_label} ({governance}), but \
+             the bundle carries no declared `acceptOwnership()` on it: the timelock would stay \
+             with {owner}"
+        ));
+    } else {
+        result.report_error(&format!(
+            "{label} is owned by {owner} (pending owner {pending}), not by {governance_label} \
+             ({governance}): who commits the CTM's chains' batches would answer to someone other \
+             than the governance this package is reviewed for"
+        ));
+    }
+}
+
+/// The account that owns `governance`: a legacy `Governance.sol`'s `owner()`. `None` where
+/// governance answers no owner — a ProtocolUpgradeHandler is not `Ownable` — or the zero address;
+/// neither is a finding, so nothing is reported.
+pub(super) async fn governance_controller<P: Provider>(
+    provider: &P,
+    governance: Address,
+) -> Option<Address> {
+    match Ownable2StepView::new(governance, provider)
+        .owner()
+        .call()
+        .await
+    {
+        Ok(owner) if !owner.is_zero() => Some(owner),
+        _ => None,
+    }
+}
+
 /// Renders the facet cuts the transition DERIVED at construction, so a reviewer can read the
 /// routing every chain will apply rather than trust a count.
 async fn render_facet_cuts<P: Provider>(
@@ -1554,7 +1534,6 @@ mod tests {
     use super::*;
     use alloy::primitives::Bytes;
     use alloy::providers::ProviderBuilder;
-    use alloy::sol_types::SolCall;
     use alloy::transports::mock::Asserter;
 
     use super::super::construction::canonical_create2_address;
@@ -1642,7 +1621,6 @@ mod tests {
             force_deployments_data: None,
             executor_records: Default::default(),
             member_records: Default::default(),
-            succession: Default::default(),
             legs,
             calls,
         }
@@ -1871,134 +1849,6 @@ mod tests {
         );
     }
 
-    // ───────────────────────── an executor succession ─────────────────────────
-
-    use super::super::succession::{ExecutorSuccession, Successions};
-
-    const CORE_PREDECESSOR: Address = Address::repeat_byte(0xD0);
-    const CTM_PREDECESSOR: Address = Address::repeat_byte(0xD7);
-    const NOTIFIER: Address = Address::repeat_byte(0x5E);
-
-    /// Both executors replaced: the legs target the successors (`CORE_EXECUTOR`, `CTM_EXECUTOR`).
-    fn successions() -> Successions {
-        Successions {
-            core: Some(ExecutorSuccession {
-                predecessor: CORE_PREDECESSOR,
-                successor: CORE_EXECUTOR,
-                domain: SuccessionDomain::Core {
-                    proxy_admin: ECO_ADMIN,
-                },
-            }),
-            ctm: Some(ExecutorSuccession {
-                predecessor: CTM_PREDECESSOR,
-                successor: CTM_EXECUTOR,
-                domain: SuccessionDomain::Ctm {
-                    ctm: CTM,
-                    ctm_proxy_admin: CTM_ADMIN,
-                    server_notifier: NOTIFIER,
-                },
-            }),
-        }
-    }
-
-    /// The four succession calls, then all three legs.
-    fn succession_run() -> Vec<GovernanceCall> {
-        let mut calls = successions().calls();
-        calls.extend([core(), infrastructure(), transition()]);
-        calls
-    }
-
-    fn with_succession(
-        calls: Vec<GovernanceCall>,
-        external: Vec<ExternalAction>,
-    ) -> UpgradePackage {
-        let mut package = package(calls, external);
-        package.succession = successions();
-        package
-    }
-
-    /// The succession right before the legs is one reviewed run, with declared external actions
-    /// around it riding along; the succession calls themselves are not external actions.
-    #[test]
-    fn a_succession_right_before_the_legs_passes() {
-        let mut calls = vec![wiring(1)];
-        calls.extend(succession_run());
-        calls.push(wiring(2));
-        let result = judge(&with_succession(calls, declared(&[wiring(1), wiring(2)])));
-        assert_eq!(result.errors, 0, "{:?}", result.error_messages);
-    }
-
-    /// Each succession call missing breaks the run: the legs would run through an executor that
-    /// does not hold its domain.
-    #[test]
-    fn a_missing_succession_call_fails() {
-        for missing in 0..4 {
-            let mut calls = succession_run();
-            calls.remove(missing);
-            let result = judge(&with_succession(calls, Vec::new()));
-            assert!(
-                result.has_error("the executor succession is not where it must be"),
-                "call {missing}: {:?}",
-                result.error_messages
-            );
-        }
-    }
-
-    /// The succession calls reordered — the CTM's before the core's, or the successor accepting
-    /// before the predecessor nominates it — break the run.
-    #[test]
-    fn a_reordered_succession_fails() {
-        for (a, b) in [(0, 1), (1, 2), (2, 3)] {
-            let mut calls = succession_run();
-            calls.swap(a, b);
-            let result = judge(&with_succession(calls, Vec::new()));
-            assert!(
-                result.has_error("the executor succession is not where it must be"),
-                "swap {a}/{b}: {:?}",
-                result.error_messages
-            );
-        }
-    }
-
-    /// A succession call carried a second time outside the run reaches an authority: refused even
-    /// when declared as an external action.
-    #[test]
-    fn an_extra_succession_call_fails() {
-        for extra in 0..4 {
-            let duplicate = successions().calls()[extra].clone();
-            let mut calls = succession_run();
-            calls.push(duplicate.clone());
-            let result = judge(&with_succession(calls, declared(&[duplicate])));
-            assert!(
-                result.has_error("outside the run of legs"),
-                "call {extra}: {:?}",
-                result.error_messages
-            );
-        }
-    }
-
-    /// A succession separated from the legs by another call is not the reviewed run.
-    #[test]
-    fn a_succession_detached_from_the_legs_fails() {
-        let mut calls = successions().calls();
-        calls.push(wiring(1));
-        calls.extend([core(), infrastructure(), transition()]);
-        let result = judge(&with_succession(calls, declared(&[wiring(1)])));
-        assert!(
-            result.has_error("the executor succession is not where it must be"),
-            "{:?}",
-            result.error_messages
-        );
-    }
-
-    /// A handover the prepares never reported is no part of the reviewed run: its calls reach
-    /// executors no external action may touch, or are accounted for by nothing.
-    #[test]
-    fn an_unreported_succession_fails() {
-        let result = judge(&package(succession_run(), Vec::new()));
-        assert!(result.errors > 0, "{:?}", result.error_messages);
-    }
-
     /// The re-encoding the verifier compares against is the executors' real ABI, transcribed
     /// independently of the `sol!` mirror both sides use.
     #[test]
@@ -2125,12 +1975,12 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain,
             proxyUpgrades: rows,
-            upgradeEngine: engine(),
+            proxyUpgradeEngine: engine(),
         }
     }
 
     /// Serves `manifest` from a genuinely constructed object, its engine running `engine_runtime`,
-    /// and verifies it as `expected` with the default engine's record.
+    /// and verifies it as `expected` with `records` as the package's member records.
     async fn verify_object_with(
         manifest: &ProxyUpgradeTransitionManifest,
         expected: Inventory,
@@ -2146,7 +1996,7 @@ mod tests {
         let asserter = Asserter::new();
         asserter.push_success(&Bytes::from_static(TRANSITION_RUNTIME));
         asserter.push_success(&Bytes::from(manifest.abi_encode()));
-        if !manifest.upgradeEngine.is_zero() {
+        if !manifest.proxyUpgradeEngine.is_zero() {
             asserter.push_success(&Bytes::from_static(engine_runtime));
         }
         let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
@@ -2170,6 +2020,8 @@ mod tests {
         (rows, result, reviewed, address)
     }
 
+    /// Serves `manifest` from a genuinely constructed object, its engine the reviewed default
+    /// one, and verifies it as `expected` with the engine's record.
     async fn verify_object(
         manifest: &ProxyUpgradeTransitionManifest,
         expected: Inventory,
@@ -2266,7 +2118,7 @@ mod tests {
             let empty = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: vec![inert(); slots],
-                upgradeEngine: engine(),
+                proxyUpgradeEngine: engine(),
             };
             let (rows, result, reviewed, address) = verify_object(&empty, expected).await;
             assert_eq!(result.errors, 1, "{:?}", result.error_messages);
@@ -2280,7 +2132,7 @@ mod tests {
     }
 
     /// The mirror decodes a manifest as Solidity encodes it, POSITIONALLY: `(domain,
-    /// proxyUpgrades, upgradeEngine)`, the engine the third head word of the struct.
+    /// proxyUpgrades, proxyUpgradeEngine)`, the engine the third head word of the struct.
     #[test]
     fn a_proxy_upgrade_manifest_decodes_with_its_engine() {
         use alloy::dyn_abi::DynSolValue;
@@ -2305,7 +2157,7 @@ mod tests {
         assert_eq!(decoded.domain, PROXY_UPGRADE_DOMAIN_CTM);
         assert_eq!(decoded.proxyUpgrades.len(), 2);
         assert_eq!(decoded.proxyUpgrades[1].implNew, Address::repeat_byte(0x22));
-        assert_eq!(decoded.upgradeEngine, engine());
+        assert_eq!(decoded.proxyUpgradeEngine, engine());
         assert_eq!(
             decoded.abi_encode(),
             solidity,
@@ -2313,7 +2165,7 @@ mod tests {
         );
         let returned =
             ProxyUpgradeTransitionView::getManifestCall::abi_decode_returns(&solidity).unwrap();
-        assert_eq!(returned.upgradeEngine, engine());
+        assert_eq!(returned.proxyUpgradeEngine, engine());
     }
 
     /// The engine is part of what the object's address commits to: the same rows under another
@@ -2322,7 +2174,7 @@ mod tests {
     fn the_engine_is_part_of_the_construction() {
         let mut other = manifest(PROXY_UPGRADE_DOMAIN_CORE, L1_ECOSYSTEM_CONTRACTS.len());
         let genuine = canonical_create2_address(SALT, &transition_code(), &other.abi_encode());
-        other.upgradeEngine = STRANGER;
+        other.proxyUpgradeEngine = STRANGER;
         assert_ne!(
             canonical_create2_address(SALT, &transition_code(), &other.abi_encode()),
             genuine
@@ -2343,7 +2195,7 @@ mod tests {
         .await;
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
         assert!(
-            result.has_error("upgradeEngine"),
+            result.has_error("proxyUpgradeEngine"),
             "{:?}",
             result.error_messages
         );
@@ -2354,7 +2206,7 @@ mod tests {
         );
 
         let mut zero = manifest.clone();
-        zero.upgradeEngine = Address::ZERO;
+        zero.proxyUpgradeEngine = Address::ZERO;
         let (_, result, _, _) = verify_object_with(
             &zero,
             Inventory::CtmDomain,
@@ -2363,7 +2215,7 @@ mod tests {
         )
         .await;
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
-        assert!(result.has_error("upgradeEngine is the zero address"));
+        assert!(result.has_error("proxyUpgradeEngine is the zero address"));
 
         let (_, result, _, _) = verify_object_with(
             &manifest,
@@ -2374,7 +2226,7 @@ mod tests {
         .await;
         assert_eq!(result.errors, 1, "{:?}", result.error_messages);
         assert!(
-            result.has_error("upgradeEngine at"),
+            result.has_error("proxyUpgradeEngine at"),
             "{:?}",
             result.error_messages
         );
@@ -2697,12 +2549,12 @@ mod tests {
         let core = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()],
-            upgradeEngine: engine(),
+            proxyUpgradeEngine: engine(),
         };
         let infrastructure = ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CTM,
             proxyUpgrades: vec![inert(); CTM_CONTRACTS.len()],
-            upgradeEngine: engine(),
+            proxyUpgradeEngine: engine(),
         };
         let at = |manifest: &ProxyUpgradeTransitionManifest| {
             canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode())
@@ -2761,87 +2613,6 @@ mod tests {
             .count();
         assert_eq!(empty_legs, 2, "{:?}", result.error_messages);
         assert!(result.ensure_success().is_err());
-    }
-
-    /// A core succession on the real path: the successor the leg targets is held as the core
-    /// executor, the predecessor answers to the same governance with nothing outstanding and
-    /// holds the ecosystem ProxyAdmin now — and the successor is not expected to hold it yet.
-    #[tokio::test]
-    async fn a_core_succession_is_held_to_the_live_chain_on_the_upgrade_path() {
-        let core = ProxyUpgradeTransitionManifest {
-            domain: PROXY_UPGRADE_DOMAIN_CORE,
-            proxyUpgrades: vec![inert(); L1_ECOSYSTEM_CONTRACTS.len()],
-            upgradeEngine: engine(),
-        };
-        let object = canonical_create2_address(SALT, &transition_code(), &core.abi_encode());
-        let core_only = Successions {
-            core: successions().core,
-            ctm: None,
-        };
-        let mut calls = core_only.calls();
-        calls.push(leg_call(LegKind::Core, CORE_EXECUTOR, object));
-        let mut package = package(calls, Vec::new());
-        package.succession = core_only;
-        package.reported_ctm_executor = None;
-        package.reported_ctm = None;
-        package.reported_ctm_proxy_admin = None;
-        package.member_records = engine_records();
-
-        let run = |eco_admin_owner: Address| {
-            let asserter = Asserter::new();
-            let address = |a: Address| Bytes::from(a.abi_encode());
-            for answer in [
-                Bytes::from_static(TRANSITION_RUNTIME), // the core transition's code
-                Bytes::from(core.abi_encode()),         // its manifest
-                Bytes::from_static(ENGINE_RUNTIME),     // its engine's code
-                Bytes::from_static(&[0x60]),            // the successor's code
-                address(ECO_ADMIN),                     // its PROXY_ADMIN
-                address(GOVERNANCE),                    // the successor's owner
-                address(Address::ZERO),                 // its pending owner
-                address(GOVERNANCE),                    // the predecessor's owner
-                address(Address::ZERO),                 // its pending owner
-                Bytes::from_static(&[0x60]),            // the predecessor's code
-                address(ECO_ADMIN),                     // its PROXY_ADMIN
-                address(eco_admin_owner),               // the ecosystem ProxyAdmin's owner
-            ] {
-                asserter.push_success(&answer);
-            }
-            asserter
-        };
-        for (owner, holds) in [(CORE_PREDECESSOR, true), (CORE_EXECUTOR, false)] {
-            let asserter = run(owner);
-            let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
-            let mut result = VerificationResult::default();
-            verify(
-                &provider,
-                &reviewed_build(),
-                &unread_genesis(),
-                &package,
-                Some(GOVERNANCE),
-                &[SALT],
-                &ReviewedEnv::default(),
-                &mut result,
-            )
-            .await
-            .unwrap();
-            assert!(asserter.read_q().is_empty(), "every answer was read");
-            // The empty inventory and the successor's missing executor record are reported in
-            // both runs; the ownership finding only when the predecessor does not hold the domain.
-            assert!(result.has_error("upgrades nothing"));
-            assert!(result.has_error("has no executor record"));
-            assert_eq!(
-                result.errors,
-                if holds { 2 } else { 3 },
-                "{:?}",
-                result.error_messages
-            );
-            assert_eq!(
-                result.has_error("the ecosystem ProxyAdmin is owned by"),
-                !holds,
-                "{:?}",
-                result.error_messages
-            );
-        }
     }
 
     /// Exercise the real upgrade verifier, not `verify_shell_kept` directly: removing its shell
@@ -2930,15 +2701,26 @@ mod tests {
         fn new(
             kind: LegKind,
             executor: Address,
+            inventory: (u8, usize, usize),
+            constructor: (&'static str, &'static str),
+        ) -> Self {
+            Self::naming(kind, executor, inventory, constructor, ROW_PROXY)
+        }
+
+        /// [`Self::new`] with the row naming `proxy`.
+        fn naming(
+            kind: LegKind,
+            executor: Address,
             (domain, slots, slot): (u8, usize, usize),
             (contract, parameter): (&'static str, &'static str),
+            proxy: Address,
         ) -> Self {
             let creation = format!("the creation code of {contract}").into_bytes();
             let args = BRIDGEHUB.abi_encode();
             let implementation = canonical_create2_address(SALT, &creation, &args);
             let mut rows = vec![inert(); slots];
             rows[slot] = ProxyUpgradeRow {
-                proxy: ROW_PROXY,
+                proxy,
                 expectedOldImpl: OLD_IMPL,
                 implNew: implementation,
                 callInitializeUpgrade: false,
@@ -2946,7 +2728,7 @@ mod tests {
             let manifest = ProxyUpgradeTransitionManifest {
                 domain,
                 proxyUpgrades: rows,
-                upgradeEngine: engine(),
+                proxyUpgradeEngine: engine(),
             };
             let object =
                 canonical_create2_address(SALT, &transition_code(), &manifest.abi_encode());
@@ -3032,37 +2814,50 @@ mod tests {
             ("ValidatorTimelock", "_bridgehubAddr"),
         );
         assert_eq!(CTM_CONTRACTS[6], "ValidatorTimelock");
-        let answers = |ctm_bridgehub: Option<Address>| {
+        let answers = |ctm_bridgehub: Address, recorded: bool| {
             let mut answers = vec![
-                Bytes::from_static(&[0x60]), // the CTM executor's code
-                word(CTM),                   // its CHAIN_TYPE_MANAGER
-                word(CTM_ADMIN),             // its CTM_PROXY_ADMIN
-                word(GOVERNANCE),            // the CTM executor's owner
-                word(Address::ZERO),         // its pending owner
-                word(CTM_EXECUTOR),          // the CTM's owner
-                word(CTM_EXECUTOR),          // the CTM-domain ProxyAdmin's owner
-                word(Address::ZERO),         // the CTM's pending owner
-                word(ROW_PROXY),             // the CTM's validatorTimelockPostV29()
-                word(OLD_IMPL),              // the row's live implementation
+                Bytes::from_static(&[0x60]),    // the CTM executor's code
+                word(CTM),                      // its CHAIN_TYPE_MANAGER
+                word(CTM_ADMIN),                // its CTM_PROXY_ADMIN
+                Bytes::from(true.abi_encode()), // the reviewed Bridgehub registers the CTM
+                word(ctm_bridgehub),            // the CTM's BRIDGE_HUB()
+                word(CTM_ADMIN),                // the CTM proxy's EIP-1967 admin slot
+                word(GOVERNANCE),               // the CTM executor's owner
+                word(Address::ZERO),            // its pending owner
+                word(CTM_EXECUTOR),             // the CTM's owner
+                word(CTM_EXECUTOR),             // the CTM-domain ProxyAdmin's owner
+                word(Address::ZERO),            // the CTM's pending owner
+                word(ROW_PROXY),                // the CTM's validatorTimelockPostV29()
+                word(GOVERNANCE),               // the ValidatorTimelock's owner
+                word(Address::ZERO),            // its pending owner
+                word(ROW_PROXY), // the CTM's validatorTimelockPostV29(), the row's slot
+                word(OLD_IMPL),  // the row's live implementation
                 Bytes::from_static(ROW_RUNTIME),
             ];
             // The package's CTM's BRIDGE_HUB(), read once the record is.
-            answers.extend(ctm_bridgehub.map(word));
+            if recorded {
+                answers.push(word(ctm_bridgehub));
+            }
             answers
         };
-        let control = fixture.verify(true, &answers(Some(BRIDGEHUB))).await;
+        let control = fixture.verify(true, &answers(BRIDGEHUB, true)).await;
         assert!(
             !control.has_error("ValidatorTimelock"),
             "{:?}",
             control.error_messages
         );
 
-        let unrecorded = fixture.verify(false, &answers(None)).await;
+        let unrecorded = fixture.verify(false, &answers(BRIDGEHUB, false)).await;
         assert_eq!(unrecorded.errors, control.errors + 1);
         assert!(unrecorded.has_error("a row installs only an implementation its prepare deployed"));
 
-        let elsewhere = fixture.verify(true, &answers(Some(STRANGER))).await;
-        assert_eq!(elsewhere.errors, control.errors + 1);
+        // A CTM over another Bridgehub fails its binding, and every argument held against the
+        // reviewed Bridgehub then fails too.
+        let elsewhere = fixture.verify(true, &answers(STRANGER, true)).await;
+        assert_eq!(elsewhere.errors, control.errors + 2);
+        assert!(elsewhere.has_error(&format!(
+            "the CTM {CTM} is built over Bridgehub {STRANGER}, not the reviewed {BRIDGEHUB}"
+        )));
         assert!(elsewhere.has_error(&format!(
             "the package's CTM {CTM} answers BRIDGE_HUB() {STRANGER}, not env test's \
              bridgehub_proxy_addr {BRIDGEHUB}"
@@ -3093,10 +2888,11 @@ mod tests {
         let answers = [
             Bytes::from_static(&[0x60]), // the core executor's code
             word(ECO_ADMIN),             // its PROXY_ADMIN
+            word(ECO_ADMIN),             // the reviewed Bridgehub's EIP-1967 admin slot
             word(GOVERNANCE),            // the core executor's owner
             word(Address::ZERO),         // its pending owner
             word(CORE_EXECUTOR),         // the ecosystem ProxyAdmin's owner
-            word(ROW_PROXY),             // the Bridgehub's chainRegistrationSender()
+            word(ROW_PROXY),             // the reviewed Bridgehub's chainRegistrationSender()
             word(OLD_IMPL),              // the row's live implementation
             Bytes::from_static(ROW_RUNTIME),
         ];
@@ -3111,12 +2907,244 @@ mod tests {
         assert_eq!(unrecorded.errors, control.errors + 1);
         assert!(unrecorded.has_error("a row installs only an implementation its prepare deployed"));
 
+        // A package prepared against another Bridgehub fails its binding, and every argument held
+        // against the reviewed Bridgehub then fails too.
         fixture.package.reported_singletons.bridgehub = Some(STRANGER);
         let elsewhere = fixture.verify(true, &answers).await;
-        assert_eq!(elsewhere.errors, control.errors + 1);
+        assert_eq!(elsewhere.errors, control.errors + 2);
+        assert!(elsewhere.has_error(&format!(
+            "the core prepare's bridgehub_proxy_addr {STRANGER} is not the reviewed Bridgehub \
+             {BRIDGEHUB}"
+        )));
         assert!(elsewhere.has_error(&format!(
             "the package's bridgehub_proxy_addr {STRANGER} is not env test's bridgehub_proxy_addr \
              {BRIDGEHUB}"
+        )));
+    }
+
+    // ───────────────────────── the ValidatorTimelock's owner (OZ L-21) ─────────────────────────
+
+    const TIMELOCK: Address = Address::repeat_byte(0x7C);
+
+    /// Governance's acceptance of the timelock's nomination, as the merge prepends it.
+    fn timelock_accept() -> GovernanceCall {
+        GovernanceCall {
+            target: TIMELOCK,
+            value: U256::ZERO,
+            data: Ownable2StepView::acceptOwnershipCall {}.abi_encode(),
+        }
+    }
+
+    /// The account that owns a legacy `Governance.sol` [`GOVERNANCE`].
+    const CONTROLLER: Address = Address::repeat_byte(0x6C);
+
+    /// Runs the check over a timelock owned by `owner` with `pending` nominated, against a bundle
+    /// of `calls` declaring `declared`; every answer read. `governance_owner` is what governance's
+    /// `owner()` answers when the check reads it (`Some(None)`: it reverts, as a
+    /// ProtocolUpgradeHandler's does), and `None` when the check must not read it.
+    async fn judge_timelock(
+        timelock: Address,
+        (owner, pending): (Address, Address),
+        (calls, declared): (&[GovernanceCall], &[ExternalAction]),
+        governance_owner: Option<Option<Address>>,
+    ) -> VerificationResult {
+        let asserter = Asserter::new();
+        asserter.push_success(&word(timelock));
+        if !timelock.is_zero() {
+            asserter.push_success(&word(owner));
+            asserter.push_success(&word(pending));
+        }
+        match governance_owner {
+            Some(Some(controller)) => asserter.push_success(&word(controller)),
+            Some(None) => asserter.push_failure_msg("execution reverted"),
+            None => {}
+        }
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let mut result = VerificationResult::default();
+        verify_validator_timelock_owner(
+            &provider,
+            &mut result,
+            CTM,
+            (GOVERNANCE, "the reviewed governance"),
+            (calls, declared),
+        )
+        .await;
+        assert!(asserter.read_q().is_empty(), "every answer was read");
+        result
+    }
+
+    /// OZ L-21: the timelock stays governance's — owned outright with no nomination, or nominated
+    /// with governance's acceptance declared and carried; an acceptance with nobody nominating
+    /// governance reverts the bundle.
+    #[tokio::test]
+    async fn the_validator_timelock_must_stay_with_governance() {
+        let accept = timelock_accept();
+        let carried = [accept.clone(), core()];
+        let declares = declared(std::slice::from_ref(&accept));
+        let accepting = (&carried[..], &declares[..]);
+        let plain = (&[core()][..], &[][..]);
+
+        let result = judge_timelock(TIMELOCK, (GOVERNANCE, Address::ZERO), plain, None).await;
+        assert_eq!((result.errors, result.warnings), (0, 0));
+
+        let result = judge_timelock(TIMELOCK, (STRANGER, GOVERNANCE), accepting, None).await;
+        assert_eq!(
+            (result.errors, result.warnings),
+            (0, 0),
+            "{:?}",
+            result.error_messages
+        );
+
+        for (case, owners, bundle, governance_owner, needle) in [
+            (
+                "a nomination beside governance's ownership",
+                (GOVERNANCE, STRANGER),
+                plain,
+                None,
+                "but has a pending owner",
+            ),
+            (
+                "governance nominated, no acceptance",
+                (STRANGER, GOVERNANCE),
+                plain,
+                Some(Some(CONTROLLER)),
+                "carries no declared `acceptOwnership()`",
+            ),
+            (
+                "an acceptance the package does not declare",
+                (STRANGER, GOVERNANCE),
+                (&carried[..], &[][..]),
+                Some(Some(CONTROLLER)),
+                "carries no declared `acceptOwnership()`",
+            ),
+            (
+                "a declared acceptance the bundle does not carry",
+                (STRANGER, GOVERNANCE),
+                (&[core()][..], &declares[..]),
+                Some(Some(CONTROLLER)),
+                "carries no declared `acceptOwnership()`",
+            ),
+            (
+                "another owner, nobody nominated",
+                (STRANGER, Address::ZERO),
+                plain,
+                Some(Some(CONTROLLER)),
+                "not by the reviewed governance",
+            ),
+            (
+                "another owner, under a governance that is not Ownable",
+                (STRANGER, Address::ZERO),
+                plain,
+                Some(None),
+                "not by the reviewed governance",
+            ),
+            (
+                "an acceptance of a timelock governance already holds",
+                (GOVERNANCE, Address::ZERO),
+                accepting,
+                None,
+                "the call reverts, and with it the whole bundle",
+            ),
+            (
+                "the owner of legacy governance with a stranger nominated",
+                (CONTROLLER, STRANGER),
+                plain,
+                Some(Some(CONTROLLER)),
+                "a nomination is outstanding",
+            ),
+        ] {
+            let result = judge_timelock(TIMELOCK, owners, bundle, governance_owner).await;
+            assert_eq!(result.errors, 1, "{case}: {:?}", result.error_messages);
+            assert!(
+                result.has_error(needle),
+                "{case}: {:?}",
+                result.error_messages
+            );
+        }
+
+        let result = judge_timelock(Address::ZERO, (GOVERNANCE, Address::ZERO), plain, None).await;
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("names no ValidatorTimelock"));
+    }
+
+    /// The fresh-ecosystem shape: `ecosystem init` hands the timelock to `owner_address`, which
+    /// owns the legacy `Governance.sol` the Bridgehub answers to (and, deployed by that same
+    /// account, nominated to itself). A WARN, as at the merge-base — not with governance
+    /// nominated and accepted, which is the normalization.
+    #[tokio::test]
+    async fn a_timelock_held_by_the_owner_of_legacy_governance_is_a_warning() {
+        let plain = (&[core()][..], &[][..]);
+        for pending in [Address::ZERO, CONTROLLER, GOVERNANCE] {
+            let result = judge_timelock(
+                TIMELOCK,
+                (CONTROLLER, pending),
+                plain,
+                Some(Some(CONTROLLER)),
+            )
+            .await;
+            assert_eq!(
+                (result.errors, result.warnings),
+                (0, 1),
+                "pending {pending}: {:?}",
+                result.error_messages
+            );
+        }
+    }
+
+    /// F1 (inverts the external review's forged-anchor repro): a core-only package naming its own
+    /// Bridgehub F was anchored on F, unchecked, so a row in the `L1Bridgehub` slot naming F
+    /// verified clean. The anchor is now the reviewed Bridgehub: the package's F fails its binding
+    /// and the row fails its slot. The executors carry no records and the row's implementation
+    /// none, alike in both runs.
+    #[tokio::test]
+    async fn a_core_only_package_is_anchored_on_the_reviewed_bridgehub() {
+        const FORGED: Address = Address::repeat_byte(0xF0);
+        let run = |bridgehub: Address| async move {
+            let mut fixture = RowFixture::naming(
+                LegKind::Core,
+                CORE_EXECUTOR,
+                (PROXY_UPGRADE_DOMAIN_CORE, L1_ECOSYSTEM_CONTRACTS.len(), 0),
+                ("L1Bridgehub", "_bridgehub"),
+                bridgehub,
+            );
+            fixture.package.reported_ctm_executor = None;
+            fixture.package.reported_ctm = None;
+            fixture.package.reported_ctm_proxy_admin = None;
+            fixture.package.reported_singletons.bridgehub = Some(bridgehub);
+            let answers = [
+                Bytes::from_static(&[0x60]), // the core executor's code
+                word(ECO_ADMIN),             // its PROXY_ADMIN
+                word(ECO_ADMIN),             // the reviewed Bridgehub's EIP-1967 admin slot
+                word(GOVERNANCE),            // the core executor's owner
+                word(Address::ZERO),         // its pending owner
+                word(CORE_EXECUTOR),         // the ecosystem ProxyAdmin's owner
+                word(OLD_IMPL),              // the row's live implementation (no slot read)
+                Bytes::from_static(ROW_RUNTIME),
+            ];
+            fixture.verify(false, &answers).await
+        };
+        assert_eq!(L1_ECOSYSTEM_CONTRACTS[0], "L1Bridgehub");
+        let control = run(BRIDGEHUB).await;
+        assert!(
+            !control.has_error("is not the reviewed Bridgehub")
+                && !control.has_error("names proxy"),
+            "{:?}",
+            control.error_messages
+        );
+
+        let forged = run(FORGED).await;
+        assert_eq!(
+            forged.errors,
+            control.errors + 2,
+            "{:?}",
+            forged.error_messages
+        );
+        assert!(forged.has_error(&format!(
+            "the core prepare's bridgehub_proxy_addr {FORGED} is not the reviewed Bridgehub \
+             {BRIDGEHUB}"
+        )));
+        assert!(forged.has_error(&format!(
+            "names proxy {FORGED}, but the live L1Bridgehub is {BRIDGEHUB}"
         )));
     }
 }
