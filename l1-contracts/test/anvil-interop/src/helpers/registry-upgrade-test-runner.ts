@@ -11,7 +11,7 @@
  *      assert the bound shape a fresh ecosystem is born with — nothing is bootstrapped here.
  *   3. Deploy the new-version implementations of a synthetic minor bump (fresh facets except
  *      Mailbox, `DefaultUpgrade` engine, verifier, `DiamondInit`, and an `L1MessageRoot`
- *      implementation for the ecosystem leg) from the `registry-deterministic` forge profile. The
+ *      implementation for the ecosystem leg) from the out/ build. The
  *      deployer key and starting nonce are fixed by the chain states, so their addresses are
  *      reproducible run-to-run and machine-to-machine.
  *   4. CONSUME the committed manifest scripts/registry-manifests/v35-local.json (any drift from the
@@ -37,7 +37,6 @@
  *   `MockContractDeployer` stand-in is the faithful equivalent.
  */
 
-import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
@@ -51,12 +50,7 @@ import {
   L2_COMPLEX_UPGRADER_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
 } from "../core/const";
-import {
-  getAbi,
-  getCreationBytecode,
-  getDeterministicBytecode,
-  getDeterministicCreationBytecode,
-} from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
 import { createProvider, impersonateAndRun } from "../core/utils";
 import {
   coreInitArgs,
@@ -107,38 +101,14 @@ const STALE_REGISTRIES_HINT =
   "(yarn regen:registry-manifest in l1-contracts/test/anvil-interop) and commit the result " +
   `(${REGISTRY_MANIFEST_REL}).`;
 
-// Sources compiled with the `registry-deterministic` forge profile (CBOR-metadata-free, so
-// byte-identical across platforms; see foundry.toml). Everything a committed bytecode hash or
-// bytecode-derived address covers is deployed from this build.
-const DETERMINISTIC_FOUNDRY_PROFILE = "registry-deterministic";
-
 // Mirrors BytecodePublisher.MAX_BATCH_SIZE: the byte budget of one `publishEVMBytecodes` call.
 const MAX_PUBLISH_BATCH_BYTES = 126_000;
 const PUBLISH_GAS_LIMIT = 15_000_000;
-const DETERMINISTIC_SOURCES = [
-  "contracts/state-transition/chain-deps/facets/Admin.sol",
-  "contracts/state-transition/chain-deps/facets/Getters.sol",
-  "contracts/state-transition/chain-deps/facets/Executor.sol",
-  "contracts/state-transition/chain-deps/facets/Migrator.sol",
-  "contracts/state-transition/chain-deps/facets/Committer.sol",
-  "contracts/upgrades/DefaultUpgrade.sol",
-  "contracts/state-transition/chain-deps/DiamondInit.sol",
-  "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol",
-  "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol",
-  "contracts/state-transition/verifiers/MultiProofVerifier.sol",
-  "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol",
-  "contracts/core/message-root/L1MessageRoot.sol",
-  "contracts/dev-contracts/MockContractDeployer.sol",
-  "contracts/upgrades/registry/objects/CTMRelease.sol",
-  "contracts/upgrades/registry/objects/CTMTransition.sol",
-  "contracts/upgrades/registry/objects/ProxyUpgradeTransition.sol",
-  "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol",
-];
 
 // Mirror L2GenesisForceDeploymentsHelper.generateRandomAddress: the delegate must be
 // installed at the address committed by its descriptor, including in the Anvil stand-in.
 function upgradeDelegateInfo(): { deployedBytecodeInfo: string; address: string } {
-  const bytecode = getDeterministicBytecode("MockContractDeployer");
+  const bytecode = getBytecode("MockContractDeployer");
   const hash = ethers.utils.keccak256(bytecode);
   const deployedBytecodeInfo = ethers.utils.defaultAbiCoder.encode(
     ["bytes32", "uint32", "bytes32"],
@@ -260,7 +230,6 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     // ── 3. Deploy the new-version implementations ──
     console.log("\n── Deploying new-version implementations ──");
-    buildDeterministicArtifacts();
     const deployed = await deployUpgradeImplementations(deployer, {
       l1ChainId,
       rollupDAManager: live.rollupDAManager,
@@ -329,7 +298,7 @@ export async function runRegistryDrivenUpgradeScenario(scenario: RegistryUpgrade
 
     // The CTM leg refuses to commit an edge whose L2 factory dependencies are not published.
     const supplier = new ethers.Contract(await ctm.L1_BYTECODES_SUPPLIER(), getAbi("BytecodesSupplier"), deployer);
-    await publishFactoryDeps(l1Provider, supplier, [getDeterministicBytecode("MockContractDeployer")]);
+    await publishFactoryDeps(l1Provider, supplier, [getBytecode("MockContractDeployer")]);
     console.log("  ✓ the L2 delegate's bytecode is published on the CTM's supplier");
 
     // ── 5. Governance executes the upgrade as one bundle ──
@@ -847,17 +816,15 @@ async function deployUpgradeImplementations(
     console.log(`  ${name}: ${contract.address}`);
     return contract.address;
   };
-  // Deployed from the deterministic (CBOR-metadata-free) build, the one the committed manifest's
-  // bytecode-DERIVED values are taken from — see buildDeterministicArtifacts().
-  const deployDeterministic = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
-    deployFrom(name, getDeterministicCreationBytecode(name), args);
-  const mockDeployer = getDeterministicBytecode("MockContractDeployer");
+  const deployFromOut = (name: Parameters<typeof getAbi>[0], args: unknown[]) =>
+    deployFrom(name, getCreationBytecode(name), args);
+  const mockDeployer = getBytecode("MockContractDeployer");
 
   // NOTE: the deploy ORDER below is part of the committed manifest's contract: the deployer key and
   // starting nonce are fixed by the chain states, so each contract's address is a pure function of
   // its position in this sequence. Reordering/inserting deploys invalidates the committed manifest
   // (rerun with REGEN_REGISTRIES=1).
-  const newVerifierPlonk = await deployDeterministic("ZKsyncOSVerifierPlonk", []);
+  const newVerifierPlonk = await deployFromOut("ZKsyncOSVerifierPlonk", []);
   return {
     // Pinned CODE defines the delegate calldata. The mock delegate deliberately has no fallback,
     // so the composed call names its explicit no-op method and a stale selector still fails.
@@ -877,26 +844,26 @@ async function deployUpgradeImplementations(
     // RollupDAManager, testnet). MailboxFacet is the one facet NOT replaced: its constructor needs
     // the live EIP7702Checker, which only the original deployment config knows, so the release
     // keeps the live Mailbox.
-    newAdminFacet: await deployDeterministic("AdminFacet", [params.l1ChainId, params.rollupDAManager]),
-    newGettersFacet: await deployDeterministic("GettersFacet", []),
-    newExecutorFacet: await deployDeterministic("ExecutorFacet", []),
-    newMigratorFacet: await deployDeterministic("MigratorFacet", [params.l1ChainId, true /* _isTestnet */]),
-    newCommitterFacet: await deployDeterministic("CommitterFacet", [params.l1ChainId]),
-    newDefaultUpgrade: await deployDeterministic("DefaultUpgrade", []),
-    newDiamondInit: await deployDeterministic("DiamondInit", []),
+    newAdminFacet: await deployFromOut("AdminFacet", [params.l1ChainId, params.rollupDAManager]),
+    newGettersFacet: await deployFromOut("GettersFacet", []),
+    newExecutorFacet: await deployFromOut("ExecutorFacet", []),
+    newMigratorFacet: await deployFromOut("MigratorFacet", [params.l1ChainId, true /* _isTestnet */]),
+    newCommitterFacet: await deployFromOut("CommitterFacet", [params.l1ChainId]),
+    newDefaultUpgrade: await deployFromOut("DefaultUpgrade", []),
+    newDiamondInit: await deployFromOut("DiamondInit", []),
     // A multi-proof testnet verifier like the live one: the ZKsync OS testnet verifier over the plonk
     // sub-verifier deployed above, next to the live ZiSK side. Interop chains require the second
     // proof system ({protocol-docs/interop-gating.md#second-proof-system-requirement}), so a
     // single-proof verifier would not be accepted. No proofs are verified in this harness.
     newVerifierPlonk,
-    newVerifier: await deployDeterministic("MultiProofTestnetVerifier", [
-      await deployDeterministic("MultiProofVerifier", [
-        await deployDeterministic("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
+    newVerifier: await deployFromOut("MultiProofTestnetVerifier", [
+      await deployFromOut("MultiProofVerifier", [
+        await deployFromOut("ZKsyncOSTestnetVerifier", [newVerifierPlonk]),
         params.ziskRangeVerifier,
       ]),
     ]),
     // Ecosystem leg: a fresh L1MessageRoot implementation with the live immutable values.
-    newMessageRootImpl: await deployDeterministic("L1MessageRoot", [params.bridgehub, params.chainAssetHandler]),
+    newMessageRootImpl: await deployFromOut("L1MessageRoot", [params.bridgehub, params.chainAssetHandler]),
   };
 }
 
@@ -1027,24 +994,6 @@ function buildRegistryManifest(
   };
 }
 
-/**
- * Compile the pinned sources with the `registry-deterministic` forge profile into
- * out-registry-deterministic/. Both modes run this: emit records the resulting addresses and
- * bytecode-derived values, consume deploys the exact same bytecode so those committed values still
- * describe this run.
- */
-function buildDeterministicArtifacts(): void {
-  console.log(`  compiling pinned sources with FOUNDRY_PROFILE=${DETERMINISTIC_FOUNDRY_PROFILE}…`);
-  const result = spawnSync("forge", ["build", ...DETERMINISTIC_SOURCES], {
-    cwd: l1ContractsDir,
-    stdio: "inherit",
-    env: { ...process.env, FOUNDRY_PROFILE: DETERMINISTIC_FOUNDRY_PROFILE },
-  });
-  if (result.status !== 0) {
-    throw new Error(`forge build failed for the ${DETERMINISTIC_FOUNDRY_PROFILE} profile (status ${result.status})`);
-  }
-}
-
 function staleRegistriesError(cause: unknown): Error {
   const message = cause instanceof Error ? cause.message : String(cause);
   return new Error(`${message}\n\n${STALE_REGISTRIES_HINT}`);
@@ -1155,7 +1104,7 @@ async function deployUpgradeObjectsFromManifest(
     name: "CTMRelease" | "CTMTransition" | "ProxyUpgradeTransition" | "DefaultProxyUpgradeEngine",
     ...constructorArgs: unknown[]
   ): Promise<string> => {
-    const factory = new ethers.ContractFactory(getAbi(name), getDeterministicCreationBytecode(name), deployer);
+    const factory = new ethers.ContractFactory(getAbi(name), getCreationBytecode(name), deployer);
     const contract = await factory.deploy(...constructorArgs);
     await contract.deployed();
     return contract.address;
@@ -1191,10 +1140,7 @@ async function relayL2UpgradeTx(
   upgradeTxData: string,
   chainId: number
 ): Promise<void> {
-  await l2Provider.send("anvil_setCode", [
-    upgradeDelegateInfo().address,
-    getDeterministicBytecode("MockContractDeployer"),
-  ]);
+  await l2Provider.send("anvil_setCode", [upgradeDelegateInfo().address, getBytecode("MockContractDeployer")]);
 
   const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
     const tx = await signer.sendTransaction({

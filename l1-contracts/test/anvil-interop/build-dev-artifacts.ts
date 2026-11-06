@@ -1,5 +1,8 @@
 import { spawnSync } from "child_process";
+import * as fs from "fs";
 import * as path from "path";
+import { getSoliditySourceFileName } from "./src/core/contracts";
+import { PREDEPLOY_SYSTEM_CONTRACTS } from "./src/core/predeploys";
 
 type DevArtifact = {
   contractPath: string;
@@ -49,14 +52,40 @@ const ANVIL_INTEROP_DEV_ARTIFACTS: DevArtifact[] = [
   },
 ];
 
+/** The source under `contracts/` of each predeploy, found by its file name, which must be unique. */
+function findPredeploySources(l1ContractsDir: string): string[] {
+  const pathsByFileName = new Map<string, string[]>();
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(entryPath);
+      } else {
+        pathsByFileName.set(entry.name, [...(pathsByFileName.get(entry.name) ?? []), entryPath]);
+      }
+    }
+  };
+  walk(path.join(l1ContractsDir, "contracts"));
+  return PREDEPLOY_SYSTEM_CONTRACTS.map(({ contractName }) => {
+    const fileName = getSoliditySourceFileName(contractName);
+    const matches = pathsByFileName.get(fileName) ?? [];
+    if (matches.length !== 1) {
+      throw new Error(`Expected exactly one ${fileName} under contracts/, found ${matches.length}`);
+    }
+    return path.relative(l1ContractsDir, matches[0]);
+  });
+}
+
 function main(): void {
   const l1ContractsDir = path.resolve(__dirname, "../..");
-  const contractPaths = ANVIL_INTEROP_DEV_ARTIFACTS.map(({ contractPath }) => contractPath);
+  const predeploySources = findPredeploySources(l1ContractsDir);
+  const contractPaths = [...ANVIL_INTEROP_DEV_ARTIFACTS.map(({ contractPath }) => contractPath), ...predeploySources];
 
   console.log("Building Anvil interop dev artifacts:");
   for (const { contractPath, reason } of ANVIL_INTEROP_DEV_ARTIFACTS) {
     console.log(`- ${contractPath}: ${reason}`);
   }
+  console.log(`- ${predeploySources.length} predeploy sources: spec 01 holds each predeploy's code against out/`);
 
   const result = spawnSync("forge", ["build", ...contractPaths], {
     cwd: l1ContractsDir,

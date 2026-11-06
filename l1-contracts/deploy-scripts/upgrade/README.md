@@ -17,8 +17,9 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
 ## Layout
 
 - `default-upgrade/` — the version-independent prepare pipeline. `DefaultCoreUpgrade` (ecosystem
-  side) deploys or reuses each L1 ecosystem implementation against the live one by code identity
-  and pins the replacements in a Core-domain `ProxyUpgradeTransition`.
+  side) deploys each L1 ecosystem implementation the version declares changed, reuses the rest
+  (each must already run the code the current sources produce) and pins the replacements in a
+  Core-domain `ProxyUpgradeTransition`.
   `DefaultCTMUpgrade` (per-CTM side) deploys the release members the version changes, the
   `CTMTransition` and, when a CTM-domain implementation changes, a CTM-domain
   `ProxyUpgradeTransition`, each independently. Neither emits the executor calls — each is a
@@ -59,17 +60,17 @@ cargo run -p protocol_ops -- ecosystem upgrade-prepare-all \
 On one anvil fork of L1, in this order:
 
 1. `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance` — the ownership precondition.
-2. The core prepare (`noGovernancePrepare`): each ecosystem implementation reused when it already
-   runs the code the current sources produce and redeployed only when the version declares it
-   changed, then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
+2. The core prepare (`noGovernancePrepare`): each ecosystem implementation the version declares
+   changed is redeployed, and every other one reused when it already runs the code the current
+   sources produce (refused otherwise), then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
    implementation), pinning the `DefaultProxyUpgradeEngine` it deploys (`deployProxyUpgradeEngine()`
    is the override point for a release engine with follow-up calls). Output `[registry]`:
    `core_transition_addr` (zero when none) and
    `core_upgrade_executor_addr` — the executor read from the live ecosystem `ProxyAdmin`'s owner,
    or deployed by the v35 prepare.
-3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
-   reused when it already runs the code the current sources produce and redeployed only when the
-   version names it in `changedReleaseMembers()`; the release itself is new on every version bump
+3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member the
+   version names in `changedReleaseMembers()` is redeployed, and every other one reused when it
+   already runs the code the current sources produce (refused otherwise); the release itself is new on every version bump
    and reused only by an infrastructure-only edge. Then the transition (validated) unless the
    version declares an infrastructure-only edge, the CTM-domain `ProxyUpgradeTransition` when a
    CTM-domain implementation changed, and — on the bootstrap edge only — the ChainAdmin's half of
@@ -312,7 +313,9 @@ them. The header of `scripts/new-release.ts` lists what it changes and what it l
 
 Start from `v36/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
 contracts the release changes, name every release member you replace in `changedReleaseMembers()`,
-and keep everything else derived.
+and keep everything else derived. Declare every contract the release changes, even when only its
+constructor changed: the build has no CBOR metadata, so such a change keeps the runtime code, and only
+the declaration makes the prepare redeploy it.
 
 **Declare what the upgrade is.** `DefaultCTMUpgrade.upgradeKind()` returns `ChainRelease` by
 default — the edge deploys the upgrade engine and a `CTMTransition`, and the protocol version

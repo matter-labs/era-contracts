@@ -168,8 +168,9 @@ A bundle in which the deployer signs nothing passes. A release input declaring
 from zk-governance artifacts, which the check does not know yet. Signing (`replay-bundle --key`, and
 `check-deployer-plan --bundle`, which the deploy workflow runs) also requires this checkout to be
 the bundle's `contracts_commit` with no change to the contract sources and reviewed inputs the
-generation tracks, a bundle not marked `contracts_worktree_dirty`, and the build to be read from
-this checkout.
+generation tracks, its `lib/` submodules at their pins, a bundle not marked
+`contracts_worktree_dirty`, and the build to be read from this checkout. `etherscan-verify` and
+`etherscan-check` require the same.
 
 It runs in the generate workflow's `verify-bundle-handoff` job and in every `replay-bundle` except
 `--verify-only`; the deploy workflow runs it after selecting the L1 RPC and before the step that

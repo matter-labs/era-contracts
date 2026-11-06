@@ -217,9 +217,9 @@ reviewed Bridgehub (below), `aliasedL1Governance` against the alias of the revie
 against the `zk_token_asset_id` of `upgrade-envs/permanent-values/<env>.toml` for the `--env` the
 package is held against (required unless the package is a replacement), the legacy and test-only
 addresses against zero, and each bytecode field against the release's own L2 bytecode table. The
-arriving release's system-proxy shell is compared with the departing one's, compiler metadata
-stripped: a logic change fails unless the edge ships a delegate the reviewed commit builds other
-than the stock `L2DefaultUpgrade`, which is then reported for the reviewer to confirm. The
+arriving release's system-proxy shell is compared with the departing one's: a logic change fails
+unless the edge ships a delegate the reviewed commit builds other than the stock
+`L2DefaultUpgrade`, which is then reported for the reviewer to confirm. The
 release's own `validate()` is called as well: it reads no state, and it runs on chain when a
 transition is built over the release, in the bootstrap's `validate()` and when the CTM installs the
 release, so a revert — a codeless `diamondInit`, `genesisUpgrade`, verifier or facet

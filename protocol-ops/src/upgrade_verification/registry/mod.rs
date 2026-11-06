@@ -169,7 +169,6 @@ pub(crate) async fn verify(
             replacement::verify(
                 &provider,
                 &build,
-                genesis_image.as_ref().ok(),
                 &package,
                 expected_governance_owner,
                 &salts,

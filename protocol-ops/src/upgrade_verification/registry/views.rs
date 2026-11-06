@@ -275,10 +275,8 @@ sol! {
     /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read
     /// `L2PlanLib.requirePublished` performs when the CTM commits a transition (and the bootstrap
     /// migration's `validate()`), so a zero here is the readiness failure that would revert it.
-    /// The event carries the published code.
     #[sol(rpc)]
     contract BytecodesSupplierView {
-        event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 

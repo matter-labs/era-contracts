@@ -437,17 +437,9 @@ pub(crate) async fn verify<P: Provider>(
     }
 
     // ── 5. The L2 proxy logic chains crossing the edge keep ──
-    if let (Some(edge), Some(ctm)) = (&transition_edge, &ctm) {
+    if let Some(edge) = &transition_edge {
         result.print_info("\n== L2 system-proxy shell ==");
-        verify_shell_kept(
-            provider,
-            build.identity(),
-            genesis.image.as_ref().ok(),
-            result,
-            ctm,
-            &edge.manifest,
-        )
-        .await;
+        verify_shell_kept(provider, build.identity(), result, &edge.manifest).await;
     }
 
     // ── 6. The calldata governance will actually sign ──

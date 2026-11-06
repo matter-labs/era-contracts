@@ -171,13 +171,11 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 # `EXECUTE.md` (written by the sim-inputs emit).
 #
 # ─── WHY THE DEPLOY BUNDLE IS THE POINT ───
-# Solidity output is not byte-stable across build environments (the default
-# foundry profile embeds path-dependent CBOR metadata), so the bytecode — and
-# with it every CREATE2 address and all the governance calldata — belongs to the
-# machine that compiled it. Nobody can "reproduce" this run elsewhere and get the
-# same addresses. What they CAN do is broadcast the exact deployer calls this run
-# computed: the `prepare/*.safe.json` transactions carry the CREATE2 init code
-# verbatim.
+# The build carries no CBOR metadata, so a build of the same commit with the
+# pinned toolchain reproduces this run's bytecode, CREATE2 addresses and
+# governance calldata. The deployer still broadcasts the exact calls this run
+# computed rather than rebuilding: the `prepare/*.safe.json` transactions carry
+# the CREATE2 init code verbatim.
 # So this workflow publishes a self-contained DEPLOY BUNDLE
 # (`ecosystem-upgrade-deploy-inputs-<env>`): the deployer calls, `ecosystem.toml`,
 # the Etherscan verify commands, and a `bundle-metadata.json` pinning the

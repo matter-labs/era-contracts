@@ -357,9 +357,10 @@ version, and building or generating `selectors` with the fork mismatches CI in b
 without saying so.
 
 Never bump the pin in a workflow directly — change it in `.github/foundry-versions.env` and
-regenerate whatever it invalidates. A bump changes solc metadata in every artifact, so
-`AllContractsHashes.json` always needs regenerating (`zkstack-out` and `selectors` are ABI-derived
-and unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
+regenerate whatever it invalidates. The build carries no CBOR metadata, so a bump changes bytecode
+only if it changes the solc version or the settings Foundry passes to it; run the hash check and
+regenerate `AllContractsHashes.json` if it fails (`zkstack-out` and `selectors` are ABI-derived and
+unaffected — measured, not assumed). Anvil's trace schema must stay compatible with the
 committed anvil-interop chain states; regenerate those too if a bump changes it.
 
 One anvil is pinned separately: [`.github/amsterdam-anvil.env`](.github/amsterdam-anvil.env), for
