@@ -55,8 +55,11 @@ enum L2EcosystemContract {
 ///         `ProxyUpgradeRow[]` inventories of length `CTM_CONTRACT_COUNT` indexed by this enum (same slot semantics as `L1EcosystemContract`). Only the members that are
 ///         TUPPs under the CTM-domain `ProxyAdmin` can meaningfully participate
 ///         (ChainTypeManager, ValidatorTimelock, BytecodesSupplier, PermissionlessValidator,
-///         ServerNotifier, L1InteropFeeManager), applied through the executor's bound admin. A row in a facet or
-///         verifier slot can never apply.
+///         ServerNotifier, L1InteropFeeManager), applied through the executor's bound admin.
+/// @dev The slot index is a label the chain does not bind: on chain a row applies to whatever proxy
+///      it names under the applying executor's `ProxyAdmin`, whichever slot it sits in. Package
+///      verification (`protocol-ops`) binds each slot to its live proxy. Rows apply in enum order,
+///      so a row's `initializeUpgrade` may depend only on lower-numbered members.
 /// @dev APPEND-ONLY once a manifest indexed by it is deployed (see `L1EcosystemContract`).
 enum CTMContract {
     // ---- Diamond facets ----
@@ -104,7 +107,10 @@ enum ZKsyncOSUpgradeType {
 ///         is the "not upgraded" statement. The fixed length guarantees every member HAS a slot;
 ///         it does not guarantee that preparation wrote every intended change into one, since an
 ///         inert slot and a row that was never built are the same bytes (see
-///         {ProxyUpgradeRowLib.toRows}).
+///         {ProxyUpgradeRowLib.toRows}). Nor does it bind a slot to its member: on chain a row
+///         applies to the proxy it names, and package verification (`protocol-ops`) holds each
+///         slot to its live proxy. Rows apply in enum order, so a row's `initializeUpgrade` may
+///         depend only on lower-numbered members.
 /// @dev APPEND-ONLY once a manifest indexed by it is deployed: numeric values are then stable
 ///      identifiers — never reorder or remove members. Appending one grows the manifest array,
 ///      which the next release's objects pick up.

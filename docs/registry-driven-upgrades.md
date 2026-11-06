@@ -196,6 +196,16 @@ be smuggled in, and the enum — being the same one deployment uses — is the s
 to end. `ProxyUpgradeRowLib.toRows` flattens the array into the `ProxyUpgradeRow[]` the executors
 apply, dropping the inert slots, so the executors never recompile when the inventory grows.
 
+**The slot is a label the chain does not bind.** On chain a row applies to whatever proxy its
+`proxy` field names, provided the applying executor's `ProxyAdmin` administers it: a row placed in
+another member's slot applies just the same, and the duplicate-row check compares proxies, not
+slots. That a slot names its own member is established by package verification, which resolves
+each slot's proxy from live state (the Bridgehub for the ecosystem domain, the CTM for the CTM
+domain) and refuses a row naming any other contract. Rows also apply in enum order, so a row's
+`initializeUpgrade` runs with the lower-numbered slots already upgraded and the higher-numbered
+ones not yet: a reinitializer may depend only on lower-numbered members, which is part of
+reviewing every new `initializeUpgrade`.
+
 **What the length check does not give you.** It guarantees the SLOTS exist, not that preparation
 populated every intended change: an inert slot is the same bytes whether the upgrade deliberately
 leaves the contract alone or whether nobody wrote its row builder. Nothing on-chain can tell those
