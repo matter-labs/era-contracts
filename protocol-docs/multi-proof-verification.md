@@ -22,6 +22,6 @@ Platform clients can query the getter initially and refresh it after `NewDisable
 
 ## Rollout
 
-A CTM gets the multi-proof verifier either when it is deployed (`multi_proof_verifier = true` in `config-deploy-ctm.toml`) or through an upgrade, which deploys it when the CTM's entry in `upgrade-envs/permanent-values/<env>.toml` sets `multi_proof_verifier = true`. Every chain takes its new verifier from the CTM during its upgrade, so the flag is permanent: the upgrade prepare refuses to give a multi-proof CTM an Airbender-only verifier.
+Every CTM upgrade deploys the multi-proof verifier, and every chain takes it from the CTM during its own upgrade. A fresh CTM deploy gets it with `multi_proof_verifier = true` in `config-deploy-ctm.toml`. Whether a chain proves with ZiSK is then the chain's own choice.
 
 The disable bit is zero on a new diamond, so the contracts start every chain with ZiSK enabled. The tooling makes ZiSK opt-in instead. `RegisterZKChain` disables it right after creating a chain, and `AdminFunctions.upgradeChainFromCTM` disables it in the same multicall as the cut that takes a chain into v34. Upgrades that start at v34 or later leave the bit alone. `protocol-ops chain init --enable-zisk` and `protocol-ops chain upgrade --enable-zisk` skip the disable. A chain created or upgraded without this tooling starts with ZiSK enabled. So does the diamond created for a chain on a settlement layer it migrates to, because the migration data does not carry the bit.

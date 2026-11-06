@@ -151,10 +151,6 @@ pub struct CtmEntry {
     pub bytecodes_supplier: Option<Address>,
     #[serde(default)]
     pub rollup_da_manager: Option<Address>,
-    /// Whether the upgrade gives this CTM the Airbender + ZiSK multi-proof verifier. Permanent: once a
-    /// CTM runs it, every later upgrade must keep the flag, and the prepare refuses one that does not.
-    #[serde(default)]
-    pub multi_proof_verifier: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -598,32 +594,6 @@ mod tests {
             saw_mainnet |= env == "mainnet";
         }
         assert!(saw_mainnet, "no mainnet permanent values");
-    }
-
-    /// Only stage's CTM runs the multi-proof verifier: turning it on for another env is a decision
-    /// this test should make someone confirm.
-    #[test]
-    fn only_stage_runs_the_multi_proof_verifier() {
-        let dir = resolve_l1_contracts_path()
-            .unwrap()
-            .join(PERMANENT_VALUES_DIR);
-        for entry in fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
-            if path.extension().and_then(|e| e.to_str()) != Some("toml") {
-                continue;
-            }
-            let env = path.file_stem().unwrap().to_str().unwrap();
-            let values: PermanentValues =
-                toml::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
-            for ctm in values.ctm_contracts.iter().flat_map(|c| &c.ctms) {
-                assert_eq!(
-                    ctm.multi_proof_verifier,
-                    env == "stage",
-                    "{env} CTM {:#x} has an unexpected multi_proof_verifier",
-                    ctm.proxy
-                );
-            }
-        }
     }
 
     #[test]

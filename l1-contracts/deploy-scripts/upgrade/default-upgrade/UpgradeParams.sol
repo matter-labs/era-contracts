@@ -48,8 +48,4 @@ struct CTMUpgradeParams {
     ///         `performForceDeployedContractsInit`, so a zero value breaks the genesis of chains created
     ///         from this release.
     bytes32 zkTokenAssetId;
-    /// @notice Whether the CTM's new verifier is the Airbender + ZiSK multi-proof one. Declared per CTM
-    ///         in `upgrade-envs/permanent-values/<env>.toml`. The upgrade refuses to drop a CTM that
-    ///         already runs a multi-proof verifier back to Airbender-only.
-    bool multiProofVerifier;
 }

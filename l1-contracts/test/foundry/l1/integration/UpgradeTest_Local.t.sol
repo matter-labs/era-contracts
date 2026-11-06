@@ -28,6 +28,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DefaultUpgradeZKsyncOS} from "contracts/upgrades/DefaultUpgradeZKsyncOS.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {Bytes} from "contracts/vendor/Bytes.sol";
+import {ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE} from "contracts/common/Config.sol";
 
 /// @notice Test-only variant of the CTM script protocol-ops prepares with by default, skipping the
 ///         bytecode-heavy steps to avoid MemoryOOG.
@@ -259,6 +260,11 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationTestBase, L1ContractDe
             IZKsyncOSVerifier(newVerifier).isTestnetVerifier(),
             _expectTestnetEcosystem(),
             "New version registered with the wrong verifier kind"
+        );
+        assertEq(
+            IZKsyncOSVerifier(newVerifier).getProofMode(0),
+            ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE,
+            "New version registered without the multi-proof verifier"
         );
         assertGt(
             IChainTypeManager(ctm).protocolVersionDeadline(_expectedNewVersion),
