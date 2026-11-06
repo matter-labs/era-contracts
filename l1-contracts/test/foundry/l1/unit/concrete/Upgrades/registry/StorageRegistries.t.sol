@@ -612,6 +612,44 @@ contract StorageRegistriesTest is Test {
         assertEq(_setFlags(patchTransition.releaseDiff()), 0, "a copy one version up differs nowhere else");
     }
 
+    /// @dev OZ L-01. A release built before an `L2EcosystemContract` append keeps its shorter
+    ///      table (modelled by serving `newRelease`'s table one slot short). An L1-only edge from it
+    ///      toward a release whose appended row is empty changes no member's row, so it constructs
+    ///      and its diff names no L2 table change.
+    function test_l1OnlyEdgeDepartingAPreAppendReleaseKeepsItsL2Description() public {
+        vm.mockCall(
+            address(newRelease),
+            abi.encodeCall(ICTMRelease.l2BytecodeInfos, ()),
+            abi.encode(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT - 1))
+        );
+
+        CTMTransition patchTransition = new CTMTransition(_patchManifest());
+
+        ReleaseDiff memory diff = patchTransition.releaseDiff();
+        assertFalse(diff.l2BytecodeInfos, "an empty appended row is no change");
+        assertEq(_setFlags(diff), 0, "and the version-only patch changes nothing else");
+    }
+
+    /// @dev The member-by-member comparison still sees a changed row past the shorter table: a
+    ///      filled appended row derives a deployment, which a patch cannot carry.
+    function test_revertWhen_patchFillsARowAppendedAfterItsDepartingRelease() public {
+        vm.mockCall(
+            address(newRelease),
+            abi.encodeCall(ICTMRelease.l2BytecodeInfos, ()),
+            abi.encode(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT - 1))
+        );
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
+        releaseManifest.l2BytecodeInfos[L2_ECOSYSTEM_CONTRACT_COUNT - 1] = L2PlanFixtures.bytecodeInfo(hex"dd05");
+        L2PlanFixtures.syncForceDeployments(releaseManifest);
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        // A derived deployment needs a delegate before the edge rules are reached.
+        manifest.l2Plan = _l2Plan();
+
+        vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
+        new CTMTransition(manifest);
+    }
+
     /// @dev The fixture releases differ in the admin facet alone, so the hop's diff is exactly the
     ///      facet flag — the same fact `facetCuts()` spells out in full.
     function test_releaseDiff_namesOnlyTheFacetsForTheFixtureHop() public view {

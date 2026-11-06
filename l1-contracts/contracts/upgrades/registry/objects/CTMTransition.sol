@@ -123,11 +123,12 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
 
     /// @dev The L2/genesis description an edge without an L2 side must carry over unchanged (see
     ///      the constructor). Compared by value: such an edge names a release of its own, whose
-    ///      snapshot may differ from the departing one in its L1 members only.
+    ///      snapshot may differ from the departing one in its L1 members only. The table is compared
+    ///      member by member ({_l2TableChanged}), so a release built after an enum append, whose
+    ///      table is longer but whose appended rows are empty, keeps the same L2 description.
     function _requireL2StateKept(ICTMRelease _fromRelease, ICTMRelease _newRelease) private view {
         if (
-            keccak256(abi.encode(_fromRelease.l2BytecodeInfos())) !=
-                keccak256(abi.encode(_newRelease.l2BytecodeInfos())) ||
+            _l2TableChanged(_fromRelease.l2BytecodeInfos(), _newRelease.l2BytecodeInfos()) ||
             keccak256(_fromRelease.l2SystemProxyBytecodeInfo()) != keccak256(_newRelease.l2SystemProxyBytecodeInfo()) ||
             keccak256(_fromRelease.fixedForceDeploymentsData()) != keccak256(_newRelease.fixedForceDeploymentsData())
         ) {
@@ -155,12 +156,32 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
             diff.genesisBatch = fromBatchHash != toBatchHash || fromIndex != toIndex;
         }
         diff.genesisFacets = keccak256(abi.encode(from.genesisFacets())) != keccak256(abi.encode(to.genesisFacets()));
-        diff.l2BytecodeInfos =
-            keccak256(abi.encode(from.l2BytecodeInfos())) != keccak256(abi.encode(to.l2BytecodeInfos()));
+        diff.l2BytecodeInfos = _l2TableChanged(from.l2BytecodeInfos(), to.l2BytecodeInfos());
         diff.l2SystemProxyBytecodeInfo =
             keccak256(from.l2SystemProxyBytecodeInfo()) != keccak256(to.l2SystemProxyBytecodeInfo());
         diff.fixedForceDeploymentsData =
             keccak256(from.fixedForceDeploymentsData()) != keccak256(to.fixedForceDeploymentsData());
+    }
+
+    /// @dev Whether two L2 bytecode tables differ in any member's row. A table is indexed by
+    ///      member, and a release built before an enum append keeps its shorter table, so the
+    ///      comparison runs over the longer table with a row past the shorter one's length counting
+    ///      as empty, the same rule {TransitionDerivationLib.changedL2Rows} derives by.
+    /// @param _fromTable The departing release's table.
+    /// @param _newTable The target release's table.
+    /// @return True if some member's row differs.
+    function _l2TableChanged(bytes[] memory _fromTable, bytes[] memory _newTable) private pure returns (bool) {
+        uint256 fromLength = _fromTable.length;
+        uint256 newLength = _newTable.length;
+        uint256 length = fromLength > newLength ? fromLength : newLength;
+        for (uint256 i = 0; i < length; ++i) {
+            bytes32 fromRow = i < fromLength ? keccak256(_fromTable[i]) : keccak256("");
+            bytes32 newRow = i < newLength ? keccak256(_newTable[i]) : keccak256("");
+            if (fromRow != newRow) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// @notice The whole manifest, exactly as it was pinned.
