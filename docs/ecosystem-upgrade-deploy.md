@@ -136,7 +136,11 @@ bytecode with altered comments, and Etherscan keeps the first verification of an
 address, with no self-service way to replace it (until then, it shows one of
 identical code elsewhere; every address is submitted all the same).
 `protocol_ops ecosystem etherscan-verify --l1-rpc-url` therefore runs next to the
-broadcast and submits each contract the moment its code is on L1, and
+broadcast and submits each contract the moment its code is on L1. If it exits with
+an error, the broadcast stops before its next transaction (`upgrade-broadcast
+--halt-when`); a resumed deploy's verifier first submits what already landed. A
+contract Etherscan refuses does not stop the broadcast: the verifier reports it once
+the broadcast is over.
 `protocol_ops ecosystem etherscan-check` then holds what Etherscan shows for every
 address to this checkout: the contract name and every source file, byte for byte.
 A similar match (another address's verification) is held to the same sources:
@@ -194,11 +198,14 @@ cd protocol-ops && cargo build --release && cd ..
 
 # Start verifying on Etherscan before the broadcast: each contract step 1 logged
 # (`forge verify-contract <address> <Contract> [--constructor-args <hex>]`, from the
-# CREATE2 init code it deployed) is submitted as soon as its code is on L1.
+# CREATE2 init code it deployed) is submitted as soon as its code is on L1. If the
+# verifier fails, the broadcast stops before its next transaction.
 export ETHERSCAN_API_KEY
-rm -f ./deploy-result/broadcast-done  # left by an earlier run, it would stop the verifier at once
-./protocol-ops/target/release/protocol_ops ecosystem etherscan-verify --bundle "$BUNDLE" \
-  --l1-rpc-url <l1-rpc> --stop-when ./deploy-result/broadcast-done &
+# Left by an earlier run, either would stop the verifier or the broadcast at once.
+mkdir -p ./deploy-result && rm -f ./deploy-result/broadcast-done ./deploy-result/verifier-failed
+(./protocol-ops/target/release/protocol_ops ecosystem etherscan-verify --bundle "$BUNDLE" \
+  --l1-rpc-url <l1-rpc> --stop-when ./deploy-result/broadcast-done ||
+  touch ./deploy-result/verifier-failed) &
 verifier=$!
 
 # Broadcast the deployer bundles → writes ./deploy-result/transactions.txt, this
@@ -211,7 +218,8 @@ DEPLOYER_ADDR=$(cast wallet address --private-key "$DEPLOYER_KEY")
   --key "${DEPLOYER_ADDR}=${DEPLOYER_KEY}" \
   --skip-unkeyed \
   --max-gas-price-gwei 500 \
-  --out ./deploy-result/deploy-executed.json
+  --out ./deploy-result/deploy-executed.json \
+  --halt-when ./deploy-result/verifier-failed
 
 # The broadcast is over: the verifier makes a last pass and reports what it could not submit.
 touch ./deploy-result/broadcast-done

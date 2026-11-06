@@ -143,14 +143,17 @@ test("a deploy run on another commit than the generation is refused", () => {
   assert.match(result.stdout, /::error::bundle was generated from a{40} but this run checked out b{40}/);
 });
 
-function runFollowerLaunch({ key, toolExit }) {
+// `then`, if given, runs in the launch's directory once the verifier has exited.
+function runFollowerLaunch({ key, toolExit, toolDelay = 0, then }) {
   const directory = mkdtempSync(join(tmpdir(), "follower-test-"));
   try {
     const tool = join(directory, "protocol-ops/target/release");
     mkdirSync(tool, { recursive: true });
-    writeFileSync(join(tool, "protocol_ops"), `#!/bin/sh\necho "protocol_ops $*"\nexit ${toolExit}\n`, {
-      mode: 0o755,
-    });
+    writeFileSync(
+      join(tool, "protocol_ops"),
+      `#!/bin/sh\necho "protocol_ops $*"\nsleep ${toolDelay}\nexit ${toolExit}\n`,
+      { mode: 0o755 }
+    );
     const env = {
       ...process.env,
       ETHERSCAN_API_KEY: key,
@@ -159,10 +162,52 @@ function runFollowerLaunch({ key, toolExit }) {
       RUNNER_TEMP: directory,
       GITHUB_ENV: join(directory, "env"),
     };
-    return spawnSync("bash", ["-c", followerScript], { cwd: directory, encoding: "utf8", env });
+    // Returns once the backgrounded verifier closes its inherited stdout, i.e. has exited.
+    const launch = spawnSync("bash", ["-c", followerScript], { cwd: directory, encoding: "utf8", env });
+    return then ? then(launch, directory) : launch;
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+}
+
+// The broadcast step after a launch in `directory`, with a stand-in protocol_ops that halts as
+// `upgrade-broadcast --halt-when` does.
+function runBroadcast(directory) {
+  const broadcast = steps[stepIndex("Broadcast deployer bundles to L1")];
+  const tool = join(directory, "protocol-ops/target/release/protocol_ops");
+  writeFileSync(
+    tool,
+    `#!/bin/bash
+echo "protocol_ops $*"
+while [ $# -gt 0 ]; do
+  if [ "$1" = --halt-when ] && [ -f "$2" ]; then echo "$2 exists: stopped before Safe tx #0"; exit 1; fi
+  shift
+done
+`,
+    { mode: 0o755 }
+  );
+  const exported = Object.fromEntries(
+    readFileSync(join(directory, "env"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => line.split(/=(.*)/s).slice(0, 2))
+  );
+  return spawnSync("bash", ["-c", broadcast.run], {
+    cwd: directory,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      ...exported,
+      L1_NETWORK: "sepolia",
+      PK_SEPOLIA: "0x01",
+      DEPLOYER_ADDR: "0x02",
+      DEPLOY_BUNDLE_DIR: "/bundle",
+      L1_RPC_URL: "http://127.0.0.1:1",
+      DEPLOY_OUTDIR: directory,
+      TXLOG: join(directory, "transactions.txt"),
+      MAX_GAS_PRICE_GWEI: "500",
+    },
+  });
 }
 
 test("a follower that cannot run stops the deploy before the broadcast", () => {
@@ -174,6 +219,26 @@ test("a follower that cannot run stops the deploy before the broadcast", () => {
   const failed = runFollowerLaunch({ key: "k", toolExit: 1 });
   assert.equal(failed.status, 1);
   assert.match(failed.stdout, /protocol_ops ecosystem etherscan-verify[\s\S]*::error::The Etherscan verifier failed/);
+});
+
+test("a verifier that exits during the broadcast stops it before its next transaction", () => {
+  // Past the launch's own check: the launch passes, and only the broadcast can stop.
+  const late = runFollowerLaunch({
+    key: "k",
+    toolExit: 1,
+    toolDelay: 6,
+    then: (launch, directory) => {
+      assert.equal(launch.status, 0, launch.stdout + launch.stderr);
+      return runBroadcast(directory);
+    },
+  });
+  assert.equal(late.status, 1);
+  assert.match(late.stdout, /--halt-when \S+\/etherscan-verify\/failed\n\S+\/etherscan-verify\/failed exists/);
+  assert.match(late.stdout, /protocol_ops ecosystem etherscan-verify[\s\S]*::error::The Etherscan verifier exited/);
+  // A verifier that is done (it submitted every contract) does not stop the broadcast.
+  const done = runFollowerLaunch({ key: "k", toolExit: 0, then: (launch, directory) => runBroadcast(directory) });
+  assert.equal(done.status, 0, done.stdout + done.stderr);
+  assert.match(done.stdout, /--halt-when \S+\/etherscan-verify\/failed\n/);
 });
 
 const checkedOut = "c".repeat(40);

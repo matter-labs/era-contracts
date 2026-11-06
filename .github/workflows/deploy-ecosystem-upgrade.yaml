@@ -500,13 +500,22 @@ jobs:
           esac
           MANIFEST="$DEPLOY_BUNDLE_DIR/prepare/manifest.json"
           echo "Manifest: $MANIFEST"
-          ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
+          halt=()
+          if [ -n "${ETHERSCAN_VERIFY_DIR:-}" ]; then halt=(--halt-when "$ETHERSCAN_VERIFY_DIR/failed"); fi
+          if ! ./protocol-ops/target/release/protocol_ops ecosystem upgrade-broadcast \
             --manifest "$MANIFEST" \
             --l1-rpc-url "$L1_RPC_URL" \
             --key "${DEPLOYER_ADDR}=${pk}" \
             --skip-unkeyed \
             --max-gas-price-gwei "$MAX_GAS_PRICE_GWEI" \
-            --out "$DEPLOY_OUTDIR/deploy-executed.json"
+            --out "$DEPLOY_OUTDIR/deploy-executed.json" \
+            "${halt[@]}"; then
+            if [ -n "${ETHERSCAN_VERIFY_DIR:-}" ] && [ -f "$ETHERSCAN_VERIFY_DIR/failed" ]; then
+              cat "$ETHERSCAN_VERIFY_DIR/log"
+              echo "::error::The Etherscan verifier exited during the broadcast (its log is above), so the broadcast stopped before its next transaction. Fix the cause, then resume the deploy (resume_deploy_run_id): its verifier first submits what already landed."
+            fi
+            exit 1
+          fi
           echo "=== transactions.txt ==="
           cat "$TXLOG" || true
 

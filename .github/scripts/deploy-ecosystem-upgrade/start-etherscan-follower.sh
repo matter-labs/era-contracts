@@ -16,7 +16,10 @@ if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then forge_script=(--forge-script);
     --l1-rpc-url "$L1_RPC_URL" \
     --stop-when "$VERIFY_DIR/broadcast-done" \
     "${forge_script[@]}" > "$VERIFY_DIR/log" 2>&1
-  echo $? > "$VERIFY_DIR/status.tmp"
+  status=$?
+  # Once the verifier is gone, the broadcast stops before its next transaction (--halt-when).
+  if [ "$status" != 0 ]; then touch "$VERIFY_DIR/failed"; fi
+  echo "$status" > "$VERIFY_DIR/status.tmp"
   mv "$VERIFY_DIR/status.tmp" "$VERIFY_DIR/status"
 ) &
 sleep 5

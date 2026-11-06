@@ -45,6 +45,9 @@ const CODE_POLL_INTERVAL: Duration = Duration::from_secs(6);
 /// Etherscan's read API lags a fresh verification, and rate-limits bursts.
 const CHECK_ATTEMPTS: u32 = 10;
 const CHECK_RETRY_DELAY: Duration = Duration::from_secs(15);
+/// The longest one source request may take, answer included: a stalled one is unreadable, and
+/// checked again on the next pass.
+const CHECK_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// One logged deployment to verify.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -384,7 +387,10 @@ enum Pending {
 /// file appears (a last pass then picks up what landed meanwhile) or `max_wait` passes. A failed
 /// code read or submission is tried again on the next pass, never waited out in this one, so it
 /// holds up no other contract; `resubmit` decides which answers are. Whatever is still pending
-/// after the last pass is a failure.
+/// after the last pass is a failure. Once Etherscan has refused a contract for good, a run with a
+/// stop file waits for it before returning: the deploy workflow stops the broadcast when this
+/// command fails (`upgrade-broadcast --halt-when`), which should happen only while a deployment
+/// may still land.
 async fn follow_and_submit<P: Provider>(
     provider: &P,
     submitter: &mut impl Submitter,
@@ -445,7 +451,8 @@ async fn follow_and_submit<P: Provider>(
             }
         }
         pending = still_pending;
-        if pending.is_empty() || last_pass {
+        let refusal_waits = !outcome.failed.is_empty() && stop_when.is_some();
+        if last_pass || (pending.is_empty() && !refusal_waits) {
             break;
         }
         tokio::time::sleep(poll_interval).await;
@@ -794,14 +801,23 @@ impl CheckStatus {
     }
 }
 
+/// A client whose every request, answer included, ends within `timeout`.
+fn check_client(timeout: Duration) -> anyhow::Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .timeout(timeout)
+        .build()
+        .context("Etherscan HTTP client")
+}
+
 async fn fetch_source(
     client: &reqwest::Client,
+    api_url: &str,
     key: &str,
     chain_id: u64,
     address: Address,
 ) -> anyhow::Result<EtherscanSource> {
     let url = reqwest::Url::parse_with_params(
-        ETHERSCAN_API_URL,
+        api_url,
         [
             ("chainid", chain_id.to_string()),
             ("module", "contract".to_string()),
@@ -957,7 +973,7 @@ pub async fn run_check(args: EtherscanCheckArgs) -> anyhow::Result<()> {
     } else {
         "the sources of this checkout and the earlier cuts"
     };
-    let client = reqwest::Client::new();
+    let client = check_client(CHECK_REQUEST_TIMEOUT)?;
     let results = check_in_passes(
         &verifications,
         CHECK_ATTEMPTS,
@@ -965,7 +981,15 @@ pub async fn run_check(args: EtherscanCheckArgs) -> anyhow::Result<()> {
         |verification| {
             let (client, key, reviewed) = (&client, &key, &reviewed);
             async move {
-                match fetch_source(client, key, chain_id, verification.address).await {
+                match fetch_source(
+                    client,
+                    ETHERSCAN_API_URL,
+                    key,
+                    chain_id,
+                    verification.address,
+                )
+                .await
+                {
                     Ok(source) => CheckStatus::of(verification, &source, reviewed),
                     Err(error) => CheckStatus::Unreadable(format!("{error:#}")),
                 }
@@ -1480,6 +1504,43 @@ mod tests {
         assert!(asserter.read_q().is_empty());
     }
 
+    #[tokio::test]
+    async fn a_refusal_waits_for_the_stop_file_once_everything_landed() {
+        let verifications = parsed(&format!("forge verify-contract {A1} bad\n"));
+        let asserter = Asserter::new();
+        asserter.push_success(&Bytes::from_static(b"\x60"));
+        let provider = ProviderBuilder::new().connect_mocked_client(asserter.clone());
+        let directory = tempfile::tempdir().unwrap();
+        let stop = directory.path().join("broadcast-done");
+        let broadcast = tokio::spawn({
+            let stop = stop.clone();
+            async move {
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                std::fs::write(stop, "").unwrap();
+            }
+        });
+        let mut recorder = Recorder::default();
+        let outcome = follow_and_submit(
+            &provider,
+            &mut recorder,
+            &verifications,
+            1,
+            Some(&stop),
+            Duration::from_secs(60),
+            Duration::from_millis(10),
+        )
+        .await;
+        assert!(stop.exists(), "returned before the broadcast was over");
+        assert_eq!(recorder.calls.len(), SUBMIT_ATTEMPTS as usize);
+        assert_eq!(
+            outcome.failed,
+            [format!(
+                "bad at {A1}: not accepted: Fail - Unable to verify"
+            )]
+        );
+        broadcast.await.unwrap();
+    }
+
     /// Etherscan may take minutes to index fresh code, and a network outage stops forge before it
     /// submits: neither is capped.
     #[tokio::test]
@@ -1721,6 +1782,33 @@ mod tests {
             .map(|(verification, _)| verification.contract.as_str())
             .collect();
         assert_eq!(failing, ["Forged"]);
+    }
+
+    /// A source request that stalls, before its answer or within it, fails once the client's
+    /// timeout passes, so its contract is unreadable on this pass and the check moves on.
+    #[tokio::test]
+    async fn a_stalled_source_request_times_out() {
+        use tokio::io::AsyncWriteExt;
+
+        for answer in ["", "HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n{"] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api_url = format!("http://{}/api", listener.local_addr().unwrap());
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                socket.write_all(answer.as_bytes()).await.unwrap();
+                std::future::pending::<()>().await;
+            });
+            let client = check_client(Duration::from_millis(300)).unwrap();
+            let request = fetch_source(&client, &api_url, "secret-key", 1, Address::repeat_byte(1));
+            let error = tokio::time::timeout(Duration::from_secs(5), request)
+                .await
+                .unwrap_or_else(|_| panic!("{answer:?}: still waiting after 5s"))
+                .unwrap_err();
+            let error = format!("{error:#}");
+            assert!(error.contains("timed out"), "{error}");
+            assert!(!error.contains("secret-key"), "{error}");
+            server.abort();
+        }
     }
 
     /// A re-cut keeps a contract whose code and salt did not change: Etherscan then shows the
