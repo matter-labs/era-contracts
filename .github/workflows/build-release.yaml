@@ -19,14 +19,17 @@ jobs:
     steps:
       - name: Resolve tag
         id: vars
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "TAG=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "TAG=${INPUT_TAG}" >> $GITHUB_OUTPUT
           else
             # For push/create on a tag, github.ref looks like 'refs/tags/<tag>'
             echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           fi
-          echo "Resolved TAG=${{ steps.vars.outputs.TAG }}"
+          echo "Resolved TAG will be available from step outputs"
 
       - name: Checkout the repository
         uses: actions/checkout@v4
