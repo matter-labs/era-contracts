@@ -485,6 +485,14 @@ inside a proxy leg):
 (`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
 ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
 
+The `ValidatorTimelock` also keeps its own owner (governance): the bootstrap swaps only its
+implementation, through the CTM-domain `ProxyAdmin`, and never moves its `Ownable2Step` ownership.
+Its owner methods — `setExecutionDelay`, `setChainExecutionDelay` (the only way to lower a delay a
+chain admin raised) and the MultisigCommitter's shared-signing-set methods (`addSharedValidator`,
+`removeSharedValidator`, `setSharedSigningThreshold`, `useCustomSigningSet`) — are therefore called
+by governance directly, not through an executor. A chain admin can only raise its own chain's delay
+(`increaseChainExecutionDelay`).
+
 ## Provenance and validation
 
 **Governance approves the exact deployed objects, and verifying them off-chain is a mandatory step
