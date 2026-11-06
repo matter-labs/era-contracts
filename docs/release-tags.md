@@ -28,15 +28,18 @@ the go-ahead from the release owner.
 A pushed tag is never moved. If a proposal is resubmitted with new calldata, tag the new proposal's number.
 
 The tagged commit must be on a `release/*` branch. That branch keeps the deployed bytecode: contract fixes go to the
-next release, not to the tagged branch. Merge the branch into `main` with a merge commit, not a squash: GitHub deletes a
-merged PR's head branch, and the check then looks for the tagged commit on `main`.
+next release, not to the tagged branch. The check looks for the commit on that branch only in the PR that adds or
+changes the tag's entry, so record the tag while the branch exists. After a merge commit into `main` the branch may
+already be deleted: the check then finds it through that merge. After a squash merge, restore the branch first ("Restore
+branch" on its merged PR).
 
 ## What the check enforces
 
 For each tag in `tags`:
 
 - the tag exists and points at the recorded `commit`;
-- the commit is on the recorded `release/*` branch, or on `main` once that branch is merged and deleted;
+- the commit is on the recorded `release/*` branch, if the entry is new or differs from `origin/main`'s. A deleted
+  branch counts when a merge of it into `main` contains the commit;
 - `configs/genesis/{era,zksync-os}/latest.json` at the commit declare the recorded `genesis` versions;
 - the version in a `v` / `era-v` tag name equals that flavour's genesis version.
 

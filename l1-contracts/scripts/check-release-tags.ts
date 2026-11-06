@@ -18,7 +18,8 @@ const GETTERS_ABI = require("../zkstack-out/IZKChain.sol/IZKChain.json");
 const BRIDGEHUB_ABI = require("../zkstack-out/L1Bridgehub.sol/L1Bridgehub.json");
 
 const REPO_ROOT = path.join(__dirname, "..", "..");
-const MANIFEST_PATH = path.join(REPO_ROOT, "release-tags.json");
+const MANIFEST_FILE = "release-tags.json";
+const MANIFEST_PATH = path.join(REPO_ROOT, MANIFEST_FILE);
 const REMOTE = "origin";
 const RELEASE_BRANCH_PREFIX = "release/";
 const MAIN_BRANCH = "main";
@@ -29,6 +30,8 @@ const RELEASE_TAG_PATTERN = /^(v\d|era-v\d|zkos-v?\d|zip-\d)/;
 const VERSION_TAG_PATTERN = /^(era-)?v(\d+\.\d+\.\d+)$/;
 // `zip-<n>` marks the commit that produced governance proposal ZIP-<n>'s calldata.
 const PROPOSAL_TAG_PATTERN = /^zip-\d+$/;
+// GitHub's subject for a PR merged with a merge commit; the group is the PR's head branch.
+const MERGE_SUBJECT_PATTERN = /^Merge pull request #\d+ from [^/]+\/(.+)$/;
 
 const FLAVOURS = ["era", "zksync-os"] as const;
 type Flavour = (typeof FLAVOURS)[number];
@@ -87,6 +90,38 @@ function genesisVersion(_commit: string, _flavour: Flavour): string | undefined 
   return `${major}.${minor}.${patch}`;
 }
 
+// The tag entries main records. A tag's branch is checked only where its entry is added or changed: once recorded, the
+// tag pins the commit, and the branch may be squash-merged or deleted.
+function tagsOnMain(): Map<string, ReleaseTag> {
+  const file = `refs/remotes/${REMOTE}/${MAIN_BRANCH}:${MANIFEST_FILE}`;
+  if (!gitSucceeds("cat-file", "-e", file)) {
+    return new Map();
+  }
+  const manifest: Manifest = JSON.parse(git("show", file));
+  return new Map(manifest.tags.map((tag) => [tag.name, tag]));
+}
+
+// Why `_commit` is not on `_branch`, or undefined if it is. A branch merged into main with a merge commit and then
+// deleted still counts: the merge's second parent was the branch's head.
+function notOnBranch(_commit: string, _branch: string): string | undefined {
+  const ref = `refs/remotes/${REMOTE}/${_branch}`;
+  if (gitSucceeds("rev-parse", "--verify", "--quiet", ref)) {
+    return gitSucceeds("merge-base", "--is-ancestor", _commit, ref) ? undefined : `${_commit} is not on \`${_branch}\``;
+  }
+  const merged = git("log", "--first-parent", "--merges", "--format=%H %s", `refs/remotes/${REMOTE}/${MAIN_BRANCH}`)
+    .split("\n")
+    .some((line) => {
+      const [merge, ...subject] = line.split(" ");
+      return (
+        MERGE_SUBJECT_PATTERN.exec(subject.join(" "))?.[1] == _branch &&
+        gitSucceeds("merge-base", "--is-ancestor", _commit, `${merge}^2`)
+      );
+    });
+  return merged
+    ? undefined
+    : `\`${_branch}\` does not exist, and no merge of it into \`${MAIN_BRANCH}\` contains ${_commit}`;
+}
+
 function checkTags(_manifest: Manifest) {
   const recorded = new Map(_manifest.tags.map((tag) => [tag.name, tag]));
   const legacy = new Set(_manifest.legacyTags);
@@ -107,6 +142,7 @@ function checkTags(_manifest: Manifest) {
     }
   }
 
+  const onMain = tagsOnMain();
   for (const tag of _manifest.tags) {
     const versionMatch = VERSION_TAG_PATTERN.exec(tag.name);
     if (!versionMatch && !PROPOSAL_TAG_PATTERN.test(tag.name)) {
@@ -122,13 +158,11 @@ function checkTags(_manifest: Manifest) {
     }
     if (!tag.branch.startsWith(RELEASE_BRANCH_PREFIX)) {
       errors.push(`\`${tag.name}\`: branch \`${tag.branch}\` is not a \`${RELEASE_BRANCH_PREFIX}*\` branch`);
-    } else if (gitSucceeds("rev-parse", "--verify", "--quiet", `refs/remotes/${REMOTE}/${tag.branch}`)) {
-      if (!gitSucceeds("merge-base", "--is-ancestor", commit, `refs/remotes/${REMOTE}/${tag.branch}`)) {
-        errors.push(`\`${tag.name}\`: ${commit} is not on \`${tag.branch}\``);
+    } else if (onMain.get(tag.name)?.commit != tag.commit || onMain.get(tag.name)?.branch != tag.branch) {
+      const reason = notOnBranch(commit, tag.branch);
+      if (reason) {
+        errors.push(`\`${tag.name}\`: ${reason}`);
       }
-    } else if (!gitSucceeds("merge-base", "--is-ancestor", commit, `refs/remotes/${REMOTE}/${MAIN_BRANCH}`)) {
-      // A release branch merged into main with a merge commit may be deleted: its commits stay on main.
-      errors.push(`\`${tag.name}\`: \`${tag.branch}\` does not exist and ${commit} is not on \`${MAIN_BRANCH}\``);
     }
     for (const flavour of FLAVOURS) {
       const expected = tag.genesis[flavour];
