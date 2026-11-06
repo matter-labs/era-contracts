@@ -785,11 +785,11 @@ stores each implementation descriptor and one shared system-proxy shell; derivat
 into the executable descriptor. Unchanged rows are not reinstalled. A changed shell alone derives
 nothing: `updateZKsyncOSContract` deploys a shell only at a system address with no code yet, so a
 new shell reaches the members first populated after the edge, and new chains through the genesis
-image, but never an existing member's proxy. The shell is rebuilt with every release and its bytes
-change with its compiler metadata, so it is not frozen across edges: a change to the shell's logic
-needs its own migration of existing proxies, which no transition derives. The chain cannot tell a
-rebuild from such a change, so `verify-package` compares the departing and arriving releases'
-shells with their compiler metadata stripped. It refuses a changed shell on an edge whose delegate
+image, but never an existing member's proxy. The shell is rebuilt with every release, so it is not
+frozen across edges: a change to the shell's logic needs its own migration of existing proxies,
+which no transition derives. The build carries no compiler metadata, so the shell's bytes change
+only with its code, and `verify-package` compares the departing and arriving releases' shells
+directly. It refuses a changed shell on an edge whose delegate
 is absent, the stock `L2DefaultUpgrade` or code the reviewed commit does not build, and asks the
 reviewer to confirm any other delegate migrates the existing proxies. A compiler bump that
 changes the shell's code counts as a change. The bootstrap edge has no departing release and is
@@ -849,9 +849,10 @@ until then it has no working path on ZKsync OS. An edge that changes the L2 desc
 carry an L2 side — at least an authored delegate that brings existing chains there — and so is a
 minor edge. The prepare rebuilds the L2 bytecode and reuses the live genesis upgrade only when its
 code is identical, so such an edge is built from a tree in which they compile to the departing
-release's bytes: an edit to a source they share with L1 (an error added to `L1ContractErrors.sol`,
-say) changes their metadata, and the edge then needs an L2 side, so a minor version. A patch that changes nothing but the version names a copy of the departing release one
-patch version up, and derives nothing.
+release's bytes: an edit to a source they share with L1 that reaches their code (an error they
+raise, say) changes those bytes, and the edge then needs an L2 side, so a minor version. A patch
+that changes nothing but the version names a copy of the departing release one patch version up,
+and derives nothing.
 
 A verifier rotation is therefore: deploy the verifier, publish release B copying release A except
 that member, publish the `0.35.0 -> 0.35.1` transition naming `A -> B` with no L2 side, execute it
@@ -1026,14 +1027,12 @@ prepare deployment rides the CREATE2 factory, because the deployer Safe bundle r
 transactions only.
 
 Prepares deploy each object from its build artifact (`BytecodeUtils.readBytecodeL1`), the same
-bytes a reviewer's build of the reviewed commit produces — the remapping set recorded in CBOR
-metadata is pinned, so it does not depend on the machine — and which `AllContractsHashes.json`
+bytes a reviewer's build of the reviewed commit produces and which `AllContractsHashes.json`
 commits to. The construction check in `protocol-ops ecosystem verify-bootstrap` rests on that.
 
 The anvil registry runner (`test/anvil-interop/run-recurring-upgrade-test.ts`) deploys its objects
 from a committed manifest, `l1-contracts/scripts/registry-manifests/v35-local.json`, and fails on
-any drift from it; the contracts that manifest names by a bytecode-derived value come from the
-CBOR-metadata-free `registry-deterministic` profile. The manifest is a generated artifact
+any drift from it. The manifest is a generated artifact
 (`yarn regen:registry-manifest` in `l1-contracts/test/anvil-interop`).
 
 **Gateway.** EraVM has no constructors, so these objects cannot be constructed there. A Gateway CTM

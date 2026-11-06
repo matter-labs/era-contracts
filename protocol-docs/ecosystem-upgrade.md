@@ -32,9 +32,10 @@ A protocol release is the combination of:
   root, nullifier, asset router, native token vault, interop handler, CTM deployment tracker, chain
   registration sender) and for the CTM-domain proxies (`ChainTypeManager`, `ValidatorTimelock`,
   `BytecodesSupplier`, `PermissionlessValidator`, `ServerNotifier`), each deployed only when the
-  release changes it: an implementation that already runs the code the current sources produce is
-  reused. The core ones become rows of a Core-domain `ProxyUpgradeTransition`, the CTM-domain ones
-  rows of a CTM-domain one;
+  release changes it. An ecosystem implementation the release does not declare changed is reused
+  (it must already run the code the current sources produce); a CTM-domain one is deployed only by
+  a version's `deployNewCTMContracts`. The core ones become rows of a Core-domain
+  `ProxyUpgradeTransition`, the CTM-domain ones rows of a CTM-domain one;
 - **a new chain version**: a write-once `CTMRelease` naming the diamond facets, `DiamondInit`, the
   verifier, the genesis upgrade and the L2 description, and a `CTMTransition` from the departing
   release to it, which derives the facet cuts and the L2 upgrade transaction (force deployments of
@@ -150,10 +151,10 @@ but exactly one ZKsync OS CTM is refused). The bundles and `manifest.json` go to
 `ecosystem.toml` is written to its parent). Together they:
 
 1. deploy through CREATE2, with the salts of the release input, every implementation the release
-   changes (one already running the code the current sources produce is reused), then the
-   write-once objects: a Core-domain `ProxyUpgradeTransition`, the `CTMRelease`, the
-   `CTMTransition` and a CTM-domain `ProxyUpgradeTransition`, each only when the release changes
-   what it describes;
+   changes (an ecosystem implementation it does not declare is reused, and must already run the code
+   the current sources produce), then the write-once objects: a Core-domain
+   `ProxyUpgradeTransition`, the `CTMRelease`, the `CTMTransition` and a CTM-domain
+   `ProxyUpgradeTransition`, each only when the release changes what it describes;
 2. publish the new L2 bytecodes to the `BytecodesSupplier`; the transition derives the facet cuts
    and the L2 upgrade transaction (force deployments of the L2 built-ins plus the delegate call to
    the L2 upgrade contract) from the two releases when it is constructed;
@@ -168,10 +169,9 @@ Two properties of the prepare decide whether the rest of the pipeline can work:
 
 - **The build must be the default Foundry profile.** Verification re-derives each object's CREATE2
   address from creation code held against `AllContractsHashes.json`, and checks live runtime code
-  against it; that file is generated under that profile, so a metadata-stripped build never matches
-  and verifies nothing. The price is that the CREATE2 addresses embed path-dependent metadata, so a
-  prepare re-run from another checkout yields different but equally valid addresses. The artifact
-  is verified by re-deriving its addresses (phase 3), never by diffing them against one's own run.
+  against it; that file is generated under that profile, so a build with other compiler settings
+  never matches and verifies nothing. The artifact is verified by re-deriving its addresses
+  (phase 3), never by diffing them against one's own run.
 - **Salts and the deployer are part of the result.** CREATE2 returns the previously deployed
   contract for a repeated `(salt, init code)` pair, so the salts in the release input are rotated
   before every regeneration; they are also verification inputs, since every address is re-derived
@@ -409,10 +409,11 @@ The scripts under `l1-contracts/deploy-scripts/upgrade/` are split into what eve
 and what one release adds:
 
 - `default-upgrade/DefaultCoreUpgrade.s.sol` and `DefaultCTMUpgrade.s.sol` are the
-  version-independent prepare pipeline: they deploy or reuse each implementation by code identity,
-  build the release and the transitions, deploy each proxy upgrade transition's
-  `DefaultProxyUpgradeEngine` (`deployProxyUpgradeEngine()`), and record every other call a version
-  needs as a declared external action (`declareExternalAction`).
+  version-independent prepare pipeline: they deploy each ecosystem implementation and release
+  member the version declares changed (reusing the others, which must already run the code the
+  current sources produce), build the release and the transitions, deploy each proxy upgrade
+  transition's `DefaultProxyUpgradeEngine` (`deployProxyUpgradeEngine()`), and record every other
+  call a version needs as a declared external action (`declareExternalAction`).
 - `v<N>/CoreUpgrade_v<N>.s.sol` and `CTMUpgrade_v<N>.s.sol` override only what the release changes:
   the implementations it deploys (`deployNew*Contracts`), the release members it replaces
   (`changedReleaseMembers()`), its kind (`upgradeKind()`: a chain release or an

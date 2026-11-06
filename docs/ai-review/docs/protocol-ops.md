@@ -147,11 +147,10 @@ from calldata:
   release's own table for the bytecode fields; the package's `force_deployments_data` remains a
   cross-check. A replacement lands on an existing release and is exempt.
 - **System-proxy shell** — on the upgrade and replacement paths, the arriving release's shell
-  against the departing release's, compared with the compiler metadata stripped (why: "What the
-  derivation guarantees" in `docs/registry-driven-upgrades.md`). The code comes from the reviewed
-  genesis image or the CTM supplier's `EVMBytecodePublished` log; a shell in neither is an ERROR. A
-  logic change is an ERROR when the edge's delegate is absent, the stock `L2DefaultUpgrade` or code
-  the reviewed commit does not build, and a WARN naming any other delegate.
+  bytecode info against the departing release's (why: "What the derivation guarantees" in
+  `docs/registry-driven-upgrades.md`). A change is an ERROR when the edge's delegate is absent, the
+  stock `L2DefaultUpgrade` or code the reviewed commit does not build, and a WARN naming any other
+  delegate.
 - **Readiness**, reported apart from anything about value: the transition's or the bootstrap
   migration's L2 factory dependencies published on the CTM's supplier.
 - **Release validity** — the arriving release's own `validate()`, called before the vote. It

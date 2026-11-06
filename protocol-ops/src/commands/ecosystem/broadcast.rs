@@ -85,6 +85,11 @@ pub struct UpgradeBroadcastArgs {
         default_value = crate::commands::dev::execute_safe::DEFAULT_MAX_GAS_PRICE_GWEI
     )]
     pub max_gas_price_wei: u128,
+
+    /// Stop before the next transaction once this file exists. The deploy workflow's Etherscan
+    /// verifier creates it when it exits with an error.
+    #[clap(long, value_name = "FILE")]
+    pub halt_when: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -197,6 +202,7 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
                 &args.l1_rpc_url,
                 bundle.target,
                 &mut journal,
+                args.halt_when.as_deref(),
             )
             .await
             .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
@@ -208,6 +214,7 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
                 key,
                 &mut journal,
                 max_gas_price_wei,
+                args.halt_when.as_deref(),
             )
             .await
             .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;

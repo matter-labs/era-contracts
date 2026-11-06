@@ -665,10 +665,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         ctmAddresses.admin.eip7702Checker = _eip7702Checker;
     }
 
-    /// @notice The release members this version SETS OUT to change. Everything else must come
-    ///         through unchanged, and the prepare refuses to replace anything not named here — so
-    ///         "change one contract" cannot quietly become "replace the facet set" because the
-    ///         local build differs from the one that produced the live code.
+    /// @notice The release members this version SETS OUT to change. Each is redeployed, everything
+    ///         else must come through unchanged, and the prepare refuses to replace anything not
+    ///         named here — so "change one contract" cannot quietly become "replace the facet set"
+    ///         because the local build differs from the one that produced the live code.
     /// @dev Names are the `deploySimpleContract` names of the members that pass through
     ///      {DeployCTMUtils._deployReleaseMember}: the six facets, `DiamondInit`, `L1GenesisUpgrade`
     ///      and `EIP7702Checker`. The verifier is not among them — a version that replaces it does so
@@ -681,12 +681,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /// @notice Refuses a replacement this version did not declare (see {changedReleaseMembers}).
     function _requireDeclaredReleaseMemberChange(string memory _name, address _live) internal virtual override {
-        string[] memory declared = changedReleaseMembers();
-        uint256 length = declared.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (compareStrings(declared[i], _name)) {
-                return;
-            }
+        if (_isDeclaredReleaseMemberChange(_name)) {
+            return;
         }
         console.log("Undeclared release member change:", _name);
         console.log("  live:", _live);
@@ -704,17 +700,19 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         );
     }
 
-    /// @notice A live release member may serve this release when it ALREADY runs the code the
-    ///         current sources produce with this run's constructor arguments — so an upgrade
-    ///         deploys only the members it changes, and one that changes none of them reuses the
-    ///         release object itself.
+    /// @notice A live release member may serve this release when this version does not declare it
+    ///         changed and it ALREADY runs the code the current sources produce with this run's
+    ///         constructor arguments — so an upgrade deploys only the members it changes, and one
+    ///         that changes none of them reuses the release object itself.
+    /// @dev A declared member is always redeployed: the build has no CBOR metadata, so a
+    ///      constructor-only change leaves the runtime codehash as it was.
     /// @dev The identity check needs a local deployment: an artifact's `deployedBytecode` carries
     ///      ZEROED immutable slots, so it cannot be compared against live code. The probe is a
     ///      plain CREATE in the script's own EVM and is never broadcast — nothing reaches the
     ///      chain — and it is exact, immutables included (the same technique
     ///      `GatewayCTMDeployerHelper` uses to predict Gateway codehashes).
     function _canReuseReleaseMember(string memory _name, address _live) internal virtual override returns (bool) {
-        if (_live == address(0) || _live.code.length == 0) {
+        if (_live == address(0) || _live.code.length == 0 || _isDeclaredReleaseMemberChange(_name)) {
             return false;
         }
         if (address(releaseMemberProbe) == address(0)) {
@@ -722,6 +720,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             releaseMemberProbe = new ReleaseMemberProbe();
         }
         return _live.codehash == releaseMemberProbe.codehashOf(_name, getCreationCalldata(_name));
+    }
+
+    /// @notice Whether this version names `_name` in {changedReleaseMembers}.
+    function _isDeclaredReleaseMemberChange(string memory _name) internal view returns (bool) {
+        string[] memory declared = changedReleaseMembers();
+        uint256 length = declared.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (compareStrings(declared[i], _name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do

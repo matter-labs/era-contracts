@@ -66,7 +66,7 @@ Finished, and described where it now lives:
 - The output's `diamond_cut_data` is retired; the field is optional in the v31 verifier (shipped
   v31–v33 artifacts carry it). `force_deployments_data` and `chain_upgrade_diamond_cut` stay: both
   have live consumers (new-Gateway bring-up; the anvil bootstrap chain leg).
-- Unchanged release members are reused by CODE IDENTITY: the prepare probes what the current
+- Undeclared release members are reused by CODE IDENTITY: the prepare probes what the current
   sources produce (a local, never-broadcast deployment with this run's constructor arguments — an
   artifact's `deployedBytecode` has immutable slots zeroed) and keeps the live member when they
   match (`ReleaseMemberReuse.t.sol`). A version bump still publishes its own release (one release
@@ -77,7 +77,8 @@ Finished, and described where it now lives:
   the bootstrap's own deployment (the core executor).
 - Replacing a live member is a change of SCOPE and must be INTENDED: the prepare refuses to replace
   any member the version does not name in `changedReleaseMembers()`, and any ecosystem
-  implementation the version does not declare. The v34 -> v35 bootstrap declares the whole set,
+  implementation the version does not declare. It always redeploys a declared one: the build has
+  no CBOR metadata, so a constructor-only change leaves the runtime code identical. The v34 -> v35 bootstrap declares the whole set,
   since it authors a complete release for a pre-registry ecosystem — the genesis engine
   (`L1GenesisUpgrade`) included: the pre-v35 one lacks the entrypoint the v35 Admin facet
   calls, so a release that kept it could create no chain.
