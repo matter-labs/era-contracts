@@ -85,7 +85,7 @@ contract CounterfeitObjectTest is RegistryObjectsFixture {
         approvedManifest = TransitionManifest({
             fromRelease: address(departingRelease),
             newRelease: address(arrivingRelease),
-            upgradeEngine: _deployedStub("upgradeEngine"),
+            chainUpgradeEngine: _deployedStub("chainUpgradeEngine"),
             oldProtocolVersionDeadline: type(uint256).max,
             upgradeTimestamp: 0,
             l2Plan: _emptyPlan()
@@ -169,7 +169,7 @@ contract CounterfeitObjectTest is RegistryObjectsFixture {
     /// verifier's member check (`protocol-ops` `registry/members.rs`) answers that, not this one.
     function test_theConstructionCheckSaysNothingAboutWhatMembersRun() public {
         TransitionManifest memory hostile = approvedManifest;
-        hostile.upgradeEngine = _attackerFacet();
+        hostile.chainUpgradeEngine = _attackerFacet();
         bytes memory hostileArgs = abi.encode(hostile);
         address hostileObject = _deployThroughFactory(_transitionCreationCode(), hostileArgs);
 

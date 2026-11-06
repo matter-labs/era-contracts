@@ -565,6 +565,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         args.private_key.expose(),
         &mut journal,
         args.max_gas_price_wei,
+        None,
     )
     .await
 }
@@ -638,6 +639,7 @@ pub async fn execute_one_bundle(
     private_key: &str,
     journal: &mut ResumeJournal,
     max_gas_price_wei: u128,
+    halt_when: Option<&Path>,
 ) -> anyhow::Result<()> {
     logger::step(format!("Execute Safe file: {}", safe_file.display()));
 
@@ -690,6 +692,7 @@ pub async fn execute_one_bundle(
     // side-effects of earlier ones, and a revert in tx N stops the loop
     // before any tx N+1 hits the wire.
     for (idx, tx) in safe_txs.iter().enumerate() {
+        halt_before(halt_when, idx)?;
         let to: Address = tx
             .get("to")
             .and_then(|v| v.as_str())
@@ -1224,6 +1227,17 @@ fn append_transaction_hash(out_path: &Path, tx_hash: B256) -> anyhow::Result<()>
     Ok(())
 }
 
+/// Refuses to send Safe tx #`idx` once the `halt_when` file exists
+/// (`ecosystem upgrade-broadcast --halt-when`).
+fn halt_before(halt_when: Option<&Path>, idx: usize) -> anyhow::Result<()> {
+    match halt_when {
+        Some(file) if file.exists() => {
+            anyhow::bail!("{} exists: stopped before Safe tx #{idx}", file.display())
+        }
+        _ => Ok(()),
+    }
+}
+
 /// Replay a Safe bundle file under an **anvil-impersonated** EOA. Matches
 /// `execute_one_bundle` on the wire shape but skips local signing — txs are
 /// dispatched via `eth_sendTransaction` with `from` set to `sender`. Anvil
@@ -1235,6 +1249,7 @@ pub async fn execute_one_bundle_unlocked(
     l1_rpc_url: &str,
     sender: Address,
     journal: &mut ResumeJournal,
+    halt_when: Option<&Path>,
 ) -> anyhow::Result<()> {
     logger::step(format!(
         "Execute Safe file (unlocked): {}",
@@ -1279,6 +1294,7 @@ pub async fn execute_one_bundle_unlocked(
 
     let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
+        halt_before(halt_when, idx)?;
         let to: Address = tx
             .get("to")
             .and_then(|v| v.as_str())
@@ -1631,7 +1647,7 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        bump_gas, gwei_to_wei, load_executed_bundle, parse_gwei, record_executed_tx,
+        bump_gas, gwei_to_wei, halt_before, load_executed_bundle, parse_gwei, record_executed_tx,
         ExecutedBundle, ExecutedTx, GAS_BUMP_BPS,
     };
 
@@ -1683,6 +1699,20 @@ mod tests {
         );
         assert_eq!(parse(&[]).unwrap().max_gas_price_wei, gwei_to_wei(500));
         assert!(parse(&["--max-gas-price-gwei", "0"]).is_err());
+    }
+
+    #[test]
+    fn a_halt_file_stops_the_next_transaction() {
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("failed");
+        assert!(halt_before(None, 0).is_ok());
+        assert!(halt_before(Some(&file), 3).is_ok());
+        std::fs::write(&file, "").unwrap();
+        let error = halt_before(Some(&file), 3).unwrap_err().to_string();
+        assert!(
+            error.ends_with("failed exists: stopped before Safe tx #3"),
+            "{error}"
+        );
     }
 
     #[test]

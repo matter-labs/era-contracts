@@ -69,7 +69,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     ///         READ from the migration — the object composes it on-chain from its pinned inputs, so
     ///         the prepare has nothing to compose and nothing to keep in step.
     function deployUpgradeObjects() public virtual override {
-        upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
+        upgradeAddresses.chainUpgradeEngine = deployUsedUpgradeContract();
         deployRegistryBootstrap();
         _declareBootstrapActions();
     }
@@ -100,12 +100,12 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
 
     /// @inheritdoc DefaultCTMUpgrade
     /// @dev This edge deploys no transition, so the migration is the object that pins its engine.
-    function committedUpgradeEngine() public view override returns (address) {
+    function committedChainUpgradeEngine() public view override returns (address) {
         if (address(bootstrapMigration) != address(0)) {
-            return bootstrapMigration.getManifest().upgradeEngine;
+            return bootstrapMigration.getManifest().chainUpgradeEngine;
         }
-        require(upgradeAddresses.upgradeEngine != address(0), "bootstrap engine not deployed");
-        return upgradeAddresses.upgradeEngine;
+        require(upgradeAddresses.chainUpgradeEngine != address(0), "bootstrap engine not deployed");
+        return upgradeAddresses.chainUpgradeEngine;
     }
 
     /// @inheritdoc DefaultCTMUpgrade
@@ -332,7 +332,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             callInitializeUpgrade: false
         });
 
-        address engine = committedUpgradeEngine();
+        address engine = committedChainUpgradeEngine();
 
         manifest = BootstrapManifest({
             ctm: _ctmProxy,
@@ -341,7 +341,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
             ctmProxyUpgrades: proxyUpgrades,
             currentRelease: release,
             oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
-            upgradeEngine: engine,
+            chainUpgradeEngine: engine,
             l2Plan: authoredL2Plan(),
             upgradeTimestamp: 0,
             ctmExecutor: address(ctmUpgradeExecutor),

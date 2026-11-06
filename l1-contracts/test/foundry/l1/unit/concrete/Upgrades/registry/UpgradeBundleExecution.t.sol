@@ -503,7 +503,7 @@ contract UpgradeBundleExecutionTest is CTMUpgradeExecutorFixture {
             _bundle(_infrastructureLeg(address(substituted)), _transitionLeg(address(transition)))
         );
         // The proxy answers a non-admin by delegating to its implementation, which has no
-        // `implementation()` — a revert without data.
+        // `implementation()` — a revert without data, which the executor bubbles as it is.
         vm.expectRevert(bytes(""));
         _executeProposal(proposal);
         _assertNothingApplied();

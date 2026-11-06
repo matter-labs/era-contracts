@@ -144,6 +144,7 @@ pub(super) const CONSTRUCTOR_EXPECTATIONS: &[(&str, &[(&str, ArgSource)])] = &[
     ),
     ("DefaultUpgrade", &[]),
     ("BootstrapUpgrade", &[]),
+    ("DefaultProxyUpgradeEngine", &[]),
     ("L2DefaultDelegateCalldataComposer", &[]),
     (
         "L1Bridgehub",

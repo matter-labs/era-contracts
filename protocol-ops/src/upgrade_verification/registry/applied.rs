@@ -905,6 +905,7 @@ mod tests {
     const CTM_ADMIN: Address = Address::repeat_byte(0xA7);
     const ECO_ADMIN: Address = Address::repeat_byte(0xA0);
     const NOTIFIER: Address = Address::repeat_byte(0x5E);
+    const ENGINE: Address = Address::repeat_byte(0xE9);
     const R36: Address = Address::repeat_byte(0x36);
     const PROXY: Address = Address::repeat_byte(0x70);
     const OLD: Address = Address::repeat_byte(0x01);
@@ -1005,6 +1006,7 @@ mod tests {
         ProxyUpgradeTransitionManifest {
             domain: PROXY_UPGRADE_DOMAIN_CORE,
             proxyUpgrades: rows,
+            proxyUpgradeEngine: ENGINE,
         }
     }
 
@@ -1258,7 +1260,7 @@ mod tests {
             ctmProxyUpgrades: rows,
             currentRelease: R36,
             oldProtocolVersionDeadline: U256::MAX,
-            upgradeEngine: Address::repeat_byte(0xEA),
+            chainUpgradeEngine: Address::repeat_byte(0xEA),
             l2Plan: AuthoredL2Plan {
                 delegateBytecodeInfo: Bytes::new(),
                 extraBytecodeInfos: Vec::new(),

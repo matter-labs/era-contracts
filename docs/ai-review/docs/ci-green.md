@@ -127,7 +127,7 @@ CI runs this in the `if: always()` cleanup step; do the same locally.
 
 ```bash
 cd l1-contracts
-FOUNDRY_PROFILE=anvil-interop forge build
+forge build
 cd test/anvil-interop
 npx ts-node setup-and-dump-state.ts
 ```

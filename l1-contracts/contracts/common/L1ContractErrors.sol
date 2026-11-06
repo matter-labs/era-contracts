@@ -390,6 +390,12 @@ error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtoc
 error ProtocolIdNotGreater();
 // 0x896ad688
 error ProxyUpgradeDomainMismatch(uint8 expected, uint8 actual);
+// 0x8771630a
+error ProxyUpgradeEngineAuthorityMismatch(address proxyAdmin, address proxyAdminOwner);
+// 0xa0f50c6e
+error ProxyUpgradeEngineChangedExecutorOwnership(address proxyUpgradeEngine);
+// 0xfa7144ba
+error ProxyUpgradeEngineMovedDomainAuthority(address proxyUpgradeEngine);
 // 0x929dc94b
 error ProxyUpgradeRowMismatch(address proxy, address expectedOldImpl, address actualImpl);
 // 0xd95d4d82

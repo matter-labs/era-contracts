@@ -98,8 +98,6 @@ export interface ChainInfo {
 
 export interface DeploymentState {
   chains?: ChainInfo;
-  /** How the running chains were started: from the committed chain states, or by a fresh deployment. */
-  startedFrom?: "chainStates" | "freshDeploy";
   l1Addresses?: CoreDeployedAddresses;
   ctmAddresses?: CTMDeployedAddresses;
   chainAddresses?: ChainAddresses[];

@@ -177,7 +177,7 @@ contract UpgradeIntegrationTestFreshEcosystemLocal is ZKChainDeployer {
         assertEq(repaired.oldProtocolVersionDeadline(), replaced.oldProtocolVersionDeadline(), "the same deadline");
         assertEq(repaired.newRelease(), IChainTypeManager(ctm).currentRelease(), "the continuation release");
         assertEq(repaired.newProtocolVersion(), replaced.newProtocolVersion(), "the same target");
-        assertTrue(repaired.upgradeEngine() != replaced.upgradeEngine(), "this run's engine is the repair");
+        assertTrue(repaired.chainUpgradeEngine() != replaced.chainUpgradeEngine(), "this run's engine is the repair");
 
         // ── One call, and nothing else ──
         assertEq(bundle.length, 1, "the single forward");

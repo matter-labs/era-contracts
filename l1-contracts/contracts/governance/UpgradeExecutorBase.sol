@@ -12,9 +12,11 @@ import {RenounceOwnershipDisabled, ZeroAddress} from "../common/L1ContractErrors
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Shared authority base for the domain-specific upgrade executors. It holds ownerships on
-///         governance's behalf (ChainTypeManagers, the ecosystem ProxyAdmin, ...) behind FIXED,
-///         non-delegatecall entrypoints, plus ONE raw-call escape hatch — `forward` — so the
-///         authority the executor holds never becomes unreachable.
+///         governance's behalf (ChainTypeManagers, the ecosystem ProxyAdmin, ...) behind FIXED
+///         entrypoints, plus ONE raw-call escape hatch — `forward` — so the authority the executor
+///         holds never becomes unreachable. The only delegatecall a registry executor makes is into
+///         the engine an approved transition pins (`ProxyUpgradeExecutorBase`); `forward` stays a
+///         plain call.
 /// @dev One role: `forward` is gated on the owner alone — see "Authority" in
 ///      {docs/registry-driven-upgrades.md}.
 abstract contract UpgradeExecutorBase is Ownable2Step, IUpgradeExecutorBase {

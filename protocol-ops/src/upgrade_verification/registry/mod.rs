@@ -28,9 +28,9 @@
 //!      produces for its role? ([`provenance`], [`members`]) — the live code against the
 //!      reviewed artifact, byte for byte outside its immutable slots: each release's facets,
 //!      `DiamondInit`, genesis upgrade and verifier tree, each L2 bytecode the release's table or
-//!      a plan names, each engine and composer, each row's `implNew`. Was each member the package
-//!      newly installs BUILT from argument values the review holds — the values that comparison
-//!      masks? ([`member_construction`]) The ZiSK Plonk backend, which no reviewed build
+//!      a plan names, each engine (a proxy upgrade transition's included) and composer, each
+//!      row's `implNew`. Was each member the package newly installs BUILT from argument values
+//!      the review holds — the values that comparison masks? ([`member_construction`]) The ZiSK Plonk backend, which no reviewed build
 //!      describes, is held to its pin ([`external_backends`]).
 //!   3. Does every proxy inventory belong to the domain its leg applies, upgrade something, and
 //!      hold only real edges, each naming the proxy of its slot, discovered on chain from the
@@ -169,7 +169,6 @@ pub(crate) async fn verify(
             replacement::verify(
                 &provider,
                 &build,
-                genesis_image.as_ref().ok(),
                 &package,
                 expected_governance_owner,
                 &salts,

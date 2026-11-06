@@ -78,14 +78,17 @@ const FUNDING_TX_GAS_LIMIT: u64 = 500_000;
 /// Tracked paths whose modification changes the bytecode or calldata a generation run
 /// produces. `contracts_worktree_dirty` is scoped to these, so the generated files the run
 /// itself rewrites (`output/<env>/`, `zkstack-out/`) do not count.
-const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
+const CONTRACT_SOURCE_PATHSPECS: [&str; 13] = [
     "*/foundry.toml",
+    "*/remappings.txt",
     "AllContractsHashes.json",
     "SystemConfig.json",
     "configs/genesis",
     "l1-contracts/contracts",
     "l1-contracts/deploy-scripts",
     "l1-contracts/dev",
+    // The links to the `lib/` submodules.
+    "l1-contracts/lib",
     "l1-contracts/upgrade-envs/permanent-values",
     "l2-contracts/contracts",
     "protocol-ops/src",
@@ -140,8 +143,8 @@ pub struct DeployBundleMetadata {
     pub env: String,
     pub contracts_commit: String,
     /// Whether [`CONTRACT_SOURCE_PATHSPECS`] differed from `contracts_commit`. Absent when
-    /// generated in the protocol-ops image, which has no git: it runs its commit's configs unless
-    /// a `docker run` mounts others, which it can't tell.
+    /// generated in the protocol-ops image, which has no repository: it runs its commit's configs
+    /// unless a `docker run` mounts others, which it can't tell.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contracts_worktree_dirty: Option<bool>,
     pub all_contracts_hashes_sha256: String,
@@ -1317,7 +1320,7 @@ mod tests {
             assert!(status().is_empty());
         }
 
-        // In the image, which has no git: its own commit.
+        // In the image, which has no repository: its own commit.
         assert_eq!(contracts_commit(repo.path(), Some("abc")), "abc");
     }
 

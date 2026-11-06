@@ -99,8 +99,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         ///      migration pins its own rows).
         address ctmInfrastructureTransition;
         /// @dev The engine this edge commits, held only until the object that pins it exists.
-        ///      Read it through {committedUpgradeEngine}, never directly.
-        address upgradeEngine;
+        ///      Read it through {committedChainUpgradeEngine}, never directly.
+        address chainUpgradeEngine;
     }
 
     struct AdditionalConfig {
@@ -336,7 +336,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     function deployUpgradeObjects() public virtual {
         _requireDeclaredKindHolds();
         if (upgradeKind() != UpgradeKind.InfrastructureOnly) {
-            upgradeAddresses.upgradeEngine = deployUsedUpgradeContract();
+            upgradeAddresses.chainUpgradeEngine = deployUsedUpgradeContract();
             deployCTMTransition();
         }
         deployCTMInfrastructureTransition();
@@ -382,12 +382,12 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         require(fromRelease != address(0), "CTM has no current release: the bootstrap edge must run first");
         address newRelease = ctmAddresses.stateTransition.currentRelease;
         require(newRelease != address(0), "new release not deployed");
-        address engine = committedUpgradeEngine();
+        address engine = committedChainUpgradeEngine();
         upgradeAddresses.ctmTransition = deployTransition(
             TransitionManifest({
                 fromRelease: fromRelease,
                 newRelease: newRelease,
-                upgradeEngine: engine,
+                chainUpgradeEngine: engine,
                 oldProtocolVersionDeadline: UpgradeHelperLib.getOldProtocolDeadline(),
                 upgradeTimestamp: 0,
                 l2Plan: authoredL2Plan()
@@ -426,11 +426,27 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             return;
         }
         // From the build ARTIFACT, for the same reason as the transition above.
+        address proxyUpgradeEngine = deployProxyUpgradeEngine();
         upgradeAddresses.ctmInfrastructureTransition = deployViaCreate2AndNotify(
             BytecodeUtils.readBytecodeL1("ProxyUpgradeTransition.sol", "ProxyUpgradeTransition"),
-            abi.encode(ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory})),
+            abi.encode(
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.CTM,
+                    proxyUpgrades: inventory,
+                    proxyUpgradeEngine: proxyUpgradeEngine
+                })
+            ),
             "ProxyUpgradeTransition"
         );
+    }
+
+    /// @notice The engine the infrastructure transition pins: the code `CTMUpgradeExecutor`
+    ///         delegatecalls to apply it, with the CTM, its `ProxyAdmin` and the ServerNotifier as
+    ///         its authority. The default applies the rows and nothing else; a version whose upgrade
+    ///         needs follow-up calls (CTM or notifier wiring) deploys its `DefaultProxyUpgradeEngine`
+    ///         subclass instead.
+    function deployProxyUpgradeEngine() internal virtual returns (address) {
+        return deploySimpleContract("DefaultProxyUpgradeEngine");
     }
 
     /// @notice The enum-indexed CTM-domain inventory of this edge: a source-checked row for every
@@ -596,18 +612,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
     /// @notice The upgrade engine this edge commits: this prepare's own deployment until the
     ///         object that pins it exists, and that object's pin from then on. Reading it back off
     ///         the object means the output cannot name an engine the committed edge does not pin.
-    function committedUpgradeEngine() public view virtual returns (address) {
+    function committedChainUpgradeEngine() public view virtual returns (address) {
         address transition = upgradeAddresses.ctmTransition;
         if (transition != address(0)) {
-            return ICTMTransition(transition).upgradeEngine();
+            return ICTMTransition(transition).chainUpgradeEngine();
         }
         if (upgradeKind() == UpgradeKind.InfrastructureOnly) {
             // No chain crosses an infrastructure-only edge, so there is no engine to commit and
             // the output must not name one.
             return address(0);
         }
-        require(upgradeAddresses.upgradeEngine != address(0), "upgrade engine not deployed");
-        return upgradeAddresses.upgradeEngine;
+        require(upgradeAddresses.chainUpgradeEngine != address(0), "upgrade engine not deployed");
+        return upgradeAddresses.chainUpgradeEngine;
     }
 
     function bootstrapMigrationAddress() public view virtual returns (address) {
@@ -649,10 +665,10 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         ctmAddresses.admin.eip7702Checker = _eip7702Checker;
     }
 
-    /// @notice The release members this version SETS OUT to change. Everything else must come
-    ///         through unchanged, and the prepare refuses to replace anything not named here — so
-    ///         "change one contract" cannot quietly become "replace the facet set" because the
-    ///         local build differs from the one that produced the live code.
+    /// @notice The release members this version SETS OUT to change. Each is redeployed, everything
+    ///         else must come through unchanged, and the prepare refuses to replace anything not
+    ///         named here — so "change one contract" cannot quietly become "replace the facet set"
+    ///         because the local build differs from the one that produced the live code.
     /// @dev Names are the `deploySimpleContract` names of the members that pass through
     ///      {DeployCTMUtils._deployReleaseMember}: the six facets, `DiamondInit`, `L1GenesisUpgrade`
     ///      and `EIP7702Checker`. The verifier is not among them — a version that replaces it does so
@@ -665,12 +681,8 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
 
     /// @notice Refuses a replacement this version did not declare (see {changedReleaseMembers}).
     function _requireDeclaredReleaseMemberChange(string memory _name, address _live) internal virtual override {
-        string[] memory declared = changedReleaseMembers();
-        uint256 length = declared.length;
-        for (uint256 i = 0; i < length; ++i) {
-            if (compareStrings(declared[i], _name)) {
-                return;
-            }
+        if (_isDeclaredReleaseMemberChange(_name)) {
+            return;
         }
         console.log("Undeclared release member change:", _name);
         console.log("  live:", _live);
@@ -688,17 +700,19 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         );
     }
 
-    /// @notice A live release member may serve this release when it ALREADY runs the code the
-    ///         current sources produce with this run's constructor arguments — so an upgrade
-    ///         deploys only the members it changes, and one that changes none of them reuses the
-    ///         release object itself.
+    /// @notice A live release member may serve this release when this version does not declare it
+    ///         changed and it ALREADY runs the code the current sources produce with this run's
+    ///         constructor arguments — so an upgrade deploys only the members it changes, and one
+    ///         that changes none of them reuses the release object itself.
+    /// @dev A declared member is always redeployed: the build has no CBOR metadata, so a
+    ///      constructor-only change leaves the runtime codehash as it was.
     /// @dev The identity check needs a local deployment: an artifact's `deployedBytecode` carries
     ///      ZEROED immutable slots, so it cannot be compared against live code. The probe is a
     ///      plain CREATE in the script's own EVM and is never broadcast — nothing reaches the
     ///      chain — and it is exact, immutables included (the same technique
     ///      `GatewayCTMDeployerHelper` uses to predict Gateway codehashes).
     function _canReuseReleaseMember(string memory _name, address _live) internal virtual override returns (bool) {
-        if (_live == address(0) || _live.code.length == 0) {
+        if (_live == address(0) || _live.code.length == 0 || _isDeclaredReleaseMemberChange(_name)) {
             return false;
         }
         if (address(releaseMemberProbe) == address(0)) {
@@ -706,6 +720,18 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
             releaseMemberProbe = new ReleaseMemberProbe();
         }
         return _live.codehash == releaseMemberProbe.codehashOf(_name, getCreationCalldata(_name));
+    }
+
+    /// @notice Whether this version names `_name` in {changedReleaseMembers}.
+    function _isDeclaredReleaseMemberChange(string memory _name) internal view returns (bool) {
+        string[] memory declared = changedReleaseMembers();
+        uint256 length = declared.length;
+        for (uint256 i = 0; i < length; ++i) {
+            if (compareStrings(declared[i], _name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// @notice Declares one governance/admin call this prepare emits that the upgrade objects do
@@ -1033,7 +1059,7 @@ contract DefaultCTMUpgrade is Script, DeployCTMScript {
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            committedUpgradeEngine()
+            committedChainUpgradeEngine()
         );
 
         // Serialize newly deployed upgrade addresses
