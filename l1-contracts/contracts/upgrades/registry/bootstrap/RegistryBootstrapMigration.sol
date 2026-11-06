@@ -145,7 +145,10 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
     ///         in the same governance bundle), and the one-time ServerNotifier handover to the CTM
     ///         domain has completed.
     /// @dev Runs on the execution path, so a drifted ecosystem cannot be migrated by accident and
-    ///      the preconditions are enforced by the object itself, not by call order in a bundle.
+    ///      every CTM-domain precondition is enforced by the object itself, not by call order in a
+    ///      bundle. The core leg is the exception: the manifest names no core transition and this
+    ///      reads no core proxy, so `applyL1Upgrade` of the transition the sequence pins is ordered
+    ///      by the bundle, earlier in the same transaction, and checked off chain.
     function validate() public view {
         BootstrapManifest memory m = getManifest();
 

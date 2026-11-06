@@ -974,6 +974,11 @@ it now. The rows are then applied with the shared row semantics: every proxy at 
 `expectedOldImpl` (or already at `implNew`) and every `implNew` deployed code, before the first
 swap. `migrate()` runs once (`BootstrapAlreadyExecuted`).
 
+What `validate()` holds is the CTM domain. It does not read the core proxies: the manifest names no
+core transition, and the core leg — `applyL1Upgrade` of the transition the sequence pins — is
+ordered by the bundle, earlier in the same transaction, and checked off chain by package
+verification. `migrate()` relies on that order rather than on a state check of its own.
+
 Three properties that look like omissions but are not:
 
 - `migrate()` is **permissionless**. The gate is the state, not the caller: nothing runs until
