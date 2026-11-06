@@ -25,6 +25,11 @@ import {
 ///         `implNew` is skipped (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy
 ///         at anything else reverts, so replaying a stale object can never downgrade a proxy that
 ///         a later upgrade has already moved on.
+/// @dev The skip covers the row's reinitializer too: a proxy already at `implNew` is not called
+///      again, which is what lets a transition be applied again. It cannot tell a swap whose
+///      reinitializer ran from one whose did not, so a proxy swapped by hand through an executor's
+///      `forward` must run its reinitializer in that same call (`upgradeAndCall`); see "Recovery"
+///      in {docs/upgrade-operations.md}.
 /// @dev Manifests carry rows as inventories indexed by the canonical contract enums
 ///      (`L1EcosystemContract` for the ecosystem domain, `CTMContract` for the CTM domain — one
 ///      enum per domain for deployment and upgrades alike), with the array length checked
