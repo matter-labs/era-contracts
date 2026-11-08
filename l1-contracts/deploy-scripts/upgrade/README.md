@@ -35,6 +35,8 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
   `RegistryBootstrapMigration` (naming both executors) and the `RegistryBootstrapSequence` over the
   migration and the core transition, and declares every call of the one-time edge by reading it off
   that sequence.
+  `SplitCTMProxyAdmin` gives a CTM that still shares the ecosystem `ProxyAdmin` one of its own,
+  ahead of the prepare.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 - `EmergencyUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
   emergency upgrade ("Emergency execution" below).
@@ -228,6 +230,10 @@ Gotchas:
 
 - **CTM-admin calls.** The `[ctm_admin_calls]` of a bootstrap (the ServerNotifier handover) are not
   governance calls. They must land before the proposal.
+- **Shared CTM-domain `ProxyAdmin`.** A CTM still behind the ecosystem `ProxyAdmin` cannot be
+  bootstrapped, and the v35 prepare refuses it. Run `v35/SplitCTMProxyAdmin.s.sol` and have
+  governance execute its calls BEFORE the prepare, in an execution of their own
+  ([operations document](../../../docs/upgrade-operations.md#splitting-a-shared-ctm-domain-proxyadmin)).
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the
   handler names when the calldata is emitted. The deployer plan check refuses such a release for

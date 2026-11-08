@@ -956,6 +956,9 @@ the `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under and the `govern
 already be owned by. Its notifier row is mandatory:
 the one-time ServerNotifier handover is a precondition of the edge (see the
 [operations document](upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
+So is a CTM-domain `ProxyAdmin` apart from the ecosystem's: a CTM still behind the ecosystem
+admin is split off it first, in a governance execution of its own
+([splitting a shared CTM-domain ProxyAdmin](upgrade-operations.md#splitting-a-shared-ctm-domain-proxyadmin)).
 
 Governance nominates the migration as CTM owner and transfers the CTM-domain `ProxyAdmin` to it;
 `migrate()` accepts the CTM, performs the whole edge and hands both to the bound executor in the
