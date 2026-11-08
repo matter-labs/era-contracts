@@ -22,7 +22,6 @@ use super::construction::ReviewedBuild;
 use super::declared_calls::{judge_declared_calls, DerivedRun};
 use super::ecosystem_binding::{bind_to_reviewed_ecosystem, EcosystemClaims};
 use super::format_semver;
-use super::genesis::GenesisImage;
 use super::lifecycle::{
     verify_executor_owners, verify_lifecycle_construction, CtmExecutorReview, LifecycleReview,
 };
@@ -40,7 +39,6 @@ use super::views::{CTMTransitionView, CtmView};
 pub(crate) async fn verify<P: Provider>(
     provider: &P,
     build: &ReviewedBuild,
-    image: Option<&GenesisImage>,
     package: &ReplacementPackage,
     expected_governance_owner: Option<Address>,
     salts: &[B256],
@@ -244,15 +242,7 @@ pub(crate) async fn verify<P: Provider>(
     // ── 5. The L2 proxy logic chains crossing the edge keep ──
     if let Some(edge) = &replacement_edge {
         result.print_info("\n== L2 system-proxy shell ==");
-        verify_shell_kept(
-            provider,
-            build.identity(),
-            image,
-            result,
-            &ctm,
-            &edge.manifest,
-        )
-        .await;
+        verify_shell_kept(provider, build.identity(), result, &edge.manifest).await;
     }
 
     // ── 6. The calldata governance will actually sign ──
@@ -709,7 +699,6 @@ mod tests {
             verify(
                 &provider,
                 &fixture.build,
-                fixture.genesis.image.as_ref().ok(),
                 &package,
                 Some(GOVERNANCE),
                 &[],
@@ -777,7 +766,6 @@ mod tests {
             verify(
                 &provider,
                 &fixture.build,
-                fixture.genesis.image.as_ref().ok(),
                 &shell_package(TRANSITION, NEW_RELEASE),
                 Some(GOVERNANCE),
                 &[],

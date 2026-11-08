@@ -81,14 +81,17 @@ const FUNDING_TX_GAS_LIMIT: u64 = 500_000;
 /// Tracked paths whose modification changes the bytecode or calldata a generation run
 /// produces. `contracts_worktree_dirty` is scoped to these, so the generated files the run
 /// itself rewrites (`output/<env>/`, `zkstack-out/`) do not count.
-const CONTRACT_SOURCE_PATHSPECS: [&str; 11] = [
+const CONTRACT_SOURCE_PATHSPECS: [&str; 13] = [
     "*/foundry.toml",
+    "*/remappings.txt",
     "AllContractsHashes.json",
     "SystemConfig.json",
     "configs/genesis",
     "l1-contracts/contracts",
     "l1-contracts/deploy-scripts",
     "l1-contracts/dev",
+    // The links to the `lib/` submodules.
+    "l1-contracts/lib",
     "l1-contracts/upgrade-envs/permanent-values",
     "l2-contracts/contracts",
     "protocol-ops/src",

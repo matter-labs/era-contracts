@@ -1572,10 +1572,11 @@ pub(crate) async fn check_bundle(
     )
 }
 
-/// Refuses to sign unless the contracts checkout is exactly the generation's: at the bundle's
-/// `contracts_commit`, with no change to the contract sources and reviewed inputs
-/// (`contract_source_pathspecs`), from a bundle generated from a clean worktree. Signing runs the
-/// checkout's reviewed inputs (env salts and owner, the allowlist, the build) against the plan.
+/// Refuses unless the contracts checkout is exactly the generation's: at the bundle's
+/// `contracts_commit` with its `lib/` submodules at their pins, with no change to the contract
+/// sources and reviewed inputs (`contract_source_pathspecs`), from a bundle generated from a clean
+/// worktree. Signing runs the checkout's reviewed inputs (env salts and owner, the allowlist, the
+/// build) against the plan, and Etherscan verification submits and checks the checkout's sources.
 pub(crate) fn require_checkout_at(
     repository_root: &Path,
     metadata: &DeployBundleMetadata,
@@ -1583,11 +1584,21 @@ pub(crate) fn require_checkout_at(
     anyhow::ensure!(
         !metadata.contracts_worktree_dirty,
         "the bundle was generated from a worktree whose contract sources differed from {} \
-         (contracts_worktree_dirty): it cannot be signed. Generate it again from a clean checkout",
+         (contracts_worktree_dirty): no checkout matches it. Generate it again from a clean \
+         checkout",
         metadata.contracts_commit
     );
     let git = |args: &[&str]| -> anyhow::Result<String> {
         let output = Command::new("git")
+            // With `--ignore-submodules=none` below, a change shows whatever the operator's
+            // `diff.ignoreSubmodules`, `submodule.<name>.ignore` or `status.showUntrackedFiles`;
+            // only a library's own `submodule.<name>.ignore` can still hide a nested one.
+            .args([
+                "-c",
+                "diff.ignoreSubmodules=none",
+                "-c",
+                "status.showUntrackedFiles=normal",
+            ])
             .args(args)
             .current_dir(repository_root)
             .output()
@@ -1602,17 +1613,52 @@ pub(crate) fn require_checkout_at(
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     };
     ensure_same_commit(&git(&["rev-parse", "HEAD"])?, &metadata.contracts_commit)?;
-    let pathspecs = contract_source_pathspecs(&metadata.upgrade);
-    let status_args: Vec<&str> = ["status", "--porcelain", "--"]
-        .into_iter()
-        .chain(pathspecs.iter().map(String::as_str))
-        .collect();
-    let status = git(&status_args)?;
+    // Only the commit's own submodules: `git submodule update` leaves behind the repository of
+    // one an earlier release dropped, which forge reaches only through the links held here.
+    let gitlinks = git(&["ls-tree", "-r", "HEAD", "--", "lib/"])?;
+    let mut pathspecs = contract_source_pathspecs(&metadata.upgrade);
+    pathspecs.extend(
+        gitlinks
+            .lines()
+            .filter(|line| line.starts_with("160000 commit "))
+            .filter_map(|line| line.split('\t').nth(1))
+            .map(str::to_string),
+    );
+    // Next to a pathspec with a wildcard, `git status` drops untracked repositories.
+    let (globs, literals): (Vec<&str>, Vec<&str>) = pathspecs
+        .iter()
+        .map(String::as_str)
+        .partition(|pathspec| pathspec.contains('*'));
+    let mut changes = Vec::new();
+    for set in [literals, globs] {
+        let status_args: Vec<&str> = ["status", "--porcelain", "--ignore-submodules=none", "--"]
+            .into_iter()
+            .chain(set)
+            .collect();
+        changes.push(git(&status_args)?);
+    }
+    changes.retain(|change| !change.is_empty());
+    let status = changes.join("\n");
     anyhow::ensure!(
         status.is_empty(),
         "this checkout's contract sources or reviewed inputs differ from {}:\n{status}\nSigning \
-         holds the plan to them: discard or commit the changes, rebuild, and run again",
+         and Etherscan verification are held to them: discard or commit the changes (for `lib/`, \
+         `git submodule update --init --recursive --force` and `git submodule foreach --recursive \
+         git clean -ffd`), rebuild, and run again",
         metadata.contracts_commit
+    );
+    // `git status` reports nothing for a library copied in without its repository.
+    let submodules = git(&["submodule", "status"])?;
+    let unpopulated: Vec<&str> = submodules
+        .lines()
+        .filter(|line| line.starts_with('-'))
+        .collect();
+    anyhow::ensure!(
+        unpopulated.is_empty(),
+        "these submodules are not git checkouts, so they cannot be held to {}:\n{}\nRemove \
+         them, run `git submodule update --init --recursive`, rebuild, and run again",
+        metadata.contracts_commit,
+        unpopulated.join("\n")
     );
     Ok(())
 }
@@ -1621,8 +1667,9 @@ fn ensure_same_commit(head: &str, bundle_commit: &str) -> anyhow::Result<()> {
     anyhow::ensure!(
         head == bundle_commit,
         "this checkout is at {head}, but the bundle was generated from {bundle_commit}. Signing \
-         must run from the generation commit, whose build the plan is held against: `git checkout \
-         {bundle_commit}`, rebuild, and run again (a --fork-url rehearsal does not require it)"
+         and Etherscan verification must run from the generation commit, whose build and sources \
+         they are held to: `git checkout {bundle_commit}`, rebuild, and run again (a \
+         `replay-bundle --fork-url` rehearsal does not require it)"
     );
     Ok(())
 }
@@ -2527,7 +2574,7 @@ data = "{nominate}"
     }
 
     /// Signing needs the generation commit, its contract sources and reviewed inputs unchanged,
-    /// and a bundle generated from a clean worktree.
+    /// its `lib/` submodules at their pins, and a bundle generated from a clean worktree.
     #[test]
     fn signing_requires_the_clean_generation_checkout() {
         use crate::commands::ecosystem::bundle::{L1Provenance, Toolchain};
@@ -2541,23 +2588,69 @@ data = "{nominate}"
             assert!(output.status.success(), "git {args:?}");
             String::from_utf8(output.stdout).unwrap().trim().to_string()
         };
-        let source = repo.path().join("protocol-ops/src/allowlist.rs");
-        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
-        std::fs::write(&source, "reviewed\n").unwrap();
-        git(&["init", "-q"]);
-        git(&["add", "."]);
+        let commit = |dir: &str| {
+            git(&[
+                "-C",
+                dir,
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "fixture",
+            ])
+        };
+        let sources = [
+            "protocol-ops/src/allowlist.rs",
+            "l1-contracts/remappings.txt",
+            "l1-contracts/lib/forge-std",
+        ];
+        for source in sources {
+            let source = repo.path().join(source);
+            std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+            std::fs::write(&source, "reviewed\n").unwrap();
+        }
+        // Submodules' repositories embedded at their paths, each pinned as a gitlink by the
+        // repository above it, then configured as an operator may have to hide their changes.
+        let library = repo.path().join("lib/forge-std/Test.sol");
+        let nested = repo.path().join("lib/forge-std/lib/ds-test/Test.sol");
+        let scoped = repo.path().join("lib/@scope/dep/Dep.sol");
+        for file in [&library, &nested, &scoped] {
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, "pinned\n").unwrap();
+        }
+        for dir in [
+            "lib/forge-std/lib/ds-test",
+            "lib/forge-std",
+            "lib/@scope/dep",
+            ".",
+        ] {
+            git(&["-C", dir, "init", "-q"]);
+            git(&["-C", dir, "add", "."]);
+            commit(dir);
+        }
         git(&[
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "-c",
-            "commit.gpgsign=false",
-            "commit",
-            "-q",
-            "-m",
-            "fixture",
+            "-C",
+            "lib/forge-std",
+            "config",
+            "diff.ignoreSubmodules",
+            "all",
         ]);
+        std::fs::write(
+            repo.path().join(".gitmodules"),
+            "[submodule \"forge-std\"]\n\tpath = lib/forge-std\n\turl = ./lib/forge-std\n\
+             \tignore = all\n[submodule \"dep\"]\n\tpath = lib/@scope/dep\n\turl = \
+             ./lib/@scope/dep\n",
+        )
+        .unwrap();
+        git(&["add", ".gitmodules"]);
+        commit(".");
+        git(&["submodule", "init"]);
         let mut metadata = DeployBundleMetadata {
             schema: String::new(),
             upgrade: DEFAULT_UPGRADE.to_string(),
@@ -2581,16 +2674,81 @@ data = "{nominate}"
         };
         require_checkout_at(repo.path(), &metadata).unwrap();
 
-        std::fs::write(&source, "edited after review\n").unwrap();
+        for source in sources {
+            std::fs::write(repo.path().join(source), "edited after review\n").unwrap();
+            let error = require_checkout_at(repo.path(), &metadata)
+                .unwrap_err()
+                .to_string();
+            assert!(
+                error.contains("contract sources or reviewed inputs differ"),
+                "{error}"
+            );
+            assert!(error.contains(source), "{error}");
+            std::fs::write(repo.path().join(source), "reviewed\n").unwrap();
+        }
+
+        // A library, a nested one or a scoped one edited in place, or checked out at another
+        // commit than the pin.
+        for (file, submodule) in [
+            (&library, "lib/forge-std"),
+            (&nested, "lib/forge-std"),
+            (&scoped, "lib/@scope/dep"),
+        ] {
+            std::fs::write(file, "edited after review\n").unwrap();
+            let error = require_checkout_at(repo.path(), &metadata)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(submodule), "{error}");
+            std::fs::write(file, "pinned\n").unwrap();
+        }
+        commit("lib/forge-std");
         let error = require_checkout_at(repo.path(), &metadata)
             .unwrap_err()
             .to_string();
-        assert!(
-            error.contains("contract sources or reviewed inputs differ"),
-            "{error}"
-        );
-        assert!(error.contains("protocol-ops/src/allowlist.rs"), "{error}");
-        std::fs::write(&source, "reviewed\n").unwrap();
+        assert!(error.contains("lib/forge-std"), "{error}");
+        git(&["-C", "lib/forge-std", "checkout", "-q", "HEAD~1"]);
+        require_checkout_at(repo.path(), &metadata).unwrap();
+
+        // An untracked file the operator's `status.showUntrackedFiles=no` would hide, and a
+        // repository next to the links, which a wildcard pathspec in the same call would hide.
+        for dir in [".", "lib/forge-std"] {
+            git(&["-C", dir, "config", "status.showUntrackedFiles", "no"]);
+        }
+        let repository_at = |dir: &str| {
+            std::fs::create_dir_all(repo.path().join(dir)).unwrap();
+            std::fs::write(repo.path().join(dir).join("A.sol"), "unreviewed\n").unwrap();
+            git(&["-C", dir, "init", "-q"]);
+            git(&["-C", dir, "add", "."]);
+            commit(dir);
+        };
+        let extra = repo.path().join("lib/forge-std/Extra.sol");
+        std::fs::write(&extra, "unreviewed\n").unwrap();
+        let error = require_checkout_at(repo.path(), &metadata)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("lib/forge-std"), "{error}");
+        std::fs::remove_file(&extra).unwrap();
+        repository_at("l1-contracts/lib/evil");
+        let error = require_checkout_at(repo.path(), &metadata)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("l1-contracts/lib/evil"), "{error}");
+        std::fs::remove_dir_all(repo.path().join("l1-contracts/lib/evil")).unwrap();
+        // The repository of a submodule an earlier release had is no part of this commit.
+        repository_at("lib/@matterlabs/zksync-contracts");
+        require_checkout_at(repo.path(), &metadata).unwrap();
+
+        // A library copied in without its repository, which `git status` does not look into.
+        let repository = repo.path().join("lib/forge-std/.git");
+        let aside = repo.path().join("forge-std.git");
+        std::fs::rename(&repository, &aside).unwrap();
+        let error = require_checkout_at(repo.path(), &metadata)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("not git checkouts"), "{error}");
+        assert!(error.contains("lib/forge-std"), "{error}");
+        std::fs::rename(&aside, &repository).unwrap();
+        require_checkout_at(repo.path(), &metadata).unwrap();
 
         metadata.contracts_worktree_dirty = true;
         let error = require_checkout_at(repo.path(), &metadata)

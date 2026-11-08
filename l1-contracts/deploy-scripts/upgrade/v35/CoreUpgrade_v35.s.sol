@@ -27,11 +27,10 @@ contract CoreUpgrade_v35 is DefaultCoreUpgrade {
     CoreExecutorDeployment internal executorDeployment;
 
     /// @inheritdoc DefaultCoreUpgrade
-    /// @dev Every ecosystem implementation differs from the v0.34.0 build by runtime codehash. In
-    ///      executable code `L1Bridgehub`, `L1MessageRoot`, `L1ChainAssetHandler`, `L1AssetRouter`,
-    ///      `L1NativeTokenVault` and `ChainRegistrationSender` changed; the other three differ in their
-    ///      CBOR metadata alone, because sources in their import closure (shared error and interface
-    ///      files) changed.
+    /// @dev Every ecosystem implementation differs from the deployed v0.34.0 code by runtime codehash:
+    ///      v0.35.0 is the first release built without CBOR metadata. In executable code `L1Bridgehub`,
+    ///      `L1MessageRoot`, `L1ChainAssetHandler`, `L1AssetRouter`, `L1NativeTokenVault` and
+    ///      `ChainRegistrationSender` changed.
     function changedEcosystemImplementations() internal view virtual override returns (string[] memory names) {
         names = new string[](9);
         names[0] = "L1Bridgehub";

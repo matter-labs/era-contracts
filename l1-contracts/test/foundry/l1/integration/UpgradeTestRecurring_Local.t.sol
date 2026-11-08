@@ -175,8 +175,9 @@ contract CoreUpgradeUndeclaredChange is CoreUpgradeNoEcosystemLeg {
     }
 }
 
-/// @notice The same differing build, declared as this version's change.
-contract CoreUpgradeDeclaredChange is CoreUpgradeUndeclaredChange {
+/// @notice `L1MessageRoot` declared as this version's change. The fixture's live one already runs
+///         this build, the shape of a constructor-only change: the declaration alone decides.
+contract CoreUpgradeDeclaredChange is CoreUpgradeNoEcosystemLeg {
     function changedEcosystemImplementations() internal pure override returns (string[] memory names) {
         names = new string[](1);
         names[0] = "L1MessageRoot";
@@ -184,25 +185,12 @@ contract CoreUpgradeDeclaredChange is CoreUpgradeUndeclaredChange {
 }
 
 /// @notice The two ecosystem proxies that gained row builders last (`L1InteropHandler`,
-///         `ChainRegistrationSender`), their local builds differing from the live ones (simulated:
-///         the fixture's live code is this build) and declared as this version's changes.
+///         `ChainRegistrationSender`), declared as this version's changes.
 contract CoreUpgradeDeclaredInteropAndRegistration is CoreUpgradeNoEcosystemLeg {
-    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
-        if (_isOneOfTheTwo(_name)) {
-            return false;
-        }
-        return super._canReuseEcosystemImplementation(_name, _live);
-    }
-
     function changedEcosystemImplementations() internal pure override returns (string[] memory names) {
         names = new string[](2);
         names[0] = "L1InteropHandler";
         names[1] = "ChainRegistrationSender";
-    }
-
-    function _isOneOfTheTwo(string memory _name) private pure returns (bool) {
-        bytes32 name = keccak256(bytes(_name));
-        return name == keccak256(bytes("L1InteropHandler")) || name == keccak256(bytes("ChainRegistrationSender"));
     }
 }
 
@@ -620,9 +608,8 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
     }
 
     /// @notice `L1InteropHandler` and `ChainRegistrationSender` are installable like every other
-    ///         ecosystem singleton: declared and differing, each is deployed, pinned as a row departing
-    ///         from its live implementation, and swapped by the core executor when the core leg
-    ///         executes.
+    ///         ecosystem singleton: declared, each is deployed, pinned as a row departing from its
+    ///         live implementation, and swapped by the core executor when the core leg executes.
     function test_corePrepare_installsTheInteropHandlerAndRegistrationSender() public {
         CoreUpgradeDeclaredInteropAndRegistration core = new CoreUpgradeDeclaredInteropAndRegistration();
         RecurringCTMUpgradeForTests hop = new CTMUpgradeEmpty();
@@ -673,7 +660,9 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
     }
 
     /// @notice A declared replacement is deployed and pinned as the core leg's only row, departing
-    ///         from what the proxy runs today; every undeclared implementation is reused.
+    ///         from what the proxy runs today, even when its runtime code is unchanged (a
+    ///         constructor-only change does not show in the codehash); every undeclared
+    ///         implementation is reused.
     function test_corePrepare_deploysAndInstallsADeclaredReplacement() public {
         CoreUpgradeDeclaredChange core = new CoreUpgradeDeclaredChange();
         core.initializeWithArgs(
@@ -693,6 +682,7 @@ contract UpgradeIntegrationTestRecurringLocal is UpgradeIntegrationBootstrapFixt
         assertEq(rows[0].expectedOldImpl, DeployScriptUtils.getImplementation(messageRootProxy), "from live");
         assertEq(rows[0].implNew, core.getDiscoveredBridgehub().implementations.messageRoot, "to this run's");
         assertTrue(rows[0].implNew != rows[0].expectedOldImpl, "a real replacement");
+        assertEq(rows[0].implNew.codehash, rows[0].expectedOldImpl.codehash, "of the same runtime code");
     }
 
     /// @notice A recurring CTM prepare finds its executor on the CTM (the CTM's owner, bound to it)
