@@ -229,14 +229,7 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         // against it, so a stale book entry would fail loudly at the wrong time.
         ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(ctmProxy));
         require(address(ctmProxyAdmin) != address(0), "CTM proxy has no admin");
-        // The two-executor model hands the CTM domain's admin to the CTM executor and the
-        // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
-        // the collision would only surface as a bundle revert; a CTM-domain proxy left behind
-        // another admin would end up where the CTM executor cannot upgrade it. CTMs deployed
-        // before that model (zksync-os mainnet's and the ZKsync OS testnet's among them) still
-        // share the ecosystem's: `SplitCTMProxyAdmin` gives them their own, in a governance
-        // execution before this prepare (see "Splitting a shared CTM-domain ProxyAdmin" in
-        // {docs/upgrade-operations.md}).
+        // CTMs deployed before the two-executor model share the ecosystem's admin until split.
         CTMDomainProxies.requireSplit(
             ctmAddresses.stateTransition.proxies,
             address(ctmProxyAdmin),
@@ -325,11 +318,6 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         address timelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
         address timelockImplNew = ctmAddresses.stateTransition.implementations.validatorTimelock;
         require(timelockImplNew != address(0), "new ValidatorTimelock implementation not deployed");
-        // `migrate()` reads and swaps every row through `ctmProxyAdmin`.
-        require(
-            Utils.getProxyAdminAddress(timelockProxy) == address(_ctmProxyAdmin),
-            "ValidatorTimelock is not behind the CTM-domain ProxyAdmin"
-        );
         proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: timelockProxy,
             expectedOldImpl: Utils.getImplementation(timelockProxy),

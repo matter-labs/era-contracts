@@ -149,6 +149,12 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     ///      setUp has just handed to governance. None by default.
     function _beforePrepare() internal virtual {}
 
+    /// @dev How many ServerNotifier handover calls the ChainAdmin makes: moving the notifier's
+    ///      proxy and nominating the CTM executor, unless {_beforePrepare} already moved the proxy.
+    function _handoverAdminCalls() internal pure virtual returns (uint256) {
+        return 2;
+    }
+
     function setUp() public virtual {
         previousRelease = _loadPreviousRelease();
         FixtureChain memory chain = _fixtureChain(previousRelease, UPGRADED_CHAIN_ID);
@@ -569,8 +575,8 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertEq(bundle[6].data, abi.encodeCall(RegistryBootstrapMigration.validateApplied, ()), "validateApplied()");
         assertEq(
             _bootstrap.externalActionEntries().length,
-            9,
-            "the CTM prepare declares the 7 derived governance calls and the 2 handover admin calls"
+            7 + _handoverAdminCalls(),
+            "the CTM prepare declares the 7 derived governance calls and the handover admin calls"
         );
         assertEq(coreUpgrade.externalActionEntries().length, 0, "the core prepare of a derived edge authors nothing");
         migration.validateApplied();

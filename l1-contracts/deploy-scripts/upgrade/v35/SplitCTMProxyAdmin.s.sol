@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 // solhint-disable no-console
 
 import {console2 as console} from "forge-std/Script.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -19,27 +20,11 @@ import {CTMDomainProxies} from "./CTMDomainProxies.sol";
 
 /// @title SplitCTMProxyAdmin
 /// @author Matter Labs
-/// @notice Gives a CTM whose proxies still share the ecosystem `ProxyAdmin` a CTM-domain
-///         `ProxyAdmin` of its own: the shape the v35 registry bootstrap requires, since it hands
-///         the ecosystem admin to the core executor and the CTM-domain one to the CTM executor.
-///         Ecosystems deployed before the two-executor model (zksync-os mainnet and the ZKsync OS
-///         testnet among them) keep the CTM, its ValidatorTimelock, BytecodesSupplier and
-///         PermissionlessValidator behind the ecosystem admin, and `CTMUpgrade_v35` refuses them
-///         until this has run ({CTMDomainProxies.requireSplit}).
-/// @dev Run ONCE per affected CTM, BEFORE the v35 prepare, and execute its governance calls in an
-///      earlier governance execution than the bootstrap bundle: the prepare reads the CTM-domain
-///      admin from the CTM's live EIP-1967 slot, binds the CTM executor to it and pins it in the
-///      migration's manifest, and package verification refuses any extra call to a `ProxyAdmin`
-///      inside the bootstrap bundle. See "Splitting a shared CTM-domain ProxyAdmin" in
-///      {docs/upgrade-operations.md}.
-/// @dev What it does: deploys a `ProxyAdmin` through the CREATE2 factory, owned by the ecosystem
-///      admin's owner (governance, the account that hands the CTM-domain admin to the migration in
-///      the bootstrap bundle), under the salt domain fresh deployments use for theirs keyed by the
-///      CTM, so each CTM gets an admin of its own; and renders one
-///      `changeProxyAdmin(proxy, newAdmin)` call on the ecosystem admin per CTM-domain proxy
-///      (`AddressIntrospector.getCTMProxies`, the list the prepare reads) still behind it. A
-///      ServerNotifier behind an admin of its own is left to the bootstrap's ChainAdmin handover.
-///      Rendered from live state, so a CTM that already has its own admin yields no calls.
+/// @notice Gives a CTM whose proxies share the ecosystem `ProxyAdmin` a CTM-domain `ProxyAdmin` of
+///         its own, owned by governance, and renders the governance calls that move the CTM domain
+///         under it: the precondition {CTMDomainProxies.requireSplit} states for the v35 bootstrap.
+///         When and how to run it:
+///         {docs/upgrade-operations.md#splitting-a-shared-ctm-domain-proxyadmin}.
 contract SplitCTMProxyAdmin is Create2FactoryUtils {
     /// @notice What the split moves and where.
     struct Split {
@@ -58,34 +43,48 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
     }
 
     /// @notice Prepares the split of `_ctm` off `_bridgehub`'s ProxyAdmin and writes it to
-    ///         `_outputPath` as `[ctm_proxy_admin_split]`, the calls ABI-encoded as a `Call[]`.
+    ///         `_outputPath` ({write}). Only under `--broadcast`: a dry run's admin exists only in
+    ///         the simulation, and calls naming it would hand the proxies to an address with no code.
     /// @param _bridgehub The ecosystem's Bridgehub proxy.
     /// @param _ctm The CTM proxy.
     /// @param _outputPath Where the TOML output goes.
     function run(address _bridgehub, address _ctm, string memory _outputPath) external {
+        require(
+            vm.isContext(VmSafe.ForgeContext.ScriptBroadcast) || vm.isContext(VmSafe.ForgeContext.ScriptResume),
+            "dry run: the CTM-domain ProxyAdmin would not be deployed on chain; rerun with --broadcast"
+        );
         Split memory split = prepare(_bridgehub, _ctm);
-
-        string memory section = "ctm_proxy_admin_split";
-        vm.serializeAddress(section, "chain_type_manager", split.chainTypeManager);
-        vm.serializeAddress(section, "ecosystem_proxy_admin", split.ecosystemProxyAdmin);
-        vm.serializeAddress(section, "governance", split.governance);
-        vm.serializeAddress(section, "ctm_proxy_admin", split.ctmProxyAdmin);
-        vm.serializeAddress(section, "proxies", split.proxies);
-        string memory body = vm.serializeBytes(section, "governance_calls", abi.encode(split.calls));
-        vm.writeToml(vm.serializeString("root", section, body), _outputPath);
-
+        write(split, _outputPath);
         if (split.calls.length == 0) {
             console.log("Nothing left behind the ecosystem ProxyAdmin; CTM-domain ProxyAdmin:", split.ctmProxyAdmin);
         } else {
             console.log("CTM-domain ProxyAdmin:", split.ctmProxyAdmin);
-            console.log("Governance calls to execute before the v35 prepare:", split.calls.length);
+            for (uint256 i = 0; i < split.proxies.length; ++i) {
+                console.log("changeProxyAdmin", split.proxies[i], "on", split.ecosystemProxyAdmin);
+            }
         }
     }
 
+    /// @notice Writes `_split` to `_outputPath`: the calls as `[governance_calls] calls` (an
+    ///         `abi.encode(Call[])`, the shape the governance tooling reads), what they move as
+    ///         `[ctm_proxy_admin_split]`.
+    /// @param _split The split {prepare} returned.
+    /// @param _outputPath Where the TOML output goes.
+    function write(Split memory _split, string memory _outputPath) public {
+        string memory section = "ctm_proxy_admin_split";
+        vm.serializeAddress(section, "chain_type_manager", _split.chainTypeManager);
+        vm.serializeAddress(section, "ecosystem_proxy_admin", _split.ecosystemProxyAdmin);
+        vm.serializeAddress(section, "governance", _split.governance);
+        vm.serializeAddress(section, "ctm_proxy_admin", _split.ctmProxyAdmin);
+        string memory splitToml = vm.serializeAddress(section, "proxies", _split.proxies);
+        string memory callsToml = vm.serializeBytes("governance_calls", "calls", abi.encode(_split.calls));
+        vm.serializeString("root", section, splitToml);
+        vm.writeToml(vm.serializeString("root", "governance_calls", callsToml), _outputPath);
+    }
+
     /// @notice Deploys the CTM-domain ProxyAdmin when the CTM still shares the ecosystem's, and
-    ///         renders the governance calls that move every CTM-domain proxy still behind the
-    ///         ecosystem admin under the CTM's. A partial split is finished towards the admin the
-    ///         CTM already has.
+    ///         renders one `changeProxyAdmin` on the ecosystem admin per CTM-domain proxy still
+    ///         behind it. A partial split is finished towards the admin the CTM already has.
     /// @param _bridgehub The ecosystem's Bridgehub proxy.
     /// @param _ctm The CTM proxy.
     /// @return split The split; `calls` is empty when nothing is left behind the ecosystem admin.
@@ -110,10 +109,14 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
             return split;
         }
 
+        require(
+            !_isBoundCoreExecutor(split.governance, ecosystemAdmin),
+            "the ecosystem ProxyAdmin is already the core executor's: split before the v35 bootstrap"
+        );
+
         if (split.ctmProxyAdmin == ecosystemAdmin) {
-            // The CTM is part of the salt domain: two CTMs split under one governance must never
-            // land on one admin, and the factory hands back an existing deployment at a repeated
-            // address.
+            // Keyed by the CTM: the factory hands back an existing deployment at a repeated
+            // address, so two CTMs under one governance would otherwise share one admin.
             split.ctmProxyAdmin = create2WithDeterministicOwner(
                 type(ProxyAdmin).creationCode,
                 split.governance,
@@ -121,9 +124,8 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
             );
             notifyAboutDeployment(split.ctmProxyAdmin, "ProxyAdmin", "", "CTM-domain ProxyAdmin");
         }
-        // A rerun reuses the admin an earlier run deployed, and a partial split moves the rest
-        // under the CTM's own: either must still be governance's, or the moves would hand the
-        // proxies to someone else.
+        // A reused admin (an earlier run's, or the CTM's own after a partial split) may have
+        // changed hands since; moving proxies under it would hand them over too.
         require(
             ProxyAdmin(split.ctmProxyAdmin).owner() == split.governance,
             "CTM-domain ProxyAdmin not owned by governance"
@@ -150,8 +152,7 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
     }
 
     /// @notice Reverts unless `_ctm` is split off `_bridgehub`'s ProxyAdmin
-    ///         ({CTMDomainProxies.requireSplit}, the check `CTMUpgrade_v35` makes before it
-    ///         prepares) and governance, the ecosystem admin's owner, owns the CTM-domain admin.
+    ///         ({CTMDomainProxies.requireSplit}) and governance owns the CTM-domain admin.
     /// @param _bridgehub The ecosystem's Bridgehub proxy.
     /// @param _ctm The CTM proxy.
     function requireSplit(address _bridgehub, address _ctm) public view {
@@ -166,5 +167,35 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
             ProxyAdmin(ctmAdmin).owner() == ProxyAdmin(ecosystemAdmin).owner(),
             "CTM-domain ProxyAdmin not owned by governance"
         );
+    }
+
+    /// @notice Reverts unless `_ctmProxyAdmin`, the admin a split's calls name, is ready to receive
+    ///         `_ctm`'s domain: deployed with the `ProxyAdmin` code this build produces, owned by
+    ///         governance (the ecosystem admin's owner), and not the ecosystem admin.
+    /// @param _bridgehub The ecosystem's Bridgehub proxy.
+    /// @param _ctm The CTM proxy.
+    /// @param _ctmProxyAdmin The output's `ctm_proxy_admin`.
+    function requireReady(address _bridgehub, address _ctm, address _ctmProxyAdmin) external view {
+        require(IBridgehubBase(_bridgehub).chainTypeManagerIsRegistered(_ctm), "CTM not registered on the Bridgehub");
+        address ecosystemAdmin = Utils.getProxyAdminAddress(_bridgehub);
+        require(_ctmProxyAdmin != ecosystemAdmin, "the CTM-domain ProxyAdmin is the ecosystem one");
+        require(
+            keccak256(_ctmProxyAdmin.code) == keccak256(type(ProxyAdmin).runtimeCode),
+            "the CTM-domain ProxyAdmin does not run this build's ProxyAdmin code"
+        );
+        require(
+            ProxyAdmin(_ctmProxyAdmin).owner() == ProxyAdmin(ecosystemAdmin).owner(),
+            "CTM-domain ProxyAdmin not owned by governance"
+        );
+    }
+
+    /// @dev Whether `_owner` is a `CoreUpgradeExecutor` bound to `_ecosystemAdmin`. Legacy
+    ///      governance and the upgrade handler have no `PROXY_ADMIN()`, so the call fails for them.
+    function _isBoundCoreExecutor(address _owner, address _ecosystemAdmin) private view returns (bool) {
+        if (_owner.code.length == 0) {
+            return false;
+        }
+        (bool ok, bytes memory ret) = _owner.staticcall(abi.encodeWithSignature("PROXY_ADMIN()"));
+        return ok && ret.length == 32 && abi.decode(ret, (address)) == _ecosystemAdmin;
     }
 }

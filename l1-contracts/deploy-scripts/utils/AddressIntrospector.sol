@@ -227,9 +227,10 @@ library AddressIntrospector {
         });
     }
 
-    /// @notice The CTM domain's proxies, as the CTM names them: the one source every script that
-    ///         walks the domain reads (the prepares through {getCTMAddresses}, `SplitCTMProxyAdmin`).
-    ///         The interop fee manager is zero on a CTM that predates it.
+    /// @notice The CTM domain's proxies, as the CTM names them: the list the prepares (through
+    ///         {getCTMAddresses}) and `SplitCTMProxyAdmin` both walk.
+    /// @param _ctm The CTM proxy.
+    /// @return The domain's proxies; the interop fee manager is zero on a CTM that predates it.
     function getCTMProxies(ChainTypeManager _ctm) internal view returns (StateTransitionContracts memory) {
         return
             StateTransitionContracts({
