@@ -145,6 +145,10 @@ abstract contract UpgradeIntegrationBootstrapFixture is
             });
     }
 
+    /// @dev Governance-side state changes that land before the prepares run, on the authority
+    ///      setUp has just handed to governance. None by default.
+    function _beforePrepare() internal virtual {}
+
     function setUp() public virtual {
         previousRelease = _loadPreviousRelease();
         FixtureChain memory chain = _fixtureChain(previousRelease, UPGRADED_CHAIN_ID);
@@ -152,6 +156,7 @@ abstract contract UpgradeIntegrationBootstrapFixture is
         _settleBatch(chain);
         _installChainAdmin(chain);
         _handAuthorityToGovernance(previousRelease);
+        _beforePrepare();
         chainId = UPGRADED_CHAIN_ID;
         genesisEngineBeforeUpgrade = IChainTypeManager(previousRelease.chainTypeManager).l1GenesisUpgrade();
         rollupDAManagerBeforeUpgrade = IAdmin(chain.diamondProxy).getRollupDAManager();

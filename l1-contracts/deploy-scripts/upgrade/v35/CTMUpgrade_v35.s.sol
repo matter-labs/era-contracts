@@ -230,12 +230,21 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         require(address(ctmProxyAdmin) != address(0), "CTM proxy has no admin");
         // The two-executor model hands the CTM domain's admin to the CTM executor and the
         // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
-        // the collision would only surface as a bundle revert. ZKsyncOS CTMs (the only ones
-        // this release upgrades) are deployed with their own admin; Era CTMs on old ecosystems
-        // share the ecosystem's and would need an admin split first.
+        // the collision would only surface as a bundle revert. CTMs deployed before that model
+        // (zksync-os mainnet's and the ZKsync OS testnet's among them) still share the
+        // ecosystem's: `SplitCTMProxyAdmin` gives them their own, in a governance execution
+        // before this prepare (see "Splitting a shared CTM-domain ProxyAdmin" in
+        // {docs/upgrade-operations.md}).
         require(
             address(ctmProxyAdmin) != coreAddresses.shared.transparentProxyAdmin,
-            "CTM domain shares the ecosystem ProxyAdmin; split the admin before the bootstrap"
+            "CTM domain shares the ecosystem ProxyAdmin; run SplitCTMProxyAdmin and execute its calls first"
+        );
+        // A partial split would leave the supplier behind the ecosystem admin, which the core
+        // executor receives: every later CTM-domain upgrade of it would then revert.
+        require(
+            Utils.getProxyAdminAddress(ctmAddresses.stateTransition.proxies.bytecodesSupplier) ==
+                address(ctmProxyAdmin),
+            "BytecodesSupplier is not behind the CTM-domain ProxyAdmin; finish the SplitCTMProxyAdmin calls"
         );
 
         // Both go through the CREATE2 factory like every other prepare deployment: the Safe
