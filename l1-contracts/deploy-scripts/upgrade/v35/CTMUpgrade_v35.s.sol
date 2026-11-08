@@ -30,6 +30,7 @@ import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
+import {CTMDomainProxies} from "./CTMDomainProxies.sol";
 
 /// @notice The v35 CTM upgrade: the ONE-TIME edge into the registry-driven model (see the
 ///         Bootstrap section of {docs/registry-driven-upgrades.md}). Chains crossing this edge
@@ -230,21 +231,16 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         require(address(ctmProxyAdmin) != address(0), "CTM proxy has no admin");
         // The two-executor model hands the CTM domain's admin to the CTM executor and the
         // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
-        // the collision would only surface as a bundle revert. CTMs deployed before that model
-        // (zksync-os mainnet's and the ZKsync OS testnet's among them) still share the
-        // ecosystem's: `SplitCTMProxyAdmin` gives them their own, in a governance execution
-        // before this prepare (see "Splitting a shared CTM-domain ProxyAdmin" in
+        // the collision would only surface as a bundle revert; a CTM-domain proxy left behind
+        // another admin would end up where the CTM executor cannot upgrade it. CTMs deployed
+        // before that model (zksync-os mainnet's and the ZKsync OS testnet's among them) still
+        // share the ecosystem's: `SplitCTMProxyAdmin` gives them their own, in a governance
+        // execution before this prepare (see "Splitting a shared CTM-domain ProxyAdmin" in
         // {docs/upgrade-operations.md}).
-        require(
-            address(ctmProxyAdmin) != coreAddresses.shared.transparentProxyAdmin,
-            "CTM domain shares the ecosystem ProxyAdmin; run SplitCTMProxyAdmin and execute its calls first"
-        );
-        // A partial split would leave the supplier behind the ecosystem admin, which the core
-        // executor receives: every later CTM-domain upgrade of it would then revert.
-        require(
-            Utils.getProxyAdminAddress(ctmAddresses.stateTransition.proxies.bytecodesSupplier) ==
-                address(ctmProxyAdmin),
-            "BytecodesSupplier is not behind the CTM-domain ProxyAdmin; finish the SplitCTMProxyAdmin calls"
+        CTMDomainProxies.requireSplit(
+            ctmAddresses.stateTransition.proxies,
+            address(ctmProxyAdmin),
+            coreAddresses.shared.transparentProxyAdmin
         );
 
         // Both go through the CREATE2 factory like every other prepare deployment: the Safe
