@@ -358,6 +358,11 @@ pub(crate) async fn verify<P: Provider>(
     )
     .await;
 
+    // ── 3b. The CTM-domain ProxyAdmin the edge hands to the CTM executor: the CTM's own, not the
+    //    ecosystem's, and in front of the BytecodesSupplier ──
+    result.print_info("\n== Prerequisite: CTM-domain ProxyAdmin ==");
+    verify_ctm_proxy_admin(provider, result, &manifest, bindings.core_proxy_admin).await?;
+
     // ── 4. The one-time ServerNotifier handover: a precondition of the edge, half of which
     //    governance cannot perform ──
     result.print_info("\n== Prerequisite: ServerNotifier handover ==");
@@ -740,6 +745,98 @@ struct NotifierFacts {
     proxy_admin: Address,
     owner: Option<Address>,
     pending_owner: Option<Address>,
+}
+
+/// Where to point a reviewer whose CTM domain is not split off the ecosystem's `ProxyAdmin`.
+const SPLIT_REMEDY: &str = "run `SplitCTMProxyAdmin` and have governance execute its calls before \
+                            the prepare (\"Splitting a shared CTM-domain ProxyAdmin\" in \
+                            `docs/upgrade-operations.md`)";
+
+/// The CTM-domain `ProxyAdmin` the edge hands to the CTM executor, read live and judged by
+/// [`judge_ctm_proxy_admin`]. Its code is not held to the reviewed build: it is an existing,
+/// governance-owned admin, and admins deployed before the metadata-less build (the ecosystem's and
+/// the notifier's on mainnet among them) never match it byte for byte.
+async fn verify_ctm_proxy_admin<P: Provider>(
+    provider: &P,
+    result: &mut VerificationResult,
+    manifest: &views::BootstrapManifest,
+    core_proxy_admin: Option<Address>,
+) -> anyhow::Result<()> {
+    let supplier = tolerate(
+        CtmView::new(manifest.ctm, provider)
+            .L1_BYTECODES_SUPPLIER()
+            .call()
+            .await,
+        result,
+        "the CTM's L1_BYTECODES_SUPPLIER()",
+    );
+    let supplier_admin = match supplier {
+        // A transparent proxy answers `admin()` only to its admin, so the slot itself is read.
+        Some(supplier) => {
+            let word = provider
+                .get_storage_at(supplier, EIP1967_PROXY_ADMIN_SLOT.into())
+                .await?;
+            Some((supplier, Address::from_word(word.into())))
+        }
+        None => None,
+    };
+    judge_ctm_proxy_admin(
+        result,
+        manifest.ctmProxyAdmin,
+        core_proxy_admin,
+        supplier_admin,
+    );
+    Ok(())
+}
+
+/// The CTM-domain admin against the ecosystem's and the BytecodesSupplier's.
+///
+/// A CTM deployed before the two-executor model shares the ecosystem `ProxyAdmin`. The bundle
+/// hands that admin to the core executor before it hands "the CTM-domain admin" to the migration,
+/// so the shared case reverts the edge: an ERROR. A BytecodesSupplier left behind another admin
+/// (a split that moved only the bootstrap's rows) leaves it where the CTM executor cannot upgrade
+/// it: an ERROR too. `supplier` is `(proxy, its EIP-1967 admin)`, or `None` when unreadable (the
+/// read already reported it).
+fn judge_ctm_proxy_admin(
+    result: &mut VerificationResult,
+    ctm_proxy_admin: Address,
+    core_proxy_admin: Option<Address>,
+    supplier: Option<(Address, Address)>,
+) {
+    match core_proxy_admin {
+        Some(core) if core == ctm_proxy_admin => result.report_error(&format!(
+            "the CTM-domain ProxyAdmin {ctm_proxy_admin} is the ecosystem ProxyAdmin: the bundle \
+             hands it to the core executor before handing it to the migration, so the edge \
+             reverts — {SPLIT_REMEDY}"
+        )),
+        Some(core) => result.report_ok(&format!(
+            "the CTM-domain ProxyAdmin {ctm_proxy_admin} is the CTM's own, apart from the ecosystem \
+             ProxyAdmin {core}"
+        )),
+        None => result.report_warn(
+            "the ecosystem ProxyAdmin is unknown (the core executor's PROXY_ADMIN could not be \
+             read), so whether the CTM domain shares it is unchecked",
+        ),
+    }
+    let Some((supplier, admin)) = supplier else {
+        return;
+    };
+    if admin == ctm_proxy_admin {
+        result.report_ok(&format!(
+            "the BytecodesSupplier {supplier} sits behind the CTM-domain ProxyAdmin"
+        ));
+    } else {
+        let holder = if Some(admin) == core_proxy_admin {
+            "the ecosystem ProxyAdmin, which the core executor receives"
+        } else {
+            "an admin the CTM executor does not receive"
+        };
+        result.report_error(&format!(
+            "the BytecodesSupplier {supplier} sits behind {admin}, {holder}, not the CTM-domain \
+             ProxyAdmin {ctm_proxy_admin}: every later CTM-domain upgrade of it would revert — \
+             {SPLIT_REMEDY}"
+        ));
+    }
 }
 
 /// The one-time ServerNotifier handover `RegistryBootstrapMigration.validate()` requires complete
@@ -1913,6 +2010,60 @@ mod tests {
 
     fn accepting_bundle() -> Vec<GovernanceCall> {
         vec![notifier_acceptance(CTM_EXECUTOR, NOTIFIER)]
+    }
+
+    const ECOSYSTEM_ADMIN: Address = Address::repeat_byte(0xEA);
+    const SPLIT_ADMIN: Address = Address::repeat_byte(0x5A);
+    const SUPPLIER: Address = Address::repeat_byte(0xB5);
+
+    fn judge_admins(
+        ctm_admin: Address,
+        core_admin: Option<Address>,
+        supplier_admin: Option<Address>,
+    ) -> VerificationResult {
+        let mut result = VerificationResult::default();
+        judge_ctm_proxy_admin(
+            &mut result,
+            ctm_admin,
+            core_admin,
+            supplier_admin.map(|admin| (SUPPLIER, admin)),
+        );
+        result
+    }
+
+    /// A CTM that shares the ecosystem's admin cannot cross the bootstrap: the bundle hands that
+    /// admin to the core executor first.
+    #[test]
+    fn a_ctm_sharing_the_ecosystem_proxy_admin_fails() {
+        let result = judge_admins(
+            ECOSYSTEM_ADMIN,
+            Some(ECOSYSTEM_ADMIN),
+            Some(ECOSYSTEM_ADMIN),
+        );
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("is the ecosystem ProxyAdmin"));
+        assert!(result.has_error("SplitCTMProxyAdmin"));
+    }
+
+    #[test]
+    fn a_split_ctm_domain_passes() {
+        let result = judge_admins(SPLIT_ADMIN, Some(ECOSYSTEM_ADMIN), Some(SPLIT_ADMIN));
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// A split that moved the CTM but left the supplier behind the ecosystem admin leaves it
+    /// where the CTM executor cannot upgrade it.
+    #[test]
+    fn a_supplier_left_behind_the_ecosystem_admin_fails() {
+        let result = judge_admins(SPLIT_ADMIN, Some(ECOSYSTEM_ADMIN), Some(ECOSYSTEM_ADMIN));
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("which the core executor receives"));
+    }
+
+    #[test]
+    fn an_unknown_ecosystem_admin_only_warns() {
+        let result = judge_admins(SPLIT_ADMIN, None, Some(SPLIT_ADMIN));
+        assert_eq!((result.errors, result.warnings), (0, 1));
     }
 
     #[test]
