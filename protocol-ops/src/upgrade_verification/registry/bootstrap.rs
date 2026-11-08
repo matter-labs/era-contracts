@@ -360,7 +360,7 @@ pub(crate) async fn verify<P: Provider>(
     .await;
 
     // ── 3b. The CTM-domain ProxyAdmin the edge hands to the CTM executor: the CTM's own, not the
-    //    ecosystem's, and in front of the BytecodesSupplier ──
+    //    ecosystem's, and in front of every CTM-domain proxy ──
     result.print_info("\n== Prerequisite: CTM-domain ProxyAdmin ==");
     verify_ctm_proxy_admin(provider, result, &manifest, bindings.core_proxy_admin).await?;
 
@@ -2335,6 +2335,8 @@ mod tests {
         /// What the reviewed Bridgehub, and the CTM's own Bridgehub, answer as `messageRoot()`.
         message_root: (Address, Address),
         timelock_owner: Address,
+        /// The PermissionlessValidator's EIP-1967 admin: the CTM-domain admin when split.
+        validator_admin: Address,
     }
 
     const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
@@ -2397,7 +2399,7 @@ mod tests {
                 (CTM, CTM_ADMIN),
                 (TIMELOCK, CTM_ADMIN),
                 (SUPPLIER, CTM_ADMIN),
-                (VALIDATOR, CTM_ADMIN),
+                (VALIDATOR, self.validator_admin),
             ] {
                 l1.storage(proxy, EIP1967_PROXY_ADMIN_SLOT, admin.into_word());
             }
@@ -2487,6 +2489,7 @@ mod tests {
             registered: true,
             message_root: (ROOT_PROXY, OTHER_PROXY),
             timelock_owner: governance,
+            validator_admin: CTM_ADMIN,
         };
         let (control, l1) = control_run.verify().await;
         assert!(
@@ -2569,6 +2572,20 @@ mod tests {
         assert_eq!(timelock_elsewhere.errors, control.errors + 1);
         assert!(timelock_elsewhere.has_error(&format!(
             "the ValidatorTimelock {TIMELOCK} is owned by {ATTACKER}"
+        )));
+
+        // A partial split: the PermissionlessValidator, which no bootstrap row names, was left
+        // behind the ecosystem admin.
+        let (validator_left_behind, _) = ReviewedRootRun {
+            validator_admin: ECO_ADMIN,
+            ..control_run
+        }
+        .verify()
+        .await;
+        assert_eq!(validator_left_behind.errors, control.errors + 1);
+        assert!(validator_left_behind.has_error(&format!(
+            "the CTM's PermissionlessValidator {VALIDATOR} still sits behind the ecosystem \
+             ProxyAdmin {ECO_ADMIN}"
         )));
     }
 
