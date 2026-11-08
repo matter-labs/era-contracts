@@ -50,12 +50,13 @@ sit behind the second. Ecosystems deployed before the two-executor model keep th
 only the ServerNotifier has an admin of its own. The prepare refuses such a CTM
 (`CTMDomainProxies.requireSplit`) and `verify-bootstrap` reports it.
 
-The same goes for every other CTM on the ecosystem, Era CTMs included, though the bootstrap does
-not touch them: once the core executor holds the ecosystem admin, governance can no longer reach
-a CTM behind it, and the prepares' ownership precondition
-(`AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance`) reverts on it.
+Era CTMs are not bootstrapped and Era chains do not take the registry releases, so they are not
+split: an Era CTM behind the ecosystem admin stays there and passes to the core executor with it.
+The prepares' ownership precondition (`AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance`)
+leaves such a CTM's admin with the executor, and any change to its proxies goes through
+`CoreUpgradeExecutor.forward`.
 
-So, BEFORE the ecosystem's v35 bootstrap, once per CTM that shares the ecosystem admin:
+So, BEFORE the ecosystem's v35 bootstrap, once per ZKsync OS CTM that shares the ecosystem admin:
 
 1. The deployer runs `SplitCTMProxyAdmin`. It deploys the CTM's `ProxyAdmin` through the CREATE2
    factory, owned by the ecosystem admin's owner (governance) under a salt keyed by the CTM, and
