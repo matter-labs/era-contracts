@@ -45,39 +45,53 @@ belongs to the CTM domain early. A recurring prepare has no admin calls.
 
 The bootstrap hands the ecosystem `ProxyAdmin` (the Bridgehub's) to the core executor and the
 CTM-domain `ProxyAdmin` to the CTM executor, so the two must differ and every CTM-domain proxy must
-sit behind the second. Ecosystems deployed before the two-executor model (zksync-os mainnet, the
-ZKsync OS testnet) keep the CTM, its `ValidatorTimelock`, `BytecodesSupplier` and
-`PermissionlessValidator` behind the ecosystem admin; only the ServerNotifier has an admin of its
-own. The prepare refuses such a CTM (`CTMDomainProxies.requireSplit`) and `verify-bootstrap`
-reports it, so the split is a PRECONDITION of the bootstrap, run once per affected CTM:
+sit behind the second. Ecosystems deployed before the two-executor model keep the CTM, its
+`ValidatorTimelock`, `BytecodesSupplier` and `PermissionlessValidator` behind the ecosystem admin;
+only the ServerNotifier has an admin of its own. The prepare refuses such a CTM
+(`CTMDomainProxies.requireSplit`) and `verify-bootstrap` reports it.
+
+The same goes for every other CTM on the ecosystem, Era CTMs included, though the bootstrap does
+not touch them: once the core executor holds the ecosystem admin, governance can no longer reach
+a CTM behind it, and the prepares' ownership precondition
+(`AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance`) reverts on it.
+
+So, BEFORE the ecosystem's v35 bootstrap, once per CTM that shares the ecosystem admin:
 
 1. The deployer runs `SplitCTMProxyAdmin`. It deploys the CTM's `ProxyAdmin` through the CREATE2
    factory, owned by the ecosystem admin's owner (governance) under a salt keyed by the CTM, and
-   writes `[ctm_proxy_admin_split]`: one `changeProxyAdmin(proxy, ctmProxyAdmin)` on the ecosystem
+   writes `[governance_calls] calls`: one `changeProxyAdmin(proxy, ctmProxyAdmin)` on the ecosystem
    admin per CTM-domain proxy still behind it (`AddressIntrospector.getCTMProxies`, the list the
-   prepare reads).
+   prepare reads). It writes only under `--broadcast`.
 
    ```sh
    forge script deploy-scripts/upgrade/v35/SplitCTMProxyAdmin.s.sol:SplitCTMProxyAdmin \
      --sig 'run(address,address,string)' <bridgehub> <ctm> script-out/ctm-proxy-admin-split.toml \
-     --rpc-url <l1> --broadcast
+     --rpc-url <l1> --broadcast --sender <deployer> --ledger
    ```
 
-2. Governance executes those calls, in an execution of its own. They cannot ride in the bootstrap
-   bundle: the prepare binds the CTM executor to the admin it reads off the CTM and pins it in the
-   manifest, and package verification refuses any call to a `ProxyAdmin` the bootstrap sequence
-   does not describe. `SplitCTMProxyAdmin.requireSplit(bridgehub, ctm)` passes once they landed.
-3. The v35 prepare and bootstrap run as usual; the ServerNotifier handover moves the notifier under
-   the new admin.
+2. Before anyone signs, check the admin on L1 with
+   `SplitCTMProxyAdmin.requireReady(bridgehub, ctm, ctm_proxy_admin)`: this build's `ProxyAdmin`
+   code, owned by governance. Then governance executes the calls in an execution of its own (a full
+   proposal where governance is the upgrade handler), with the tooling a package's bundle goes
+   through: `ecosystem governance-toml-to-simulator --governance-toml <output>` for review, and on a
+   PUH-governed environment the [emergency scripts](../l1-contracts/deploy-scripts/upgrade/README.md#emergency-execution)
+   with the output in place of `ecosystem.toml`. They cannot ride in the bootstrap bundle: the
+   prepare binds the CTM executor to the admin it reads off the CTM and pins it in the manifest,
+   and package verification refuses any call to a `ProxyAdmin` the bootstrap sequence does not
+   describe.
+3. `SplitCTMProxyAdmin.requireSplit(bridgehub, ctm)` passes once they landed (and only until the
+   bootstrap hands the admin on). The v35 prepare and bootstrap then run as usual; the ServerNotifier
+   handover moves the notifier under the new admin.
 
-The script renders from live state: a rerun reuses the admin it deployed, a partial split is
-finished towards the admin the CTM already has, and a split CTM yields no calls. Until the
-bootstrap, governance owns both admins, as it owned the one before, so no upgrade path changes
-hands. A cancelled bootstrap leaves the split in place: the shape a fresh deployment has.
+Prepares address each proxy through the admin they read, so no package prepared before the split
+may execute after it. The script refuses an ecosystem whose admin the core executor already holds.
+It renders from live state: a rerun reuses the admin it deployed, a partial split is finished
+towards the admin the CTM already has, and a split CTM yields no calls. Until the bootstrap,
+governance owns both admins, as it owned the one before, so no upgrade path changes hands. A
+cancelled bootstrap leaves the split in place: the shape a fresh deployment has.
 
-Era CTMs are not bootstrapped, so the split does not apply to them: one that shares the ecosystem
-admin stays behind it, and after the bootstrap its proxies are upgraded through
-`CoreUpgradeExecutor.forward`.
+The script reads the CTM's v31 getters (`L1_BYTECODES_SUPPLIER()`, `PERMISSIONLESS_VALIDATOR()`),
+so an older CTM is split once it is on v31.
 
 ## Executor succession
 
