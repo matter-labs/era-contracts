@@ -90,7 +90,8 @@ contract UpgradeIntegrationTestLocalSplitCTMProxyAdmin is UpgradeIntegrationTest
         assertEq(split.proxies.length, shared, "every CTM-domain proxy behind the ecosystem admin moves");
         assertEq(split.proxies[0], ctm, "the CTM moves first");
         assertEq(split.proxies[3], domain.permissionlessValidator, "the PermissionlessValidator moves too");
-        assertEq(split.governance, ProxyAdmin(ecosystemAdmin).owner(), "governance owns the ecosystem admin");
+        assertEq(split.governance, IOwnable(bridgehub).owner(), "governance is the Bridgehub's owner");
+        assertEq(ProxyAdmin(ecosystemAdmin).owner(), split.governance, "and owns the ecosystem admin");
         assertTrue(split.ctmProxyAdmin != ecosystemAdmin, "a new admin, not the ecosystem's");
         assertTrue(split.ctmProxyAdmin != ownAdmin, "a new admin, not the one the fixture emptied");
         script.requireReady(bridgehub, ctm, split.ctmProxyAdmin);
@@ -114,6 +115,15 @@ contract UpgradeIntegrationTestLocalSplitCTMProxyAdmin is UpgradeIntegrationTest
             )
         );
         script.requireSplit(bridgehub, ctm);
+
+        // The rerun reuses the admin the CTM already has, so it must still be governance's.
+        address stranger = makeAddr("stranger");
+        vm.prank(split.governance);
+        ProxyAdmin(split.ctmProxyAdmin).transferOwnership(stranger);
+        vm.expectRevert("CTM-domain ProxyAdmin not owned by governance");
+        script.prepare(bridgehub, ctm);
+        vm.prank(stranger);
+        ProxyAdmin(split.ctmProxyAdmin).transferOwnership(split.governance);
 
         // Rerun from live state: the rest moves under the admin the CTM already has.
         SplitCTMProxyAdmin.Split memory rest = script.prepare(bridgehub, ctm);
@@ -215,21 +225,14 @@ contract UpgradeIntegrationTestLocalSplitCTMProxyAdmin is UpgradeIntegrationTest
     }
 
     /// @dev After the bootstrap the ecosystem admin is the core executor's, so governance can no
-    ///      longer send a split's calls; and an admin the split would reuse must be governance's.
-    function test_splitRefusesAfterTheBootstrapAndAnAdminGovernanceDoesNotOwn() public {
+    ///      longer send a split's calls.
+    function test_splitRefusesAfterTheBootstrap() public {
         address bridgehub = previousRelease.bridgehub;
         address ctm = ctmUpgrade.getCTMAddress();
-        address coreExecutor = ProxyAdmin(ecosystemAdmin).owner();
         _moveValidatorTo(ecosystemAdmin);
         SplitCTMProxyAdmin script = new SplitCTMProxyAdmin();
 
-        vm.expectRevert("the ecosystem ProxyAdmin is already the core executor's: split before the v35 bootstrap");
-        script.prepare(bridgehub, ctm);
-
-        // Were the ecosystem admin's owner not the bound executor, the split admin (the CTM
-        // executor's) would still not be that owner's.
-        vm.mockCall(coreExecutor, abi.encodeWithSignature("PROXY_ADMIN()"), abi.encode(address(1)));
-        vm.expectRevert("CTM-domain ProxyAdmin not owned by governance");
+        vm.expectRevert("the ecosystem ProxyAdmin is not governance's: split before the v35 bootstrap");
         script.prepare(bridgehub, ctm);
     }
 

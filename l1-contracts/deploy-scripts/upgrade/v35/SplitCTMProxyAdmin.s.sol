@@ -10,6 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {Call} from "contracts/governance/Common.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
@@ -32,7 +33,7 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
         address chainTypeManager;
         /// The ecosystem `ProxyAdmin` (the Bridgehub's).
         address ecosystemProxyAdmin;
-        /// Its owner, which owns the CTM-domain admin too.
+        /// The Bridgehub's owner, which owns the ecosystem admin and the CTM-domain one.
         address governance;
         /// The CTM-domain admin: newly deployed, or the CTM's own when it already has one.
         address ctmProxyAdmin;
@@ -95,7 +96,7 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
 
         split.chainTypeManager = _ctm;
         split.ecosystemProxyAdmin = ecosystemAdmin;
-        split.governance = ProxyAdmin(ecosystemAdmin).owner();
+        split.governance = IOwnable(_bridgehub).owner();
         split.ctmProxyAdmin = Utils.getProxyAdminAddress(_ctm);
 
         (address[] memory domain, ) = CTMDomainProxies.list(AddressIntrospector.getCTMProxies(ChainTypeManager(_ctm)));
@@ -109,9 +110,10 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
             return split;
         }
 
+        // The bootstrap hands the ecosystem admin, not the Bridgehub, to the core executor.
         require(
-            !_isBoundCoreExecutor(split.governance, ecosystemAdmin),
-            "the ecosystem ProxyAdmin is already the core executor's: split before the v35 bootstrap"
+            ProxyAdmin(ecosystemAdmin).owner() == split.governance,
+            "the ecosystem ProxyAdmin is not governance's: split before the v35 bootstrap"
         );
 
         if (split.ctmProxyAdmin == ecosystemAdmin) {
@@ -152,7 +154,8 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
     }
 
     /// @notice Reverts unless `_ctm` is split off `_bridgehub`'s ProxyAdmin
-    ///         ({CTMDomainProxies.requireSplit}) and governance owns the CTM-domain admin.
+    ///         ({CTMDomainProxies.requireSplit}) and governance (the Bridgehub's owner) owns the
+    ///         CTM-domain admin.
     /// @param _bridgehub The ecosystem's Bridgehub proxy.
     /// @param _ctm The CTM proxy.
     function requireSplit(address _bridgehub, address _ctm) public view {
@@ -164,14 +167,14 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
             ecosystemAdmin
         );
         require(
-            ProxyAdmin(ctmAdmin).owner() == ProxyAdmin(ecosystemAdmin).owner(),
+            ProxyAdmin(ctmAdmin).owner() == IOwnable(_bridgehub).owner(),
             "CTM-domain ProxyAdmin not owned by governance"
         );
     }
 
     /// @notice Reverts unless `_ctmProxyAdmin`, the admin a split's calls name, is ready to receive
     ///         `_ctm`'s domain: deployed with the `ProxyAdmin` code this build produces, owned by
-    ///         governance (the ecosystem admin's owner), and not the ecosystem admin.
+    ///         governance (the Bridgehub's owner), and not the ecosystem admin.
     /// @param _bridgehub The ecosystem's Bridgehub proxy.
     /// @param _ctm The CTM proxy.
     /// @param _ctmProxyAdmin The output's `ctm_proxy_admin`.
@@ -184,18 +187,8 @@ contract SplitCTMProxyAdmin is Create2FactoryUtils {
             "the CTM-domain ProxyAdmin does not run this build's ProxyAdmin code"
         );
         require(
-            ProxyAdmin(_ctmProxyAdmin).owner() == ProxyAdmin(ecosystemAdmin).owner(),
+            ProxyAdmin(_ctmProxyAdmin).owner() == IOwnable(_bridgehub).owner(),
             "CTM-domain ProxyAdmin not owned by governance"
         );
-    }
-
-    /// @dev Whether `_owner` is a `CoreUpgradeExecutor` bound to `_ecosystemAdmin`. Legacy
-    ///      governance and the upgrade handler have no `PROXY_ADMIN()`, so the call fails for them.
-    function _isBoundCoreExecutor(address _owner, address _ecosystemAdmin) private view returns (bool) {
-        if (_owner.code.length == 0) {
-            return false;
-        }
-        (bool ok, bytes memory ret) = _owner.staticcall(abi.encodeWithSignature("PROXY_ADMIN()"));
-        return ok && ret.length == 32 && abi.decode(ret, (address)) == _ecosystemAdmin;
     }
 }

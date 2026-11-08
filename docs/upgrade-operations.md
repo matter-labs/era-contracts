@@ -59,7 +59,7 @@ leaves such a CTM's admin with the executor, and any change to its proxies goes 
 So, BEFORE the ecosystem's v35 bootstrap, once per ZKsync OS CTM that shares the ecosystem admin:
 
 1. The deployer runs `SplitCTMProxyAdmin`. It deploys the CTM's `ProxyAdmin` through the CREATE2
-   factory, owned by the ecosystem admin's owner (governance) under a salt keyed by the CTM, and
+   factory, owned by governance (the Bridgehub's owner) under a salt keyed by the CTM, and
    writes `[governance_calls] calls`: one `changeProxyAdmin(proxy, ctmProxyAdmin)` on the ecosystem
    admin per CTM-domain proxy still behind it (`AddressIntrospector.getCTMProxies`, the list the
    prepare reads). It writes only under `--broadcast`.
@@ -85,7 +85,8 @@ So, BEFORE the ecosystem's v35 bootstrap, once per ZKsync OS CTM that shares the
    handover moves the notifier under the new admin.
 
 Prepares address each proxy through the admin they read, so no package prepared before the split
-may execute after it. The script refuses an ecosystem whose admin the core executor already holds.
+may execute after it. The script refuses an ecosystem whose admin governance no longer owns, which
+is the case once the bootstrap has handed it to the core executor.
 It renders from live state: a rerun reuses the admin it deployed, a partial split is finished
 towards the admin the CTM already has, and a split CTM yields no calls. Until the bootstrap,
 governance owns both admins, as it owned the one before, so no upgrade path changes hands. A
