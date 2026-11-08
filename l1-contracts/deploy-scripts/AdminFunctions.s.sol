@@ -292,7 +292,7 @@ contract AdminFunctions is Script, IAdminFunctions {
                 }
             }
 
-            _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
+            _ensureCtmProxyAdminOwnedByGovernance(_bridgehub, ctm, _governance, _wraps);
         }
 
         _savePreGovernanceAcceptOwnershipCalls(acceptCalls, acceptCount);
@@ -354,6 +354,25 @@ contract AdminFunctions is Script, IAdminFunctions {
         );
         require(executor.owner() == _governance, "the core executor is not owned by governance");
         return true;
+    }
+
+    /// Helper: {_ensureProxyAdminOwnedByGovernance} for a CTM proxy, except a CTM still behind
+    /// the ecosystem ProxyAdmin once the bootstrap handed that admin to the core executor bound to
+    /// it: an Era CTM, which no registry edge bootstraps, is then governed through that executor's
+    /// `forward`, and its admin must stay where it is.
+    function _ensureCtmProxyAdminOwnedByGovernance(
+        address _bridgehub,
+        address _ctm,
+        address _governance,
+        OwnerWrap[] memory _wraps
+    ) private {
+        if (
+            Utils.getProxyAdminAddress(_ctm) == Utils.getProxyAdminAddress(_bridgehub) &&
+            _isUnderBoundEcosystemExecutor(_bridgehub, _governance)
+        ) {
+            return;
+        }
+        _ensureProxyAdminOwnedByGovernance(_ctm, _governance, _wraps);
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step

@@ -4,7 +4,12 @@ pragma solidity 0.8.28;
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    ITransparentUpgradeableProxy,
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 
 import {CTMDomainProxies} from "deploy-scripts/upgrade/v35/CTMDomainProxies.sol";
 import {SplitCTMProxyAdmin} from "deploy-scripts/upgrade/v35/SplitCTMProxyAdmin.s.sol";
@@ -13,8 +18,32 @@ import {Utils as DeployScriptUtils} from "deploy-scripts/utils/Utils.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {StateTransitionContracts} from "contracts/common/StateTransitionTypes.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {CTMUpgradeForLocalTest, UpgradeIntegrationTestLocal} from "./UpgradeTest_Local.t.sol";
+
+/// @notice What the ownership precondition reads off an Era CTM that no registry edge bootstraps.
+contract EraCTMStub {
+    /// @dev Immutable, so the proxy in front of the stub answers it too.
+    address internal immutable OWNER;
+
+    constructor(address _owner) {
+        OWNER = _owner;
+    }
+
+    function owner() external view returns (address) {
+        return OWNER;
+    }
+
+    function pendingOwner() external pure returns (address) {
+        return address(0);
+    }
+
+    function validatorTimelockPostV29() external pure returns (address) {
+        return address(0);
+    }
+}
 
 /// @notice The v35 bootstrap over an ecosystem whose CTM still shares the ecosystem ProxyAdmin, as
 ///         zksync-os mainnet's and the ZKsync OS testnet's do: the CTM, its ValidatorTimelock,
@@ -202,6 +231,31 @@ contract UpgradeIntegrationTestLocalSplitCTMProxyAdmin is UpgradeIntegrationTest
         vm.mockCall(coreExecutor, abi.encodeWithSignature("PROXY_ADMIN()"), abi.encode(address(1)));
         vm.expectRevert("CTM-domain ProxyAdmin not owned by governance");
         script.prepare(bridgehub, ctm);
+    }
+
+    /// @dev An Era CTM (no registry edge bootstraps it) behind the ecosystem admin, which the
+    ///      bootstrap handed to the core executor: the ownership precondition every later prepare
+    ///      starts with leaves that admin with the executor instead of reverting on it.
+    function test_laterPreparesLeaveAnEraCTMBehindTheCoreExecutorsAdmin() public {
+        address bridgehub = previousRelease.bridgehub;
+        address coreExecutor = ProxyAdmin(ecosystemAdmin).owner();
+        address governance = IOwnable(coreExecutor).owner();
+        address eraCtm = address(
+            new TransparentUpgradeableProxy(address(new EraCTMStub(governance)), ecosystemAdmin, "")
+        );
+
+        uint256[] memory chainIds = IBridgehubBase(bridgehub).getAllZKChainChainIDs();
+        uint256[] memory withEra = new uint256[](chainIds.length + 1);
+        for (uint256 i = 0; i < chainIds.length; ++i) {
+            withEra[i] = chainIds[i];
+        }
+        uint256 eraChainId = 300_301;
+        withEra[chainIds.length] = eraChainId;
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.getAllZKChainChainIDs, ()), abi.encode(withEra));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.chainTypeManager, (eraChainId)), abi.encode(eraCtm));
+
+        new AdminFunctions().ensureCtmsAndProxyAdminsOwnedByGovernance(bridgehub, governance);
+        assertEq(ProxyAdmin(ecosystemAdmin).owner(), coreExecutor, "the ecosystem admin stays with the core executor");
     }
 
     function test_requireReadyRefusesAnAdminNotReadyForTheDomain() public {
