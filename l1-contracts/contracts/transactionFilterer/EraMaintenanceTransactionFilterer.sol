@@ -4,9 +4,8 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {ValueMismatch, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {MissingBaseTokenAssetId} from "../bridge/asset-tracker/AssetTrackerErrors.sol";
-import {ArrayLengthMismatch} from "./TransactionFiltererErrors.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
@@ -113,7 +112,7 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
     function setDepositCaps(bytes32[] calldata _assetIds, uint256[] calldata _caps) external onlyOwner {
         uint256 length = _assetIds.length;
         if (length != _caps.length) {
-            revert ArrayLengthMismatch(length, _caps.length);
+            revert ValueMismatch(length, _caps.length);
         }
         for (uint256 i = 0; i < length; ++i) {
             _setDepositCap(_assetIds[i], _caps[i]);
@@ -188,6 +187,9 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
         }
 
         if (_sender == L1_ASSET_ROUTER) {
+            // Not expected to trigger: the L1 asset router always targets the L2 asset router, and its asset handlers
+            // (the native token vault, the chain asset handler) and the asset handler registration require a zero
+            // `l2Value`. Checked just in case.
             if (_contractL2 != L2_ASSET_ROUTER_ADDR || _l2Value != 0) {
                 return false;
             }

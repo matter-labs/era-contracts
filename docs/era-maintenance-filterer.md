@@ -90,7 +90,9 @@ derived as the one of an L1-native NTV token.
 Custom bridges that call their L2 counterpart through the Mailbox with the same legacy ABI, such as
 the Lido bridge, are registered with `setLegacyBridge`. Their deposits are then capped by the
 derived asset id of the L1 token; leaving that cap at zero blocks their deposits while their
-withdrawals stay reachable through `withdrawalFunctions`.
+withdrawals stay reachable through `withdrawalFunctions`. That is also the asset id of the token's
+deposits through the asset router, so a custom bridge and the asset router share one cap for the
+same L1 token. This is a known limitation.
 
 ## Configuration checklist
 

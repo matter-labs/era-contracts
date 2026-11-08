@@ -41,6 +41,8 @@ interface IEraMaintenanceTransactionFilterer is ITransactionFilterer {
 
     /// @notice The maximum amount of a single deposit of `_assetId`; zero means the asset is not accepted.
     /// @dev The cap of the chain's base token bounds `mintValue` of every non-exempt L1->L2 transaction.
+    /// Known issue: a legacy bridge's deposits are capped by the NTV asset id of their L1 token, so a custom bridge
+    /// (such as Lido's) and the asset router share one cap for the same L1 token.
     function depositCap(bytes32 _assetId) external view returns (uint256);
 
     /// @notice Whether the exact transaction with this `getTxHash` value is allowed, whatever the other rules say.

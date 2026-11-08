@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {ArrayLengthMismatch} from "contracts/transactionFilterer/TransactionFiltererErrors.sol";
+import {ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {
     CallMode,
     IEraMaintenanceTransactionFilterer
@@ -60,7 +60,7 @@ contract ConfigurationTest is EraMaintenanceTransactionFiltererTest {
     }
 
     function test_revertWhen_depositCapsLengthMismatch() public {
-        vm.expectRevert(abi.encodeWithSelector(ArrayLengthMismatch.selector, 2, 1));
+        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, 2, 1));
         vm.prank(owner);
         filterer.setDepositCaps(new bytes32[](2), new uint256[](1));
     }
