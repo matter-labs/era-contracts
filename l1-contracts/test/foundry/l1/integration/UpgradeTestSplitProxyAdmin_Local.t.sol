@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {
     ITransparentUpgradeableProxy,
     TransparentUpgradeableProxy
@@ -217,9 +218,16 @@ contract UpgradeIntegrationTestLocalSplitCTMProxyAdmin is UpgradeIntegrationTest
     }
 
     function test_prepareRefusesAProxyBehindAThirdPartyAdmin() public {
-        _moveValidatorTo(address(new ProxyAdmin()));
+        address thirdParty = address(new ProxyAdmin());
+        _moveValidatorTo(thirdParty);
         vm.expectRevert(
-            "PermissionlessValidator is behind a ProxyAdmin that is neither the CTM-domain nor the ecosystem one"
+            bytes(
+                string.concat(
+                    "PermissionlessValidator is behind ",
+                    Strings.toHexString(thirdParty),
+                    ", neither the CTM-domain nor the ecosystem ProxyAdmin"
+                )
+            )
         );
         CTMUpgradeForLocalTest(address(ctmUpgrade)).deployRegistryBootstrap();
     }

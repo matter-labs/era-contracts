@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
+
 import {StateTransitionContracts} from "contracts/common/StateTransitionTypes.sol";
 
 import {Utils} from "../../utils/Utils.sol";
@@ -79,7 +81,12 @@ library CTMDomainProxies {
             }
             require(
                 proxies[i] == _proxies.serverNotifier,
-                string.concat(names[i], " is behind a ProxyAdmin that is neither the CTM-domain nor the ecosystem one")
+                string.concat(
+                    names[i],
+                    " is behind ",
+                    Strings.toHexString(admin),
+                    ", neither the CTM-domain nor the ecosystem ProxyAdmin"
+                )
             );
         }
     }
