@@ -3,7 +3,7 @@
 ## Relevant files
 
 - `.github/workflows/lint.yaml` — Solidity / TS lint, codespell, typos, `cargo fmt --check` for all Rust crates, and `cargo clippy -D warnings` for `protocol-ops`.
-- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, foundry tests (the frozen-state suites in their own `test-foundry-previous-release` job), verifier-generator check, coverage.
+- `.github/workflows/l1-contracts-ci.yaml` — l1-contracts build, foundry tests, verifier-generator check, coverage.
 - `.github/workflows/pre-merge-checks.yaml` — `check-hashes`, `check-selectors`, `check-zkstack-out`, `check-zksync-os-genesis`, `state-generation-check`, and the `pre-merge-verified` gate. Skipped while a PR is a draft (see "CI tiers" below).
 - `.github/workflows/build-contract-artifacts.yaml` — the `build` job (`workflow_call`) `pre-merge-checks` uses; `l1-contracts-ci` keeps its own inline copy because its build is a coverage matrix. `.github/actions/restore-ci-artifacts` is how their other jobs read what either built.
 - `.github/workflows/l1-contracts-foundry-ci.yaml` — foundry test build + contract-size check.
@@ -91,8 +91,7 @@ anvil-interop needs these artifacts, and `l1 build:foundry` regenerates `zkstack
 
 ```bash
 cd l1-contracts
-yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*', minus the suites below
-yarn test:foundry:previous-release  # the frozen-state suites, under FOUNDRY_PROFILE=anvil-interop like the states they load
+yarn test:foundry      # forge test --threads 1 --ffi --match-path 'test/foundry/*'
 ```
 
 Common foundry test failures and their root causes:
@@ -128,7 +127,7 @@ CI runs this in the `if: always()` cleanup step; do the same locally.
 
 ```bash
 cd l1-contracts
-FOUNDRY_PROFILE=anvil-interop forge build
+forge build
 cd test/anvil-interop
 npx ts-node setup-and-dump-state.ts
 ```
@@ -144,8 +143,7 @@ Two runners cover the two shapes of upgrade, and CI runs each as its own job in
 (`ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance
 calls, `ecosystem verify-package`, `ecosystem upgrade-governance` to replay the bundle, then each
 chain crossing) over the previous release's frozen states, then a same-minor patch through
-the same tooling. It needs `l1-contracts` built with `FOUNDRY_PROFILE=anvil-interop`, like those
-states.
+the same tooling.
 
 `run-recurring-upgrade-test.ts` is the **steady-state** edge, driven at the object level
 rather than through the governance-calldata scripts. `REGEN_REGISTRIES=1` regenerates its
@@ -303,7 +301,7 @@ Before pushing, run from repo root:
 yarn l1 build:foundry
 
 # 2. Tests
-cd l1-contracts && yarn test:foundry && yarn test:foundry:previous-release && cd ..
+cd l1-contracts && yarn test:foundry && cd ..
 # (Only if you touched contracts that affect interop or upgrades)
 cd l1-contracts && yarn test:hardhat:interop && cd ..
 

@@ -47,7 +47,7 @@ Only the current snapshot directory, selected by `stateVersion`, is regenerated.
 
 The per-chain state dumps are committed **gzip-compressed** (`<chainId>.json.gz`). These snapshots are multi-MB; storing them as raw JSON floods every regeneration with an enormous, unreviewable diff. GitHub renders `.gz` as binary ("Binary file not shown"), keeping them out of PR diffs, and gzip shrinks them ~10x. `addresses.json` stays plain text so contract-address changes remain reviewable. Compression/decompression is handled automatically by `dumpAllStates()` / `loadChainStates()` in `deployment-runner.ts` — no manual step.
 
-To regenerate pregenerated state after contract changes, first finalize `configs/genesis/zksync-os/latest.json` from the production build, then build the `anvil-interop` profile and generate the snapshots. The genesis root is part of CTM deployment data; changing it afterward invalidates the snapshot addresses.
+To regenerate pregenerated state after contract changes, first finalize `configs/genesis/zksync-os/latest.json` from the production build, then generate the snapshots (the setup builds `l1-contracts` first). The genesis root is part of CTM deployment data; changing it afterward invalidates the snapshot addresses.
 
 ```bash
 cd l1-contracts/test/anvil-interop
@@ -56,16 +56,8 @@ yarn setup-and-dump
 
 This runs the full deployment with pinned settings (`blockTime=1`, `timestamp=1`) and dumps each chain's state to the `chain-states/` directory. Interval mining makes the final block height and block-indexed state wall-clock-dependent, so the CI determinism check uses `compare-chain-states.ts` to normalize the documented drift and requires every non-normalized field to match.
 
-Spec `01` compares all predeploy runtimes byte-for-byte against a reference chosen by how the chains
-were started, which the run records in its deployment state, so reruns against kept chains use the
-same one. On loaded snapshots the reference is the current sources built with the `anvil-interop`
-Foundry profile the snapshots use, so a stale snapshot fails: its setup builds those artifacts in
-`outputs/predeploy-identity<run-suffix>/`, leaving the default artifacts used by coverage intact. A
-cold identity build adds compilation time; reruns reuse that separate cache. A fresh deployment
-(`ANVIL_INTEROP_FRESH_DEPLOY=1`, `run-coverage.ts --fresh-deploy`, or no snapshots for the state
-version) installs the predeploys from the profile's forge output (`out/`, or `out-anvil-interop/`
-under `FOUNDRY_PROFILE=anvil-interop`), so the spec compares against those artifacts and skips the
-reference build.
+Spec `01` compares all predeploy runtimes byte-for-byte against their artifacts in `out/`, so a
+snapshot built from other sources fails.
 
 ## Upgrade Tests
 
@@ -74,10 +66,6 @@ cd l1-contracts/test/anvil-interop
 yarn test:upgrade             # the release's edge via protocol-ops on the frozen previous-release states, then a patch hop
 yarn test:upgrade-recurring   # the recurring registry-driven hop on the current-genesis states
 ```
-
-`yarn test:upgrade` needs `l1-contracts` built with `FOUNDRY_PROFILE=anvil-interop`, like the
-states it departs from: a prepare decides reuse by comparing code, and only a build without CBOR
-metadata compares unchanged code as unchanged.
 
 It reviews each package the way governance would before replaying it:
 `protocol-ops ecosystem verify-package` against the live anvil L1, with `--env local`, the
@@ -137,8 +125,8 @@ contiguous leg run and assert that one transaction emitted every leg's domain ev
 The recurring runner builds its objects from the committed manifest `scripts/registry-manifests/v35-local.json`
 and fails on any drift; `yarn regen:registry-manifest` (`REGEN_REGISTRIES=1`) rewrites it from the live deployment.
 `ANVIL_INTEROP_FRESH_DEPLOY=1` runs it against a fresh deployment instead of the chain states. The
-committed manifest describes the chain states, which are built with the `anvil-interop` profile, so a
-fresh deployment from the default build only matches in emit mode — restore the manifest afterwards.
+committed manifest describes the chain states: restore it after an emit-mode run against a fresh
+deployment.
 
 ## Running Tests Without Redeployment
 

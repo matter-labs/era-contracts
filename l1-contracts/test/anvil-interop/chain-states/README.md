@@ -7,8 +7,8 @@ Two kinds of directories live here, with OPPOSITE maintenance rules. Both names 
   release's edge departs from, copied byte for byte from the previous release's branch. It is the
   input of `run-upgrade-test.ts` and of the Foundry upgrade tests (`PreviousReleaseFixture`, which
   loads its L1 state) and MUST NEVER be regenerated: contract changes on this branch must not touch it,
-  exactly like the real chains it stands in for. Its `AllContractsHashes.json` is that release's,
-  built with metadata like production: `ReleaseDeclaredChangesTest` requires every ecosystem
+  exactly like the real chains it stands in for. Its `AllContractsHashes.json` is that release's:
+  `ReleaseDeclaredChangesTest` requires every ecosystem
   implementation or release member whose hash has changed since then to be declared.
 
 - **`stateVersion` — current-genesis states.** Generated from THIS branch's sources by

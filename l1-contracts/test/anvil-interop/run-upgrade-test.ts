@@ -4,10 +4,6 @@ import { readStateVersion, readUpgradeSourceGenesisRoot } from "./src/core/anvil
 import { runPipelineUpgradeScenario } from "./src/helpers/pipeline-upgrade-runner";
 import { packProtocolVersion, readGenesisSemVer } from "./src/helpers/upgrade-test-utils";
 
-// The previous release's states are built without CBOR metadata, and a prepare decides reuse by comparing code, so
-// the prepares protocol-ops runs and the reviewed build hashes come from a build without it too.
-process.env.FOUNDRY_PROFILE = "anvil-interop";
-
 // The upgrade the current release ships, applied through protocol-ops to the previous release's ecosystem
 // (`upgradeSourceStateVersion` in config/anvil-config.json), then a same-minor patch on top. The target version is
 // the one in the ZKsync OS genesis config.

@@ -59,8 +59,8 @@ contract CurrentReleaseTest is ChainTypeManagerTest {
         vm.mockCall(address(transition), abi.encodeCall(ICTMTransition.newRelease, ()), abi.encode(_newRelease));
         vm.mockCall(
             address(transition),
-            abi.encodeCall(ICTMTransition.upgradeEngine, ()),
-            abi.encode(makeAddr("upgradeEngine"))
+            abi.encodeCall(ICTMTransition.chainUpgradeEngine, ()),
+            abi.encode(makeAddr("chainUpgradeEngine"))
         );
         // The commit's own checks: the code the transition names, and an L2 plan with nothing to
         // publish.

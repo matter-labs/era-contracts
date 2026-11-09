@@ -246,7 +246,7 @@ function main(): void {
   } else if (!fs.existsSync(frozenSourceDir)) {
     throw new Error(`chain-states/${anvilConfig.stateVersion} is missing: it becomes the upgrade source`);
   }
-  // Built with metadata, like production: `ReleaseDeclaredChangesTest` compares the next release's hashes with it.
+  // `ReleaseDeclaredChangesTest` compares the next release's hashes with it.
   write(
     join(frozenSourceDir, "AllContractsHashes.json"),
     previousReleaseRef
@@ -346,7 +346,7 @@ ${stillUsingOutgoing.map((file) => `      ${file}`).join("\n")}`
   - Release-specific preparation (extra contracts, a per-chain initializer) goes into ${repoPath(nextScriptsDir)}/;
     protocol-ops and UpgradeTest_Local already run those scripts.
   - Run \`cd protocol-ops && cargo test\` and the upgrade tests (\`yarn ts-node run-upgrade-test.ts\` in
-    l1-contracts/test/anvil-interop, \`yarn test:foundry:previous-release\` in l1-contracts).`);
+    l1-contracts/test/anvil-interop, \`yarn test:foundry\` in l1-contracts).`);
 }
 
 main();

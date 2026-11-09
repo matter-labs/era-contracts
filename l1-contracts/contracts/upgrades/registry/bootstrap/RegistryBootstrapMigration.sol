@@ -65,7 +65,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
             _manifest.ctmExecutor == address(0) ||
             _manifest.coreExecutor == address(0) ||
             _manifest.governance == address(0) ||
-            _manifest.upgradeEngine == address(0)
+            _manifest.chainUpgradeEngine == address(0)
         ) {
             revert ZeroAddress();
         }
@@ -170,7 +170,7 @@ contract RegistryBootstrapMigration is IRegistryBootstrapMigration, ManifestStor
 
         RegistryAuthorityLib.requireNotifierHandedOver(authority);
 
-        ObjectAnchorLib.requireCode(m.upgradeEngine);
+        ObjectAnchorLib.requireCode(m.chainUpgradeEngine);
         if (m.l2Plan.delegateComposer != address(0)) {
             ObjectAnchorLib.requireCode(m.l2Plan.delegateComposer);
         }

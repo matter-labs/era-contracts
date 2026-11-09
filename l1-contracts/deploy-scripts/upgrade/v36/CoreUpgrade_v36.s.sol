@@ -6,8 +6,8 @@ pragma solidity 0.8.28;
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 
 /// @notice Core (ecosystem) side of the v36 upgrade — the first REGISTRY-DRIVEN edge after the
-///         v35 bootstrap. The base pipeline deploys the changed ecosystem implementations (when
-///         their code differs from the live one) and pins them in a Core-domain
+///         v35 bootstrap. The base pipeline deploys the changed ecosystem implementations and pins
+///         them in a Core-domain
 ///         `ProxyUpgradeTransition`, which the merged bundle applies through
 ///         `CoreUpgradeExecutor.applyL1Upgrade`. This prepare emits no governance call of its own.
 // solhint-disable-next-line contract-name-capwords

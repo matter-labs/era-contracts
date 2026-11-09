@@ -1,7 +1,7 @@
 {
   "stateVersion": "v0.36.0",
   "upgradeSourceStateVersion": "v0.35.0",
-  "upgradeSourceGenesisRoot": "0x54b9afb3e00cdcdee45e2bc8f1ab3a7ac82cedcfadfdfd14811e937f7dc412e3",
+  "upgradeSourceGenesisRoot": "0x3f7a2974b360cc5a8a1f75e9dfa3ef8dd5e6a07426fc8acca8fef0ff156355a7",
   "chains": [
     {
       "chainId": 31337,

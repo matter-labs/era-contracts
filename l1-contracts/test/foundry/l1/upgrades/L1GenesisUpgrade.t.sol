@@ -205,17 +205,17 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     ///      performs (and the factory deps an upgrade plan carries). Every other field of the
     ///      canonical transaction comes from the one shared envelope.
     function test_genesisAndUpgradePathsShareTheEnvelope() public {
-        DummyDefaultUpgradeForGenesis upgradeEngine = new DummyDefaultUpgradeForGenesis();
+        DummyDefaultUpgradeForGenesis chainUpgradeEngine = new DummyDefaultUpgradeForGenesis();
         CTMTransition transition = _transition(
             _release(_departingFacets(), _deployedStub("fromVerifier"), 0),
             release,
             0,
-            address(upgradeEngine),
+            address(chainUpgradeEngine),
             _defaultComposerPlan()
         );
 
         L2CanonicalTransaction memory genesisTx = _composedGenesisTx(ETH_CHAIN_ID);
-        L2CanonicalTransaction memory upgradeTx = upgradeEngine.l2UpgradeTx(
+        L2CanonicalTransaction memory upgradeTx = chainUpgradeEngine.l2UpgradeTx(
             address(transition),
             mockBridgehub,
             ETH_CHAIN_ID
@@ -247,12 +247,12 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
     ///      same contract set — the same pinned fixed blob, the same CTM deployment tracker and the
     ///      same per-chain data — even though the calls that carry them differ.
     function test_creatingAtAReleaseInstallsWhatUpgradingToItInstalls() public {
-        DummyDefaultUpgradeForGenesis upgradeEngine = new DummyDefaultUpgradeForGenesis();
+        DummyDefaultUpgradeForGenesis chainUpgradeEngine = new DummyDefaultUpgradeForGenesis();
         CTMTransition transition = _transition(
             _release(_departingFacets(), _deployedStub("fromVerifierForEquivalence"), 0),
             release,
             0,
-            address(upgradeEngine),
+            address(chainUpgradeEngine),
             _defaultComposerPlan()
         );
 
@@ -263,7 +263,7 @@ contract L1GenesisUpgradeTest is BaseUpgrade, RegistryObjectsFixture {
             bytes memory genesisPerChain
         ) = this.decodeGenesisUpgrade(_innerCalldata(_composedGenesisTx(ERC20_CHAIN_ID).data));
         (address upgradeDeployer, bytes memory upgradeFixed, bytes memory upgradePerChain) = this.decodeDefaultUpgrade(
-            _delegateCalldata(upgradeEngine.l2UpgradeTx(address(transition), mockBridgehub, ERC20_CHAIN_ID).data)
+            _delegateCalldata(chainUpgradeEngine.l2UpgradeTx(address(transition), mockBridgehub, ERC20_CHAIN_ID).data)
         );
 
         assertEq(genesisChainId, ERC20_CHAIN_ID, "the genesis call names the chain it is composed for");

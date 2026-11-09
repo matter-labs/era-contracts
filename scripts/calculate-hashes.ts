@@ -6,8 +6,6 @@ import { join } from "path";
 import * as blakejs from "blakejs";
 
 const SOLIDITY_SOURCE_CODE_PATHS = ["l1-contracts/"];
-// l1-contracts' `anvil-interop` profile builds into its own out dir (l1-contracts/foundry.toml).
-const SOLIDITY_ARTIFACTS_DIR = process.env.FOUNDRY_PROFILE === "anvil-interop" ? "out-anvil-interop" : "out";
 const OUTPUT_FILE_PATH = "AllContractsHashes.json";
 
 const SKIPPED_FOLDERS = [
@@ -44,7 +42,7 @@ function getCanonicalPathsFromFile(directory: string, fileName: string, fullPath
   const parsed = parseSolFile(fullPath);
 
   for (const item of parsed) {
-    res.push(`/${folderName}${SOLIDITY_ARTIFACTS_DIR}/${fileName}/${item}.json`);
+    res.push(`/${folderName}out/${fileName}/${item}.json`);
   }
 
   return res;
@@ -130,6 +128,8 @@ const findDirsEndingWith = (path: string, endingWith: string): fs.Dirent[] => {
     return [];
   }
 };
+
+const SOLIDITY_ARTIFACTS_DIR = "out";
 
 type EvmJsonFileContents = {
   bytecode: { object: string };
