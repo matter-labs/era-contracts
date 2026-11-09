@@ -59,36 +59,39 @@ function gitSucceeds(..._args: string[]): boolean {
   }
 }
 
-// A `release/*` branch's head, and the base its own commits are not on: main for a live branch. A branch merged into
-// main with a merge commit and since deleted is the merge's second parent, with the first parent as its base. Without
-// the base, a commit main had when the branch was cut would count as a release commit.
+// A `release/*` branch's head, and its fork point: the newest commit of main's first-parent history that the branch
+// contains. The branch's own commits are those after the fork point, however they later reach main. A branch merged
+// into main with a merge commit and since deleted is found as that merge's second parent.
 interface ReleaseHead {
   head: string;
-  base: string;
+  forkPoint: string;
 }
 
 function releaseHeads(): ReleaseHead[] {
   const main = `refs/remotes/${REMOTE}/${MAIN_BRANCH}`;
+  const mainLine = git("rev-list", "--first-parent", main).split("\n");
+  const withForkPoint = (_head: string): ReleaseHead => {
+    const history = new Set(git("rev-list", _head).split("\n"));
+    return { head: _head, forkPoint: mainLine.find((commit) => history.has(commit))! };
+  };
   const branches = git("for-each-ref", "--format=%(refname)", `refs/remotes/${REMOTE}/${RELEASE_BRANCH_PREFIX}`)
     .split("\n")
-    .filter((ref) => ref)
-    .map((ref) => ({ head: ref, base: main }));
+    .filter((ref) => ref);
   const merged = git("log", "--first-parent", "--merges", "--format=%H %s", main)
     .split("\n")
     .filter((line) => {
       const subject = line.split(" ").slice(1).join(" ");
       return MERGE_SUBJECT_PATTERN.exec(subject)?.[1].startsWith(RELEASE_BRANCH_PREFIX);
     })
-    .map((line) => line.split(" ")[0])
-    .map((merge) => ({ head: `${merge}^2`, base: `${merge}^1` }));
-  return [...branches, ...merged];
+    .map((line) => `${line.split(" ")[0]}^2`);
+  return [...branches, ...merged].map(withForkPoint);
 }
 
 function onReleaseBranch(_commit: string, _releaseHeads: ReleaseHead[]): boolean {
   return _releaseHeads.some(
-    ({ head, base }) =>
+    ({ head, forkPoint }) =>
       gitSucceeds("merge-base", "--is-ancestor", _commit, head) &&
-      !gitSucceeds("merge-base", "--is-ancestor", _commit, base)
+      !gitSucceeds("merge-base", "--is-ancestor", _commit, forkPoint)
   );
 }
 

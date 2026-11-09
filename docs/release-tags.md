@@ -26,7 +26,8 @@ is pushed by hand, after the go-ahead from the release owner.
 A pushed tag is never moved. If a proposal is resubmitted with new calldata, tag the new proposal's number.
 
 The tagged commit must be one of the release branch's own commits, not one it shares with `main`. That branch keeps
-the deployed bytecode: contract fixes go to the next release, not to the tagged branch.
+the deployed bytecode: contract fixes go to the next release, not to the tagged branch. Do not merge `main` into a
+release branch after its commits have reached `main`: its tags would then count as shared with `main`.
 
 Keep the release branch: the daily check reports a tag whose branch is gone. GitHub deletes a PR's head branch when the
 PR merges, so never open a PR from a `release/*` branch itself. To bring its changes into `main`, open the PR from a copy
@@ -44,8 +45,9 @@ and for each CTM:
 - the CTM is listed in the environment's file. Its flavour comes from the file's `is_zk_sync_os`, or else from the CTM's
   `isZKsyncOS()`;
 - its `getSemverProtocolVersion()` has a tag: `era-v<x.y.z>` for Era, `v<x.y.z>` or `zkos-v<x.y.z>` for ZKsync OS;
-- the tag's commit is on an `origin/release/*` branch and not on `main`, or was on a release branch merged into `main`
-  with a merge commit and not on `main` before that merge.
+- the tag's commit is one of a release branch's own commits: reachable from the branch, but not from the newest commit
+  of `main`'s first-parent history that the branch contains. The `origin/release/*` branches count, and so do deleted
+  release branches merged into `main` with a merge commit.
 
 On mainnet a failure is an error: it fails the run and posts to Slack. On Sepolia it is a warning in the run summary:
 some testnet versions released before this policy have no tag. A failed RPC call is an error everywhere.
