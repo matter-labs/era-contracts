@@ -14,6 +14,7 @@ extend-exclude = [
     "/system-contracts/contracts-preprocessed",
     "/system-contracts/typechain",
     "*.json",
+    "*.svg",
     "*.lock",
     ".git/",
     "SECURITY.md"

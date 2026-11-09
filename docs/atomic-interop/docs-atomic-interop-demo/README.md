@@ -35,13 +35,13 @@ The tutorial, `docs/atomic-interop/02-tutorial.md` in this repository, walks thr
 
 ## What's inside
 
-| Path                                      | Content                                                                                                              |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `scripts/common.ts`                       | Chains, accounts, addresses and ABIs, helpers for hints and proofs, and one function per contract call               |
-| `scripts/call.ts`, `refund.ts`, `swap.ts` | The three flows; `scripts/demo.ts` runs them in a row                                                                |
-| `contracts/`                              | The receiver and the demo token; the scripts compile them with `solc`                                                |
-| `docker-compose.yaml`                     | The L1, the two chains, the registration step and the demo                                                           |
-| `docker/`                                 | What the containers load: L1 state, genesis, server configs, start-up scripts                                        |
+| Path                                      | Content                                                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `scripts/common.ts`                       | Chains, accounts, addresses and ABIs, helpers for hints and proofs, and one function per contract call |
+| `scripts/call.ts`, `refund.ts`, `swap.ts` | The three flows; `scripts/demo.ts` runs them in a row                                                  |
+| `contracts/`                              | The receiver and the demo token; the scripts compile them with `solc`                                  |
+| `docker-compose.yaml`                     | The L1, the two chains, the registration step and the demo                                             |
+| `docker/`                                 | What the containers load: L1 state, genesis, server configs, start-up scripts                          |
 
 | Service              | Image                                                                       |
 | -------------------- | --------------------------------------------------------------------------- |

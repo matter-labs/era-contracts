@@ -1,5 +1,4 @@
 ---
-title: Tutorial
 description: Run an atomic cross-chain call, a refund after a missed deadline and a token swap on two local ZKsync chains.
 ---
 
@@ -134,12 +133,12 @@ state, with new chains; the demo folder's `README.md` explains how that state wa
 
 The demo folder:
 
-| Path                                      | Content                                                                                                              |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `scripts/common.ts`                       | Chains, accounts, addresses and ABIs, helpers for hints and proofs, and one function per contract call               |
-| `scripts/call.ts`, `refund.ts`, `swap.ts` | The three flows; `scripts/demo.ts` runs them in a row                                                                |
-| `contracts/`                              | The receiver and the demo token; the scripts compile them with `solc`                                                |
-| `docker-compose.yaml`, `docker/`          | The sandbox                                                                                                          |
+| Path                                      | Content                                                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `scripts/common.ts`                       | Chains, accounts, addresses and ABIs, helpers for hints and proofs, and one function per contract call |
+| `scripts/call.ts`, `refund.ts`, `swap.ts` | The three flows; `scripts/demo.ts` runs them in a row                                                  |
+| `contracts/`                              | The receiver and the demo token; the scripts compile them with `solc`                                  |
+| `docker-compose.yaml`, `docker/`          | The sandbox                                                                                            |
 
 The scripts use three of Anvil's default test accounts, which the sandbox gives 100 ETH each on both
 chains. Never use their keys on a real network.

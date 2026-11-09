@@ -1,5 +1,4 @@
 ---
-title: Reference
 description: Contracts, arguments, safety notes and common questions for Private Atomic Interop in ZKsync v33.
 ---
 
@@ -11,13 +10,13 @@ description: Contracts, arguments, safety notes and common questions for Private
 
 The L2 contracts are system contracts at the same address on every ZKsync OS chain.
 
-| Contract | Address | Role |
-|---|---|---|
-| `InteropCenter` | `0x000000000000000000000000000000000001000d` | Previews and sends legs: `previewMessageHash`, `previewBundleHash`, `sendMessage`, `sendBundle`. |
-| `L2InteropHandler` | `0x000000000000000000000000000000000001000e` | Executes legs and delivers their calls: `executeAtomicBundle`, `bundleStatus`. |
-| `AtomicFlowManager` | `0x0000000000000000000000000000000000010014` | Tracks legs and handles refunds: `legState`, `authorizeRefund`, `claimRefund`. |
-| `L2AssetRouter` | `0x0000000000000000000000000000000000010003` | Target of every token transfer. |
-| `L2NativeTokenVault` | `0x0000000000000000000000000000000000010004` | Holds, burns and mints tokens: `assetId`, `registerToken`. |
+| Contract             | Address                                      | Role                                                                                             |
+| -------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `InteropCenter`      | `0x000000000000000000000000000000000001000d` | Previews and sends legs: `previewMessageHash`, `previewBundleHash`, `sendMessage`, `sendBundle`. |
+| `L2InteropHandler`   | `0x000000000000000000000000000000000001000e` | Executes legs and delivers their calls: `executeAtomicBundle`, `bundleStatus`.                   |
+| `AtomicFlowManager`  | `0x0000000000000000000000000000000000010014` | Tracks legs and handles refunds: `legState`, `authorizeRefund`, `claimRefund`.                   |
+| `L2AssetRouter`      | `0x0000000000000000000000000000000000010003` | Target of every token transfer.                                                                  |
+| `L2NativeTokenVault` | `0x0000000000000000000000000000000000010004` | Holds, burns and mints tokens: `assetId`, `registerToken`.                                       |
 
 ### Registering chains
 
@@ -33,13 +32,13 @@ chain being registered must already have a settled batch.
 A leg carries a **bundle**, the list of calls it makes on its destination. The flow definition
 (`preimage` in the contracts) has five fields:
 
-| Field | Value |
-|---|---|
-| `version` | `0x01` |
-| `deadline` | Ethereum timestamp |
-| `settlementLayerChainId` | The Ethereum chain ID |
-| `legBundleHashes` | The legs' bundle hashes, strictly ascending; 1 to 8 legs |
-| `legSourceChainIds` | Each leg's source chain ID, in the same order |
+| Field                    | Value                                                    |
+| ------------------------ | -------------------------------------------------------- |
+| `version`                | `0x01`                                                   |
+| `deadline`               | Ethereum timestamp                                       |
+| `settlementLayerChainId` | The Ethereum chain ID                                    |
+| `legBundleHashes`        | The legs' bundle hashes, strictly ascending; 1 to 8 legs |
+| `legSourceChainIds`      | Each leg's source chain ID, in the same order            |
 
 The flow ID is `keccak256(abi.encode(preimage))`.
 
@@ -66,10 +65,10 @@ is what you checked, including its `unbundlerAddress` and `executionAddress`.
 
 Two optional bundle attributes decide who can act on a leg after it is sent. Both are ERC-7930 addresses.
 
-| Setting | If unset | Recommended |
-|---|---|---|
+| Setting            | If unset                        | Recommended                                                                                                                                                  |
+| ------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `executionAddress` | Any account can execute the leg | Leave it unset. An executor can only deliver the leg as its sender built it, once the proofs check out, so anyone, including a relayer, can finish the flow. |
-| `unbundlerAddress` | The sender, on the source chain | In a swap, the leg's receiver, on the destination chain. See [Safety](#safety). |
+| `unbundlerAddress` | The sender, on the source chain | In a swap, the leg's receiver, on the destination chain. See [Safety](#safety).                                                                              |
 
 ## Executing and refunding
 
@@ -91,11 +90,11 @@ definition, and `executeAtomicBundle` and `claimRefund` also need the bundle byt
 A ZKsync OS server with v33 support (release v0.23.1 or later) returns proofs ready to pass on-chain. Ask
 the leg's source chain, using the leg's commit value:
 
-| Method | Returns | Call it |
-|---|---|---|
-| `zks_getImtInclusionProof(commitValue, blockNumber)` | The finality proof for a leg | After the batch that holds the send block (`blockNumber`) is executed on Ethereum |
-| `zks_getImtNonInclusionProof(commitValue, batchNumber)` | The timeout proof for a missing leg | For a batch settled after the deadline, once it is executed on Ethereum |
-| `zks_getImtLowNullifierIndex(commitValue, blockNumber)` | The insertion hint for sending a leg | Before you send |
+| Method                                                  | Returns                              | Call it                                                                           |
+| ------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------- |
+| `zks_getImtInclusionProof(commitValue, blockNumber)`    | The finality proof for a leg         | After the batch that holds the send block (`blockNumber`) is executed on Ethereum |
+| `zks_getImtNonInclusionProof(commitValue, batchNumber)` | The timeout proof for a missing leg  | For a batch settled after the deadline, once it is executed on Ethereum           |
+| `zks_getImtLowNullifierIndex(commitValue, blockNumber)` | The insertion hint for sending a leg | Before you send                                                                   |
 
 A proof comes back as `null` if the leg isn't in that batch (inclusion) or is in it (non-inclusion). It
 has the fields of the on-chain `ImtProof` except `sourceChainId`, which you add, plus
@@ -134,11 +133,11 @@ a refund pays its gas.
 
 ## What is visible to whom
 
-| Who | Sees |
-|---|---|
-| Readers of the source chain | The full leg, and the flow definition (bundle hashes, chain IDs and the deadline) |
-| Readers of the destination chain | The leg executed there and the flow definition |
-| Ethereum | From interop itself, at most one hash per leg |
+| Who                              | Sees                                                                              |
+| -------------------------------- | --------------------------------------------------------------------------------- |
+| Readers of the source chain      | The full leg, and the flow definition (bundle hashes, chain IDs and the deadline) |
+| Readers of the destination chain | The leg executed there and the flow definition                                    |
+| Ethereum                         | From interop itself, at most one hash per leg                                     |
 
 Anyone can read a public chain, and a private chain decides who can read it. A rollup also publishes its
 state changes on Ethereum.

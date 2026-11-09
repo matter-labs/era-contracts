@@ -1,5 +1,4 @@
 ---
-title: Private Atomic Interop
 description: "Complete one trade across ZKsync chains: every leg can be delivered, or every leg that was sent can be refunded."
 ---
 

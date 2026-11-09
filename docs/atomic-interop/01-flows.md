@@ -1,5 +1,4 @@
 ---
-title: Flows
 description: The atomic swap in detail, and how cross-chain calls, token transfers and refunds differ from it.
 ---
 
