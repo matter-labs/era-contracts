@@ -218,13 +218,13 @@ contract UpgradeIntegrationTestLocalSplitCTMProxyAdmin is UpgradeIntegrationTest
     }
 
     function test_prepareRefusesAProxyBehindAThirdPartyAdmin() public {
-        address thirdParty = address(new ProxyAdmin());
-        _moveValidatorTo(thirdParty);
+        address foreignAdmin = address(new ProxyAdmin());
+        _moveValidatorTo(foreignAdmin);
         vm.expectRevert(
             bytes(
                 string.concat(
                     "PermissionlessValidator is behind ",
-                    Strings.toHexString(thirdParty),
+                    Strings.toHexString(foreignAdmin),
                     ", neither the CTM-domain nor the ecosystem ProxyAdmin"
                 )
             )
