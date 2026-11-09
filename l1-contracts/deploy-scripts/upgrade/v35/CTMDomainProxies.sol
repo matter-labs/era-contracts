@@ -79,15 +79,10 @@ library CTMDomainProxies {
             if (admin == _ecosystemAdmin) {
                 revert(string.concat(names[i], " is still behind the ecosystem ProxyAdmin", REMEDY));
             }
+            string memory found = string.concat(names[i], " is behind ", Strings.toHexString(admin));
             require(
                 proxies[i] == _proxies.serverNotifier,
-                string.concat(
-                    names[i],
-                    " is behind ",
-                    Strings.toHexString(admin),
-                    ", not the CTM-domain ProxyAdmin ",
-                    Strings.toHexString(_ctmAdmin)
-                )
+                string.concat(found, ", not the CTM-domain ProxyAdmin ", Strings.toHexString(_ctmAdmin))
             );
         }
     }
