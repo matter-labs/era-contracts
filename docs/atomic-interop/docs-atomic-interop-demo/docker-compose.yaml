@@ -1,0 +1,97 @@
+# Local sandbox for ZKsync v33 atomic interop: an L1 and two ZKsync OS chains that settle on it.
+#
+#   docker compose run --rm demo    start the chains and run the three example flows
+#   docker compose up -d --wait     start the chains without the demo; returns once they are registered with each other
+#   docker compose down             stop and delete everything; the next start is new
+#
+# L1 (Anvil, chain 31337)  http://127.0.0.1:8545
+# Chain A (chain 506)      http://127.0.0.1:3050
+# Chain B (chain 507)      http://127.0.0.1:3051
+name: atomic-interop-demo
+
+x-chain: &chain
+  image: ghcr.io/matter-labs/zksync-os-server:v0.24.5
+  platform: linux/amd64
+  command: ["--config", "/config/chain.yaml"]
+  environment:
+    L1_PROVIDER_RPC_URL: http://l1:8545
+  # The chain's database is kept in memory: every start is a new chain, matching the new L1.
+  tmpfs:
+    - /db:mode=1777
+  working_dir: /db
+  depends_on:
+    l1:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3050"]
+    interval: 1s
+    timeout: 2s
+    retries: 180
+
+services:
+  l1:
+    image: ghcr.io/foundry-rs/foundry:v1.8.4
+    entrypoint: ["bash", "/sandbox/l1.sh"]
+    volumes:
+      - ./docker/l1.sh:/sandbox/l1.sh:ro
+      - ./docker/l1-state.json.gz:/sandbox/l1-state.json.gz:ro
+    ports:
+      - 127.0.0.1:8545:8545
+    healthcheck:
+      test: ["CMD", "bash", "/sandbox/l1.sh", "healthy"]
+      interval: 1s
+      timeout: 2s
+      retries: 120
+
+  chain-a:
+    <<: *chain
+    volumes:
+      - ./docker/chain-506.yaml:/config/chain.yaml:ro
+      - ./docker/genesis.json:/config/genesis.json:ro
+    ports:
+      - 127.0.0.1:3050:3050
+
+  chain-b:
+    <<: *chain
+    volumes:
+      - ./docker/chain-507.yaml:/config/chain.yaml:ro
+      - ./docker/genesis.json:/config/genesis.json:ro
+    ports:
+      - 127.0.0.1:3051:3050
+
+  # Registers the chains with each other once each has a batch executed on L1, then reports healthy.
+  register:
+    image: ghcr.io/foundry-rs/foundry:v1.8.4
+    entrypoint: ["bash", "/sandbox/register.sh"]
+    volumes:
+      - ./docker/register.sh:/sandbox/register.sh:ro
+    depends_on:
+      chain-a:
+        condition: service_healthy
+      chain-b:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "/sandbox/register.sh", "ready"]
+      interval: 1s
+      timeout: 2s
+      retries: 300
+
+  # Runs scripts/demo.ts against the chains. `docker compose run --rm demo` starts it, `up` doesn't.
+  demo:
+    profiles: [demo]
+    image: node:24.22.1-slim
+    entrypoint: ["sh", "/src/docker/demo.sh"]
+    working_dir: /app
+    environment:
+      L1_RPC_URL: http://l1:8545
+      CHAIN_A_RPC_URL: http://chain-a:3050
+      CHAIN_B_RPC_URL: http://chain-b:3050
+    volumes:
+      - ./:/src:ro
+      - npm-cache:/root/.npm
+    depends_on:
+      register:
+        condition: service_healthy
+
+volumes:
+  npm-cache:

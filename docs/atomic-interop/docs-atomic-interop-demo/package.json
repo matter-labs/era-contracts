@@ -1,0 +1,18 @@
+{
+  "name": "atomic-interop-demo",
+  "private": true,
+  "scripts": {
+    "demo": "tsx scripts/demo.ts",
+    "call": "tsx scripts/call.ts",
+    "refund": "tsx scripts/refund.ts",
+    "swap": "tsx scripts/swap.ts"
+  },
+  "dependencies": {
+    "solc": "0.8.28",
+    "viem": "2.48.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "tsx": "4.23.15"
+  }
+}

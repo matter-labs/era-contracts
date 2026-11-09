@@ -1,0 +1,62 @@
+{
+  "theme": "base",
+  "htmlLabels": false,
+  "themeVariables": {
+    "fontFamily": "Arial, Helvetica, sans-serif",
+    "fontSize": "15px",
+    "primaryColor": "#FFFFFF",
+    "primaryTextColor": "#11141A",
+    "primaryBorderColor": "#334155",
+    "lineColor": "#334155",
+    "actorBkg": "#FFFFFF",
+    "actorBorder": "#334155",
+    "actorTextColor": "#11141A",
+    "actorLineColor": "#94A3B8",
+    "signalColor": "#11141A",
+    "signalTextColor": "#11141A",
+    "noteBkgColor": "#FFFFFF",
+    "noteBorderColor": "#64748B",
+    "noteTextColor": "#11141A",
+    "sequenceNumberColor": "#FFFFFF",
+    "labelBoxBkgColor": "#FFFFFF",
+    "labelBoxBorderColor": "#334155",
+    "labelTextColor": "#11141A",
+    "loopTextColor": "#11141A",
+    "edgeLabelBackground": "#FFFFFF",
+    "clusterBorder": "#334155",
+    "titleColor": "#11141A"
+  },
+  "sequence": {
+    "mirrorActors": true,
+    "actorMargin": 36,
+    "messageMargin": 34,
+    "noteMargin": 14,
+    "boxMargin": 8,
+    "boxTextMargin": 6,
+    "useMaxWidth": false,
+    "actorFontFamily": "Arial, Helvetica, sans-serif",
+    "noteFontFamily": "Arial, Helvetica, sans-serif",
+    "messageFontFamily": "Arial, Helvetica, sans-serif",
+    "actorFontSize": 15,
+    "noteFontSize": 14,
+    "messageFontSize": 15,
+    "wrap": false,
+    "bottomMarginAdj": 4,
+    "width": 120,
+    "height": 48
+  },
+  "flowchart": {
+    "htmlLabels": false,
+    "useMaxWidth": false,
+    "curve": "basis",
+    "nodeSpacing": 30,
+    "rankSpacing": 70,
+    "padding": 14,
+    "wrappingWidth": 400,
+    "subGraphTitleMargin": {
+      "top": 6,
+      "bottom": 10
+    }
+  },
+  "themeCSS": ".messageText { paint-order: stroke; stroke: #FFFFFF; stroke-width: 5px; stroke-linejoin: round; } .edgeLabel text, .edgeLabel tspan { paint-order: stroke; stroke: #FFFFFF; stroke-width: 5px; stroke-linejoin: round; }"
+}
