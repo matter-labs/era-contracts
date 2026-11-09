@@ -59,8 +59,9 @@ With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment i
 missing inputs fail before deployment.
 
 The merged package `<env-out>/ecosystem.toml` carries ONE governance bundle, `[governance_calls] calls`, in this
-order: the merge's own extras (the PUH/Guardians wiring when the release redeploys the governance set), the core
-prepare's declared calls, the derived executor legs, then the CTM prepare's declared calls. The legs are one contiguous run in canonical order, each present only when its prepare
+order: the merge's own extras (the PUH/Guardians wiring when the release redeploys the governance set, then an
+`acceptOwnership()` for each CTM or ValidatorTimelock that is not under its bound executor and whose pending owner is
+governance, which no ecosystem has from v35 on), the core prepare's declared calls, the derived executor legs, then the CTM prepare's declared calls. The legs are one contiguous run in canonical order, each present only when its prepare
 reported the object (`[registry]` of the core and CTM prepare outputs), all with no value:
 
 1. `CoreUpgradeExecutor.applyL1Upgrade(core_transition_addr)` on `core_upgrade_executor_addr`;

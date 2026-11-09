@@ -109,22 +109,16 @@ value and be either
   constructor's parameters for an object a `[registry]` key names; or, for a `TransparentUpgradeableProxy` the package
   names, a recorded implementation and the ecosystem `ProxyAdmin` or a CTM's `ProxyAdmin` on L1; or
 - a call on the reviewed allowlist (`ALLOWLIST` in
-  `protocol-ops/src/commands/ecosystem/deployer_plan.rs`), every entry taken from the v35 bootstrap
-  prepare's deployer bundle (the three handover rows admit only a declared `admin`-phase action,
-  which no v36 prepare declares):
+  `protocol-ops/src/commands/ecosystem/deployer_plan.rs`):
 
-| call                                        | target (package)                                                                                          | constraint                                                                                 | emitted by                                                     |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `transferOwnership(address)`                | the CTM, its `ValidatorTimelock`, its `ProxyAdmin` (its EIP-1967 admin on L1), the ecosystem `ProxyAdmin` | new owner is the env's `owner_address`                                                     | `ensureCtmsAndProxyAdminsOwnedByGovernance`, deployer as owner |
-| `publishEVMBytecodes(bytes[])`              | the CTM's `bytecodes_supplier_addr`, which must be its `L1_BYTECODES_SUPPLIER()` on L1                    | none: publishing is permissionless                                                         | `BytecodePublisher` in the CTM prepare                         |
-| `multicall((address,uint256,bytes)[],bool)` | `[ctm_admin_calls] chain_admin`                                                                           | requires success; every call sends no value and is one of the two rows below               | the ServerNotifier handover through a ChainAdmin               |
-| `transferOwnership(address)`                | an `admin`-phase `[[external_actions]]` target                                                            | exactly that declared call, nominating the CTM executor this plan deploys                  | the ServerNotifier handover, deployer as owner                 |
-| `changeProxyAdmin(address,address)`         | an `admin`-phase `[[external_actions]]` target                                                            | exactly that declared call, to the `ProxyAdmin` that administers that executor's CTM on L1 | the ServerNotifier handover, deployer as owner                 |
+| call                           | target (package)                                                                                          | constraint                             | emitted by                                                     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
+| `transferOwnership(address)`   | the CTM, its `ValidatorTimelock`, its `ProxyAdmin` (its EIP-1967 admin on L1), the ecosystem `ProxyAdmin` | new owner is the env's `owner_address` | `ensureCtmsAndProxyAdminsOwnedByGovernance`, deployer as owner |
+| `publishEVMBytecodes(bytes[])` | the CTM's `bytecodes_supplier_addr`, which must be its `L1_BYTECODES_SUPPLIER()` on L1                    | none: publishing is permissionless     | `BytecodePublisher` in the CTM prepare                         |
 
-A role that belongs to a CTM (the CTM, its `ValidatorTimelock`, `ProxyAdmin`, `BytecodesSupplier`
-and `ctm_admin_calls` ChainAdmin) counts only in a `[ctms.<key>]` table whose
-`chain_type_manager_proxy` is one of the env's `[[ctm_contracts.ctms]]`; a table naming such a role
-without a CTM is refused. The CTMs' `ProxyAdmin`, `BytecodesSupplier` and `ValidatorTimelock`
+A role that belongs to a CTM (the CTM, its `ValidatorTimelock`, `ProxyAdmin` and
+`BytecodesSupplier`) counts only in a `[ctms.<key>]` table whose `chain_type_manager_proxy` is one
+of the env's `[[ctm_contracts.ctms]]`; a table naming such a role without a CTM is refused. The CTMs' `ProxyAdmin`, `BytecodesSupplier` and `ValidatorTimelock`
 (`validatorTimelockPostV29()`), and the ecosystem `ProxyAdmin` (the EIP-1967 admin of the env's
 `bridgehub_proxy_addr`), are read over `--l1-rpc-url`
 (`replay-bundle` passes its `--rpc`, or in a rehearsal the fork it replays on), never taken from the
