@@ -69,7 +69,16 @@ refuses to render the calls unless governance owns both admins.
 
 The calls are rendered from live state: a rerun reuses the admin it deployed, a partial split is
 finished towards the admin the CTM already has, and a split CTM yields none. Prepares address each
-proxy through the admin they read, so no package prepared before the split may execute after it.
+proxy through the admin they read, so no other package prepared before the split may execute after
+it. Only a bootstrap package may carry a split: the replay, the simulator, the package review and the
+emergency scripts refuse one beside a bundle that runs no `migrate()`, since only `verify-bootstrap`
+reviews it.
+
+A package is checked against the state before its split: once the split has executed,
+`verify-bootstrap`, the governance replay and the emergency dry run of the same package fail on its
+calls. Run them before the split. To re-check afterwards, rerun the prepare under the same salts and
+verify that package: its split comes out empty, and its bundle must equal the one approved.
+
 Until the bootstrap, governance owns both admins, as it owned the one before. A cancelled bootstrap
 leaves the split in place: the shape a fresh deployment has.
 

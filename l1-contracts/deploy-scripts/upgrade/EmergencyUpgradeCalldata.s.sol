@@ -15,6 +15,7 @@ import {IProtocolUpgradeHandler} from "../interfaces/IProtocolUpgradeHandler.sol
 import {IEmergencyUpgrageBoard} from "../interfaces/IEmergencyUpgrageBoard.sol";
 import {IMultisig} from "../interfaces/IMultisig.sol";
 import {ISafe} from "../interfaces/ISafe.sol";
+import {RegistryBootstrapMigration} from "contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol";
 
 /// @notice Emits everything needed to run a prepared upgrade as ONE EMERGENCY upgrade proposal
 ///         (`EmergencyUpgradeBoard.executeEmergencyUpgrade` -> `ProtocolUpgradeHandler.executeEmergencyUpgrade`)
@@ -78,7 +79,9 @@ contract EmergencyUpgradeCalldata is Script {
 
     /// @notice The CTM-domain ProxyAdmin split of a prepared package: every
     ///         `[ctms.<key>.ctm_proxy_admin_split] calls`, which governance executes before the bundle
-    ///         ({docs/upgrade-operations.md#the-ctm-domain-proxyadmin-split}). Empty when no CTM has one.
+    ///         ({docs/upgrade-operations.md#the-ctm-domain-proxyadmin-split}). Empty when no CTM has one;
+    ///         refused in a package whose bundle runs no bootstrap edge (`migrate()`), since only
+    ///         `verify-bootstrap` reviews a split.
     /// @param _ecosystemToml The merged package.
     function loadCTMProxyAdminSplitCalls(
         string memory _ecosystemToml
@@ -93,6 +96,12 @@ contract EmergencyUpgradeCalldata is Script {
             if (vm.keyExistsToml(toml, key)) {
                 calls = _append(calls, abi.decode(toml.readBytes(key), (IProtocolUpgradeHandler.Call[])));
             }
+        }
+        if (calls.length != 0) {
+            require(
+                _runsMigrate(loadGovernanceCalls(_ecosystemToml)),
+                "the package carries a CTM-domain ProxyAdmin split but its bundle runs no bootstrap edge (migrate())"
+            );
         }
     }
 
@@ -258,6 +267,16 @@ contract EmergencyUpgradeCalldata is Script {
                 safe: _safe,
                 safeMessageHash: ISafe(_safe).getMessageHash(abi.encode(_digest))
             });
+    }
+
+    function _runsMigrate(IProtocolUpgradeHandler.Call[] memory _calls) private pure returns (bool) {
+        bytes32 migrate = keccak256(abi.encodeCall(RegistryBootstrapMigration.migrate, ()));
+        for (uint256 i = 0; i < _calls.length; ++i) {
+            if (keccak256(_calls[i].data) == migrate) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function _append(

@@ -19,6 +19,7 @@ import {
     CallRecorderDouble,
     EmergencyUpgradeFixture,
     GUARDIANS_EIP1271_THRESHOLD,
+    MIGRATE_TAG,
     OneOwnerSafeDouble,
     ProtocolUpgradeHandlerDouble,
     SECURITY_COUNCIL_EIP1271_THRESHOLD
@@ -171,12 +172,7 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
     ///         first, then the bundle. An empty split adds no proposal.
     function test_package_runsTheCTMProxyAdminSplitFirst() public {
         IProtocolUpgradeHandler.Call[] memory split = _recordCalls(1);
-        IProtocolUpgradeHandler.Call[] memory bundle = new IProtocolUpgradeHandler.Call[](1);
-        bundle[0] = IProtocolUpgradeHandler.Call({
-            target: address(recorder),
-            value: 0,
-            data: abi.encodeCall(CallRecorderDouble.record, (2))
-        });
+        IProtocolUpgradeHandler.Call[] memory bundle = _migrateCall();
         string memory package = _writeSplitPackage("split-package", split, bundle);
 
         IProtocolUpgradeHandler.Call[] memory loaded = tool.loadCTMProxyAdminSplitCalls(package);
@@ -187,13 +183,36 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
 
         assertEq(recorder.recordedCount(), 2, "both proposals ran");
         assertEq(recorder.recorded(0), 1, "the split first");
-        assertEq(recorder.recorded(1), 2, "then the bundle");
+        assertEq(recorder.recorded(1), MIGRATE_TAG, "then the bundle");
         assertTrue(handler.emergencyUpgradeExecuted(tool.proposalId(_board(), split)), "the split's own proposal");
         assertTrue(handler.emergencyUpgradeExecuted(tool.proposalId(_board(), bundle)), "the bundle's proposal");
 
         string memory noSplit = _writeSplitPackage("empty-split", new IProtocolUpgradeHandler.Call[](0), bundle);
         assertEq(tool.loadCTMProxyAdminSplitCalls(noSplit).length, 0, "an empty split");
         assertEq(tool.loadCTMProxyAdminSplitCalls(_writeBundlePackage("no-ctms", bundle)).length, 0, "no [ctms]");
+    }
+
+    /// @notice Only `verify-bootstrap` reviews a split, so a package whose bundle runs no `migrate()`
+    ///         (an upgrade or replacement package) is refused when it carries one, before any proposal.
+    function test_package_refusesASplitOutsideABootstrap() public {
+        string memory package = _writeSplitPackage("split-upgrade", _recordCalls(1), _recordCalls(2));
+        string
+            memory refusal = "the package carries a CTM-domain ProxyAdmin split but its bundle runs no bootstrap edge (migrate())";
+
+        vm.expectRevert(bytes(refusal));
+        tool.loadCTMProxyAdminSplitCalls(package);
+        vm.expectRevert(bytes(refusal));
+        tool.run(address(handler), package);
+        vm.expectRevert(bytes(refusal));
+        dryRun.verify(address(handler), package);
+        assertEq(recorder.recordedCount(), 0, "nothing ran");
+
+        string memory noSplit = _writeSplitPackage(
+            "empty-split-upgrade",
+            new IProtocolUpgradeHandler.Call[](0),
+            _recordCalls(2)
+        );
+        assertEq(tool.loadCTMProxyAdminSplitCalls(noSplit).length, 0, "an empty split beside any bundle");
     }
 
     // ───────────────────────────── the board's checks ─────────────────────────────
@@ -334,6 +353,16 @@ contract EmergencyUpgradeProposalTest is EmergencyUpgradeFixture {
                 data: abi.encodeCall(CallRecorderDouble.record, (i + 1))
             });
         }
+    }
+
+    /// @dev A bootstrap bundle: one `migrate()` call, to the recorder.
+    function _migrateCall() internal view returns (IProtocolUpgradeHandler.Call[] memory calls) {
+        calls = new IProtocolUpgradeHandler.Call[](1);
+        calls[0] = IProtocolUpgradeHandler.Call({
+            target: address(recorder),
+            value: 0,
+            data: abi.encodeCall(CallRecorderDouble.migrate, ())
+        });
     }
 
     /// @dev A merged package with the bundle and one CTM's `[ctm_proxy_admin_split]`.

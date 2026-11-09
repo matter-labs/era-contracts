@@ -37,7 +37,7 @@ use crate::common::forge::scripts::{
 };
 use crate::common::forge::ForgeRunner;
 use crate::common::governance_calls::{
-    ctm_proxy_admin_split_calls, decode_calls, encode_calls, GovernanceCall, GovernanceCallsTable,
+    decode_calls, encode_calls, GovernanceCall, GovernanceCallsTable,
 };
 use crate::common::logger;
 use crate::common::output::write_output_if_requested;
@@ -45,7 +45,7 @@ use crate::common::paths;
 use crate::common::wallets::Wallet;
 use crate::common::SharedRunArgs;
 use crate::upgrade_verification::registry::applied;
-use crate::upgrade_verification::registry::package::RegistryPackage;
+use crate::upgrade_verification::registry::package::{ctm_proxy_admin_split_of, RegistryPackage};
 use crate::upgrade_verification::report::VerificationResult;
 
 // ── upgrade-governance (the one governance bundle on a fork) ──────────────
@@ -511,11 +511,13 @@ fn read_governance_executions(governance_toml: &Path) -> anyhow::Result<Governan
 fn governance_executions(toml_content: &str) -> anyhow::Result<GovernanceExecutions> {
     let root: toml::Value =
         toml::from_str(toml_content).context("Failed to parse governance TOML")?;
-    let split = ctm_proxy_admin_split_calls(&root)?;
-    let upgrade_output: EcosystemUpgradeOutput =
-        root.try_into().context("Failed to parse governance TOML")?;
+    let upgrade_output: EcosystemUpgradeOutput = root
+        .clone()
+        .try_into()
+        .context("Failed to parse governance TOML")?;
     let bundle =
         decode_calls(&upgrade_output.governance_calls.calls).context("decode governance calls")?;
+    let split = ctm_proxy_admin_split_of(&root, &bundle)?;
     Ok(GovernanceExecutions { split, bundle })
 }
 
@@ -1618,6 +1620,7 @@ mod tests {
         assert!(err.to_string().contains("redeploy_zk_governance"), "{err}");
     }
     use crate::common::governance_calls::{encode_calls, GovernanceCall};
+    use crate::upgrade_verification::registry::package::MIGRATE_SELECTOR;
 
     fn call(target: u8, data: &[u8]) -> GovernanceCall {
         GovernanceCall {
@@ -1657,7 +1660,7 @@ mod tests {
     #[test]
     fn a_pending_split_runs_on_its_own_before_the_bundle() {
         let executions = governance_executions(&governance_toml(
-            &[call(0x11, &[0xaa])],
+            &[call(0x11, &MIGRATE_SELECTOR)],
             Some(&[call(0xE0, &[0x7e]), call(0xE0, &[0x7f])]),
         ))
         .unwrap();
@@ -1670,7 +1673,7 @@ mod tests {
         );
         assert_eq!(
             targets_and_data(&executions.bundle),
-            [(Address::repeat_byte(0x11), vec![0xaa])]
+            [(Address::repeat_byte(0x11), MIGRATE_SELECTOR.to_vec())]
         );
     }
 
@@ -2247,15 +2250,16 @@ mod tests {
         assert!(DeclaredCalls::match_calls(&bundle, &declared).is_exact());
     }
 
-    /// The CTM prepare's `[ctm_proxy_admin_split]` reaches the merged package under
-    /// `[ctms.zksync_os]` and stays out of the bundle: the replay and the simulator both run it on
-    /// its own, first.
-    #[test]
-    fn the_ctm_proxy_admin_split_stays_out_of_the_bundle_and_runs_first() {
-        let split = call(0xE0, &[0x7e]);
+    /// A merged package whose CTM prepare wrote `[ctm_proxy_admin_split]` `split`, its own
+    /// declared calls `declared` and the registry addresses `registry`.
+    fn merged_with_split(
+        registry: &[(&str, Address)],
+        declared: &[GovernanceCall],
+        split: &GovernanceCall,
+    ) -> String {
         let section: toml::Value =
-            toml::from_str(&governance_toml(&[], Some(std::slice::from_ref(&split)))).unwrap();
-        let mut ctm = prepare_output(ctm_body(&[("ctm_transition_addr", TRANSITION)]), &[]);
+            toml::from_str(&governance_toml(&[], Some(std::slice::from_ref(split)))).unwrap();
+        let mut ctm = prepare_output(ctm_body(registry), declared);
         ctm.body.insert(
             "ctm_proxy_admin_split".into(),
             section["ctms"]["zksync_os"]["ctm_proxy_admin_split"].clone(),
@@ -2266,7 +2270,21 @@ mod tests {
             &[],
         )
         .unwrap();
-        let toml = toml::to_string(&doc).unwrap();
+        toml::to_string(&doc).unwrap()
+    }
+
+    /// The CTM prepare's `[ctm_proxy_admin_split]` reaches the merged bootstrap package under
+    /// `[ctms.zksync_os]` and stays out of the bundle: the replay and the simulator both run it on
+    /// its own, first.
+    #[test]
+    fn the_ctm_proxy_admin_split_stays_out_of_the_bundle_and_runs_first() {
+        let split = call(0xE0, &[0x7e]);
+        let migrate = call(0x55, &MIGRATE_SELECTOR);
+        let toml = merged_with_split(
+            &[("bootstrap_migration_addr", Address::repeat_byte(0x55))],
+            std::slice::from_ref(&migrate),
+            &split,
+        );
 
         let executions = governance_executions(&toml).unwrap();
         assert_eq!(
@@ -2275,7 +2293,7 @@ mod tests {
         );
         assert_eq!(
             targets_and_data(&executions.bundle),
-            targets_and_data(&[transition_leg()])
+            targets_and_data(&[migrate])
         );
 
         let dir = tempfile::tempdir().unwrap();
@@ -2285,6 +2303,33 @@ mod tests {
             crate::commands::ecosystem::simulator::simulator_transaction_tags(&path).unwrap(),
             ["ctm_proxy_admin_split", "governance"]
         );
+    }
+
+    /// Only `verify-bootstrap` reviews a split, so one beside an upgrade bundle is refused by the
+    /// replay, the simulator and the package load every other verification starts from.
+    #[test]
+    fn a_split_outside_a_bootstrap_package_is_refused() {
+        let toml = merged_with_split(
+            &[("ctm_transition_addr", TRANSITION)],
+            &[],
+            &call(0xE0, &[0x7e]),
+        );
+        let refused = |err: anyhow::Error| {
+            let err = format!("{err:#}");
+            assert!(
+                err.contains("runs no bootstrap edge (`migrate()`)"),
+                "{err}"
+            );
+        };
+        refused(governance_executions(&toml).unwrap_err());
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ecosystem.toml");
+        fs::write(&path, toml).unwrap();
+        refused(
+            crate::commands::ecosystem::simulator::simulator_transaction_tags(&path).unwrap_err(),
+        );
+        refused(RegistryPackage::load_if_registry(&path).unwrap_err());
     }
 }
 

@@ -138,7 +138,9 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 ```
 
 Run it before every vote: governance approves the exact deployed objects, and this is where their
-construction is established ("Provenance and validation" in the architecture document).
+construction is established ("Provenance and validation" in the architecture document). A package
+that splits a CTM-domain `ProxyAdmin` verifies only before its split executes
+([operations document](../../../docs/upgrade-operations.md#the-ctm-domain-proxyadmin-split)).
 `verify-bootstrap` (alias `verify-package`, `upgrade_verification/registry/`) verifies a
 registry-driven package against live L1 and decides from the package itself which kind it is: an
 upgrade driven through the domain executors' legs, the one-time bootstrap edge, or the replacement
@@ -237,7 +239,9 @@ Gotchas:
   governance calls. They must land before the proposal.
 - **CTM-domain `ProxyAdmin` split.** The v35 prepare's `[ctm_proxy_admin_split] calls` are
   governance calls outside the bundle: their proposal executes after the CTM-admin calls and
-  BEFORE the bundle's
+  BEFORE the bundle's. Only a bootstrap package may carry them; both scripts refuse a split beside a
+  bundle that runs no `migrate()`. Run the dry run before the split executes: afterwards it fails on
+  the split's calls, and a re-check needs a re-prepared package
   ([operations document](../../../docs/upgrade-operations.md#the-ctm-domain-proxyadmin-split)).
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the

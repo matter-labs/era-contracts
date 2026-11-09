@@ -11,10 +11,9 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::common::execution_runbook;
-use crate::common::governance_calls::{
-    ctm_proxy_admin_split_calls, decode_calls, GovernanceCall, GovernanceCallsTable,
-};
+use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCallsTable};
 use crate::common::logger;
+use crate::upgrade_verification::registry::package::ctm_proxy_admin_split_of;
 
 alloy::sol! {
     struct ChainAdminCall {
@@ -1261,12 +1260,13 @@ fn governance_toml_to_simulator_transactions(
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
     let root: toml::Value =
         toml::from_str(&content).with_context(|| format!("failed to parse {}", path.display()))?;
-    let split = ctm_proxy_admin_split_calls(&root)?;
     let parsed: GovernanceCallsToml = root
+        .clone()
         .try_into()
         .with_context(|| format!("failed to parse {}", path.display()))?;
     let bundle = decode_calls(&parsed.governance_calls.calls)
         .context("failed to decode [governance_calls] calls")?;
+    let split = ctm_proxy_admin_split_of(&root, &bundle)?;
 
     let mut out = governance_transactions(
         split,
@@ -1396,6 +1396,7 @@ fn append_test_upgrade_calls(
 mod tests {
     use super::*;
     use crate::common::governance_calls::{encode_calls, GovernanceCall};
+    use crate::upgrade_verification::registry::package::MIGRATE_SELECTOR;
     use alloy::primitives::U256;
 
     /// The one bundle becomes one transaction per call, all tagged `governance` and sent by the
@@ -1440,37 +1441,51 @@ mod tests {
         assert!(!json.contains("timeIncrease"), "{json}");
     }
 
-    /// A pending CTM-domain ProxyAdmin split runs first under its own tag and takes the one mint;
-    /// the bundle after it mints nothing.
-    #[test]
-    fn a_pending_split_runs_first_and_takes_the_one_mint() {
-        let from = Address::repeat_byte(0x99);
-        let call = |target: u8| GovernanceCall {
-            target: Address::repeat_byte(target),
-            value: U256::ZERO,
-            data: vec![0x7e, 0xff, 0x27, 0x5e],
-        };
-        let toml = format!(
+    fn split_package(bundle: &[GovernanceCall], split: &[GovernanceCall], from: Address) -> String {
+        format!(
             "[governance_calls]\ncalls = \"0x{}\"\n\n\
              [ctms.zksync_os.ctm_proxy_admin_split]\n\
              ecosystem_proxy_admin = \"{}\"\nctm_proxy_admin = \"{}\"\ngovernance = \"{}\"\n\
              calls = \"0x{}\"\n",
-            hex::encode(encode_calls(&[call(0x22)])),
+            hex::encode(encode_calls(bundle)),
             Address::repeat_byte(0xE0),
             Address::repeat_byte(0xC0),
             from,
-            hex::encode(encode_calls(&[call(0xE0), call(0xE0)])),
-        );
+            hex::encode(encode_calls(split)),
+        )
+    }
+
+    fn simulate(toml: String, from: Address) -> anyhow::Result<Vec<SimulatorTransaction>> {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("ecosystem.toml");
         fs::write(&path, toml).unwrap();
-        let txs = governance_toml_to_simulator_transactions(
+        governance_toml_to_simulator_transactions(
             &path,
             "l1",
             from,
             &SimDescriptionRegistry::default(),
         )
-        .unwrap();
+    }
+
+    fn call(target: u8, data: &[u8]) -> GovernanceCall {
+        GovernanceCall {
+            target: Address::repeat_byte(target),
+            value: U256::ZERO,
+            data: data.to_vec(),
+        }
+    }
+
+    /// A pending CTM-domain ProxyAdmin split runs first under its own tag and takes the one mint;
+    /// the bundle after it mints nothing.
+    #[test]
+    fn a_pending_split_runs_first_and_takes_the_one_mint() {
+        let from = Address::repeat_byte(0x99);
+        let split = [
+            call(0xE0, &[0x7e, 0xff, 0x27, 0x5e]),
+            call(0xE0, &[0x7e, 0xff, 0x27, 0x5e]),
+        ];
+        let migrate = call(0x55, &MIGRATE_SELECTOR);
+        let txs = simulate(split_package(&[migrate], &split, from), from).unwrap();
         let tags: Vec<&str> = txs.iter().map(|tx| tx.tag.as_str()).collect();
         assert_eq!(
             tags,
@@ -1490,6 +1505,20 @@ mod tests {
             "{}",
             txs[1].description
         );
+    }
+
+    /// Only a bootstrap package's review verifies a split, so the simulator refuses one beside a
+    /// bundle that runs no `migrate()`.
+    #[test]
+    fn a_split_outside_a_bootstrap_package_is_refused() {
+        let from = Address::repeat_byte(0x99);
+        let split = [call(0xE0, &[0x7e, 0xff, 0x27, 0x5e])];
+        let err = simulate(split_package(&[call(0x22, &[0xaa])], &split, from), from).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("runs no bootstrap edge (`migrate()`)"),
+            "{err:#}"
+        );
+        assert!(simulate(split_package(&[call(0x22, &[0xaa])], &[], from), from).is_ok());
     }
 
     #[test]

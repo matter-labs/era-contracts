@@ -37,6 +37,8 @@ uint256 constant GUARDIANS_EIP1271_THRESHOLD = 5;
 uint256 constant SECURITY_COUNCIL_EIP1271_THRESHOLD = 6;
 /// @dev zk-governance `SecurityCouncil.APPROVE_UPGRADE_SECURITY_COUNCIL_THRESHOLD`.
 uint256 constant SECURITY_COUNCIL_APPROVE_UPGRADE_THRESHOLD = 4;
+/// @dev The tag `CallRecorderDouble.migrate` records.
+uint256 constant MIGRATE_TAG = type(uint256).max;
 
 /// @notice A 1-of-1 Gnosis Safe (v1.3 with the CompatibilityFallbackHandler) as an approving member:
 ///         `getMessageHash`, `approveHash` and the EIP-1271 check over that message hash, accepting
@@ -352,12 +354,17 @@ contract ProtocolUpgradeHandlerFreezeDouble {
 }
 
 /// @notice The call target of the synthetic packages: records every tag it is called with, in
-///         order, so a test can see which calls of a proposal ran; `fail` is a call that reverts.
+///         order, so a test can see which calls of a proposal ran; `fail` is a call that reverts,
+///         `migrate` a bootstrap edge's call (`RegistryBootstrapMigration.migrate()`).
 contract CallRecorderDouble {
     uint256[] public recorded;
 
     function record(uint256 _tag) external {
         recorded.push(_tag);
+    }
+
+    function migrate() external {
+        recorded.push(MIGRATE_TAG);
     }
 
     function fail() external pure {

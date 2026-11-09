@@ -85,6 +85,7 @@ impl RegistryPackage {
     pub(crate) fn load_if_registry(ecosystem_toml: &Path) -> anyhow::Result<Option<Self>> {
         let root = read_toml(ecosystem_toml)?;
         let calls = bundle_in(&root)?;
+        ctm_proxy_admin_split_of(&root, &calls)?;
         let legs = recover_legs(&calls)?;
         let migrates = migrate_targets(&calls);
         let replacement = recover_replacement(&calls)?;
@@ -841,6 +842,25 @@ impl BootstrapPackage {
             ctm_key,
         })
     }
+}
+
+/// The `[ctms.*.ctm_proxy_admin_split] calls` of a package whose governance bundle is `bundle`.
+/// A non-empty split is refused unless the bundle runs a bootstrap edge (`migrate()`): only
+/// `verify-bootstrap` reviews a split, so anywhere else it would go out unreviewed.
+pub(crate) fn ctm_proxy_admin_split_of(
+    root: &toml::Value,
+    bundle: &[GovernanceCall],
+) -> anyhow::Result<Vec<GovernanceCall>> {
+    let split = ctm_proxy_admin_split_calls(root)?;
+    if !split.is_empty() && migrate_targets(bundle).is_empty() {
+        anyhow::bail!(
+            "the package carries a CTM-domain ProxyAdmin split ([ctms.*.ctm_proxy_admin_split], \
+             {} calls) but its governance bundle runs no bootstrap edge (`migrate()`): only a \
+             bootstrap package's review verifies a split",
+            split.len()
+        );
+    }
+    Ok(split)
 }
 
 /// Every target the bundle calls `migrate()` on — the bootstrap migrations it drives.
