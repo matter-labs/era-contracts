@@ -11,19 +11,6 @@ import {AuthoredL2Side, DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUp
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v36 is DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade
-    function changedReleaseMembers() internal view virtual override returns (string[] memory names) {
-        names = new string[](8);
-        names[0] = "AdminFacet";
-        names[1] = "GettersFacet";
-        names[2] = "MailboxFacet";
-        names[3] = "ExecutorFacet";
-        names[4] = "CommitterFacet";
-        names[5] = "MigratorFacet";
-        names[6] = "DiamondInit";
-        names[7] = "L1GenesisUpgrade";
-    }
-
-    /// @inheritdoc DefaultCTMUpgrade
     function deployNewCTMContracts() public virtual override {
         super.deployNewCTMContracts();
         deployL2DelegateComposer();
