@@ -453,7 +453,9 @@ export async function assertLegsApplied(
   let rows = 0;
   let swaps = 0;
   for (const { leg, rows: legRows } of snapshots) {
-    const emitted = parsedFrom(leg.executor, legInterface(leg.kind))
+    // The swaps run in the transition's engine, delegatecalled by the executor: the events come
+    // from the executor's address but are declared by the engine, not in the executor's ABI.
+    const emitted = parsedFrom(leg.executor, new ethers.utils.Interface(getAbi("DefaultProxyUpgradeEngine")))
       .filter(({ event }) => event.name === "ProxyImplementationUpgraded")
       .map(({ event }) => ({ proxy: event.args.proxy as string, newImpl: event.args.newImpl as string }));
     const expectedSwaps = legRows.filter((row) => row.implBefore.toLowerCase() !== row.implNew.toLowerCase());

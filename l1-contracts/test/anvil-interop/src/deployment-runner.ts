@@ -514,7 +514,6 @@ export class DeploymentRunner {
 
     const state = this.loadState();
     state.chains = chainInfo;
-    state.startedFrom = "freshDeploy";
     this.saveState(state);
 
     return { chains: chainInfo };
@@ -737,7 +736,6 @@ export class DeploymentRunner {
     // Populate deployment state so downstream tools (tests) work
     const state = this.loadState();
     state.chains = chainInfo;
-    state.startedFrom = "chainStates";
     state.l1Addresses = l1Addresses;
     state.ctmAddresses = ctmAddresses;
     state.chainAddresses = chainAddresses;

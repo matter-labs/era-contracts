@@ -106,7 +106,7 @@ contract TransitionReplacementTest is ChainTypeManagerTest, RegistryDrivenUpgrad
                 TransitionManifest({
                     fromRelease: _fromRelease,
                     newRelease: _newRelease,
-                    upgradeEngine: _engine,
+                    chainUpgradeEngine: _engine,
                     oldProtocolVersionDeadline: _deadline,
                     upgradeTimestamp: 0,
                     l2Plan: _plan

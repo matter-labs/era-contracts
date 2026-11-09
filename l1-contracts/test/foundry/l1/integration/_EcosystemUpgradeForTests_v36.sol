@@ -51,7 +51,7 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
             _vm: vm,
             _outputPath: outputPath,
             _upgradeCutData: getChainUpgradeDiamondCutData(),
-            _defaultUpgrade: committedUpgradeEngine(),
+            _defaultUpgrade: committedChainUpgradeEngine(),
             _eip7702Checker: getAddresses().admin.eip7702Checker,
             _registry: TrimmedUpgradeOutput.Registry({
                 ctmTransition: upgradeAddresses.ctmTransition,
@@ -73,15 +73,7 @@ contract CTMUpgradeForTests_v36 is CTMUpgrade_v36 {
 }
 
 /// @dev Core upgrade for the harness. The anvil ecosystem this hop runs on was bootstrapped from the
-///      current sources, so its `L1MessageRoot` already runs this build and the base pipeline would
-///      reuse it; the harness deploys the declared change anyway so the hop carries the ecosystem leg
-///      it exists to exercise.
+///      current sources, so its `L1MessageRoot` already runs this build; the version declares it
+///      changed, so the hop still deploys it and carries the ecosystem leg it exists to exercise.
 // solhint-disable-next-line contract-name-capwords
-contract CoreUpgradeForTests_v36 is CoreUpgrade_v36 {
-    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
-        if (keccak256(bytes(_name)) == keccak256(bytes("L1MessageRoot"))) {
-            return false;
-        }
-        return super._canReuseEcosystemImplementation(_name, _live);
-    }
-}
+contract CoreUpgradeForTests_v36 is CoreUpgrade_v36 {}

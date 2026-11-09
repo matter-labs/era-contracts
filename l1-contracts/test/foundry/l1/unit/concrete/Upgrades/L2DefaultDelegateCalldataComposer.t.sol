@@ -235,7 +235,7 @@ contract L2DefaultDelegateCalldataComposerTest is RegistryObjectsFixture {
             fromRelease,
             release,
             0,
-            _deployedStub("upgradeEngine"),
+            _deployedStub("chainUpgradeEngine"),
             _defaultComposerPlan()
         );
         transition.validate();

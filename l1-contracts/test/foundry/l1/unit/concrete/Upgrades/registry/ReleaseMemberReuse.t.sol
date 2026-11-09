@@ -32,8 +32,9 @@ contract DeclaredMemberHarness is ReleaseMemberReuseHarness {
 }
 
 /// @notice The rule that lets a small upgrade deploy only what it changes: a live release member is
-///         reused when — and only when — it already runs the code this prepare would deploy. See
-///         "reduce preparation for small changes" in {docs/upgrade-script-retirement.md}.
+///         reused when — and only when — the version does not declare it changed and it already
+///         runs the code this prepare would deploy. See "reduce preparation for small changes" in
+///         {docs/upgrade-script-retirement.md}.
 contract ReleaseMemberReuseTest is Test {
     ReleaseMemberReuseHarness internal harness;
 
@@ -94,6 +95,18 @@ contract ReleaseMemberReuseTest is Test {
         DeclaredMemberHarness declaring = new DeclaredMemberHarness();
         address live = _deployFromArtifact("Getters.sol", "GettersFacet", "");
         declaring.requireDeclaredReleaseMemberChange("ExecutorFacet", live);
+    }
+
+    /// @dev A declared member is redeployed even when it runs the code this prepare would deploy: a
+    ///      constructor-only change does not show in the runtime codehash, so the declaration decides.
+    ///      The members the version does not declare are still reused.
+    function test_redeploysADeclaredMemberRunningUnchangedCode() public {
+        DeclaredMemberHarness declaring = new DeclaredMemberHarness();
+        address liveExecutor = _deployFromArtifact("Executor.sol", "ExecutorFacet", "");
+        assertTrue(harness.canReuseReleaseMember("ExecutorFacet", liveExecutor), "the code is identical");
+        assertFalse(declaring.canReuseReleaseMember("ExecutorFacet", liveExecutor), "but it is declared changed");
+        address liveGetters = _deployFromArtifact("Getters.sol", "GettersFacet", "");
+        assertTrue(declaring.canReuseReleaseMember("GettersFacet", liveGetters), "an undeclared member is reused");
     }
 
     /// @dev Declaring one member does not license another.
