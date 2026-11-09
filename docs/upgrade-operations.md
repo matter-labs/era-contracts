@@ -51,10 +51,11 @@ only the ServerNotifier has an admin of its own. The prepare refuses such a CTM
 (`CTMDomainProxies.requireSplit`) and `verify-bootstrap` reports it.
 
 Era CTMs are not bootstrapped and Era chains do not take the registry releases, so they are not
-split: an Era CTM behind the ecosystem admin stays there and passes to the core executor with it.
+split. One can still share the Bridgehub: on testnet, the Era CTM `0x3Cc8…` (chain 301) sits behind
+the same ecosystem admin as the ZKsync OS CTM `0x54D5…`, and passes to the core executor with it.
 The prepares' ownership precondition (`AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance`)
-leaves such a CTM's admin with the executor, and any change to its proxies goes through
-`CoreUpgradeExecutor.forward`.
+walks every CTM on the Bridgehub; it leaves such a CTM's admin with the executor instead of handing
+it back to governance, and any change to its proxies goes through `CoreUpgradeExecutor.forward`.
 
 So, BEFORE the ecosystem's v35 bootstrap, once per ZKsync OS CTM that shares the ecosystem admin:
 
