@@ -17,8 +17,9 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
 ## Layout
 
 - `default-upgrade/` — the version-independent prepare pipeline. `DefaultCoreUpgrade` (ecosystem
-  side) deploys or reuses each L1 ecosystem implementation against the live one by code identity
-  and pins the replacements in a Core-domain `ProxyUpgradeTransition`.
+  side) deploys each L1 ecosystem implementation the version declares changed, reuses the rest
+  (each must already run the code the current sources produce) and pins the replacements in a
+  Core-domain `ProxyUpgradeTransition`.
   `DefaultCTMUpgrade` (per-CTM side) deploys the release members the version changes, the
   `CTMTransition` and, when a CTM-domain implementation changes, a CTM-domain
   `ProxyUpgradeTransition`, each independently. Neither emits the executor calls — each is a
@@ -56,27 +57,30 @@ cargo run -p protocol_ops -- ecosystem upgrade-prepare-all \
 On one anvil fork of L1, in this order:
 
 1. `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernance` — the ownership precondition.
-2. The core prepare (`noGovernancePrepare`): each ecosystem implementation reused when it already
-   runs the code the current sources produce and redeployed only when the version declares it
-   changed, then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
-   implementation). Output `[registry]`: `core_transition_addr` (zero when none) and
+2. The core prepare (`noGovernancePrepare`): each ecosystem implementation the version declares
+   changed is redeployed, and every other one reused when it already runs the code the current
+   sources produce (refused otherwise), then the Core-domain `ProxyUpgradeTransition` (none when the run deployed no ecosystem
+   implementation), pinning the `DefaultProxyUpgradeEngine` it deploys (`deployProxyUpgradeEngine()`
+   is the override point for a release engine with follow-up calls). Output `[registry]`:
+   `core_transition_addr` (zero when none) and
    `core_upgrade_executor_addr` — the executor read from the live ecosystem `ProxyAdmin`'s owner.
-3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member is
-   reused when it already runs the code the current sources produce and redeployed only when the
-   version names it in `changedReleaseMembers()`; the release itself is new on every version bump
+3. Each ZKsync OS CTM prepare, in input order (Era CTMs are skipped): every release member the
+   version names in `changedReleaseMembers()` is redeployed, and every other one reused when it
+   already runs the code the current sources produce (refused otherwise); the release itself is new on every version bump
    and reused only by an infrastructure-only edge. Then the transition (validated) unless the
    version declares an infrastructure-only edge, the CTM-domain `ProxyUpgradeTransition` when a
    CTM-domain implementation changed. The prepare refuses an upgrade with no core transition, no
    CTM-domain object and no transition. The CTM executor is read on-chain (the CTM's owner, bound
    to it). Output `[registry]`: `ctm_transition_addr`, `ctm_infrastructure_transition_addr` (each
    zero when none), `ctm_release_addr` and `ctm_upgrade_executor_addr` (nonzero whenever one of
-   those objects exists).
+   those objects exists). As on the core side, the CTM-domain transition pins the engine.
 4. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
    PUH/Guardians redeploy (`zk_governance.rs`). `yarn new-release` drops the key, so a release declares it
-   only on purpose.
+   only on purpose. The deployer plan check refuses such a release until it learns the redeploy's salt
+   and artifacts ([Deployer signing](../../../docs/upgrade-operations.md#deployer-signing)).
 5. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
-   governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring and CTM
-   `acceptOwnership` normalization) → the core prepare's declared calls → the executor legs,
+   governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring when the
+   release redeploys the governance set) → the core prepare's declared calls → the executor legs,
    derived from the `[registry]` objects and executors the prepares reported, one contiguous run in
    canonical order (`applyL1Upgrade(core_transition_addr)`,
    `applyInfrastructureUpgrade(ctm_infrastructure_transition_addr)`,
@@ -147,6 +151,23 @@ after Glamsterdam single deploys exceed it on their own (their state gas is outs
 cargo run -p protocol_ops -- ecosystem upgrade-broadcast --manifest <out>/manifest.json --l1-rpc-url <rpc> --key 0x<addr>=0x<key>
 ```
 
+`upgrade-broadcast` checks nothing it signs: run the deployer plan check first
+([what it admits](../../../docs/upgrade-operations.md#deployer-signing)). For a deploy bundle, sign
+with `replay-bundle` instead, which refuses a checkout other than the bundle's clean
+`contracts_commit`, then runs the check, then broadcasts:
+
+```sh
+cargo run -p protocol_ops -- ecosystem replay-bundle --bundle <bundle> --rpc <rpc> --key 0x<key>
+```
+
+For a prepare output that is not packed into a bundle, run the check against the env's reviewed
+inputs before the `upgrade-broadcast` above:
+
+```sh
+cargo run -p protocol_ops -- ecosystem check-deployer-plan --manifest <out>/manifest.json \
+  --ecosystem-toml <env-out>/ecosystem.toml --deployer 0x<addr> --env <env> --l1-rpc-url <rpc>
+```
+
 ## 6. Governance
 
 **Before the v36 proposal executes, every chain on the CTM must be at v35 or later**: past it, a
@@ -195,7 +216,8 @@ Gotchas:
 
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the
-  handler names when the calldata is emitted.
+  handler names when the calldata is emitted. The deployer plan check refuses such a release for
+  now (step 5).
 
 Companions:
 
@@ -234,10 +256,38 @@ after v35, the restriction's default admin sets it for the new one
 (`setRequiredRoleForCall(chainAddress, 0x03129ad9, role)`); until then only the default admin can
 send the crossing.
 
-Server and monitoring consumers must read the final transaction through
-`transition.l2UpgradeTx(bridgehub, chainId)`. This view uses the same chain-context composition as execution; there is no
-`getL2UpgradeTxData(bridgehub, chainId, zksyncOS, data)`, so its external consumers must be updated
-and verified before rollout.
+**Node pre-flight.** A node follows a registry-driven edge as
+[Node integration](../../../protocol-docs/node-upgrade-integration.md) requires; a zksync-os-server
+release without it stops on the chain's first `UpgradeTimestampUpdated` of such an edge. Before any
+`chain set-upgrade-timestamp` of such an edge, confirm that every node of every chain that will
+cross runs a server release that meets that page, and schedule a chain only once all of its nodes
+do. Server and monitoring consumers read the final transaction through
+`transition.l2UpgradeTx(bridgehub, chainId)`, which uses the same chain-context composition as
+execution; there is no `getL2UpgradeTxData(bridgehub, chainId, zksyncOS, data)`, so its external
+consumers must be updated and verified before rollout.
+
+**After a transition replacement.** `replaceUpgradeTransition` changes what a chain departing that
+version crosses
+([replacing a committed transition](../../../protocol-docs/ecosystem-upgrade-coordination.md#replacing-a-committed-transition)).
+Before it executes, check that no chain still on that version has a schedule
+(`ServerNotifier.protocolVersionToUpgradeTimestamp(chainId, oldVersion)`) that has already passed:
+its nodes may have executed the replaced edge's L2 transaction, which is not the one its crossing
+would record. After it executes, the admin of every chain that had scheduled that departure re-runs
+`chain set-upgrade-timestamp`; nodes resolve the edge at execution
+([requirement 4](../../../protocol-docs/node-upgrade-integration.md#requirements)).
+
+**DA during a crossing.** `chain upgrade` leaves the chain's DA setup as it is unless
+`--da-mode <mode> --l1-da-validator <address>` names the one it moves to, set in the same multicall;
+`--l2-da-commitment-scheme` overrides the scheme the mode derives and is refused without
+`--da-mode`. The bundle sets the pubdata content only when the mode changes it, so a permanent rollup
+can move its pair in the same multicall. From v33 on, `chain upgrade` refuses to prepare a crossing
+after which the chain (with what the bundle sets, and its live DA pair and `getPubdataContent()` for
+the rest) commits full pubdata and delivers nothing, which does not prove; commits full pubdata
+through an L1 DA validator that does not check its delivery; commits the log region and delivers
+nothing L1 checks, unless `--acknowledge-unrecommended-noda` is passed; or commits full pubdata
+while priced as a validium. A blobs or calldata scheme is checked only through a pair the chain's
+`RollupDAManager` allows; `pubdata-keccak256` takes any external DA validator on trust, but not a
+rollup one or the no-DA validator the chain runs today.
 
 ## Preparing the scripts for a new upgrade
 
@@ -250,7 +300,9 @@ lists what it changes and what it leaves to you.
 
 Start from the current release's `v<minor>/`: inherit the `Default*Upgrade` bases, override
 `deployNew*Contracts` with the contracts the release changes, name every release member you replace
-in `changedReleaseMembers()`, and keep everything else derived.
+in `changedReleaseMembers()`, and keep everything else derived. Declare every contract the release
+changes, even when only its constructor changed: the build has no CBOR metadata, so such a change keeps
+the runtime code, and only the declaration makes the prepare redeploy it.
 
 **Declare what the upgrade is.** `DefaultCTMUpgrade.upgradeKind()` returns `ChainRelease` by
 default — the edge deploys the upgrade engine and a `CTMTransition`, and the protocol version
@@ -289,11 +341,8 @@ genesis generator, so that upgraded and freshly created chains match
   refuse (an upgrade that changes nothing, either version/kind contradiction, an orphaned
   deployment on either domain).
 
-  These and the other Foundry suites that load the previous release's states run with
-  `yarn test:foundry:previous-release`, built like those states (`FOUNDRY_PROFILE=anvil-interop`,
-  no CBOR metadata), since a prepare decides reuse by comparing code; `yarn test:foundry` leaves
-  them out. So they hold a release to declaring every contract whose code it changes, not the
-  contracts that differ in metadata alone.
+  The states, like the build, carry no CBOR metadata, and a prepare decides reuse by comparing
+  code, so these hold a release to declaring every contract whose code it changes.
 
 - `test/anvil-interop/run-upgrade-test.ts` — the release's edge driven end to end by protocol-ops
   against the frozen departing-version chain states, then a same-minor patch on the same

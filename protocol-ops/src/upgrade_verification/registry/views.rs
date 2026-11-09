@@ -66,7 +66,7 @@ sol! {
     struct TransitionManifest {
         address fromRelease;
         address newRelease;
-        address upgradeEngine;
+        address chainUpgradeEngine;
         uint256 oldProtocolVersionDeadline;
         uint256 upgradeTimestamp;
         AuthoredL2Plan l2Plan;
@@ -113,11 +113,16 @@ sol! {
     /// constructor argument of a `ProxyUpgradeTransition`, which is what its address commits to.
     /// `domain` is the `ProxyUpgradeDomain` enum as its underlying `uint8`
     /// ([`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CORE`] /
-    /// [`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CTM`]).
+    /// [`crate::upgrade_verification::constants::PROXY_UPGRADE_DOMAIN_CTM`]). `proxyUpgradeEngine` is
+    /// the `IProxyUpgradeEngine` the domain's executor delegatecalls to apply the rows (and any
+    /// follow-up calls a release engine adds), held to its role by
+    /// [`super::members::verify_proxy_upgrade_engine`]. Field ORDER is the Solidity struct's: the
+    /// decode and the construction re-derivation are positional.
     #[derive(Debug)]
     struct ProxyUpgradeTransitionManifest {
         uint8 domain;
         ProxyUpgradeRow[] proxyUpgrades;
+        address proxyUpgradeEngine;
     }
 
     /// One domain's write-once proxy inventory: the core leg's (`Core`) or the CTM
@@ -128,13 +133,16 @@ sol! {
         function getManifest() external view returns (ProxyUpgradeTransitionManifest memory);
         function domain() external view returns (uint8);
         function rows() external view returns (ProxyUpgradeRow[] memory);
+        function proxyUpgradeEngine() external view returns (address);
     }
 
-    /// The live owner and outstanding nomination of an `Ownable2Step` lifecycle object.
+    /// The live owner and outstanding nomination of an `Ownable2Step` contract, and the call
+    /// through which the nominee takes it.
     #[sol(rpc)]
     contract Ownable2StepView {
         function owner() external view returns (address);
         function pendingOwner() external view returns (address);
+        function acceptOwnership() external;
     }
 
     /// Positional mirror of `RegistryTypes.GenesisFacet`.
@@ -214,21 +222,21 @@ sol! {
     }
 
     /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read
-    /// `L2PlanLib.requirePublished` performs when the CTM commits a transition, so a zero here is
-    /// the readiness failure that would revert it.
-    /// The event carries the published code.
+    /// `L2PlanLib.requirePublished` performs when the CTM commits a transition, so a zero here is the
+    /// readiness failure that would revert it.
     #[sol(rpc)]
     contract BytecodesSupplierView {
-        event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
         function evmPublishingBlock(bytes32 bytecodeHash) external view returns (uint256);
     }
 
-    /// The chain registry a CTM's chains are enumerated from, the live values a release's force
-    /// deployments are held against, the ecosystem proxies an inventory's
-    /// slots must name, and the owner a CTM also takes its chain freezes from.
+    /// The chain registry a CTM's chains are enumerated from, the CTM registry every CTM a package
+    /// drives must be in, the live values a release's force deployments are held against, the
+    /// ecosystem proxies an inventory's slots must name, and the owner a CTM also takes its chain
+    /// freezes from.
     #[sol(rpc)]
     contract BridgehubView {
         function owner() external view returns (address);
+        function chainTypeManagerIsRegistered(address _chainTypeManager) external view returns (bool);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
         function chainTypeManager(uint256 _chainId) external view returns (address);
         function assetRouter() external view returns (address);

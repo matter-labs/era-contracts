@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {ChainTypeManagerTest} from "../../state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
@@ -62,6 +63,9 @@ import {
 ///         See {protocol-docs/ecosystem-upgrade-coordination.md}.
 /// @dev Every fixture transition departs from the fixture's current release toward `release`.
 abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPostState {
+    /// @dev The engine every transition fixture pins: the rows and nothing else.
+    DefaultProxyUpgradeEngine internal proxyUpgradeEngine = new DefaultProxyUpgradeEngine();
+
     CTMUpgradeExecutor internal ctmExecutor;
     ProxyAdmin internal ctmProxyAdmin;
     CoreUpgradeExecutor internal coreExecutor;
@@ -75,7 +79,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
 
     uint256 internal newVersion;
     address internal chainAddress;
-    address internal upgradeEngineAddr;
+    address internal chainUpgradeEngineAddr;
 
     /// @dev Dummy EVM bytecode of the L2 upgrade delegate every fixture transition carries as its
     ///      one Unsafe extra (see {L2PlanFixtures}); published on the fixture supplier in `setUp`.
@@ -98,6 +102,10 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         ctmExecutor = new CTMUpgradeExecutor(governor, IChainTypeManager(address(chainContractAddress)), ctmProxyAdmin);
         ctmProxyAdmin.transferOwnership(address(ctmExecutor));
 
+        // The CTM domain holds a real ServerNotifier too.
+        _handARealServerNotifierTo(chainContractAddress, ctmExecutor, address(ctmProxyAdmin));
+        _assertNotifierHeldBy(IChainTypeManager(address(chainContractAddress)), address(ctmExecutor));
+
         // Handover through the fixed entrypoint — no escape hatch involved.
         vm.prank(governor);
         chainContractAddress.transferOwnership(address(ctmExecutor));
@@ -106,10 +114,10 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         assertEq(chainContractAddress.owner(), address(ctmExecutor));
 
         newVersion = SemVer.packSemVer(0, 1, 0);
-        // The pinned upgradeEngine stand-in must carry real code — a transition's `validate()`
+        // The pinned chainUpgradeEngine stand-in must carry real code — a transition's `validate()`
         // rejects codeless members — so etch it.
-        upgradeEngineAddr = makeAddr("upgradeEngine");
-        vm.etch(upgradeEngineAddr, hex"600043");
+        chainUpgradeEngineAddr = makeAddr("chainUpgradeEngine");
+        vm.etch(chainUpgradeEngineAddr, hex"600043");
         delegateComposer = new FixedDelegateCalldataComposer(DELEGATE_CALLDATA);
         // Transitions depart from the CTM's release, so the fixture CTM was initialized on a real
         // one ({_fixtureGenesisRelease}) rather than the suite's mocked stand-in.
@@ -203,7 +211,7 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
                 // genesis'd with (its current release), as the executor's release-edge pin requires.
                 fromRelease: _fromRelease,
                 newRelease: address(release),
-                upgradeEngine: upgradeEngineAddr,
+                chainUpgradeEngine: chainUpgradeEngineAddr,
                 oldProtocolVersionDeadline: 1000,
                 upgradeTimestamp: _upgradeTimestamp,
                 l2Plan: L2PlanFixtures.delegatePlan(_delegateCode, address(delegateComposer))
@@ -237,7 +245,11 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         inventory[uint256(L1EcosystemContract.L1Bridgehub)] = _inventoryRow;
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.Core, proxyUpgrades: inventory})
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.Core,
+                    proxyUpgrades: inventory,
+                    proxyUpgradeEngine: address(proxyUpgradeEngine)
+                })
             );
     }
 
@@ -249,7 +261,11 @@ abstract contract CTMUpgradeExecutorFixture is ChainTypeManagerTest, RegistryPos
         inventory[uint256(CTMContract.ValidatorTimelock)] = _inventoryRow;
         return
             new ProxyUpgradeTransition(
-                ProxyUpgradeTransitionManifest({domain: ProxyUpgradeDomain.CTM, proxyUpgrades: inventory})
+                ProxyUpgradeTransitionManifest({
+                    domain: ProxyUpgradeDomain.CTM,
+                    proxyUpgrades: inventory,
+                    proxyUpgradeEngine: address(proxyUpgradeEngine)
+                })
             );
     }
 

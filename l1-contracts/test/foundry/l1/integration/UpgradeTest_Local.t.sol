@@ -250,9 +250,10 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
         if (newGenesisEngine != oldGenesisEngine) {
             _recordedMember(ctmOutput, ctmSalt, newGenesisEngine);
         }
-        _recordedMember(ctmOutput, ctmSalt, transition.upgradeEngine());
+        _recordedMember(ctmOutput, ctmSalt, transition.chainUpgradeEngine());
 
         if (address(coreUpgrade.coreTransition()) != address(0)) {
+            _recordedMember(coreOutput, coreSalt, coreUpgrade.coreTransition().proxyUpgradeEngine());
             ProxyUpgradeRow[] memory rows = coreUpgrade.coreTransition().rows();
             for (uint256 i = 0; i < rows.length; ++i) {
                 _recordedMember(coreOutput, coreSalt, rows[i].implNew);
@@ -304,7 +305,11 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
         assertEq(transition.fromRelease(), releaseBeforeUpgrade, "the edge departs from the previous release");
         assertEq(transition.newRelease(), release, "the CTM serves the release the transition pins");
         assertEq(release, ctmUpgrade.getAddresses().stateTransition.currentRelease, "release must be the pipeline's");
-        assertEq(transition.upgradeEngine(), ctmUpgrade.committedUpgradeEngine(), "the engine the prepare reports");
+        assertEq(
+            transition.chainUpgradeEngine(),
+            ctmUpgrade.committedChainUpgradeEngine(),
+            "the engine the prepare reports"
+        );
 
         // Authority stays in the registry model: governance owns the executor, which stays bound to the CTM.
         address executor = IOwnable(ctm).owner();
@@ -422,9 +427,9 @@ struct ContractHash {
 
 /// @notice Every ecosystem implementation and release member whose production build differs from the previous
 ///         release's is one the release declares as changed. The production prepare compares live code with that
-///         build, CBOR metadata included, and refuses to replace what the release does not declare. The suites above
-///         build without metadata, so only `AllContractsHashes.json` (built with it, and frozen next to the previous
-///         release's chain states by `yarn new-release`) shows such a change.
+///         build and refuses to replace what the release does not declare; this holds every such contract to it at
+///         once, from the previous release's `AllContractsHashes.json` (frozen next to its chain states by
+///         `yarn new-release`).
 contract ReleaseDeclaredChangesTest is Test {
     using stdJson for string;
 

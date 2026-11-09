@@ -232,11 +232,6 @@ pub async fn deploy_puh_guardians(
     let script = runner
         .script_path_from_root(&zk_gov_dir, script_rel)
         .with_broadcast()
-        // The zk-governance foundry.toml has [profile.default|ci|lite] but no
-        // `anvil-interop` profile. If our parent harness exported
-        // FOUNDRY_PROFILE=anvil-interop (era-contracts side), forge would
-        // refuse to load the zk-governance side. Pin to default.
-        .with_env("FOUNDRY_PROFILE", "default")
         .with_env("PREV_PROTOCOL_UPGRADE_HANDLER", format!("{:#x}", puh_proxy))
         .with_env("CHAIN_ASSET_HANDLER", format!("{:#x}", chain_asset_handler))
         .with_env(

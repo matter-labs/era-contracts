@@ -59,9 +59,8 @@ With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment i
 missing inputs fail before deployment.
 
 The merged package `<env-out>/ecosystem.toml` carries ONE governance bundle, `[governance_calls] calls`, in this
-order: the merge's own extras (the PUH/Guardians wiring when the release redeploys the governance set, then any CTM
-`acceptOwnership()` normalization), the core prepare's declared calls, the derived executor legs, then the CTM
-prepare's declared calls. The legs are one contiguous run in canonical order, each present only when its prepare
+order: the merge's own extras (the PUH/Guardians wiring when the release redeploys the governance set), the core
+prepare's declared calls, the derived executor legs, then the CTM prepare's declared calls. The legs are one contiguous run in canonical order, each present only when its prepare
 reported the object (`[registry]` of the core and CTM prepare outputs), all with no value:
 
 1. `CoreUpgradeExecutor.applyL1Upgrade(core_transition_addr)` on `core_upgrade_executor_addr`;
@@ -78,9 +77,11 @@ nothing, and a leg whose executor is missing or zero. `ecosystem upgrade-governa
 registry package must leave behind, part of which the contracts check themselves: the CTM at the
 target version and release with the transition committed for its departure (the release at the CTM's version),
 every row's proxy at its `implNew`, the CTM, its ProxyAdmin and its ServerNotifier owned by the CTM executor with
-no nomination and the notifier bound to the CTM, the ecosystem ProxyAdmin owned by the core executor, and every
-executor owned by governance with no nomination (for a replacement, the CTM committing the replacement). Any unmet
-expectation fails the command.
+no nomination and the notifier bound to the CTM, the CTM's ValidatorTimelock owned by governance with no nomination,
+the ecosystem ProxyAdmin owned by the core executor, every core row in the slot whose proxy the Bridgehub the replay
+resolved names, and every executor owned by governance with no nomination (for a replacement, the CTM committing the
+replacement, and a deadline the `forward` sets — or clears with timestamp 0, falling back to the committed
+transition's pin — in force). Any unmet expectation fails the command.
 
 A fresh ecosystem (`ecosystem init`, or `hub init` + `ctm init`) is born into the registry model: the
 deployer creates the core executor and the CTM executor, hands them the ProxyAdmins, the CTM and the
@@ -128,7 +129,8 @@ replays it like any other. Verify it with `verify-package` before it is signed (
 `<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`
 and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
 `[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
-reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set). The old
+reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set; the deployer
+plan check refuses such a release for now, see [Deployer signing](../docs/upgrade-operations.md#deployer-signing)). The old
 protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (see
 [Preparing an upgrade](#preparing-an-upgrade)) unless `--upgrade-env-dir` selects another (on the commands built on the
 shared `--env` topology args; `ecosystem init` / `ctm init` always use the current release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
@@ -198,14 +200,14 @@ held against the reviewed genesis: `genesisBatchHash` against the `genesis_root`
 `configs/genesis/zksync-os/latest.json`, `genesisIndexRepeatedStorageChanges` against zero, and
 `fixedForceDeploymentsData` against the package's `force_deployments_data` — and decoded, with every
 field held against an independent expectation: `l1ChainId` against the RPC's chain id,
-`l1AssetRouter`, `maxNumberOfZKChains` and the aliased chain registration sender against the CTM's
-live Bridgehub, `aliasedL1Governance` against the alias of the reviewed governance, `zkTokenAssetId`
+`l1AssetRouter`, `maxNumberOfZKChains` and the aliased chain registration sender against the
+reviewed Bridgehub (below), `aliasedL1Governance` against the alias of the reviewed governance, `zkTokenAssetId`
 against the `zk_token_asset_id` of `upgrade-envs/permanent-values/<env>.toml` for the `--env` the
 package is held against (required unless the package is a replacement), the legacy and test-only
 addresses against zero, and each bytecode field against the release's own L2 bytecode table. The
-arriving release's system-proxy shell is compared with the departing one's, compiler metadata
-stripped: a logic change fails unless the edge ships a delegate the reviewed commit builds other
-than the stock `L2DefaultUpgrade`, which is then reported for the reviewer to confirm. The
+arriving release's system-proxy shell is compared with the departing one's: a logic change fails
+unless the edge ships a delegate the reviewed commit builds other than the stock
+`L2DefaultUpgrade`, which is then reported for the reviewer to confirm. The
 release's own `validate()` is called as well: it reads no state, and it runs on chain when a
 transition is built over the release and when the CTM installs the release, so a revert — a codeless `diamondInit`, `genesisUpgrade`, verifier or facet
 (`RegistryTargetHasNoCode`), a facet with no selectors (`RegistryEmptySelectors`), a selector two
@@ -217,14 +219,15 @@ is compared with the reviewed artifact of each contract its role admits, byte fo
 artifact's immutable slots (`immutableReferences`) — which proves the code, not the values its
 constructor wrote into those slots (see the construction records below):
 
-| Member                                       | Must run                                                                                                                                                                                                                                                                     |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| a release's genesis facets                   | `AdminFacet`, `GettersFacet`, `MailboxFacet`, `ExecutorFacet`, `MigratorFacet` or `CommitterFacet`                                                                                                                                                                           |
-| a release's `diamondInit` / `genesisUpgrade` | `DiamondInit` / `L1GenesisUpgrade`                                                                                                                                                                                                                                           |
-| a release's `verifier`                       | `MultiProofTestnetVerifier`, `MultiProofVerifier`, `ZKsyncOSTestnetVerifier` or `ZKsyncOSVerifier`, and each sub-verifier it names through `INNER_VERIFIER` / `AIRBENDER_VERIFIER` / `ZISK_RANGE_VERIFIER` / `PLONK_VERIFIER` the reviewed contract of its place in the tree |
-| a transition's `upgradeEngine`               | `DefaultUpgrade`                                                                                                                                                                                                                                                             |
-| an L2 plan's `delegateComposer`              | `L2DefaultDelegateCalldataComposer`                                                                                                                                                                                                                                          |
-| each proxy row's `implNew`                   | the contract of the row's slot (`MultisigCommitter` or `ValidatorTimelock` for the timelock)                                                                                                                                                                                 |
+| Member                                            | Must run                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a release's genesis facets                        | `AdminFacet`, `GettersFacet`, `MailboxFacet`, `ExecutorFacet`, `MigratorFacet` or `CommitterFacet`                                                                                                                                                                           |
+| a release's `diamondInit` / `genesisUpgrade`      | `DiamondInit` / `L1GenesisUpgrade`                                                                                                                                                                                                                                           |
+| a release's `verifier`                            | `MultiProofTestnetVerifier`, `MultiProofVerifier`, `ZKsyncOSTestnetVerifier` or `ZKsyncOSVerifier`, and each sub-verifier it names through `INNER_VERIFIER` / `AIRBENDER_VERIFIER` / `ZISK_RANGE_VERIFIER` / `PLONK_VERIFIER` the reviewed contract of its place in the tree |
+| a transition's `chainUpgradeEngine`               | `DefaultUpgrade`                                                                                                                                                                                                                                                             |
+| a proxy upgrade transition's `proxyUpgradeEngine` | `DefaultProxyUpgradeEngine`                                                                                                                                                                                                                                                  |
+| an L2 plan's `delegateComposer`                   | `L2DefaultDelegateCalldataComposer`                                                                                                                                                                                                                                          |
+| each proxy row's `implNew`                        | the contract of the row's slot (`MultisigCommitter` or `ValidatorTimelock` for the timelock)                                                                                                                                                                                 |
 
 A release may carry over the verifier already in force where it departs from — the departing
 release's — even when
@@ -270,8 +273,7 @@ no check consulted are listed for information.
 
 **Every proxy row names the proxy of its slot.** Row `i` of a Core-domain inventory is
 `L1EcosystemContract` member `i`, of a CTM-domain one `CTMContract` member `i`,
-and that member's proxy is discovered on chain: the Bridgehub (from the CTM's `BRIDGE_HUB()`, or the
-core prepare's `bridgehub_proxy_addr` for a core-only package naming no CTM) and its `assetRouter()`, the router's `L1_NULLIFIER()` and
+and that member's proxy is discovered on chain: the reviewed Bridgehub (below) and its `assetRouter()`, the router's `L1_NULLIFIER()` and
 `nativeTokenVault()`, the Bridgehub's `messageRoot()`, `l1CtmDeployer()`, `chainAssetHandler()` and
 `chainRegistrationSender()`, the nullifier's `l1InteropHandler()`; the CTM itself and its
 `validatorTimelockPostV29()`, `L1_BYTECODES_SUPPLIER()`, `PERMISSIONLESS_VALIDATOR()` and
@@ -289,14 +291,21 @@ the package reports for that slot (`[ctms.*.state_transition]`) once it is shown
 reviewed `TransparentUpgradeableProxy`, with the CTM-domain ProxyAdmin in its EIP-1967 admin slot
 and an implementation in its EIP-1967 implementation slot that runs the slot's reviewed contract —
 a singleton the upgrade introduces, such as an `L1InteropFeeManager`. Such a proxy's
-`initialize` calldata is not reviewed. `BRIDGE_HUB` has no fallback. A zero value, or one nothing
-establishes, fails the run; `PERMISSIONLESS_VALIDATOR` is written into every new chain once. The
+`initialize` calldata is not reviewed. `BRIDGE_HUB` falls back to the reviewed Bridgehub. A zero value, or one
+nothing establishes, fails the run; `PERMISSIONLESS_VALIDATOR` is written into every new chain once. The
 implementation's construction record is held against the same values (its `_bridgehub` against the
 reviewed Bridgehub), as an independent second check, and so is the record of the implementation
 behind a reported proxy.
 
-`--expected-bridgehub <address>` replaces the env's `bridgehub_proxy_addr` as the Bridgehub the
-members' arguments are held against. It exists for harnesses whose scratch L1 the env file does not
+**Every package kind is verified against one reviewed Bridgehub**: the env's `bridgehub_proxy_addr`,
+or `--expected-bridgehub <address>` — which wins over a different env value with a warning; a run
+with neither, or a zero one, is refused. It is the only ecosystem root: every ecosystem slot, the
+genesis expectations, the members' Bridgehub arguments and the CTM's chains the v35 gate reads are
+discovered through it, and what the package names is held against it,
+never used as one. The package's `bridgehub_proxy_addr` must be it; every CTM the package drives
+must be registered on it (`chainTypeManagerIsRegistered`) and answer it as its `BRIDGE_HUB()`; the
+core executor's `PROXY_ADMIN` must be its EIP-1967 admin and the CTM executor's `CTM_PROXY_ADMIN` the
+CTM proxy's. `--expected-bridgehub` exists for harnesses whose scratch L1 the env file does not
 describe (the anvil upgrade runner passes the fixture's); a package that will be signed is reviewed
 with the env's.
 
@@ -322,16 +331,22 @@ judged on this path; the replacement's own engine, composer and L2 bytecodes are
 from the reviewed executor and object and requiring the run — core, then CTM infrastructure, then
 CTM transition, each only when present — to appear exactly once, contiguous and in that order; a
 swapped order or another call between two legs fails the run. The legs' internal calls are
-deliberately not re-derived — the executors derive them on chain from the same pinned objects. Every
-other call must be a declared governance external action, matched one for one and in declared order,
-with every declaration present, and none may reach the upgrade's authorities (the executors, the
-objects, the CTM, either ProxyAdmin) whether declared or not. A replacement's bundle must carry the one `forward`,
-sent to the executor that owns the CTM, and nothing else may reach the CTM or its executor.
+deliberately not re-derived — the executors derive them on chain from the same pinned objects. No
+other call may reach the upgrade's authorities (the executors, the objects, the CTM, either
+ProxyAdmin) whether declared or not. A replacement's bundle must carry the one `forward`, sent to
+the executor that owns the CTM, and nothing else may reach the CTM or its executor. For every
+package kind the calls other than the executor legs ARE the package's governance-phase
+declarations — one for one, in declared order, every declaration present; a replacement's
+`forward` is declared like any other call, and a declared call the authority rule refuses is
+reported twice (the call, and the declaration it then leaves uncarried).
 
 Around those it checks what the objects cannot answer for themselves: authority bound where the
 review says (governance owning each executor with no nomination outstanding, the CTM executor bound
 to the reviewed CTM and CTM-domain ProxyAdmin, the core executor to the ecosystem ProxyAdmin, no
-binding zero, and each domain still held by its executor), the
+binding zero, each domain still held by its executor, and the CTM's ValidatorTimelock owned by
+governance with no nomination — or nominating governance, with the bundle carrying governance's
+declared `acceptOwnership()` on it; held by the owner of a legacy `Governance.sol` governance, a
+warning), the
 live state the upgrade departs from, and readiness — the L2 factory dependencies published on the
 CTM's supplier, which the CTM's commit requires. Readiness is reported apart from anything about
 value.

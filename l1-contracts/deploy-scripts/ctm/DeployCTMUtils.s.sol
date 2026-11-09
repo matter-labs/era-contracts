@@ -93,8 +93,9 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
     GenesisFacet[] internal releaseFacets;
 
     /// @notice Deploys the release's L1 members and pins them in a `CTMRelease`. Each member that
-    ///         the live release already runs byte-identical code for is REUSED rather than
-    ///         redeployed (see {_canReuseReleaseMember}), so an upgrade deploys what it changes.
+    ///         the live release already runs byte-identical code for, and that the version does not
+    ///         declare changed, is REUSED rather than redeployed (see {_canReuseReleaseMember}), so
+    ///         an upgrade deploys what it changes.
     //slither-disable-next-line reentrancy-benign
     function deployStateTransitionDiamondFacets() internal {
         Facets storage facets = ctmAddresses.stateTransition.facets;
@@ -396,6 +397,8 @@ abstract contract DeployCTMUtils is DeployUtils, BytecodeInfoCache {
         } else if (compareStrings(contractName, "MultiProofTestnetVerifier")) {
             return abi.encode(ctmAddresses.multiProof.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "DefaultProxyUpgradeEngine")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();

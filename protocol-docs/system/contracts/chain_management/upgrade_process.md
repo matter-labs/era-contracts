@@ -48,7 +48,7 @@ that served the v35 bootstrap edge was removed in v36, with the rest of that edg
    verifier and the new version.
 3. If the release changes L2 code or state, the engine records the canonical system-upgrade
    transaction, composed from the transition's L2 plan for this chain. It is consumed in the next
-   compatible batch.
+   compatible batch; how a node finds it is [Node integration](../../../node-upgrade-integration.md).
 4. The diamond records the new protocol version. Chains that remain on an expired version cannot
    continue normal batch processing until upgraded.
 

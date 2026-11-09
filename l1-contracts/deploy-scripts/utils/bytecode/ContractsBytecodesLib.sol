@@ -7,7 +7,7 @@ import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 /// @notice Library providing functions to read bytecodes of L2 contracts individually.
 ///         Handles special-case filename/contract-name mismatches (e.g. Admin.sol → AdminFacet).
 library ContractsBytecodesLib {
-    /// @notice Get L2 deployed bytecode for factory deps, from {BytecodeUtils.forgeOutDir}.
+    /// @notice Get L2 deployed bytecode for factory deps, from `out/`.
     function getL2DeployedBytecode(string memory _contractName) internal view returns (bytes memory) {
         string memory fileName = string.concat(_contractName, ".sol");
         return Utils.readDeployedBytecodeL1(fileName, _contractName);
@@ -20,7 +20,7 @@ library ContractsBytecodesLib {
     /// @return The bytecode of the contract.
     /// @dev Reverts if the contractIdentifier is unknown or unsupported.
 
-    /// @notice Reads L2 bytecode from {BytecodeUtils.forgeOutDir}.
+    /// @notice Reads L2 bytecode from `out/`.
     function getL2Bytecode(string memory contractIdentifier) internal view returns (bytes memory) {
         return getCreationCodeEVM(contractIdentifier);
     }
@@ -43,7 +43,7 @@ library ContractsBytecodesLib {
             return Utils.readBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
         }
 
-        // Default: standard naming
+        // Default: read from l1-contracts/out/ using standard naming
         return Utils.readBytecodeL1(string.concat(contractIdentifier, ".sol"), contractIdentifier);
     }
 }

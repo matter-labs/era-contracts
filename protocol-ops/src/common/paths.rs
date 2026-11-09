@@ -23,16 +23,6 @@ fn default_contracts_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// The output directory of `l1-contracts`' forge build under the profile in effect, relative to
-/// `l1-contracts`: the `anvil-interop` profile has its own (l1-contracts/foundry.toml).
-pub fn l1_contracts_forge_out() -> &'static str {
-    if std::env::var("FOUNDRY_PROFILE").as_deref() == Ok("anvil-interop") {
-        "out-anvil-interop"
-    } else {
-        "out"
-    }
-}
-
 pub fn path_to_foundry_scripts() -> PathBuf {
     path_from_root("l1-contracts")
 }

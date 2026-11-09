@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {DefaultProxyUpgradeEngine} from "contracts/upgrades/registry/engines/DefaultProxyUpgradeEngine.sol";
 import {Test, Vm} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -68,6 +69,9 @@ contract RowApplier {
 /// @dev Transitions are REAL, write-once `ProxyUpgradeTransition` instances rather than mutable test
 ///      doubles: the rows the executor applies are the rows a governance-reviewed object serves.
 contract CoreUpgradeExecutorTest is Test {
+    /// @dev The engine every transition fixture pins: the rows and nothing else.
+    DefaultProxyUpgradeEngine internal proxyUpgradeEngine = new DefaultProxyUpgradeEngine();
+
     bytes32 internal constant EIP1967_IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     address internal ecosystemGovernor = makeAddr("ecosystemGovernor");
@@ -123,6 +127,7 @@ contract CoreUpgradeExecutorTest is Test {
     function _deployRegistry(ProxyUpgradeRow[] memory _rows) internal returns (IProxyUpgradeTransition) {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.Core;
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](L1_ECOSYSTEM_CONTRACT_COUNT);
         if (_rows.length > 0) {
             manifest.proxyUpgrades[uint256(L1EcosystemContract.L1Bridgehub)] = _rows[0];
@@ -237,6 +242,7 @@ contract CoreUpgradeExecutorTest is Test {
     function test_revertWhen_applyL1UpgradeWithACTMDomainTransition() public {
         ProxyUpgradeTransitionManifest memory manifest;
         manifest.domain = ProxyUpgradeDomain.CTM;
+        manifest.proxyUpgradeEngine = address(proxyUpgradeEngine);
         manifest.proxyUpgrades = new ProxyUpgradeRow[](CTM_CONTRACT_COUNT);
         manifest.proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = _row(
             address(bridgehubProxy),

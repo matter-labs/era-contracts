@@ -1,11 +1,7 @@
 out
-out-registry-deterministic
-out-anvil-interop
 zkout
 lib
 cache-forge
-cache-forge-registry-deterministic
-cache-forge-anvil-interop
 broadcast
 # Plain-text RPC URL list (one per line) consumed by the anvil-interop harness.
 # Prettier tries to parse it as JSON because of the .json extension and chokes

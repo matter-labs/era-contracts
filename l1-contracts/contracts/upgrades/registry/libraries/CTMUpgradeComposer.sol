@@ -35,7 +35,7 @@ library CTMUpgradeComposer {
     function buildUpgradeCutData(ICTMTransition _transition) internal view returns (Diamond.DiamondCutData memory) {
         return
             _cutNamingObject(
-                _transition.upgradeEngine(),
+                _transition.chainUpgradeEngine(),
                 abi.encodeCall(IDefaultUpgrade.upgradeFromTransition, (address(_transition)))
             );
     }

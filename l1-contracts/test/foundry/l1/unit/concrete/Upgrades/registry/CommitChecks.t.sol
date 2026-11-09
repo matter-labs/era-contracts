@@ -66,8 +66,8 @@ contract CommitChecksTest is CTMUpgradeExecutorFixture {
     }
 
     function test_revertWhen_aCommitThroughForwardNamesACodelessEngine() public {
-        vm.etch(upgradeEngineAddr, "");
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeEngineAddr));
+        vm.etch(chainUpgradeEngineAddr, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, chainUpgradeEngineAddr));
         _commitThroughForward(transition);
         _assertNothingCommitted();
     }
@@ -117,12 +117,12 @@ contract CommitChecksTest is CTMUpgradeExecutorFixture {
             chainContractAddress.currentRelease(),
             L2_DELEGATE_CODE
         );
-        manifest.upgradeEngine = address(0);
+        manifest.chainUpgradeEngine = address(0);
         vm.expectRevert(ZeroAddress.selector);
         new CTMTransition(manifest);
 
-        vm.etch(upgradeEngineAddr, "");
-        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, upgradeEngineAddr));
+        vm.etch(chainUpgradeEngineAddr, "");
+        vm.expectRevert(abi.encodeWithSelector(RegistryTargetHasNoCode.selector, chainUpgradeEngineAddr));
         _execute(transition);
         _assertNothingCommitted();
     }

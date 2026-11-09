@@ -1,7 +1,7 @@
 //! Shared RPC fixture for the two shell-check call-site regressions. The transport is mocked to
 //! isolate wiring in the real upgrade/replacement verifiers, not to simulate a valid ecosystem:
 //! unrelated construction/genesis reads deliberately remain unverifiable in BOTH controls. Only
-//! the arriving shell's logic differs, so it must contribute exactly one additional error.
+//! the arriving shell's code differs, so it must contribute exactly one additional error.
 
 use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::sol_types::SolValue;
@@ -19,7 +19,6 @@ const CTM: Address = Address::repeat_byte(0xC7);
 pub(super) const CTM_EXECUTOR: Address = Address::repeat_byte(0xE7);
 const CTM_ADMIN: Address = Address::repeat_byte(0xA7);
 const SUPPLIER: Address = Address::repeat_byte(0x5B);
-const BRIDGEHUB: Address = Address::repeat_byte(0xB0);
 pub(super) const GOVERNANCE: Address = Address::repeat_byte(0x60);
 const OLD_VERSION: u64 = 35 << 32;
 const NEW_VERSION: u64 = 36 << 32;
@@ -34,21 +33,13 @@ pub(super) struct ShellPathFixture {
 
 impl ShellPathFixture {
     pub(super) fn new(change_logic: bool) -> Self {
-        let mut image = reviewed_genesis_image().expect("the reviewed genesis image must load");
+        let image = reviewed_genesis_image().expect("the reviewed genesis image must load");
         let departing = image.code[&L2_BRIDGEHUB_ADDR].clone();
         let mut arriving = departing.to_vec();
-        // The real SystemContractProxy's CBOR tail ends in an ipfs digest, solc version and
-        // length. Change a digest byte in BOTH controls: metadata alone must still pass.
-        let metadata_len =
-            u16::from_be_bytes(arriving[arriving.len() - 2..].try_into().unwrap()) as usize;
-        assert!(metadata_len > 20 && metadata_len + 2 < arriving.len());
-        let metadata_hash_byte = arriving.len() - 20;
-        arriving[metadata_hash_byte] ^= 1;
         if change_logic {
             arriving[0] ^= 1;
         }
         let arriving = Bytes::from(arriving);
-        image.code.insert(NEW_RELEASE, arriving.clone());
         Self {
             asserter: Asserter::new(),
             build: ReviewedBuild::from_parts(&[]),
@@ -87,7 +78,7 @@ impl ShellPathFixture {
             TransitionManifest {
                 fromRelease: FROM_RELEASE,
                 newRelease: NEW_RELEASE,
-                upgradeEngine: Address::ZERO,
+                chainUpgradeEngine: Address::ZERO,
                 oldProtocolVersionDeadline: U256::MAX,
                 upgradeTimestamp: U256::ZERO,
                 l2Plan: AuthoredL2Plan {
@@ -139,12 +130,12 @@ impl ShellPathFixture {
                 .abi_encode(),
             ));
         }
-        self.address(SUPPLIER); // Both bytecodes are available in the reviewed image.
     }
 
     /// The reads of a transition-only upgrade, in the order `upgrade::verify` makes them.
     pub(super) fn upgrade_reads(&self) {
-        self.unrelated_read(); // eth_chainId for genesis expectations (package names no CTM).
+        // eth_chainId for genesis expectations (no reviewed Bridgehub: nothing past it is read).
+        self.unrelated_read();
         self.transition_reads(false);
         self.code(true); // The CTM executor, whose bound CTM the departing state is read through.
         self.address(CTM);
@@ -154,22 +145,32 @@ impl ShellPathFixture {
         self.address(CTM_EXECUTOR); // CTM owner.
         self.address(CTM_EXECUTOR); // CTM-domain ProxyAdmin owner.
         self.address(Address::ZERO); // CTM pending owner.
+        self.unrelated_read(); // The ValidatorTimelock's owners are outside this regression.
         self.asserter
             .push_success(&Bytes::from(U256::from(OLD_VERSION).abi_encode()));
         self.address(FROM_RELEASE);
-        // The edge crosses into v0.36.0, so the CTM's chains are checked; it has none.
-        self.address(BRIDGEHUB);
-        self.asserter
-            .push_success(&Bytes::from(Vec::<U256>::new().abi_encode()));
+        // The edge crosses into v0.36.0, but with no reviewed Bridgehub the CTM's chains cannot be
+        // enumerated: the gate reads nothing and fails alike in both runs.
         self.readiness_and_shell_reads();
     }
 
     pub(super) fn replacement_reads(&self) {
+        self.replacement_reads_bound(None);
+    }
+
+    /// [`Self::replacement_reads`] with a reviewed Bridgehub: `binding` is whether it registers
+    /// the forward's CTM and the Bridgehub that CTM answers as its `BRIDGE_HUB()`.
+    pub(super) fn replacement_reads_bound(&self, binding: Option<(bool, Address)>) {
         self.transition_reads(true);
         self.code(false); // Replaced transition's unrelated state checks are isolated out.
         self.address(CTM_EXECUTOR);
         self.address(Address::ZERO); // CTM pending owner.
         self.code(false); // CTM executor construction is outside this regression.
+        if let Some((registered, bridgehub)) = binding {
+            self.asserter
+                .push_success(&Bytes::from(registered.abi_encode()));
+            self.address(bridgehub);
+        }
         self.address(GOVERNANCE); // The CTM executor's owner.
         self.address(Address::ZERO); // Its pending owner.
         self.readiness_and_shell_reads();

@@ -261,7 +261,7 @@ abstract contract RegistryObjectsFixture is Test {
         CTMRelease _fromRelease,
         CTMRelease _newRelease,
         uint256 _upgradeTimestamp,
-        address _upgradeEngine,
+        address _chainUpgradeEngine,
         AuthoredL2Plan memory _plan
     ) internal returns (CTMTransition) {
         return
@@ -269,7 +269,7 @@ abstract contract RegistryObjectsFixture is Test {
                 TransitionManifest({
                     fromRelease: address(_fromRelease),
                     newRelease: address(_newRelease),
-                    upgradeEngine: _upgradeEngine,
+                    chainUpgradeEngine: _chainUpgradeEngine,
                     oldProtocolVersionDeadline: type(uint256).max,
                     upgradeTimestamp: _upgradeTimestamp,
                     l2Plan: _plan
