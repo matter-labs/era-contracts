@@ -1,0 +1,46 @@
+flowchart TB
+  subgraph APP["User / App"]
+    direction LR
+    app["Your app or wallet"]
+  end
+  subgraph SRC["Source chain"]
+    direction LR
+    ic["InteropCenter"]
+    ar1["L2AssetRouter and<br/>L2NativeTokenVault"]
+    fm1["AtomicFlowManager<br/>(leg states, refunds)"]
+    tree1[("Commitment tree")]
+    ic -- "take tokens" --> ar1
+    ic -- "commit leg" --> fm1
+    fm1 -- "add commit value" --> tree1
+  end
+  subgraph L1["Ethereum (L1)"]
+    direction LR
+    roots[("Interop root over<br/>all settled batches")]
+    l1h["L1InteropHandler<br/>(for withdrawals)"]
+  end
+  subgraph DST["Destination chain"]
+    direction LR
+    h["L2InteropHandler<br/>(execute, verify,<br/>unbundle)"]
+    fm2["AtomicFlowManager<br/>(checks proofs)"]
+    ir[("Imported<br/>interop roots")]
+    rcv["Your receiver contract"]
+    ar2["L2AssetRouter and<br/>L2NativeTokenVault"]
+    h -- "check every leg" --> fm2
+    fm2 -- "check against" --> ir
+    h -- "deliver call" --> rcv
+    h -- "deliver tokens" --> ar2
+  end
+  subgraph EXE["Executor"]
+    direction LR
+    ex["Relayer, app or user<br/>(gets proofs from the<br/>source chain's server)"]
+  end
+  APP -- "send leg" --> SRC
+  SRC -- "settle batch" --> L1
+  L1 -- "import interop root<br/>(every chain does)" --> DST
+  DST ~~~ EXE
+  EXE -- "execute with proofs" --> DST
+  style APP fill:#F1F5F9,stroke:#64748B
+  style SRC fill:#DBEAFE,stroke:#1E40AF
+  style L1 fill:#EDE9FE,stroke:#5B21B6
+  style DST fill:#DCFCE7,stroke:#166534
+  style EXE fill:#FEF3C7,stroke:#92400E
