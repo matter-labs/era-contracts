@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the sandbox L1: Anvil, loaded from l1-state.json.gz, inside the foundry image.
+# Runs the sandbox L1: Anvil, loaded from the saved L1 state that fetch-l1-state.mjs provides.
 #   l1.sh            start Anvil on port 8545
 #   l1.sh healthy    exit 0 once Anvil answers and its clock is synced
 set -euo pipefail
@@ -13,7 +13,7 @@ if [[ ${1:-} == healthy ]]; then
 fi
 
 rm -f "$SYNCED"
-gzip -dc /sandbox/l1-state.json.gz > "$STATE"
+gzip -dc /state/l1-state.json.gz > "$STATE"
 
 # Anvil resumes its clock from the state's last block, while the chains stamp their blocks with the
 # current time. Batches more than an hour ahead of L1 can't be committed, so move the clock to now.

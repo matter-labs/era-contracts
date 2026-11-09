@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds docker/l1-state.json.gz: an L1 (Anvil) state with two ZKsync OS v33.2 chains, 506 and 507, that
-# settle directly on L1. For maintainers only; the sandbox ships the result.
+# settle directly on L1. For maintainers only; the sandbox downloads the published result (see
+# fetch-l1-state.mjs), and uses this file instead when present.
 #
 # Input: a v33.2 single-chain L1 state (chain 506, era-contracts v0.33.2), public in
 # matter-labs/local-prividium at dev/zksyncos/l1-state.json.gz (commit f5fcd53). The script adds

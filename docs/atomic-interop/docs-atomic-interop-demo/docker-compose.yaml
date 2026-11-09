@@ -29,12 +29,24 @@ x-chain: &chain
     retries: 180
 
 services:
+  # Downloads the saved L1 state once and keeps it in the l1-state volume. See docker/fetch-l1-state.mjs.
+  l1-state:
+    image: node:24.22.1-slim
+    entrypoint: ["node", "/sandbox/fetch-l1-state.mjs"]
+    volumes:
+      - ./docker:/local:ro
+      - ./docker/fetch-l1-state.mjs:/sandbox/fetch-l1-state.mjs:ro
+      - l1-state:/state
+
   l1:
     image: ghcr.io/foundry-rs/foundry:v1.8.4
     entrypoint: ["bash", "/sandbox/l1.sh"]
     volumes:
       - ./docker/l1.sh:/sandbox/l1.sh:ro
-      - ./docker/l1-state.json.gz:/sandbox/l1-state.json.gz:ro
+      - l1-state:/state:ro
+    depends_on:
+      l1-state:
+        condition: service_completed_successfully
     ports:
       - 127.0.0.1:8545:8545
     healthcheck:
@@ -95,3 +107,4 @@ services:
 
 volumes:
   npm-cache:
+  l1-state:

@@ -13,7 +13,7 @@ docker compose run --rm demo
 ```
 
 This starts the chains, waits until they are registered with each other, and runs the three flows. The
-initial run downloads about 430 MB of Docker images; later runs take about a minute and a half. The chains
+initial run downloads about 430 MB of Docker images and the 21 MB L1 state; later runs take about a minute and a half. The chains
 keep running afterwards:
 
 | Node                 | Chain ID | RPC                     |
@@ -41,7 +41,7 @@ The tutorial, `docs/atomic-interop/02-tutorial.md` in this repository, walks thr
 | `scripts/call.ts`, `refund.ts`, `swap.ts` | The three flows; `scripts/demo.ts` runs them in a row                                                  |
 | `contracts/`                              | The receiver and the demo token; the scripts compile them with `solc`                                  |
 | `docker-compose.yaml`                     | The L1, the two chains, the registration step and the demo                                             |
-| `docker/`                                 | What the containers load: L1 state, genesis, server configs, start-up scripts                          |
+| `docker/`                                 | What the containers load: genesis, server configs, start-up scripts, and the L1 state download         |
 
 | Service              | Image                                                                       |
 | -------------------- | --------------------------------------------------------------------------- |
@@ -74,6 +74,12 @@ checks the new chain against chain 506 and writes the gzipped dump.
 ```bash
 docker/generate-l1-state.sh path/to/local-prividium/dev/zksyncos/l1-state.json.gz
 ```
+
+The result is 21 MB, so it isn't on `main`: it is `l1-state.json.gz` on the `atomic-interop-demo-assets`
+branch of era-contracts. The `l1-state` service (`docker/fetch-l1-state.mjs`) downloads it from a fixed
+commit of that branch, checks its sha256 and keeps it in a Docker volume. A `docker/l1-state.json.gz` made by
+the script above is used instead when present. To publish a new state, commit it to that branch and update
+the commit and hash in `docker/fetch-l1-state.mjs`.
 
 Interop registration (`ChainRegistrationSender.registerChain`) isn't in the state: it reverts with
 `ChainHasNoBatchesInMessageRoot` until the chain being registered has a batch executed on L1, which needs

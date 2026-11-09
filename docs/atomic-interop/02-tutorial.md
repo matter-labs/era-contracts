@@ -59,7 +59,7 @@ Start it and run the three flows:
 docker compose run --rm demo
 ```
 
-The initial run downloads about 430 MB of Docker images. Then the command starts the chains, waits until
+The initial run downloads about 430 MB of Docker images and the sandbox's saved Ethereum state (21 MB). Then the command starts the chains, waits until
 they are registered with each other, installs the example's dependencies in a container and runs the
 flows. After Docker's progress lines, the output is:
 
