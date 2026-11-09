@@ -26,7 +26,12 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
+import {CTM_PROXY_ADMIN_SALT_DOMAIN, Utils as DeployScriptUtils} from "../../../../deploy-scripts/utils/Utils.sol";
+import {Create2AndTransfer} from "../../../../deploy-scripts/utils/deploy/Create2AndTransfer.sol";
+import {StateTransitionContracts} from "contracts/common/StateTransitionTypes.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {CoreUpgradeExecutor} from "contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol";
 import {IBootstrapUpgrade} from "contracts/upgrades/IBootstrapUpgrade.sol";
@@ -149,10 +154,15 @@ abstract contract UpgradeIntegrationBootstrapFixture is
     ///      setUp has just handed to governance. None by default.
     function _beforePrepare() internal virtual {}
 
-    /// @dev How many ServerNotifier handover calls the ChainAdmin makes: moving the notifier's
-    ///      proxy and nominating the CTM executor, unless {_beforePrepare} already moved the proxy.
-    function _handoverAdminCalls() internal pure virtual returns (uint256) {
-        return 2;
+    /// @dev The ChainAdmin's handover runs in the prepare phase; governance then executes the
+    ///      prepare's `[ctm_proxy_admin_split] calls` on their own, ahead of the bootstrap bundle.
+    function executeCTMAdminCalls() internal virtual override {
+        super.executeCTMAdminCalls();
+        string memory ctmOutput = vm.readFile(string.concat(vm.projectRoot(), CTM_OUTPUT));
+        governanceMulticall(
+            ctmOutput.readAddress("$.ctm_proxy_admin_split.governance"),
+            abi.decode(ctmOutput.readBytes("$.ctm_proxy_admin_split.calls"), (Call[]))
+        );
     }
 
     function setUp() public virtual {
@@ -183,9 +193,160 @@ abstract contract UpgradeIntegrationBootstrapFixture is
 }
 
 /// @notice The bootstrap edge's own assertions over the fixture above: the version bump, the
-///         authority handover to the bound executor, and the legacy commit shape.
+///         authority handover to the bound executor, and the legacy commit shape. The CTM starts
+///         out sharing the ecosystem ProxyAdmin, as on zksync-os mainnet and the ZKsync OS
+///         testnet, so the edge also splits the CTM domain off it.
 contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
     using stdToml for string;
+
+    /// @dev The ecosystem (Bridgehub) ProxyAdmin.
+    address internal ecosystemAdmin;
+
+    /// @dev The ProxyAdmin the previous release deployed the CTM domain behind, emptied by
+    ///      {_beforePrepare}.
+    address internal previousCTMProxyAdmin;
+
+    /// @dev Moves the CTM, its ValidatorTimelock, BytecodesSupplier and PermissionlessValidator
+    ///      behind the ecosystem ProxyAdmin; the ServerNotifier keeps an admin of its own, as on
+    ///      those ecosystems.
+    function _beforePrepare() internal override {
+        ChainTypeManager ctm = ChainTypeManager(previousRelease.chainTypeManager);
+        ecosystemAdmin = DeployScriptUtils.getProxyAdminAddress(previousRelease.bridgehub);
+        previousCTMProxyAdmin = DeployScriptUtils.getProxyAdminAddress(address(ctm));
+        address[4] memory shared = [
+            address(ctm),
+            ctm.validatorTimelockPostV29(),
+            ctm.L1_BYTECODES_SUPPLIER(),
+            ctm.PERMISSIONLESS_VALIDATOR()
+        ];
+        vm.startPrank(ProxyAdmin(previousCTMProxyAdmin).owner());
+        for (uint256 i = 0; i < shared.length; ++i) {
+            assertEq(
+                DeployScriptUtils.getProxyAdminAddress(shared[i]),
+                previousCTMProxyAdmin,
+                "the previous release deploys the CTM domain behind one admin"
+            );
+            ProxyAdmin(previousCTMProxyAdmin).changeProxyAdmin(
+                ITransparentUpgradeableProxy(payable(shared[i])),
+                ecosystemAdmin
+            );
+        }
+        vm.stopPrank();
+    }
+
+    /// @notice The prepare deployed a CTM-domain ProxyAdmin for governance, reproducible from the
+    ///         reviewed salt and owner, and wrote one governance call per proxy behind the
+    ///         ecosystem admin; after the edge the whole domain sits behind that admin, which the
+    ///         CTM executor holds.
+    function test_bootstrapSplitsTheCTMDomainOffTheEcosystemProxyAdmin() public view {
+        CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
+        string memory ctmOutput = vm.readFile(string.concat(vm.projectRoot(), CTM_OUTPUT));
+        (, bytes32 ctmSalt) = ctmUpgrade.getCreate2FactoryParams();
+        BootstrapManifest memory manifest = bootstrap.bootstrapMigration().getManifest();
+        address ctmProxyAdmin = address(manifest.ctmProxyAdmin);
+
+        assertEq(ctmOutput.readAddress("$.ctm_proxy_admin_split.ecosystem_proxy_admin"), ecosystemAdmin);
+        assertEq(ctmOutput.readAddress("$.ctm_proxy_admin_split.ctm_proxy_admin"), ctmProxyAdmin);
+        assertEq(ctmOutput.readAddress("$.ctm_proxy_admin_split.governance"), manifest.governance);
+        assertTrue(ctmProxyAdmin != ecosystemAdmin, "not the ecosystem admin");
+        assertTrue(ctmProxyAdmin != previousCTMProxyAdmin, "a new admin");
+        address deployer = DeployScriptUtils.canonicalCreate2Address(
+            ctmSalt,
+            type(Create2AndTransfer).creationCode,
+            abi.encode(
+                type(ProxyAdmin).creationCode,
+                keccak256(abi.encode(ctmSalt, keccak256(abi.encode(CTM_PROXY_ADMIN_SALT_DOMAIN, manifest.ctm)))),
+                manifest.governance
+            )
+        );
+        assertEq(Create2AndTransfer(deployer).deployedAddress(), ctmProxyAdmin, "deployed for governance");
+
+        StateTransitionContracts memory domain = ctmUpgrade.getAddresses().stateTransition.proxies;
+        address[6] memory proxies = [
+            domain.chainTypeManager,
+            domain.validatorTimelock,
+            domain.bytecodesSupplier,
+            domain.permissionlessValidator,
+            domain.serverNotifier,
+            domain.interopFeeManager
+        ];
+        Call[] memory calls = abi.decode(ctmOutput.readBytes("$.ctm_proxy_admin_split.calls"), (Call[]));
+        assertEq(calls.length, 4, "one call per proxy behind the ecosystem admin; the notifier is the handover's");
+        for (uint256 i = 0; i < calls.length; ++i) {
+            assertEq(calls[i].target, ecosystemAdmin, "governance moves it off the ecosystem admin");
+            assertEq(
+                calls[i].data,
+                abi.encodeCall(
+                    ProxyAdmin.changeProxyAdmin,
+                    (ITransparentUpgradeableProxy(payable(proxies[i])), ctmProxyAdmin)
+                )
+            );
+        }
+
+        assertEq(ProxyAdmin(ctmProxyAdmin).owner(), address(bootstrap.ctmUpgradeExecutor()), "the CTM executor's");
+        for (uint256 i = 0; i < proxies.length; ++i) {
+            assertTrue(proxies[i] != address(0), "the domain includes the new interop fee manager");
+            assertEq(DeployScriptUtils.getProxyAdminAddress(proxies[i]), ctmProxyAdmin, "behind the CTM-domain admin");
+        }
+    }
+
+    /// @dev Pranks the CTM executor, which holds the CTM-domain ProxyAdmin since the edge.
+    function _moveBehind(address _proxy, address _admin) private {
+        CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
+        address ctmProxyAdmin = DeployScriptUtils.getProxyAdminAddress(ctmUpgrade.getCTMAddress());
+        vm.prank(address(bootstrap.ctmUpgradeExecutor()));
+        ProxyAdmin(ctmProxyAdmin).changeProxyAdmin(ITransparentUpgradeableProxy(payable(_proxy)), _admin);
+    }
+
+    function test_prepareRefusesACTMDomainProxyBehindAnotherAdmin() public {
+        address ctmProxyAdmin = DeployScriptUtils.getProxyAdminAddress(ctmUpgrade.getCTMAddress());
+        address foreignAdmin = address(new ProxyAdmin());
+        _moveBehind(ctmUpgrade.getAddresses().stateTransition.proxies.permissionlessValidator, foreignAdmin);
+        vm.expectRevert(
+            bytes(
+                string.concat(
+                    "PermissionlessValidator is behind ",
+                    Strings.toHexString(foreignAdmin),
+                    ", not the CTM-domain ProxyAdmin ",
+                    Strings.toHexString(ctmProxyAdmin)
+                )
+            )
+        );
+        CTMUpgradeForLocalTest(address(ctmUpgrade)).deployRegistryBootstrap();
+    }
+
+    /// @notice A partial split: the CTM already has its own admin and only what is left behind the
+    ///         ecosystem admin moves, once governance holds both admins.
+    function test_splitMovesOnlyWhatIsLeftBehindTheEcosystemAdmin() public {
+        CTMUpgradeForLocalTest bootstrap = CTMUpgradeForLocalTest(address(ctmUpgrade));
+        address ctmProxyAdmin = DeployScriptUtils.getProxyAdminAddress(ctmUpgrade.getCTMAddress());
+        address timelock = ctmUpgrade.getAddresses().stateTransition.proxies.validatorTimelock;
+        address governance = ctmUpgrade.getOwnerAddress();
+        _moveBehind(timelock, ecosystemAdmin);
+
+        // After the edge the executors hold both admins; pranked back to governance.
+        vm.expectRevert("the ecosystem ProxyAdmin is not governance's");
+        bootstrap.ctmProxyAdminSplitCalls();
+        vm.prank(address(coreUpgrade.getCoreUpgradeExecutor()));
+        ProxyAdmin(ecosystemAdmin).transferOwnership(governance);
+        vm.expectRevert("CTM-domain ProxyAdmin not owned by governance");
+        bootstrap.ctmProxyAdminSplitCalls();
+        vm.prank(address(bootstrap.ctmUpgradeExecutor()));
+        ProxyAdmin(ctmProxyAdmin).transferOwnership(governance);
+
+        Call[] memory calls = bootstrap.ctmProxyAdminSplitCalls();
+        assertEq(calls.length, 1, "only the timelock moves");
+        assertEq(
+            calls[0].data,
+            abi.encodeCall(
+                ProxyAdmin.changeProxyAdmin,
+                (ITransparentUpgradeableProxy(payable(timelock)), ctmProxyAdmin)
+            )
+        );
+        governanceMulticall(governance, calls);
+        assertEq(DeployScriptUtils.getProxyAdminAddress(timelock), ctmProxyAdmin, "back behind the CTM-domain admin");
+        assertEq(bootstrap.ctmProxyAdminSplitCalls().length, 0, "nothing left to move");
+    }
 
     /// @notice Every object the bootstrap prepare deploys is reproducible from the build
     ///         artifact's creation code and the constructor arguments the reviewed package and
@@ -575,8 +736,8 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationBootstrapFixture {
         assertEq(bundle[6].data, abi.encodeCall(RegistryBootstrapMigration.validateApplied, ()), "validateApplied()");
         assertEq(
             _bootstrap.externalActionEntries().length,
-            7 + _handoverAdminCalls(),
-            "the CTM prepare declares the 7 derived governance calls and the handover admin calls"
+            9,
+            "the CTM prepare declares the 7 derived governance calls and the 2 handover admin calls"
         );
         assertEq(coreUpgrade.externalActionEntries().length, 0, "the core prepare of a derived edge authors nothing");
         migration.validateApplied();

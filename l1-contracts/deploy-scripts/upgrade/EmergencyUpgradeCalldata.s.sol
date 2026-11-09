@@ -21,7 +21,8 @@ import {ISafe} from "../interfaces/ISafe.sol";
 ///         with no private key and no off-chain signing: one owner EOA pre-approves each Safe message
 ///         hash on-chain (`approveHash`), and the board call carries Gnosis "approved hash" markers.
 ///         The proposal's calls are the governance bundle of the merged package
-///         `protocol-ops ecosystem upgrade-prepare-all` writes ({loadGovernanceCalls}). Usage and
+///         `protocol-ops ecosystem upgrade-prepare-all` writes ({loadGovernanceCalls}); a package with a
+///         CTM-domain ProxyAdmin split gets a proposal of its own before it. Usage and
 ///         inputs: "Emergency execution" in `deploy-scripts/upgrade/README.md`.
 /// @dev Read-only; it reads the board, its multisigs and the Safes' message hashes from L1.
 contract EmergencyUpgradeCalldata is Script {
@@ -46,13 +47,19 @@ contract EmergencyUpgradeCalldata is Script {
         bytes zkFoundationSignatures;
     }
 
-    /// @notice Emits the ONE emergency proposal carrying the governance bundle of a prepared package.
+    /// @notice Emits the emergency proposal carrying the governance bundle of a prepared package and,
+    ///         ahead of it, the one carrying its CTM-domain ProxyAdmin split when the package has one.
     /// @param _protocolUpgradeHandler The handler that executes the package's governance calls.
     /// @param _ecosystemToml The merged package (`upgrade-envs/<version>/output/<env>/ecosystem.toml`).
     function run(address _protocolUpgradeHandler, string memory _ecosystemToml) external view {
+        IProtocolUpgradeHandler handler = IProtocolUpgradeHandler(_protocolUpgradeHandler);
         IProtocolUpgradeHandler.Call[] memory calls = loadGovernanceCalls(_ecosystemToml);
         require(calls.length != 0, "the package carries no governance calls");
-        _print(buildEmergencyProposal(IProtocolUpgradeHandler(_protocolUpgradeHandler), calls), _ecosystemToml);
+        IProtocolUpgradeHandler.Call[] memory split = loadCTMProxyAdminSplitCalls(_ecosystemToml);
+        if (split.length != 0) {
+            _print(buildEmergencyProposal(handler, split), "CTM-DOMAIN PROXYADMIN SPLIT (execute FIRST)");
+        }
+        _print(buildEmergencyProposal(handler, calls), _ecosystemToml);
     }
 
     /// @notice The governance bundle of a prepared package, in execution order: its
@@ -66,6 +73,26 @@ contract EmergencyUpgradeCalldata is Script {
         bytes memory encoded = vm.readFile(_ecosystemToml).readBytes(".governance_calls.calls");
         if (encoded.length != 0) {
             calls = abi.decode(encoded, (IProtocolUpgradeHandler.Call[]));
+        }
+    }
+
+    /// @notice The CTM-domain ProxyAdmin split of a prepared package: every
+    ///         `[ctms.<key>.ctm_proxy_admin_split] calls`, which governance executes before the bundle
+    ///         ({docs/upgrade-operations.md#the-ctm-domain-proxyadmin-split}). Empty when no CTM has one.
+    /// @param _ecosystemToml The merged package.
+    function loadCTMProxyAdminSplitCalls(
+        string memory _ecosystemToml
+    ) public view returns (IProtocolUpgradeHandler.Call[] memory calls) {
+        string memory toml = vm.readFile(_ecosystemToml);
+        if (!vm.keyExistsToml(toml, ".ctms")) {
+            return calls;
+        }
+        string[] memory ctms = vm.parseTomlKeys(toml, ".ctms");
+        for (uint256 i = 0; i < ctms.length; ++i) {
+            string memory key = string.concat(".ctms.", ctms[i], ".ctm_proxy_admin_split.calls");
+            if (vm.keyExistsToml(toml, key)) {
+                calls = _append(calls, abi.decode(toml.readBytes(key), (IProtocolUpgradeHandler.Call[])));
+            }
         }
     }
 
@@ -231,6 +258,19 @@ contract EmergencyUpgradeCalldata is Script {
                 safe: _safe,
                 safeMessageHash: ISafe(_safe).getMessageHash(abi.encode(_digest))
             });
+    }
+
+    function _append(
+        IProtocolUpgradeHandler.Call[] memory _head,
+        IProtocolUpgradeHandler.Call[] memory _tail
+    ) private pure returns (IProtocolUpgradeHandler.Call[] memory joined) {
+        joined = new IProtocolUpgradeHandler.Call[](_head.length + _tail.length);
+        for (uint256 i = 0; i < _head.length; ++i) {
+            joined[i] = _head[i];
+        }
+        for (uint256 i = 0; i < _tail.length; ++i) {
+            joined[_head.length + i] = _tail[i];
+        }
     }
 
     /// @dev Gnosis Safe "pre-approved hash" signature: r = owner, s = 0, v = 1.

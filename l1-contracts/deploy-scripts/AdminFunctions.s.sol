@@ -292,11 +292,7 @@ contract AdminFunctions is Script, IAdminFunctions {
                 }
             }
 
-            // A CTM behind the ecosystem ProxyAdmin is left to the ecosystem leg below, which also
-            // keeps that admin with the core executor once the bootstrap handed it over.
-            if (Utils.getProxyAdminAddress(ctm) != Utils.getProxyAdminAddress(_bridgehub)) {
-                _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
-            }
+            _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
         }
 
         _savePreGovernanceAcceptOwnershipCalls(acceptCalls, acceptCount);

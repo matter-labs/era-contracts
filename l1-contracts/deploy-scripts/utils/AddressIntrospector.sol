@@ -179,6 +179,8 @@ library AddressIntrospector {
         address ctmAddr = address(_ctm);
         ChainTypeManager ctm = ChainTypeManager(ctmAddr);
 
+        address validatorTimelock = ctm.validatorTimelockPostV29();
+
         // The release registry only exists on the CTM from v35 on — every earlier
         // implementation has no `currentRelease` getter at all — so it is read only off a
         // registry-era CTM and reported as zero otherwise.
@@ -199,10 +201,18 @@ library AddressIntrospector {
             genesisUpgrade = ctm.l1GenesisUpgrade();
         }
         (address verifierFflonk, address verifierPlonk) = _getSubVerifiers(verifier);
+        address bytecodesSupplier = ctm.L1_BYTECODES_SUPPLIER();
 
         // Note: daAddresses is left zero-initialized (Solidity default)
         info.stateTransition = StateTransitionDeployedAddresses({
-            proxies: getCTMProxies(ctm),
+            proxies: StateTransitionContracts({
+                chainTypeManager: ctmAddr,
+                serverNotifier: ctm.serverNotifierAddress(),
+                validatorTimelock: validatorTimelock,
+                bytecodesSupplier: bytecodesSupplier,
+                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR(),
+                interopFeeManager: _getInteropFeeManager(ctm)
+            }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(ctmAddr),
                 serverNotifier: address(0),
@@ -225,22 +235,6 @@ library AddressIntrospector {
             chainTypeManagerAdmin: address(0),
             chainTypeManagerOwner: address(0)
         });
-    }
-
-    /// @notice The CTM domain's proxies, as the CTM names them: the list the prepares (through
-    ///         {getCTMAddresses}) and `SplitCTMProxyAdmin` both walk.
-    /// @param _ctm The CTM proxy.
-    /// @return The domain's proxies; the interop fee manager is zero on a CTM that predates it.
-    function getCTMProxies(ChainTypeManager _ctm) internal view returns (StateTransitionContracts memory) {
-        return
-            StateTransitionContracts({
-                chainTypeManager: address(_ctm),
-                serverNotifier: _ctm.serverNotifierAddress(),
-                validatorTimelock: _ctm.validatorTimelockPostV29(),
-                bytecodesSupplier: _ctm.L1_BYTECODES_SUPPLIER(),
-                permissionlessValidator: _ctm.PERMISSIONLESS_VALIDATOR(),
-                interopFeeManager: _getInteropFeeManager(_ctm)
-            });
     }
 
     // ============ ZkChain Addresses ============

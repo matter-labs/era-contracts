@@ -239,7 +239,7 @@ So the main protocol-ops commands are **simulator + bundle emitters**, not direc
 
 `dev execute-safe` is a developer replay helper. Given a Safe bundle JSON, an RPC URL, and a private key, it signs and submits every transaction from that key's address. It is intended for anvil/local validation unless someone deliberately points it at a live testnet RPC.
 
-`ecosystem governance-toml-to-simulator` is the transaction-simulator bridge: it reads a prepared protocol-ops governance TOML, decodes `[governance_calls] calls`, and emits the simulator's JSON transaction list (one `governance`-tagged transaction per call, the sender funded on the first).
+`ecosystem governance-toml-to-simulator` is the transaction-simulator bridge: it reads a prepared protocol-ops governance TOML, decodes `[governance_calls] calls`, and emits the simulator's JSON transaction list (one `governance`-tagged transaction per call, the sender funded on the first), preceded by the v35 CTM-domain `ProxyAdmin` split's calls, tagged `ctm_proxy_admin_split`, when the package carries one.
 
 `upgrade-prepare-all` writes the canonical merged artifact to `<env-out>/ecosystem.toml`.
 Both `upgrade-governance --env` and `governance-toml-to-simulator --env` discover that path; use
@@ -259,7 +259,7 @@ For non-trivial flows (the ecosystem upgrade in particular) we keep a small libr
 
 - **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. Each prepare deploys its own domain's objects; on the bootstrap edge the CTM prepare takes the core executor from the core prepare's output. Returns the per-step output TOML paths.
 - **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before and the ServerNotifier handover calls (bootstrap only) after. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
-- **Free `replay_governance_calls` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `[governance_calls] calls`, dispatches one `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
+- **Free `replay_governance_calls` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `[governance_calls] calls`, dispatches one `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments, preceded by a separate execution of the v35 CTM-domain `ProxyAdmin` split when the package carries one. No struct because there's no state.
 
 The asymmetry (Inner/Full for prepare; free fn for governance) is deliberate: prepare needs orchestration (multiple forge invocations + preconditions); governance is a single ABI-passthrough loop.
 

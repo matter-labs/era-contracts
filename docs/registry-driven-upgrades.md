@@ -7,6 +7,10 @@ of its domain, in a canonical order, plus whatever the prepare declared as an ex
 
 **Scope:** L1 + L2 era-contracts, upgrade tooling, governance proposal shape.
 
+The Era (EraVM) and ZKsync OS ecosystems are split: Era chains and the Era CTM take nothing from v34
+on and stay on their own line, also where an Era CTM is registered on the same Bridgehub (ZKsync OS
+testnet). Every prepare, bootstrap and package described here is ZKsync OS only.
+
 This is the architecture document. Two other documents complete it and are not restated here:
 
 - [`protocol-docs/ecosystem-upgrade-coordination.md`](../protocol-docs/ecosystem-upgrade-coordination.md)
@@ -956,9 +960,9 @@ the `CoreUpgradeExecutor` the ecosystem `ProxyAdmin` lands under and the `govern
 already be owned by. Its notifier row is mandatory:
 the one-time ServerNotifier handover is a precondition of the edge (see the
 [operations document](upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
-So is a CTM-domain `ProxyAdmin` apart from the ecosystem's: a CTM still behind the ecosystem
-admin is split off it first, in a governance execution of its own
-([splitting a shared CTM-domain ProxyAdmin](upgrade-operations.md#splitting-a-shared-ctm-domain-proxyadmin)).
+So is a CTM-domain `ProxyAdmin` apart from the ecosystem's: the v35 prepare renders the split of a
+CTM still behind the ecosystem admin, which governance executes on its own ahead of the bundle
+([the CTM-domain ProxyAdmin split](upgrade-operations.md#the-ctm-domain-proxyadmin-split)).
 
 Governance nominates the migration as CTM owner and transfers the CTM-domain `ProxyAdmin` to it;
 `migrate()` accepts the CTM, performs the whole edge and hands both to the bound executor in the

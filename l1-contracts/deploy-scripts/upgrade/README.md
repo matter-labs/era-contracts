@@ -35,8 +35,8 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
   `RegistryBootstrapMigration` (naming both executors) and the `RegistryBootstrapSequence` over the
   migration and the core transition, and declares every call of the one-time edge by reading it off
   that sequence.
-  `SplitCTMProxyAdmin` gives a CTM that still shares the ecosystem `ProxyAdmin` one of its own,
-  ahead of the prepare.
+  It also binds the CTM-domain `ProxyAdmin` and renders the split of a CTM still behind the
+  ecosystem's.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 - `EmergencyUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
   emergency upgrade ("Emergency execution" below).
@@ -104,7 +104,9 @@ On one anvil fork of L1, in this order:
    bootstrap or a replacement) → the CTM prepare's declared calls. The layout is documented on that
    function. The merge authors nothing else and refuses a prepare's `[governance_calls] calls`
    unless every call is a declared external action — matched by identity, target, value and
-   calldata alike, not by headcount (`check_bundle_provenance`).
+   calldata alike, not by headcount (`check_bundle_provenance`). The v35 CTM prepare's
+   `[ctm_proxy_admin_split] calls` stay out of the bundle: the merge carries them under
+   `[ctms.<key>]`, and the governance replay runs them as an execution of their own right before it.
 
 Every prepare deployment rides the CREATE2 factory; the deployer's Safe bundles and `manifest.json`
 land under `--out` (default `upgrade-envs/<version>/output/<env>/protocol-ops/prepare/`). Each
@@ -203,7 +205,10 @@ Monitoring and recovery: the [operations document](../../../docs/upgrade-operati
 On a PUH-governed environment (`governance_kind = "puh"`) the package can run as an emergency
 upgrade instead of step 6: `EmergencyUpgradeBoard.executeEmergencyUpgrade` has the
 `ProtocolUpgradeHandler` execute the calls at once. The scripts make ONE emergency proposal of the
-governance bundle in `<env-out>/ecosystem.toml` (`[governance_calls] calls`).
+governance bundle in `<env-out>/ecosystem.toml` (`[governance_calls] calls`). A v35 package that
+splits a CTM-domain `ProxyAdmin` (`[ctms.<key>.ctm_proxy_admin_split] calls`) gets a second
+proposal of those calls, which executes first: the dry run executes both in order, and the calldata
+step prints the split's first.
 
 1. Dry run on a fork before any approval is collected. It impersonates the board, so only the
    signature check is skipped:
@@ -230,10 +235,10 @@ Gotchas:
 
 - **CTM-admin calls.** The `[ctm_admin_calls]` of a bootstrap (the ServerNotifier handover) are not
   governance calls. They must land before the proposal.
-- **Shared CTM-domain `ProxyAdmin`.** A CTM still behind the ecosystem `ProxyAdmin` cannot be
-  bootstrapped, and the v35 prepare refuses it. Run `v35/SplitCTMProxyAdmin.s.sol` and have
-  governance execute its calls BEFORE the prepare, in an execution of their own
-  ([operations document](../../../docs/upgrade-operations.md#splitting-a-shared-ctm-domain-proxyadmin)).
+- **CTM-domain `ProxyAdmin` split.** The v35 prepare's `[ctm_proxy_admin_split] calls` are
+  governance calls outside the bundle: their proposal executes after the CTM-admin calls and
+  BEFORE the bundle's
+  ([operations document](../../../docs/upgrade-operations.md#the-ctm-domain-proxyadmin-split)).
 - **Governance redeploy.** In a release that redeploys the governance set (`redeploy_zk_governance`),
   the rewiring runs inside the proposal. The proposal is still approved through the board the
   handler names when the calldata is emitted. The deployer plan check refuses such a release for

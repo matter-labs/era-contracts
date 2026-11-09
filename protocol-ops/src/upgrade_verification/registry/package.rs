@@ -37,7 +37,9 @@ use anyhow::Context;
 use crate::common::external_actions::ExternalAction;
 use crate::common::forge::scripts::member_deployments::MemberDeployments;
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
-use crate::common::governance_calls::{decode_calls, GovernanceCall, GovernanceCallsTable};
+use crate::common::governance_calls::{
+    ctm_proxy_admin_split_calls, decode_calls, GovernanceCall, GovernanceCallsTable,
+};
 
 use super::records::{member_records_in, records_in};
 use super::views::{CTMUpgradeExecutorView, CoreUpgradeExecutorView};
@@ -607,6 +609,9 @@ pub(crate) struct BootstrapPackage {
     pub(crate) ctm_key: String,
     /// `[governance_calls] calls` — the one bundle governance signs.
     pub(crate) calls: Vec<GovernanceCall>,
+    /// `[ctms.*.ctm_proxy_admin_split] calls` — what governance executes on its own before the
+    /// bundle to move the CTM domain off the ecosystem ProxyAdmin. Empty without the table.
+    pub(crate) ctm_proxy_admin_split: Vec<GovernanceCall>,
     /// The prepare's declared external actions — calls the objects do NOT describe.
     pub(crate) external_actions: Vec<ExternalAction>,
     /// The package's record of the lifecycle objects' binding values.
@@ -826,6 +831,7 @@ impl BootstrapPackage {
             ),
             reported_singletons: ReportedSingletons::in_package(root, Some(&ctm_key)),
             calls,
+            ctm_proxy_admin_split: ctm_proxy_admin_split_calls(root)?,
             external_actions: external_actions_in(root)?,
             create2_salts: create2_salts_in(root, Some(&ctm_key)),
             lifecycle: lifecycle_inputs_in(root),

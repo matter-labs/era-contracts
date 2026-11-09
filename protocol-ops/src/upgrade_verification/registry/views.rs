@@ -278,6 +278,8 @@ sol! {
     contract ProxyAdminView {
         function owner() external view returns (address);
         function getProxyImplementation(address proxy) external view returns (address);
+        /// Decoded, never called: a CTM-domain ProxyAdmin split is a list of these.
+        function changeProxyAdmin(address proxy, address newAdmin) external;
     }
 
     /// The CTM's bytecode supplier. `evmPublishingBlock` is the exact read

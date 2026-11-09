@@ -9,7 +9,8 @@
 //!                         registry bootstrap's ServerNotifier handover; none on a
 //!                         recurring upgrade). Emits per-script governance TOMLs.
 //!   `upgrade-governance`  replays the package's one governance bundle
-//!                         (`[governance_calls] calls`) on an anvil fork, holds a
+//!                         (`[governance_calls] calls`) on an anvil fork, after the
+//!                         CTM-domain ProxyAdmin split it carries, if any, holds a
 //!                         registry package's fork state against what it must
 //!                         leave, and emits one Safe bundle (governance owner
 //!                         signs). Accepts multiple `--governance-toml` args and
@@ -35,7 +36,9 @@ use crate::common::forge::scripts::{
     CURRENT_UPGRADE_LOCAL_INPUT_PATH, UPGRADE_CORE_OUTPUT_PATH,
 };
 use crate::common::forge::ForgeRunner;
-use crate::common::governance_calls::GovernanceCallsTable;
+use crate::common::governance_calls::{
+    ctm_proxy_admin_split_calls, decode_calls, encode_calls, GovernanceCall, GovernanceCallsTable,
+};
 use crate::common::logger;
 use crate::common::output::write_output_if_requested;
 use crate::common::paths;
@@ -135,13 +138,11 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
         }
     };
 
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     let toml_refs: Vec<&Path> = args.governance_toml.iter().map(|p| p.as_path()).collect();
 
     let governance_address = replay_governance_calls(
         &mut runner,
         &sender,
-        &contracts_path,
         bridgehub,
         toml_refs.as_slice(),
         governance_kind,
@@ -406,7 +407,8 @@ fn derive_executor_legs(
 ///
 /// Each TOML's `[governance_calls] calls` is one `governanceExecuteCalls` (legacy Governance) or
 /// `governanceExecuteCallsDirect` (PUH) invocation signed by `sender` (the governance owner), so
-/// they merge into one governance Safe bundle. A bootstrap bundle's last call is
+/// they merge into one governance Safe bundle. Its `[ctms.*.ctm_proxy_admin_split] calls`, when
+/// any, are an invocation of their own right before it. A bootstrap bundle's last call is
 /// `RegistryBootstrapMigration.validateApplied()`, so an incomplete edge reverts the replay
 /// itself. Right after a registry package's bundle runs, the fork is also held against the whole
 /// state it must have left ([`expect_applied`]), so a bundle that executes without landing fails
@@ -415,7 +417,6 @@ fn derive_executor_legs(
 pub async fn replay_governance_calls(
     runner: &mut ForgeRunner,
     sender: &Wallet,
-    contracts_path: &Path,
     bridgehub: Address,
     governance_tomls: &[&Path],
     governance_kind: crate::common::env_config::GovernanceKind,
@@ -425,19 +426,39 @@ pub async fn replay_governance_calls(
     }
     let mut governance_addr = Address::ZERO;
     for toml_path in governance_tomls {
-        governance_addr = governance_execute(
+        let context = || format!("governance bundle ({})", toml_path.display());
+        let executions = read_governance_executions(toml_path).with_context(context)?;
+        governance_addr =
+            crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
+                .await
+                .context("Failed to auto-resolve governance address from bridgehub")?;
+        logger::info(format!(
+            "Governance (auto-resolved): {:#x}",
+            governance_addr
+        ));
+        governance_execute(
             runner,
             sender,
-            contracts_path,
-            toml_path,
-            bridgehub,
+            governance_addr,
             governance_kind,
+            "CTM-domain ProxyAdmin split",
+            toml_path,
+            &executions.split,
         )
-        .await
-        .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
+        .with_context(context)?;
+        governance_execute(
+            runner,
+            sender,
+            governance_addr,
+            governance_kind,
+            "governance bundle",
+            toml_path,
+            &executions.bundle,
+        )
+        .with_context(context)?;
         expect_applied(&runner.rpc_url, toml_path, governance_addr, bridgehub)
             .await
-            .with_context(|| format!("governance bundle ({})", toml_path.display()))?;
+            .with_context(context)?;
     }
     Ok(governance_addr)
 }
@@ -468,53 +489,57 @@ async fn expect_applied(
         .context("the replayed bundle executed but did not leave the state its package describes")
 }
 
-fn read_governance_calls(governance_toml: &Path) -> anyhow::Result<String> {
+/// One governance TOML's executions, in the order governance runs them.
+#[derive(Debug)]
+struct GovernanceExecutions {
+    /// Its `[ctms.*.ctm_proxy_admin_split] calls`, in CTM-key order.
+    split: Vec<GovernanceCall>,
+    /// Its `[governance_calls] calls`.
+    bundle: Vec<GovernanceCall>,
+}
+
+fn read_governance_executions(governance_toml: &Path) -> anyhow::Result<GovernanceExecutions> {
     let toml_content = fs::read_to_string(governance_toml).with_context(|| {
         format!(
             "Failed to read governance TOML: {}",
             governance_toml.display()
         )
     })?;
-    let upgrade_output: EcosystemUpgradeOutput =
-        toml::from_str(&toml_content).context("Failed to parse governance TOML")?;
-    Ok(upgrade_output.governance_calls.calls)
+    governance_executions(&toml_content)
 }
 
-async fn governance_execute(
+fn governance_executions(toml_content: &str) -> anyhow::Result<GovernanceExecutions> {
+    let root: toml::Value =
+        toml::from_str(toml_content).context("Failed to parse governance TOML")?;
+    let split = ctm_proxy_admin_split_calls(&root)?;
+    let upgrade_output: EcosystemUpgradeOutput =
+        root.try_into().context("Failed to parse governance TOML")?;
+    let bundle =
+        decode_calls(&upgrade_output.governance_calls.calls).context("decode governance calls")?;
+    Ok(GovernanceExecutions { split, bundle })
+}
+
+/// Executes `calls` (the `what` of `governance_toml`) through `governance_addr` as one governance
+/// operation signed by `sender`.
+fn governance_execute(
     runner: &mut ForgeRunner,
     sender: &Wallet,
-    _contracts_path: &Path,
-    governance_toml: &Path,
-    bridgehub: Address,
+    governance_addr: Address,
     governance_kind: crate::common::env_config::GovernanceKind,
-) -> anyhow::Result<Address> {
-    let encoded_calls_hex = read_governance_calls(governance_toml)?;
-
-    let governance_addr =
-        crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
-            .await
-            .context("Failed to auto-resolve governance address from bridgehub")?;
-    logger::info(format!(
-        "Governance (auto-resolved): {:#x}",
-        governance_addr
-    ));
-
-    // An empty bundle is skipped rather than replayed as an empty governance operation, which
-    // a second empty TOML under the same legacy-Gov salt would schedule a second time.
-    if crate::common::governance_calls::decode_calls(&encoded_calls_hex)
-        .context("decode governance calls")?
-        .is_empty()
-    {
+    what: &str,
+    governance_toml: &Path,
+    calls: &[GovernanceCall],
+) -> anyhow::Result<()> {
+    // An empty `Call[]` is skipped rather than replayed as an empty governance operation, which
+    // a second empty one under the same legacy-Gov salt would schedule a second time.
+    if calls.is_empty() {
         logger::info(format!(
-            "Governance bundle ({}) carries no calls: nothing to execute",
+            "The {what} ({}) carries no calls: nothing to execute",
             governance_toml.display()
         ));
-        return Ok(governance_addr);
+        return Ok(());
     }
-    let encoded_calls = Bytes::from(
-        hex::decode(encoded_calls_hex.trim_start_matches("0x"))
-            .context("invalid governance calls hex")?,
-    );
+    let encoded_calls = Bytes::from(encode_calls(calls));
     let calldata = match governance_kind {
         crate::common::env_config::GovernanceKind::Legacy => {
             AdminFunctionsAbi::governanceExecuteCallsCall {
@@ -537,17 +562,17 @@ async fn governance_execute(
         .with_wallet(sender);
 
     logger::step(format!(
-        "Running the governance bundle ({})",
+        "Running the {what} ({})",
         governance_toml.display()
     ));
     logger::info(format!("Governance address: {:#x}", governance_addr));
 
     runner
         .run(script)
-        .context("Failed to execute forge script for the governance bundle")?;
+        .with_context(|| format!("Failed to execute forge script for the {what}"))?;
 
-    logger::success("Governance bundle executed");
-    Ok(governance_addr)
+    logger::success(format!("The {what} executed"));
+    Ok(())
 }
 
 // ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
@@ -1612,6 +1637,53 @@ mod tests {
         }
     }
 
+    /// A governance TOML whose bundle is `bundle` and whose CTM section carries `split`, if any.
+    fn governance_toml(bundle: &[GovernanceCall], split: Option<&[GovernanceCall]>) -> String {
+        let mut toml = format!("[governance_calls]\ncalls = \"{}\"\n", bundle_hex(bundle));
+        if let Some(split) = split {
+            toml.push_str(&format!(
+                "\n[ctms.zksync_os.ctm_proxy_admin_split]\n\
+                 ecosystem_proxy_admin = \"{}\"\nctm_proxy_admin = \"{}\"\ngovernance = \"{}\"\n\
+                 calls = \"{}\"\n",
+                Address::repeat_byte(0xE0),
+                Address::repeat_byte(0xC0),
+                Address::repeat_byte(0x60),
+                bundle_hex(split)
+            ));
+        }
+        toml
+    }
+
+    #[test]
+    fn a_pending_split_runs_on_its_own_before_the_bundle() {
+        let executions = governance_executions(&governance_toml(
+            &[call(0x11, &[0xaa])],
+            Some(&[call(0xE0, &[0x7e]), call(0xE0, &[0x7f])]),
+        ))
+        .unwrap();
+        assert_eq!(
+            targets_and_data(&executions.split),
+            [
+                (Address::repeat_byte(0xE0), vec![0x7e]),
+                (Address::repeat_byte(0xE0), vec![0x7f])
+            ]
+        );
+        assert_eq!(
+            targets_and_data(&executions.bundle),
+            [(Address::repeat_byte(0x11), vec![0xaa])]
+        );
+    }
+
+    #[test]
+    fn an_absent_or_empty_split_leaves_only_the_bundle() {
+        for split in [None, Some(&[][..])] {
+            let executions =
+                governance_executions(&governance_toml(&[call(0x11, &[0xaa])], split)).unwrap();
+            assert!(executions.split.is_empty(), "{split:?}");
+            assert_eq!(executions.bundle.len(), 1);
+        }
+    }
+
     #[test]
     fn a_bundle_of_exactly_the_declared_actions_passes() {
         let emitted = [call(0x11, &[0xaa]), call(0x22, &[0xbb])];
@@ -2173,6 +2245,46 @@ mod tests {
         // With no leg, the whole bundle IS the declarations, in declared order.
         let declared: Vec<ExternalAction> = doc["external_actions"].clone().try_into().unwrap();
         assert!(DeclaredCalls::match_calls(&bundle, &declared).is_exact());
+    }
+
+    /// The CTM prepare's `[ctm_proxy_admin_split]` reaches the merged package under
+    /// `[ctms.zksync_os]` and stays out of the bundle: the replay and the simulator both run it on
+    /// its own, first.
+    #[test]
+    fn the_ctm_proxy_admin_split_stays_out_of_the_bundle_and_runs_first() {
+        let split = call(0xE0, &[0x7e]);
+        let section: toml::Value =
+            toml::from_str(&governance_toml(&[], Some(std::slice::from_ref(&split)))).unwrap();
+        let mut ctm = prepare_output(ctm_body(&[("ctm_transition_addr", TRANSITION)]), &[]);
+        ctm.body.insert(
+            "ctm_proxy_admin_split".into(),
+            section["ctms"]["zksync_os"]["ctm_proxy_admin_split"].clone(),
+        );
+        let doc = merge_prepare_outputs(
+            prepare_output(core_body(None), &[]),
+            vec![(Address::repeat_byte(0x77), ctm)],
+            &[],
+        )
+        .unwrap();
+        let toml = toml::to_string(&doc).unwrap();
+
+        let executions = governance_executions(&toml).unwrap();
+        assert_eq!(
+            targets_and_data(&executions.split),
+            targets_and_data(&[split])
+        );
+        assert_eq!(
+            targets_and_data(&executions.bundle),
+            targets_and_data(&[transition_leg()])
+        );
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ecosystem.toml");
+        fs::write(&path, toml).unwrap();
+        assert_eq!(
+            crate::commands::ecosystem::simulator::simulator_transaction_tags(&path).unwrap(),
+            ["ctm_proxy_admin_split", "governance"]
+        );
     }
 }
 
