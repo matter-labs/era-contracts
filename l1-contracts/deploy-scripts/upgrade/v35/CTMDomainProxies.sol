@@ -85,7 +85,8 @@ library CTMDomainProxies {
                     names[i],
                     " is behind ",
                     Strings.toHexString(admin),
-                    ", neither the CTM-domain nor the ecosystem ProxyAdmin"
+                    ", not the CTM-domain ProxyAdmin ",
+                    Strings.toHexString(_ctmAdmin)
                 )
             );
         }

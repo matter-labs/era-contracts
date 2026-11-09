@@ -225,7 +225,8 @@ contract UpgradeIntegrationTestLocalSplitCTMProxyAdmin is UpgradeIntegrationTest
                 string.concat(
                     "PermissionlessValidator is behind ",
                     Strings.toHexString(foreignAdmin),
-                    ", neither the CTM-domain nor the ecosystem ProxyAdmin"
+                    ", not the CTM-domain ProxyAdmin ",
+                    Strings.toHexString(splitAdmin)
                 )
             )
         );
