@@ -5,17 +5,14 @@
 //! supplier, CTM deployment tracker, …) directly from L1 rather than
 //! requiring callers to pass them explicitly.
 
-use alloy::network::Ethereum;
 use alloy::primitives::{Address, Bytes, U256};
-use alloy::providers::{ProviderBuilder, RootProvider};
 use anyhow::Context;
 
 use crate::common::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
-
-type AlloyProvider = RootProvider<Ethereum>;
+use crate::common::ethereum::{get_read_provider, AlloyProvider};
 
 fn provider(rpc_url: &str) -> anyhow::Result<AlloyProvider> {
-    Ok(ProviderBuilder::default().connect_http(rpc_url.parse()?))
+    get_read_provider(rpc_url)
 }
 
 fn ensure_nonzero(addr: Address, what: &str) -> anyhow::Result<Address> {

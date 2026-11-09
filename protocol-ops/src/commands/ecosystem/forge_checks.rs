@@ -45,7 +45,7 @@ use crate::common::abi::{
 use crate::common::anvil::{evm_increase_time_and_mine, send_impersonated_tx, set_balance};
 use crate::common::chain_upgrade_calls;
 use crate::common::env_config::EnvConfig;
-use crate::common::ethereum::{get_provider, AlloyProvider};
+use crate::common::ethereum::{get_read_provider, AlloyProvider};
 use crate::common::forge::{split_into_bundles, ForgeRunner, ForgeScriptArgs, SafeBundle};
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
 use crate::common::l1_contracts::{
@@ -213,7 +213,7 @@ pub(crate) async fn check_publication(
     output: &UpgradeOutput,
     bridgehub: Address,
 ) -> anyhow::Result<()> {
-    let provider = get_provider(rpc_url)?;
+    let provider = get_read_provider(rpc_url)?;
     let mut report = Report::default();
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
     let ctm = output.state_transition_address("chain_type_manager_proxy")?;
@@ -348,7 +348,7 @@ pub(crate) async fn check_provenance(
     txs: &[SafeTx],
     fork_block: u64,
 ) -> anyhow::Result<()> {
-    let provider = get_provider(rpc_url)?;
+    let provider = get_read_provider(rpc_url)?;
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
     let addresses = output.output_addresses();
     let mut undeployed = BTreeSet::new();
@@ -664,7 +664,7 @@ pub(crate) async fn replay(
 ) -> anyhow::Result<ReplayedChains> {
     let fork = Fork {
         rpc_url: rpc_url.to_string(),
-        provider: get_provider(rpc_url)?,
+        provider: get_read_provider(rpc_url)?,
     };
     let facts = read_facts(&fork, env_cfg, output)
         .await
