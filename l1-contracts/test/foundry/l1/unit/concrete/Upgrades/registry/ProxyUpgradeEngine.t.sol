@@ -188,6 +188,17 @@ contract DomainHandingEngine is DefaultProxyUpgradeEngine {
     }
 }
 
+/// @notice A careless engine: its `_beforeSwaps` scribbles over its inventory. The rows applied must
+///         still be the pinned ones (OZ N-16).
+contract InventoryRewritingEngine is DefaultProxyUpgradeEngine {
+    function _beforeSwaps(ProxyUpgradeContext memory, ProxyUpgradeRow[] memory _inventory) internal pure override {
+        for (uint256 i = 0; i < _inventory.length; ++i) {
+            _inventory[i].expectedOldImpl = address(0xdead);
+            _inventory[i].callInitializeUpgrade = true;
+        }
+    }
+}
+
 /// @notice A follow-up that reverts: the whole leg, swaps included, must roll back.
 contract RevertingFollowUpEngine is DefaultProxyUpgradeEngine {
     /// @dev Conditional only so that the base's postcondition call stays reachable (solc 5740).
@@ -462,6 +473,13 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
             ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(address(chainContractAddress))),
             address(ctmProxyAdmin)
         );
+    }
+
+    /// @notice OZ N-16: a hook's writes to its inventory do not reach the rows that are applied.
+    function test_aHookRewritingItsInventoryLeavesThePinnedRows() public {
+        IProxyUpgradeTransition t = _ctmTransition(address(new InventoryRewritingEngine()));
+        _applyInfrastructure(t);
+        assertEq(_liveImpl(ctmDomainProxy, ctmProxyAdmin), implNew, "the pinned row was applied");
     }
 
     /// @notice An engine that moves the ServerNotifier's proxy out from under the `ProxyAdmin` fails
