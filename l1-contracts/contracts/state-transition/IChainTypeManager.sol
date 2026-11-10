@@ -89,6 +89,7 @@ interface IChainTypeManager {
     function L1_INTEROP_FEE_MANAGER() external view returns (address);
 
     /// @notice The CTM's admin role (`setPendingAdmin` / `acceptAdmin`), distinct from its owner.
+    /// @dev The CTM-domain executor reads it on every engine leg, so every CTM implementation keeps it.
     function admin() external view returns (address);
 
     function setPendingAdmin(address _newPendingAdmin) external;

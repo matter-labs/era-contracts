@@ -21,6 +21,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {
+    ProxyUpgradeCTMAdminIsProxyAdmin,
     ProxyUpgradeEngineAuthorityMismatch,
     ProxyUpgradeRowMismatch,
     RegistryTargetHasNoCode,
@@ -478,14 +479,17 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         assertEq(IOwnable(serverNotifier).pendingOwner(), address(0));
     }
 
+    /// @dev As in a deployment, the CTM-domain ProxyAdmin administers the CTM (the shared fixture
+    ///      leaves it with an EOA).
+    function _putTheCtmUnderTheProxyAdmin() internal {
+        vm.prank(admin);
+        ITransparentUpgradeableProxy(address(chainContractAddress)).changeAdmin(address(ctmProxyAdmin));
+    }
+
     /// @notice An engine that moves the CTM's proxy out from under the `ProxyAdmin` is refused by the
     ///         executor itself.
     function test_revertWhen_theEngineMovesTheCtmProxyAdmin() public {
-        // As in a deployment, the CTM-domain ProxyAdmin administers the CTM (the shared fixture
-        // leaves it with an EOA).
-        vm.prank(admin);
-        ITransparentUpgradeableProxy(address(chainContractAddress)).changeAdmin(address(ctmProxyAdmin));
-
+        _putTheCtmUnderTheProxyAdmin();
         address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManagerProxy));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
@@ -495,13 +499,6 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
             ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(address(chainContractAddress))),
             address(ctmProxyAdmin)
         );
-    }
-
-    /// @dev As in a deployment, the CTM-domain ProxyAdmin administers the CTM (the shared fixture
-    ///      leaves it with an EOA).
-    function _putTheCtmUnderTheProxyAdmin() internal {
-        vm.prank(admin);
-        ITransparentUpgradeableProxy(address(chainContractAddress)).changeAdmin(address(ctmProxyAdmin));
     }
 
     /// @notice OZ N-14: making the `ProxyAdmin` the CTM's admin first does not let an engine move the
@@ -523,8 +520,8 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
     }
 
     /// @notice The degenerate case of N-14: a CTM whose admin already is the `ProxyAdmin` hashes the
-    ///         same moved or not, so the executor refuses that state outright.
-    function test_revertWhen_theCtmAdminIsTheProxyAdminAndTheEngineMovesTheCtm() public {
+    ///         same moved or not, so the executor refuses that state before any engine runs.
+    function test_revertWhen_theCtmAdminIsTheProxyAdmin() public {
         _putTheCtmUnderTheProxyAdmin();
         Call[] memory calls = new Call[](2);
         calls[0] = Call({
@@ -548,7 +545,9 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManagerProxy));
         IProxyUpgradeTransition t = _ctmTransition(engine);
         vm.prank(governor);
-        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
+        vm.expectRevert(
+            abi.encodeWithSelector(ProxyUpgradeCTMAdminIsProxyAdmin.selector, address(chainContractAddress))
+        );
         ctmExecutor.applyInfrastructureUpgrade(t);
     }
 

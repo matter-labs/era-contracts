@@ -10,6 +10,7 @@ import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {IOwnable} from "../../../common/interfaces/IOwnable.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
 import {
+    ProxyUpgradeCTMAdminIsProxyAdmin,
     ProxyUpgradeDomainMismatch,
     ProxyUpgradeEngineChangedExecutorOwnership,
     ProxyUpgradeEngineMovedDomainAuthority
@@ -67,6 +68,12 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
             proxyAdmin: address(_proxyAdmin),
             chainTypeManager: _chainTypeManager
         });
+        // A CTM the `ProxyAdmin` no longer administers answers `getProxyAdmin` with its own `admin()`:
+        // were that the `ProxyAdmin`, a moved CTM would hash as unmoved. The hash pins `admin()`, so
+        // refusing that state before the engine runs covers the leg.
+        if (_chainTypeManager != address(0) && IChainTypeManager(_chainTypeManager).admin() == address(_proxyAdmin)) {
+            revert ProxyUpgradeCTMAdminIsProxyAdmin(_chainTypeManager);
+        }
         address ownerBefore = owner();
         address pendingOwnerBefore = pendingOwner();
         bytes32 domainHoldersBefore = _domainHolders(_proxyAdmin, _chainTypeManager);
@@ -88,11 +95,6 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
         if (_domainHolders(_proxyAdmin, _chainTypeManager) != domainHoldersBefore) {
             revert ProxyUpgradeEngineMovedDomainAuthority(manifest.proxyUpgradeEngine);
         }
-        // A CTM the `ProxyAdmin` no longer administers answers `getProxyAdmin` with its own `admin()`:
-        // were that the `ProxyAdmin`, a moved CTM would hash as unmoved.
-        if (_chainTypeManager != address(0) && IChainTypeManager(_chainTypeManager).admin() == address(_proxyAdmin)) {
-            revert ProxyUpgradeEngineMovedDomainAuthority(manifest.proxyUpgradeEngine);
-        }
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(
             manifest.proxyUpgrades,
             ProxyUpgradeRowLib.inventoryLength(_domain)
@@ -110,6 +112,7 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
     ///      implementation: a moved CTM answers its own `admin()` (the caller refuses that being the
     ///      `ProxyAdmin`), a moved ServerNotifier has none and reverts the leg. The CTM's
     ///      `pendingAdmin` is private, so a nomination is not compared.
+    ///      TODO(v36): make the CTM's `pendingAdmin` readable (or drop the admin role) and compare it.
     function _domainHolders(ProxyAdmin _proxyAdmin, address _chainTypeManager) private view returns (bytes32) {
         if (_chainTypeManager == address(0)) {
             return keccak256(abi.encode(_proxyAdmin.owner()));

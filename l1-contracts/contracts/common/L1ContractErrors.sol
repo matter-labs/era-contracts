@@ -388,6 +388,8 @@ error ProofTooShort();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0x272c89a5
+error ProxyUpgradeCTMAdminIsProxyAdmin(address chainTypeManager);
 // 0x896ad688
 error ProxyUpgradeDomainMismatch(uint8 expected, uint8 actual);
 // 0x8771630a
