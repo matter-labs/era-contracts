@@ -113,7 +113,8 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
     ///      implementation: a moved CTM answers its own `admin()` (the caller refuses that being the
     ///      `ProxyAdmin`), a moved ServerNotifier has none and reverts the leg. The CTM's
     ///      `pendingAdmin` is private, so a nomination is not compared.
-    ///      TODO(v36): make the CTM's `pendingAdmin` readable (or drop the admin role) and compare it.
+    ///      TODO(v36): make the CTM's `pendingAdmin` readable and compare it, or drop the admin role.
+    ///      Either way the CTM keeps `admin()` (returning zero once the role is gone): this reads it.
     function _domainHolders(ProxyAdmin _proxyAdmin, address _chainTypeManager) private view returns (bytes32) {
         if (_chainTypeManager == address(0)) {
             return keccak256(abi.encode(_proxyAdmin.owner()));

@@ -471,7 +471,7 @@ reviewed with the release and not logged as `CallForwarded`
 ([above](#follow-up-calls-the-pinned-upgrade-engine)), so every `forward` cell below holds for it
 too, except a completed `setPendingAdmin` (the admin role changing hands), `setServerNotifier` and the
 last row: the executor's post-check refuses those (`ProxyUpgradeEngineMovedDomainAuthority`), as it
-refuses the ServerNotifier's `setChainTypeManager` and any change of the holders below.
+refuses any other change of the holders it compares.
 
 | CTM owner method                                                                                                          | Through the executors                                                                                                                               | Chain side                              |
 | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -494,7 +494,8 @@ The executors hold three more authorities, reached the same way (`forward`, or t
 inside a proxy leg):
 `CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
 (`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
-ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
+ecosystem `ProxyAdmin`. Inside a leg the post-check still refuses an engine's change to those
+contracts' owners or to the ServerNotifier's CTM. The `L1ChainAssetHandler` stays with its own owner.
 
 The `ValidatorTimelock` also keeps its own owner (governance): the bootstrap swaps only its
 implementation, through the CTM-domain `ProxyAdmin`, and never moves its `Ownable2Step` ownership.
@@ -636,7 +637,8 @@ an ADDRESS; what it runs is held to the reviewed build off chain (question 2), n
 - Authority and bindings: the executors' bound CTM, ProxyAdmin and owner, checked by value against
   the manifest before the domain is handed over.
 - Domains: each executor applies only objects of its own domain (`ProxyUpgradeDomainMismatch`),
-  through the `ProxyAdmin` it is bound to, and only for its owner.
+  through the `ProxyAdmin` it is bound to, and only for its owner. Before the pinned engine runs, a
+  CTM executor refuses a CTM whose admin is its `ProxyAdmin` (`ProxyUpgradeCTMAdminIsProxyAdmin`).
 
 **Post-state verification.** A second layer proves the upgrade LANDED, in the transaction that
 applies it:
@@ -644,10 +646,9 @@ applies it:
 - `ProxyUpgradeRowLib.applyRows` re-reads every row after the swaps and reverts unless each proxy
   runs its `implNew` — for both domains' proxy upgrade transitions and the bootstrap's `migrate()`
   alike.
-- Before the pinned engine runs, a CTM executor refuses a CTM whose admin is its `ProxyAdmin`;
-  after it returns, the executor reads its ownership, the domain's holders and every row's
-  implementation again ([the engine](#follow-up-calls-the-pinned-upgrade-engine)), and the engine's
-  `_checkPostconditions` reads back the release's follow-up calls.
+- After the pinned engine returns, the executor reads its ownership, the domain's holders and every
+  row's implementation again ([the engine](#follow-up-calls-the-pinned-upgrade-engine)), and the
+  engine's `_checkPostconditions` reads back the release's follow-up calls.
 - `CTMUpgradeExecutor.applyCTMUpgrade` ends by requiring that the CTM commits exactly this
   transition for its departure and has reached its target.
 - `RegistryBootstrapMigration.validateApplied()` — the bootstrap's completion check, the last call
