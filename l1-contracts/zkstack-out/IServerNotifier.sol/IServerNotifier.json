@@ -1,6 +1,19 @@
 [
   {
     "type": "function",
+    "name": "chainTypeManager",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IChainTypeManager"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "migrateFromGateway",
     "inputs": [
       {
