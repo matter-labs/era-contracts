@@ -100,6 +100,10 @@ export class AnvilManager {
       port.toString(),
       "--chain-id",
       chainId.toString(),
+      // The harness's chain ids are arbitrary, but Anvil maps well-known ones to a network family: 10 is
+      // OP Mainnet, whose fork schedule at the pinned genesis timestamp predates Shanghai (no PUSH0).
+      "--network",
+      "ethereum",
       "--accounts",
       "10",
       "--balance",

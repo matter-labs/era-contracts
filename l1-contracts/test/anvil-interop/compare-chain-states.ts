@@ -51,7 +51,13 @@ const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 // MessageRoot storage is a block/batch-indexed accumulator, so ~all of it legitimately drifts
 // run-to-run. Chain diamonds are handled separately: their deterministic fixed-layout state and
 // facet membership are compared, while their gas-sensitive priority-tree contents are not.
-const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set(["0x0000000000000000000000000000000000010005"]);
+// The EIP-2935 block-hash history and EIP-4788 beacon-root contracts drift wholesale too: Anvil
+// writes a ring-buffer entry into each for every mined block.
+const BLOCK_INDEXED_STORAGE_ACCOUNTS = new Set([
+  "0x0000000000000000000000000000000000010005",
+  "0x0000f90827f1c53a10cb7a02335b175320002935",
+  "0x000f3df6d732807ef1319fb7b8bb8522d0beac02",
+]);
 
 interface StorageAccountPolicies {
   skip: Set<string>;
