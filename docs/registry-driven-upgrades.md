@@ -255,8 +255,9 @@ it (`ProxyUpgradeExecutorBase`):
   executor's authority — the CTM, the CTM-domain `ProxyAdmin` and the ServerNotifier for a CTM
   executor, the ecosystem `ProxyAdmin` for the core executor. An engine cannot call the owner methods
   of governance-owned ecosystem contracts (Bridgehub, AssetRouter); those stay declared external
-  actions. It can still rewrite the storage of any proxy under its `ProxyAdmin`, rows included,
-  through `upgradeAndCall` (see the post-checks below), so that rests on the engine's review.
+  actions. It can still rewrite the storage of any proxy under its `ProxyAdmin` (rows, the CTM and
+  the ServerNotifier included) through `upgradeAndCall` (see the post-checks below), so that rests
+  on the engine's review.
   Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
   like) also accept the owner of the contract's `ProxyAdmin`, so the core executor's engine can make
   them while governance keeps ownership. The release that ships those implementations can already
@@ -267,22 +268,24 @@ it (`ProxyUpgradeExecutorBase`):
   read the same under the delegatecall. Only configuration an immutable cannot hold (a dynamic
   array, say) goes in the engine's own storage, read through an external call to
   `context.proxyUpgradeEngine`.
+- Before the engine runs, a CTM executor refuses a CTM whose `admin()` is the `ProxyAdmin`
+  (`ProxyUpgradeCTMAdminIsProxyAdmin`): a CTM the `ProxyAdmin` no longer administers answers
+  `getProxyAdmin` with its own `admin()`, so in that state a moved CTM would read as unmoved.
 - After the engine returns, the executor requires its `owner` and `pendingOwner` unchanged
   (`ProxyUpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin` and, for a CTM executor,
   the CTM's owner, pending owner, admin, proxy admin and ServerNotifier, and that ServerNotifier's
-  owner, pending owner and proxy admin, unchanged (`ProxyUpgradeEngineMovedDomainAuthority`: a hook
-  cannot transfer or nominate those holders through their setters, take the CTM's admin role,
-  re-point the CTM at another ServerNotifier, nor move those proxies with `changeProxyAdmin`; a
-  succession is a `forward`), and every row at its `implNew` again, so a hook that moves a row's
-  proxy is caught. A CTM the `ProxyAdmin` no longer administers answers `getProxyAdmin` with its own
-  `admin()`, so the executor also refuses a CTM whose admin is the `ProxyAdmin`. The CTM's
-  `pendingAdmin` is private: a hook that only nominates an admin is not seen. The check compares what
-  those getters return, and rows: a hook that swaps the implementation of, or `upgradeAndCall`s
-  into, any proxy under the `ProxyAdmin` (rows, the CTM and the ServerNotifier included) can change
-  what it returns or stores, and that, like moving another proxy to another `ProxyAdmin`, is engine
-  code the release review covers. Called directly with a real `ProxyAdmin`, an engine reverts
-  (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as the engine holds
-  no authority or storage of its own.
+  owner, pending owner, proxy admin and CTM, unchanged (`ProxyUpgradeEngineMovedDomainAuthority`: a
+  hook cannot transfer those holders, nominate an owner, take the CTM's admin role, re-point the CTM
+  at another ServerNotifier or the ServerNotifier at another CTM, nor move those proxies with
+  `changeProxyAdmin`; a succession is a `forward`), and every row at its `implNew` again, so a hook
+  that moves a row's proxy is caught. The CTM's `pendingAdmin` is private, so a hook that only
+  nominates a CTM admin is not seen; today that role gates only its own succession. The check
+  compares what those getters return, and rows: a hook that swaps the implementation of, or
+  `upgradeAndCall`s into, any proxy under the `ProxyAdmin` (rows, the CTM and the ServerNotifier
+  included) can change what it returns or stores, and that, like moving another proxy to another
+  `ProxyAdmin`, is engine code the release review covers. Called directly with a real `ProxyAdmin`,
+  an engine reverts (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as
+  the engine holds no authority or storage of its own.
 - A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
   is therefore source-checked like a row: skip what is at its target, act on the reviewed source
   state, revert on anything else; `_checkPostconditions` reads the result back, so a forgotten or
@@ -467,7 +470,8 @@ A release's pinned upgrade engine reaches the same methods from inside `applyInf
 reviewed with the release and not logged as `CallForwarded`
 ([above](#follow-up-calls-the-pinned-upgrade-engine)), so every `forward` cell below holds for it
 too, except a completed `setPendingAdmin` (the admin role changing hands), `setServerNotifier` and the
-last row: the executor's post-check refuses those (`ProxyUpgradeEngineMovedDomainAuthority`).
+last row: the executor's post-check refuses those (`ProxyUpgradeEngineMovedDomainAuthority`), as it
+refuses the ServerNotifier's `setChainTypeManager` and any change of the holders below.
 
 | CTM owner method                                                                                                          | Through the executors                                                                                                                               | Chain side                              |
 | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -640,9 +644,10 @@ applies it:
 - `ProxyUpgradeRowLib.applyRows` re-reads every row after the swaps and reverts unless each proxy
   runs its `implNew` — for both domains' proxy upgrade transitions and the bootstrap's `migrate()`
   alike.
-- After the pinned engine returns, the executor reads its ownership, the domain's holders and every
-  row's implementation again ([the engine](#follow-up-calls-the-pinned-upgrade-engine)), and the
-  engine's `_checkPostconditions` reads back the release's follow-up calls.
+- Before the pinned engine runs, a CTM executor refuses a CTM whose admin is its `ProxyAdmin`;
+  after it returns, the executor reads its ownership, the domain's holders and every row's
+  implementation again ([the engine](#follow-up-calls-the-pinned-upgrade-engine)), and the engine's
+  `_checkPostconditions` reads back the release's follow-up calls.
 - `CTMUpgradeExecutor.applyCTMUpgrade` ends by requiring that the CTM commits exactly this
   transition for its departure and has reached its target.
 - `RegistryBootstrapMigration.validateApplied()` — the bootstrap's completion check, the last call
