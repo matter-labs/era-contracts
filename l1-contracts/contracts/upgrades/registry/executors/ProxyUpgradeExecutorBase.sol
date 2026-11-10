@@ -31,9 +31,9 @@ import {
 ///         `IProxyUpgradeEngine.executeUpgrade` selector and arguments the executor builds itself.
 /// @dev The engine runs with the executor's authority and storage. What the executor checks after
 ///      it returns: its own ownership (owner and pending owner unchanged), the holders of the domain
-///      it lends the engine (the `ProxyAdmin`'s owner and, in a CTM domain, the owner, pending owner
-///      and proxy admin of the CTM and of its ServerNotifier unchanged; a succession is a `forward`,
-///      not a leg) and every row's proxy at its `implNew`.
+///      it lends the engine (the `ProxyAdmin`'s owner and, in a CTM domain, the CTM's owner, pending
+///      owner, admin and proxy admin, and its ServerNotifier's owner, pending owner and proxy admin,
+///      unchanged; a succession is a `forward`, not a leg) and every row's proxy at its `implNew`.
 ///      Anything else the engine does is what governance reviewed when it approved the transition,
 ///      and the engine's own postconditions.
 abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
@@ -90,6 +90,11 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
         if (_domainHolders(_proxyAdmin, _chainTypeManager, serverNotifier) != domainHoldersBefore) {
             revert ProxyUpgradeEngineMovedDomainAuthority(manifest.proxyUpgradeEngine);
         }
+        // A CTM the `ProxyAdmin` no longer administers answers `getProxyAdmin` with its own `admin()`:
+        // were that the `ProxyAdmin`, a moved CTM would hash as unmoved.
+        if (_chainTypeManager != address(0) && IChainTypeManager(_chainTypeManager).admin() == address(_proxyAdmin)) {
+            revert ProxyUpgradeEngineMovedDomainAuthority(manifest.proxyUpgradeEngine);
+        }
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(
             manifest.proxyUpgrades,
             ProxyUpgradeRowLib.inventoryLength(_domain)
@@ -101,11 +106,12 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
     /// @param _proxyAdmin The executor's bound `ProxyAdmin`.
     /// @param _chainTypeManager The executor's bound CTM, or zero in the `Core` domain.
     /// @param _serverNotifier The CTM's ServerNotifier as it was before the engine ran, or zero.
-    /// @return The hash of the `ProxyAdmin`'s owner and, with a CTM, the owner, pending owner and proxy
-    ///         admin of the CTM and of its ServerNotifier.
+    /// @return The hash of the `ProxyAdmin`'s owner and, with a CTM, the CTM's owner, pending owner,
+    ///         admin and proxy admin, and its ServerNotifier's owner, pending owner and proxy admin.
     /// @dev A proxy `_proxyAdmin` no longer administers passes `getProxyAdmin`'s `admin()` query to its
-    ///      implementation: a moved CTM answers its own `admin()` and fails the comparison, a moved
-    ///      ServerNotifier has none and reverts the leg.
+    ///      implementation: a moved CTM answers its own `admin()` (the caller refuses that being the
+    ///      `ProxyAdmin`), a moved ServerNotifier has none and reverts the leg. The CTM's
+    ///      `pendingAdmin` is private, so a nomination is not compared.
     function _domainHolders(
         ProxyAdmin _proxyAdmin,
         address _chainTypeManager,
@@ -120,6 +126,7 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
                 _proxyAdmin.owner(),
                 ctm.owner(),
                 ctm.pendingOwner(),
+                IChainTypeManager(_chainTypeManager).admin(),
                 _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(_chainTypeManager))
             )
         );

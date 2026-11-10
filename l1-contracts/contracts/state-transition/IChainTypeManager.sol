@@ -88,6 +88,9 @@ interface IChainTypeManager {
     /// {protocol-docs/interop-fee.md}.
     function L1_INTEROP_FEE_MANAGER() external view returns (address);
 
+    /// @notice The CTM's admin role (`setPendingAdmin` / `acceptAdmin`), distinct from its owner.
+    function admin() external view returns (address);
+
     function setPendingAdmin(address _newPendingAdmin) external;
 
     function acceptAdmin() external;

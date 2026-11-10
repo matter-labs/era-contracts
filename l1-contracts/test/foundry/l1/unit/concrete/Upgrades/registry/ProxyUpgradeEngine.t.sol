@@ -147,14 +147,18 @@ contract ProxyMovingEngine is DefaultProxyUpgradeEngine {
 }
 
 /// @dev What {DomainHandingEngine} hands away: the ownership of the `ProxyAdmin`, a pending
-///      ownership of the CTM or its ServerNotifier, or (`...Proxy`) the CTM's or the ServerNotifier's
-///      proxy, moved out from under the `ProxyAdmin`.
+///      ownership of the CTM or its ServerNotifier, (`...Proxy`) the CTM's or the ServerNotifier's
+///      proxy, moved out from under the `ProxyAdmin`, the CTM's admin role (`ChainTypeManagerAdmin`),
+///      or the CTM's proxy after making the `ProxyAdmin` the CTM's admin
+///      (`ChainTypeManagerProxyViaAdmin`, OZ N-14).
 enum HandedContract {
     ProxyAdmin,
     ChainTypeManager,
     ServerNotifier,
     ChainTypeManagerProxy,
-    ServerNotifierProxy
+    ServerNotifierProxy,
+    ChainTypeManagerAdmin,
+    ChainTypeManagerProxyViaAdmin
 }
 
 /// @notice A malicious engine: hands away part of the domain the executor lends it. The executor's
@@ -181,9 +185,22 @@ contract DomainHandingEngine is DefaultProxyUpgradeEngine {
                 ITransparentUpgradeableProxy(_context.chainTypeManager),
                 NEW_HOLDER
             );
-        } else {
+        } else if (HANDED == HandedContract.ServerNotifierProxy) {
             address serverNotifier = IChainTypeManager(_context.chainTypeManager).serverNotifierAddress();
             ProxyAdmin(_context.proxyAdmin).changeProxyAdmin(ITransparentUpgradeableProxy(serverNotifier), NEW_HOLDER);
+        } else if (HANDED == HandedContract.ChainTypeManagerAdmin) {
+            IChainTypeManager(_context.chainTypeManager).setPendingAdmin(address(this));
+            IChainTypeManager(_context.chainTypeManager).acceptAdmin();
+        } else {
+            ProxyAdmin proxyAdmin = ProxyAdmin(_context.proxyAdmin);
+            ITransparentUpgradeableProxy ctm = ITransparentUpgradeableProxy(_context.chainTypeManager);
+            IChainTypeManager(_context.chainTypeManager).setPendingAdmin(address(proxyAdmin));
+            proxyAdmin.upgradeAndCall(
+                ctm,
+                proxyAdmin.getProxyImplementation(ctm),
+                abi.encodeCall(IChainTypeManager.acceptAdmin, ())
+            );
+            proxyAdmin.changeProxyAdmin(ctm, NEW_HOLDER);
         }
     }
 }
@@ -473,6 +490,74 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
             ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(address(chainContractAddress))),
             address(ctmProxyAdmin)
         );
+    }
+
+    /// @dev As in a deployment, the CTM-domain ProxyAdmin administers the CTM (the shared fixture
+    ///      leaves it with an EOA).
+    function _putTheCtmUnderTheProxyAdmin() internal {
+        vm.prank(admin);
+        ITransparentUpgradeableProxy(address(chainContractAddress)).changeAdmin(address(ctmProxyAdmin));
+    }
+
+    /// @notice OZ N-14: making the `ProxyAdmin` the CTM's admin first does not let an engine move the
+    ///         CTM's proxy unseen (`getProxyAdmin` would fall through to that `admin()`). The CTM is
+    ///         not a row of this leg, so only the holders check can refuse it.
+    function test_revertWhen_theEngineMakesTheProxyAdminTheCtmAdminAndMovesTheCtm() public {
+        _putTheCtmUnderTheProxyAdmin();
+        address engine = address(
+            new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManagerProxyViaAdmin)
+        );
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(
+            ctmProxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(address(chainContractAddress))),
+            address(ctmProxyAdmin)
+        );
+    }
+
+    /// @notice The degenerate case of N-14: a CTM whose admin already is the `ProxyAdmin` hashes the
+    ///         same moved or not, so the executor refuses that state outright.
+    function test_revertWhen_theCtmAdminIsTheProxyAdminAndTheEngineMovesTheCtm() public {
+        _putTheCtmUnderTheProxyAdmin();
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({
+            target: address(chainContractAddress),
+            value: 0,
+            data: abi.encodeCall(IChainTypeManager.setPendingAdmin, (address(ctmProxyAdmin)))
+        });
+        ITransparentUpgradeableProxy ctm = ITransparentUpgradeableProxy(address(chainContractAddress));
+        calls[1] = Call({
+            target: address(ctmProxyAdmin),
+            value: 0,
+            data: abi.encodeCall(
+                ProxyAdmin.upgradeAndCall,
+                (ctm, ctmProxyAdmin.getProxyImplementation(ctm), abi.encodeCall(IChainTypeManager.acceptAdmin, ()))
+            )
+        });
+        vm.prank(governor);
+        ctmExecutor.forward(calls);
+        assertEq(chainContractAddress.admin(), address(ctmProxyAdmin), "the CTM's admin is the ProxyAdmin");
+
+        address engine = address(new DomainHandingEngine(makeAddr("newHolder"), HandedContract.ChainTypeManagerProxy));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+    }
+
+    /// @notice An engine that takes the CTM's admin role is refused: the role is a holder too. With the
+    ///         CTM under the `ProxyAdmin`, only the `admin()` term can see it.
+    function test_revertWhen_theEngineTakesTheCtmAdminRole() public {
+        _putTheCtmUnderTheProxyAdmin();
+        address adminBefore = chainContractAddress.admin();
+        address engine = address(new DomainHandingEngine(address(0), HandedContract.ChainTypeManagerAdmin));
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(chainContractAddress.admin(), adminBefore);
     }
 
     /// @notice OZ N-16: a hook's writes to its inventory do not reach the rows that are applied.

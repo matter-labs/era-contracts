@@ -266,10 +266,14 @@ it (`ProxyUpgradeExecutorBase`):
   `context.proxyUpgradeEngine`.
 - After the engine returns, the executor requires its `owner` and `pendingOwner` unchanged
   (`ProxyUpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin` and, for a CTM executor,
-  the owner, pending owner and proxy admin of the CTM and of its ServerNotifier unchanged
-  (`ProxyUpgradeEngineMovedDomainAuthority`: a hook cannot transfer or nominate those holders through
-  their setters, nor move those proxies with `changeProxyAdmin`; a succession is a `forward`), and
-  every row at its `implNew` again, so a hook that moves a row's proxy is caught. The check compares
+  the CTM's owner, pending owner, admin and proxy admin, and its ServerNotifier's owner, pending
+  owner and proxy admin, unchanged (`ProxyUpgradeEngineMovedDomainAuthority`: a hook cannot transfer or
+  nominate those holders through their setters, take the CTM's admin role, nor move those proxies with
+  `changeProxyAdmin`; a succession is a `forward`), and every row at its `implNew` again, so a hook
+  that moves a row's proxy is caught. A CTM the `ProxyAdmin` no longer administers answers
+  `getProxyAdmin` with its own `admin()`, so the executor also refuses a CTM whose admin is the
+  `ProxyAdmin`. The CTM's `pendingAdmin` is private: a hook that only nominates an admin is not seen.
+  The check compares
   what those getters return, and rows: a hook that swaps the implementation of, or `upgradeAndCall`s
   into, a proxy that is not a row (the CTM and the ServerNotifier included) can change what they
   return, and that, like moving another proxy to another `ProxyAdmin` or re-pointing the CTM at
@@ -459,8 +463,8 @@ method the executor has no entrypoint for, through the executor's owner-gated, l
 A release's pinned upgrade engine reaches the same methods from inside `applyInfrastructureUpgrade`,
 reviewed with the release and not logged as `CallForwarded`
 ([above](#follow-up-calls-the-pinned-upgrade-engine)), so every `forward` cell below holds for it
-too, except the last row: the executor's post-check refuses an ownership move
-(`ProxyUpgradeEngineMovedDomainAuthority`).
+too, except a completed `setPendingAdmin` (the admin role changing hands) and the last row: the
+executor's post-check refuses those (`ProxyUpgradeEngineMovedDomainAuthority`).
 
 | CTM owner method                                                                                                          | Through the executors                                                                                                                               | Chain side                              |
 | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
