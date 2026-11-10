@@ -14,6 +14,8 @@ struct RegisterZKChainConfig {
     address validatorSenderOperatorProve;
     // optional - if not set, then equal to 0
     address validatorSenderOperatorExecute;
+    // optional - dedicated REVERTER; when 0 the role stays on validatorSenderOperatorEth
+    address validatorSenderOperatorReverter;
     address baseToken;
     bytes32 baseTokenAssetId;
     uint128 baseTokenGasPriceMultiplierNominator;
