@@ -32,6 +32,7 @@
     {
       "paths": [
         "l1-contracts/contracts/upgrades/**",
+        "l1-contracts/contracts/governance/**",
         "l1-contracts/contracts/l2-upgrades/**",
         "l1-contracts/contracts/l2-system/**",
         "l1-contracts/deploy-scripts/**",

@@ -7,10 +7,6 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: ai-security-review-caller-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
-
 jobs:
   security-review:
     name: Security review
@@ -19,7 +15,15 @@ jobs:
       !github.event.pull_request.draft &&
       github.event.pull_request.user.type == 'User' &&
       github.event.sender.type == 'User' &&
-      !endsWith(github.actor, '[bot]')
+      !endsWith(github.actor, '[bot]') &&
+      !(
+        (github.event.pull_request.head.ref == 'draft/v0.35.0' &&
+         github.event.pull_request.base.ref == 'draft/v0.36.0') ||
+        startsWith(github.event.pull_request.head.ref, 'sync/')
+      )
+    concurrency:
+      group: ai-security-review-caller-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
     permissions:
       contents: read
       pull-requests: write

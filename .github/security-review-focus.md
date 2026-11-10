@@ -2,72 +2,118 @@
 
 Applies to ZKsync OS contracts, shared L1 contracts, genesis, deployment and upgrade tooling in this repository.
 
-## Available evidence
+## Release scope
 
-- Base the review on the supplied changes and relevant repository code, configuration, tests and documentation.
-- Trace changed behavior through relevant callers, validation and state transitions. Check documented invariants against their implementation.
-- Separate verified behavior from assumptions. State missing evidence or uncertainty, especially when assessing deployment state, dependencies or compatibility.
+- ZKsync OS only. Era (EraVM) chains and the Era CTM receive nothing from v34 onward; an Era-only consequence of a
+  change is not a finding.
+- All chains settle on L1. Gateway is softly deprecated and chain migration is disabled
+  (`CHAIN_MIGRATIONS_ENABLED = false` in `common/Config.sol`). Gateway-only and migration-only paths are not findings
+  unless the change re-enables them.
+- An L2 to L2 send must be atomic and an L2 to L1 send must be non-atomic (`InteropCenter`). Public L2 to L2 execution
+  was removed: `L2InteropHandler` exposes only `executeAtomicBundle` and `verifyAtomicBundle`. Commit-based interop roots
+  revert in `Executor`. Atomic interop settles on L1 only (`AtomicFlowManager._checkSettlementLayerIsL1`).
+- `protocol-docs/` specifies the intended behavior. Accepted limitations are under "Known issues" in
+  `protocol-docs/atomicity/security.md` and `protocol-docs/interop-gating.md`, and in the security notes of
+  `protocol-docs/bridging.md`. A change that widens one of them is still a finding.
 
-## Scope and trust boundaries
+## Roles
 
-- Protect shared escrow, base-token reserves, bridged assets, authenticated messages, settlement correctness and upgrade authority.
-- Treat L1 and L2 callers, token contracts, custom asset handlers, message payloads, proof encodings and external tooling inputs as untrusted.
-- Governance is trusted to exercise its documented powers correctly. Review initialization, authority handovers and paths that let other actors gain those powers.
-- A chain admin, operator or custom asset handler has only its documented authority. Check whether it can affect other chains, unrelated assets or shared infrastructure.
-- Distinguish proof-system soundness assumptions from the on-chain checks selecting verifiers, binding public inputs and enforcing interop eligibility and balance caps.
-- Trace shared L1 changes through callers and interfaces visible in the checkout. Do not assume which chains use an implementation or which versions are deployed unless the supplied context establishes that fact.
-- Follow the changed behavior through production callers and consumers. Tests, fixtures and generated outputs can expose a production bug; their presence is not an exclusion.
+- Governance (the Bridgehub owner) and the CTM owner (`CTMUpgradeExecutor` and `CoreUpgradeExecutor`, which can
+  `forward` arbitrary calls) are fully trusted. Review their implementation: scheduling, timelocks, cancellation,
+  ownership handovers and initialization, across new selectors, multicalls and encodings. Do not review their decisions.
+- A chain admin (a `ChainAdmin` with restrictions such as `PermanentRestriction`) and the chain's validators are trusted
+  for that chain only. Check that they cannot affect other chains, unrelated assets, shared escrow or shared settlement.
+- The Bridgehub admin may create chains and register base-token asset IDs, nothing more.
+- On L2, `ComplexUpgrader` and the bootloader are the privileged built-in callers.
+- Everyone else is untrusted, including token contracts, custom asset handlers, message payloads, proofs and tooling
+  inputs. Permissionless token registration (asset IDs are namespaced by the registrant) and L1 to L2 submission
+  (through the chain's transaction filterer and deposit pause) are intentional.
 
-## Authorization and identity
+## Funds and messages
 
-- Trace the original caller through routers, forwarded calls, delegate calls and L1-to-L2 address aliasing. Preserve sender, chain and asset identity at every boundary.
-- Check asset registration and counterpart authentication. A handler or tracker for one asset must not acquire authority over another asset or a shared vault.
-- Check governance, chain admin, validator and system-contract permissions separately, including initialization and ownership changes.
-- Trusting governance decisions does not exempt governance implementation from review. Check scheduling, timelocks, cancellation, owner transitions and attached restrictions across new selectors, multicalls and encodings.
-- Check commit, prove and execute roles, multisig committer thresholds, global and per-chain execution delays, and the intended priority-mode exceptions. An ordinary caller must not acquire validator authority through these paths.
-- Freezing must block the selectors marked freezable while preserving authorized recovery. Check freeze and unfreeze permissions and the freezability of new or replaced facets.
-- Privileged ZKsync OS hooks authenticate their immediate fixed-address built-in caller. Check that public entry points cannot misuse that caller to forge messages, mint value, install bytecode or publish interop commitments.
-- Permissionless token registration and transaction submission are intentional. Report a concrete authority bypass or impact beyond the caller's permitted actions.
+- A successful credit must have the backing its route requires. Trace lock, burn, mint, release, failed-deposit claims,
+  refunds and fees together. One chain or asset handler must not spend another chain's backing in the shared vault
+  beyond the per-chain balance rules.
+- Preserve sender, chain and asset identity through routers, forwarded calls and L1 to L2 address aliasing. A handler
+  or tracker for one asset must not gain authority over another asset or the shared vault.
+- Withdrawal, failed-deposit, bundle and refund identifiers must not be reusable across routes or chains.
 
-## Funds, messages and replay protection
+## Settlement and validators
 
-- Trace lock, burn, mint, release, failed-deposit claims, refunds and fees together. A successful credit must have the backing required by that asset and route.
-- Check chain and asset accounting, base-token reserves, interop pools and balance caps. One chain or handler must not spend another's backing outside the documented shared-pool rules.
-- Bind message and proof acceptance to the correct source chain, destination, sender, recipient, asset, amount, batch and root. Check domain separation and ambiguous encodings.
-- Verify that withdrawal, failed-deposit, bundle, call and refund identifiers cannot be reused across routes or chains. State consumption and external calls must remain safe under reentrancy and partial failure.
-- Treat arbitrary tokens and receivers as adversarial. Check balance deltas, callbacks, return data and unusual token behavior when they can affect other users or shared accounting.
+- `ValidatorTimelock` keeps commit, prove and execute roles separate and enforces `MultisigCommitter` thresholds. The
+  execution delay is the larger of the global and per-chain delays; a chain admin can only raise its own.
+- Commit requires an active protocol version (`protocolVersionIsActive`, the CTM deadline) and binds the chain-config
+  hash and interop fee units into the batch commitment. Chain-config changes require no unverified batches. Prove and
+  execute must refer to the same stored batch and full public input.
+- Anyone can activate priority mode once its conditions hold. Its batches carry only L1 transactions, skip the interop
+  fee and cannot be reverted; only the CTM owner can deactivate it. `permanentlyAllowPriorityMode` cannot be undone and
+  locks fee parameters, the token multiplier, the pubdata pricing mode, the transaction filterer and L1 transaction
+  filtering.
+- Mailbox, Executor and Committer are freezable; Admin, Getters and Migrator are not. New or replaced facets must keep
+  that split, and unfreeze must stay reachable.
+- The `*TestnetVerifier` contracts revert on chain ID 1. Test-only verifiers and DA stand-ins must stay out of
+  production deployment paths. Avail is validium-only. Permanent-rollup chains keep their DA validator pair and pubdata
+  restrictions in `Admin`.
 
-## Settlement, proofs and availability
+## Interop
 
-- Trace batch commit, proof verification and execution to the same stored batch and full public-input commitment, including runtime configuration, data availability and priority operations.
-- Check verifier selection, proof envelopes, required proof systems, upgrade boundaries and configuration changes with already committed batches. Test-only proof bypasses must stay confined to their intended environments.
-- Check authenticated roots, leaf indices, lengths, timestamps and imported-root validation. Reject malformed proofs and cross-domain substitutions rather than relying on an operator to format them correctly.
-- Check the bindings and trust assumptions of the configured data-availability scheme, including calldata, blobs and attestations where applicable. Preserve permanent-rollup restrictions on validator pairs and pubdata configuration; do not impose rollup guarantees on an intentional validium mode.
-- Bind proven interop fee units to execute-time charging and authorized fee-manager withdrawals. Trace any waiver or exemption through its documented authority.
-- Check priority-transaction ordering, inclusion and gas bounds. Publicly submitted transactions must not bypass restrictions or permanently block unrelated progress at low cost.
-- Distinguish an operator's accepted ability to delay its own chain from a new way to execute invalid state or disrupt other chains.
+- `enableInterop` in `L1MessageRoot` is one-way, and so is the second-proof-system requirement. Once a second proof
+  system is required, disabling one needs the Bridgehub owner, while enabling stays with the chain admin
+  (`setProofSystemStatus`). A chain whose balance backfill is pending has no balance cap. Chains without interop may use
+  only the native token vault or the chain asset handler.
+- Atomic flows check peer consent on send (`InteropCenter`) and on L1 registration (`ChainRegistrationSender`). Finality
+  and timeout refunds are mutually exclusive: inclusion needs a batch timestamp at or before the deadline, and absence
+  needs a root timestamp after it (`AtomicInteropProof`). Atomicity authorizes execution; it does not promise that each
+  destination call succeeds.
+- Interop fee units are proven at commit and charged at execute. The chain admin withdraws its prepaid balance, the
+  sweep to `feeRecipient` is permissionless, and priority mode is the only exemption.
 
-## Interop and atomic flows
+## Upgrades and genesis
 
-- Check peer consent, enabled-chain requirements and receive filters on every path where the protocol requires them, including finality and timeout refunds.
-- Finality and timeout authorization must remain mutually exclusive for the same flow. Verify authenticated time, inclusion and non-inclusion evidence, and the chain-registration prerequisites for those proofs.
-- Distinguish permission to execute from execution itself. Atomic flow authorization does not promise that every destination call succeeds or that arbitrary sender recovery logic returns funds.
-- Trace execution, unbundling and refund state transitions together. Check duplicate effects, recovery authorization, value recipients and compatibility with in-flight payloads after upgrades.
-- For denial of service, identify attacker prerequisites, cost, affected users and the available recovery. Separate self-inflicted failures from shared queue, proof or settlement failures.
+- Registry upgrades bind releases, transitions and manifests by `manifestHash`. Treat source and target release,
+  transition commitments, proxies, facets, implementations, upgrade engines and initialization data as one authority
+  path.
+- Registry executors delegatecall the upgrade engine that an approved transition pins (`ProxyUpgradeExecutorBase`).
+  The engine runs with the executor's authority and storage: its `ProxyAdmin` and, in the CTM domain, the CTM and
+  `ServerNotifier`. Review engine changes as governance-authority code. `forward` stays a plain call.
+- Compare changed storage layouts with the base snapshots. Keep reserved slots and enum values, and check initializer
+  replay.
+- L2 built-ins have no constructors or immutables. Genesis (`L2GenesisForceDeploymentsHelper`) and upgrades
+  (`L2InventoryLib`) must set their state and agree on fixed addresses, implementations and ownership.
+  `L2WrappedBaseToken` and `L2AdminFactory` are not built-ins and do have constructors.
+- System hooks check their immediate fixed-address caller and return empty success to an unauthorized caller instead
+  of reverting (`protocol-docs/system/system-hooks.md`). Public entry points must not let anyone else reach a hook
+  through that caller.
+- `ServerNotifier.setUpgradeTimestamp` is only a signal to the node. The enforced boundary is the CTM protocol version
+  deadline.
+- In tooling (`protocol-ops`, deploy scripts, upgrade-env inputs), trace configuration, RPC data and paths to file
+  writes, subprocesses and generated transactions. Outputs must be bound to the intended network, addresses, bytecode
+  and signers.
 
-## Upgrades, genesis and operational tooling
+## Generated files
 
-- Check source and target releases, transition commitments, proxy identities, facets, implementations, upgrade engines and initialization data as one authority path.
-- Compare changed storage declarations and inherited layouts with supplied base snapshots where available. Preserve reserved slots and enum values; check initializer replay, rollback and compatibility with older interfaces represented in the available code and fixtures.
-- For components touched by the change, compare genesis and upgrade inventories in both directions: fixed addresses, proxy ownership, implementations, initialization and required state must agree unless a difference is intentional.
-- L2 built-ins cannot depend on constructors or immutables. Check that genesis and upgrade initialization establish their required state.
-- Check governance bundle ordering, atomicity, authority handovers and postconditions. A valid package hash or published bytecode alone does not establish safe executable behavior.
-- Check scheduled activation times and per-version precondition checkers against their documented authority and compatibility with pending upgrades.
-- Trace untrusted configuration, RPC data, artifact paths and command arguments in tooling to file writes, subprocesses and transaction generation. Check how code binds output to the network, revision, addresses, bytecode and signers established by local configuration and artifacts.
+Skip the contents of these reproducible generated outputs during security review:
+
+- `AllContractsHashes.json`
+- `l1-contracts/selectors`
+- `l1-contracts/zkstack-out/**/*.json`
+- `configs/genesis/zksync-os/latest.json`
+- `l1-contracts/test/anvil-interop/chain-states/v0.35.0/*.json.gz`
+- `l1-contracts/test/anvil-interop/chain-states/v0.35.0/addresses.json`
+- `l1-contracts/scripts/registry-manifests/v35-local.json`
+
+The hashes, selectors, zkstack exports, genesis and chain-state outputs are regenerated and checked by
+`pre-merge-checks`. The local registry manifest is regenerated and drift-checked by the anvil upgrade test.
+Do not analyze their hex, bytecode or other generated contents, or report findings in those contents.
+
+Only skip the listed v0.35.0 chain-state outputs while CI regenerates that version. Previous-release fixtures are
+inputs to upgrade tests, not rebuilt outputs; keep them in scope.
+
+Review the sources, generators, inputs and CI checks that produce and validate these outputs. Changes that weaken
+regeneration or comparison checks remain in scope. Do not extend this list merely because a file looks generated.
+Historical upgrade records, deployment configurations and other registry manifests remain in scope.
 
 ## Reporting
 
-Report reachable security impact introduced or worsened by the change. State the attacker role, configuration, affected assets or users, and the broken invariant.
-Static code tracing can substantiate a finding without executing an exploit. Separate code-proven behavior from deployment assumptions, and do not claim runtime reproduction.
-Use existing accepted limitations as context; do not suppress a regression or broader impact because a related limitation was previously documented.
-Avoid style, gas-only suggestions and claims that require a trusted role to deliberately misuse its authorized powers.
+State the attacker role, configuration, affected assets or users and the broken invariant. Separate code-proven
+behavior from deployment assumptions. Do not report claims that need a trusted role to misuse its documented powers.
