@@ -5,8 +5,8 @@ Airbender + ZiSK (type 5) proofs according to the chain's switch. See
 [proof-mode discovery and switch semantics](../../../../protocol-docs/multi-proof-verification.md). `ZiskVerifier`
 is its range verifier: it pins three values, RECONSTRUCTS the 576-byte ZiSK
 public values on-chain from those pins and the batch public inputs (the
-self-contained seed-0 chain), and delegates the Plonk check to a standalone
-snarkJS-generated verifier referenced through `IZiskSnarkPlonkVerifier`. The
+self-contained seed-0 chain), and delegates the SNARK check to ZiSK's own
+pilfflonk verifier, `PilfflonkVerifier`, through `IZiskSnarkVerifier`. The
 public values are not carried in the proof, so there is nothing redundant to
 cross-check and the cross-proof binding is inherent.
 
@@ -38,51 +38,45 @@ and regenerate the contract.
 `verificationKeyHash()` is `keccak256` over the three pins in that order, so
 a rotation of any pin rotates the hash.
 
-The pins come from [zksync-os-zisk release 0.0.9](https://github.com/matter-labs/zksync-os-zisk/releases/tag/0.0.9),
-the ZKsync OS 0.6.0 guest on zksync-os-revm v0.4.0, using ZiSK
-[v1.3.2-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.3.2-alpha).
-The release commit records both reproducible ELF hashes, both program VKs and
-the vadcop-final root. The combined verification-key hash is
-`0x482778c1f7c2f1153a627d52a592d6d44d8dda440ddae77dc101e31251f49197`.
-
-The final PLONK circuit key is unchanged from ZiSK 1.3.0-alpha: every field of
-the committed key (domain, SRS point, omega, coset constants and circuit
-commitments) matches the upstream v1.3.2-alpha `zisk-contracts/PlonkVerifier.sol`.
-Existing backends for that circuit can be reused.
+The pins come from the move of the ZiSK lane to ZiSK
+[v1.4.0-alpha](https://github.com/0xPolygonHermez/zisk/releases/tag/v1.4.0-alpha)
+in [zksync-os-zisk#66](https://github.com/matter-labs/zksync-os-zisk/pull/66),
+the ZKsync OS 0.6.0 guest on zksync-os-revm v0.4.0. That PR records both
+reproducible ELF hashes, both program VKs and the vadcop-final root. The
+combined verification-key hash is
+`0x38afdbde9dffe0a1ef942e7214d59700b47319d225d4558bb6f166ef09a31dd7`.
 
 The real-proof fixtures come from
-[fixture-session run 39274149227](https://github.com/matter-labs/zksync-os-zisk/actions/runs/39274149227),
-which reproduced both release 0.0.9 guest ELFs, proved four deterministic
-batches on the release pins, compared their commitments with native execution,
-and produced the aggregated binding digest
-`0xec1bf9cd08fde7ce771e6ceb96064b0fa73b3a475e7f6da8675989c3c40b13a2`.
+[fixture-session run 41671348755](https://github.com/matter-labs/zksync-os-zisk/actions/runs/41671348755),
+which reproduced both guest ELFs, proved four deterministic batches on the
+pins, compared their commitments with native execution, and produced the
+aggregated binding digest
+`0x5afe2e89a27ddd841b343cff7fb3a9f3c0dc18b0d6bc7d685fbfa55af59c9bd0`.
 
-## Preparing the backend
+## The SNARK verifier
 
-Deployment requires a standalone backend implementing `IZiskSnarkPlonkVerifier`.
-If one is already deployed for the selected verification key, use its address as
-`zisk_plonk_verifier_addr`. Reuse that backend across guest VK updates: the
-inner/aggregator program VKs and vadcop-final root are pinned in our
-`ZiskVerifier` wrapper. A new backend is needed only when its final PLONK
-circuit/setup verification key changes. Multiple wrappers on the same L1 can
-use the same backend.
+`PilfflonkVerifier.sol` is ZiSK's generated verifier for the release's
+Poseidon1 pilfflonk verification key (digest
+`0xe8f7e04ba2ff5bedda661368eb890d4b70fa8c139cac772ef42cb30cac2f454b`). It is
+upstream's `zisk-contracts/poseidon1/PilfflonkVerifier.sol` at ZiSK
+v1.4.0-alpha (commit `64a1f1664184e76053686745d50c6b9aaa51b034`), copied
+unmodified (sha256
+`13a14c51355acc520ace141112bb6b97b42f8e6db6490a2f85173bfdce85646a`). Upstream
+licenses it MIT OR Apache-2.0. The file carries only the SPDX line and our root
+`LICENSE-MIT` is Matter Labs' own, so ZiSK's MIT notice ships next to it as
+`PilfflonkVerifier.LICENSE-MIT`; refresh both from the same upstream commit on a
+rotation. Keep it byte-identical to upstream, so a review
+of a key rotation is a diff of two upstream files, and so lint and formatting
+skip it.
 
-Backend preparation and optional deployment live in
-[zk-deployer](https://github.com/matter-labs/zksync-os-integration-tests/blob/d1be31737c3d68346cf36495ec0991cefd5233e3/bin/zk-deployer/README.md).
-It reads this checkout's `tools/verifier-gen/data/ZiSK_plonk_verification_key.json`,
-fetches the pinned upstream dependencies, and builds outside Git checkouts.
-The upstream source and notices are preserved; generated outputs retain their
-upstream license and stay out of published packages.
+`verifyProof(bytes32[69], uint256[1])` takes the 2,208-byte proof as 69
+big-endian words and the circuit's single public signal. It compiles to
+9,767 bytes of runtime code.
 
-To prepare, deploy, or test directly from a zk-deployer checkout:
-
-```bash
-node bin/zk-deployer/tools/zisk-backend/zisk-backend.js deploy /path/to/era-contracts -- \
-  --rpc-url "$RPC_URL" --account deployer --broadcast
-```
-
-The helper prints `zisk_plonk_verifier_addr` for the deployment config. Its
-`prepare` command only builds and prints the external artifact path.
+The SNARK verifier changes only with the release's pilfflonk key. Guest program
+changes rotate the three pins of `ZiskVerifier` and leave the SNARK verifier as
+it is, so one deployed `PilfflonkVerifier` serves every `ZiskVerifier` of the
+same ZiSK release.
 
 ## Generating the range verifier
 
@@ -94,17 +88,18 @@ cargo run -- --variant zisk \
   --zisk_output_path ../../l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol
 ```
 
-This command only generates `ZiskVerifier`; backend preparation is independent.
+This command only generates `ZiskVerifier`.
 
 ## Deploying and wiring
 
-Set `zisk_plonk_verifier_addr` in `config-deploy-ctm.toml`. With
-`multi_proof_verifier = true`, `DeployCTM` wires that backend into `ZiskVerifier`
-and `MultiProofVerifier`. Deployment rejects an address without code; the
-operator must select the backend for the intended verification key.
+With `multi_proof_verifier = true` in `config-deploy-ctm.toml`, `DeployCTM`
+deploys `PilfflonkVerifier`, then `ZiskVerifier` over it, and wires
+`ZiskVerifier` into `MultiProofVerifier`. The output records both, as
+`zisk_snark_verifier_addr` and `zisk_verifier_addr`.
 
-After a SNARK circuit change, update the committed Plonk verification key,
-prepare/deploy the new backend, and redeploy `ZiskVerifier` with its address.
+An operator may instead supply a range verifier of their own through
+`zisk_range_verifier_addr`. Deployment rejects an address without code, and it
+then deploys neither `PilfflonkVerifier` nor `ZiskVerifier`.
 
 ## The Airbender side
 
@@ -124,31 +119,14 @@ zero.
 ## Tests
 
 `ZiskVerifierRealProofTest` drives a real aggregated cargo-zisk proof through
-`ZiskVerifier.verify`, so it exercises the on-chain reconstruction and the
-real pairing together. Run the full Foundry suite with a locally prepared
-backend from a zk-deployer checkout:
-
-```bash
-node bin/zk-deployer/tools/zisk-backend/zisk-backend.js test /path/to/era-contracts
-```
-
-Additional test flags may follow `--`, for example
-`-- --match-contract ZiskVerifierRealProofTest`. The helper sets
-`ZISK_PLONK_BYTECODE` from the prepared artifact and requires the real-proof
-suite's prerequisite.
-
-This repository's CI does not depend on zk-deployer, so its `yarn test:foundry`
-run skips the real-proof suite. The suite runs in zk-deployer's CI against a
-pinned era-contracts revision.
-
-Ordinary `yarn test:foundry` runs skip the real-proof suite when
-`ZISK_PLONK_BYTECODE` is unset. Invalid supplied bytecode fails setup.
-`ZISK_REQUIRE_REAL_PROOFS=true` also makes absent bytecode fail setup.
+`ZiskVerifier.verify` over the vendored `PilfflonkVerifier`, so it exercises the
+on-chain reconstruction and the real pairing together. It also checks a real
+per-batch proof against its own signal, and that a tampered proof, public value
+or range is rejected. It runs in every `yarn test:foundry`.
 
 `MultiProofRangeVectorTest` pins the same aggregation vector against a
 signal stand-in, which lets it assert the exact reconstructed signal and
-reject near-misses. The remaining multi-proof tests use mocks and run
-unconditionally.
+reject near-misses. The remaining multi-proof tests use mocks.
 
 These suites live in `test/foundry/l1/unit/concrete/Verifier/`, the path the
 `test:foundry` script runs.

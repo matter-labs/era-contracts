@@ -268,6 +268,11 @@
                 "internalType": "address"
               },
               {
+                "name": "ziskSnarkVerifier",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
                 "name": "ziskVerifier",
                 "type": "address",
                 "internalType": "address"
@@ -333,11 +338,6 @@
                 "name": "enabled",
                 "type": "bool",
                 "internalType": "bool"
-              },
-              {
-                "name": "ziskPlonkVerifierAddr",
-                "type": "address",
-                "internalType": "address"
               },
               {
                 "name": "ziskRangeVerifierAddr",

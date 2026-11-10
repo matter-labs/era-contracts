@@ -139,8 +139,8 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         }
 
         uint256 ziskStart = 3 + _proof[2];
-        // 24 = the ZiSK SNARK proof words. The ZiSK public values are no
-        // longer carried: the range verifier reconstructs them on-chain.
+        // The ZiSK section is the SNARK alone. The ZiSK public values are not
+        // carried: the range verifier reconstructs them on-chain.
         if (_proof.length < ziskStart + ZISK_SNARK_PROOF_LENGTH) {
             revert ProofTooShort();
         }
@@ -162,8 +162,8 @@ contract MultiProofVerifier is IVerifier, IZKsyncOSVerifier {
         // chain), then checks the SNARK. Nothing about the state transition is
         // read from the submitted proof, so the cross-proof binding is
         // inherent: a ZiSK proof attesting to a different transition would
-        // reconstruct a different signal and fail here. Only the 24-word SNARK
-        // is passed through.
+        // reconstruct a different signal and fail here. Only the SNARK words
+        // are passed through.
         if (!ZISK_RANGE_VERIFIER.verify(_publicInputs, _proof[ziskStart:ziskStart + ZISK_SNARK_PROOF_LENGTH])) {
             revert ZiskVerificationFailed();
         }
