@@ -253,9 +253,11 @@ it (`ProxyUpgradeExecutorBase`):
 - The context is the executor's own, built from its immutables: the transition, the engine, the
   domain, the executor's `ProxyAdmin` and (CTM domain) its CTM. So the hooks act with exactly the
   executor's authority — the CTM, the CTM-domain `ProxyAdmin` and the ServerNotifier for a CTM
-  executor, the ecosystem `ProxyAdmin` for the core executor. Owner methods of governance-owned
-  ecosystem contracts (Bridgehub, AssetRouter) are not reachable and stay declared external
-  actions. Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
+  executor, the ecosystem `ProxyAdmin` for the core executor. An engine cannot call the owner methods
+  of governance-owned ecosystem contracts (Bridgehub, AssetRouter); those stay declared external
+  actions. It can still rewrite the storage of any proxy under its `ProxyAdmin`, rows included,
+  through `upgradeAndCall` (see the post-checks below), so that rests on the engine's review.
+  Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
   like) also accept the owner of the contract's `ProxyAdmin`, so the core executor's engine can make
   them while governance keeps ownership. The release that ships those implementations can already
   call them in `_afterSwaps`, on the contracts its rows upgrade; a release that only wires needs a
@@ -276,9 +278,9 @@ it (`ProxyUpgradeExecutorBase`):
   `admin()`, so the executor also refuses a CTM whose admin is the `ProxyAdmin`. The CTM's
   `pendingAdmin` is private: a hook that only nominates an admin is not seen. The check compares what
   those getters return, and rows: a hook that swaps the implementation of, or `upgradeAndCall`s
-  into, a proxy that is not a row (the CTM and the ServerNotifier included) can change what they
-  return, and that, like moving another proxy to another `ProxyAdmin`, is engine code the release
-  review covers. Called directly with a real `ProxyAdmin`, an engine reverts
+  into, any proxy under the `ProxyAdmin` (rows, the CTM and the ServerNotifier included) can change
+  what it returns or stores, and that, like moving another proxy to another `ProxyAdmin`, is engine
+  code the release review covers. Called directly with a real `ProxyAdmin`, an engine reverts
   (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as the engine holds
   no authority or storage of its own.
 - A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
