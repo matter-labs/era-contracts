@@ -24,19 +24,12 @@ contract MultiProofVerifierDeployer is DeployCTMScript {
     function deployMultiProofLane(address _owner, bool _testnet, address _ziskRange) public {
         config.multiProof.ziskRangeVerifierAddr = _ziskRange;
         config.testnetVerifier = _testnet;
-        config.multiProof.enabled = true;
         config.ownerAddress = _owner;
         deployVerifiers();
     }
 
     function writeOutput(string memory _path) public {
         saveOutput(_path);
-    }
-
-    function deployAirbenderLane(bool _testnet) public {
-        config.testnetVerifier = _testnet;
-        config.multiProof.enabled = false;
-        deployVerifiers();
     }
 }
 
@@ -131,32 +124,11 @@ contract MultiProofVerifierDeploymentTest is Test {
         );
     }
 
-    function testFuzz_singleProver_addressesHaveNoMultiproverComponents(bool _testnet) public {
-        deployer.deployAirbenderLane(_testnet);
-        _assertAirbenderOnlyAddresses();
-    }
-
     function test_repeatedDeployment_clearsUnusedComponents() public {
         deployer.deployMultiProofLane(owner, true);
         assertGt(deployer.getAddresses().multiProof.ziskTestnetVerifier.code.length, 0);
         deployer.deployMultiProofLane(owner, false);
         assertEq(deployer.getAddresses().multiProof.ziskTestnetVerifier, address(0));
-        deployer.deployAirbenderLane(false);
-        _assertAirbenderOnlyAddresses();
-    }
-
-    function _assertAirbenderOnlyAddresses() internal view {
-        CTMDeployedAddresses memory addresses = deployer.getAddresses();
-        assertGt(addresses.stateTransition.verifiers.verifier.code.length, 0);
-        assertEq(
-            address(ZKsyncOSVerifier(addresses.stateTransition.verifiers.verifier).PLONK_VERIFIER()),
-            addresses.stateTransition.verifiers.verifierPlonk
-        );
-        assertEq(addresses.multiProof.airbenderVerifier, address(0));
-        assertEq(addresses.multiProof.ziskSnarkVerifier, address(0));
-        assertEq(addresses.multiProof.ziskVerifier, address(0));
-        assertEq(addresses.multiProof.ziskTestnetVerifier, address(0));
-        assertEq(addresses.multiProof.multiProofVerifier, address(0));
     }
 
     function test_rangeVerifierWithoutCode_revertsDeployment() public {
