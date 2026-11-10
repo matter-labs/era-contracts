@@ -35,6 +35,8 @@ contract DefaultProxyUpgradeEngine is IProxyUpgradeEngine {
         if (proxyAdminOwner != address(this)) {
             revert ProxyUpgradeEngineAuthorityMismatch(address(proxyAdmin), proxyAdminOwner);
         }
+        // Each call below converts the calldata `_inventory` into a fresh memory copy: one shared copy
+        // would let a hook change the rows `applyRows` applies.
         _beforeSwaps(_context, _inventory);
         ProxyUpgradeRowLib.applyRows(
             proxyAdmin,
