@@ -20,6 +20,7 @@ import {ProxyUpgradeRowLib} from "contracts/upgrades/registry/libraries/ProxyUpg
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {IServerNotifier} from "contracts/governance/IServerNotifier.sol";
 import {
     ProxyUpgradeCTMAdminIsProxyAdmin,
     ProxyUpgradeEngineAuthorityMismatch,
@@ -153,7 +154,8 @@ contract ProxyMovingEngine is DefaultProxyUpgradeEngine {
 ///      ownership of the CTM or its ServerNotifier, (`...Proxy`) the CTM's or the ServerNotifier's
 ///      proxy, moved out from under the `ProxyAdmin`, the CTM's admin role (`ChainTypeManagerAdmin`),
 ///      the CTM's proxy after making the `ProxyAdmin` the CTM's admin (`ChainTypeManagerProxyViaAdmin`,
-///      OZ N-14), or the CTM's ServerNotifier binding (`ServerNotifierBinding`, OZ N-17).
+///      OZ N-14), the CTM's ServerNotifier binding (`ServerNotifierBinding`, OZ N-17), or the
+///      ServerNotifier's own CTM binding (`ServerNotifierBackPointer`).
 enum HandedContract {
     ProxyAdmin,
     ChainTypeManager,
@@ -162,7 +164,8 @@ enum HandedContract {
     ServerNotifierProxy,
     ChainTypeManagerAdmin,
     ChainTypeManagerProxyViaAdmin,
-    ServerNotifierBinding
+    ServerNotifierBinding,
+    ServerNotifierBackPointer
 }
 
 /// @notice A malicious engine: hands away part of the domain the executor lends it. The executor's
@@ -205,8 +208,11 @@ contract DomainHandingEngine is DefaultProxyUpgradeEngine {
                 abi.encodeCall(IChainTypeManager.acceptAdmin, ())
             );
             proxyAdmin.changeProxyAdmin(ctm, NEW_HOLDER);
-        } else {
+        } else if (HANDED == HandedContract.ServerNotifierBinding) {
             ChainTypeManager(_context.chainTypeManager).setServerNotifier(NEW_HOLDER);
+        } else {
+            address serverNotifier = IChainTypeManager(_context.chainTypeManager).serverNotifierAddress();
+            IServerNotifier(serverNotifier).setChainTypeManager(IChainTypeManager(NEW_HOLDER));
         }
     }
 }
@@ -584,6 +590,21 @@ contract ProxyUpgradeEngineTest is CTMUpgradeExecutorFixture {
         vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
         ctmExecutor.applyInfrastructureUpgrade(t);
         assertEq(chainContractAddress.serverNotifierAddress(), address(serverNotifier));
+    }
+
+    /// @notice An engine cannot point the CTM's ServerNotifier at another CTM: the notifier would then
+    ///         serve that CTM's chain admins.
+    function test_revertWhen_theEngineRePointsTheServerNotifiersCtm() public {
+        IServerNotifier serverNotifier = IServerNotifier(chainContractAddress.serverNotifierAddress());
+        assertEq(address(serverNotifier.chainTypeManager()), address(chainContractAddress), "bound both ways");
+        address engine = address(
+            new DomainHandingEngine(makeAddr("otherCtm"), HandedContract.ServerNotifierBackPointer)
+        );
+        IProxyUpgradeTransition t = _ctmTransition(engine);
+        vm.prank(governor);
+        vm.expectRevert(abi.encodeWithSelector(ProxyUpgradeEngineMovedDomainAuthority.selector, engine));
+        ctmExecutor.applyInfrastructureUpgrade(t);
+        assertEq(address(serverNotifier.chainTypeManager()), address(chainContractAddress));
     }
 
     /// @notice OZ N-16: a hook's writes to its inventory do not reach the rows that are applied.

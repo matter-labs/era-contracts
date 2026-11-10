@@ -9,6 +9,7 @@ import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {IOwnable} from "../../../common/interfaces/IOwnable.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
+import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 import {
     ProxyUpgradeCTMAdminIsProxyAdmin,
     ProxyUpgradeDomainMismatch,
@@ -33,9 +34,9 @@ import {
 /// @dev The engine runs with the executor's authority and storage. What the executor checks after
 ///      it returns: its own ownership (owner and pending owner unchanged), the holders of the domain
 ///      it lends the engine (the `ProxyAdmin`'s owner and, in a CTM domain, the CTM's owner, pending
-///      owner, admin, proxy admin and ServerNotifier, and that ServerNotifier's owner, pending owner
-///      and proxy admin, unchanged; a succession or a re-pointed ServerNotifier is a `forward`, not a
-///      leg) and every row's proxy at its `implNew`.
+///      owner, admin, proxy admin and ServerNotifier, and that ServerNotifier's owner, pending owner,
+///      proxy admin and CTM, unchanged; a succession or a re-pointed ServerNotifier is a `forward`,
+///      not a leg) and every row's proxy at its `implNew`.
 ///      Anything else the engine does is what governance reviewed when it approved the transition,
 ///      and the engine's own postconditions.
 abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
@@ -106,8 +107,8 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
     /// @param _proxyAdmin The executor's bound `ProxyAdmin`.
     /// @param _chainTypeManager The executor's bound CTM, or zero in the `Core` domain.
     /// @return The hash of the `ProxyAdmin`'s owner and, with a CTM, the CTM's owner, pending owner,
-    ///         admin, proxy admin and ServerNotifier, and that ServerNotifier's owner, pending owner and
-    ///         proxy admin.
+    ///         admin, proxy admin and ServerNotifier, and that ServerNotifier's owner, pending owner,
+    ///         proxy admin and CTM.
     /// @dev A proxy `_proxyAdmin` no longer administers passes `getProxyAdmin`'s `admin()` query to its
     ///      implementation: a moved CTM answers its own `admin()` (the caller refuses that being the
     ///      `ProxyAdmin`), a moved ServerNotifier has none and reverts the leg. The CTM's
@@ -139,7 +140,8 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
                     holders,
                     notifier.owner(),
                     notifier.pendingOwner(),
-                    _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(serverNotifier))
+                    _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(serverNotifier)),
+                    IServerNotifier(serverNotifier).chainTypeManager()
                 )
             );
     }

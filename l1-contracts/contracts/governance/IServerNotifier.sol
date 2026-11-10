@@ -37,6 +37,10 @@ interface IServerNotifier {
         uint256 _oldProtocolVersion
     ) external view returns (uint256);
 
+    /// @notice The CTM whose chain admins the notifier serves.
+    /// @dev The CTM-domain executor reads it on every engine leg, so every notifier implementation keeps it.
+    function chainTypeManager() external view returns (IChainTypeManager);
+
     function setChainTypeManager(IChainTypeManager _chainTypeManager) external;
 
     function migrateToGateway(uint256 _chainId) external;

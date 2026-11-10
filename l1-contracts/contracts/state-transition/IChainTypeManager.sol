@@ -131,6 +131,7 @@ interface IChainTypeManager {
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
+    /// @dev The CTM-domain executor reads it on every engine leg, so every CTM implementation keeps it.
     function serverNotifierAddress() external view returns (address);
 
     function validatorTimelockPostV29() external view returns (address);
