@@ -115,9 +115,6 @@ same L1 token. This is a known limitation.
 - **Ecosystem senders.** Contracts such as `CTMDeploymentTracker` and `ChainRegistrationSender`
   send two-bridges requests to the L2 Bridgehub, which are generic calls and are rejected in
   `WITHDRAWALS_ONLY` unless their sender is exempt.
-- **Governance.** The ZK Nation `Guardians` contract cancels and proposes L2 governor proposals
-  through the Era Mailbox's `requestL2Transaction`. These are generic calls too, so it is exempted
-  before switching to `WITHDRAWALS_ONLY`.
 
 ## Era mainnet
 
@@ -161,7 +158,6 @@ between 2025-11-06 and 2026-11-09 (L1 blocks 23,740,000 to 26,376,900). With it 
   | ZKsync `ProtocolUpgradeHandler`          | `0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3` | 1            | L2 contract upgrades                                                                       |
   | L2Scan `L2ScanEthereumBridgeV2`          | `0x375424756f4a5ada1ce1e0849abdd19255b1729e` | 1            | ETH to an L2 account                                                                       |
   | Unverified contract                      | `0xab23df3fd78f45e54466d08926c3a886211ac5a1` | 2            | `receiveHashes` calls to two L2 contracts                                                  |
-  | ZK Nation `Guardians`                    | `0x8f525e55f76050d8dfdda4870da1b3ede54e908f` | 0            | L2 governor proposals and cancellations                                                    |
 
   Apart from the asset router and the Lido and NODL bridges, the other senders were EOAs and two
   Safes, mostly sending ETH, which `WITHDRAWALS_ONLY` mode is meant to reject.
