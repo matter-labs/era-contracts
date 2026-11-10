@@ -31,7 +31,7 @@ import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
 
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, ProofSystem} from "contracts/common/Config.sol";
 import {ZkChainAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
@@ -51,6 +51,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
 
     RegisterZKChainConfig internal config;
     ZkChainAddresses internal output;
+    bool internal enableZisk;
 
     function run(address _chainTypeManagerProxy, uint256 _chainChainId) public {
         runWithPaths(
@@ -194,6 +195,9 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
             config.validatorSenderOperatorExecute = toml.readAddress("$.chain.validator_sender_operator_execute");
         } else {
             config.validatorSenderOperatorExecute = address(0);
+        }
+        if (vm.keyExistsToml(toml, "$.chain.enable_zisk")) {
+            enableZisk = toml.readBool("$.chain.enable_zisk");
         }
 
         config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
@@ -448,6 +452,11 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
 
         if (config.validiumMode) {
             zkChain.setPubdataPricingMode(PubdataPricingMode.Validium);
+        }
+        // The contracts start a new chain with ZiSK enabled; the tooling makes it opt-in. Done while
+        // the deployer is still the admin, before the chain has a batch to prove.
+        if (!enableZisk) {
+            zkChain.setProofSystemStatus(ProofSystem.Zisk, false);
         }
 
         vm.stopBroadcast();

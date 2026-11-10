@@ -25,6 +25,7 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     // ZK chain Admin facet: the current and the pre-v31 signature
     "upgradeChainFromVersion(address,uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     "upgradeChainFromVersion(uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
+    "setProofSystemStatus(uint8,bool)",
     // ChainTypeManager
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
@@ -49,6 +50,9 @@ pub(super) const INLINE_CALLDATA_MAX_BYTES: usize = 4 + 2 * 32;
 const SEMVER_MINOR_OFFSET: u32 = 32;
 const SEMVER_MAJOR_OFFSET: u32 = 64;
 const SEMVER_PART_MASK: u64 = u32::MAX as u64;
+
+/// `ProofSystem.Zisk`, the only system `setProofSystemStatus` accepts on ZKsync OS.
+const PROOF_SYSTEM_ZISK: u8 = 2;
 
 fn known_functions() -> &'static [Function] {
     static TABLE: OnceLock<Vec<Function>> = OnceLock::new();
@@ -149,6 +153,17 @@ pub(super) fn annotation(data: &[u8]) -> Option<String> {
                 protocol_version(first)
             };
             Some(format!("{subject} at timestamp {}", uint(1)?))
+        }
+        "setProofSystemStatus" => {
+            let system = match uint(0)? {
+                system if system == U256::from(PROOF_SYSTEM_ZISK) => "ZiSK".to_string(),
+                system => format!("proof system {system}"),
+            };
+            let enabled = matches!(args.get(1), Some(DynSolValue::Bool(true)));
+            Some(format!(
+                "{system} {}",
+                if enabled { "enabled" } else { "disabled" }
+            ))
         }
         "scheduleTransparent" => Some(format!("delay {} s", uint(1)?)),
         "transferOwnership" | "setPendingAdmin" => Some(format!(
