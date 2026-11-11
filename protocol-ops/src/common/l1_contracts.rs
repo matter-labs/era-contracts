@@ -69,6 +69,17 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
             ctms.push(ctm);
         }
     }
+    select_zksync_os_ctm(l1_rpc_url, bridgehub, ctms).await
+}
+
+/// The ZKsync OS CTM among `ctms` (an `--env` preset's): the one the bridgehub still registers
+/// whose `isZKsyncOS()` is true. Unlike `discover_ctm_proxy`, it takes `eth_call`s alone.
+pub async fn select_zksync_os_ctm(
+    l1_rpc_url: &str,
+    bridgehub: Address,
+    ctms: Vec<Address>,
+) -> anyhow::Result<Address> {
+    let p = provider(l1_rpc_url)?;
     single_zksync_os_ctm(bridgehub, &zksync_os_ctms(&p, bridgehub, ctms).await?)
 }
 

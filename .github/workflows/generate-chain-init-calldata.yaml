@@ -44,7 +44,7 @@ on:
         required: true
         type: string
       ctm_proxy:
-        description: "ZKsync OS CTM proxy. Empty: discovered from L1, which scans eth_getLogs from block 0"
+        description: "ZKsync OS CTM proxy. Empty: the one among the preset's CTMs, checked on L1 (a preset without a CTM list scans eth_getLogs from block 0)"
         required: false
         type: string
         default: ""

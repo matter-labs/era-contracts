@@ -45,9 +45,9 @@ pub struct ChainInitArgs {
     #[serde(flatten)]
     pub topology: crate::common::EcosystemArgs,
 
-    /// CTM proxy address. Optional: the ZKsync OS CTM is discovered from L1 when omitted. Pass
-    /// it where the RPC caps the `eth_getLogs` range, since discovery scans
-    /// `ChainTypeManagerAdded` from block 0.
+    /// CTM proxy address. Optional: when omitted, the ZKsync OS CTM among the `--env` preset's
+    /// CTMs, checked on L1. Without the preset's CTM list, it is discovered from L1, which scans
+    /// `ChainTypeManagerAdded` from block 0: pass it where the RPC caps the `eth_getLogs` range.
     #[clap(long, help_heading = "Input")]
     pub ctm_proxy: Option<Address>,
 
@@ -115,11 +115,19 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     let ctm_proxy = match args.ctm_proxy {
         Some(ctm) => ctm,
-        None => crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, bridgehub)
-            .await
-            .context("Failed to discover CTM proxy from L1")?,
+        None => match args.topology.env_config()? {
+            Some(cfg) if !cfg.ctms().is_empty() => {
+                let ctms = cfg.ctms().iter().map(|ctm| ctm.proxy).collect();
+                crate::common::l1_contracts::select_zksync_os_ctm(&runner.rpc_url, bridgehub, ctms)
+                    .await
+                    .context("Failed to pick the ZKsync OS CTM among the --env preset's CTMs")?
+            }
+            _ => crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, bridgehub)
+                .await
+                .context("Failed to discover CTM proxy from L1")?,
+        },
     };
-    logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
+    logger::info(format!("CTM proxy: {:#x}", ctm_proxy));
 
     crate::common::l1_contracts::ensure_supported_os_ctm(&runner.rpc_url, ctm_proxy)
         .await

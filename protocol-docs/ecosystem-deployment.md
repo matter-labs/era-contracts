@@ -221,16 +221,18 @@ governance enables interop for it on `L1MessageRoot`, and its admin allows each 
 | Chain parameters                         | chain id, owner, operators, base token and price ratio, `--da-mode`, `--l1-da-validator`, pubdata delivery overrides    |
 
 `--env <name>` exists on `ecosystem init`, `ctm init` and `chain init` (which takes the bridgehub
-from it); `hub init` takes flags only. For the first two it reads two files: the owner
+and the CTMs from it); `hub init` takes flags only. For the first two it reads two files: the owner
 and the Era chain id come from the release input `l1-contracts/upgrade-envs/<release>/<name>.toml`,
 the ZK token asset id from `l1-contracts/upgrade-envs/permanent-values/<name>.toml`. Since
 `permanent-values` requires `bridgehub_proxy_addr`, `--env` cannot be used for an ecosystem that
 does not exist yet; a fresh ecosystem is deployed with flags.
 
-When `--ctm-proxy` is omitted, `chain init` discovers the ZKsync OS CTM from L1: the one CTM the
+When `--ctm-proxy` is omitted, `chain init` takes the ZKsync OS CTM from L1: the one CTM the
 Bridgehub still registers (`chainTypeManagerIsRegistered`) whose `isZKsyncOS()` is true, among the
-CTMs of its chains and those `ChainTypeManagerAdded` names, scanned from block 0, which hosted RPCs
-may refuse. It fails when there is none or more than one.
+`--env` preset's CTMs. Without the preset's CTM list (no `--env`, or a preset with no
+`[[ctm_contracts.ctms]]`), it looks among the CTMs of the Bridgehub's chains and those
+`ChainTypeManagerAdded` names, scanned from block 0, which hosted RPCs may refuse. It fails when
+there is none or more than one.
 
 `upgrade-envs/permanent-values/<env>.toml` is the per-environment fact sheet (L1 chain id,
 Bridgehub, CTMs, governance kind); a new ecosystem gets a new file there once its addresses exist,
