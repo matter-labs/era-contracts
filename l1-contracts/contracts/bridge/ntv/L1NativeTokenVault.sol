@@ -26,14 +26,7 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddr
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
-import {
-    AssetIdAlreadyRegistered,
-    NoFundsTransferred,
-    OriginChainIdNotFound,
-    Unauthorized,
-    WithdrawFailed,
-    ZeroAddress
-} from "../../common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, AssetIdNotSupported, NoFundsTransferred, OriginChainIdNotFound, Unauthorized, WithdrawFailed, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {ClaimFailedDepositFailed, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
@@ -164,6 +157,27 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 amount = DEPRECATED_chainBalance[_chainId][_assetId];
         DEPRECATED_chainBalance[_chainId][_assetId] = 0;
         return amount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Chain shutdown
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IL1NativeTokenVault
+    /// @dev Mirrors the payout part of `bridgeMint`: tokens native to L1 are released from the vault,
+    /// bridged tokens are minted (as they would have been on a withdrawal).
+    function transferShutdownChainFunds(
+        bytes32 _assetId,
+        address _to,
+        uint256 _amount
+    ) external onlyAssetTracker whenNotPaused {
+        address token = tokenAddress[_assetId];
+        require(token != address(0), AssetIdNotSupported(_assetId));
+        if (originChainId[_assetId] == block.chainid) {
+            _withdrawFunds(_assetId, _to, token, _amount);
+        } else {
+            IBridgedStandardToken(token).bridgeMint(_to, _amount);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

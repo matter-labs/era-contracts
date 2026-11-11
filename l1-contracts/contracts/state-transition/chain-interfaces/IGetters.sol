@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
-import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
+import {PubdataPricingMode, ShutdownInformation} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
@@ -105,6 +105,12 @@ interface IGetters is IZKChainBase {
     /// @return Verifier parameters.
     /// @dev This function is deprecated and will soon be removed.
     function getVerifierParams() external view returns (VerifierParams memory);
+
+    /// @return Whether the chain has been irreversibly shut down
+    function isShutdown() external view returns (bool);
+
+    /// @return The shutdown approvals and status of the chain
+    function getShutdownInfo() external view returns (ShutdownInformation memory);
 
     /// @return Whether the diamond is frozen or not
     function isDiamondStorageFrozen() external view returns (bool);

@@ -29,6 +29,20 @@ interface IL1AssetTracker {
 
     event PauseDepositsForChainRequested(uint256 indexed chainId, uint256 indexed settlementLayer);
 
+    /// @notice Emitted when a chain notifies the asset tracker that it has been irreversibly shut down.
+    event ChainShutdownRegistered(uint256 indexed chainId);
+
+    /// @notice Emitted when the governance sets the distributor for a shut down chain.
+    event ShutdownDistributorSet(uint256 indexed chainId, address indexed distributor);
+
+    /// @notice Emitted when the L1 funds of a shut down chain are sent to its distributor.
+    event ShutdownChainFundsSent(
+        uint256 indexed chainId,
+        bytes32 indexed assetId,
+        address indexed distributor,
+        uint256 amount
+    );
+
     function BRIDGE_HUB() external view returns (IBridgehubBase);
 
     function handleChainBalanceIncreaseOnL1(
@@ -54,4 +68,14 @@ interface IL1AssetTracker {
     function setAddresses() external;
 
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
+
+    function isChainShutdown(uint256 _chainId) external view returns (bool);
+
+    function shutdownDistributor(uint256 _chainId) external view returns (address);
+
+    function registerChainShutdown(uint256 _chainId) external;
+
+    function setShutdownDistributor(uint256 _chainId, address _distributor) external;
+
+    function sendShutdownChainFunds(uint256 _chainId, bytes32 _assetId) external returns (uint256 amount);
 }

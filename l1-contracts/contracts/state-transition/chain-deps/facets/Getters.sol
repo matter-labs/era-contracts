@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {PubdataPricingMode} from "../ZKChainStorage.sol";
+import {PubdataPricingMode, ShutdownInformation} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
@@ -188,6 +188,16 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     /// @inheritdoc IGetters
     function getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
         return s.l2SystemContractsUpgradeBatchNumber;
+    }
+
+    /// @inheritdoc IGetters
+    function isShutdown() external view returns (bool) {
+        return s.shutdownInfo.activated;
+    }
+
+    /// @inheritdoc IGetters
+    function getShutdownInfo() external view returns (ShutdownInformation memory) {
+        return s.shutdownInfo;
     }
 
     /// @inheritdoc IGetters

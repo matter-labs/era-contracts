@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AmountToKeepOnL1NotUint256();
 // 0x7a734a36
 error AssetAlreadyRegistered(bytes32 assetId);
+// 0xae410527
+error AssetBalanceNotOnL1(uint256 chainId, bytes32 assetId);
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0xffaa9b75
@@ -17,6 +19,8 @@ error BaseTokenTotalSupplyBackfillRequired();
 error CanNotSendInteropToL1(uint256 destinationChainId);
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
+// 0x7165f465
+error ChainNotShutdown(uint256 chainId);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0xb13a28eb
@@ -59,6 +63,8 @@ error InvalidWithdrawalChainId();
 error MissingBaseTokenAssetId();
 // 0x10c549b7
 error MustBeWithdrawalToL1(uint256 destinationChainId);
+// 0x7e862ce6
+error NoChainBalanceToSend(uint256 chainId, bytes32 assetId);
 // 0x8dfed13a
 error NotMigratedChain();
 // 0x4a22c4b8
@@ -69,6 +75,12 @@ error OnlyWhitelistedSettlementLayer(address, address);
 error RegisterNewTokenNotAllowed();
 // 0xaad86dcd
 error SettlementFeePayerNotAgreed(address payer, uint256 chainId);
+// 0x2b6d6822
+error SettlementLayerCannotBeShutdown(uint256 chainId);
+// 0x92767805
+error ShutdownChainNativeAsset(uint256 chainId, bytes32 assetId);
+// 0x3da0b0be
+error ShutdownDistributorNotSet(uint256 chainId);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x34838ed2

@@ -5,58 +5,17 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {
-    L2DACommitmentScheme,
-    MAX_GAS_PER_TRANSACTION,
-    MAX_PRICE_CHANGE_DENOMINATOR,
-    MAX_PRICE_CHANGE_NUMERATOR,
-    PRICE_REFERENCE_L1_GAS,
-    PRICE_UPDATE_INTERVAL,
-    PRIORITY_EXPIRATION,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-} from "../../../common/Config.sol";
-import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
+import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, MAX_PRICE_CHANGE_DENOMINATOR, MAX_PRICE_CHANGE_NUMERATOR, PRICE_REFERENCE_L1_GAS, PRICE_UPDATE_INTERVAL, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../common/Config.sol";
+import {FeeParams, PubdataPricingMode, ShutdownInformation} from "../ZKChainStorage.sol";
+import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {
-    L1DAValidatorAddressIsZero,
-    NotL1,
-    PriorityModeAlreadyAllowed,
-    ExecutedIsNotConsistentWithVerified,
-    VerifiedIsNotConsistentWithCommitted,
-    NotMigrated
-} from "../../L1StateTransitionErrors.sol";
-import {
-    AlreadyPermanentRollup,
-    BaseTokenPreV31TotalSupplyAlreadySet,
-    DenominatorIsZero,
-    DiamondAlreadyFrozen,
-    DiamondNotFrozen,
-    FeeParamsChangeTooLarge,
-    HashMismatch,
-    InvalidDAForPermanentRollup,
-    InvalidL2DACommitmentScheme,
-    InvalidPubdataPricingMode,
-    PriorityModeActivationTooEarly,
-    PriorityModeIsNotAllowed,
-    PriorityModeRequiresPermanentRollup,
-    PriorityOpsRequestTimestampMissing,
-    PriorityTxPubdataExceedsMaxPubDataPerBatch,
-    ProtocolIdMismatch,
-    ProtocolIdNotGreater,
-    TokenMultiplierChangeTooFrequent,
-    TooMuchGas,
-    Unauthorized,
-    UpgradeTimestampNotReached,
-    NotCompatibleWithPriorityMode
-} from "../../../common/L1ContractErrors.sol";
+import {L1DAValidatorAddressIsZero, NotL1, PriorityModeAlreadyAllowed, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, NotMigrated} from "../../L1StateTransitionErrors.sol";
+import {AlreadyPermanentRollup, BaseTokenPreV31TotalSupplyAlreadySet, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, UpgradeTimestampNotReached, NotCompatibleWithPriorityMode, ChainShutdownAlreadyApproved, ChainShutdownNotApproved} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
-} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 import {IL2BaseTokenZKOS} from "../../../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
@@ -384,7 +343,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 onlyZKsyncOS {
+    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 onlyZKsyncOS notShutdown {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
@@ -419,7 +378,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function activatePriorityMode() external onlySettlementLayer onlyL1 notPriorityMode nonReentrant {
+    function activatePriorityMode() external onlySettlementLayer onlyL1 notPriorityMode notShutdown nonReentrant {
         if (!s.priorityModeInfo.canBeActivated) {
             revert PriorityModeIsNotAllowed();
         }
@@ -484,7 +443,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         address, // _chainAddress (unused in this specific implementation)
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyAdminOrChainTypeManagerOrValidator {
+    ) external onlyAdminOrChainTypeManagerOrValidator notShutdown {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
         bytes32 upgradeCutHash = IChainTypeManager(s.chainTypeManager).upgradeCutHash(_oldProtocolVersion);
         if (cutHashInput != upgradeCutHash) {
@@ -536,6 +495,59 @@ contract AdminFacet is ZKChainBase, IAdmin {
         });
 
         _executeDiamondCut(cutData);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            CHAIN SHUTDOWN
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IAdmin
+    /// @dev The shutdown becomes active in the same call in which the second party approves it.
+    /// Upon activation:
+    /// - all committed but not executed batches are reverted, so the final state of the chain is the one
+    ///   of the last executed batch (`shutdownInfo.lastExecutedBatch`);
+    /// - the L1AssetTracker is notified, which blocks any further withdrawals / failed deposit claims for the chain
+    ///   and allows the chain's L1 funds to be sent to the distributor set by the governance.
+    // slither-disable-next-line reentrancy-no-eth
+    function approveShutdown() external onlyAdminOrChainTypeManager onlySettlementLayer onlyL1 notShutdown {
+        ShutdownInformation memory info = s.shutdownInfo;
+        if (msg.sender == s.admin) {
+            require(!info.approvedByAdmin, ChainShutdownAlreadyApproved());
+            info.approvedByAdmin = true;
+        } else {
+            require(!info.approvedByChainTypeManager, ChainShutdownAlreadyApproved());
+            info.approvedByChainTypeManager = true;
+        }
+        emit ShutdownApproved(msg.sender);
+
+        if (!(info.approvedByAdmin && info.approvedByChainTypeManager)) {
+            s.shutdownInfo = info;
+            return;
+        }
+
+        uint256 lastExecutedBatch = s.totalBatchesExecuted;
+        info.activated = true;
+        info.lastExecutedBatch = uint64(lastExecutedBatch);
+        s.shutdownInfo = info;
+
+        // The final state of the chain is the state after the last executed batch.
+        _revertBatches(lastExecutedBatch);
+
+        IL1AssetTracker(s.assetTracker).registerChainShutdown(s.chainId);
+
+        emit ChainShutdown(lastExecutedBatch);
+    }
+
+    /// @inheritdoc IAdmin
+    function revokeShutdownApproval() external onlyAdminOrChainTypeManager notShutdown {
+        if (msg.sender == s.admin) {
+            require(s.shutdownInfo.approvedByAdmin, ChainShutdownNotApproved());
+            s.shutdownInfo.approvedByAdmin = false;
+        } else {
+            require(s.shutdownInfo.approvedByChainTypeManager, ChainShutdownNotApproved());
+            s.shutdownInfo.approvedByChainTypeManager = false;
+        }
+        emit ShutdownApprovalRevoked(msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////

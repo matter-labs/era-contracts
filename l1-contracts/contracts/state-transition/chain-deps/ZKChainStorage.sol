@@ -65,6 +65,20 @@ struct PriorityModeInformation {
     address transactionFilterer;
 }
 
+/// @notice Information about the irreversible shutdown of the chain.
+/// @dev Shutdown requires the approval of both the chain admin and the ChainTypeManager (i.e. its owner, the governance).
+/// Once both have approved, `activated` is set and it can never be unset.
+/// @param approvedByAdmin Whether the chain admin has approved the shutdown.
+/// @param approvedByChainTypeManager Whether the ChainTypeManager (governance) has approved the shutdown.
+/// @param activated Whether the shutdown is active. Once `true`, it stays `true` forever.
+/// @param lastExecutedBatch The last executed batch at the moment of shutdown, i.e. the final state of the chain.
+struct ShutdownInformation {
+    bool approvedByAdmin;
+    bool approvedByChainTypeManager;
+    bool activated;
+    uint64 lastExecutedBatch;
+}
+
 /// @dev storing all storage variables for ZK chain diamond facets
 /// NOTE: It is used in a proxy, so it is possible to add new variables to the end
 /// but NOT to modify already existing variables or change their order.
@@ -260,4 +274,7 @@ struct ZKChainStorage {
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
     /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
+    /// @dev Information about the irreversible shutdown of the chain.
+    /// @dev STORAGE SLOT: 69
+    ShutdownInformation shutdownInfo;
 }

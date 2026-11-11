@@ -11,22 +11,8 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
-import {
-    CanOnlyProcessOneBatch,
-    CantExecuteUnprovenBatches,
-    InvalidMessageRoot,
-    InvalidProof,
-    NonSequentialBatch,
-    PriorityOperationsRollingHashMismatch,
-    VerifiedBatchesExceedsCommittedBatches
-} from "../../../common/L1ContractErrors.sol";
-import {
-    CommitBasedInteropNotSupported,
-    DependencyRootsRollingHashMismatch,
-    InvalidBatchesDataLength,
-    MessageRootIsZero,
-    MismatchNumberOfLayer1Txs
-} from "../../L1StateTransitionErrors.sol";
+import {CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, InvalidMessageRoot, InvalidProof, NonSequentialBatch, PriorityOperationsRollingHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
+import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -160,7 +146,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
-    ) external nonReentrant onlyValidatorOrPriorityMode onlySettlementLayer {
+    ) external nonReentrant onlyValidatorOrPriorityMode onlySettlementLayer notShutdown {
         (
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
@@ -238,7 +224,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
-    ) external nonReentrant onlyValidatorOrPriorityMode onlySettlementLayer {
+    ) external nonReentrant onlyValidatorOrPriorityMode onlySettlementLayer notShutdown {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
