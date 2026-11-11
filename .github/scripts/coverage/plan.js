@@ -10,7 +10,8 @@ const { totals } = require("./check");
 const ROOT = path.resolve(__dirname, "../../..");
 const WORKFLOW = ".github/workflows/l1-contracts-ci.yaml";
 const SPEC_DIRECTORY = "l1-contracts/test/anvil-interop/test/hardhat";
-const RECIPE_FILES = [WORKFLOW, ".github/scripts/coverage/plan.js", ".nvmrc", ".github/foundry-versions.env"];
+const RECIPE_FILES = [WORKFLOW, ".github/scripts/coverage/plan.js", ".nvmrc"];
+const FOUNDRY_PIN = ".github/foundry-versions.env";
 const SHA = /^[a-f0-9]{40}$/;
 const GROUP_COUNT = 2;
 const WAIT_MS = 120000;
@@ -22,6 +23,18 @@ function coverageCommand(_read) {
     throw new Error("coverage:foundry must be a single-line forge coverage command");
   }
   return command;
+}
+
+// Each revision is measured with the Foundry it pins, so the pin belongs to the measured commit and
+// not to the recipe. A bump can change what the base's own tests and committed chain states work
+// with (Anvil's state dump format, cheatcode semantics), so the base cannot be re-measured with
+// the PR's toolchain.
+function foundryVersion(_read) {
+  const version = /^FOUNDRY_VERSION=([A-Za-z0-9._-]+)\r?$/m.exec(_read(FOUNDRY_PIN))?.[1];
+  if (!version) {
+    throw new Error("Invalid Foundry version pin");
+  }
+  return version;
 }
 
 function recipeHash(_read, _coverageCommand = coverageCommand(_read)) {
@@ -138,9 +151,8 @@ async function main() {
   const command = coverageCommand(read);
   const recipe = recipeHash(read, command);
   const nodeVersion = read(".nvmrc").trim();
-  const foundryVersion = /^FOUNDRY_VERSION=([A-Za-z0-9._-]+)\r?$/m.exec(read(".github/foundry-versions.env"))?.[1];
-  if (!/^[A-Za-z0-9.*_/-]+$/.test(nodeVersion) || !foundryVersion) {
-    throw new Error("Invalid Node or Foundry version pin");
+  if (!/^[A-Za-z0-9.*_/-]+$/.test(nodeVersion)) {
+    throw new Error("Invalid Node version pin");
   }
   const ensureCommit = (sha) => {
     try {
@@ -169,17 +181,20 @@ async function main() {
       plan.revisions.push({ kind: "base", sha: plan.base_sha });
     }
   }
-  const anvil = plan.revisions.flatMap((revision) =>
+  const revisions = plan.revisions.map((revision) => ({
+    ...revision,
+    foundry_version: foundryVersion((file) => git("show", `${revision.sha}:${file}`)),
+  }));
+  const anvil = revisions.flatMap((revision) =>
     groupSpecs(revision, git("ls-tree", "-z", "--name-only", `${revision.sha}:${SPEC_DIRECTORY}`).split("\0"))
   );
   const outputs = {
     ...plan,
-    revisions: JSON.stringify(plan.revisions),
+    revisions: JSON.stringify(revisions),
     anvil: JSON.stringify({ include: anvil }),
     recipe,
     cached: String(cached),
     node_version: nodeVersion,
-    foundry_version: foundryVersion,
     coverage_command: command,
   };
   fs.appendFileSync(

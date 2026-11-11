@@ -80,7 +80,7 @@ Delta: ${delta.toPrecision(4)} percentage points. Exact, unrounded ratios determ
 
 **${result}**
 
-Each revision uses its own test and coverage code. Review changes to measurement logic alongside this comparison.`;
+Each revision uses its own test and coverage code and its own pinned Foundry. Review changes to measurement logic alongside this comparison.`;
   console.log(summary);
   writeSummary(summary);
   process.exitCode = difference < 0n ? 1 : 0;
