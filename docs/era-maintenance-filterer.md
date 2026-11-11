@@ -1,99 +1,115 @@
 # Era maintenance-mode transaction filterer
 
-`EraMaintenanceTransactionFilterer` implements the L1 side of the maintenance-mode limits for EraVM
-chains: deposits are limited to whitelisted tokens and capped amounts, and other L1→L2 transactions
-(priority operations) can be restricted to withdrawals. It plugs into the existing
-`ITransactionFilterer` hook of the Mailbox, so it needs no protocol upgrade, and the chain admin can
-reconfigure, replace or unset it with one transaction.
-
-Transactions sent directly on L2 never reach the L1 filterer. Restrictions on them, including the
-ban on new contract deployments, are applied by the sequencer and are out of scope here. The same
-holds for inbound interop: anyone can call `InteropHandler.executeBundle` on L2, and a bundle can
-mint tokens and base token without a priority operation. `executeBundle` reverts while the chain
-settles on L1, as Era does. The sequencer cannot skip a priority operation, so for L1→L2
-transactions the filterer rejects calls to the L2 deployers instead, which does not block every
-deployment (see [Design decisions](#design-decisions)).
-
-## Deployment and ownership
-
-Each EraVM chain gets its own proxy, owned by its chain admin, whose `initialize(owner, chainId)`
-(which reverts for a chain the Bridgehub has no base token for) leaves it in the permissive configuration:
-
-- `callMode = ALLOW_ALL`;
-- the chain's base token uncapped (`depositCap = type(uint256).max`), so no transaction is blocked
-  on `mintValue`;
-- no other token accepted;
-- the withdrawal functions of the L2 base token (`withdraw`, `withdrawWithMessage`) and of the L2
-  asset router (`withdraw(bytes32,bytes)` and the legacy `withdraw(address,address,uint256)`)
-  registered for `WITHDRAWALS_ONLY` mode.
-
-Before setting the filterer on the chain, the admin whitelists the tokens that are already bridged
-(`setDepositCaps` with `type(uint256).max`); a token left out is rejected from the moment the
-filterer is set, even in `ALLOW_ALL` mode, and so are calls to the L2 deployers (see
-[Rules](#rules)). The admin also adds the exemptions, legacy bridges and withdrawal
-functions the chain needs (see [Configuration checklist](#configuration-checklist)). Every later
-change is a single owner call that emits an event.
+`EraMaintenanceTransactionFilterer` restricts the L1→L2 transactions (priority operations) of an
+EraVM chain in maintenance mode: deposits are limited to whitelisted tokens, with a cap per
+deposit, other priority operations can be limited to forced withdrawals, and calls to the L2
+deployers are rejected. It plugs into the Mailbox's existing `ITransactionFilterer` hook,
+so it needs no protocol upgrade, and the chain admin sets, reconfigures or unsets it with one
+transaction. Transactions sent on L2 and inbound interop never reach it (see
+[Limits and design decisions](#limits-and-design-decisions)).
 
 ## Rules
 
-`isTransactionAllowed` evaluates, in order:
+The filterer has two modes, `ALLOW_ALL` and `WITHDRAWALS_ONLY`. `isTransactionAllowed` goes
+through the rows below in order, and the first row that matches decides.
 
-1. **Pointed whitelisted hash.** If
-   `allowedTxHashes[getTxHash(sender, contractL2, l2Value, l2Calldata, refundRecipient)]` is set, the
-   transaction passes. `mintValue` is not hashed, because it includes the L1 base cost,
-   which depends on the gas price at submission. The filter is a `view` function, so an entry is not
-   consumed: the same transaction can be replayed until the admin removes it, each time with any
-   `mintValue`, so an entry also lifts the base token cap for that sender. `sender` and
-   `refundRecipient` are the values the Bridgehub passes to the Mailbox: `sender` is the second
-   bridge for two-bridges requests, and `refundRecipient` defaults to the Bridgehub caller when it is
-   zero, but is not yet aliased (the Mailbox aliases it only after the filter runs), so the hash must
-   be built from those, not from the user's raw request. Requests made directly through the Era
-   Mailbox's legacy `requestL2Transaction` (used by Lido and other legacy integrators) do not go
-   through the Bridgehub: there `sender` is the caller and `refundRecipient` is the raw argument.
-2. **Exempt sender.** If `exempt[sender]`, the transaction passes.
-3. **Deposits.** The depositor is decoded from the calldata (see [Deposit decoding](#deposit-decoding)).
-   An exempt depositor passes in either mode. Any other deposit is rejected in `WITHDRAWALS_ONLY`
-   mode, and in `ALLOW_ALL` mode both its token amount and `mintValue` must be within their caps.
-   - **Through the Bridgehub.** If `sender` is the L1 asset router, the transaction is a token
-     deposit. It must target the L2 asset router with `l2Value == 0`; any other message of the router
-     (for example registering a custom asset handler) is rejected, as is a new-encoding deposit of an
-     asset whose handler is not the native token vault, since its transfer data is handler-defined.
-   - **Through a legacy bridge.** If `sender` is registered in `legacyBridges` and the calldata calls
-     the legacy `finalizeDeposit`, the transaction is checked like a Bridgehub deposit. Other calls of
-     the bridge are generic calls. The decoded `l1Sender` is trusted as the depositor, so only bridges
-     that set it to their caller should be registered.
-4. **Generic calls.** Any other call passes if `mintValue` is within the base token cap and
-   `contractL2` is neither the `ContractDeployer` nor the `Create2Factory`. In `WITHDRAWALS_ONLY`
-   mode it must also call a `(contractL2, selector)` pair registered in `withdrawalFunctions`, so
-   users can still force a withdrawal from L1.
+| Priority operation                                        | `ALLOW_ALL`                                                      | `WITHDRAWALS_ONLY`                                                                               |
+| --------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Its hash is whitelisted ([pointed hash](#pointed-hashes)) | passes                                                           | passes                                                                                           |
+| Its sender is [exempt](#exemptions)                       | passes                                                           | passes                                                                                           |
+| A [deposit](#deposits) by an exempt depositor             | passes                                                           | passes                                                                                           |
+| Any other deposit                                         | passes if the token amount and `mintValue` are within their caps | rejected                                                                                         |
+| Any other message of the L1 asset router                  | rejected                                                         | rejected                                                                                         |
+| A call to the L2 `ContractDeployer` or `Create2Factory`   | rejected                                                         | rejected                                                                                         |
+| Any other (generic) call                                  | passes if `mintValue` is within the base token cap               | passes if it calls a registered withdrawal function and `mintValue` is within the base token cap |
 
-A cap applies to a single deposit, and a cap of zero means the asset is not accepted. The cap of the
-base token bounds `mintValue`, i.e. all base token entering the chain through a non-exempt priority
-operation, fees included. Setting it to zero blocks every non-exempt, non-whitelisted transaction,
-including forced withdrawals.
+- **Caps.** `depositCap` is set per asset id and applies to a single deposit. A cap of zero means
+  the asset is not accepted.
+- **Base token cap.** The base token's cap bounds `mintValue`, i.e. all base token a non-exempt
+  priority operation brings in, fees included. A zero base token cap rejects everything the first
+  three rows do not let through, forced withdrawals included.
+- **Withdrawal functions.** `withdrawalFunctions` holds `(contractL2, selector)` pairs. They keep
+  forced withdrawals from L1 working in `WITHDRAWALS_ONLY` mode.
 
-`WITHDRAWALS_ONLY` limits what an L1→L2 call can do, not how much base token it mints: a call to a
-registered withdrawal function brings in up to the base token cap, and whatever the L2 call does
-not spend is refunded on L2. Switching to `WITHDRAWALS_ONLY` therefore goes together with lowering
-the base token cap to about the fee of a withdrawal. The cap is fixed in wei while the fee follows
-the L1 gas price, so it is sized for the highest gas price at which forced withdrawals must still
-pass; above that price they are rejected, and below it the difference is refunded on L2 and can be
-used to deposit. A forced withdrawal does not need its value in `mintValue`, since `l2Value` can
-come from the sender's existing L2 balance. The sender is the L1 caller itself for an EOA or an
-EIP-7702 account and its alias for a contract, so a contract's forced withdrawal spends its alias's
-balance.
+## Setup
 
-Funds held by an L2 contract account, such as a smart account or an L2 Safe, cannot be withdrawn
-this way: the withdrawal has to be a call from the account, so the L1 transaction targets the
-account itself, which is not a registered withdrawal function. Such an account can withdraw
-through a pointed hash of its withdrawal transaction, if it accepts that call from an L1 sender (a
-Safe does, given its owners' signatures). Registering its execution function (for a
-Safe, `execTransaction` on that Safe's address) would let through any transaction its owners sign,
-not only withdrawals.
+Each EraVM chain gets its own proxy, owned by its chain admin. `initialize(owner, chainId)` reverts
+for a chain the Bridgehub has no base token for, and starts permissive:
 
-## Deposit decoding
+- `callMode = ALLOW_ALL`;
+- the chain's base token uncapped (`depositCap = type(uint256).max`);
+- no other token accepted;
+- the withdrawal functions of the L2 base token (`withdraw`, `withdrawWithMessage`) and of the L2
+  asset router (`withdraw(bytes32,bytes)` and the legacy `withdraw(address,address,uint256)`)
+  registered.
 
-Era's priority operations carry two `finalizeDeposit` encodings, and both are decoded:
+Even so, the filterer rejects deposits of every token not whitelisted, and calls to the L2
+deployers, from the moment it is set. The admin therefore works through the checklist below
+before setting it. Every later change is a single owner call that emits an event.
+
+- **Tokens.** `setDepositCaps` for every token already bridged to the chain, with
+  `type(uint256).max` or a lower cap.
+- **Governance.** Exempt the ecosystem governance (the `ProtocolUpgradeHandler` on Era). An
+  upgrade that sends an L2 call executes atomically, so a rejected call reverts the whole upgrade,
+  and the filterer is owned by the chain admin, so governance cannot lift a rejection itself.
+- **Legacy shared bridge.** The chain's legacy L2 shared bridge is not a built-in address, so
+  register its `withdraw(address,address,uint256)` with `setWithdrawalFunction`.
+- **Custom bridges.** Register each with `setLegacyBridge` (see [Deposits](#deposits)), and its L2
+  `withdraw` with `setWithdrawalFunction`.
+- **Tokens native to L2**, such as ZK. The L2 native token vault burns a token bridged from L1
+  without an allowance, but takes a token native to L2 with `transferFrom`, so withdrawing it needs
+  an `approve` of the vault first. Register the token's `approve` with `setWithdrawalFunction`, so
+  its holders can force a withdrawal in `WITHDRAWALS_ONLY` mode.
+- **Wrapped base token.** Holders of L2 WETH unwrap it before withdrawing the base token, so
+  register its `withdraw(uint256)` with `setWithdrawalFunction`.
+- **Third-party senders** whose L1→L2 messages must keep working, such as Across's HubPool (which
+  settles relayer refunds through priority operations). Either exempt them (see
+  [Exemptions](#exemptions)) or enable the restrictions that would affect them only after they
+  close their routes.
+
+## Details
+
+### Pointed hashes
+
+An entry in `allowedTxHashes` whitelists one exact transaction, keyed by
+`getTxHash(sender, contractL2, l2Value, l2Calldata, refundRecipient)`.
+
+- `mintValue` is not hashed: it includes the L1 base cost, which depends on the gas price at
+  submission.
+- An entry is not consumed, since the filter is a `view` function. The same transaction can be
+  replayed until the admin removes the entry, each time with any `mintValue`, so an entry also
+  lifts the base token cap for that transaction.
+- The hash is built from the values the Bridgehub passes to the Mailbox, not from the user's raw
+  request. `sender` is the second bridge for two-bridges requests. `refundRecipient` defaults to
+  the Bridgehub caller when it is zero, and is not yet aliased (the Mailbox aliases it only after
+  the filter runs).
+- Requests made directly through the Era Mailbox's legacy `requestL2Transaction` (used by Lido and
+  other legacy integrators) do not go through the Bridgehub: there `sender` is the caller and
+  `refundRecipient` is the raw argument.
+
+### Exemptions
+
+An exemption covers the transactions the account sends itself and the token deposits it makes
+through the asset router or a registered legacy bridge, in either mode and with no cap. It
+therefore also covers whatever the account can be made to send. Only exempt a sender whose L1→L2
+transactions are access-controlled, or fixed in target, calldata, `mintValue` and refund
+recipient. A contract that forwards its caller's request, or lets its caller choose the gas limit
+and receive the L2 refund, would let anyone deposit through it.
+
+### Deposits
+
+A priority operation is a deposit when it calls `finalizeDeposit` (either encoding below) and
+comes from one of these senders:
+
+- **The L1 asset router** (deposits through the Bridgehub). It must target the L2 asset router with
+  `l2Value == 0`, and in the new encoding the asset's handler must be the native token vault, since
+  the transfer data of other handlers is handler-defined. Any other message of the router, for
+  example registering a custom asset handler, is rejected, even when the depositor is exempt.
+- **A registered legacy bridge** (`setLegacyBridge`), when the calldata calls the legacy
+  `finalizeDeposit`. Its other calls are generic calls. The decoded `l1Sender` is trusted as the
+  depositor, so register only bridges that set it to their caller.
+
+The asset, amount and depositor are decoded from either of Era's two `finalizeDeposit` encodings:
 
 | Encoding                                                                                             | Selector     | Asset id                                                | Depositor                                                             |
 | ---------------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -102,101 +118,107 @@ Era's priority operations carry two `finalizeDeposit` encodings, and both are de
 
 The Era L1 asset router builds the legacy encoding for every L1-native token, including every
 `L1ERC20Bridge` deposit, and the new one for the rest, such as tokens bridged back from L2. In the
-legacy encoding the trailing `data` holds token metadata, not transfer data, and the asset id is
-derived as the one of an L1-native NTV token.
+legacy encoding the trailing `data` holds token metadata, not transfer data.
 
-Custom bridges that call their L2 counterpart through the Mailbox with the same legacy ABI, such as
-the Lido bridge, are registered with `setLegacyBridge`. Their deposits are then capped by the
-derived asset id of the L1 token; leaving that cap at zero blocks their deposits while their
-withdrawals stay reachable through `withdrawalFunctions`. That is also the asset id of the token's
-deposits through the asset router, so a custom bridge and the asset router share one cap for the
-same L1 token. This is a known limitation.
+Once registered, a custom bridge with the same legacy ABI, such as Lido's, is capped by the asset id derived from
+its L1 token. A zero cap blocks its deposits, while its withdrawals stay reachable through
+`withdrawalFunctions`. That asset id is also the one of the token's deposits through the asset
+router, so the custom bridge and the asset router share one cap for the same L1 token. This is a
+known limitation.
 
-## Configuration checklist
+### The base token cap in `WITHDRAWALS_ONLY` mode
 
-- **Tokens.** Every token to keep accepting, with its cap.
-- **Legacy shared bridge.** The legacy L2 shared bridge of the chain is not a built-in address, so
-  its `withdraw(address,address,uint256)` is registered with `setWithdrawalFunction`.
-- **Custom bridges.** Each custom bridge is registered with `setLegacyBridge`, and its L2
-  `withdraw` with `setWithdrawalFunction`.
-- **Tokens native to L2.** The L2 native token vault burns a token bridged from L1 without an
-  allowance, but takes a token native to L2 (such as ZK) with `transferFrom`, so its withdrawal
-  needs an `approve` of the vault first. For its holders to force a withdrawal in
-  `WITHDRAWALS_ONLY` mode, the token's `approve` is registered with `setWithdrawalFunction`.
-- **Wrapped base token.** Holders of L2 WETH unwrap it before withdrawing the base token, so its
-  `withdraw(uint256)` is registered with `setWithdrawalFunction`.
-- **Third-party bridges and protocols.** Senders whose L1→L2 messages must keep working, such as
-  Across's HubPool (which settles relayer refunds through priority operations), are either
-  exempted or the restrictions that would affect them are enabled only after they close their
-  routes. An exemption covers the transactions the account sends itself and, in either mode, the
-  token deposits it makes through the asset router or a registered legacy bridge. It therefore also
-  covers whatever the account can be made to send, with no base token cap, so only a sender whose
-  L1→L2 transactions are access-controlled, or fixed in target, calldata, `mintValue` and refund
-  recipient, is exempted. A contract that forwards its caller's request, or lets its caller choose
-  the gas limit and receive the L2 refund, would let anyone deposit through it.
-- **Governance.** The ecosystem governance (the `ProtocolUpgradeHandler` on Era) is exempted before
-  the filterer is set. An upgrade that sends an L2 call executes atomically, so a rejected call
-  reverts the whole upgrade, and the filterer is owned by the chain admin, not by governance.
+`WITHDRAWALS_ONLY` limits what an L1→L2 call can do, not how much base token it brings in. A call
+to a registered withdrawal function can bring in up to the base token cap, and whatever the L2 call
+does not spend is refunded on L2. Switching to `WITHDRAWALS_ONLY` therefore goes together with
+lowering the base token cap to about the fee of a withdrawal.
 
-## Era mainnet
+- The cap is fixed in wei while the fee follows the L1 gas price, so the cap is sized for the
+  highest gas price at which forced withdrawals must still pass. Above that price they are
+  rejected; below it the difference is refunded on L2 and can be used to deposit.
+- A forced withdrawal does not need its value in `mintValue`: `l2Value` can come from the sender's
+  existing L2 balance. The sender is the L1 caller itself for an EOA or an EIP-7702 account, and
+  its alias for a contract, so a contract's forced withdrawal spends its alias's balance.
+
+### Withdrawals from L2 contract accounts
+
+Funds held by an L2 contract account, such as a smart account or an L2 Safe, cannot be withdrawn
+through `withdrawalFunctions`: the withdrawal has to be a call from the account, so the L1
+transaction targets the account itself, which is not a registered withdrawal function. Such an
+account can withdraw through a pointed hash of its withdrawal transaction, if it accepts that call
+from an L1 sender (a Safe does, given its owners' signatures). Registering its execution function
+instead (for a Safe, `execTransaction` on that Safe's address) would let through any transaction
+its owners sign, not only withdrawals.
+
+## Limits and design decisions
+
+- **Transactions sent on L2** never reach the L1 filterer. The sequencer restricts them, including
+  the ban on new contract deployments.
+- **Inbound interop.** Anyone can call `InteropHandler.executeBundle` on L2, and a bundle can mint
+  tokens and base token without a priority operation. `executeBundle` reverts while the chain
+  settles on L1, as Era does.
+- **Deployments.** The sequencer cannot skip a priority operation, so the filterer rejects calls to
+  the `ContractDeployer` and the public `Create2Factory` in either mode, unless the sender is
+  exempt or the transaction has a pointed hash. This does not block every deployment:
+  - in `ALLOW_ALL` mode a priority operation can still call any factory contract on L2 (on Era, for
+    example, the deterministic-deployment proxy `0x4e59b44847b379578588920cA78FbF26c0B4956C` or
+    CreateX `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed`);
+  - a bytecode already known on L2 needs no `factoryDeps`;
+  - where EVM bytecode is allowed, as on Era, an EVM factory deploys any init code from the
+    calldata.
+
+  None of Era's priority operations from 2025-11-06 to 2026-11-09 called either deployer. The 10
+  that deployed a contract were first deposits of a token, for which the L2 bridge deploys the
+  token's proxy.
+
+- **Factory dependencies.** The filterer does not see `factoryDeps`, so it cannot block priority
+  operations that publish bytecode. Blocking them would need a Mailbox change.
+- **Cap per deposit.** A deposit split into many small ones bypasses it. Per-account and
+  per-time-window caps would need extra state and accounting on every deposit, while the goal is
+  only to make funding the chain unattractive.
+- **Standalone filterer.** Hardcoding the restrictions in the Mailbox would make every change a
+  protocol upgrade and prevent reuse across EraVM chains.
+- **Failure mode.** The filterer sits on every priority operation, so a bug could block deposits
+  and forced withdrawals. The logic is kept small, malformed deposit calldata reverts instead of
+  passing, and the admin can unset the filterer with one transaction.
+
+## Appendix: Era mainnet configuration
 
 The configuration below is derived from all 26,575 priority operations of ZKsync Era (chain 324)
 between 2025-11-06 and 2026-11-09 (L1 blocks 23,740,000 to 26,376,900). With it and every cap at
 `type(uint256).max`, all of them pass in `ALLOW_ALL` mode.
 
-- **Legacy bridges.** `setLegacyBridge` for the Lido wstETH L1 bridge
-  `0x41527b2d03844db6b0945f25702cb958b6d55989`, the only custom bridge that uses the legacy
-  `finalizeDeposit` encoding.
-- **Withdrawal functions**, on top of the built-ins:
+### Legacy bridges
 
-  | L2 contract                                 | Address                                      | Function                                         |
-  | ------------------------------------------- | -------------------------------------------- | ------------------------------------------------ |
-  | Legacy L2 shared bridge                     | `0x11f943b2c77b743ab90f4a0ae7d5a4e7fca3e102` | `withdraw(address,address,uint256)` `0xd9caed12` |
-  | L2 WETH                                     | `0x5aea5775959fbc2557cc8789bc1bf90a239d9a91` | `withdraw(uint256)` `0x2e1a7d4d`                 |
-  | ZK                                          | `0x5a7d6b2f92c77fad6ccabd7ee0624e64907eaf3e` | `approve(address,uint256)` `0x095ea7b3`          |
-  | Lido L2 bridge                              | `0xe1d6a50e7101c8f8db77352897ee3f1ac53f782b` | `withdraw(address,address,uint256)` `0xd9caed12` |
-  | NODL L2 bridge                              | `0x2c1b65da72d5cf19b41de6edccfb7dd83d1b529e` | `withdraw(address,uint256)` `0xf3fef3a3`         |
-  | NODL (burned by its bridge with `burnFrom`) | `0xbd4372e44c5ee654dd838304006e1f0f69983154` | `approve(address,uint256)` `0x095ea7b3`          |
+`setLegacyBridge` for the Lido wstETH L1 bridge `0x41527b2d03844db6b0945f25702cb958b6d55989`, the
+only custom bridge that uses the legacy `finalizeDeposit` encoding.
 
-- **Tokens.** The base token (ETH, asset id
-  `0x05e1c3ae4b9732444ae25217ac7666e46fa365fee1768de00c9fcb65532b7609`) is set by `initialize`.
-  `setDepositCaps` covers the 70 tokens listed below: the 49 deposited through the L1 asset router
-  in that period and 21 more that were only withdrawn from Era in it. Their handler is the native
-  token vault, and each asset id is the one returned by `L1NativeTokenVault.assetId(token)`. For a
-  token native to L1 the filterer derives the same id from a legacy-encoded deposit. A token native
-  to Era (ZK in this list) uses the new encoding, and its id is not the one derived from its L1
-  token address. The list is a floor, not the whitelist: a token with a
-  supply on Era that was not bridged in that period is rejected unless it is added too, so the
-  whitelist is built from the tokens bridged to Era before the filterer is set.
-- **Exemptions.** In `WITHDRAWALS_ONLY` mode these senders' messages are generic calls, so they
-  are rejected unless the sender is exempt. The `ProtocolUpgradeHandler` is exempted from the start
-  (see [Configuration checklist](#configuration-checklist)). Exempting the others is a policy
-  decision; the last column shows who can make each of them send.
+### Withdrawal functions
 
-  | Sender                                   | Address                                      | Transactions | Sends                                                                                      | Who triggers it                                                                                              |
-  | ---------------------------------------- | -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-  | Across `HubPool`                         | `0xc186fa914353c44b2e33ebe05f21846f1048beda` | 14,004       | root bundles and ETH to its L2 `SpokePool`, and 18 token deposits through the asset router | anyone, for a root bundle that passed its challenge period; its owner, with any message                      |
-  | Chainlink `ZKSyncValidator`              | `0xdd2e524d186615dedd052c35d3f669b35c5faa8c` | 462          | L2 sequencer uptime feed updates                                                           | accounts on its access list                                                                                  |
-  | Rocket Pool `RocketZkSyncPriceMessenger` | `0x6cf6cb29754aebf88af12089224429bd68b0b8c8` | 367          | rETH rate updates                                                                          | anyone; the caller chooses the gas limit and gets the L2 refund, an uncapped ETH deposit: not to be exempted |
-  | zkLink `ZkSyncL1Gateway`                 | `0xecd189e0f390826e137496a4e4a23acf76c942ab` | 301          | messages to its L2 gateway                                                                 | its arbitrator; its relayers retry a failed message with any `mintValue` and refund recipient                |
-  | Across `AtomicWethDepositor`             | `0x64668fbd18b967b46dd22dc8675134d91efedd8d` | 29           | ETH to an L2 account                                                                       | anyone, with any Bridgehub request: not to be exempted                                                       |
-  | Aave a.DI `CrossChainController`         | `0xed42a7d8559a463722ca4bed50e0cc05a386b0e1` | 4            | governance messages                                                                        | approved senders; retries by its owner or guardian                                                           |
-  | ZKsync `ProtocolUpgradeHandler`          | `0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3` | 1            | L2 contract upgrades                                                                       | governance                                                                                                   |
-  | L2Scan `L2ScanEthereumBridgeV2`          | `0x375424756f4a5ada1ce1e0849abdd19255b1729e` | 1            | ETH to an L2 account                                                                       | anyone, with any L2 call: not to be exempted                                                                 |
-  | Unverified contract                      | `0xab23df3fd78f45e54466d08926c3a886211ac5a1` | 2            | `receiveHashes` calls to two L2 contracts                                                  | unknown: not to be exempted while unverified                                                                 |
+On top of the built-ins:
 
-  Apart from the asset router and the Lido and NODL bridges, the other senders were EOAs and two
-  Safes, mostly sending ETH, which `WITHDRAWALS_ONLY` mode is meant to reject.
+| L2 contract                                 | Address                                      | Function                                         |
+| ------------------------------------------- | -------------------------------------------- | ------------------------------------------------ |
+| Legacy L2 shared bridge                     | `0x11f943b2c77b743ab90f4a0ae7d5a4e7fca3e102` | `withdraw(address,address,uint256)` `0xd9caed12` |
+| L2 WETH                                     | `0x5aea5775959fbc2557cc8789bc1bf90a239d9a91` | `withdraw(uint256)` `0x2e1a7d4d`                 |
+| ZK                                          | `0x5a7d6b2f92c77fad6ccabd7ee0624e64907eaf3e` | `approve(address,uint256)` `0x095ea7b3`          |
+| Lido L2 bridge                              | `0xe1d6a50e7101c8f8db77352897ee3f1ac53f782b` | `withdraw(address,address,uint256)` `0xd9caed12` |
+| NODL L2 bridge                              | `0x2c1b65da72d5cf19b41de6edccfb7dd83d1b529e` | `withdraw(address,uint256)` `0xf3fef3a3`         |
+| NODL (burned by its bridge with `burnFrom`) | `0xbd4372e44c5ee654dd838304006e1f0f69983154` | `approve(address,uint256)` `0x095ea7b3`          |
 
-**NODL is a known misfit.** The NODL bridge (L1 `0x2d02b651ea9630351719c8c55210e042e940d69a`, L2
-`0x2c1b65da72d5cf19b41de6edccfb7dd83d1b529e`) delivers deposits with
-`finalizeDeposit(address,address,uint256)` (`0x4ddf75e6`), not the legacy encoding, so registering
-it with `setLegacyBridge` has no effect and its deposits are generic calls. In `ALLOW_ALL` mode they
-pass with no token cap; in `WITHDRAWALS_ONLY` mode they are rejected unless the bridge is exempt,
-and an exemption lets them through uncapped. A rejection reverts the whole L1 deposit, so no NODL is
-lost. NODL is native to Era and its bridge burns it on one side and mints it on the other, so no L1
-escrow is exposed. Its withdrawals fit. The period has 7 NODL deposits, the largest of 450,000 NODL.
-Capping them would need the filterer to decode per-bridge deposit encodings.
+### Tokens
+
+The base token (ETH, asset id `0x05e1c3ae4b9732444ae25217ac7666e46fa365fee1768de00c9fcb65532b7609`)
+is set by `initialize`. `setDepositCaps` covers the 70 tokens listed below: the 49 deposited
+through the L1 asset router in that period and 21 more that were only withdrawn from Era in it.
+
+- Their handler is the native token vault, and each asset id is the one returned by
+  `L1NativeTokenVault.assetId(token)`. For a token native to L1, the filterer derives the same id
+  from a legacy-encoded deposit. A token native to Era (ZK in this list) uses the new encoding, and
+  its id is not the one derived from its L1 token address.
+- The list is a floor, not the whitelist: a token with a supply on Era that was not bridged in
+  that period is rejected unless it is added too. The whitelist is built from all tokens bridged
+  to Era before the filterer is set.
 
 <details>
 <summary>Tokens bridged between Era and L1, 2025-11-06 to 2026-11-09</summary>
@@ -276,25 +298,39 @@ Capping them would need the filterer to decode per-bridge deposit encodings.
 
 </details>
 
-## Design decisions
+### Exemption candidates
 
-- **Cap per deposit.** Per-account and per-time-window caps need extra state and accounting on
-  every deposit, while the goal is only to make funding the chain unattractive. A cap per deposit
-  can be bypassed by splitting a deposit into many small ones.
-- **Standalone filterer.** Hardcoding the restrictions in the Mailbox would make every change a
-  protocol upgrade and prevent reuse across EraVM chains.
-- **Factory dependencies.** The filterer does not see `factoryDeps`, so it cannot block priority
-  operations that publish bytecode. Blocking them would need a Mailbox change.
-- **Deployments.** A priority operation that calls the `ContractDeployer` or the public
-  `Create2Factory` is rejected in either mode, unless the sender is exempt or the transaction has
-  a pointed hash. This does not block every deployment: in `ALLOW_ALL` mode a priority operation
-  can still call any factory contract on L2 (on Era, for example, the deterministic-deployment
-  proxy `0x4e59b44847b379578588920cA78FbF26c0B4956C` or CreateX
-  `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed`), a bytecode already known on L2 needs no
-  `factoryDeps`, and where EVM bytecode is allowed, as on Era, an EVM factory deploys any init
-  code from the calldata. None of Era's priority operations from 2025-11-06 to 2026-11-09 called
-  either deployer; the 10 that deployed a contract were first deposits of a token, for which the
-  L2 bridge deploys the token's proxy.
-- **Failure mode.** The filterer sits on every priority operation, so a bug could block deposits
-  and forced withdrawals. The logic is kept small, malformed deposit calldata reverts instead of
-  passing, and the admin can unset the filterer with one transaction.
+In `WITHDRAWALS_ONLY` mode the messages of these senders are generic calls, so they are rejected
+unless the sender is exempt. The `ProtocolUpgradeHandler` is exempted from the start (see
+[Setup](#setup)). Exempting the others is a policy decision; the last column shows who can make
+each of them send.
+
+| Sender                                   | Address                                      | Transactions | Sends                                                                                      | Who triggers it                                                                                              |
+| ---------------------------------------- | -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Across `HubPool`                         | `0xc186fa914353c44b2e33ebe05f21846f1048beda` | 14,004       | root bundles and ETH to its L2 `SpokePool`, and 18 token deposits through the asset router | anyone, for a root bundle that passed its challenge period; its owner, with any message                      |
+| Chainlink `ZKSyncValidator`              | `0xdd2e524d186615dedd052c35d3f669b35c5faa8c` | 462          | L2 sequencer uptime feed updates                                                           | accounts on its access list                                                                                  |
+| Rocket Pool `RocketZkSyncPriceMessenger` | `0x6cf6cb29754aebf88af12089224429bd68b0b8c8` | 367          | rETH rate updates                                                                          | anyone; the caller chooses the gas limit and gets the L2 refund, an uncapped ETH deposit: not to be exempted |
+| zkLink `ZkSyncL1Gateway`                 | `0xecd189e0f390826e137496a4e4a23acf76c942ab` | 301          | messages to its L2 gateway                                                                 | its arbitrator; its relayers retry a failed message with any `mintValue` and refund recipient                |
+| Across `AtomicWethDepositor`             | `0x64668fbd18b967b46dd22dc8675134d91efedd8d` | 29           | ETH to an L2 account                                                                       | anyone, with any Bridgehub request: not to be exempted                                                       |
+| Aave a.DI `CrossChainController`         | `0xed42a7d8559a463722ca4bed50e0cc05a386b0e1` | 4            | governance messages                                                                        | approved senders; retries by its owner or guardian                                                           |
+| ZKsync `ProtocolUpgradeHandler`          | `0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3` | 1            | L2 contract upgrades                                                                       | governance                                                                                                   |
+| L2Scan `L2ScanEthereumBridgeV2`          | `0x375424756f4a5ada1ce1e0849abdd19255b1729e` | 1            | ETH to an L2 account                                                                       | anyone, with any L2 call: not to be exempted                                                                 |
+| Unverified contract                      | `0xab23df3fd78f45e54466d08926c3a886211ac5a1` | 2            | `receiveHashes` calls to two L2 contracts                                                  | unknown: not to be exempted while unverified                                                                 |
+
+Apart from the asset router and the Lido and NODL bridges, the other senders were EOAs and two
+Safes, mostly sending ETH, which `WITHDRAWALS_ONLY` mode is meant to reject.
+
+### NODL
+
+NODL is a known misfit. The NODL bridge (L1 `0x2d02b651ea9630351719c8c55210e042e940d69a`, L2
+`0x2c1b65da72d5cf19b41de6edccfb7dd83d1b529e`) delivers deposits with
+`finalizeDeposit(address,address,uint256)` (`0x4ddf75e6`), not the legacy encoding.
+
+- Registering it with `setLegacyBridge` has no effect, so its deposits are generic calls. In
+  `ALLOW_ALL` mode they pass with no token cap. In `WITHDRAWALS_ONLY` mode they are rejected unless
+  the bridge is exempt, and an exemption lets them through uncapped.
+- A rejection reverts the whole L1 deposit, so no NODL is lost. NODL is native to Era and its
+  bridge burns it on one side and mints it on the other, so no L1 escrow is exposed. Its
+  withdrawals fit.
+- The period has 7 NODL deposits, the largest of 450,000 NODL. Capping them would need the
+  filterer to decode per-bridge deposit encodings.
