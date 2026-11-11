@@ -1,0 +1,22 @@
+# Compiler settings copied from matter-labs/zksync-lite-sunset@b7ab9f88
+# (contracts/zksync-lite-migration-claims/foundry.toml), so that the audited source is built exactly as upstream.
+[profile.default]
+src = "src"
+out = "out"
+libs = ["../../../lib"]
+cache_path = "cache"
+allow_paths = ["../../../lib"]
+remappings = [
+    "@openzeppelin/contracts/=../../../lib/openzeppelin-contracts-v4/contracts/",
+    "@openzeppelin/contracts-upgradeable/=../../../lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+]
+
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+
+solc_version = "0.8.24"
+evm_version = "paris"
+
+[lint]
+lint_on_build = false

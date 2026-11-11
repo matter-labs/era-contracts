@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {AmountToKeepOnL1NotUint256, AssetBalanceNotOnL1, AssetIdNotRegistered, ChainNotShutdown, NoChainBalanceToSend, SettlementLayerCannotBeShutdown, ShutdownChainNativeAsset, ShutdownDistributorNotSet, AssetNotMigratedFromNTV, ChainBalanceMustBeZeroBeforeMigration, InvalidAssetMigrationNumber, InvalidChainMigrationNumber, InvalidMigrationAmount, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidVersion, InvalidWithdrawalChainId, AssetAlreadyRegistered, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
+import {AmountToKeepOnL1NotUint256, AssetBalanceNotOnL1, AssetIdNotRegistered, ChainNotShutdown, NoChainBalanceToSend, SettlementLayerCannotBeShutdown, NotShutdownChainNativeAsset, ShutdownChainNativeAssetAmountAlreadySet, ShutdownDistributorNotSet, AssetNotMigratedFromNTV, ChainBalanceMustBeZeroBeforeMigration, InvalidAssetMigrationNumber, InvalidChainMigrationNumber, InvalidMigrationAmount, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidVersion, InvalidWithdrawalChainId, AssetAlreadyRegistered, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
@@ -46,9 +46,19 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     mapping(uint256 chainId => bool isShutdown) public isChainShutdown;
 
     /// @notice The claim distributor to which the L1 funds of a shut down chain are sent.
-    /// @dev Set by the governance (owner). It is expected to be a Merkle distributor (see `ChainShutdownClaimDistributor`)
+    /// @dev Set by the governance (owner). It is expected to be the Merkle distributor used for the ZKsync Lite sunset
+    /// (`ZkSyncLiteSunsetClaimDistributorL1`)
     /// whose root commits to the final balances of the users of the chain.
     mapping(uint256 chainId => address distributor) public shutdownDistributor;
+
+    /// @notice The amount of a token native to a shut down chain that was still held on that chain at shutdown and
+    /// can be minted on L1 for the distributor.
+    /// @dev Set once by the chain's admin (through the chain's diamond proxy). Withdrawals that were finalized before
+    /// the shutdown are already held by their owners on L1, so they must not be included. Reset to zero once sent.
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public shutdownChainNativeAssetAmount;
+
+    /// @notice Whether `shutdownChainNativeAssetAmount` has been set for the asset, so it can not be set again.
+    mapping(uint256 chainId => mapping(bytes32 assetId => bool isSet)) public isShutdownChainNativeAssetAmountSet;
 
     function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return NATIVE_TOKEN_VAULT;
@@ -359,9 +369,41 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         emit ShutdownDistributorSet(_chainId, _distributor);
     }
 
-    /// @notice Sends the whole L1 balance of `_assetId` of a shut down chain to its distributor.
+    /// @notice Sets the amount of a token native to the shut down chain that its users still held on the chain at
+    /// shutdown. This amount can then be minted on L1 for the distributor by `sendShutdownChainFunds`.
+    /// @dev Called by the chain's diamond proxy on behalf of the chain admin. Can only be set once per asset.
+    /// The amount comes on top of what has already been withdrawn to L1, which its owners already hold.
+    /// @param _chainId The id of the shut down chain.
+    /// @param _assetId The asset native to the chain.
+    /// @param _amount The amount of the asset held on the chain at shutdown.
+    function setShutdownChainNativeAssetAmount(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount
+    ) external onlyChain(_chainId) {
+        require(isChainShutdown[_chainId], ChainNotShutdown(_chainId));
+        require(
+            NATIVE_TOKEN_VAULT.originChainId(_assetId) == _chainId,
+            NotShutdownChainNativeAsset(_chainId, _assetId)
+        );
+        require(
+            !isShutdownChainNativeAssetAmountSet[_chainId][_assetId],
+            ShutdownChainNativeAssetAmountAlreadySet(_chainId, _assetId)
+        );
+        // The token must already have its L1 representation, i.e. be registered here and deployed by the NTV.
+        _requireRegistered(_assetId);
+
+        isShutdownChainNativeAssetAmountSet[_chainId][_assetId] = true;
+        shutdownChainNativeAssetAmount[_chainId][_assetId] = _amount;
+        emit ShutdownChainNativeAssetAmountSet(_chainId, _assetId, _amount);
+    }
+
+    /// @notice Sends the funds of a shut down chain in `_assetId` to its distributor.
     /// @dev Permissionless: anyone can trigger it once the distributor is set.
-    /// @dev Accounting-wise it behaves like a withdrawal of the chain's whole balance to L1.
+    /// @dev For tokens not native to the chain, the whole L1 balance of the chain is sent.
+    /// For tokens native to the chain, the amount set by the chain admin via `setShutdownChainNativeAssetAmount`
+    /// is minted on L1.
+    /// @dev Accounting-wise it behaves like a withdrawal of the amount to L1.
     /// @param _chainId The id of the shut down chain.
     /// @param _assetId The asset to send.
     /// @return amount The amount sent to the distributor.
@@ -371,13 +413,18 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(distributor != address(0), ShutdownDistributorNotSet(_chainId));
         _requireRegistered(_assetId);
 
-        // Tokens native to the shut down chain have no funds locked on L1 (their L1 supply is already held by users).
-        require(NATIVE_TOKEN_VAULT.originChainId(_assetId) != _chainId, ShutdownChainNativeAsset(_chainId, _assetId));
         // If the chain used to settle on Gateway, the balance of the asset must have been migrated back to L1.
         // Odd migration numbers mean that the balance is still held by the settlement layer.
         require(assetMigrationNumber[_chainId][_assetId] % 2 == 0, AssetBalanceNotOnL1(_chainId, _assetId));
 
-        amount = chainBalance[_chainId][_assetId];
+        if (NATIVE_TOKEN_VAULT.originChainId(_assetId) == _chainId) {
+            // Tokens native to the chain have no funds locked on L1: the part of the supply that has been withdrawn
+            // is already held by users on L1, and the part still on the chain is declared by the chain admin.
+            amount = shutdownChainNativeAssetAmount[_chainId][_assetId];
+            shutdownChainNativeAssetAmount[_chainId][_assetId] = 0;
+        } else {
+            amount = chainBalance[_chainId][_assetId];
+        }
         require(amount != 0, NoChainBalanceToSend(_chainId, _assetId));
 
         _migrateFunds({_fromChainId: _chainId, _toChainId: block.chainid, _assetId: _assetId, _amount: amount});

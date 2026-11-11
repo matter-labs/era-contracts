@@ -67,6 +67,8 @@ error MustBeWithdrawalToL1(uint256 destinationChainId);
 error NoChainBalanceToSend(uint256 chainId, bytes32 assetId);
 // 0x8dfed13a
 error NotMigratedChain();
+// 0x74746b0a
+error NotShutdownChainNativeAsset(uint256 chainId, bytes32 assetId);
 // 0x4a22c4b8
 error OnlyGatewaySettlementLayer();
 // 0x0fd3385e
@@ -77,8 +79,8 @@ error RegisterNewTokenNotAllowed();
 error SettlementFeePayerNotAgreed(address payer, uint256 chainId);
 // 0x2b6d6822
 error SettlementLayerCannotBeShutdown(uint256 chainId);
-// 0x92767805
-error ShutdownChainNativeAsset(uint256 chainId, bytes32 assetId);
+// 0x750619e7
+error ShutdownChainNativeAssetAmountAlreadySet(uint256 chainId, bytes32 assetId);
 // 0x3da0b0be
 error ShutdownDistributorNotSet(uint256 chainId);
 // 0x90ed63bb

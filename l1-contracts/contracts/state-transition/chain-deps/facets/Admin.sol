@@ -550,6 +550,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit ShutdownApprovalRevoked(msg.sender);
     }
 
+    /// @inheritdoc IAdmin
+    function setShutdownChainNativeAssetAmount(bytes32 _assetId, uint256 _amount) external onlyAdmin onlyL1 {
+        // The asset tracker checks that the chain is shut down, that the asset is native to the chain
+        // and that the amount has not been set before.
+        IL1AssetTracker(s.assetTracker).setShutdownChainNativeAssetAmount(s.chainId, _assetId, _amount);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             CONTRACT FREEZING
     //////////////////////////////////////////////////////////////*/

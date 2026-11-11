@@ -35,6 +35,9 @@ interface IL1AssetTracker {
     /// @notice Emitted when the governance sets the distributor for a shut down chain.
     event ShutdownDistributorSet(uint256 indexed chainId, address indexed distributor);
 
+    /// @notice Emitted when the chain admin sets the amount of a chain-native token held on a shut down chain.
+    event ShutdownChainNativeAssetAmountSet(uint256 indexed chainId, bytes32 indexed assetId, uint256 amount);
+
     /// @notice Emitted when the L1 funds of a shut down chain are sent to its distributor.
     event ShutdownChainFundsSent(
         uint256 indexed chainId,
@@ -76,6 +79,12 @@ interface IL1AssetTracker {
     function registerChainShutdown(uint256 _chainId) external;
 
     function setShutdownDistributor(uint256 _chainId, address _distributor) external;
+
+    function shutdownChainNativeAssetAmount(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    function isShutdownChainNativeAssetAmountSet(uint256 _chainId, bytes32 _assetId) external view returns (bool);
+
+    function setShutdownChainNativeAssetAmount(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
 
     function sendShutdownChainFunds(uint256 _chainId, bytes32 _assetId) external returns (uint256 amount);
 }

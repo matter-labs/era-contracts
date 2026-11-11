@@ -23,11 +23,16 @@ import {ShutdownInformation} from "contracts/state-transition/chain-deps/ZKChain
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
-import {ChainShutdownClaimDistributor} from "contracts/bridge/shutdown/ChainShutdownClaimDistributor.sol";
+import {IZkSyncLiteSunsetClaimDistributorL1} from "./utils/IZkSyncLiteSunsetClaimDistributorL1.sol";
+import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
+import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {ChainIsShutdown, ChainShutdownAlreadyApproved, ChainShutdownNotApproved, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {ChainNotShutdown, NoChainBalanceToSend, ShutdownDistributorNotSet} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {ClaimAlreadyClaimed, ClaimInvalidProof, ClaimWindowNotOpen} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {ChainNotShutdown, NoChainBalanceToSend, NotShutdownChainNativeAsset, ShutdownChainNativeAssetAmountAlreadySet, ShutdownDistributorNotSet} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
 /// @notice End-to-end tests of the chain shutdown flow on L1:
 /// two-party approval -> chain is frozen forever -> its L1 funds are sent to a Merkle distributor -> users claim.
@@ -141,14 +146,22 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         return keccak256(abi.encodePacked(_index, _claimant, _token, _amount));
     }
 
-    function _deployDistributor(bytes32 _root, uint256 _windowStart) internal returns (ChainShutdownClaimDistributor) {
-        ChainShutdownClaimDistributor impl = new ChainShutdownClaimDistributor();
+    /// @dev The distributor is the unchanged, audited ZKsync Lite sunset distributor. It is built with the upstream
+    /// compiler settings in `vendor/zksync-lite-sunset`, so it is deployed from that artifact.
+    string constant DISTRIBUTOR_ARTIFACT =
+        "vendor/zksync-lite-sunset/out/ZkSyncLiteSunsetClaimDistributorL1.sol/ZkSyncLiteSunsetClaimDistributorL1.json";
+
+    function _deployDistributor(
+        bytes32 _root,
+        uint256 _windowStart
+    ) internal returns (IZkSyncLiteSunsetClaimDistributorL1) {
+        address impl = deployCode(DISTRIBUTOR_ARTIFACT);
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-            address(impl),
+            impl,
             makeAddr("distributorProxyAdmin"),
-            abi.encodeCall(ChainShutdownClaimDistributor.initialize, (_root, _windowStart, assetTrackerOwner))
+            abi.encodeCall(IZkSyncLiteSunsetClaimDistributorL1.initialize, (_root, _windowStart, assetTrackerOwner))
         );
-        return ChainShutdownClaimDistributor(payable(address(proxy)));
+        return IZkSyncLiteSunsetClaimDistributorL1(address(proxy));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -375,7 +388,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     bytes32[] snapshotLeaves;
 
     /// @dev Snapshot of the final L2 state (computed off-chain): alice owns all the ETH, bob owns the tokens.
-    function _deployDistributorForSnapshot() internal returns (ChainShutdownClaimDistributor distributor) {
+    function _deployDistributorForSnapshot() internal returns (IZkSyncLiteSunsetClaimDistributorL1 distributor) {
         snapshotLeaves.push(_leaf(0, alice, address(0), ethDeposited));
         snapshotLeaves.push(_leaf(1, bob, address(token), TOKEN_DEPOSIT));
         merkle = new Merkle();
@@ -384,7 +397,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
     function test_fullFlow_sendFundsToDistributorAndClaim() public {
         _shutdown();
-        ChainShutdownClaimDistributor distributor = _deployDistributorForSnapshot();
+        IZkSyncLiteSunsetClaimDistributorL1 distributor = _deployDistributorForSnapshot();
 
         vm.prank(assetTrackerOwner);
         assetTracker.setShutdownDistributor(chainId, address(distributor));
@@ -419,7 +432,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         _claimAll(distributor, anyone);
     }
 
-    function _claimAll(ChainShutdownClaimDistributor _distributor, address _anyone) internal {
+    function _claimAll(IZkSyncLiteSunsetClaimDistributorL1 _distributor, address _anyone) internal {
         // Alice claims herself.
         uint256 aliceBefore = alice.balance;
         bytes32[] memory proof0 = merkle.getProof(snapshotLeaves, 0);
@@ -438,8 +451,155 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Double claims are impossible.
         vm.prank(alice);
-        vm.expectRevert(ClaimAlreadyClaimed.selector);
+        vm.expectRevert(IZkSyncLiteSunsetClaimDistributorL1.ZkSyncLiteSunsetClaimDistributor__AlreadyClaimed.selector);
         _distributor.claim(0, address(0), ethDeposited, proof0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Tokens native to the shut down chain
+    //////////////////////////////////////////////////////////////*/
+
+    address constant L2_NATIVE_TOKEN = address(0x1234);
+    uint256 constant WITHDRAWN_BEFORE_SHUTDOWN = 3 ether;
+    uint256 constant HELD_ON_L2_AT_SHUTDOWN = 7 ether;
+
+    /// @dev Finalizes on L1 a withdrawal of a token native to the chain, which deploys its L1 representation and
+    /// registers it in the asset tracker. The Merkle proof of the L2 -> L1 message (`proveL2MessageInclusionShared` and
+    /// `getProofData`) is mocked: this test is isolated from the message-root proof verification, everything after it (L1Nullifier, AssetRouter, NTV, asset tracker)
+    /// runs for real.
+    function _withdrawChainNativeToken(address _receiver, uint256 _amount) internal returns (bytes32 assetId) {
+        vm.mockCall(
+            address(addresses.bridgehub.messageRoot()),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+        // The chain settles directly on L1, so the proof has no settlement-layer part (`settlementLayerChainId == 0`).
+        ProofData memory proofData;
+        vm.mockCall(
+            address(addresses.bridgehub.messageRoot()),
+            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
+            abi.encode(proofData)
+        );
+        assetId = DataEncoding.encodeNTVAssetId(chainId, L2_NATIVE_TOKEN);
+        bytes memory transferData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: _receiver,
+            _remoteReceiver: _receiver,
+            _originToken: L2_NATIVE_TOKEN,
+            _amount: _amount,
+            _erc20Metadata: DataEncoding.encodeTokenData(
+                chainId,
+                abi.encode("L2 Token"),
+                abi.encode("L2T"),
+                abi.encode(uint8(18))
+            )
+        });
+        addresses.l1Nullifier.finalizeDeposit(
+            FinalizeL1DepositParams({
+                chainId: chainId,
+                l2BatchNumber: 0,
+                l2MessageIndex: 0,
+                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2TxNumberInBatch: 0,
+                message: abi.encodePacked(AssetRouterBase.finalizeDeposit.selector, chainId, assetId, transferData),
+                merkleProof: new bytes32[](0)
+            })
+        );
+        vm.clearMockedCalls();
+    }
+
+    function test_chainNativeAsset_fullFlow() public {
+        bytes32 nativeAssetId = _withdrawChainNativeToken(alice, WITHDRAWN_BEFORE_SHUTDOWN);
+        IERC20 l1Token = IERC20(addresses.l1NativeTokenVault.tokenAddress(nativeAssetId));
+        assertEq(l1Token.balanceOf(alice), WITHDRAWN_BEFORE_SHUTDOWN);
+        uint256 chainBalanceBefore = IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, nativeAssetId);
+
+        _shutdown();
+
+        // The chain admin declares how much of the token was still held on L2 at shutdown.
+        vm.expectEmit(true, true, false, true, address(assetTracker));
+        emit IL1AssetTracker.ShutdownChainNativeAssetAmountSet(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        vm.prank(chainAdmin);
+        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        assertEq(assetTracker.shutdownChainNativeAssetAmount(chainId, nativeAssetId), HELD_ON_L2_AT_SHUTDOWN);
+        assertTrue(assetTracker.isShutdownChainNativeAssetAmountSet(chainId, nativeAssetId));
+
+        // Snapshot: bob held the whole remaining L2 supply.
+        snapshotLeaves.push(_leaf(0, bob, address(l1Token), HELD_ON_L2_AT_SHUTDOWN));
+        // Murky needs at least two leaves; a zero claim for alice fills the tree.
+        snapshotLeaves.push(_leaf(1, alice, address(0), 0));
+        merkle = new Merkle();
+        IZkSyncLiteSunsetClaimDistributorL1 distributor = _deployDistributor(
+            merkle.getRoot(snapshotLeaves),
+            block.timestamp
+        );
+        vm.prank(assetTrackerOwner);
+        assetTracker.setShutdownDistributor(chainId, address(distributor));
+
+        vm.expectEmit(true, true, true, true, address(assetTracker));
+        emit IL1AssetTracker.ShutdownChainFundsSent(
+            chainId,
+            nativeAssetId,
+            address(distributor),
+            HELD_ON_L2_AT_SHUTDOWN
+        );
+        assertEq(assetTracker.sendShutdownChainFunds(chainId, nativeAssetId), HELD_ON_L2_AT_SHUTDOWN);
+
+        // The remaining L2 supply is minted on L1 to the distributor, on top of what was withdrawn before.
+        assertEq(l1Token.balanceOf(address(distributor)), HELD_ON_L2_AT_SHUTDOWN);
+        assertEq(l1Token.totalSupply(), WITHDRAWN_BEFORE_SHUTDOWN + HELD_ON_L2_AT_SHUTDOWN);
+        assertEq(
+            IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, nativeAssetId),
+            chainBalanceBefore - HELD_ON_L2_AT_SHUTDOWN
+        );
+        assertEq(assetTracker.shutdownChainNativeAssetAmount(chainId, nativeAssetId), 0);
+
+        // It can only be sent once, and the amount can not be set again.
+        vm.expectRevert(abi.encodeWithSelector(NoChainBalanceToSend.selector, chainId, nativeAssetId));
+        assetTracker.sendShutdownChainFunds(chainId, nativeAssetId);
+        vm.prank(chainAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(ShutdownChainNativeAssetAmountAlreadySet.selector, chainId, nativeAssetId)
+        );
+        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, 1);
+
+        // Bob claims the token from the distributor.
+        bytes32[] memory proof = merkle.getProof(snapshotLeaves, 0);
+        vm.prank(bob);
+        distributor.claim(0, address(l1Token), HELD_ON_L2_AT_SHUTDOWN, proof);
+        assertEq(l1Token.balanceOf(bob), HELD_ON_L2_AT_SHUTDOWN);
+        assertEq(l1Token.balanceOf(address(distributor)), 0);
+    }
+
+    function test_setShutdownChainNativeAssetAmount_reverts() public {
+        bytes32 nativeAssetId = _withdrawChainNativeToken(alice, WITHDRAWN_BEFORE_SHUTDOWN);
+
+        // Not shut down yet.
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(ChainNotShutdown.selector, chainId));
+        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+
+        _shutdown();
+
+        // Only the chain admin.
+        vm.prank(ctmOwner);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ctmOwner));
+        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+
+        // Only through the chain's diamond proxy.
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+
+        // Only for tokens native to the chain: L1 tokens are swept from the chain's L1 balance instead.
+        vm.prank(chainAdmin);
+        vm.expectRevert(abi.encodeWithSelector(NotShutdownChainNativeAsset.selector, chainId, tokenAssetId));
+        IZKChain(chain).setShutdownChainNativeAssetAmount(tokenAssetId, HELD_ON_L2_AT_SHUTDOWN);
+
+        // Without a declared amount there is nothing to send for a chain-native token.
+        vm.prank(assetTrackerOwner);
+        assetTracker.setShutdownDistributor(chainId, makeAddr("distributor"));
+        vm.expectRevert(abi.encodeWithSelector(NoChainBalanceToSend.selector, chainId, nativeAssetId));
+        assetTracker.sendShutdownChainFunds(chainId, nativeAssetId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -451,7 +611,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         leaves[0] = _leaf(0, alice, address(0), 1 ether);
         leaves[1] = _leaf(1, bob, address(token), 2 ether);
         Merkle merkle = new Merkle();
-        ChainShutdownClaimDistributor distributor = _deployDistributor(
+        IZkSyncLiteSunsetClaimDistributorL1 distributor = _deployDistributor(
             merkle.getRoot(leaves),
             block.timestamp + 1 days
         );
@@ -460,19 +620,21 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         // Window not open yet.
         vm.prank(alice);
-        vm.expectRevert(ClaimWindowNotOpen.selector);
+        vm.expectRevert(
+            IZkSyncLiteSunsetClaimDistributorL1.ZkSyncLiteSunsetClaimDistributor__ClaimWindowNotOpen.selector
+        );
         distributor.claim(0, address(0), 1 ether, proof0);
 
         vm.warp(block.timestamp + 1 days);
 
         // Wrong amount -> invalid proof.
         vm.prank(alice);
-        vm.expectRevert(ClaimInvalidProof.selector);
+        vm.expectRevert(IZkSyncLiteSunsetClaimDistributorL1.ZkSyncLiteSunsetClaimDistributor__InvalidProof.selector);
         distributor.claim(0, address(0), 2 ether, proof0);
 
         // Another caller cannot redirect alice's claim to themselves via `claim`.
         vm.prank(bob);
-        vm.expectRevert(ClaimInvalidProof.selector);
+        vm.expectRevert(IZkSyncLiteSunsetClaimDistributorL1.ZkSyncLiteSunsetClaimDistributor__InvalidProof.selector);
         distributor.claim(0, address(0), 1 ether, proof0);
 
         // Paused by the owner.

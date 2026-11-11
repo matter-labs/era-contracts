@@ -2059,6 +2059,24 @@
   },
   {
     "type": "function",
+    "name": "setShutdownChainNativeAssetAmount",
+    "inputs": [
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setTokenMultiplier",
     "inputs": [
       {

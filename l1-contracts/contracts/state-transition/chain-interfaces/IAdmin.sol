@@ -99,6 +99,14 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @dev Only possible while the shutdown is not yet active.
     function revokeShutdownApproval() external;
 
+    /// @notice Sets the amount of a token native to this (shut down) chain that its users still held on the chain at
+    /// shutdown, so that it can be minted on L1 for the shutdown distributor.
+    /// @dev Only callable by the chain admin, once per asset and only after the shutdown. The amount must not include
+    /// withdrawals that were already finalized on L1 before the shutdown.
+    /// @param _assetId The asset native to the chain.
+    /// @param _amount The amount of the asset held on the chain at shutdown.
+    function setShutdownChainNativeAssetAmount(bytes32 _assetId, uint256 _amount) external;
+
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
     function freezeDiamond() external;
