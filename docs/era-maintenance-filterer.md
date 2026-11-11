@@ -7,7 +7,11 @@ chains: deposits are limited to whitelisted tokens and capped amounts, and other
 reconfigure, replace or unset it with one transaction.
 
 Transactions sent directly on L2 never reach the L1 filterer. Restrictions on them, including the
-ban on new contract deployments, are applied by the sequencer and are out of scope here.
+ban on new contract deployments, are applied by the sequencer and are out of scope here. The same
+holds for inbound interop: anyone can call `InteropHandler.executeBundle` on L2, and a bundle can
+mint tokens and base token without a priority operation. `executeBundle` reverts while the chain
+settles on L1, as Era does. The sequencer cannot skip a priority operation, so the ban on
+deployments does not cover L1→L2 transactions (see [Design decisions](#design-decisions)).
 
 ## Deployment and ownership
 
@@ -68,10 +72,21 @@ including forced withdrawals.
 `WITHDRAWALS_ONLY` limits what an L1→L2 call can do, not how much base token it mints: a call to a
 registered withdrawal function brings in up to the base token cap, and whatever the L2 call does
 not spend is refunded on L2. Switching to `WITHDRAWALS_ONLY` therefore goes together with lowering
-the base token cap to about the fee of a withdrawal. A forced withdrawal does not need its value in
-`mintValue`, since `l2Value` can come from the sender's existing L2 balance. The sender is the L1
-caller itself for an EOA or an EIP-7702 account and its alias for a contract, so a contract's forced
-withdrawal spends its alias's balance.
+the base token cap to about the fee of a withdrawal. The cap is fixed in wei while the fee follows
+the L1 gas price, so it is sized for the highest gas price at which forced withdrawals must still
+pass; above that price they are rejected, and below it the difference is refunded on L2 and can be
+used to deposit. A forced withdrawal does not need its value in `mintValue`, since `l2Value` can
+come from the sender's existing L2 balance. The sender is the L1 caller itself for an EOA or an
+EIP-7702 account and its alias for a contract, so a contract's forced withdrawal spends its alias's
+balance.
+
+Funds held by an L2 contract account, such as a smart account or an L2 Safe, cannot be withdrawn
+this way: the withdrawal has to be a call from the account, so the L1 transaction targets the
+account itself, which is not a registered withdrawal function. Such an account can withdraw
+through a pointed hash of its withdrawal transaction, if it accepts that call from an L1 sender (a
+Safe does, given its owners' signatures). Registering its execution function (for a
+Safe, `execTransaction` on that Safe's address) would let through any transaction its owners sign,
+not only withdrawals.
 
 ## Deposit decoding
 
@@ -111,7 +126,14 @@ same L1 token. This is a known limitation.
   Across's HubPool (which settles relayer refunds through priority operations), are either
   exempted or the restrictions that would affect them are enabled only after they close their
   routes. An exemption covers the transactions the account sends itself and, in either mode, the
-  token deposits it makes through the asset router or a registered legacy bridge.
+  token deposits it makes through the asset router or a registered legacy bridge. It therefore also
+  covers whatever the account can be made to send, with no base token cap, so only a sender whose
+  L1→L2 transactions are access-controlled, or fixed in target, calldata, `mintValue` and refund
+  recipient, is exempted. A contract that forwards its caller's request, or lets its caller choose
+  the gas limit and receive the L2 refund, would let anyone deposit through it.
+- **Governance.** The ecosystem governance (the `ProtocolUpgradeHandler` on Era) is exempted before
+  the filterer is set. An upgrade that sends an L2 call executes atomically, so a rejected call
+  reverts the whole upgrade, and the filterer is owned by the chain admin, not by governance.
 - **Ecosystem senders.** Contracts such as `CTMDeploymentTracker` and `ChainRegistrationSender`
   send two-bridges requests to the L2 Bridgehub, which are generic calls and are rejected in
   `WITHDRAWALS_ONLY` unless their sender is exempt.
@@ -145,19 +167,21 @@ between 2025-11-06 and 2026-11-09 (L1 blocks 23,740,000 to 26,376,900). With it 
   supply on Era that was not bridged in that period is rejected unless it is added too, so the
   whitelist is built from the tokens bridged to Era before the filterer is set.
 - **Exemptions.** In `WITHDRAWALS_ONLY` mode these senders' messages are generic calls, so they
-  are rejected unless the sender is exempt. Whether to exempt them is a policy decision.
+  are rejected unless the sender is exempt. The `ProtocolUpgradeHandler` is exempted from the start
+  (see [Configuration checklist](#configuration-checklist)). Exempting the others is a policy
+  decision; the last column shows who can make each of them send.
 
-  | Sender                                   | Address                                      | Transactions | Sends                                                                                      |
-  | ---------------------------------------- | -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------ |
-  | Across `HubPool`                         | `0xc186fa914353c44b2e33ebe05f21846f1048beda` | 14,004       | root bundles and ETH to its L2 `SpokePool`, and 18 token deposits through the asset router |
-  | Chainlink `ZKSyncValidator`              | `0xdd2e524d186615dedd052c35d3f669b35c5faa8c` | 462          | L2 sequencer uptime feed updates                                                           |
-  | Rocket Pool `RocketZkSyncPriceMessenger` | `0x6cf6cb29754aebf88af12089224429bd68b0b8c8` | 367          | rETH rate updates                                                                          |
-  | zkLink `ZkSyncL1Gateway`                 | `0xecd189e0f390826e137496a4e4a23acf76c942ab` | 301          | messages to its L2 gateway                                                                 |
-  | Across `AtomicWethDepositor`             | `0x64668fbd18b967b46dd22dc8675134d91efedd8d` | 29           | ETH to an L2 account                                                                       |
-  | Aave a.DI `CrossChainController`         | `0xed42a7d8559a463722ca4bed50e0cc05a386b0e1` | 4            | governance messages                                                                        |
-  | ZKsync `ProtocolUpgradeHandler`          | `0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3` | 1            | L2 contract upgrades                                                                       |
-  | L2Scan `L2ScanEthereumBridgeV2`          | `0x375424756f4a5ada1ce1e0849abdd19255b1729e` | 1            | ETH to an L2 account                                                                       |
-  | Unverified contract                      | `0xab23df3fd78f45e54466d08926c3a886211ac5a1` | 2            | `receiveHashes` calls to two L2 contracts                                                  |
+  | Sender                                   | Address                                      | Transactions | Sends                                                                                      | Who triggers it                                                                                              |
+  | ---------------------------------------- | -------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+  | Across `HubPool`                         | `0xc186fa914353c44b2e33ebe05f21846f1048beda` | 14,004       | root bundles and ETH to its L2 `SpokePool`, and 18 token deposits through the asset router | anyone, for a root bundle that passed its challenge period; its owner, with any message                      |
+  | Chainlink `ZKSyncValidator`              | `0xdd2e524d186615dedd052c35d3f669b35c5faa8c` | 462          | L2 sequencer uptime feed updates                                                           | accounts on its access list                                                                                  |
+  | Rocket Pool `RocketZkSyncPriceMessenger` | `0x6cf6cb29754aebf88af12089224429bd68b0b8c8` | 367          | rETH rate updates                                                                          | anyone; the caller chooses the gas limit and gets the L2 refund, an uncapped ETH deposit: not to be exempted |
+  | zkLink `ZkSyncL1Gateway`                 | `0xecd189e0f390826e137496a4e4a23acf76c942ab` | 301          | messages to its L2 gateway                                                                 | its arbitrator; its relayers retry a failed message with any `mintValue` and refund recipient                |
+  | Across `AtomicWethDepositor`             | `0x64668fbd18b967b46dd22dc8675134d91efedd8d` | 29           | ETH to an L2 account                                                                       | anyone, with any Bridgehub request: not to be exempted                                                       |
+  | Aave a.DI `CrossChainController`         | `0xed42a7d8559a463722ca4bed50e0cc05a386b0e1` | 4            | governance messages                                                                        | approved senders; retries by its owner or guardian                                                           |
+  | ZKsync `ProtocolUpgradeHandler`          | `0xe30dca3047b37dc7d88849de4a4dc07937ad5ab3` | 1            | L2 contract upgrades                                                                       | governance                                                                                                   |
+  | L2Scan `L2ScanEthereumBridgeV2`          | `0x375424756f4a5ada1ce1e0849abdd19255b1729e` | 1            | ETH to an L2 account                                                                       | anyone, with any L2 call: not to be exempted                                                                 |
+  | Unverified contract                      | `0xab23df3fd78f45e54466d08926c3a886211ac5a1` | 2            | `receiveHashes` calls to two L2 contracts                                                  | unknown: not to be exempted while unverified                                                                 |
 
   Apart from the asset router and the Lido and NODL bridges, the other senders were EOAs and two
   Safes, mostly sending ETH, which `WITHDRAWALS_ONLY` mode is meant to reject.
@@ -259,6 +283,12 @@ Capping them would need the filterer to decode per-bridge deposit encodings.
   protocol upgrade and prevent reuse across EraVM chains.
 - **Factory dependencies.** The filterer does not see `factoryDeps`, so it cannot block priority
   operations that publish bytecode. Blocking them would need a Mailbox change.
+- **Deployments.** In `ALLOW_ALL` mode a priority operation can deploy a contract, by calling the
+  `ContractDeployer`, the public `Create2Factory` or any factory contract on L2. A bytecode already
+  known on L2 needs no `factoryDeps`, and where EVM bytecode is allowed, as on Era, `createEVM`
+  deploys any init code from the calldata. Rejecting the two deployer targets would not close
+  this, so the filterer does not try. `WITHDRAWALS_ONLY` mode rejects such calls unless the sender
+  is exempt or the transaction has a pointed hash.
 - **Failure mode.** The filterer sits on every priority operation, so a bug could block deposits
   and forced withdrawals. The logic is kept small, malformed deposit calldata reverts instead of
   passing, and the admin can unset the filterer with one transaction.
