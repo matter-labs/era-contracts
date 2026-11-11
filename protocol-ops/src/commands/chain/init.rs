@@ -106,6 +106,10 @@ pub struct ChainInitArgs {
     /// skipped, see `RegisterOnAllChains.s.sol`.
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub register_for_interop: bool,
+    /// Leave ZiSK enabled. A new chain otherwise starts with it disabled; its admin can enable it
+    /// later with `setProofSystemStatus`, which matters only on a multi-proof verifier.
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
+    pub enable_zisk: bool,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -142,6 +146,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         execute_operator: args.execute_operator.unwrap_or(Address::ZERO),
         token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
+        enable_zisk: args.enable_zisk,
     };
 
     let input = ChainInitInput {

@@ -929,8 +929,10 @@ function decodeUpgradeTxData(upgradeTxData: string): {
  * Extract the L2 upgrade tx data from a DefaultChainUpgrade broadcast file.
  *
  * Walks transactions in reverse looking for a ChainAdminOwnable.multicall
- * containing a single upgradeChainFromVersion call, then extracts the
- * l2ProtocolUpgradeTx.data from the per-chain upgrade calldata.
+ * containing exactly one upgradeChainFromVersion call, then extracts the
+ * l2ProtocolUpgradeTx.data from the per-chain upgrade calldata. The multicall
+ * may carry other admin calls next to the cut: the upgrade into v34 also
+ * disables ZiSK in the same multicall.
  */
 function decodeLatestL2UpgradeTx(broadcastPath: string): {
   tx: Record<string, unknown>;
@@ -949,6 +951,7 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
   const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
   const settlementLayerIface = new ethers.utils.Interface(getAbi("DefaultUpgradeZKsyncOS"));
 
+  const upgradeSelector = adminIface.getSighash("upgradeChainFromVersion");
   const errors: string[] = [];
 
   for (const transaction of [...transactions].reverse()) {
@@ -960,13 +963,19 @@ function decodeLatestL2UpgradeTx(broadcastPath: string): {
 
     try {
       const [calls] = chainAdminIface.decodeFunctionData("multicall", input);
-      if (calls.length !== 1) {
-        errors.push(`tx skipped: multicall has ${calls.length} calls, expected 1`);
+      const upgradeCalls = (calls as Array<{ data: string }>).filter(
+        (call) => call.data.slice(0, 10).toLowerCase() === upgradeSelector
+      );
+      if (upgradeCalls.length !== 1) {
+        errors.push(
+          `tx skipped: multicall has ${upgradeCalls.length} upgradeChainFromVersion calls ` +
+            `(of ${calls.length}), expected 1`
+        );
         continue;
       }
 
       // The DiamondCutData tuple is (facetCuts[], initAddress, initCalldata).
-      const diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
+      const diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", upgradeCalls[0].data)[2];
       const initAddress: string = diamondCut.initAddress ?? diamondCut[1];
       const initCalldata: string = diamondCut.initCalldata ?? diamondCut[2];
 

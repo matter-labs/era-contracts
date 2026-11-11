@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::common::abi::IDeployCTMAbi;
 use crate::common::forge::scripts::{
-    deploy_ctm::{DeployCTMConfig, DeployCTMOutput, MultiProofDeployCTMConfig},
+    deploy_ctm::{DeployCTMConfig, DeployCTMOutput},
     deploy_ecosystem::InitialDeploymentConfig,
     DEPLOY_CTM_INVOCATION,
 };
@@ -24,7 +24,6 @@ pub struct CtmDeployInput {
     pub with_testnet_verifier: bool,
     pub zk_token_asset_id: Option<B256>,
     pub create2_factory_salt: Option<B256>,
-    pub multi_proof_verifier: bool,
     pub zisk_range_verifier_addr: Option<Address>,
 }
 
@@ -36,7 +35,7 @@ pub fn deploy(
 ) -> anyhow::Result<DeployCTMOutput> {
     let l1_network = L1Network::from_l1_rpc(&runner.rpc_url)?;
     ensure_testnet_verifier_allowed(l1_network, input.with_testnet_verifier)?;
-    ensure_multi_proof_config(input.multi_proof_verifier, input.zisk_range_verifier_addr)?;
+    ensure_zisk_range_verifier_addr(input.zisk_range_verifier_addr)?;
     let mut initial_deployment_config = InitialDeploymentConfig::default();
 
     // CREATE2 factory address isn't configurable: the Solidity script
@@ -55,10 +54,7 @@ pub fn deploy(
         &initial_deployment_config,
         input.with_testnet_verifier,
         zk_token_asset_id,
-        MultiProofDeployCTMConfig {
-            enabled: input.multi_proof_verifier,
-            zisk_range_verifier_addr: input.zisk_range_verifier_addr,
-        },
+        input.zisk_range_verifier_addr,
     );
 
     let input_path = runner.input_path(&DEPLOY_CTM_INVOCATION)?;
@@ -101,17 +97,9 @@ fn ensure_testnet_verifier_allowed(
     Ok(())
 }
 
-fn ensure_multi_proof_config(
-    multi_proof_verifier: bool,
+fn ensure_zisk_range_verifier_addr(
     zisk_range_verifier_addr: Option<Address>,
 ) -> anyhow::Result<()> {
-    if !multi_proof_verifier {
-        if zisk_range_verifier_addr.is_some() {
-            bail!("zisk_range_verifier_addr requires multi_proof_verifier=true");
-        }
-        return Ok(());
-    }
-
     if zisk_range_verifier_addr.is_some_and(|address| address == Address::ZERO) {
         bail!("zisk_range_verifier_addr must be non-zero when supplied");
     }
@@ -143,22 +131,15 @@ mod tests {
     }
 
     #[test]
-    fn accepts_zksync_os_multiprover_config() {
-        // The deploy script deploys the ZiSK SNARK verifier itself.
-        ensure_multi_proof_config(true, None).unwrap();
-        ensure_multi_proof_config(true, Some(Address::repeat_byte(0x11))).unwrap();
-    }
-
-    #[test]
-    fn rejects_range_verifier_without_multiprover() {
-        let err = ensure_multi_proof_config(false, Some(Address::repeat_byte(0x11))).unwrap_err();
-
-        assert!(err.to_string().contains("multi_proof_verifier"));
+    fn accepts_default_or_supplied_range_verifier() {
+        // Without an override the deploy script deploys the ZiSK range verifier itself.
+        ensure_zisk_range_verifier_addr(None).unwrap();
+        ensure_zisk_range_verifier_addr(Some(Address::repeat_byte(0x11))).unwrap();
     }
 
     #[test]
     fn rejects_zero_range_verifier() {
-        let err = ensure_multi_proof_config(true, Some(Address::ZERO)).unwrap_err();
+        let err = ensure_zisk_range_verifier_addr(Some(Address::ZERO)).unwrap_err();
 
         assert!(err.to_string().contains("zisk_range_verifier_addr"));
     }
