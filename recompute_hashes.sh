@@ -13,7 +13,7 @@ fi
 # shellcheck source=.github/foundry-versions.env
 . "$VERSIONS_FILE"
 BARE_VERSION="${FOUNDRY_VERSION#v}"
-EXPECTED_VERSION="forge Version: ${BARE_VERSION}-${FOUNDRY_VERSION}"
+EXPECTED_VERSION="forge Version: ${BARE_VERSION}"
 EXPECTED_COMMIT="${FOUNDRY_COMMIT}"
 
 # Check if Foundry is installed

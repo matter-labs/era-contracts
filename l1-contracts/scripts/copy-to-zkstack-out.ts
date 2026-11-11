@@ -69,6 +69,11 @@ const REQUIRED_CONTRACTS = [
   "L2InteropCommitmentTree.sol",
 ];
 
+// Forge's dynamic test linking adds a `VmContractHelper<N>` contract to every test source that deploys
+// with `new`. A test file named like a required contract shares its artifact directory, and `<N>` is the
+// source's index in the build, so copying it would rewrite zkstack-out whenever an unrelated file is added.
+const FORGE_TEST_HELPER = /^VmContractHelper\d+\.json$/;
+
 async function copyContractAbi(src: string, dest: string): Promise<number> {
   await fs.mkdir(dest, { recursive: true });
   const entries = await fs.readdir(src, { withFileTypes: true });
@@ -80,6 +85,8 @@ async function copyContractAbi(src: string, dest: string): Promise<number> {
 
     if (entry.isDirectory()) {
       abiCount += await copyContractAbi(srcPath, destPath);
+    } else if (FORGE_TEST_HELPER.test(entry.name)) {
+      continue;
     } else if (entry.name.endsWith(".json")) {
       // Read the JSON file and reduce it to ABI-only JSON.
       const content = await fs.readFile(srcPath, "utf-8");

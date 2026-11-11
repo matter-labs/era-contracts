@@ -123,8 +123,8 @@ test("comment, remapping and receipt-wait edits still measure the exact base and
     const output = fixture.plan();
     assert.equal(output.cached, "false");
     assert.deepEqual(JSON.parse(output.revisions), [
-      { kind: "pr", sha: head },
-      { kind: "base", sha: fixture.base },
+      { kind: "pr", sha: head, foundry_version: "v1.5.1" },
+      { kind: "base", sha: fixture.base, foundry_version: "v1.5.1" },
     ]);
   }
 });
@@ -143,7 +143,27 @@ test("manual regeneration accepts an exact source with different helper code", (
   fixture.write(`${INTEROP}/src/core/utils.ts`, "export const changed = true;\n");
   fixture.commit();
   const output = fixture.plan("workflow_dispatch", fixture.base);
-  assert.deepEqual(JSON.parse(output.revisions), [{ kind: "base", sha: fixture.base }]);
+  assert.deepEqual(JSON.parse(output.revisions), [{ kind: "base", sha: fixture.base, foundry_version: "v1.5.1" }]);
+});
+
+test("a Foundry bump measures each revision with its own pin and keeps the recipe", (_t) => {
+  const fixture = plannerFixture(_t);
+  const { recipe } = fixture.plan();
+  fixture.write(".github/foundry-versions.env", "FOUNDRY_VERSION=v1.8.4\n");
+  const head = fixture.commit();
+  const output = fixture.plan();
+  assert.equal(output.recipe, recipe);
+  assert.deepEqual(JSON.parse(output.revisions), [
+    { kind: "pr", sha: head, foundry_version: "v1.8.4" },
+    { kind: "base", sha: fixture.base, foundry_version: "v1.5.1" },
+  ]);
+  assert.deepEqual(
+    JSON.parse(output.anvil).include.map((_group) => [_group.kind, _group.foundry_version]),
+    [
+      ["pr", "v1.8.4"],
+      ["base", "v1.5.1"],
+    ]
+  );
 });
 
 test("a valid baseline from a successful upstream push remains reusable", async (_t) => {

@@ -28,7 +28,6 @@ jobs:
       base_sha: ${{ steps.plan.outputs.base_sha }}
       recipe: ${{ steps.plan.outputs.recipe }}
       node_version: ${{ steps.plan.outputs.node_version }}
-      foundry_version: ${{ steps.plan.outputs.foundry_version }}
       coverage_command: ${{ steps.plan.outputs.coverage_command }}
     steps:
       - uses: actions/checkout@v4
@@ -68,11 +67,12 @@ jobs:
           ref: ${{ matrix.sha }}
           submodules: recursive
 
+      # The revision's own pin rather than the PR's: see `foundryVersion` in the planner.
       - &coverage-foundry-setup
         name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: ${{ needs.plan.outputs.foundry_version }}
+          version: ${{ matrix.foundry_version }}
 
       - &coverage-node-setup
         name: Use Node.js
