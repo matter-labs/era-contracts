@@ -1,15 +1,63 @@
 # syntax=docker/dockerfile:1.6
 
+ARG FOUNDRY_ARCH=linux_amd64
 ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
-# Pre-baked toolchain base for the build stages (see Dockerfile.base +
-# build-docker-base.yaml). Must be a global ARG so it's visible in the
-# `FROM ${BUILD_BASE_IMAGE}` lines below.
-ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
 # The zksync-association/zk-governance commit the image holds at /zk-governance.
 ARG ZK_GOVERNANCE_COMMIT=9b06a16159cd58add109f25598e79731450d1772
+
+########################################
+# 0) Toolchain for both build stages
+########################################
+# Its layers change only with the ARGs above or the foundry pin, so the build
+# cache keeps them across commits.
+FROM debian:bookworm-slim AS toolchain
+
+ARG FOUNDRY_ARCH
+ARG NODE_MAJOR
+ARG RUST_TARGET
+ARG RUST_TOOLCHAIN
+ARG YARN_VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    YARN_CACHE_FOLDER=/tmp/yarn-cache
+
+# Build deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl git bash coreutils openssl jq xz-utils gnupg \
+      build-essential pkg-config libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Node + Yarn
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
+ && apt-get update && apt-get install -y --no-install-recommends nodejs \
+ && npm i -g yarn@${YARN_VERSION} \
+ && npm cache clean --force \
+ && rm -rf /var/lib/apt/lists/*
+
+# The foundry pin comes from the repository's single source of truth rather than
+# a build arg, so the image cannot drift from the toolchain CI installs. Copied
+# after the apt/Node layers so a version bump only invalidates the layers below.
+COPY .github/foundry-versions.env /usr/local/share/foundry-versions.env
+
+# Foundry (forge + cast + anvil). One pinned version, so one download.
+RUN . /usr/local/share/foundry-versions.env \
+ && curl -L -o /tmp/foundry.tgz "https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VERSION}/foundry_${FOUNDRY_VERSION}_${FOUNDRY_ARCH}.tar.gz" \
+ && tar zxf /tmp/foundry.tgz -C /tmp/ forge cast anvil \
+ && mv /tmp/forge /tmp/cast /tmp/anvil /usr/local/bin/ \
+ && chmod +x /usr/local/bin/forge /usr/local/bin/cast /usr/local/bin/anvil \
+ && rm /tmp/foundry.tgz
+
+# Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN} --no-modify-path
+RUN rustup target add ${RUST_TARGET}
+RUN cargo install cargo-chef --locked
 
 ########################################
 # 1) Planner — prepare cargo-chef recipes
@@ -35,7 +83,7 @@ RUN mkdir -p /recipes && \
 # (committed JSON ABIs read by `abigen!` macros at compile time) — we COPY that
 # subset rather than the whole tree so a Solidity-only change doesn't
 # invalidate the cargo layers.
-FROM ${BUILD_BASE_IMAGE} AS cargo-builder
+FROM toolchain AS cargo-builder
 
 ARG RUST_TARGET
 
@@ -105,7 +153,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
 # yarn install + forge build for each contracts subproject + zk-governance.
 # Independent of cargo-builder, so buildkit runs them in parallel — wall-time
 # of the build stage drops to max(rust, forge) instead of rust + forge.
-FROM ${BUILD_BASE_IMAGE} AS forge-builder
+FROM toolchain AS forge-builder
 
 WORKDIR /contracts
 

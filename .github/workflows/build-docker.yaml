@@ -124,27 +124,26 @@ jobs:
 
       # Loaded, not pushed: the steps below test this exact image, then push it.
       - name: Build Docker Image
-        uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
-          source: .
-          files: docker/protocol/docker-bake.hcl
-          targets: protocol
+          context: .
+          file: docker/protocol/Dockerfile
+          platforms: linux/amd64
           load: true
           provenance: false
-          set: |
-            base.cache-from=type=gha,scope=protocol-ops-base
-            base.cache-to=type=gha,mode=max,scope=protocol-ops-base
-            protocol.cache-from=type=gha,scope=protocol-ops
-            protocol.cache-to=type=gha,mode=max,scope=protocol-ops
-            protocol.tags=${{ env.IMAGE }}
-            protocol.args.CONTRACTS_COMMIT=${{ steps.meta.outputs.revision }}
-            protocol.args.ZK_GOVERNANCE_COMMIT=${{ steps.meta.outputs.zk_governance_commit }}
-            protocol.labels.org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            protocol.labels.org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}
-            protocol.labels.org.opencontainers.image.created=${{ steps.meta.outputs.created }}
-            protocol.labels.org.opencontainers.image.version=${{ env.IMAGE_TAG }}
-            protocol.labels.io.matter-labs.protocol-ops.tested-with=${{ steps.gate.outputs.run_url }}
-            protocol.labels.io.matter-labs.protocol-ops.zk-governance-commit=${{ steps.meta.outputs.zk_governance_commit }}
+          cache-from: type=gha,scope=protocol-ops
+          cache-to: type=gha,mode=max,scope=protocol-ops
+          tags: ${{ env.IMAGE }}
+          build-args: |
+            CONTRACTS_COMMIT=${{ steps.meta.outputs.revision }}
+            ZK_GOVERNANCE_COMMIT=${{ steps.meta.outputs.zk_governance_commit }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+            org.opencontainers.image.version=${{ env.IMAGE_TAG }}
+            io.matter-labs.protocol-ops.tested-with=${{ steps.gate.outputs.run_url }}
+            io.matter-labs.protocol-ops.zk-governance-commit=${{ steps.meta.outputs.zk_governance_commit }}
 
       # verify-bootstrap holds the image's contract build against its AllContractsHashes.json.
       # Not on PRs, whose hashes are regenerated last (docker/protocol/Dockerfile).
