@@ -537,7 +537,9 @@ export async function runChainUpgradesAndRelayL2(params: {
       throw new Error(`Expected one chain-upgrade Safe bundle for chain ${chain.chainId}, found ${safeBundles.length}`);
     }
 
+    const hadProofSystemSetter = await hasProofSystemSetter(l1Provider, chain.diamondProxy);
     await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
+    await assertZiskDisabledWithSetter(l1Provider, chain, hadProofSystemSetter);
 
     // Decode the L2 upgrade tx and the cut's initializer from the protocol-ops Safe bundle.
     const {
@@ -643,7 +645,9 @@ export async function runChainUpgradesPerCtm(params: {
           "--out",
           chainOutDir,
         ]);
+        const hadProofSystemSetter = await hasProofSystemSetter(l1Provider, chain.diamondProxy);
         await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
+        await assertZiskDisabledWithSetter(l1Provider, chain, hadProofSystemSetter);
         console.log(`  ✅ chain ${chain.chainId} L1 upgrade applied`);
       }
       continue;
@@ -1109,6 +1113,34 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
   if (!(await assetTracker.isAssetRegistered(baseTokenAssetId))) {
     throw new Error(`Chain ${chainId}: base token bookkeeping not initialized after L2 upgrade`);
+  }
+}
+
+async function hasProofSystemSetter(
+  provider: ethers.providers.JsonRpcProvider,
+  diamondProxy: string
+): Promise<boolean> {
+  const diamond = new ethers.Contract(diamondProxy, getAbi("GettersFacet"), provider);
+  const setter = new ethers.utils.Interface(getAbi("AdminFacet")).getSighash("setProofSystemStatus");
+  return (await diamond.facetAddress(setter)) !== ethers.constants.AddressZero;
+}
+
+/**
+ * `chain upgrade` runs without `--enable-zisk`, so the upgrade that installs `setProofSystemStatus` must
+ * leave ZiSK disabled ({protocol-docs/multi-proof-verification.md}).
+ */
+async function assertZiskDisabledWithSetter(
+  provider: ethers.providers.JsonRpcProvider,
+  chain: { chainId: number; diamondProxy: string },
+  hadProofSystemSetter: boolean
+): Promise<void> {
+  if (hadProofSystemSetter || !(await hasProofSystemSetter(provider, chain.diamondProxy))) {
+    return;
+  }
+  const diamond = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
+  const { zisk } = await diamond.disabledProofSystems();
+  if (!zisk) {
+    throw new Error(`Chain ${chain.chainId}: the upgrade installing setProofSystemStatus left ZiSK enabled`);
   }
 }
 

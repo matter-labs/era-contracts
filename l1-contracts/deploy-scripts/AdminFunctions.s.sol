@@ -49,11 +49,6 @@ bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPL
 ///      fallback and reverts with `"F"`.
 uint256 constant V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD = uint256(31) << 32;
 
-/// @dev Protocol version threshold (packed `major << 32`) at which the Admin facet gained
-///      `setProofSystemStatus`. A chain crossing it comes out with ZiSK enabled, since nothing
-///      ever set its disable bit, so the chain upgrade disables it unless the chain opts in.
-uint256 constant V34_PROOF_SYSTEM_STATUS_THRESHOLD = uint256(34) << 32;
-
 /// @notice Legacy 2-arg Admin interface used when the chain being upgraded is
 ///         still on a pre-v31 protocol version (so its Admin facet only has
 ///         the old selector). The abi-encoded call produced via this interface
@@ -713,11 +708,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
             : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
 
-        // Only the upgrade that first installs `setProofSystemStatus` disables ZiSK: a later one
-        // must not undo a chain's decision to enable it.
-        bool shouldDisableZisk = !_params.enableZisk &&
-            currentProtocolVersion < V34_PROOF_SYSTEM_STATUS_THRESHOLD &&
-            newProtocolVersion >= V34_PROOF_SYSTEM_STATUS_THRESHOLD;
+        bool shouldDisableZisk = _shouldDisableZisk(chain, diamondCut, _params.enableZisk);
 
         uint256 callCount = 1;
         if (_params.shouldSetDaValidatorPair) {
@@ -767,6 +758,38 @@ contract AdminFunctions is Script, IAdminFunctions {
         Utils.adminExecuteCalls(_params.adminAddr, _params.accessControlRestriction, calls);
 
         console.log("AdminFunctions: upgrade completed successfully");
+    }
+
+    /// @notice Whether the chain upgrade disables ZiSK: only the cut that first installs
+    ///         `setProofSystemStatus` does, so a later upgrade never undoes a chain's decision to enable it.
+    /// @dev Keyed on the cut rather than on the CTM's version: a chain several versions behind gets the
+    ///      cut stored for its own version, which can land below the one that installs the setter.
+    /// @param _chain The chain being upgraded.
+    /// @param _diamondCut The cut the upgrade applies.
+    /// @param _enableZisk Whether the chain keeps ZiSK enabled.
+    function _shouldDisableZisk(
+        IZKChain _chain,
+        Diamond.DiamondCutData memory _diamondCut,
+        bool _enableZisk
+    ) internal view returns (bool) {
+        bytes4 setter = IAdmin.setProofSystemStatus.selector;
+        if (_enableZisk || _chain.facetAddress(setter) != address(0)) {
+            return false;
+        }
+        uint256 facetCutsLength = _diamondCut.facetCuts.length;
+        for (uint256 i = 0; i < facetCutsLength; ++i) {
+            Diamond.FacetCut memory facetCut = _diamondCut.facetCuts[i];
+            if (facetCut.action != Diamond.Action.Add) {
+                continue;
+            }
+            uint256 selectorsLength = facetCut.selectors.length;
+            for (uint256 j = 0; j < selectorsLength; ++j) {
+                if (facetCut.selectors[j] == setter) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     function adminScheduleUpgrade(
