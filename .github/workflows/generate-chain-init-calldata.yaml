@@ -43,6 +43,11 @@ on:
         description: "L1 DA validator address for the new chain"
         required: true
         type: string
+      ctm_proxy:
+        description: "ZKsync OS CTM proxy. Empty: discovered from L1, which scans eth_getLogs from block 0"
+        required: false
+        type: string
+        default: ""
       base_token_addr:
         description: "Base token address (0x0000...0001 for ETH)"
         required: false
@@ -89,11 +94,14 @@ jobs:
           PROVE_OPERATOR: ${{ inputs.prove_operator }}
           EXECUTE_OPERATOR: ${{ inputs.execute_operator }}
           L1_DA_VALIDATOR_ADDR: ${{ inputs.l1_da_validator_addr }}
+          CTM_PROXY: ${{ inputs.ctm_proxy }}
           BASE_TOKEN_ADDR: ${{ inputs.base_token_addr }}
           BASE_TOKEN_PRICE_RATIO: ${{ inputs.base_token_price_ratio }}
           PAUSE_DEPOSITS: ${{ inputs.pause_deposits }}
         run: |
           mkdir -p "$WORK_DIR"
+          ctm=()
+          [ -z "$CTM_PROXY" ] || ctm=(--ctm-proxy "$CTM_PROXY")
           bash protocol-ops.sh --tag "$PROTOCOL_OPS_TAG" \
             chain init \
             --l1-rpc-url          "$L1_RPC_URL" \
@@ -108,7 +116,8 @@ jobs:
             --base-token-addr     "$BASE_TOKEN_ADDR" \
             --base-token-price-ratio "$BASE_TOKEN_PRICE_RATIO" \
             --pause-deposits      "$PAUSE_DEPOSITS" \
-            --out /contracts/work/safe
+            --out /contracts/work/safe \
+            "${ctm[@]}"
 
       - name: Upload Safe bundles
         uses: actions/upload-artifact@v4

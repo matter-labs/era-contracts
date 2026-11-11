@@ -229,8 +229,8 @@ does not exist yet; a fresh ecosystem is deployed with flags.
 
 When `--ctm-proxy` is omitted, `chain init` discovers the ZKsync OS CTM from L1: the one CTM the
 Bridgehub still registers (`chainTypeManagerIsRegistered`) whose `isZKsyncOS()` is true, among the
-CTMs of its chains, else among those `ChainTypeManagerAdded` names, scanned from block 0, which
-hosted RPCs may refuse. It fails when there is none or more than one.
+CTMs of its chains and those `ChainTypeManagerAdded` names, scanned from block 0, which hosted RPCs
+may refuse. It fails when there is none or more than one.
 
 `upgrade-envs/permanent-values/<env>.toml` is the per-environment fact sheet (L1 chain id,
 Bridgehub, CTMs, governance kind); a new ecosystem gets a new file there once its addresses exist,

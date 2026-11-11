@@ -46,9 +46,8 @@ pub struct ChainInitArgs {
     pub topology: crate::common::EcosystemArgs,
 
     /// CTM proxy address. Optional: the ZKsync OS CTM is discovered from L1 when omitted. Pass
-    /// it for the first chain on a fresh ecosystem, where discovery has to fall back to
-    /// scanning `ChainTypeManagerAdded` from block 0 and hosted RPCs cap the `eth_getLogs`
-    /// range.
+    /// it where the RPC caps the `eth_getLogs` range, since discovery scans
+    /// `ChainTypeManagerAdded` from block 0.
     #[clap(long, help_heading = "Input")]
     pub ctm_proxy: Option<Address>,
 

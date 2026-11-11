@@ -39,47 +39,50 @@ pub async fn resolve_ctm_proxy(
 }
 
 /// Discover the ZKsync OS CTM from L1, without requiring an existing chain ID: the one CTM the
-/// bridgehub still registers whose `isZKsyncOS()` is true, among the CTMs of its chains, else among
-/// the CTMs its `ChainTypeManagerAdded` events name (an ecosystem whose OS CTM has no chain yet).
-/// Fails when there is no such CTM or more than one.
+/// bridgehub still registers whose `isZKsyncOS()` is true, among the CTMs of its chains and those
+/// its `ChainTypeManagerAdded` events name, scanned from block 0 (an OS CTM need not have a chain
+/// yet). Fails when there is no such CTM or more than one.
 pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
     use alloy::primitives::keccak256;
     use alloy::providers::Provider;
     use alloy::rpc::types::Filter;
 
     let p = provider(l1_rpc_url)?;
-    let chain_ctms = discover_all_ctms(l1_rpc_url, bridgehub)
+    let mut ctms: Vec<Address> = discover_all_ctms(l1_rpc_url, bridgehub)
         .await?
         .into_iter()
         .map(|(ctm, _)| ctm)
         .collect();
-    let mut os_ctms = zksync_os_ctms(&p, bridgehub, chain_ctms).await?;
-    if os_ctms.is_empty() {
-        // event ChainTypeManagerAdded(address indexed chainTypeManager)
-        let filter = Filter::new()
-            .address(bridgehub)
-            .event_signature(keccak256(b"ChainTypeManagerAdded(address)"))
-            .from_block(0u64);
-        let logs = p
-            .get_logs(&filter)
-            .await
-            .context("scan ChainTypeManagerAdded events on bridgehub")?;
-        let mut added: Vec<Address> = Vec::new();
-        for log in logs {
-            // The CTM address is indexed (topic1).
-            let ctm = Address::from_slice(&log.topics()[1][12..]);
-            if !added.contains(&ctm) {
-                added.push(ctm);
-            }
+    // event ChainTypeManagerAdded(address indexed chainTypeManager)
+    let filter = Filter::new()
+        .address(bridgehub)
+        .event_signature(keccak256(b"ChainTypeManagerAdded(address)"))
+        .from_block(0u64);
+    let logs = p.get_logs(&filter).await.context(
+        "scan ChainTypeManagerAdded events on bridgehub from block 0 \
+         (where the RPC caps the eth_getLogs range, pass the CTM proxy explicitly)",
+    )?;
+    for log in logs {
+        // The CTM address is indexed (topic1).
+        let ctm = Address::from_slice(&log.topics()[1][12..]);
+        if !ctms.contains(&ctm) {
+            ctms.push(ctm);
         }
-        os_ctms = zksync_os_ctms(&p, bridgehub, added).await?;
     }
-    match os_ctms.as_slice() {
+    single_zksync_os_ctm(bridgehub, &zksync_os_ctms(&p, bridgehub, ctms).await?)
+}
+
+fn single_zksync_os_ctm(bridgehub: Address, os_ctms: &[Address]) -> anyhow::Result<Address> {
+    match os_ctms {
         [ctm] => Ok(*ctm),
         [] => anyhow::bail!("no ZKsync OS CTM found on bridgehub {bridgehub:#x}"),
         ctms => anyhow::bail!(
-            "{} ZKsync OS CTMs on bridgehub {bridgehub:#x}: pass the CTM proxy explicitly",
-            ctms.len()
+            "{} ZKsync OS CTMs on bridgehub {bridgehub:#x} ({}): pass the CTM proxy explicitly",
+            ctms.len(),
+            ctms.iter()
+                .map(|ctm| format!("{ctm:#x}"))
+                .collect::<Vec<_>>()
+                .join(", ")
         ),
     }
 }
@@ -530,4 +533,26 @@ mod tests {
     // Verify these symbols compile and resolve — actual calls require a live RPC.
     #[allow(unused_imports)]
     use super::{resolve_bytecodes_supplier, resolve_is_testnet_verifier};
+
+    use super::single_zksync_os_ctm;
+    use alloy::primitives::Address;
+
+    #[test]
+    fn discovery_takes_only_a_sole_zksync_os_ctm() {
+        let bridgehub = Address::repeat_byte(0xb0);
+        let (a, b) = (Address::repeat_byte(0x0a), Address::repeat_byte(0x0b));
+        assert_eq!(single_zksync_os_ctm(bridgehub, &[a]).unwrap(), a);
+        let none = single_zksync_os_ctm(bridgehub, &[])
+            .unwrap_err()
+            .to_string();
+        assert!(none.starts_with("no ZKsync OS CTM"), "{none}");
+        let two = single_zksync_os_ctm(bridgehub, &[a, b])
+            .unwrap_err()
+            .to_string();
+        assert!(
+            two.contains(&format!("{a:#x}, {b:#x}"))
+                && two.contains("pass the CTM proxy explicitly"),
+            "{two}"
+        );
+    }
 }
