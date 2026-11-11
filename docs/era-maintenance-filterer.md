@@ -162,8 +162,10 @@ between 2025-11-06 and 2026-11-09 (L1 blocks 23,740,000 to 26,376,900). With it 
   `0x05e1c3ae4b9732444ae25217ac7666e46fa365fee1768de00c9fcb65532b7609`) is set by `initialize`.
   `setDepositCaps` covers the 70 tokens listed below: the 49 deposited through the L1 asset router
   in that period and 21 more that were only withdrawn from Era in it. Their handler is the native
-  token vault, and each asset id is the one of the L1 native token vault, which the filterer also
-  derives from a legacy-encoded deposit. The list is a floor, not the whitelist: a token with a
+  token vault, and each asset id is the one returned by `L1NativeTokenVault.assetId(token)`. For a
+  token native to L1 the filterer derives the same id from a legacy-encoded deposit. A token native
+  to Era (ZK in this list) uses the new encoding, and its id is not the one derived from its L1
+  token address. The list is a floor, not the whitelist: a token with a
   supply on Era that was not bridged in that period is rejected unless it is added too, so the
   whitelist is built from the tokens bridged to Era before the filterer is set.
 - **Exemptions.** In `WITHDRAWALS_ONLY` mode these senders' messages are generic calls, so they
