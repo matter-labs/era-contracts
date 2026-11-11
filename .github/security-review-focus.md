@@ -92,7 +92,7 @@ Applies to ZKsync OS contracts, shared L1 contracts, genesis, deployment and upg
 
 ## Generated files
 
-Skip the contents of these reproducible generated outputs during security review:
+Do not analyze or report findings in the contents of these reproducible generated outputs:
 
 - `AllContractsHashes.json`
 - `l1-contracts/selectors`
