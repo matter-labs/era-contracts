@@ -5,7 +5,8 @@
  * (build-docker.yaml; Linux, for the host network), every command runs in that image, the chain commands
  * by `docker run` as docs/protocol-ops-for-partners.md runs them; else from this checkout.
  *
- * Unlike `runPipelineUpgradeScenario`, it runs the env's committed configs, the only ones an image holds.
+ * `--env` reads its configs only from `upgrade-envs/`, so the run writes the env's pair there from the fixture
+ * and, in the image, mounts it over the same paths.
  * Not `chain upgrade`: the fixture's chains still have the previous upgrade's L2 transaction pending.
  */
 
@@ -15,7 +16,6 @@ import * as os from "os";
 import * as path from "path";
 import * as zlib from "zlib";
 import { ethers } from "ethers";
-import { parse as parseToml } from "toml";
 import { AnvilManager } from "../daemons/anvil-manager";
 import { DeploymentRunner } from "../deployment-runner";
 import { readStateVersion } from "../core/anvil-config";
@@ -29,6 +29,7 @@ import { selectUpgradeChains } from "./upgrade-test-utils";
 const ENV = "anvil-interop";
 const UPGRADE_TIMESTAMP = 1_900_000_000;
 const VALIDATOR = "0x1111111111111111111111111111111111111111";
+const CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 
 const anvilInteropDir = path.resolve(__dirname, "../..");
 const contractsRootDir = path.resolve(anvilInteropDir, "../../..");
@@ -37,36 +38,61 @@ const upgradeEnvsDir = path.join(contractsRootDir, "l1-contracts", "upgrade-envs
 /** A command line's arguments, split on whitespace, so a long command can wrap; no value contains any. */
 const words = (command: string) => command.trim().split(/\s+/);
 
+/**
+ * The env's permanent values and the upgrade's input, keyed by their paths under `upgrade-envs/`: the fixture's
+ * addresses, with salts of the run's own (every run starts from the same frozen L1).
+ */
+function envConfigs(
+  upgrade: string,
+  l1ChainId: number,
+  { l1Addresses, ctmAddresses, chainAddresses, zkToken }: Required<DeploymentState>
+): Record<string, string> {
+  const ctm = ctmAddresses.chainTypeManager;
+  const toml = (...lines: string[]) => `${lines.join("\n")}\n`;
+  return {
+    [`permanent-values/${ENV}.toml`]: toml(
+      `l1_chain_id = ${l1ChainId}`,
+      `zk_token_asset_id = "${zkToken.assetId}"`,
+      "testnet_verifier = true",
+      "[core_contracts]",
+      `bridgehub_proxy_addr = "${l1Addresses.bridgehub}"`,
+      "[[ctm_contracts.ctms]]",
+      `proxy = "${ctm}"`,
+      "[permanent_contracts]",
+      `create2_factory_addr = "${CREATE2_FACTORY}"`
+    ),
+    [`${upgrade}/${ENV}.toml`]: toml(
+      `era_chain_id = ${chainAddresses[0].chainId}`,
+      `owner_address = "${l1Addresses.governance}"`,
+      "[contracts]",
+      `create2_factory_salt = "${ethers.utils.id(`${ENV} release flow`)}"`,
+      "[create2_factory_salts]",
+      `"${ctm}" = "${ethers.utils.id(`${ENV} release flow ${ctm}`)}"`
+    ),
+  };
+}
+
 export async function runReleaseFlow(): Promise<void> {
   const tag = process.env.PROTOCOL_OPS_TAG || undefined;
   const image = tag && `ghcr.io/matter-labs/protocol-ops${tag.startsWith("sha256:") ? "@" : ":"}${tag}`;
   const fixture = path.join(anvilInteropDir, "chain-states", readStateVersion("upgradeSourceStateVersion"));
-  const { l1Addresses, ctmAddresses, chainAddresses, zkToken } = JSON.parse(
-    fs.readFileSync(path.join(fixture, "addresses.json"), "utf8")
-  ) as Required<DeploymentState>;
+  const state = JSON.parse(fs.readFileSync(path.join(fixture, "addresses.json"), "utf8")) as Required<DeploymentState>;
+  const { l1Addresses, ctmAddresses, chainAddresses } = state;
   const config = new DeploymentRunner().getConfig();
   const l1Config = config.chains.find((chain) => chain.role === "l1")!;
   // The partner's chain: one that settles on L1, so its operations are L1 bundles.
   const [chain] = selectUpgradeChains(chainAddresses, config.chains, ["directSettled"]);
   const upgrade = fs
     .readdirSync(upgradeEnvsDir)
-    .filter((dir) => dir.startsWith("v") && fs.existsSync(path.join(upgradeEnvsDir, dir, `${ENV}.toml`)))
+    .filter((dir) => dir.startsWith("v") && fs.existsSync(path.join(upgradeEnvsDir, dir, "upgrade.toml")))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .pop()!;
   // Relative to the checkout: in the image, the upgrade's output directory is mounted at the same place.
   const out = `l1-contracts/upgrade-envs/${upgrade}/output/${ENV}`;
-  // The env must name the fixture. Most stale values make a later command fail, but not these two: for a CTM
-  // without a salt in the release input protocol-ops picks a random one, and it checks the ZK asset id only
-  // against the env itself.
-  const preset = parseToml(fs.readFileSync(path.join(upgradeEnvsDir, "permanent-values", `${ENV}.toml`), "utf8"));
-  const input = parseToml(fs.readFileSync(path.join(upgradeEnvsDir, upgrade, `${ENV}.toml`), "utf8"));
-  const saltedCtms = Object.keys(input.create2_factory_salts ?? {}).map((ctm) => ctm.toLowerCase());
-  if (
-    preset.zk_token_asset_id?.toLowerCase() !== zkToken.assetId.toLowerCase() ||
-    !saltedCtms.includes(ctmAddresses.chainTypeManager.toLowerCase())
-  ) {
-    throw new Error(`copy ${fixture}/addresses.json's zkToken.assetId and chainTypeManager into the ${ENV} configs`);
-  }
+  const configs = envConfigs(upgrade, l1Config.chainId, state);
+  const configMounts = Object.keys(configs).map(
+    (file) => `${path.join(upgradeEnvsDir, file)}:/contracts/l1-contracts/upgrade-envs/${file}:ro`
+  );
 
   const anvilManager = new AnvilManager();
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "release-flow-"));
@@ -75,12 +101,16 @@ export async function runReleaseFlow(): Promise<void> {
   const result = path.join(work, "result");
   fs.mkdirSync(bundle);
   fs.mkdirSync(result);
-  // A protocol-ops command through protocol-ops.sh, in the image when a tag is set, with both mounted.
+  // A protocol-ops command through protocol-ops.sh, in the image when a tag is set, with both mounted, and the
+  // env's configs over the image's.
   const po = (command: string) =>
     runProtocolOps([...(tag ? ["--tag", tag] : []), ...words(command)], {
-      EXTRA_MOUNTS: `${bundle}:${bundle}:ro ${result}:${result}`,
+      EXTRA_MOUNTS: [`${bundle}:${bundle}:ro`, `${result}:${result}`, ...configMounts].join(" "),
     });
   try {
+    for (const [file, contents] of Object.entries(configs)) {
+      fs.writeFileSync(path.join(upgradeEnvsDir, file), contents);
+    }
     const l1StatePath = path.join(work, "l1-state.json");
     fs.writeFileSync(l1StatePath, zlib.gunzipSync(fs.readFileSync(path.join(fixture, `${l1Config.chainId}.json.gz`))));
     await anvilManager.startChain({ ...l1Config, loadStatePath: l1StatePath, blockTime: 0 });
@@ -149,7 +179,8 @@ export async function runReleaseFlow(): Promise<void> {
       if (!image) {
         runProtocolOps(words(`${chainCommand} --out ${dir}`));
       } else {
-        const docker = words(`run --rm --platform linux/amd64 --network=host -v ${dir}:/out ${image}
+        const mounts = configMounts.map((mount) => `-v ${mount}`).join(" ");
+        const docker = words(`run --rm --platform linux/amd64 --network=host -v ${dir}:/out ${mounts} ${image}
           protocol_ops ${chainCommand} --out /out`);
         if (spawnSync("docker", docker, { stdio: "inherit" }).status !== 0) {
           throw new Error(`docker ${docker.join(" ")} failed`);
@@ -179,5 +210,8 @@ export async function runReleaseFlow(): Promise<void> {
   } finally {
     await anvilManager.stopAll();
     fs.rmSync(work, { recursive: true, force: true });
+    for (const file of Object.keys(configs)) {
+      fs.rmSync(path.join(upgradeEnvsDir, file), { force: true });
+    }
   }
 }

@@ -69,9 +69,10 @@ yarn test:release-flow        # the release's protocol-ops commands on the froze
 ```
 
 `yarn test:release-flow` is step 3 of [the release flow](../../../.github/workflows/README.md#release-flow),
-from this checkout or, with `PROTOCOL_OPS_TAG` set, in that image (Linux, for the host network). It starts
-only the L1, which replaces whatever listens on its port: set `ANVIL_INTEROP_PORT_OFFSET` while other chains
-are up.
+from this checkout or, with `PROTOCOL_OPS_TAG` set, in that image (Linux, for the host network). The
+`anvil-interop` env it runs is written from the fixture into `l1-contracts/upgrade-envs/` for the run. It
+starts only the L1, which replaces whatever listens on its port: set `ANVIL_INTEROP_PORT_OFFSET` while other
+chains are up.
 
 `yarn test:upgrade` reviews each package the way governance would before replaying it:
 `protocol-ops ecosystem verify-package` against the live anvil L1, with `--env local`, the
