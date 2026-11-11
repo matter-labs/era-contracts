@@ -10,8 +10,9 @@ Transactions sent directly on L2 never reach the L1 filterer. Restrictions on th
 ban on new contract deployments, are applied by the sequencer and are out of scope here. The same
 holds for inbound interop: anyone can call `InteropHandler.executeBundle` on L2, and a bundle can
 mint tokens and base token without a priority operation. `executeBundle` reverts while the chain
-settles on L1, as Era does. The sequencer cannot skip a priority operation, so the ban on
-deployments does not cover L1→L2 transactions (see [Design decisions](#design-decisions)).
+settles on L1, as Era does. The sequencer cannot skip a priority operation, so for L1→L2
+transactions the filterer rejects calls to the L2 deployers instead, which does not block every
+deployment (see [Design decisions](#design-decisions)).
 
 ## Deployment and ownership
 
@@ -28,7 +29,8 @@ Each EraVM chain gets its own proxy, owned by its chain admin, whose `initialize
 
 Before setting the filterer on the chain, the admin whitelists the tokens that are already bridged
 (`setDepositCaps` with `type(uint256).max`); a token left out is rejected from the moment the
-filterer is set, even in `ALLOW_ALL` mode. The admin also adds the exemptions, legacy bridges and withdrawal
+filterer is set, even in `ALLOW_ALL` mode, and so are calls to the L2 deployers (see
+[Rules](#rules)). The admin also adds the exemptions, legacy bridges and withdrawal
 functions the chain needs (see [Configuration checklist](#configuration-checklist)). Every later
 change is a single owner call that emits an event.
 
@@ -60,9 +62,10 @@ change is a single owner call that emits an event.
      the legacy `finalizeDeposit`, the transaction is checked like a Bridgehub deposit. Other calls of
      the bridge are generic calls. The decoded `l1Sender` is trusted as the depositor, so only bridges
      that set it to their caller should be registered.
-4. **Generic calls.** Any other call passes if `mintValue` is within the base token cap. In
-   `WITHDRAWALS_ONLY` mode it must also call a `(contractL2, selector)` pair registered in
-   `withdrawalFunctions`, so users can still force a withdrawal from L1.
+4. **Generic calls.** Any other call passes if `mintValue` is within the base token cap and
+   `contractL2` is neither the `ContractDeployer` nor the `Create2Factory`. In `WITHDRAWALS_ONLY`
+   mode it must also call a `(contractL2, selector)` pair registered in `withdrawalFunctions`, so
+   users can still force a withdrawal from L1.
 
 A cap applies to a single deposit, and a cap of zero means the asset is not accepted. The cap of the
 base token bounds `mintValue`, i.e. all base token entering the chain through a non-exempt priority
@@ -134,9 +137,6 @@ same L1 token. This is a known limitation.
 - **Governance.** The ecosystem governance (the `ProtocolUpgradeHandler` on Era) is exempted before
   the filterer is set. An upgrade that sends an L2 call executes atomically, so a rejected call
   reverts the whole upgrade, and the filterer is owned by the chain admin, not by governance.
-- **Ecosystem senders.** Contracts such as `CTMDeploymentTracker` and `ChainRegistrationSender`
-  send two-bridges requests to the L2 Bridgehub, which are generic calls and are rejected in
-  `WITHDRAWALS_ONLY` unless their sender is exempt.
 
 ## Era mainnet
 
@@ -285,12 +285,16 @@ Capping them would need the filterer to decode per-bridge deposit encodings.
   protocol upgrade and prevent reuse across EraVM chains.
 - **Factory dependencies.** The filterer does not see `factoryDeps`, so it cannot block priority
   operations that publish bytecode. Blocking them would need a Mailbox change.
-- **Deployments.** In `ALLOW_ALL` mode a priority operation can deploy a contract, by calling the
-  `ContractDeployer`, the public `Create2Factory` or any factory contract on L2. A bytecode already
-  known on L2 needs no `factoryDeps`, and where EVM bytecode is allowed, as on Era, `createEVM`
-  deploys any init code from the calldata. Rejecting the two deployer targets would not close
-  this, so the filterer does not try. `WITHDRAWALS_ONLY` mode rejects such calls unless the sender
-  is exempt or the transaction has a pointed hash.
+- **Deployments.** A priority operation that calls the `ContractDeployer` or the public
+  `Create2Factory` is rejected in either mode, unless the sender is exempt or the transaction has
+  a pointed hash. This does not block every deployment: in `ALLOW_ALL` mode a priority operation
+  can still call any factory contract on L2 (on Era, for example, the deterministic-deployment
+  proxy `0x4e59b44847b379578588920cA78FbF26c0B4956C` or CreateX
+  `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed`), a bytecode already known on L2 needs no
+  `factoryDeps`, and where EVM bytecode is allowed, as on Era, an EVM factory deploys any init
+  code from the calldata. None of Era's priority operations from 2025-11-06 to 2026-11-09 called
+  either deployer; the 10 that deployed a contract were first deposits of a token, for which the
+  L2 bridge deploys the token's proxy.
 - **Failure mode.** The filterer sits on every priority operation, so a bug could block deposits
   and forced withdrawals. The logic is kept small, malformed deposit calldata reverts instead of
   passing, and the admin can unset the filterer with one transaction.

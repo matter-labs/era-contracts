@@ -7,7 +7,12 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ValueMismatch, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {MissingBaseTokenAssetId} from "../bridge/asset-tracker/AssetTrackerErrors.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_CREATE2_FACTORY_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -201,6 +206,11 @@ contract EraMaintenanceTransactionFilterer is IEraMaintenanceTransactionFilterer
             return _isDepositAllowed(_mintValue, _l2Calldata);
         }
 
+        // The L2 deployers are rejected in either mode. Any L2 factory contract can still deploy, so this only closes
+        // the direct path.
+        if (_contractL2 == L2_DEPLOYER_SYSTEM_CONTRACT_ADDR || _contractL2 == L2_CREATE2_FACTORY_ADDR) {
+            return false;
+        }
         if (callMode == CallMode.WITHDRAWALS_ONLY) {
             return _isCallAllowedInWithdrawalsOnlyMode(_contractL2, _mintValue, _l2Calldata);
         }

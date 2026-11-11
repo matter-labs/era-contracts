@@ -4,8 +4,11 @@ pragma solidity 0.8.28;
 
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_CREATE2_FACTORY_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
@@ -338,6 +341,34 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
         _setCap(baseTokenAssetId, 0);
         assertFalse(_allowed(user, l2Contract, 0, 0, hex""));
         assertFalse(_allowed(l1AssetRouter, L2_ASSET_ROUTER_ADDR, 0, 0, _newDepositCalldata(user, tokenAssetId, 1)));
+    }
+
+    /// @dev `Create2Factory.create2` has the same signature as `ContractDeployer.create2`.
+    function test_deployerTargetsRejectedInEitherMode() public {
+        bytes memory data = abi.encodeCall(IL2ContractDeployer.create2, (bytes32(0), bytes32(0), hex""));
+        assertFalse(_allowed(user, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MINT_VALUE, 0, data));
+        assertFalse(_allowed(user, L2_CREATE2_FACTORY_ADDR, MINT_VALUE, 0, data));
+        // Any calldata, not only a deployment.
+        assertFalse(_allowed(user, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MINT_VALUE, MINT_VALUE, hex""));
+
+        // Registering a deployer function for `WITHDRAWALS_ONLY` mode does not let it through either.
+        _setCallMode(CallMode.WITHDRAWALS_ONLY);
+        vm.prank(owner);
+        filterer.setWithdrawalFunction(L2_CREATE2_FACTORY_ADDR, IL2ContractDeployer.create2.selector, true);
+        assertFalse(_allowed(user, L2_CREATE2_FACTORY_ADDR, MINT_VALUE, 0, data));
+    }
+
+    function test_deployerTargetsPassForExemptSenderAndAllowedTxHash() public {
+        bytes memory data = abi.encodeCall(IL2ContractDeployer.create2, (bytes32(0), bytes32(0), hex""));
+        address governance = makeAddr("governance");
+        vm.startPrank(owner);
+        filterer.setExempt(governance, true);
+        filterer.setAllowedTxHash(_txHash(user, L2_CREATE2_FACTORY_ADDR, 0, data, user), true);
+        vm.stopPrank();
+
+        assertTrue(_allowed(governance, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MINT_VALUE, 0, data));
+        assertTrue(_allowed(user, L2_CREATE2_FACTORY_ADDR, MINT_VALUE, 0, data));
+        assertFalse(_allowed(user, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MINT_VALUE, 0, data));
     }
 
     function test_withdrawalsOnlyModeAllowsDefaultWithdrawalFunctions() public {

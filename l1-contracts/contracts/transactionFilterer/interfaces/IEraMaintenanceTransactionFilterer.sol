@@ -7,6 +7,7 @@ import {ITransactionFilterer} from "../../state-transition/chain-interfaces/ITra
 /// @notice Which generic (non-deposit) L1->L2 calls the filterer lets through.
 /// @dev `ALLOW_ALL`: every call passes within the caps. `WITHDRAWALS_ONLY`: only calls listed in
 /// `withdrawalFunctions` pass, and token deposits are rejected unless their depositor is exempt.
+/// In either mode, generic calls to the L2 `ContractDeployer` and `Create2Factory` are rejected.
 enum CallMode {
     ALLOW_ALL,
     WITHDRAWALS_ONLY
@@ -49,6 +50,7 @@ interface IEraMaintenanceTransactionFilterer is ITransactionFilterer {
     function allowedTxHashes(bytes32 _txHash) external view returns (bool);
 
     /// @notice Whether calls to `_selector` on `_l2Contract` pass in `WITHDRAWALS_ONLY` mode.
+    /// @dev Calls to the L2 `ContractDeployer` and `Create2Factory` never pass, even when registered.
     function withdrawalFunctions(address _l2Contract, bytes4 _selector) external view returns (bool);
 
     /// @notice Whether L1->L2 calls from `_l1Bridge` with the legacy `finalizeDeposit` selector are treated as deposits.
