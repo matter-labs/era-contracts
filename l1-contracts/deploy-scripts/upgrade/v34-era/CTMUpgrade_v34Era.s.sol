@@ -137,11 +137,14 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
 
     // ======================== Calls ========================
 
+    /// @dev No `DefaultCoreUpgrade` runs alongside to pause migrations, and the CTM's `setNewVersionUpgrade` reverts
+    ///      unless they are paused (`MigrationsNotPaused`): stage 0 pauses them, stage 2 unpauses.
     function prepareVersionSpecificStage0GovernanceCallsL1() public view override returns (Call[] memory) {
         return preparePauseGatewayMigrationsCall();
     }
 
-    /// @dev Re-pause before the check: an emergency execution unfreezes, which unpauses migrations.
+    /// @dev Re-pause before the check: every PUH unfreeze unpauses migrations, an emergency execution's included, and
+    ///      anyone can call `PUH.reinforceUnfreeze()`.
     function prepareCheckMigrationsPausedCalls() public override returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](2);
         allCalls[0] = preparePauseGatewayMigrationsCall();
@@ -149,19 +152,13 @@ contract CTMUpgrade_v34Era is Script, DefaultCTMUpgrade {
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
-    /// @dev Unpause first, as testnet3's stage-2 proposal does. Once that proposal no longer fixes the order, the
-    ///      unpause moves into `prepareVersionSpecificStage2GovernanceCallsL1`.
-    function prepareStage2GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-        allCalls[0] = new Call[](1);
-        allCalls[0][0] = Call({
+    function prepareVersionSpecificStage2GovernanceCallsL1() public view override returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
             target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
             data: abi.encodeCall(IChainAssetHandlerBase.unpauseMigration, ())
         });
-        allCalls[1] = prepareCheckUpgradeIsPresent();
-        allCalls[2] = prepareCheckMigrationsUnpausedCalls();
-        calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
 
     // ======================== Output ========================
