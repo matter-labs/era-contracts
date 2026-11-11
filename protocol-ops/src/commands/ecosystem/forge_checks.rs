@@ -40,17 +40,17 @@ use crate::common::abi::{
     BridgehubAbi, ChainAdminOwnableAbi, IBytecodesSupplierPublish, IChainAdminAbi,
     IChainAssetHandlerAbi, IChainTypeManagerAbi, IChainTypeManagerExt, IGovernanceUpgradeTimer,
     IOwnable, IPerChainRoles, IProtocolUpgradeHandler, IProxyAdmin, IServerNotifier,
-    ITestnetVerifier, ValidatorTimelockAbi, ZkChainAbi,
+    ValidatorTimelockAbi, ZkChainAbi,
 };
 use crate::common::anvil::{evm_increase_time_and_mine, send_impersonated_tx, set_balance};
 use crate::common::chain_upgrade_calls;
 use crate::common::env_config::EnvConfig;
-use crate::common::ethereum::{get_provider, AlloyProvider};
+use crate::common::ethereum::{get_read_provider, AlloyProvider};
 use crate::common::forge::{split_into_bundles, ForgeRunner, ForgeScriptArgs, SafeBundle};
 use crate::common::governance_calls::{decode_calls, GovernanceCall};
 use crate::common::l1_contracts::{
-    execution_revert_data, resolve_bytecodes_supplier, resolve_is_zksync_os, reverted_without_data,
-    testnet_flag,
+    execution_revert_data, resolve_bytecodes_supplier, resolve_is_testnet_verifier,
+    resolve_is_zksync_os, reverted_without_data,
 };
 use crate::common::upgrade_descriptor::ForkTest;
 use crate::common::{logger, output, paths, SharedRunArgs};
@@ -213,7 +213,7 @@ pub(crate) async fn check_publication(
     output: &UpgradeOutput,
     bridgehub: Address,
 ) -> anyhow::Result<()> {
-    let provider = get_provider(rpc_url)?;
+    let provider = get_read_provider(rpc_url)?;
     let mut report = Report::default();
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
     let ctm = output.state_transition_address("chain_type_manager_proxy")?;
@@ -348,7 +348,7 @@ pub(crate) async fn check_provenance(
     txs: &[SafeTx],
     fork_block: u64,
 ) -> anyhow::Result<()> {
-    let provider = get_provider(rpc_url)?;
+    let provider = get_read_provider(rpc_url)?;
     let supplier = output.state_transition_address("bytecodes_supplier_addr")?;
     let addresses = output.output_addresses();
     let mut undeployed = BTreeSet::new();
@@ -664,7 +664,7 @@ pub(crate) async fn replay(
 ) -> anyhow::Result<ReplayedChains> {
     let fork = Fork {
         rpc_url: rpc_url.to_string(),
-        provider: get_provider(rpc_url)?,
+        provider: get_read_provider(rpc_url)?,
     };
     let facts = read_facts(&fork, env_cfg, output)
         .await
@@ -827,7 +827,7 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
         provider.clone(),
     );
     let old_pointer = ext.newChainCreationParamsBlock(old).call().await?;
-    let old_is_testnet = is_testnet_verifier(fork, facts.ctm, old)
+    let old_is_testnet = resolve_is_testnet_verifier(&fork.rpc_url, facts.ctm)
         .await
         .context("the old version's verifier")?;
 
@@ -989,30 +989,10 @@ async fn replay_stages(fork: &Fork, output: &UpgradeOutput, facts: &Facts) -> an
     );
     report.equal(
         "the new version's verifier's testnet flag = the old one's",
-        is_testnet_verifier(fork, facts.ctm, new).await?,
+        resolve_is_testnet_verifier(&fork.rpc_url, facts.ctm).await?,
         old_is_testnet,
     );
     report.finish()
-}
-
-/// The flag of the CTM's verifier for `version`. Unlike `resolve_is_testnet_verifier`, a failed
-/// read fails rather than reading as a production verifier.
-async fn is_testnet_verifier(fork: &Fork, ctm: Address, version: U256) -> anyhow::Result<bool> {
-    let provider = &fork.provider;
-    let verifier = IChainTypeManagerAbi::new(ctm, provider.clone())
-        .protocolVersionVerifier(version)
-        .call()
-        .await?;
-    let code = provider
-        .get_code_at(verifier)
-        .await
-        .with_context(|| format!("eth_getCode({verifier})"))?;
-    anyhow::ensure!(!code.is_empty(), "verifier {verifier} has no code");
-    let answer = ITestnetVerifier::new(verifier, provider.clone())
-        .IS_TESTNET_VERIFIER()
-        .call()
-        .await;
-    testnet_flag(answer).with_context(|| format!("verifier {verifier}"))
 }
 
 async fn batch_counts(
