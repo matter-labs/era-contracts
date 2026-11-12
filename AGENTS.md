@@ -344,8 +344,8 @@ When debugging Solidity compilation or script failures:
 The repository builds and tests with upstream Foundry (ordinary EVM, no `--zksync`). One pinned
 version covers forge, cast and anvil alike, and it lives in
 [`.github/foundry-versions.env`](.github/foundry-versions.env) — CI installs it through
-`.github/actions/install-foundry`, `recompute_hashes.sh` reads the same file, and the Docker base
-image takes it as a build arg. Install it with:
+`.github/actions/install-foundry`, `recompute_hashes.sh` reads the same file, and so does the
+Docker image's toolchain stage. Install it with:
 
 ```bash
 curl -L https://foundry.paradigm.xyz | bash

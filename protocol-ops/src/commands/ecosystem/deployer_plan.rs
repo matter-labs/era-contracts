@@ -39,7 +39,8 @@ use clap::Parser;
 use serde::Deserialize;
 
 use crate::commands::ecosystem::bundle::{
-    contract_source_pathspecs, verify_bundle_integrity, DeployBundleMetadata, MANIFEST_FILE,
+    contract_source_pathspecs, image_contracts_commit, verify_bundle_integrity,
+    DeployBundleMetadata, MANIFEST_FILE,
 };
 use crate::common::env_config::{EnvConfig, DEFAULT_UPGRADE};
 use crate::common::ethereum::get_provider;
@@ -1547,7 +1548,7 @@ pub(crate) async fn check_bundle(
     let deployer = metadata
         .deployer_address
         .context("bundle metadata has no deployer_address")?;
-    if metadata.contracts_worktree_dirty {
+    if metadata.contracts_worktree_dirty == Some(true) {
         logger::warn(
             "the bundle was generated from a dirty worktree; signing it is refused \
              (contracts_worktree_dirty)",
@@ -1575,19 +1576,31 @@ pub(crate) async fn check_bundle(
 /// Refuses unless the contracts checkout is exactly the generation's: at the bundle's
 /// `contracts_commit` with its `lib/` submodules at their pins, with no change to the contract
 /// sources and reviewed inputs (`contract_source_pathspecs`), from a bundle generated from a clean
-/// worktree. Signing runs the checkout's reviewed inputs (env salts and owner, the allowlist, the
-/// build) against the plan, and Etherscan verification submits and checks the checkout's sources.
+/// worktree. The protocol-ops image has no repository: there the checkout is the `image_commit` it
+/// was built from. Signing runs the checkout's reviewed inputs (env salts and owner, the allowlist,
+/// the build) against the plan, and Etherscan verification submits and checks the checkout's
+/// sources.
 pub(crate) fn require_checkout_at(
     repository_root: &Path,
+    image_commit: Option<&str>,
     metadata: &DeployBundleMetadata,
 ) -> anyhow::Result<()> {
     anyhow::ensure!(
-        !metadata.contracts_worktree_dirty,
+        metadata.contracts_worktree_dirty != Some(true),
         "the bundle was generated from a worktree whose contract sources differed from {} \
          (contracts_worktree_dirty): no checkout matches it. Generate it again from a clean \
          checkout",
         metadata.contracts_commit
     );
+    if let Some(image_commit) = image_commit {
+        anyhow::ensure!(
+            image_commit == metadata.contracts_commit,
+            "this protocol-ops image was built from {image_commit}, but the bundle was generated \
+             from {}: run in the bundle's protocol_ops_image",
+            metadata.contracts_commit
+        );
+        return Ok(());
+    }
     let git = |args: &[&str]| -> anyhow::Result<String> {
         let output = Command::new("git")
             // With `--ignore-submodules=none` below, a change shows whatever the operator's
@@ -1720,7 +1733,11 @@ pub async fn run(args: CheckDeployerPlanArgs) -> anyhow::Result<()> {
         let bundle_dir = std::fs::canonicalize(bundle)
             .with_context(|| format!("deploy bundle not found: {}", bundle.display()))?;
         let metadata = verify_bundle_integrity(&bundle_dir)?;
-        require_checkout_at(&paths::contracts_root(), &metadata)?;
+        require_checkout_at(
+            &paths::contracts_root(),
+            image_contracts_commit().as_deref(),
+            &metadata,
+        )?;
         return check_bundle(&bundle_dir, &metadata, &args.l1_rpc_url).await;
     }
     let (Some(manifest), Some(ecosystem_toml), Some(deployer)) =
@@ -2656,7 +2673,7 @@ data = "{nominate}"
             upgrade: DEFAULT_UPGRADE.to_string(),
             env: "stage".to_string(),
             contracts_commit: git(&["rev-parse", "HEAD"]),
-            contracts_worktree_dirty: false,
+            contracts_worktree_dirty: Some(false),
             all_contracts_hashes_sha256: String::new(),
             l1: L1Provenance {
                 chain_id: Some(11155111),
@@ -2670,13 +2687,14 @@ data = "{nominate}"
                 foundry_zksync: None,
             },
             generated_by: None,
+            protocol_ops_image: None,
             files: BTreeMap::new(),
         };
-        require_checkout_at(repo.path(), &metadata).unwrap();
+        require_checkout_at(repo.path(), None, &metadata).unwrap();
 
         for source in sources {
             std::fs::write(repo.path().join(source), "edited after review\n").unwrap();
-            let error = require_checkout_at(repo.path(), &metadata)
+            let error = require_checkout_at(repo.path(), None, &metadata)
                 .unwrap_err()
                 .to_string();
             assert!(
@@ -2695,19 +2713,19 @@ data = "{nominate}"
             (&scoped, "lib/@scope/dep"),
         ] {
             std::fs::write(file, "edited after review\n").unwrap();
-            let error = require_checkout_at(repo.path(), &metadata)
+            let error = require_checkout_at(repo.path(), None, &metadata)
                 .unwrap_err()
                 .to_string();
             assert!(error.contains(submodule), "{error}");
             std::fs::write(file, "pinned\n").unwrap();
         }
         commit("lib/forge-std");
-        let error = require_checkout_at(repo.path(), &metadata)
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(error.contains("lib/forge-std"), "{error}");
         git(&["-C", "lib/forge-std", "checkout", "-q", "HEAD~1"]);
-        require_checkout_at(repo.path(), &metadata).unwrap();
+        require_checkout_at(repo.path(), None, &metadata).unwrap();
 
         // An untracked file the operator's `status.showUntrackedFiles=no` would hide, and a
         // repository next to the links, which a wildcard pathspec in the same call would hide.
@@ -2723,48 +2741,61 @@ data = "{nominate}"
         };
         let extra = repo.path().join("lib/forge-std/Extra.sol");
         std::fs::write(&extra, "unreviewed\n").unwrap();
-        let error = require_checkout_at(repo.path(), &metadata)
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(error.contains("lib/forge-std"), "{error}");
         std::fs::remove_file(&extra).unwrap();
         repository_at("l1-contracts/lib/evil");
-        let error = require_checkout_at(repo.path(), &metadata)
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(error.contains("l1-contracts/lib/evil"), "{error}");
         std::fs::remove_dir_all(repo.path().join("l1-contracts/lib/evil")).unwrap();
         // The repository of a submodule an earlier release had is no part of this commit.
         repository_at("lib/@matterlabs/zksync-contracts");
-        require_checkout_at(repo.path(), &metadata).unwrap();
+        require_checkout_at(repo.path(), None, &metadata).unwrap();
 
         // A library copied in without its repository, which `git status` does not look into.
         let repository = repo.path().join("lib/forge-std/.git");
         let aside = repo.path().join("forge-std.git");
         std::fs::rename(&repository, &aside).unwrap();
-        let error = require_checkout_at(repo.path(), &metadata)
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(error.contains("not git checkouts"), "{error}");
         assert!(error.contains("lib/forge-std"), "{error}");
         std::fs::rename(&aside, &repository).unwrap();
-        require_checkout_at(repo.path(), &metadata).unwrap();
+        require_checkout_at(repo.path(), None, &metadata).unwrap();
 
-        metadata.contracts_worktree_dirty = true;
-        let error = require_checkout_at(repo.path(), &metadata)
+        metadata.contracts_worktree_dirty = Some(true);
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(error.contains("contracts_worktree_dirty"), "{error}");
 
-        metadata.contracts_worktree_dirty = false;
+        metadata.contracts_worktree_dirty = Some(false);
         metadata.contracts_commit = "0".repeat(40);
-        let error = require_checkout_at(repo.path(), &metadata)
+        let error = require_checkout_at(repo.path(), None, &metadata)
             .unwrap_err()
             .to_string();
         assert!(
             error.contains("but the bundle was generated from"),
             "{error}"
         );
+
+        // In the image, which has no repository, the checkout is the commit it was built from.
+        let image = tempfile::tempdir().unwrap();
+        require_checkout_at(
+            image.path(),
+            Some(metadata.contracts_commit.as_str()),
+            &metadata,
+        )
+        .unwrap();
+        let error = require_checkout_at(image.path(), Some("abc"), &metadata)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("image was built from abc"), "{error}");
     }
 
     /// The CTM facts are the CTM proxy's EIP-1967 admin slot, its `L1_BYTECODES_SUPPLIER()` and its

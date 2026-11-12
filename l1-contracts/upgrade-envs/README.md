@@ -15,7 +15,7 @@ upgrade-envs/
 ```
 
 `<release>` is the full release name (`v0.34.0-chain-config`); `<env>` is `stage`, `testnet`,
-`mainnet`, `local`, `foundry-upgrade` or `zksync-os-integration-test`. `protocol_ops --env <env>` reads
+`mainnet`, `adi`, `local`, `foundry-upgrade` or `zksync-os-integration-test`. `protocol_ops --env <env>` reads
 `permanent-values/<env>.toml` together with `<release>/<env>.toml` of the release named by
 `current_upgrade_env_dir!` in `protocol-ops/src/common/forge/scripts/mod.rs` (moved by
 `yarn new-release`), and writes to

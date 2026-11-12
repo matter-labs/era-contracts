@@ -3,6 +3,8 @@
 set -euo pipefail
 VERIFY_DIR="$RUNNER_TEMP/etherscan-verify"
 mkdir -p "$VERIFY_DIR"
+# Mounted at the same path in the image, for this verifier and the broadcast's --halt-when.
+export EXTRA_MOUNTS="$EXTRA_MOUNTS $VERIFY_DIR:$VERIFY_DIR"
 # A follower that cannot run must stop the deploy before the broadcast, not after it.
 if [ -z "${ETHERSCAN_API_KEY:-}" ]; then
   echo "::error::ETHERSCAN_API_KEY is required with run_verify"; exit 1
@@ -11,7 +13,7 @@ forge_script=()
 if [ "${UPGRADE_KIND:-}" = "forge-script" ]; then forge_script=(--forge-script); fi
 (
   set +e
-  ./protocol-ops/target/release/protocol_ops ecosystem etherscan-verify \
+  bash protocol-ops.sh --tag "$BUNDLE_IMAGE" ecosystem etherscan-verify \
     --bundle "$DEPLOY_BUNDLE_DIR" \
     --l1-rpc-url "$L1_RPC_URL" \
     --stop-when "$VERIFY_DIR/broadcast-done" \
@@ -27,4 +29,7 @@ if [ -f "$VERIFY_DIR/status" ] && [ "$(cat "$VERIFY_DIR/status")" != 0 ]; then
   cat "$VERIFY_DIR/log"
   echo "::error::The Etherscan verifier failed before the broadcast"; exit 1
 fi
-echo "ETHERSCAN_VERIFY_DIR=$VERIFY_DIR" >> "$GITHUB_ENV"
+{
+  echo "ETHERSCAN_VERIFY_DIR=$VERIFY_DIR"
+  echo "EXTRA_MOUNTS=$EXTRA_MOUNTS"
+} >> "$GITHUB_ENV"

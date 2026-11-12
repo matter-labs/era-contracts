@@ -39,8 +39,6 @@
 **/report
 **/broadcast
 
-# Local foundry install — the container uses the version installed
-# from Dockerfile.base, not the host's copy.
 # Local Python venv used for tooling; never referenced from the build.
 venv
 
