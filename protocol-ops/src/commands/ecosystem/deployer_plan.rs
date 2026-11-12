@@ -10,9 +10,8 @@
 //!   of a contract the deploy checkout's reviewed build produces at that address: a
 //!   `[member_deployments]` record (creation code ++ recorded constructor arguments), an
 //!   `[upgrade_executors]` record, an object the package names (creation code ++ constructor
-//!   arguments that are exactly an ABI encoding of the constructor's parameters), the bootstrap
-//!   sequence over the package's migration and core transition, or a reviewed proxy in front of a
-//!   recorded implementation; or
+//!   arguments that are exactly an ABI encoding of the constructor's parameters), or a reviewed
+//!   proxy in front of a recorded implementation; or
 //! * it matches an entry of [`ALLOWLIST`], at a target holding that entry's role in the package
 //!   and with that entry's argument constraint.
 //!
@@ -60,20 +59,13 @@ use crate::upgrade_verification::registry::views::CtmView;
 
 mod abi {
     alloy::sol! {
-        struct Call {
-            address target;
-            uint256 value;
-            bytes data;
-        }
         function transferOwnership(address newOwner);
-        function changeProxyAdmin(address proxy, address newAdmin);
         function publishEVMBytecodes(bytes[] _bytecodes);
-        function multicall(Call[] _calls, bool _requireSuccess);
     }
 }
 
 /// The package's write-once objects by `[registry]` key, with the contract each must be.
-const OBJECT_KEYS: [(&str, &str); 6] = [
+const OBJECT_KEYS: [(&str, &str); 5] = [
     ("core_transition_addr", "ProxyUpgradeTransition"),
     (
         "ctm_infrastructure_transition_addr",
@@ -82,13 +74,9 @@ const OBJECT_KEYS: [(&str, &str); 6] = [
     ("ctm_transition_addr", "CTMTransition"),
     ("replacement_transition_addr", "CTMTransition"),
     ("ctm_release_addr", "CTMRelease"),
-    ("bootstrap_migration_addr", "RegistryBootstrapMigration"),
 ];
 const CORE_EXECUTOR: &str = "CoreUpgradeExecutor";
 const CTM_EXECUTOR: &str = "CTMUpgradeExecutor";
-const BOOTSTRAP_SEQUENCE: &str = "RegistryBootstrapSequence";
-/// `[[external_actions]] phase` of the calls an admin (not governance) performs.
-const ADMIN_PHASE: &str = "admin";
 /// Where a `[ctms.<key>]` table names its CTM proxy.
 const CTM_PROXY_PATH: [&str; 2] = ["state_transition", "chain_type_manager_proxy"];
 /// Where the core prepare names the Bridgehub.
@@ -112,17 +100,13 @@ pub(crate) enum Role {
     EcosystemProxyAdmin,
     /// `[ctms.*.state_transition] bytecodes_supplier_addr`.
     BytecodesSupplier,
-    /// `[ctms.*.ctm_admin_calls] chain_admin`.
-    ChainAdmin,
-    /// The target of an `admin`-phase `[[external_actions]]` entry.
-    AdminActionTarget,
 }
 
 impl Role {
     /// Whether the role belongs to one CTM, so that only a `[ctms.<key>]` table naming that CTM
     /// can grant it.
     fn per_ctm(self) -> bool {
-        !matches!(self, Self::EcosystemProxyAdmin | Self::AdminActionTarget)
+        self != Self::EcosystemProxyAdmin
     }
 }
 
@@ -134,8 +118,6 @@ impl fmt::Display for Role {
             Self::CtmProxyAdmin => "the CTM-domain ProxyAdmin",
             Self::EcosystemProxyAdmin => "the ecosystem ProxyAdmin",
             Self::BytecodesSupplier => "the CTM's BytecodesSupplier",
-            Self::ChainAdmin => "the ChainAdmin of the CTM admin calls",
-            Self::AdminActionTarget => "the target of a declared admin action",
         })
     }
 }
@@ -147,13 +129,6 @@ pub(crate) enum Constraint {
     NewOwnerIsGovernance,
     /// None: publishing bytecode is permissionless and moves no authority.
     Publication,
-    /// The call is a declared admin action, and the authority it hands over lands on the CTM
-    /// executor this plan deploys (owned by governance) or on the ProxyAdmin that administers that
-    /// executor's CTM on L1.
-    HandoverToPlannedExecutor,
-    /// `multicall(calls, true)` whose every call sends no value and is admitted as
-    /// [`Self::HandoverToPlannedExecutor`].
-    HandoverMulticall,
 }
 
 /// One reviewed deployer call shape other than a CREATE2 deployment.
@@ -163,7 +138,7 @@ pub(crate) struct AllowedCall {
     pub(crate) selector: [u8; 4],
     pub(crate) roles: &'static [Role],
     pub(crate) constraint: Constraint,
-    /// Which prepare step emits it, as seen in the v35 bootstrap prepare's deployer bundle.
+    /// Which prepare step emits it.
     pub(crate) source: &'static str,
 }
 
@@ -190,42 +165,9 @@ pub(crate) const ALLOWLIST: &[AllowedCall] = &[
         constraint: Constraint::Publication,
         source: "BytecodePublisher.publishAndProcessFactoryDeps in the CTM prepare",
     },
-    AllowedCall {
-        signature: "multicall((address,uint256,bytes)[],bool)",
-        selector: abi::multicallCall::SELECTOR,
-        roles: &[Role::ChainAdmin],
-        constraint: Constraint::HandoverMulticall,
-        source: "AdminFunctions.executeOwnableCallsWithWraps through a ChainAdmin the deployer \
-                 owns: the bootstrap's ServerNotifier handover",
-    },
-    AllowedCall {
-        signature: "transferOwnership(address)",
-        selector: abi::transferOwnershipCall::SELECTOR,
-        roles: &[Role::AdminActionTarget],
-        constraint: Constraint::HandoverToPlannedExecutor,
-        source: "AdminFunctions.executeOwnableCallsWithWraps when the deployer owns the \
-                 ServerNotifier: the bootstrap's ServerNotifier handover",
-    },
-    AllowedCall {
-        signature: "changeProxyAdmin(address,address)",
-        selector: abi::changeProxyAdminCall::SELECTOR,
-        roles: &[Role::AdminActionTarget],
-        constraint: Constraint::HandoverToPlannedExecutor,
-        source: "AdminFunctions.executeOwnableCallsWithWraps when the deployer owns the \
-                 ServerNotifier's old ProxyAdmin: the bootstrap's ServerNotifier handover",
-    },
 ];
 
 // ─── The package ────────────────────────────────────────────────────────────────
-
-/// A call the package declares in `[[external_actions]]` with `phase = "admin"`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct AdminAction {
-    target: Address,
-    value: U256,
-    data: Bytes,
-    label: String,
-}
 
 /// An object the package names under a `[registry]` key.
 #[derive(Debug, Clone)]
@@ -252,7 +194,6 @@ pub(crate) struct PackageView {
     /// Every non-zero address the package's tables name.
     named: BTreeSet<Address>,
     roles: BTreeMap<Role, BTreeMap<Address, Vec<Holder>>>,
-    admin_actions: Vec<AdminAction>,
     /// Tables the check refuses outright.
     faults: Vec<String>,
     /// The Bridgehub the core prepare names, which stands in for the env's without one.
@@ -343,7 +284,7 @@ impl PackageView {
             ..Self::default()
         };
         collect_addresses(root, &mut view.named);
-        let role_paths: [(Role, &[&str]); 6] = [
+        let role_paths: [(Role, &[&str]); 5] = [
             (Role::CtmProxy, &CTM_PROXY_PATH),
             (
                 Role::ValidatorTimelock,
@@ -361,7 +302,6 @@ impl PackageView {
                 Role::BytecodesSupplier,
                 &["state_transition", "bytecodes_supplier_addr"],
             ),
-            (Role::ChainAdmin, &["ctm_admin_calls", "chain_admin"]),
         ];
         let location_of = |prefix: &str, path: &[&str]| {
             format!(
@@ -418,46 +358,6 @@ impl PackageView {
                         ctm: if is_ctm { ctm } else { None },
                     });
             }
-        }
-        for (i, action) in root
-            .get("external_actions")
-            .and_then(toml::Value::as_array)
-            .into_iter()
-            .flatten()
-            .enumerate()
-        {
-            if action.get("phase").and_then(toml::Value::as_str) != Some(ADMIN_PHASE) {
-                continue;
-            }
-            let field = |key: &str| {
-                action
-                    .get(key)
-                    .and_then(toml::Value::as_str)
-                    .with_context(|| format!("{source}: external_actions[{i}] has no {key}"))
-            };
-            let target: Address = field("target")?
-                .parse()
-                .with_context(|| format!("{source}: external_actions[{i}].target"))?;
-            let admin_action = AdminAction {
-                target,
-                value: field("value")?
-                    .parse()
-                    .with_context(|| format!("{source}: external_actions[{i}].value"))?,
-                data: field("data")?
-                    .parse()
-                    .with_context(|| format!("{source}: external_actions[{i}].data"))?,
-                label: field("label").unwrap_or("(no label)").to_string(),
-            };
-            view.roles
-                .entry(Role::AdminActionTarget)
-                .or_default()
-                .entry(target)
-                .or_default()
-                .push(Holder {
-                    location: format!("admin action `{}`", admin_action.label),
-                    ctm: None,
-                });
-            view.admin_actions.push(admin_action);
         }
         Ok(view)
     }
@@ -631,16 +531,11 @@ enum Deployed {
         contract: String,
     },
     CoreExecutor,
-    /// Governance-owned, so authority handed to it stays governance's.
-    CtmExecutor {
-        chain_type_manager: Address,
-        ctm_proxy_admin: Address,
-    },
+    CtmExecutor,
     Object {
         contract: &'static str,
         location: String,
     },
-    BootstrapSequence,
     Proxy {
         logic: Address,
     },
@@ -651,14 +546,8 @@ impl fmt::Display for Deployed {
         match self {
             Self::Member { contract } => write!(f, "the recorded member deployment of {contract}"),
             Self::CoreExecutor => write!(f, "the recorded {CORE_EXECUTOR}, owned by governance"),
-            Self::CtmExecutor { .. } => {
-                write!(f, "the recorded {CTM_EXECUTOR}, owned by governance")
-            }
+            Self::CtmExecutor => write!(f, "the recorded {CTM_EXECUTOR}, owned by governance"),
             Self::Object { contract, location } => write!(f, "the {contract} at {location}"),
-            Self::BootstrapSequence => write!(
-                f,
-                "the {BOOTSTRAP_SEQUENCE} over the package's migration and core transition"
-            ),
             Self::Proxy { logic } => {
                 write!(
                     f,
@@ -855,13 +744,7 @@ impl PlanChecker<'_> {
                     record.ctm_proxy_admin,
                 ),
             )?;
-            return Ok((
-                address,
-                Deployed::CtmExecutor {
-                    chain_type_manager: record.chain_type_manager,
-                    ctm_proxy_admin: record.ctm_proxy_admin,
-                },
-            ));
+            return Ok((address, Deployed::CtmExecutor));
         }
         if let Some(object) = self.package.objects.iter().find(|o| o.address == address) {
             let artifact = self.artifact(object.contract)?;
@@ -886,18 +769,6 @@ impl PlanChecker<'_> {
                     location: object.location.clone(),
                 },
             ));
-        }
-        for migration in self.objects_of("RegistryBootstrapMigration") {
-            for core_transition in self.objects_at("core_transition_addr") {
-                let args =
-                    constructor_args::registry_bootstrap_sequence(migration, core_transition);
-                let artifact = self.artifact(BOOTSTRAP_SEQUENCE)?;
-                let mut expected = artifact.creation_code().to_vec();
-                expected.extend_from_slice(&args);
-                if expected == init {
-                    return Ok((address, Deployed::BootstrapSequence));
-                }
-            }
         }
         if let Ok(proxy) = self.build.get(REVIEWED_PROXY.1) {
             if init.starts_with(proxy.creation_code()) && self.package.named.contains(&address) {
@@ -938,24 +809,6 @@ impl PlanChecker<'_> {
         } else {
             "the CTMs the package's [ctms.<key>] tables drive"
         }
-    }
-
-    fn objects_of(&self, contract: &str) -> Vec<Address> {
-        self.package
-            .objects
-            .iter()
-            .filter(|o| o.contract == contract)
-            .map(|o| o.address)
-            .collect()
-    }
-
-    fn objects_at(&self, key: &str) -> Vec<Address> {
-        self.package
-            .objects
-            .iter()
-            .filter(|o| o.location.ends_with(&format!("] {key}")))
-            .map(|o| o.address)
-            .collect()
     }
 
     /// A reviewed proxy the package names, over a recorded implementation and a package
@@ -1018,13 +871,7 @@ impl PlanChecker<'_> {
     }
 
     /// Judges a call other than a deployment against [`ALLOWLIST`].
-    fn allowlisted(
-        &self,
-        target: Address,
-        data: &[u8],
-        planned: &BTreeMap<Address, Deployed>,
-        roles: &[Role],
-    ) -> Result<String, String> {
+    fn allowlisted(&self, target: Address, data: &[u8]) -> Result<String, String> {
         let Some(selector) = data.get(..4) else {
             return Err(
                 "carries no function selector: not an allowlisted deployer call".to_string(),
@@ -1032,9 +879,7 @@ impl PlanChecker<'_> {
         };
         let entries: Vec<&AllowedCall> = ALLOWLIST
             .iter()
-            .filter(|entry| {
-                entry.selector == selector && entry.roles.iter().any(|r| roles.contains(r))
-            })
+            .filter(|entry| entry.selector == selector)
             .collect();
         if entries.is_empty() {
             return Err(format!(
@@ -1047,7 +892,6 @@ impl PlanChecker<'_> {
             let held: Vec<(Role, &Holder)> = entry
                 .roles
                 .iter()
-                .filter(|role| roles.contains(role))
                 .flat_map(|role| {
                     self.package
                         .holders_of(*role, target)
@@ -1059,7 +903,6 @@ impl PlanChecker<'_> {
                 let allowed = entry
                     .roles
                     .iter()
-                    .filter(|role| roles.contains(role))
                     .map(|role| {
                         let holders = self
                             .package
@@ -1084,7 +927,7 @@ impl PlanChecker<'_> {
                 let at = &holder.location;
                 let outcome = self
                     .bound_on_l1(role, target, holder)
-                    .and_then(|()| self.constraint(entry, target, data, planned));
+                    .and_then(|()| self.constraint(entry, data));
                 match outcome {
                     Ok(what) => return Ok(format!("{} on {role} ({at}): {what}", entry.signature)),
                     Err(why) => {
@@ -1096,13 +939,7 @@ impl PlanChecker<'_> {
         Err(reasons.join("; "))
     }
 
-    fn constraint(
-        &self,
-        entry: &AllowedCall,
-        target: Address,
-        data: &[u8],
-        planned: &BTreeMap<Address, Deployed>,
-    ) -> Result<String, String> {
+    fn constraint(&self, entry: &AllowedCall, data: &[u8]) -> Result<String, String> {
         match entry.constraint {
             Constraint::NewOwnerIsGovernance => {
                 let call = decode_strict::<abi::transferOwnershipCall>(data)
@@ -1121,108 +958,7 @@ impl PlanChecker<'_> {
                     .ok_or("the calldata is not exactly publishEVMBytecodes(bytes[])")?;
                 Ok(format!("publishes {} bytecode(s)", call._bytecodes.len()))
             }
-            Constraint::HandoverToPlannedExecutor => self.handover(target, data, planned),
-            Constraint::HandoverMulticall => {
-                let call = decode_strict::<abi::multicallCall>(data).ok_or(
-                    "the calldata is not exactly multicall((address,uint256,bytes)[],bool)",
-                )?;
-                if !call._requireSuccess {
-                    return Err("does not require every call to succeed".to_string());
-                }
-                if call._calls.is_empty() {
-                    return Err("carries no call".to_string());
-                }
-                let mut admitted = Vec::new();
-                for (i, inner) in call._calls.iter().enumerate() {
-                    if !inner.value.is_zero() {
-                        return Err(format!("its call {i} sends {} wei", inner.value));
-                    }
-                    let what = self
-                        .allowlisted(
-                            inner.target,
-                            &inner.data,
-                            planned,
-                            &[Role::AdminActionTarget],
-                        )
-                        .map_err(|why| format!("its call {i} to {}: {why}", inner.target))?;
-                    admitted.push(what);
-                }
-                Ok(format!("runs {}", admitted.join("; ")))
-            }
         }
-    }
-
-    /// A declared admin action that hands authority to the CTM executor this plan deploys, or to
-    /// the ProxyAdmin that administers that executor's CTM on L1. The executor's own
-    /// `ctm_proxy_admin` record is the bundle's, so it is held to L1 too.
-    fn handover(
-        &self,
-        target: Address,
-        data: &[u8],
-        planned: &BTreeMap<Address, Deployed>,
-    ) -> Result<String, String> {
-        let Some(action) = self
-            .package
-            .admin_actions
-            .iter()
-            .find(|a| a.target == target && a.value.is_zero() && a.data[..] == *data)
-        else {
-            return Err(format!(
-                "it is not one of the package's declared admin actions on {target}"
-            ));
-        };
-        let executors: Vec<(Address, Address, Address)> = planned
-            .iter()
-            .filter_map(|(address, deployed)| match deployed {
-                Deployed::CtmExecutor {
-                    chain_type_manager,
-                    ctm_proxy_admin,
-                } => Some((*address, *chain_type_manager, *ctm_proxy_admin)),
-                _ => None,
-            })
-            .collect();
-        if let Some(call) = decode_strict::<abi::transferOwnershipCall>(data) {
-            return match executors.iter().find(|(e, _, _)| *e == call.newOwner) {
-                Some(_) => Ok(format!(
-                    "`{}` nominates the CTM executor this plan deploys",
-                    action.label
-                )),
-                None => Err(format!(
-                    "`{}` nominates {}, which is not a CTM executor this plan deploys",
-                    action.label, call.newOwner
-                )),
-            };
-        }
-        if let Some(call) = decode_strict::<abi::changeProxyAdminCall>(data) {
-            let Some((_, ctm, _)) = executors
-                .iter()
-                .find(|(_, _, admin)| *admin == call.newAdmin)
-            else {
-                return Err(format!(
-                    "`{}` moves {} under {}, which is not the ProxyAdmin of a CTM executor this \
-                     plan deploys",
-                    action.label, call.proxy, call.newAdmin
-                ));
-            };
-            let on_l1 = self.facts_of(*ctm)?.proxy_admin;
-            return if on_l1 == call.newAdmin {
-                Ok(format!(
-                    "`{}` moves {} under the ProxyAdmin that administers the planned CTM \
-                     executor's CTM {ctm} on L1",
-                    action.label, call.proxy
-                ))
-            } else {
-                Err(format!(
-                    "`{}` moves {} under {}, which the planned CTM executor's record names, but \
-                     the CTM {ctm} is administered by {on_l1} on L1",
-                    action.label, call.proxy, call.newAdmin
-                ))
-            };
-        }
-        Err(format!(
-            "`{}` is neither transferOwnership(address) nor changeProxyAdmin(address,address)",
-            action.label
-        ))
     }
 }
 
@@ -1256,38 +992,19 @@ pub(crate) fn check_plan(
             }
         }
     }
-    // Deployments first: a handover is admitted only toward the CTM executor the plan deploys.
-    // `None` marks a call still to be held against the allowlist.
-    let mut planned = BTreeMap::new();
-    let mut outcomes: Vec<Option<Result<String, String>>> = Vec::with_capacity(calls.len());
     for call in calls {
-        outcomes.push(if !call.value.is_zero() {
-            Some(Err(format!(
+        let outcome = if !call.value.is_zero() {
+            Err(format!(
                 "sends {} wei; the deployer sends no value",
                 call.value
-            )))
+            ))
         } else if call.to == inputs.factory {
-            Some(checker.deployment(call).map(|(address, deployed)| {
-                let line = format!("deploys {address}: {deployed}");
-                planned.insert(address, deployed);
-                line
-            }))
+            checker
+                .deployment(call)
+                .map(|(address, deployed)| format!("deploys {address}: {deployed}"))
         } else {
-            None
-        });
-    }
-    let all_roles = [
-        Role::CtmProxy,
-        Role::ValidatorTimelock,
-        Role::CtmProxyAdmin,
-        Role::EcosystemProxyAdmin,
-        Role::BytecodesSupplier,
-        Role::ChainAdmin,
-        Role::AdminActionTarget,
-    ];
-    for (call, outcome) in calls.iter().zip(outcomes) {
-        let outcome = outcome
-            .unwrap_or_else(|| checker.allowlisted(call.to, &call.data, &planned, &all_roles));
+            checker.allowlisted(call.to, &call.data)
+        };
         match outcome {
             Ok(line) => verdict.admitted.push(format!("{call}: {line}")),
             Err(why) => verdict.refused.push(format!("{call}: {why}")),
@@ -1790,9 +1507,6 @@ mod tests {
     const CTM: Address = Address::repeat_byte(0xC7);
     const CTM_PROXY_ADMIN: Address = Address::repeat_byte(0xCA);
     const ECOSYSTEM_PROXY_ADMIN: Address = Address::repeat_byte(0xEA);
-    const NOTIFIER: Address = Address::repeat_byte(0x9E);
-    const OLD_NOTIFIER_ADMIN: Address = Address::repeat_byte(0x6B);
-    const CHAIN_ADMIN: Address = Address::repeat_byte(0x16);
     const STRANGER: Address = Address::repeat_byte(0xEE);
 
     fn creation(name: &str) -> Vec<u8> {
@@ -1883,18 +1597,11 @@ mod tests {
         calldata(abi::transferOwnershipCall { newOwner: owner })
     }
 
-    fn change_admin_to(new_admin: Address) -> Bytes {
-        calldata(abi::changeProxyAdminCall {
-            proxy: NOTIFIER,
-            newAdmin: new_admin,
-        })
-    }
-
     fn package_toml() -> String {
         package_toml_for(HONEST)
     }
 
-    /// The bootstrap package of [`clean_plan_for`]`(executor)`.
+    /// The package of [`clean_plan_for`]`(executor)`.
     fn package_toml_for(executor_record: Executor) -> String {
         let executor = landing(SALT, &executor_init_for(executor_record));
         format!(
@@ -1930,25 +1637,6 @@ validator_timelock_addr = "{VALIDATOR_TIMELOCK}"
 
 [ctms.zksync_os.deployed_addresses]
 transparent_proxy_admin = "{CTM_PROXY_ADMIN}"
-
-[ctms.zksync_os.ctm_admin_calls]
-chain_admin = "{CHAIN_ADMIN}"
-
-[[external_actions]]
-phase = "admin"
-label = "move the notifier under the CTM ProxyAdmin"
-authority = "the live owner"
-target = "{OLD_NOTIFIER_ADMIN}"
-value = "0"
-data = "{change_admin}"
-
-[[external_actions]]
-phase = "admin"
-label = "nominate the CTM executor"
-authority = "the live owner"
-target = "{NOTIFIER}"
-value = "0"
-data = "{nominate}"
 "#,
             admin = landing(SALT, &admin_init()),
             factory = DETERMINISTIC_CREATE2_FACTORY,
@@ -1956,8 +1644,6 @@ data = "{nominate}"
             release = landing(SALT, &release_init()),
             executor_ctm = executor_record.ctm,
             executor_admin = executor_record.proxy_admin,
-            change_admin = change_admin_to(executor_record.proxy_admin),
-            nominate = handover_to(executor),
         )
     }
 
@@ -1990,28 +1676,17 @@ data = "{nominate}"
         }
     }
 
-    /// The shapes of the v35 bootstrap prepare's deployer bundle: deployments of a recorded
-    /// member, an object and an executor, an ownership normalization, a bytecode publication and
-    /// the ServerNotifier handover through the ChainAdmin and directly.
+    /// The shapes of a prepare's deployer bundle: deployments of a recorded member, an object and
+    /// an executor, an ownership normalization and a bytecode publication.
     fn clean_plan() -> Vec<(Address, U256, Bytes)> {
         clean_plan_for(HONEST)
     }
 
-    /// [`clean_plan`] with the CTM executor `executor` names, and the ServerNotifier handed to it
-    /// and to the ProxyAdmin its record names.
+    /// [`clean_plan`] with the CTM executor `executor` names.
     fn clean_plan_for(executor: Executor) -> Vec<(Address, U256, Bytes)> {
-        let multicall = abi::multicallCall {
-            _calls: vec![abi::Call {
-                target: OLD_NOTIFIER_ADMIN,
-                value: U256::ZERO,
-                data: change_admin_to(executor.proxy_admin),
-            }],
-            _requireSuccess: true,
-        };
         let (factory, admin) = deploy(SALT, &admin_init());
         let (_, release) = deploy(SALT, &release_init());
         let (_, executor_deploy) = deploy(SALT, &executor_init_for(executor));
-        let executor = landing(SALT, &executor_init_for(executor));
         vec![
             (CTM_PROXY_ADMIN, U256::ZERO, handover_to(GOVERNANCE)),
             (factory, U256::ZERO, admin),
@@ -2024,8 +1699,6 @@ data = "{nominate}"
                     _bytecodes: vec![Bytes::from_static(b"bytecode")],
                 }),
             ),
-            (CHAIN_ADMIN, U256::ZERO, calldata(multicall)),
-            (NOTIFIER, U256::ZERO, handover_to(executor)),
         ]
     }
 
@@ -2073,7 +1746,7 @@ data = "{nominate}"
         ));
         let refusal = refusal_of(plan);
         assert!(
-            refusal.contains("call 8 (01_test.safe.json tx 8)"),
+            refusal.contains("call 6 (01_test.safe.json tx 6)"),
             "{refusal}"
         );
         assert!(refusal.contains(&format!("target {STRANGER}")), "{refusal}");
@@ -2230,40 +1903,6 @@ data = "{nominate}"
         );
     }
 
-    /// The handover is admitted only as the declared admin action and only toward the executor
-    /// the plan itself deploys.
-    #[test]
-    fn a_handover_must_be_declared_and_land_on_the_planned_executor() {
-        let mut plan = clean_plan();
-        let last = plan.len() - 1;
-        plan[last] = (NOTIFIER, U256::ZERO, handover_to(STRANGER));
-        assert!(refusal_of(plan).contains("not one of the package's declared admin actions"));
-
-        let mut plan = clean_plan();
-        plan.remove(3);
-        let verdict = verdict_of(plan);
-        assert!(
-            verdict
-                .refused
-                .iter()
-                .any(|r| r.contains("not a CTM executor this plan deploys")),
-            "{:#?}",
-            verdict.refused
-        );
-
-        let mut plan = clean_plan();
-        let sneaky = abi::multicallCall {
-            _calls: vec![abi::Call {
-                target: CTM,
-                value: U256::ZERO,
-                data: handover_to(STRANGER),
-            }],
-            _requireSuccess: true,
-        };
-        plan[5] = (CHAIN_ADMIN, U256::ZERO, calldata(sneaky));
-        assert!(refusal_of(plan).contains("its call 0 to"));
-    }
-
     #[test]
     fn a_package_ctm_the_env_does_not_name_fails() {
         let mut inputs = inputs();
@@ -2277,52 +1916,12 @@ data = "{nominate}"
             "{:#?}",
             verdict.refused
         );
-        // The executor for that CTM, and the handover to it, go with it.
+        // The executor for that CTM goes with it.
         assert!(
             verdict
                 .refused
                 .iter()
                 .any(|r| r.contains("deploys the CTM executor") && r.contains(&CTM.to_string())),
-            "{:#?}",
-            verdict.refused
-        );
-    }
-
-    /// The executor record's `ctm_proxy_admin` is the bundle's: a ProxyAdmin the deployer owns
-    /// named there would take the ServerNotifier (or any proxy) through the declared handover.
-    /// The handover lands only on the ProxyAdmin that administers the executor's CTM on L1.
-    #[test]
-    fn a_handover_to_a_proxy_admin_l1_does_not_name_fails() {
-        let foreign = Executor {
-            ctm: CTM,
-            proxy_admin: STRANGER,
-        };
-        let verdict = check_plan(
-            &build(),
-            &package_from(&package_toml_for(foreign)),
-            &inputs(),
-            &calls(clean_plan_for(foreign)),
-        );
-        assert_eq!(verdict.refused.len(), 1, "{:#?}", verdict.refused);
-        let refusal = &verdict.refused[0];
-        assert!(refusal.starts_with("call 6 "), "{refusal}");
-        assert!(
-            refusal.contains(&format!(
-                "moves {NOTIFIER} under {STRANGER}, which the planned CTM executor's record \
-                 names, but the CTM {CTM} is administered by {CTM_PROXY_ADMIN} on L1"
-            )),
-            "{refusal}"
-        );
-
-        // Without the CTM's L1 facts nothing binds the record, so the handover is refused too.
-        let mut unread = inputs();
-        unread.ctm_facts.clear();
-        let verdict = check_plan(&build(), &package(), &unread, &calls(clean_plan()));
-        assert!(
-            verdict
-                .refused
-                .iter()
-                .any(|r| r.contains(&format!("no L1 facts were read for the CTM {CTM}"))),
             "{:#?}",
             verdict.refused
         );

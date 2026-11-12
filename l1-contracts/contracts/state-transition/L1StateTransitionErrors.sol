@@ -48,8 +48,6 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
-// 0xd798040a
-error LegacyCutForRegistryDrivenVersion(uint256 protocolVersion);
 // 0x9b5f85eb
 error MessageRootIsZero();
 // 0xf148c8da

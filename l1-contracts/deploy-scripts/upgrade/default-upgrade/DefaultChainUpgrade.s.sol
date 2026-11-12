@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// TODO(EVM-1644): LEGACY UPGRADE PROCESS — remove once the registry-driven upgrade process
-// (contracts/upgrades/registry: the CoreUpgradeExecutor / CTMUpgradeExecutor domain executors +
-// release/transition objects) has fully replaced off-chain
-// governance-calldata generation. Kept for the v35 bootstrap edge, which still ships a
-// script-composed governance bundle.
-
 import {Script} from "forge-std/Script.sol";
 import {Utils} from "../../utils/Utils.sol";
 
@@ -14,7 +8,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {UpgradeChainCall} from "deploy-scripts/utils/UpgradeChainCall.sol";
 
@@ -40,11 +33,9 @@ contract DefaultChainUpgrade is Script {
         // It is just a wrapper to easily call `upgradeChain`
     }
 
-    /// @notice The legacy per-chain call: the chain is HANDED the cut it must execute.
-    function upgradeChain(Diamond.DiamondCutData memory diamondCutData) public virtual {
-        _adminExecuteOnChain(
-            UpgradeChainCall.encode(config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
-        );
+    /// @notice The per-chain call, by the chain's admin: the chain reads the cut its CTM committed.
+    function upgradeChain() public virtual {
+        _adminExecuteOnChain(UpgradeChainCall.encode(config.chainDiamondProxyAddress, config.oldProtocolVersion));
     }
 
     function _adminExecuteOnChain(bytes memory _callData) private {

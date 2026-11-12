@@ -13,12 +13,11 @@
 //! | release | each L2 bytecode table row | the bytecode info of the contract its slot names |
 //! | release | `l2SystemProxyBytecodeInfo` | the bytecode info of [`SYSTEM_PROXY_SHELL`] |
 //! | transition | `chainUpgradeEngine` | [`TRANSITION_ENGINES`] |
-//! | bootstrap migration | `chainUpgradeEngine` | [`BOOTSTRAP_ENGINES`] |
 //! | proxy upgrade transition (either domain) | `proxyUpgradeEngine` | [`PROXY_UPGRADE_ENGINES`] |
-//! | transition, bootstrap migration | `l2Plan.delegateComposer` | the composer [`DELEGATE_COMPOSERS`] pairs with the plan's delegate |
-//! | transition, bootstrap migration | `l2Plan.delegateBytecodeInfo` | the bytecode info of one of [`L2_DELEGATES`] |
-//! | transition, bootstrap migration | each `l2Plan.extraBytecodeInfos` entry | the bytecode info of a reviewed contract |
-//! | proxy upgrade transition (either domain), bootstrap migration | each row's `implNew` | the contract of the row's slot ([`super::rows`]) |
+//! | transition | `l2Plan.delegateComposer` | the composer [`DELEGATE_COMPOSERS`] pairs with the plan's delegate |
+//! | transition | `l2Plan.delegateBytecodeInfo` | the bytecode info of one of [`L2_DELEGATES`] |
+//! | transition | each `l2Plan.extraBytecodeInfos` entry | the bytecode info of a reviewed contract |
+//! | proxy upgrade transition (either domain) | each row's `implNew` | the contract of the row's slot ([`super::rows`]) |
 //!
 //! An L1 member is identified by its RUNTIME: the live code against the reviewed artifact of each
 //! contract its role admits, immutable slots masked ([`super::provenance::expect_code_identity`]).
@@ -34,9 +33,8 @@
 //! only when it already IS that build's code (`DefaultCTMUpgrade._canReuseReleaseMember`). The
 //! verifier is not: `DeployCTMUtils.deployCurrentRelease` pins the live one unless the version
 //! deploys verifiers, so a release can carry a verifier an earlier release's build produced. Such
-//! a verifier is accepted only when it is the one already in force — the departing release's, or
-//! for the bootstrap the one the CTM's chains at the departing version run — because then the
-//! upgrade does not change it; anything else must be this build's.
+//! a verifier is accepted only when it is the one already in force — the departing release's —
+//! because then the upgrade does not change it; anything else must be this build's.
 //!
 //! `ZiskVerifier`'s Plonk backend is a snarkJS contract built outside this repository, so no
 //! reviewed build describes it: it is held to its pinned runtime hash instead
@@ -86,8 +84,6 @@ pub(crate) const VERIFIERS: &[&str] = &[
 ];
 /// The engine a `CTMTransition` pins (`DefaultCTMUpgrade.deployUsedUpgradeContract`).
 pub(crate) const TRANSITION_ENGINES: &[&str] = &["DefaultUpgrade"];
-/// The engine the bootstrap migration pins.
-pub(crate) const BOOTSTRAP_ENGINES: &[&str] = &["BootstrapUpgrade"];
 /// The engine a `ProxyUpgradeTransition` pins, which its domain's executor delegatecalls to apply
 /// the rows (`DefaultCoreUpgrade` / `DefaultCTMUpgrade.deployProxyUpgradeEngine`). A release whose
 /// proxy upgrade needs follow-up calls deploys a `DefaultProxyUpgradeEngine` subclass instead, and
@@ -127,7 +123,6 @@ pub(crate) const MEMBER_ARTIFACTS: &[(&str, &str)] = &[
     ("ZiskTestnetVerifier.sol", "ZiskTestnetVerifier"),
     ("ZiskVerifier.sol", "ZiskVerifier"),
     ("DefaultUpgrade.sol", "DefaultUpgrade"),
-    ("BootstrapUpgrade.sol", "BootstrapUpgrade"),
     ("DefaultProxyUpgradeEngine.sol", "DefaultProxyUpgradeEngine"),
     (
         "L2DefaultDelegateCalldataComposer.sol",
@@ -234,20 +229,6 @@ pub(super) struct DepartingMembers {
 }
 
 impl DepartingMembers {
-    /// The verifiers in force where a pre-registry CTM departs from (the bootstrap): no release
-    /// names anything else.
-    pub(super) fn verifiers_in_force(
-        source: impl Into<String>,
-        verifiers: BTreeSet<Address>,
-    ) -> Self {
-        Self {
-            source: source.into(),
-            members: verifiers.clone(),
-            verifiers,
-            sub_verifiers: RefCell::new(None),
-        }
-    }
-
     /// Every L1 member of the departing release, read off its manifest. An unreadable manifest
     /// carries nothing over (reported).
     pub(super) async fn of_release<P: Provider>(
@@ -613,8 +594,8 @@ fn judge_l2_table(
     }
 }
 
-/// An upgrade engine and the authored L2 plan beside it — a transition's or the bootstrap
-/// migration's — against the reviewed build: the engine's and the composer's code and
+/// A transition's upgrade engine and the authored L2 plan beside it against the reviewed build:
+/// the engine's and the composer's code and
 /// construction (the prepare deploys both, so neither is carried over), and the L2 bytecodes.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
@@ -624,13 +605,12 @@ pub(super) async fn verify_engine_and_l2_plan<P: Provider>(
     members: &MemberReview<'_>,
     label: &str,
     engine: Address,
-    engines: &'static [&'static str],
     plan: &AuthoredL2Plan,
 ) -> anyhow::Result<()> {
     let mut named = vec![(
         format!("{label}: chainUpgradeEngine"),
         engine,
-        engines,
+        TRANSITION_ENGINES,
         "the prepare deploys the engine its object pins",
     )];
     let delegate = (!plan.delegateBytecodeInfo.is_empty())
@@ -894,7 +874,6 @@ mod tests {
             GENESIS_UPGRADE,
             VERIFIERS,
             TRANSITION_ENGINES,
-            BOOTSTRAP_ENGINES,
             PROXY_UPGRADE_ENGINES,
             COMPOSERS,
         ]
@@ -918,9 +897,9 @@ mod tests {
         }
     }
 
-    /// The facet set and the transition engine are the contracts the prepares deploy for those
-    /// roles (`DeployCTMUtils.deployStateTransitionDiamondFacets`,
-    /// `DefaultCTMUpgrade.deployUsedUpgradeContract`).
+    /// The facet set, the engines and the composer are the contracts the prepares deploy for
+    /// those roles (`DeployCTMUtils.deployStateTransitionDiamondFacets`, the engines'
+    /// `deployUsedUpgradeContract`).
     #[test]
     fn the_roles_are_what_the_prepares_deploy() {
         let read = |path: &str| std::fs::read_to_string(format!("{L1_CONTRACTS}/{path}")).unwrap();
@@ -1361,7 +1340,6 @@ mod tests {
     const DIAMOND_INIT_RUNTIME: &[u8] = b"the reviewed DiamondInit runtime";
     const GENESIS_UPGRADE_RUNTIME: &[u8] = b"the reviewed L1GenesisUpgrade runtime";
     const DEFAULT_UPGRADE_RUNTIME: &[u8] = b"the reviewed DefaultUpgrade runtime";
-    const BOOTSTRAP_UPGRADE_RUNTIME: &[u8] = b"the reviewed BootstrapUpgrade runtime";
     const COMPOSER_RUNTIME: &[u8] = b"the reviewed L2DefaultDelegateCalldataComposer runtime";
     const COMMITTER_RUNTIME: &[u8] = b"the reviewed CommitterFacet runtime";
     const UNKNOWN_RUNTIME: &[u8] = b"code no reviewed artifact is";
@@ -1415,11 +1393,6 @@ mod tests {
                     "DefaultUpgrade.sol",
                     "DefaultUpgrade",
                     DEFAULT_UPGRADE_RUNTIME,
-                ),
-                artifact(
-                    "BootstrapUpgrade.sol",
-                    "BootstrapUpgrade",
-                    BOOTSTRAP_UPGRADE_RUNTIME,
                 ),
                 artifact(
                     "L2DefaultDelegateCalldataComposer.sol",
@@ -1831,10 +1804,7 @@ mod tests {
                 &member_build(),
                 &mut result,
                 &MemberReview::new(&records, &env, None, None),
-                &DepartingMembers::verifiers_in_force(
-                    "the verifier the chains run",
-                    [DEPARTING_VERIFIER].into_iter().collect(),
-                ),
+                &departing(&[], &[DEPARTING_VERIFIER]),
                 "the verifier",
                 verifier,
             )
@@ -1871,21 +1841,16 @@ mod tests {
 
     /// The records of every engine and of the composer.
     fn engine_records() -> MemberDeployments {
-        [
-            "DefaultUpgrade",
-            "BootstrapUpgrade",
-            "L2DefaultDelegateCalldataComposer",
-        ]
-        .into_iter()
-        .map(|contract| recorded(contract, Vec::new()))
-        .collect()
+        ["DefaultUpgrade", "L2DefaultDelegateCalldataComposer"]
+            .into_iter()
+            .map(|contract| recorded(contract, Vec::new()))
+            .collect()
     }
 
     /// The engine's code, then the composer's when the plan names one. The engine sits where the
-    /// prepare deploys the first contract `engines` admits.
+    /// prepare deploys `DefaultUpgrade`.
     async fn run_engine_with(
         answers: &[&[u8]],
-        engines: &'static [&'static str],
         plan: &AuthoredL2Plan,
         records: &MemberDeployments,
     ) -> VerificationResult {
@@ -1902,8 +1867,7 @@ mod tests {
             &mut result,
             &MemberReview::new(records, &env, None, None),
             "the transition",
-            deployed_at(engines[0]),
-            engines,
+            deployed_at("DefaultUpgrade"),
             plan,
         )
         .await
@@ -1912,12 +1876,8 @@ mod tests {
         result
     }
 
-    async fn run_engine(
-        answers: &[&[u8]],
-        engines: &'static [&'static str],
-        plan: &AuthoredL2Plan,
-    ) -> VerificationResult {
-        run_engine_with(answers, engines, plan, &engine_records()).await
+    async fn run_engine(answers: &[&[u8]], plan: &AuthoredL2Plan) -> VerificationResult {
+        run_engine_with(answers, plan, &engine_records()).await
     }
 
     #[tokio::test]
@@ -1927,16 +1887,11 @@ mod tests {
             encoded(DELEGATE_INFO),
             vec![encoded(OTHER_INFO)],
         );
-        let result = run_engine(
-            &[DEFAULT_UPGRADE_RUNTIME, COMPOSER_RUNTIME],
-            TRANSITION_ENGINES,
-            &full,
-        )
-        .await;
+        let result = run_engine(&[DEFAULT_UPGRADE_RUNTIME, COMPOSER_RUNTIME], &full).await;
         assert_eq!(result.errors, 0, "{:?}", result.error_messages);
         // An L1-only edge: no composer, no delegate — the engine alone is read.
         let empty = plan(Address::ZERO, Bytes::new(), Vec::new());
-        let result = run_engine(&[BOOTSTRAP_UPGRADE_RUNTIME], BOOTSTRAP_ENGINES, &empty).await;
+        let result = run_engine(&[DEFAULT_UPGRADE_RUNTIME], &empty).await;
         assert_eq!(result.errors, 0, "{:?}", result.error_messages);
     }
 
@@ -1947,7 +1902,6 @@ mod tests {
         let full = plan(composer(), encoded(DELEGATE_INFO), Vec::new());
         let result = run_engine_with(
             &[DEFAULT_UPGRADE_RUNTIME, COMPOSER_RUNTIME],
-            TRANSITION_ENGINES,
             &full,
             &MemberDeployments::new(),
         )
@@ -1957,14 +1911,14 @@ mod tests {
         assert!(result.has_error("l2Plan.delegateComposer at"));
     }
 
-    /// The engine kinds are not interchangeable: a transition pinning the bootstrap engine (or the
-    /// reverse) would run another upgrade on every chain.
+    /// A transition pinning anything but the reviewed engine would run another upgrade on every
+    /// chain.
     #[tokio::test]
     async fn an_engine_of_another_kind_fails() {
         let empty = plan(Address::ZERO, Bytes::new(), Vec::new());
-        let result = run_engine(&[BOOTSTRAP_UPGRADE_RUNTIME], TRANSITION_ENGINES, &empty).await;
+        let result = run_engine(&[COMPOSER_RUNTIME], &empty).await;
         assert_eq!(result.errors, 1);
-        let result = run_engine(&[DEFAULT_UPGRADE_RUNTIME], BOOTSTRAP_ENGINES, &empty).await;
+        let result = run_engine(&[UNKNOWN_RUNTIME], &empty).await;
         assert_eq!(result.errors, 1);
     }
 
@@ -1989,7 +1943,6 @@ mod tests {
     async fn a_delegate_needs_its_own_composer() {
         let result = run_engine(
             &[DEFAULT_UPGRADE_RUNTIME, DEFAULT_UPGRADE_RUNTIME],
-            TRANSITION_ENGINES,
             &plan(composer(), encoded(DELEGATE_INFO), Vec::new()),
         )
         .await;
@@ -2005,14 +1958,12 @@ mod tests {
     async fn a_composer_or_an_authored_bytecode_outside_its_role_fails() {
         let result = run_engine(
             &[DEFAULT_UPGRADE_RUNTIME, DEFAULT_UPGRADE_RUNTIME],
-            TRANSITION_ENGINES,
             &plan(composer(), encoded(DELEGATE_INFO), Vec::new()),
         )
         .await;
         assert_eq!(result.errors, 1);
         let result = run_engine(
             &[DEFAULT_UPGRADE_RUNTIME, COMPOSER_RUNTIME],
-            TRANSITION_ENGINES,
             &plan(composer(), encoded(OTHER_INFO), Vec::new()),
         )
         .await;
@@ -2020,7 +1971,6 @@ mod tests {
         let unknown = (B256::repeat_byte(0xEE), 1, B256::repeat_byte(0xEF));
         let result = run_engine(
             &[DEFAULT_UPGRADE_RUNTIME, COMPOSER_RUNTIME],
-            TRANSITION_ENGINES,
             &plan(composer(), encoded(DELEGATE_INFO), vec![encoded(unknown)]),
         )
         .await;

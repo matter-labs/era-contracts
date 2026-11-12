@@ -66,11 +66,6 @@ pub const L2_ECOSYSTEM_FIXED_ADDRESSES: [(&str, usize, Address); 21] = [
     ("L2ComplexUpgrader", 26, L2_COMPLEX_UPGRADER_ADDR),
 ];
 
-/// `CTMContract.ServerNotifier` — the slot of the CTM-domain inventory (`ProxyUpgradeRow[]`
-/// indexed by `CTMContract`) holding the ServerNotifier row, mandatory in a bootstrap manifest.
-/// The source-sync test below fails the build if the append-only enum moves it.
-pub const CTM_CONTRACT_SERVER_NOTIFIER_SLOT: usize = 19;
-
 /// The committed pins of the snarkJS Plonk backend `ZiskVerifier` delegates to, relative to the
 /// repository root (see `registry::external_backends`).
 pub const ZISK_PLONK_BACKEND_PIN_PATH: &str = "tools/verifier-gen/data/ZiSK_plonk_backend.toml";
@@ -99,7 +94,7 @@ pub const L1_ECOSYSTEM_CONTRACTS: [&str; 9] = [
 ];
 
 /// `enum CTMContract`, in declaration order: the slot names of a CTM-domain inventory (a
-/// CTM-domain `ProxyUpgradeTransition`'s rows, a bootstrap's `ctmProxyUpgrades`). The source-sync
+/// CTM-domain `ProxyUpgradeTransition`'s rows). The source-sync
 /// test below fails the build if the enum changes.
 pub const CTM_CONTRACTS: [&str; 21] = [
     "AdminFacet",
@@ -481,17 +476,6 @@ mod tests {
         assert_eq!(
             members.iter().position(|m| *m == "CTM"),
             Some(usize::from(PROXY_UPGRADE_DOMAIN_CTM))
-        );
-    }
-
-    #[test]
-    fn the_server_notifier_slot_is_its_ctm_contract_position() {
-        assert_eq!(
-            enum_members("CTMContract")
-                .iter()
-                .position(|m| *m == "ServerNotifier"),
-            Some(CTM_CONTRACT_SERVER_NOTIFIER_SLOT),
-            "CTMContract.ServerNotifier moved; update CTM_CONTRACT_SERVER_NOTIFIER_SLOT"
         );
     }
 

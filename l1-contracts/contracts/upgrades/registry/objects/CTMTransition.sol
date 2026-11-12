@@ -49,8 +49,6 @@ contract CTMTransition is ICTMTransition, ManifestStorage {
     ///         contract: everything is written once, at construction.
     constructor(TransitionManifest memory _manifest) ManifestStorage(abi.encode(_manifest)) {
         // `fromRelease` is MANDATORY: every transition departs from a real, pinned release.
-        // Bootstrapping a pre-registry CTM is one-time migration code, never an accommodation
-        // here; see the Bootstrap section of {docs/registry-driven-upgrades.md}.
         if (
             _manifest.fromRelease == address(0) ||
             _manifest.newRelease == address(0) ||

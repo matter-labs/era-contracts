@@ -12,7 +12,6 @@ library TrimmedUpgradeOutput {
         address ctmTransition;
         address ctmUpgradeExecutor;
         address ctmRelease;
-        address bootstrapMigration;
         address ctmInfrastructureTransition;
     }
 
@@ -49,12 +48,11 @@ library TrimmedUpgradeOutput {
             "default_upgrade_addr",
             _defaultUpgrade
         );
-        _vm.serializeAddress("registry", "ctm_transition_addr", _registry.ctmTransition);
-        _vm.serializeAddress("registry", "ctm_release_addr", _registry.ctmRelease);
         // The trimmed writer replaces the heavy `state_transition` section, NOT the registry
         // block: every object the production output names has to survive here too, or a package
         // verified from the harness is not the shape a package verified in production is.
-        _vm.serializeAddress("registry", "bootstrap_migration_addr", _registry.bootstrapMigration);
+        _vm.serializeAddress("registry", "ctm_transition_addr", _registry.ctmTransition);
+        _vm.serializeAddress("registry", "ctm_release_addr", _registry.ctmRelease);
         // The merge derives this upgrade's executor calls from these addresses, so a trimmed output
         // that omitted them would produce a package with no CTM leg at all.
         _vm.serializeAddress("registry", "ctm_infrastructure_transition_addr", _registry.ctmInfrastructureTransition);

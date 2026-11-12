@@ -3,8 +3,8 @@
 //!
 //! Every ecosystem lookup starts from it: the proxies an ecosystem inventory's slots must name
 //! ([`super::rows`]), the live values a release's force deployments and a member's constructor
-//! arguments are held against ([`super::genesis`], [`super::member_construction`]) and the chains
-//! a bootstrap's departing verifier is read from. What the package names in the ecosystem — its
+//! arguments are held against ([`super::genesis`], [`super::member_construction`]) and the CTM's
+//! chains the v35 gate reads. What the package names in the ecosystem — its
 //! `bridgehub_proxy_addr`, the CTMs its legs drive, the ProxyAdmins its executors apply rows
 //! through — is held against that root ([`bind_to_reviewed_ecosystem`]) and never used as one: a
 //! Bridgehub the package chose could answer real proxies under the wrong getters, and a genuine

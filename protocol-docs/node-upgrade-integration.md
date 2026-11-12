@@ -37,7 +37,9 @@ At `zksync-os-server-private` `main` @ `4d808657c` (2026-10-16):
    - otherwise the edge is legacy-committed, the v35 bootstrap included: the cut is the
      `NewUpgradeCutData` log in block `upgradeCutDataBlock(old)` whose `keccak256(abi.encode(cut))`
      is `upgradeCutHash(old)`. The bootstrap's init is `upgradeFromBootstrap(migration)`
-     (`0xa419aa8f`); a pre-v35 edge's is `upgrade(ProposedUpgrade)`, handled as today.
+     (`0xa419aa8f`); a pre-v35 edge's is `upgrade(ProposedUpgrade)`, handled as today. Only a v35
+     CTM has this branch: v36 removed `upgradeCutHash` and `upgradeCutDataBlock` with the bootstrap
+     edge, and no chain below v35 can cross onto it, so on a v36 CTM every edge is a registry edge.
 
    Never take the cut from the newest `NewUpgradeCutData(target)`. That event is keyed by the
    target, and a `replaceUpgradeTransition` that skips ahead commits a second cut under the same
@@ -74,7 +76,8 @@ At `zksync-os-server-private` `main` @ `4d808657c` (2026-10-16):
 5. **Send the crossing the chain's facets take.** Through the `ValidatorTimelock` (`UPGRADER_ROLE`),
    a chain at v35 or later takes `upgradeChainFromVersion(address,uint256)` (`0x03129ad9`) and reads
    its cut from its CTM. Only a chain below v35, crossing the bootstrap edge, takes the cut-taking
-   `upgradeChainFromVersion(address,uint256,DiamondCutData)` with the cut of requirement 1.
+   `upgradeChainFromVersion(address,uint256,DiamondCutData)` with the cut of requirement 1; a v36
+   CTM no longer has it.
 
 ## Reference implementation
 
@@ -95,9 +98,8 @@ The tests in the same file pin each branch, among them
 reads are in [`src/abi.rs`](../tools/upgrade-readiness-checker/src/abi.rs); the rest are declared
 in the contracts:
 [`IChainTypeManager`](../l1-contracts/contracts/state-transition/IChainTypeManager.sol)
-(`upgradeCutForVersion`, `upgradeCutHash`, `L1_BYTECODES_SUPPLIER`),
-[`ChainTypeManager`](../l1-contracts/contracts/state-transition/ChainTypeManager.sol)
-(`upgradeCutDataBlock`),
+(`upgradeCutForVersion`, `L1_BYTECODES_SUPPLIER`; a v35 CTM's `upgradeCutHash` and
+`upgradeCutDataBlock` are gone in v36),
 [`ICommittedUpgrade`](../l1-contracts/contracts/upgrades/registry/objects/ICommittedUpgrade.sol)
 (`upgradeTarget`), [`BytecodesSupplier`](../l1-contracts/contracts/upgrades/BytecodesSupplier.sol)
 (`evmPublishingBlock`, `EVMBytecodePublished`) and

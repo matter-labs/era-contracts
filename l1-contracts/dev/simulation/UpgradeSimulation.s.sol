@@ -30,17 +30,13 @@ contract UpgradeSimulation is Script {
             return;
         }
         ZkChainAddresses memory witness = AddressIntrospector.getZkChainAddresses(IZKChain(witnessChain));
-        // The witness chain's generation decides the call shape, and only the legacy one is handed
-        // a cut — so the package's cut is read for that shape alone (see {UpgradeChainCall}).
+        // The witness chain reads the cut its CTM committed; nothing is handed to it.
         uint256 witnessProtocolVersion = ChainTypeManager(ctm).protocolVersion();
-        bytes memory encodedCut = UpgradeChainCall.requiresCut(witnessProtocolVersion)
-            ? output.readBytes(".chain_upgrade_diamond_cut")
-            : bytes("");
         Call[] memory upgradeCalls = new Call[](1);
         upgradeCalls[0] = Call({
             target: witness.zkChainProxy,
             value: 0,
-            data: UpgradeChainCall.encodeFromEncodedCut(witness.zkChainProxy, witnessProtocolVersion, encodedCut)
+            data: UpgradeChainCall.encode(witness.zkChainProxy, witnessProtocolVersion)
         });
         Call[] memory createCalls = new Call[](1);
         createCalls[0] = createChainCall(ctm, witness.chainId, ZKSYNC_OS_TEST_CREATE_CHAIN_ID, msg.sender);

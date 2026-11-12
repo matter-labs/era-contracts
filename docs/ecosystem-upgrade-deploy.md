@@ -304,9 +304,10 @@ cd protocol-ops && cargo build --release && cd ..
 `replay-bundle` runs `ecosystem verify-bootstrap` on the bundle's `ecosystem.toml`
 with the reviewer inputs the env config supplies: the reviewed Bridgehub (the permanent values'
 `bridgehub_proxy_addr`), the expected governance owner (the upgrade input's `owner_address`) and
-the CREATE2 salts (its core and per-CTM salts). A bootstrap package carries the records of the executors it drives; a
-recurring upgrade's executors were deployed by `ecosystem init` / `ctm init`, so
-pass those runs' outputs with `--executor-record`. `ecosystem verify-bootstrap`
+the CREATE2 salts (its core and per-CTM salts). The executors an upgrade drives were deployed
+earlier — by `ecosystem init` / `ctm init`, or, on an ecosystem that crossed the v34 -> v35
+bootstrap edge (removed in v36), by that edge's package — so pass that run's output with
+`--executor-record`. `ecosystem verify-bootstrap`
 takes the same inputs as flags when run on its own (see `protocol-ops/README.md`).
 
 No receipt journal is involved: the verifier re-derives each CREATE2 address from

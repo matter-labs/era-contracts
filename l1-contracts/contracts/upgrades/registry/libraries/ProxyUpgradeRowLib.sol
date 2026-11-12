@@ -20,7 +20,7 @@ import {
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice THE `ProxyUpgradeRow` semantics, shared by everything that carries rows (the proxy
-///         upgrade transitions of both domains and the bootstrap migration) and everything that
+///         upgrade transitions of both domains) and everything that
 ///         applies them: rows are SOURCE-CHECKED edges — a proxy already at
 ///         `implNew` is skipped (idempotence); a proxy at `expectedOldImpl` is upgraded; a proxy
 ///         at anything else reverts, so replaying a stale object can never downgrade a proxy that

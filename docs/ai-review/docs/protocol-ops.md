@@ -5,7 +5,7 @@
 - `protocol-ops/src/main.rs` — top-level CLI dispatcher.
 - `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `verify-bootstrap`, `list-ctms`, `governance-toml-to-simulator`, …).
 - `protocol-ops/src/commands/ecosystem/upgrade_inner.rs` — canonical prepare-phase orchestration (`UpgradeInner::prepare`: core prepare, then the per-CTM prepare).
-- `protocol-ops/src/commands/ecosystem/upgrade_full.rs` — `UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`) + the ServerNotifier handover calls after the prepares (bootstrap only).
+- `protocol-ops/src/commands/ecosystem/upgrade_full.rs` — `UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`).
 - `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`), the merge (`write_merged_ecosystem_toml`) and the free `replay_governance_calls` helper.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — converts prepared governance TOMLs into transaction-simulator JSON.
 - `protocol-ops/src/commands/chain/` — per-chain commands (`chain init`, `chain upgrade`, `chain set-da-validator-pair`, …).
@@ -15,16 +15,16 @@
 - `protocol-ops/src/common/forge/scripts/mod.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes, and the `ScriptCall` table binding each typed call to its script.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
 - `l1-contracts/deploy-scripts/upgrade/v<minor>/{CoreUpgrade_v<minor>,CTMUpgrade_v<minor>}.s.sol` — the current release's prepares, for the minor version of `configs/genesis/zksync-os/latest.json`.
-- The core prepare deploys the Core-domain `ProxyUpgradeTransition`, the CTM prepare the CTM-domain one and/or the `CTMTransition`, and the merge derives the executor legs (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) from the objects and executors they report — there is no compose step. The merged package carries ONE governance bundle, `[governance_calls] calls`: the merge's extras (PUH/Guardians wiring, CTM `acceptOwnership()` normalization), the core prepare's declared calls, the derived legs in canonical order (none for a bootstrap or a replacement), then the CTM prepare's declared calls. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
+- The core prepare deploys the Core-domain `ProxyUpgradeTransition`, the CTM prepare the CTM-domain one and/or the `CTMTransition`, and the merge derives the executor legs (`applyL1Upgrade`, `applyInfrastructureUpgrade`, `applyCTMUpgrade`) from the objects and executors they report — there is no compose step. The merged package carries ONE governance bundle, `[governance_calls] calls`: the merge's extras (PUH/Guardians wiring, CTM `acceptOwnership()` normalization), the core prepare's declared calls, the derived legs in canonical order (none for a replacement), then the CTM prepare's declared calls. The runbook is `l1-contracts/deploy-scripts/upgrade/README.md`.
 
 ## Verifying a package before it is signed
 
 One verifier, `ecosystem verify-bootstrap` (alias `verify-package`,
-`upgrade_verification/registry/`). It decides from the package itself which kind it drives — an
-UPGRADE (one to three executor legs), the one-time BOOTSTRAP edge onto the registry model, or the
-REPLACEMENT of a committed transition (one `CTMUpgradeExecutor.forward([replaceUpgradeTransition(...)])`,
+`upgrade_verification/registry/`; the name predates the removal of the one-time bootstrap edge in
+v36, and its bootstrap path went with it). It decides from the package itself which kind it
+drives — an UPGRADE (one to three executor legs) or the REPLACEMENT of a committed transition (one `CTMUpgradeExecutor.forward([replaceUpgradeTransition(...)])`,
 see "Replacing a committed transition" in `protocol-docs/ecosystem-upgrade-coordination.md`) — and
-refuses a package that is none of them or mixes them rather than verifying it as the nearest
+refuses a package that is neither or mixes them rather than verifying it as the nearest
 match. It needs only the merged prepare TOML and an L1 RPC: the registry model moved the reviewable content off the
 calldata and onto write-once objects, so objects are identified against the reviewed commit's own
 artifacts rather than reconstructed from a CREATE2 deployment history.
@@ -45,15 +45,15 @@ from calldata:
   `docs/registry-driven-upgrades.md`). Each object's address is re-derived from the reviewed
   creation code and the arguments it was constructed with, and compared with the address the package
   uses. For a write-once object the arguments are the manifest it serves; for both domain executors
-  they are the original constructor arguments their records state, and for the bootstrap sequence
-  the reviewed migration and core transition — never the object's own getters. The current owner
+  they are the original constructor arguments their records state — never the object's own getters. The current owner
   and nomination are checked separately against the reviewed governance. The creation-code bytes
   come from the local build (`l1-contracts/out`, so the reviewed commit must be built), held against the committed `evmBytecodeHash`. The salts are
   per prepare leg: each prepare records the one it deployed under (`create2_factory_salt`, merged
   under `[core]` / `[ctms.*]`) and `--create2-salt` adds more; with no salt the check cannot run,
   and that is an ERROR rather than a silent pass. An executor is re-derived from its
   `[upgrade_executors]` record — salt and ORIGINAL constructor arguments, written by the run that
-  deployed it (`ecosystem init`, `ctm init` or the bootstrap prepares) and read from the package or
+  deployed it (`ecosystem init`, `ctm init`, or the v35 bootstrap prepares on an ecosystem that
+  crossed that retired edge) and read from the package or
   `--executor-record` — so one whose owner moved since still verifies. The record is mandatory: an
   executor without one is unverified, which is an error.
 - **Code identity** (`provenance.rs`) — the live code at an address against the reviewed build's
@@ -70,11 +70,9 @@ from calldata:
 - **Members** (`members.rs`) — every member an object names runs the reviewed build's code for its
   role: a release's genesis facets (one of the six facets), `DiamondInit`, `L1GenesisUpgrade`, its
   verifier (a top-level verifier) and every sub-verifier the verifier names through its
-  `*_VERIFIER()` getters; a transition's engine `DefaultUpgrade`, the bootstrap migration's
-  `BootstrapUpgrade`, a proxy upgrade transition's `DefaultProxyUpgradeEngine`, an L2 plan's
-  `L2DefaultDelegateCalldataComposer`. The one exception is the
-  verifier already in force where the upgrade departs from (the departing release's, or the one the
-  CTM's chains run for the bootstrap), which a release carries over without redeploying and an
+  `*_VERIFIER()` getters; a transition's engine `DefaultUpgrade`, a proxy upgrade transition's
+  `DefaultProxyUpgradeEngine`, an L2 plan's `L2DefaultDelegateCalldataComposer`. The one exception is the
+  verifier already in force where the upgrade departs from (the departing release's), which a release carries over without redeploying and an
   earlier build may have produced. `ZiskVerifier`'s snarkJS Plonk backend is outside the
   repository's build, so the code at its `PLONK_VERIFIER()` must hash to a runtime pinned in
   `tools/verifier-gen/data/ZiSK_plonk_backend.toml` (`external_backends.rs`); no code, no applicable
@@ -83,8 +81,7 @@ from calldata:
   `L2EcosystemContract` slot, the shell `SystemContractProxy`, a plan's delegate `L2DefaultUpgrade`,
   each extra bytecode some reviewed contract.
 - **Member construction** (`member_construction.rs`) — every L1 member a package NEWLY installs (a
-  release member the departing release does not name — at the bootstrap anything but the verifier
-  the chains run and its tree — every engine and composer, each row's `implNew`, the implementation
+  release member the departing release does not name, every engine and composer, each row's `implNew`, the implementation
   behind a proxy the package introduces) is re-derived from the prepare's `[member_deployments]`
   record: the reviewed creation code on the recorded, exactly-ABI-encoded arguments under the
   recorded salt through the deterministic factory must land at the member. Each argument is held
@@ -124,21 +121,20 @@ from calldata:
   CTM and `ProxyAdmin` held against the package's independently reviewed CTM and `ProxyAdmin`, the
   core executor's against the ecosystem `ProxyAdmin`), the CTM and both ProxyAdmins, and the
   governance owner the whole lifecycle answers to, with no ownership nomination outstanding on any
-  of them; for a bootstrap also the owner of the CTM's Bridgehub, which the CTM takes chain freezes
-  from too. With a CTM leg or at the bootstrap, the CTM's ValidatorTimelock must stay governance's:
-  owned by it with no nomination, or nominating it with the bundle carrying governance's declared
-  `acceptOwnership()` on it. Held by the owner of a legacy `Governance.sol` governance (as
-  `ecosystem init` leaves it) it is a warning, as at the merge-base; a carried `acceptOwnership()`
-  on a timelock that has not nominated governance is an error, because it reverts the bundle. The
-  reviewed owner is what the executors' current ownership is checked
-  against, so for an upgrade package `--expected-governance-owner` is not optional: without it that
-  ownership is unverifiable, which is an error.
+  of them. With a CTM leg, the CTM's ValidatorTimelock must stay governance's: owned by it with no
+  nomination, or nominating it with the bundle carrying governance's declared `acceptOwnership()` on
+  it. Held by the owner of a legacy `Governance.sol` governance (as `ecosystem init` leaves it) it
+  is a warning, as at the merge-base; a carried `acceptOwnership()` on a timelock that has not
+  nominated governance is an error, because it reverts the bundle. The reviewed owner is what the
+  executors' current ownership is checked against, so for an upgrade package
+  `--expected-governance-owner` is not optional: without it that ownership is unverifiable, which is
+  an error.
 - **Departing state** — the version and release edge against live, and every proxy row's
   `expectedOldImpl` against the implementation actually live behind that proxy, read through the
-  domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. For a bootstrap, every
-  chain on the CTM below the departing version is listed as a warning, not an error (the legacy
-  `protocolVersionVerifier` getter keeps them upgradeable).
-- **Genesis** — on the upgrade and bootstrap paths, a release's genesis batch hash against the
+  domain's bound `ProxyAdmin` and accepting a row already at its `implNew`. On the edge onto
+  v0.36.0, also each chain the Bridgehub lists under the CTM: one below v0.35.0 is an ERROR, since
+  it has no upgrade path once the v36 CTM lands (`deploy-scripts/upgrade/README.md`, step 6).
+- **Genesis** — on the upgrade path, a release's genesis batch hash against the
   reviewed commit's genesis config (`configs/genesis/zksync-os/latest.json`), its index against
   zero, and every field of its force-deployments data against an independent expectation: the L1
   chain id, the reviewed Bridgehub's asset router, chain cap and (aliased) chain-registration sender,
@@ -151,11 +147,11 @@ from calldata:
   `docs/registry-driven-upgrades.md`). A change is an ERROR when the edge's delegate is absent, the
   stock `L2DefaultUpgrade` or code the reviewed commit does not build, and a WARN naming any other
   delegate.
-- **Readiness**, reported apart from anything about value: the transition's or the bootstrap
-  migration's L2 factory dependencies published on the CTM's supplier.
+- **Readiness**, reported apart from anything about value: the transition's L2 factory
+  dependencies published on the CTM's supplier.
 - **Release validity** — the arriving release's own `validate()`, called before the vote. It
   depends only on the code at the addresses it names, so a revert here is the release failing every
-  on-chain check that runs it (a transition's construction, the bootstrap, the install).
+  on-chain check that runs it (a transition's construction, the install).
 
 **Does the signed transaction invoke the reviewed upgrade, at the reviewed addresses, in the
 reviewed order?** For an upgrade that is the whole of it (`verify_upgrade_calls`): each leg is
@@ -171,21 +167,13 @@ The legs' INTERNAL calls are deliberately not re-derived — the executors deriv
 them on chain from the same pinned objects, and a second derivation in the tool would be a second
 implementation to keep in sync.
 
-A bootstrap edge is the exception, because its executors do not yet hold their domains: governance
-executes a LIST of ordinary calls that `RegistryBootstrapSequence.actions()` derives, so the
-submitted bundle must END with exactly that list, and only calls outside the edge's authorities
-(the merge's extras) may precede it. The merge's CTM `acceptOwnership()` reaches the CTM, an
-authority, so a bootstrap cannot be verified while the CTM has a nomination outstanding: a CTM
-nomination to governance is accepted in an earlier governance execution, before the bootstrap is
-prepared. The list's last call is `validateApplied()` on the migration, so a bootstrap that does not
-complete reverts the whole bundle. That list comparison is transitional scaffolding for the
-bootstrap alone, and nothing new should be built on it. A replacement's bundle carries one
+A replacement's bundle carries one
 `forward` to the CTM's executor and nothing else that reaches the CTM or its executor.
 
 For every kind, the calls other than the executor legs ARE the package's governance-phase
 declarations — one for one, in declared order, every declaration present (`declared_calls.rs`, the
-same matcher the merge's `check_bundle_provenance` uses); the bootstrap's derived run and a
-replacement's `forward` are declared like any other call. A declared call an authority rule refuses
+same matcher the merge's `check_bundle_provenance` uses); a replacement's `forward` is declared
+like any other call. A declared call an authority rule refuses
 reports twice: the call, and the declaration it leaves uncarried.
 
 It deliberately does NOT re-derive facet cuts, L2 transactions or proposals — those come from the
@@ -204,14 +192,14 @@ cargo run --release --bin protocol_ops -- ecosystem verify-bootstrap \
 
 `--contract-hashes <path>` replaces the committed `AllContractsHashes.json`; only the anvil upgrade
 runner (`yarn test:upgrade`) uses it, with the hashes of the build it deployed from, because the
-committed file is regenerated last. The runner verifies the bootstrap and each registry-driven hop
-with `--env local` and the bootstrap package as `--executor-record` before it replays governance.
+committed file is regenerated last. The runner verifies each registry-driven hop with `--env local`
+and the executor records it writes for its fixture as `--executor-record` before it replays
+governance.
 
 In every kind the executing objects are recovered from the CALLDATA governance will run — each
-leg's (executor, object) pair for an upgrade, the bundle's `migrate()` call for a bootstrap, the
-replacing `forward` for a replacement — and the prepare's summary fields (`core_transition_addr`,
+leg's (executor, object) pair for an upgrade, the replacing `forward` for a replacement — and the prepare's summary fields (`core_transition_addr`,
 `core_upgrade_executor_addr`, `ctm_infrastructure_transition_addr`, `ctm_transition_addr`,
-`ctm_upgrade_executor_addr`, `bootstrap_migration_addr`) are cross-checks against them. A
+`ctm_upgrade_executor_addr`) are cross-checks against them. A
 disagreement is an ERROR: the reviewer read one upgrade and governance would sign another. For an
 upgrade the legs and the summaries must match one for one, so a reported object without its leg, a
 leg without its reported object, a substituted object or executor and a duplicated leg are refused
@@ -223,8 +211,8 @@ replays the bundle on a fork and fails unless the fork is left in the state the 
 notifier held by the CTM executor, the ValidatorTimelock owned by governance, both executors owned
 by governance, no nomination outstanding, every row's proxy at its `implNew` and every core row in
 the slot whose proxy the replay's Bridgehub names, and a replacement's deadline change (a cleared
-override falling back to the committed transition's pin). On chain, the bootstrap's `validateApplied()` and
-`applyCTMUpgrade`'s check of its own commit assert part of it in the same transaction.
+override falling back to the committed transition's pin). On chain, `applyCTMUpgrade`'s check of
+its own commit and the row swaps' post-state reads assert part of it in the same transaction.
 
 ## What protocol-ops is
 
@@ -257,8 +245,8 @@ Both `upgrade-governance --env` and `governance-toml-to-simulator --env` discove
 
 For non-trivial flows (the ecosystem upgrade in particular) we keep a small library-style struct hierarchy distinct from the CLI shells:
 
-- **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. Each prepare deploys its own domain's objects; on the bootstrap edge the CTM prepare takes the core executor from the core prepare's output. Returns the per-step output TOML paths.
-- **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before and the ServerNotifier handover calls (bootstrap only) after. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
+- **`UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires the version's core script `noGovernancePrepare` once and its CTM script `noGovernancePrepare` once per ZKsync OS CTM, on a single shared `ForgeRunner`. Each prepare deploys its own domain's objects. Returns the per-step output TOML paths.
+- **`UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance` before. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
 - **Free `replay_governance_calls` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `[governance_calls] calls`, dispatches one `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
 
 The asymmetry (Inner/Full for prepare; free fn for governance) is deliberate: prepare needs orchestration (multiple forge invocations + preconditions); governance is a single ABI-passthrough loop.

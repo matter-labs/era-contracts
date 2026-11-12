@@ -2,44 +2,21 @@
 
 Companion to [registry-driven-upgrades.md](registry-driven-upgrades.md). Execution is specified in
 [`protocol-docs/ecosystem-upgrade-coordination.md`](../protocol-docs/ecosystem-upgrade-coordination.md);
-the objects, executors and bootstrap are in the architecture document; the tooling is in
+the objects and executors are in the architecture document; the tooling is in
 [the runbook](../l1-contracts/deploy-scripts/upgrade/README.md). This document holds the
 operational policies none of those owns.
 
-## ServerNotifier: a one-time handover, then an ordinary CTM-domain proxy
+## ServerNotifier: an ordinary CTM-domain proxy
 
-The notifier is a per-CTM proxy. Pre-v35 deployments put it under its OWN `ProxyAdmin`, owned by
-the CTM's `ChainAdmin`, and nominated the `ChainAdmin` as its owner. From the registry bootstrap on
-it is administered like the rest of the CTM domain: its proxy sits under the CTM-domain `ProxyAdmin`
-the CTM executor owns, the CTM executor owns the notifier itself, and its implementation swaps are
-ordinary rows of a CTM-domain `ProxyUpgradeTransition`. A fresh ecosystem is deployed in that shape
-already: `DeployCTM` puts the notifier under the CTM-domain `ProxyAdmin` and hands it to the CTM
-executor.
+The notifier is a per-CTM proxy, administered like the rest of the CTM domain: its proxy sits under
+the CTM-domain `ProxyAdmin` the CTM executor owns, the CTM executor owns the notifier itself, and its
+implementation swaps are ordinary rows of a CTM-domain `ProxyUpgradeTransition`. A fresh ecosystem
+is deployed in that shape: `DeployCTM` puts the notifier under the CTM-domain `ProxyAdmin` and hands
+it to the CTM executor. No prepare emits an admin call for it.
 
-Getting there is a one-time handover and a PRECONDITION of the bootstrap, because governance cannot
-perform the ChainAdmin's half:
-
-| step | authority                                                                 | call                                                                    |
-| ---- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| 1    | owner of the notifier's old `ProxyAdmin`                                  | `changeProxyAdmin(notifier, ctmProxyAdmin)`                             |
-| 2    | the notifier's current owner                                              | `transferOwnership(ctmExecutor)`                                        |
-| 3    | the CTM executor's owner (governance), first call of the bootstrap bundle | `ctmExecutor.forward([notifier.acceptOwnership()])`                     |
-| 4    | the bootstrap bundle                                                      | `migrate()` swaps the notifier's implementation through `ctmProxyAdmin` |
-
-Steps 1–2 are RENDERED from live state by the bootstrap prepare
-(`CTMUpgrade_v35.serverNotifierHandoverCalls`, a step already done is left out), written to the
-prepare output's `[ctm_admin_calls].server_notifier_handover`, declared as `admin`-phase external
-actions, and run by protocol-ops right after the prepares (`UpgradeFull::run_ctm_admin_steps`). Step
-3 is derived only while the notifier is not yet the executor's, so the bootstrap bundle reverts
-until steps 1–2 landed, and step 3 itself reverts unless the CTM executor is the nominee.
-`RegistryBootstrapMigration.validate()` refuses to run unless the manifest's mandatory notifier row
-names the CTM's notifier, the notifier serves the CTM and is owned by the CTM executor with no
-nomination outstanding, and the notifier's row applies only through `ctmProxyAdmin`;
-`validateApplied()` keeps checking the ownership and the binding. `protocol-ops ecosystem
-verify-bootstrap` reports the handover as its own prerequisite.
-
-The handover is not undone if the bootstrap is cancelled afterwards: the notifier then simply
-belongs to the CTM domain early. A recurring prepare has no admin calls.
+Pre-v35 deployments put the notifier under its own `ProxyAdmin`, owned by the CTM's `ChainAdmin`;
+the one-time handover into the CTM domain belonged to the v34 -> v35 bootstrap edge, which was
+removed in v36.
 
 ## Executor succession
 
@@ -83,8 +60,9 @@ architecture document).
   CTM, both `ProxyAdmin`s, the ServerNotifier and the Bridgehub (whose owner can freeze the CTM's
   chains): expected only during executor succession or
   [governance self-migration](governance-self-migration.md).
-- **`AdminChanged`** on the CTM's and the ServerNotifier's proxies: expected only from the v35
-  ServerNotifier handover, which moves the notifier under the CTM-domain `ProxyAdmin`.
+- **`AdminChanged`** on the CTM's and the ServerNotifier's proxies: not expected from v36 on; the
+  v35 ServerNotifier handover, which moved the notifier under the CTM-domain `ProxyAdmin`, was the
+  last.
 
 ## Recovery
 
@@ -128,25 +106,19 @@ value and be either
   whose address and init code are reviewed-build creation code plus: a `[member_deployments]`
   record's constructor arguments; an `[upgrade_executors]` record's (initial owner = the env's
   `owner_address`, and a CTM executor's CTM one of the env's); an exact ABI encoding of the
-  constructor's parameters for an object a `[registry]` key names; the bootstrap sequence's (the
-  package's migration and core transition); or, for a `TransparentUpgradeableProxy` the package
+  constructor's parameters for an object a `[registry]` key names; or, for a `TransparentUpgradeableProxy` the package
   names, a recorded implementation and the ecosystem `ProxyAdmin` or a CTM's `ProxyAdmin` on L1; or
 - a call on the reviewed allowlist (`ALLOWLIST` in
-  `protocol-ops/src/commands/ecosystem/deployer_plan.rs`), every entry taken from the v35 bootstrap
-  prepare's deployer bundle:
+  `protocol-ops/src/commands/ecosystem/deployer_plan.rs`):
 
-| call                                        | target (package)                                                                                          | constraint                                                                                 | emitted by                                                     |
-| ------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `transferOwnership(address)`                | the CTM, its `ValidatorTimelock`, its `ProxyAdmin` (its EIP-1967 admin on L1), the ecosystem `ProxyAdmin` | new owner is the env's `owner_address`                                                     | `ensureCtmsAndProxyAdminsOwnedByGovernance`, deployer as owner |
-| `publishEVMBytecodes(bytes[])`              | the CTM's `bytecodes_supplier_addr`, which must be its `L1_BYTECODES_SUPPLIER()` on L1                    | none: publishing is permissionless                                                         | `BytecodePublisher` in the CTM prepare                         |
-| `multicall((address,uint256,bytes)[],bool)` | `[ctm_admin_calls] chain_admin`                                                                           | requires success; every call sends no value and is one of the two rows below               | the ServerNotifier handover through a ChainAdmin               |
-| `transferOwnership(address)`                | an `admin`-phase `[[external_actions]]` target                                                            | exactly that declared call, nominating the CTM executor this plan deploys                  | the ServerNotifier handover, deployer as owner                 |
-| `changeProxyAdmin(address,address)`         | an `admin`-phase `[[external_actions]]` target                                                            | exactly that declared call, to the `ProxyAdmin` that administers that executor's CTM on L1 | the ServerNotifier handover, deployer as owner                 |
+| call                           | target (package)                                                                                          | constraint                             | emitted by                                                     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------- |
+| `transferOwnership(address)`   | the CTM, its `ValidatorTimelock`, its `ProxyAdmin` (its EIP-1967 admin on L1), the ecosystem `ProxyAdmin` | new owner is the env's `owner_address` | `ensureCtmsAndProxyAdminsOwnedByGovernance`, deployer as owner |
+| `publishEVMBytecodes(bytes[])` | the CTM's `bytecodes_supplier_addr`, which must be its `L1_BYTECODES_SUPPLIER()` on L1                    | none: publishing is permissionless     | `BytecodePublisher` in the CTM prepare                         |
 
-A role that belongs to a CTM (the CTM, its `ValidatorTimelock`, `ProxyAdmin`, `BytecodesSupplier`
-and `ctm_admin_calls` ChainAdmin) counts only in a `[ctms.<key>]` table whose
-`chain_type_manager_proxy` is one of the env's `[[ctm_contracts.ctms]]`; a table naming such a role
-without a CTM is refused. The CTMs' `ProxyAdmin`, `BytecodesSupplier` and `ValidatorTimelock`
+A role that belongs to a CTM (the CTM, its `ValidatorTimelock`, `ProxyAdmin` and
+`BytecodesSupplier`) counts only in a `[ctms.<key>]` table whose `chain_type_manager_proxy` is one
+of the env's `[[ctm_contracts.ctms]]`; a table naming such a role without a CTM is refused. The CTMs' `ProxyAdmin`, `BytecodesSupplier` and `ValidatorTimelock`
 (`validatorTimelockPostV29()`), and the ecosystem `ProxyAdmin` (the EIP-1967 admin of the env's
 `bridgehub_proxy_addr`), are read over `--l1-rpc-url`
 (`replay-bundle` passes its `--rpc`, or in a rehearsal the fork it replays on), never taken from the

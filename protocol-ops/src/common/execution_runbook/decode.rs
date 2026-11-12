@@ -26,18 +26,16 @@ const KNOWN_FUNCTIONS: &[&str] = &[
     "upgradeChainFromVersion(address,uint256)",
     "upgradeChainFromVersion(address,uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
     "upgradeChainFromVersion(uint256,((address,uint8,bool,bytes4[])[],address,bytes))",
-    // ChainTypeManager
+    // ChainTypeManager (`setNewVersionUpgrade` is the pre-registry commit, kept to decode the
+    // committed runbooks of shipped releases)
     "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
     "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
     // Registry upgrade executors: an upgrade's legs (CoreUpgradeExecutor, CTMUpgradeExecutor) and
-    // the owner-gated `forward` (a replacement, the bootstrap's ServerNotifier acceptance)
+    // the owner-gated `forward` (a replacement)
     "applyL1Upgrade(address)",
     "applyInfrastructureUpgrade(address)",
     "applyCTMUpgrade(address)",
     "forward((address,uint256,bytes)[])",
-    // RegistryBootstrapMigration (the v35 bootstrap edge and its completion check)
-    "migrate()",
-    "validateApplied()",
     // ChainAssetHandler
     "pauseMigration()",
     "unpauseMigration()",

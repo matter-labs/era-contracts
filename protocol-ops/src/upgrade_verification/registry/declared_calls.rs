@@ -2,8 +2,7 @@
 //! executor legs ARE the package's governance-phase declarations, one for one and in declared
 //! order, every declaration present — the shape the merge emits, and the one its own
 //! `check_bundle_provenance` holds each prepare to through the same matcher
-//! ([`DeclaredCalls`]). The bootstrap's derived run and a replacement's `forward` are declared
-//! like any other call. A call the kind's authority rule already refused is left out of the
+//! ([`DeclaredCalls`]). A replacement's `forward` is declared like any other call. A call the kind's authority rule already refused is left out of the
 //! matching, so a declaration of it reports as never carried.
 
 use std::ops::Range;
@@ -16,12 +15,12 @@ use crate::upgrade_verification::report::VerificationResult;
 pub(super) struct DerivedRun<'a> {
     /// Bundle indices of the derived calls, when found.
     pub(super) at: Option<Range<usize>>,
-    /// Names them as a whole: "the legs", "the derived run", "the forward".
+    /// Names them as a whole: "the legs", "the forward".
     pub(super) name: &'a str,
-    /// Names one of them: "a leg of this upgrade", "derived by the sequence", "the forward".
+    /// Names one of them: "a leg of this upgrade", "the forward".
     pub(super) member: &'a str,
-    /// Whether the run's calls are among those judged, as declarations like any other (the
-    /// bootstrap's derived run, a replacement's forward), rather than left out (the legs).
+    /// Whether the run's calls are among those judged, as declarations like any other (a
+    /// replacement's forward), rather than left out (the legs).
     pub(super) declared: bool,
 }
 
@@ -135,8 +134,8 @@ mod tests {
         result
     }
 
-    /// An undeclared call inside a run whose calls are declarations (the bootstrap's, a
-    /// replacement's forward) is a package the prepares did not produce; one inside a run of
+    /// An undeclared call inside a run whose calls are declarations (a replacement's forward) is a
+    /// package the prepares did not produce; one inside a run of
     /// legs, which are never declarations, is an undeclared extra like any other.
     #[test]
     fn an_undeclared_call_in_the_run_is_named_by_what_the_run_is() {

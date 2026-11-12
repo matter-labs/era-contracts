@@ -33,7 +33,7 @@ live ecosystems still depend on them.
   ecosystem sit next to it, with the flow documents (interop, atomic interop, bridging, the message root, the chain
   lifecycle). Code comments point here instead of restating it.
 - [`docs/registry-driven-upgrades.md`](./docs/registry-driven-upgrades.md) describes the upgrade model: write-once
-  release / transition objects, bound executors, and the one-time bootstrap edge into it.
+  release / transition objects and bound executors.
 - Working conventions for contributors and AI agents are in [`AGENTS.md`](./AGENTS.md).
 
 ## Reviewing registry-driven upgrades
@@ -46,7 +46,7 @@ production prepare builds and submits these objects.
 
 ### New contracts and libraries
 
-The upgrade change adds **9 production contract types**, all deployed on L1. The larger source-file
+The upgrade change adds **6 production contract types**, all deployed on L1. The larger source-file
 count also includes abstract bases, internal libraries, interfaces, preparation scripts and tests.
 The **12 new runtime libraries have only internal/private functions**: they compile into their
 callers and do not require library deployment transactions. The
@@ -56,9 +56,8 @@ existing genesis and upgrade engines, with a separate diagram for each group of 
 #### Deployed contracts: recurring upgrades
 
 Solid arrows drive an action; dashed arrows read or reference an object. Boxes marked “existing”
-provide context and are not part of the 9 new contract types. This first map contains six new
-types; the bootstrap map below adds the other three. An upgrade carries only the objects, and so
-only the numbered calls, it needs.
+provide context and are not part of the 6 new contract types. An upgrade carries only the
+objects, and so only the numbered calls, it needs.
 
 ```mermaid
 flowchart TB
@@ -97,43 +96,6 @@ Governance owns both executors and calls them directly, in the numbered order, w
 that reverts as a whole; neither executor calls the other. Each controls its own administration
 targets. The composer runs on L1 even though its output is an L2 delegate call.
 
-#### Deployed contracts: one-time bootstrap
-
-The three highlighted types introduce a legacy ecosystem to the registry model. The other
-components appeared above or already exist. The sequence describes calls; governance executes
-them as one bundle, including the core leg and authority handovers.
-
-```mermaid
-flowchart TB
-    GOV["Governance · existing"]
-    SEQ["RegistryBootstrapSequence<br/>describes governance calls"]
-    CR["ProxyUpgradeTransition + CoreUpgradeExecutor<br/>core leg from the map above"]
-    MIG["RegistryBootstrapMigration<br/>installs first release and commits bootstrap edge"]
-    CTMEXEC["CTMUpgradeExecutor<br/>permanent CTM authority"]
-    CTM["ChainTypeManager + CTM ProxyAdmin · existing"]
-    CHAIN["Chain diamond · existing"]
-    ENGINE["BootstrapUpgrade<br/>extends DefaultUpgrade"]
-
-    GOV -.->|"reads actions()"| SEQ
-    SEQ -.->|"pinned core transition"| CR
-    SEQ -.->|"pinned migration"| MIG
-    GOV -->|"applies core leg"| CR
-    GOV -->|"hands authority over, calls migrate()"| MIG
-    MIG -->|"applies CTM rows / installs release / commits cut"| CTM
-    MIG -->|"hands CTM + ProxyAdmin authority to"| CTMEXEC
-    CHAIN -.->|"checks bootstrap cut hash"| CTM
-    CHAIN -->|"delegatecalls"| ENGINE
-    ENGINE -.->|"reads target release + L2 plan"| MIG
-
-    classDef added fill:#dbeafe,stroke:#2563eb,color:#172554
-    class SEQ,MIG,ENGINE added
-```
-
-`BootstrapUpgrade` also exposes the inherited recurring-upgrade entrypoint; the same deployment
-can serve later transitions, or later releases can use `DefaultUpgrade` directly. Each legacy
-chain's admin supplies its bootstrap cut separately; the chain checks it against the CTM's
-committed hash before executing it.
-
 #### Shared runtime code
 
 These are source dependencies, not additional protocol deployments. Each helper is listed once;
@@ -144,7 +106,7 @@ flowchart TB
     subgraph BASES["Abstract bases · inherited code"]
         direction LR
         DOMAINCALLER["Core / CTM domain executors"]
-        RECORDS["Three upgrade records + bootstrap migration"]
+        RECORDS["Three upgrade records"]
         UBASE["UpgradeExecutorBase<br/>owner-gated forward"]
         MBASE["ManifestStorage<br/>encoded manifest + manifestHash"]
         DOMAINCALLER -->|"inherits"| UBASE
@@ -153,13 +115,16 @@ flowchart TB
     subgraph HELPERS["Internal runtime libraries · 12"]
         direction LR
         DERIVECALLERS["Release / transition construction"]
-        APPLYCALLERS["Executors / bootstrap migration / fresh setup"]
+        APPLYCALLERS["Executors"]
+        SHAPECALLERS["Fresh-deployment checks (DeployOwnershipHandOff.t.sol)"]
         CHAINCALLERS["ChainTypeManager / DiamondInit / upgrade engines / composer"]
         DERIVE["TransitionDerivationLib<br/>L2InventoryLib<br/>L2PlanLib<br/>VersionEdgeLib"]
-        APPLY["ProxyUpgradeRowLib<br/>RegistryAuthorityLib<br/>ObjectAnchorLib"]
+        APPLY["ProxyUpgradeRowLib<br/>ObjectAnchorLib"]
+        SHAPE["RegistryAuthorityLib"]
         CHAINCODE["CTMUpgradeComposer<br/>ReleaseFacetReader<br/>LiveRoutingReader<br/>L2CanonicalTransactionLib<br/>ZKChainSpecificForceDeploymentsLib"]
         DERIVECALLERS --> DERIVE
         APPLYCALLERS --> APPLY
+        SHAPECALLERS --> SHAPE
         CHAINCALLERS --> CHAINCODE
     end
     subgraph DATA["Data declarations · no executable contracts"]
@@ -224,15 +189,14 @@ Tooling sources: [prepare helpers](./l1-contracts/deploy-scripts/upgrade/default
 [simulation](./l1-contracts/dev/simulation/). The probe and its temporary implementation are never
 broadcast. New tooling libraries also use only internal/private functions.
 
-| Interface group            | New declarations                                                                                                                  |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Objects                    | `ICTMRelease`, `ICTMTransition`, `IProxyUpgradeTransition`, `ICommittedUpgrade`, `IManifestHash`, `IL2DelegateCalldataComposer`   |
-| Executors                  | `IUpgradeExecutorBase`, `ICoreUpgradeExecutor`, `ICTMUpgradeExecutor`                                                             |
-| Bootstrap                  | `IBootstrapUpgrade`, `IRegistryBootstrapMigration`, `IRegistryBootstrapSequence`                                                  |
-| Existing-contract adapters | `ILegacyChainTypeManager`, `ISelfDescribingFacet`, `IProxyUpgradeInitializable` (declared in `IUpgradeInit.sol`), `IAdminWithCut` |
-| Script-only                | `ICoreUpgradePrepare`, `ICTMUpgradePrepare` (in `IUpgradePrepare.sol`)                                                            |
+| Interface group            | New declarations                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Objects                    | `ICTMRelease`, `ICTMTransition`, `IProxyUpgradeTransition`, `ICommittedUpgrade`, `IManifestHash`, `IL2DelegateCalldataComposer` |
+| Executors                  | `IUpgradeExecutorBase`, `ICoreUpgradeExecutor`, `ICTMUpgradeExecutor`                                                           |
+| Existing-contract adapters | `ILegacyChainTypeManager`, `ISelfDescribingFacet`, `IProxyUpgradeInitializable` (declared in `IUpgradeInit.sol`)                |
+| Script-only                | `ICoreUpgradePrepare`, `ICTMUpgradePrepare` (in `IUpgradePrepare.sol`)                                                          |
 
-The 16 runtime interfaces and two runtime data files are separate from the 14 tooling source
+The 12 runtime interfaces and two runtime data files are separate from the 14 tooling source
 files above. Test fixtures and mocks are omitted from the runtime diagrams; they exercise these
 same components rather than adding protocol deployments.
 
@@ -244,8 +208,8 @@ The current branch includes the following review surfaces:
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Upgrade description             | [RegistryTypes](./l1-contracts/contracts/upgrades/registry/RegistryTypes.sol): releases, transitions, proxy upgrade transitions, proxy rows and L2 plan inputs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Execution and recovery          | [CoreUpgradeExecutor](./l1-contracts/contracts/upgrades/registry/executors/CoreUpgradeExecutor.sol), [CTMUpgradeExecutor](./l1-contracts/contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol) and [bundle tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/UpgradeBundleExecution.t.sol): one governance proposal calls the domain entrypoints in canonical order — ecosystem rows, CTM rows, transition commit — each verified, all reverting together; [domain tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/CTMExecutorDomains.t.sol) cover per-CTM binding and executor succession. |
-| Separately administered proxies | [ProxyUpgradeRowLib](./l1-contracts/contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol): source-checked rows applied through each executor's bound ProxyAdmin (the ServerNotifier after its one-time handover) and verified in the transaction that applies them.                                                                                                                                                                                                                                                                                                                                                                   |
-| L2 and bootstrap payloads       | [CTMUpgradeComposer](./l1-contracts/contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol), [L2DefaultDelegateCalldataComposer](./l1-contracts/contracts/upgrades/L2DefaultDelegateCalldataComposer.sol), and [RegistryBootstrapMigration](./l1-contracts/contracts/upgrades/registry/bootstrap/RegistryBootstrapMigration.sol).                                                                                                                                                                                                                                                                                                       |
+| Separately administered proxies | [ProxyUpgradeRowLib](./l1-contracts/contracts/upgrades/registry/libraries/ProxyUpgradeRowLib.sol): source-checked rows applied through each executor's bound ProxyAdmin and verified in the transaction that applies them.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| L2 payloads                     | [CTMUpgradeComposer](./l1-contracts/contracts/upgrades/registry/libraries/CTMUpgradeComposer.sol) and [L2DefaultDelegateCalldataComposer](./l1-contracts/contracts/upgrades/L2DefaultDelegateCalldataComposer.sol).                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Individual-contract changes     | [RegistryIndividualUpgrade tests](./l1-contracts/test/foundry/l1/unit/concrete/Upgrades/registry/RegistryIndividualUpgrade.t.sol): facet-only, verifier-only and validator-timelock-only upgrades assert that unrelated state is unchanged.                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Production proposal generation  | [the current release's prepare scripts](./l1-contracts/deploy-scripts/upgrade/README.md#layout): the merge derives each upgrade's executor legs, in canonical order, from the objects the prepares deploy; other actions must be declared in the output.                                                                                                                                                                                                                                                                                                                                                                                      |
 
@@ -254,8 +218,7 @@ Security review should focus on the full authority and execution path:
 - Check the source and target release/version edges, proxy identities, implementation addresses,
   initialization behavior, and the code of each upgrade engine and L2 delegate/composer.
 - Check every declared external action, and verify the package with
-  `protocol-ops ecosystem verify-bootstrap` for the bootstrap or `verify-package` for recurring upgrades
-  before a vote.
+  `protocol-ops ecosystem verify-package` before a vote.
 - Check that the proposal carries every leg the upgrade needs, in canonical order: no contract ties
   the legs together. Review governance's recovery powers (`forward`, `replaceUpgradeTransition`,
   executor succession) alongside them.

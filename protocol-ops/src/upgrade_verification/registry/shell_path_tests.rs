@@ -149,6 +149,8 @@ impl ShellPathFixture {
         self.asserter
             .push_success(&Bytes::from(U256::from(OLD_VERSION).abi_encode()));
         self.address(FROM_RELEASE);
+        // The edge crosses into v0.36.0, but with no reviewed Bridgehub the CTM's chains cannot be
+        // enumerated: the gate reads nothing and fails alike in both runs.
         self.readiness_and_shell_reads();
     }
 

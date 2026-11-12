@@ -8,20 +8,15 @@
 //! each naming one write-once object, and everything executable is derived on-chain from those
 //! objects at execution time. What a reviewer checks is therefore the same for v36 as for v37 —
 //! the objects, and that the signed transaction invokes them in canonical order — so there is one
-//! verifier, not one per release.
-//!
-//! The single exception is the one-time BOOTSTRAP edge ([`bootstrap`]), and it is an exception
-//! because it happens exactly once: it is how a CTM that predates the registry model enters it.
-//! Every upgrade after it is an ordinary one ([`upgrade`]). Repairing a committed transition is not
-//! an upgrade but a CTM owner operation, and has its own path ([`replacement`]).
+//! verifier, not one per release ([`upgrade`]). Repairing a committed transition is not an upgrade
+//! but a CTM owner operation, and has its own path ([`replacement`]).
 //!
 //! # What it asks
 //!
 //!   1. Was every object PRODUCED by the reviewed code's constructor from its reviewed
 //!      arguments? ([`construction`]) — the manifest a write-once object serves (a
-//!      `ProxyUpgradeTransition`'s domain included), an executor's deploy-time record
-//!      ([`lifecycle`]), or the migration and core transition the bootstrap sequence was built
-//!      over. The question a runtime codehash cannot answer, and
+//!      `ProxyUpgradeTransition`'s domain included) or an executor's deploy-time record
+//!      ([`lifecycle`]). The question a runtime codehash cannot answer, and
 //!      the reason the chain no longer pretends to answer it. Every object a package names gets
 //!      this check, on every path.
 //!   2. Does every object, and every MEMBER an object names, run the code the reviewed build
@@ -75,14 +70,11 @@ use crate::upgrade_verification::contract_hashes::contract_hashes_path;
 use crate::upgrade_verification::report::VerificationResult;
 
 pub(crate) mod applied;
-pub(crate) mod bootstrap;
 pub(crate) mod construction;
 mod declared_calls;
 pub(crate) mod ecosystem_binding;
 pub(crate) mod external_backends;
 pub(crate) mod genesis;
-#[cfg(test)]
-mod keyed_l1;
 pub(crate) mod lifecycle;
 pub(crate) mod member_construction;
 pub(crate) mod members;
@@ -107,12 +99,11 @@ use views::CommittedUpgradeView;
 
 /// Verify a registry-driven upgrade package against the live L1 it targets.
 ///
-/// The package's own calldata decides which verifier runs — an upgrade, a bootstrap edge or a
-/// transition replacement (see [`RegistryPackage::load`]); a package that is none of them, or
-/// mixes them, is refused rather than verified as the nearest match.
+/// The package's own calldata decides which verifier runs — an upgrade or a transition
+/// replacement (see [`RegistryPackage::load`]); a package that is neither, or mixes them, is
+/// refused rather than verified as the nearest match.
 ///
-/// `expected_governance_owner` is the reviewed address the upgrade must be driven by. For a
-/// bootstrap that is the owner the CTM domain lands on permanently; otherwise it is the owner of
+/// `expected_governance_owner` is the reviewed address the upgrade must be driven by: the owner of
 /// the whole lifecycle. `executor_records` are files whose `[upgrade_executors]` records add to
 /// the package's own ([`records`]). `env` names the upgrade env whose permanent values hold the
 /// reviewed Bridgehub every package kind is bound to ([`ecosystem_binding`]) and the reviewed ZK
@@ -157,7 +148,6 @@ pub(crate) async fn verify(
     let mut package = RegistryPackage::load(ecosystem_toml)?;
     let held = match &mut package {
         RegistryPackage::Upgrade(p) => &mut p.executor_records,
-        RegistryPackage::Bootstrap(p) => &mut p.executor_records,
         RegistryPackage::Replacement(p) => &mut p.executor_records,
     };
     for path in executor_records {
@@ -194,31 +184,6 @@ pub(crate) async fn verify(
                 force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
             };
             upgrade::verify(
-                &provider,
-                &build,
-                &genesis,
-                &package,
-                expected_governance_owner,
-                &salts,
-                &reviewed_env,
-                result,
-            )
-            .await
-        }
-        RegistryPackage::Bootstrap(package) => {
-            let zk_token_asset_id = reviewed_zk_token_asset_id(
-                expected_zk_token_asset_id,
-                env_config.as_ref(),
-                result,
-            )?;
-            let salts = merge_salts(&package.create2_salts, extra_create2_salts);
-            let genesis = ReviewedGenesis {
-                genesis_root,
-                image: genesis_image,
-                force_deployments_data: package.force_deployments_data.clone(),
-                force_deployments: ExpectedForceDeployments::unread(zk_token_asset_id),
-            };
-            bootstrap::verify(
                 &provider,
                 &build,
                 &genesis,

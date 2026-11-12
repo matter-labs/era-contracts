@@ -119,8 +119,8 @@ the ServerNotifier to the `CTMUpgradeExecutor`. Governance is only nominated on 
 the deployment never accepts, so they stay owned by the deployer; anything needing the CTM,
 ServerNotifier or a ProxyAdmin owner must go through that executor's `forward`.
 `run-recurring-upgrade-test.ts` finds each executor through the custody it holds (the CTM's owner, the
-ecosystem ProxyAdmin's owner), has governance accept both nominations, and drives the hop, with no
-bootstrap, as one `Governance` bundle of the ordered legs `applyL1Upgrade` -> `applyCTMUpgrade`
+ecosystem ProxyAdmin's owner), has governance accept both nominations, and drives the hop as one
+`Governance` bundle of the ordered legs `applyL1Upgrade` -> `applyCTMUpgrade`
 (`applyInfrastructureUpgrade` between them when a CTM-domain proxy changes); a bundle whose last leg
 fails must first roll back completely. (`yarn test:upgrade`'s hops hold the merged package to the same
 contiguous leg run and assert that one transaction emitted every leg's domain event, in order.)

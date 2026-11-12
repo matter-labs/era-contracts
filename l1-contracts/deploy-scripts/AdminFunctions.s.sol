@@ -23,8 +23,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {GetDiamondCutData} from "./utils/GetDiamondCutData.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -244,7 +242,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         // ValidatorTimelock), each Ownable2Step transfer deferring its accept.
         Call[] memory acceptCalls = new Call[](chainIds.length * 2);
         uint256 acceptCount = 0;
-        // From the bootstrap edge on, the CTM domain and the ecosystem ProxyAdmin are owned by the
+        // From v35 on, the CTM domain and the ecosystem ProxyAdmin are owned by the
         // bound upgrade executors, which governance owns — the governed shape, not a drift.
         bool registryDriven = false;
 
@@ -317,7 +315,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     /// @dev Whether `_ctm` (a registry-era CTM, v35+) is owned by a `CTMUpgradeExecutor` bound to
     ///      it and owned by `_governance`: the CTM domain — the CTM and its ProxyAdmin — then lives
-    ///      where the bootstrap edge put it. A registry-era CTM owned by any other contract is a
+    ///      under its executor. A registry-era CTM owned by any other contract is a
     ///      misconfiguration this fails on (the executor getters revert on a stranger).
     function _isUnderBoundCTMExecutor(
         address _ctm,
@@ -415,10 +413,8 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     /// Execute zero-value calls against Ownable targets as their current
-    /// owners: the CTM-admin calls of a prepare (`[ctm_admin_calls]`), today
-    /// only the bootstrap's one-time ServerNotifier handover. Contract owners
-    /// without an explicit registry entry are treated as ChainAdmin-style
-    /// wrappers, the pre-v35 ServerNotifier ownership model.
+    /// owners. Contract owners without an explicit registry entry are treated
+    /// as ChainAdmin-style wrappers.
     function executeOwnableCallsWithWraps(bytes memory _callsToExecute, OwnerWrap[] memory _wraps) public {
         Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
         for (uint256 i = 0; i < calls.length; i++) {
@@ -435,9 +431,7 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// be the ChainAdmin as the *pending* owner (e.g. `acceptOwnership()` on a
     /// ServerNotifier / verifier whose ownership was transferred to the ChainAdmin
     /// but not yet accepted) — a plain owner-routed call would run as the stale
-    /// current owner and revert. It also mirrors exactly how the transaction
-    /// simulator encodes a `ctm_admin_calls` entry (one `ChainAdmin.multicall`),
-    /// keeping the prepare broadcast and the sim bundle byte-identical.
+    /// current owner and revert.
     function executeChainAdminMulticall(bytes memory _callsToExecute, address _chainAdmin) public {
         Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
         if (calls.length == 0) {
@@ -698,7 +692,6 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     function adminExecuteUpgrade(
-        bytes memory _diamondCut,
         address _adminAddr,
         address _accessControlRestriction,
         address _chainDiamondProxy
@@ -709,7 +702,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             _admin: _adminAddr,
             _accessControlRestriction: _accessControlRestriction,
             _target: _chainDiamondProxy,
-            _data: UpgradeChainCall.encodeFromEncodedCut(_chainDiamondProxy, oldProtocolVersion, _diamondCut),
+            _data: UpgradeChainCall.encode(_chainDiamondProxy, oldProtocolVersion),
             _value: 0
         });
     }
@@ -742,20 +735,8 @@ contract AdminFunctions is Script, IAdminFunctions {
             "AdminFunctions: new protocol version must be greater than current"
         );
 
-        // Pick the call the chain's CURRENT generation exposes FIRST, and only reconstruct a cut
-        // for the legacy edge that is handed one. A v35+ chain reads the cut from its own CTM, and
-        // a registry-driven edge leaves nothing to reconstruct from (`upgradeCutDataBlock` is
-        // deprecated and zero), so fetching one first would revert on the supported path.
-        bytes memory callData;
-        if (UpgradeChainCall.requiresCut(currentProtocolVersion)) {
-            Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
-                address(ctm),
-                currentProtocolVersion
-            );
-            callData = UpgradeChainCall.encode(_chainAddress, currentProtocolVersion, diamondCut);
-        } else {
-            callData = UpgradeChainCall.encodeWithoutCut(_chainAddress, currentProtocolVersion);
-        }
+        // The chain reads the cut its CTM committed for its current version; nothing is handed to it.
+        bytes memory callData = UpgradeChainCall.encode(_chainAddress, currentProtocolVersion);
 
         uint256 callCount = 1;
         if (_params.shouldSetDaValidatorPair) {

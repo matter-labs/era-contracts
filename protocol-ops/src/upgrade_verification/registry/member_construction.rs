@@ -143,7 +143,6 @@ pub(super) const CONSTRUCTOR_EXPECTATIONS: &[(&str, &[(&str, ArgSource)])] = &[
         &[("_plonkVerifier", SubVerifier(SubVerifierGetter::Plonk))],
     ),
     ("DefaultUpgrade", &[]),
-    ("BootstrapUpgrade", &[]),
     ("DefaultProxyUpgradeEngine", &[]),
     ("L2DefaultDelegateCalldataComposer", &[]),
     (

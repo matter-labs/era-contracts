@@ -54,11 +54,6 @@
             "internalType": "bytes32"
           },
           {
-            "name": "ecosystemUpgradeExecutor",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
             "name": "coreTransition",
             "type": "address",
             "internalType": "address"
