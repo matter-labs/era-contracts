@@ -1,4 +1,4 @@
-# Calldata Generation Workflows
+# GitHub Workflows
 
 Each `generate-*.yaml` workflow invokes a `protocol_ops` subcommand via
 `protocol-ops.sh --tag <docker-tag>` (the wrapper forwards the rest of the
@@ -48,3 +48,19 @@ transfers between machines.
 PR CI is split into a per-commit tier and a pre-merge tier (the committed-generated-artifact
 checks, skipped while a PR is a draft). That split, and the one-dispatch regen that clears it,
 are documented in [docs/ai-review/docs/ci-green.md](../../docs/ai-review/docs/ci-green.md).
+
+## AI security review
+
+`ai-security-review.yaml` reviews ready, human-authored, same-repository PRs targeting `draft/v0.36.0`.
+
+The caller automatically skips AI review for these same-repository branch synchronization PRs:
+
+- Source `draft/v0.35.0` targeting `draft/v0.36.0`.
+- Source branches starting with `sync/`, such as `sync/v35-into-v36`.
+
+Reserve `sync/` for release-branch synchronization. Use ordinary feature branch names for new work, including feature
+branches that contain merge commits. Sync branches with other names remain eligible for review.
+
+No label is required. The combined changes and conflict resolutions still need human review. Other CI checks
+continue to run. When adding a new release target, update the trigger's base-branch filter and the explicit branch
+pairs together.
