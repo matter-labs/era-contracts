@@ -39,7 +39,7 @@ yarn test:hardhat:interop --keep-chains
 
 ## Pregenerated Chain States
 
-Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, `v0.35.0`, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
+Tests load pregenerated Anvil snapshots from `chain-states/<stateVersion>/` by default (the current snapshot version, configured as `stateVersion` in `config/anvil-config.json`; the frozen upgrade-test fixtures are described in `chain-states/README.md`). This skips the full deployment and cuts test time from ~5 min to ~85s.
 
 The runner auto-detects pregenerated state by checking for `chain-states/<state-version>/addresses.json`. If found, it gunzips each `<chainId>.json.gz` dump and starts each Anvil process with `--load-state`. If not found (or `ANVIL_INTEROP_FRESH_DEPLOY=1`), it runs the full deployment.
 
@@ -63,21 +63,25 @@ snapshot built from other sources fails.
 
 ```bash
 cd l1-contracts/test/anvil-interop
-yarn test:upgrade             # the v35 bootstrap via protocol-ops on the frozen v0.34.0 states, then two registry-driven hops
+yarn test:upgrade             # the release's edge via protocol-ops on the frozen previous-release states, then a patch hop
 yarn test:upgrade-recurring   # the recurring registry-driven hop on the current-genesis states
 ```
 
-`yarn test:upgrade` reviews each package the way governance would before replaying it:
+It reviews each package the way governance would before replaying it:
 `protocol-ops ecosystem verify-package` against the live anvil L1, with `--env local`, the
-fixture's Bridgehub as `--expected-bridgehub` (`local` names another ecosystem's), the fixture's
-governance as `--expected-governance-owner` and, for the hops, the bootstrap package as
-`--executor-record`. It holds the deployments against the hashes of the build it deployed from
+fixture's Bridgehub as `--expected-bridgehub` and its ZK token's asset id as
+`--expected-zk-token-asset-id` (`local` names another ecosystem's), the fixture's governance as
+`--expected-governance-owner` and the fixture's executors' construction record as
+`--executor-record`: the states keep the deployment's contracts but not its outputs, so the harness
+writes that record from the deployment's config, and the review re-derives each executor from it.
+It holds the deployments against the hashes of the build it deployed from
 (`scripts/calculate-hashes.ts --output`, passed as `--contract-hashes`), because the committed
-`AllContractsHashes.json` is regenerated last. Beyond a report without errors, the harness requires
-every construction record the package carries to be consulted (each deployment of these prepares is
-a member the package installs) and, for the bootstrap, the freeze-authority check. Every prepare
-deploys under a salt of its own, as production rotates its salt per release, so the recurring hop's
-`L1MessageRoot` row really applies.
+`AllContractsHashes.json` is regenerated last. The report's only error may be the fixture's stub ZiSK
+Plonk backend, and it must reach the verifier's closing summary: a review that aborts or is killed
+fails the run. The harness also requires every construction record the package carries to be
+consulted (each deployment of these prepares is a member the package installs). Every prepare
+deploys under a salt of its own, as production rotates its salt per release, so a row that replaces
+an implementation really applies.
 
 The pipeline caps each replayed L1 prepare/governance transaction at EIP-7825's 16,777,216 gas
 limit and logs its phase, bundle, index, target, hash and gas usage. Per-chain L1 upgrade calls
@@ -311,8 +315,8 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 ```
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
-├── run-upgrade-test.ts            # Default upgrade (the v35 bootstrap) + the patch and v36 hops, via protocol-ops
-├── run-recurring-upgrade-test.ts  # Registry-driven v35 -> v36 hop through the executors the deployment created
+├── run-upgrade-test.ts            # The release upgrade (previous release -> current) + a patch hop, via protocol-ops
+├── run-recurring-upgrade-test.ts  # Registry-driven minor hop (current -> next) through the executors the deployment created
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
@@ -322,8 +326,8 @@ test/anvil-interop/
 │   ├── permanent-values.toml      # Immutable protocol values
 │   └── chain-{10,11,12,13,14}.toml # Per-chain deployment params (generated)
 ├── chain-states/
-│   ├── v0.34.0/                   # FROZEN previous-release snapshots (`upgradeSourceStateVersion`)
-│   └── v0.35.0/                   # Current-source Anvil state snapshots (`stateVersion`, regenerated)
+│   ├── <upgradeSourceStateVersion>/ # FROZEN previous-release snapshots
+│   └── <stateVersion>/            # Current-source Anvil state snapshots (regenerated)
 │       ├── 31337.json.gz          # L1 state dump (gzip; kept out of diffs)
 │       ├── {10,11,12,13,14}.json.gz # L2 chain state dumps (gzip)
 │       └── addresses.json         # All contract addresses + test tokens
@@ -413,7 +417,7 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **Empty settled batches**: no server runs on the anvil chains, so the fixture chains never settled a batch and still carry their genesis upgrade tx, which blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before upgrading, the upgrade runners commit, prove and execute one empty batch on each target chain through the CTM's `ValidatorTimelock` (`src/helpers/batch-settlement.ts`), proven with the testnet verifier's mock proof and committed against a `ValidiumL1DAValidator` pair the harness sets, as the fixture chains have none. The executed batch clears the upgrade tx hash, as a server's batch carrying it would. The bootstrap scenario settles one again before each follow-up hop that must not inherit the previous hop's pending L2 upgrade.
+- **Empty settled batches**: no server runs on the anvil chains, so the fixture chains never settled a batch and still carry their genesis upgrade tx, which blocks a new upgrade with `PreviousUpgradeNotFinalized`. Before upgrading, the upgrade runners commit, prove and execute one empty batch on each target chain through the CTM's `ValidatorTimelock` (`src/helpers/batch-settlement.ts`), proven with the testnet verifier's mock proof and committed against a `ValidiumL1DAValidator` pair the harness sets, as the fixture chains have none. The executed batch clears the upgrade tx hash, as a server's batch carrying it would. `yarn test:upgrade` settles one again before each follow-up hop that must not inherit the previous hop's pending L2 upgrade.
 - **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
 - **Temporary upgrade inputs**: the upgrade harness copies the scenario's config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs-<scenario label>/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 

@@ -1926,7 +1926,7 @@ mod tests {
             DeployBundleMetadata, L1Provenance, Toolchain, BUNDLE_METADATA_FILE,
             DEPLOY_BUNDLE_SCHEMA, MANIFEST_FILE,
         };
-        use crate::common::env_config::DEFAULT_UPGRADE;
+        use crate::common::env_config::default_upgrade;
 
         let repo = tempfile::tempdir().unwrap();
         let git = |args: &[&str]| {
@@ -1974,7 +1974,7 @@ mod tests {
         let seal = |contracts_commit: String| {
             let metadata = DeployBundleMetadata {
                 schema: DEPLOY_BUNDLE_SCHEMA.to_string(),
-                upgrade: DEFAULT_UPGRADE.to_string(),
+                upgrade: default_upgrade().unwrap().to_string(),
                 env: "stage".to_string(),
                 contracts_commit,
                 contracts_worktree_dirty: false,

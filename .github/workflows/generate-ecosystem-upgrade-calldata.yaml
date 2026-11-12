@@ -2,8 +2,9 @@ name: "Ecosystem Upgrade Calldata: Regenerate + Verify"
 
 # Generic over the `upgrade` input: `upgrade-envs/<upgrade>/upgrade.toml` says how that upgrade is
 # prepared and checked (protocol-ops/src/common/upgrade_descriptor.rs). The notes below describe
-# the default, v0.35.0-upgrade-system (`upgrade-prepare-all` + `verify-bootstrap`, the registry
-# verifier; only the release's own upgrade directory can use `prepare-all`).
+# the default, the current release: the one `upgrade-envs/v<major>.<minor>.<patch>-<name>/` of the
+# version in configs/genesis/zksync-os/latest.json (`upgrade-prepare-all` + `verify-bootstrap`,
+# the registry verifier; only the release's own upgrade directory can use `prepare-all`).
 
 # ═════════════════════════════════════════════════════════════════════════════
 # RUNBOOK — from "nothing" to "this chain is upgraded"
@@ -257,9 +258,9 @@ on:
   workflow_dispatch:
     inputs:
       upgrade:
-        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. v0.35.0-upgrade-system is the release's prepare-all + verify-bootstrap flow; a forge-script upgrade runs its declared script and checks."
+        description: "Upgrade to generate: a directory under l1-contracts/upgrade-envs/ with an upgrade.toml. BLANK = the current release (the upgrade-envs/v<major>.<minor>.<patch>-* dir of configs/genesis/zksync-os/latest.json's version), the release's prepare-all + verify-bootstrap flow; a forge-script upgrade runs its declared script and checks."
         required: false
-        default: "v0.35.0-upgrade-system"
+        default: ""
         type: string
       environment:
         description: "Environment = basename of the config pair upgrade-envs/permanent-values/<env>.toml + upgrade-envs/<upgrade>/<env>.toml. Today: stage, testnet, mainnet. The L1 to fork is chosen from that env's l1_chain_id (1 → mainnet, 11155111 → Sepolia)."
@@ -293,8 +294,6 @@ jobs:
   regen:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    env:
-      UPGRADE: ${{ inputs.upgrade }}
 
     steps:
       - name: Checkout the repository
@@ -350,6 +349,7 @@ jobs:
           ENVIRONMENT: ${{ inputs.environment }}
           # Referenced as shell vars (not `${{ }}`-interpolated into the script
           # body) to avoid shell-injection and metacharacter issues.
+          INPUT_UPGRADE: ${{ inputs.upgrade }}
           INPUT_RPC: ${{ inputs.l1_rpc_url }}
           INPUT_DEPLOYER: ${{ inputs.deployer_address }}
           RPC_SEPOLIA: ${{ secrets.L1_RPC_URL_SEPOLIA }}
@@ -359,12 +359,21 @@ jobs:
           GW_RPC_URL: ${{ secrets.GW_RPC_URL }}
         run: |
           set -euo pipefail
-          # The env is just a config-pair basename; fail early and legibly if the
-          # pair isn't committed, before spending a fork on it.
-          # The upgrade is a directory name under upgrade-envs/; never a path.
-          if ! printf '%s' "$UPGRADE" | grep -qE '^[A-Za-z0-9._-]+$' || [ "$UPGRADE" = "." ] || [ "$UPGRADE" = ".." ]; then
+          # BLANK = the current release, the upgrade protocol-ops defaults to (scripts/current-release.ts).
+          UPGRADE="$INPUT_UPGRADE"
+          if [ -z "$UPGRADE" ]; then
+            UPGRADE="$(yarn -s ts-node scripts/current-release.ts)" || {
+              echo "::error::cannot resolve the current release (see the error above)"; exit 1
+            }
+          fi
+          # The upgrade is a directory name under upgrade-envs/; never a path. Matched as a whole
+          # string (no newline either), since it goes into $GITHUB_ENV.
+          if ! [[ "$UPGRADE" =~ ^[A-Za-z0-9._-]+$ ]] || [ "$UPGRADE" = "." ] || [ "$UPGRADE" = ".." ]; then
             echo "::error::invalid upgrade '$UPGRADE': expected a directory name under upgrade-envs/"; exit 1
           fi
+          echo "UPGRADE=$UPGRADE" >> "$GITHUB_ENV"
+          # The env is just a config-pair basename; fail early and legibly if the
+          # pair isn't committed, before spending a fork on it.
           PV="l1-contracts/upgrade-envs/permanent-values/${ENVIRONMENT}.toml"
           UPGRADE_TOML="l1-contracts/upgrade-envs/${UPGRADE}/upgrade.toml"
           ENV_INPUT="l1-contracts/upgrade-envs/${UPGRADE}/${ENVIRONMENT}.toml"
@@ -485,11 +494,11 @@ jobs:
         with:
           name: ecosystem-upgrade-calldata-${{ inputs.environment }}
           path: |
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/ecosystem.toml
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/sim-inputs/
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/transaction-simulator.json
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/EXECUTE.md
-            l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/emergency-upgrade-board.json
+            l1-contracts/upgrade-envs/${{ env.UPGRADE }}/output/${{ inputs.environment }}/ecosystem.toml
+            l1-contracts/upgrade-envs/${{ env.UPGRADE }}/output/${{ inputs.environment }}/sim-inputs/
+            l1-contracts/upgrade-envs/${{ env.UPGRADE }}/output/${{ inputs.environment }}/transaction-simulator.json
+            l1-contracts/upgrade-envs/${{ env.UPGRADE }}/output/${{ inputs.environment }}/EXECUTE.md
+            l1-contracts/upgrade-envs/${{ env.UPGRADE }}/output/${{ inputs.environment }}/emergency-upgrade-board.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -511,7 +520,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ecosystem-upgrade-deploy-inputs-${{ inputs.environment }}
-          path: l1-contracts/upgrade-envs/${{ inputs.upgrade }}/output/${{ inputs.environment }}/deploy-bundle/
+          path: l1-contracts/upgrade-envs/${{ env.UPGRADE }}/output/${{ inputs.environment }}/deploy-bundle/
           if-no-files-found: warn
           # 90 days, matching the deploy workflow's result artifact: this is the
           # operational record of which bytecode was deployed, and it cannot be

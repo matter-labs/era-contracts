@@ -41,7 +41,7 @@ use serde::Deserialize;
 use crate::commands::ecosystem::bundle::{
     contract_source_pathspecs, verify_bundle_integrity, DeployBundleMetadata, MANIFEST_FILE,
 };
-use crate::common::env_config::{EnvConfig, DEFAULT_UPGRADE};
+use crate::common::env_config::{default_upgrade, EnvConfig};
 use crate::common::ethereum::get_provider;
 use crate::common::forge::scripts::member_deployments::MemberDeployments;
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
@@ -1507,10 +1507,10 @@ fn reviewed_build_of(repository_root: &Path) -> anyhow::Result<ReviewedBuild> {
 fn upgrade_env(metadata: &DeployBundleMetadata) -> anyhow::Result<EnvConfig> {
     validate_upgrade_name(&metadata.upgrade)?;
     let descriptor = UpgradeDescriptor::load(&metadata.upgrade)?;
+    let current = default_upgrade()?;
     anyhow::ensure!(
-        !matches!(descriptor, UpgradeDescriptor::PrepareAll {})
-            || metadata.upgrade == DEFAULT_UPGRADE,
-        "the bundle was generated for {}, but `prepare-all` here is the {DEFAULT_UPGRADE} flow: \
+        !matches!(descriptor, UpgradeDescriptor::PrepareAll {}) || metadata.upgrade == current,
+        "the bundle was generated for {}, but `prepare-all` here is the {current} flow: \
          check it with the protocol_ops of the line that generated it",
         metadata.upgrade
     );
@@ -2653,7 +2653,7 @@ data = "{nominate}"
         git(&["submodule", "init"]);
         let mut metadata = DeployBundleMetadata {
             schema: String::new(),
-            upgrade: DEFAULT_UPGRADE.to_string(),
+            upgrade: default_upgrade().unwrap().to_string(),
             env: "stage".to_string(),
             contracts_commit: git(&["rev-parse", "HEAD"]),
             contracts_worktree_dirty: false,

@@ -26,6 +26,7 @@ fs_permissions = [
     { access = "read", path = "./out" },
     { access = "read", path = "../configs/genesis/" },
     { access = "read", path = "../configs/" },
+    { access = "read", path = "../AllContractsHashes.json" },
 ]
 # Only filters what `forge build` prints; the enforced policy is `solc-warnings.json`.
 ignored_error_codes = ["missing-receive-ether", "code-size", "init-code-size"]
