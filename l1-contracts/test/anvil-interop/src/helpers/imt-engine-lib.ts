@@ -14,9 +14,20 @@ export const ATOMIC_COMMIT_LEAF_TAG: string = utils
   .keccak256(utils.toUtf8Bytes("AtomicInterop.commit.v1"))
   .slice(0, 10);
 
-/** The current AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION in IAtomicInterop.sol (the
- *  only version accepted today; a bump adds the new version alongside the old on all manager paths). */
+/** The base AtomicFlowPreimage.version — mirrors ATOMIC_FLOW_PREIMAGE_VERSION in IAtomicInterop.sol. */
 export const ATOMIC_FLOW_PREIMAGE_VERSION = "0x01";
+
+/** The version of a single-leg flow that can expire — mirrors ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION.
+ *  See {protocol-docs/atomicity/expiry.md}. */
+export const ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION = "0x02";
+
+/** Mirrors ATOMIC_FLOW_EXPIRY_DELAY (1 day). */
+export const ATOMIC_FLOW_EXPIRY_DELAY = 86_400;
+
+/** Domain tag for expiry values: bytes4(keccak256("AtomicInterop.expiry.v1")). */
+export const ATOMIC_EXPIRY_LEAF_TAG: string = utils
+  .keccak256(utils.toUtf8Bytes("AtomicInterop.expiry.v1"))
+  .slice(0, 10);
 
 /** Indexed-tree leaf, fields as uint256 decimal strings, in the on-chain field order. */
 export interface IMTLeaf {
@@ -49,6 +60,13 @@ export interface ImtProof {
 export function commitValue(flowId: string, bundleHash: string): string {
   return utils.keccak256(
     utils.defaultAbiCoder.encode(["bytes4", "bytes32", "bytes32"], [ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash])
+  );
+}
+
+/** The value a destination inserts into its IMT when it expires a leg, as a 0x bytes32. */
+export function expiryValue(flowId: string, bundleHash: string): string {
+  return utils.keccak256(
+    utils.defaultAbiCoder.encode(["bytes4", "bytes32", "bytes32"], [ATOMIC_EXPIRY_LEAF_TAG, flowId, bundleHash])
   );
 }
 

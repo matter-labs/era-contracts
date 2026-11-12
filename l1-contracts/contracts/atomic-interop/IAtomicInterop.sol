@@ -81,14 +81,26 @@ struct AtomicFinalityProof {
 /// `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, bundleHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));
 
-/// @dev The current {AtomicFlowPreimage.version} (same versioning convention as {INTEROP_BUNDLE_VERSION}
-/// / {INTEROP_CALL_VERSION}), and today the only accepted one. A new value is introduced whenever the
-/// {AtomicFlowPreimage} field set or its canonicalization changes; each version is validated under its
+/// @dev The base {AtomicFlowPreimage.version} (same versioning convention as {INTEROP_BUNDLE_VERSION}
+/// / {INTEROP_CALL_VERSION}). A new value is introduced whenever the {AtomicFlowPreimage} field set, its
+/// canonicalization or the rules a flow is validated under change; each version is validated under its
 /// own rules, so a preimage of one version can never be accepted — or hash to the same `flowId` — under
 /// the rules of another. Introducing a new version does not retire the old one: the {AtomicFlowManager}
 /// accepts both on every path (append/finalize/refund) so in-flight prior-version flows stay finalizable
 /// and refundable.
 bytes1 constant ATOMIC_FLOW_PREIMAGE_VERSION = 0x01;
+
+/// @dev The {AtomicFlowPreimage.version} of a single-leg flow that opts into expiry: same field set as
+/// {ATOMIC_FLOW_PREIMAGE_VERSION}, exactly one leg. See {protocol-docs/atomicity/expiry.md}.
+bytes1 constant ATOMIC_FLOW_EXPIRABLE_PREIMAGE_VERSION = 0x02;
+
+/// @dev Domain tag of the value a destination inserts into its IMT when it expires a leg:
+/// `expiryValue = uint256(keccak256(abi.encode(ATOMIC_EXPIRY_LEAF_TAG, flowId, bundleHash)))`.
+bytes4 constant ATOMIC_EXPIRY_LEAF_TAG = bytes4(keccak256("AtomicInterop.expiry.v1"));
+
+/// @dev L1 time after an expirable flow's deadline before its leg can expire.
+/// See {protocol-docs/atomicity/expiry.md#the-delay}.
+uint256 constant ATOMIC_FLOW_EXPIRY_DELAY = 1 days;
 
 /// @dev The maximum number of legs in an atomic flow. Committing a leg is cheap (one IMT insert), but
 /// finalizing ANY leg requires verifying one full inclusion proof — a settlement-layer Merkle proof

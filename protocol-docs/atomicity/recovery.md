@@ -6,7 +6,8 @@ two-call, permissionless sequence on each committed leg's source chain, driven b
 
 The proof that authorizes the unwind — that a leg is genuinely absent past the deadline and the flow can
 never finalize — is specified in {protocol-docs/atomicity/proofs.md#timeout}. This page covers what
-happens _after_ the proof checks out.
+happens _after_ the proof checks out. An expired single-leg flow reaches the same `claimRefund` through a different
+proof ({protocol-docs/atomicity/expiry.md#refund-on-the-source}).
 
 ## `authorizeRefund` → `claimRefund`
 

@@ -21,6 +21,7 @@ import {
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_COMMITMENT_TREE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
@@ -957,4 +958,41 @@ export async function deployRevertingContract(
   const receipt = await tx.wait();
   if (!receipt.contractAddress) throw new Error("Failed to deploy reverting contract");
   return receipt.contractAddress;
+}
+
+/**
+ * Ensures the settlement interop root for `settlementBlock` exists with the requested timestamp.
+ * If an entry already exists with that timestamp, the helper leaves it unchanged. A different
+ * timestamp is an error because settlement interop roots are write-once.
+ */
+export async function ensureSettlementInteropRoot(
+  provider: ethers.providers.JsonRpcProvider,
+  settlementBlock: number,
+  timestamp: number
+): Promise<void> {
+  const storage = new Contract(L2_INTEROP_ROOT_STORAGE_ADDR, getAbi("L2InteropRootStorage"), provider);
+  const existing: { root: string; timestamp: BigNumber } = await storage.interopRoots(
+    DEFAULT_SL_CHAIN_ID,
+    settlementBlock
+  );
+  if (existing.root !== ethers.constants.HashZero) {
+    const storedTs: BigNumber = existing.timestamp;
+    if (!storedTs.eq(timestamp)) {
+      throw new Error(
+        `settlement interop root (${DEFAULT_SL_CHAIN_ID}, ${settlementBlock}) already has timestamp ${storedTs}, wanted ${timestamp}`
+      );
+    }
+    return;
+  }
+  await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
+    await (
+      await storage.connect(signer).addSingleInteropRoot({
+        chainId: DEFAULT_SL_CHAIN_ID,
+        blockOrBatchNumber: settlementBlock,
+        timestamp,
+        sides: [ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`settlement-interop-root-${settlementBlock}`))],
+      })
+    ).wait();
+    expect((await storage.interopRoots(DEFAULT_SL_CHAIN_ID, settlementBlock)).timestamp.toNumber()).to.equal(timestamp);
+  });
 }
