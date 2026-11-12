@@ -246,7 +246,8 @@ function main(): void {
   } else if (!fs.existsSync(frozenSourceDir)) {
     throw new Error(`chain-states/${anvilConfig.stateVersion} is missing: it becomes the upgrade source`);
   }
-  // `ReleaseDeclaredChangesTest` compares the next release's hashes with it.
+  // `ReleaseDeclaredChangesTest` compares the next release's hashes with it, and the upgrade tests locate the
+  // release's EIP-7702 checker from it.
   write(
     join(frozenSourceDir, "AllContractsHashes.json"),
     previousReleaseRef

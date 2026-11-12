@@ -61,6 +61,8 @@ const contractsRootDir = path.resolve(l1ContractsDir, "..");
 
 // What `verify-package` prints for the outcomes the harness holds it to.
 const UNCONSULTED_RECORDS_REPORT = "recorded deployment(s) no check of this review consulted";
+// `VerificationResult`'s summary of a review with errors, printed only once the whole review ran.
+const FAILED_REVIEW_SUMMARY = /^ERROR errors: (\d+), warnings: \d+ - result:/m;
 // Upper bound on a verifier report the harness reads back.
 const PROTOCOL_OPS_REPORT_MAX_BYTES = 64 * 1024 * 1024;
 // The `verify-package` errors an anvil fixture causes by construction, and nothing else may: its ZiSK side runs a
@@ -177,7 +179,7 @@ export async function runPipelineUpgradeScenario(scenario: PipelineUpgradeScenar
 
     // Each hop departs from the state the previous one left, and carries the EIP-7702 checker
     // forward the way a production env file does.
-    let eip7702Checker: string | undefined = await fixtureEip7702Checker(l1Provider, deploymentSalt);
+    let eip7702Checker: string | undefined = await fixtureEip7702Checker(l1Provider, deploymentSalt, stateDir);
     for (const hop of scenario.hops) {
       eip7702Checker = await runRecurringHop(scenario, hop, {
         l1Provider,
@@ -241,18 +243,25 @@ async function writeFixtureExecutorRecords(
   fs.writeFileSync(outputPath, record.join("\n"));
 }
 
-/** The CTM's EIP-7702 checker: argument-less, so CREATE2 placed it from the deployment's salt alone. */
-async function fixtureEip7702Checker(provider: ethers.providers.JsonRpcProvider, salt: string): Promise<string> {
-  const checker = ethers.utils.getCreate2Address(
-    DETERMINISTIC_CREATE2_FACTORY_ADDR,
-    salt,
-    ethers.utils.keccak256(getCreationBytecode("EIP7702Checker"))
-  );
+/**
+ * The CTM's EIP-7702 checker: argument-less, so CREATE2 placed it from the deployment's salt and the
+ * release's creation code alone. That code is the release's build, frozen next to its states, not
+ * this one: a later release may change the checker.
+ */
+async function fixtureEip7702Checker(
+  provider: ethers.providers.JsonRpcProvider,
+  salt: string,
+  stateDir: string
+): Promise<string> {
+  const hashesPath = path.join(stateDir, "AllContractsHashes.json");
+  const hashes: { contractName: string; evmBytecodeHash: string }[] = JSON.parse(fs.readFileSync(hashesPath, "utf8"));
+  const release = hashes.find((h) => h.contractName === "l1-contracts/EIP7702Checker");
+  if (!release) {
+    throw new Error(`EIP7702Checker is not in ${hashesPath}`);
+  }
+  const checker = ethers.utils.getCreate2Address(DETERMINISTIC_CREATE2_FACTORY_ADDR, salt, release.evmBytecodeHash);
   if ((await provider.getCode(checker)) === "0x") {
-    throw new Error(
-      `no EIP-7702 checker at ${checker}, where the fixture's deployment placed it: this build's ` +
-        "creation code must be the one the states were built with"
-    );
+    throw new Error(`no EIP-7702 checker at ${checker}, where the fixture's deployment placed it`);
   }
   return checker;
 }
@@ -548,10 +557,10 @@ async function runRecurringHop(
     const newRelease: string = await transition.newRelease();
     // Read off the OBJECT rather than the prepare's logs: this is what governance and the chains
     // read, and it is the only evidence that unchanged contracts were not silently redeployed.
+    const diff: Record<string, unknown> = await transition.releaseDiff();
+    const changed = Object.keys(diff).filter((key) => Number.isNaN(Number(key)) && diff[key] === true);
     if (hop.expectsReusedReleaseMembers) {
       const fromRelease: string = await transition.fromRelease();
-      const diff: Record<string, unknown> = await transition.releaseDiff();
-      const changed = Object.keys(diff).filter((key) => Number.isNaN(Number(key)) && diff[key] === true);
       if (changed.length !== 0) {
         const difference = await describeReleaseDifference(l1Provider, fromRelease, newRelease);
         throw new Error(
@@ -570,8 +579,19 @@ async function runRecurringHop(
       }
       console.log("  ✓ identical routing on both edges derived an empty facet delta");
     }
+    if (hop.expectsEmptyFacetDelta) {
+      if (changed.length === 0) {
+        throw new Error(`hop ${hop.label} replaces a non-facet release member, but releaseDiff names none`);
+      }
+      console.log(`  ✓ the new release replaces ${changed.join(", ")}`);
+    }
+    const releaseVerifier: string = await new ethers.Contract(newRelease, getAbi("CTMRelease"), l1Provider).verifier();
     for (const chain of upgradeChainAddresses) {
       const getters = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), l1Provider);
+      const verifier: string = await getters.getVerifier();
+      if (verifier !== releaseVerifier) {
+        throw new Error(`chain ${chain.chainId}: runs verifier ${verifier}, not the new release's ${releaseVerifier}`);
+      }
       const recorded: string = await getters.getL2SystemContractsUpgradeTxHash();
       if (hop.keepsPendingL2Upgrade) {
         // The whole point of a patch edge: it may not carry an L2 upgrade, and it may not disturb
@@ -758,9 +778,9 @@ function writeReviewedBuildHashes(outputPath: string): void {
  * before governance signs: against the live L1, the reviewed governance owner and the `local` env's
  * permanent values. The fixture's Bridgehub and ZK token are not the ones `local` names, so they are the
  * reviewer's `--expected-bridgehub` and `--expected-zk-token-asset-id`. Throws when the verifier reports
- * an error other than the ones the fixture causes ({@link FIXTURE_REVIEW_ERRORS}), or a construction
- * record no check consulted (every deployment of these prepares is a member the package installs, so an
- * unconsulted one means a check was skipped).
+ * an error other than the ones the fixture causes ({@link FIXTURE_REVIEW_ERRORS}), stops before the end of
+ * its review, or leaves a construction record no check consulted (every deployment of these prepares is a
+ * member the package installs, so an unconsulted one means a check was skipped).
  */
 function verifyPackageAsReviewed(params: {
   rpcUrl: string;
@@ -796,12 +816,20 @@ function verifyPackageAsReviewed(params: {
     throw new Error("verify-package left construction records unconsulted (see its report above)");
   }
   // eslint-disable-next-line no-control-regex
-  const errors = report.replace(/\x1b\[[0-9;]*m/g, "").match(/^\[ERROR\]:\s*.*$/gm) ?? [];
+  const clean = report.replace(/\x1b\[[0-9;]*m/g, "");
+  const errors = clean.match(/^\[ERROR\]:\s*.*$/gm) ?? [];
   const unexpected = errors
     .map((line) => line.replace(/^\[ERROR\]:\s*/, ""))
     .filter((error) => !FIXTURE_REVIEW_ERRORS.some((pattern) => pattern.test(error)));
-  if (unexpected.length !== 0 || (status !== 0 && errors.length === 0)) {
+  if (unexpected.length !== 0) {
     throw new Error(`verify-package failed (see its report above):\n${unexpected.join("\n")}`);
+  }
+  // A failed exit without the summary, or with a count other than the errors above, is a review that
+  // aborted or was killed partway through.
+  const summary = clean.match(FAILED_REVIEW_SUMMARY);
+  const completed = status === 0 || (status === 1 && summary !== null && Number(summary[1]) === errors.length);
+  if (!completed) {
+    throw new Error(`verify-package did not finish its review (exit status ${status}; see its report above)`);
   }
   if (errors.length !== 0) {
     console.log(`  ℹ ${errors.length} verify-package error(s) are the anvil fixture's own (ZiSK stub)`);

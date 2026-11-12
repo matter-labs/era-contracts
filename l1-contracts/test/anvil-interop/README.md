@@ -76,10 +76,12 @@ fixture's Bridgehub as `--expected-bridgehub` and its ZK token's asset id as
 writes that record from the deployment's config, and the review re-derives each executor from it.
 It holds the deployments against the hashes of the build it deployed from
 (`scripts/calculate-hashes.ts --output`, passed as `--contract-hashes`), because the committed
-`AllContractsHashes.json` is regenerated last. Beyond a report without errors, the harness requires
-every construction record the package carries to be consulted (each deployment of these prepares is
-a member the package installs). Every prepare deploys under a salt of its own, as production
-rotates its salt per release, so a row that replaces an implementation really applies.
+`AllContractsHashes.json` is regenerated last. The report's only error may be the fixture's stub ZiSK
+Plonk backend, and it must reach the verifier's closing summary: a review that aborts or is killed
+fails the run. The harness also requires every construction record the package carries to be
+consulted (each deployment of these prepares is a member the package installs). Every prepare
+deploys under a salt of its own, as production rotates its salt per release, so a row that replaces
+an implementation really applies.
 
 The pipeline caps each replayed L1 prepare/governance transaction at EIP-7825's 16,777,216 gas
 limit and logs its phase, bundle, index, target, hash and gas usage. Per-chain L1 upgrade calls
