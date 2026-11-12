@@ -9,7 +9,8 @@ Two kinds of directories live here, with OPPOSITE maintenance rules. Both names 
   loads its L1 state) and MUST NEVER be regenerated: contract changes on this branch must not touch it,
   exactly like the real chains it stands in for. Its `AllContractsHashes.json` is that release's:
   `ReleaseDeclaredChangesTest` requires every ecosystem
-  implementation or release member whose hash has changed since then to be declared.
+  implementation or release member the release's prepare checks for reuse, if its creation code has
+  changed since then (a constructor-only change included), to be declared.
 
 - **`stateVersion` — current-genesis states.** Generated from THIS branch's sources by
   `setup-and-dump-state.ts`, consumed by the interop tests and `run-recurring-upgrade-test.ts`,

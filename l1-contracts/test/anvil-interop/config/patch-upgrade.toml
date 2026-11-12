@@ -1,4 +1,4 @@
-# Upgrade input for the same-minor PATCH hop: a `DiamondInit` replacement published as a new release
+# Upgrade input for the same-minor PATCH hop: a verifier replacement published as a new release
 # that copies the departing one except that member. A patch may change the release but may not
 # carry an L2 upgrade, and it deliberately does not require an earlier L2 upgrade to be finalized
 # first. Substituted by the harness like release-upgrade.toml; only

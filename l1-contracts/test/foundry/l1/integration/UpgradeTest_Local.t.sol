@@ -13,11 +13,10 @@ import {
 import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultChainUpgrade.s.sol";
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {LiveL2Table} from "./UpgradeTestFresh_Local.t.sol";
-import {PreviousReleaseFixture} from "./utils/PreviousReleaseFixture.sol";
+import {ContractHash, PreviousReleaseFixture} from "./utils/PreviousReleaseFixture.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {Test} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -39,6 +38,18 @@ import {ContractsBytecodesLib} from "../../../../deploy-scripts/utils/bytecode/C
 /// @notice The release's CTM upgrade over the previous release's L2 table, read off the live release: this fixture
 ///         is L1-only, and rebuilding the table from every L2 artifact runs out of memory here.
 contract CTMUpgradeForLocalTest is CTMUpgrade_v36 {
+    /// @dev Every release member the prepare checked for reuse, for {ReleaseDeclaredChangesTest}.
+    string[] internal reuseCheckedMembers;
+
+    function reuseChecked() external view returns (string[] memory) {
+        return reuseCheckedMembers;
+    }
+
+    function _canReuseReleaseMember(string memory _name, address _live) internal override returns (bool) {
+        reuseCheckedMembers.push(_name);
+        return super._canReuseReleaseMember(_name, _live);
+    }
+
     function getL2BytecodeInfoTable() internal view override returns (bytes[] memory) {
         return LiveL2Table.table(newConfig.ctm);
     }
@@ -60,6 +71,18 @@ contract CTMUpgradeForLocalTest is CTMUpgrade_v36 {
 ///         proof verification). No release build matches them, so the edge replaces them like declared changes. The
 ///         anvil upgrade test's `CoreUpgradeForTests_v36` does the same.
 contract CoreUpgradeForLocalTest is CoreUpgrade_v36 {
+    /// @dev Every ecosystem implementation the prepare checked for reuse, for {ReleaseDeclaredChangesTest}.
+    string[] internal reuseCheckedImplementations;
+
+    function reuseChecked() external view returns (string[] memory) {
+        return reuseCheckedImplementations;
+    }
+
+    function _canReuseEcosystemImplementation(string memory _name, address _live) internal override returns (bool) {
+        reuseCheckedImplementations.push(_name);
+        return super._canReuseEcosystemImplementation(_name, _live);
+    }
+
     function changedEcosystemImplementations() internal view override returns (string[] memory names) {
         string[] memory declared = super.changedEcosystemImplementations();
         names = new string[](declared.length + 2);
@@ -189,7 +212,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
         assertEq(
             DeployScriptUtils.canonicalCreate2Address(
                 ctmSalt,
-                vm.getCode("CTMTransition.sol:CTMTransition"),
+                ContractsBytecodesLib.getCreationCodeEVM("CTMTransition"),
                 abi.encode(transition.getManifest())
             ),
             address(transition),
@@ -202,7 +225,7 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
             assertEq(
                 DeployScriptUtils.canonicalCreate2Address(
                     coreSalt,
-                    vm.getCode("ProxyUpgradeTransition.sol:ProxyUpgradeTransition"),
+                    ContractsBytecodesLib.getCreationCodeEVM("ProxyUpgradeTransition"),
                     abi.encode(IProxyUpgradeTransition(coreTransition).getManifest())
                 ),
                 coreTransition,
@@ -419,18 +442,15 @@ contract CTMUpgradeDeclaredChanges is CTMUpgrade_v36 {
     }
 }
 
-/// @notice A contract's runtime-code hash as `AllContractsHashes.json` records it.
-struct ContractHash {
-    string contractName;
-    bytes32 evmDeployedBytecodeHash;
-}
-
-/// @notice Every ecosystem implementation and release member whose production build differs from the previous
-///         release's is one the release declares as changed. The production prepare compares live code with that
-///         build and refuses to replace what the release does not declare; this holds every such contract to it at
-///         once, from the previous release's `AllContractsHashes.json` (frozen next to its chain states by
-///         `yarn new-release`).
-contract ReleaseDeclaredChangesTest is Test {
+/// @notice Every ecosystem implementation and release member the release's prepare checks for reuse over the
+///         previous release's fixture, if its production build differs from the previous release's, is one the
+///         release declares as changed. The production prepare compares live code with that build and refuses to
+///         replace what the release does not declare; this holds every such contract to it at once, from the
+///         previous release's `AllContractsHashes.json` (frozen next to its chain states by `yarn new-release`).
+/// @dev It compares creation code, not runtime code: the prepare keeps a live contract whose runtime code equals the
+///      build's, and a constructor-only change leaves the runtime code as it was, so only the declaration redeploys
+///      it.
+contract ReleaseDeclaredChangesTest is UpgradeIntegrationReleaseFixture {
     using stdJson for string;
 
     function test_everyChangedContractIsDeclared() public {
@@ -438,77 +458,67 @@ contract ReleaseDeclaredChangesTest is Test {
         string memory sourceVersion = vm
             .readFile(string.concat(root, "/test/anvil-interop/config/anvil-config.json"))
             .readString(".upgradeSourceStateVersion");
-        ContractHash[] memory previous = _readHashes(
+        ContractHash[] memory previous = _readContractHashes(
             string.concat(root, "/test/anvil-interop/chain-states/", sourceVersion, "/AllContractsHashes.json")
         );
-        ContractHash[] memory current = _readHashes(string.concat(root, "/../AllContractsHashes.json"));
+        ContractHash[] memory current = _readContractHashes(string.concat(root, "/../AllContractsHashes.json"));
 
-        // The names `DefaultCoreUpgrade.deployNewEcosystemContractsL1` passes through the declaration check.
-        string[9] memory ecosystemImplementations = [
-            "L1Bridgehub",
-            "L1MessageRoot",
-            "CTMDeploymentTracker",
-            "L1ChainAssetHandler",
-            "L1Nullifier",
-            "L1AssetRouter",
-            "L1NativeTokenVault",
-            "L1InteropHandler",
-            "ChainRegistrationSender"
-        ];
+        string[] memory checked = CoreUpgradeForLocalTest(address(coreUpgrade)).reuseChecked();
+        assertGt(checked.length, 0, "the prepare checked no ecosystem implementation for reuse");
         string[] memory declared = new CoreUpgradeDeclaredChanges().declaredChanges();
-        for (uint256 i = 0; i < ecosystemImplementations.length; ++i) {
-            _requireDeclaredIfChanged(
-                ecosystemImplementations[i],
-                previous,
-                current,
-                declared,
-                "changedEcosystemImplementations()"
-            );
+        for (uint256 i = 0; i < checked.length; ++i) {
+            requireDeclaredIfChanged(checked[i], previous, current, declared, "changedEcosystemImplementations()");
         }
 
-        // The release members of `DeployCTMUtils.deployStateTransitionDiamondFacets` and
-        // `DeployCTM.deployEIP7702Checker`.
-        string[9] memory releaseMembers = [
-            "AdminFacet",
-            "GettersFacet",
-            "MailboxFacet",
-            "ExecutorFacet",
-            "MigratorFacet",
-            "CommitterFacet",
-            "DiamondInit",
-            "L1GenesisUpgrade",
-            "EIP7702Checker"
-        ];
+        checked = CTMUpgradeForLocalTest(address(ctmUpgrade)).reuseChecked();
+        assertGt(checked.length, 0, "the prepare checked no release member for reuse");
         declared = new CTMUpgradeDeclaredChanges().declaredChanges();
-        for (uint256 i = 0; i < releaseMembers.length; ++i) {
-            _requireDeclaredIfChanged(releaseMembers[i], previous, current, declared, "changedReleaseMembers()");
+        for (uint256 i = 0; i < checked.length; ++i) {
+            requireDeclaredIfChanged(checked[i], previous, current, declared, "changedReleaseMembers()");
         }
     }
 
-    function _readHashes(string memory _path) private view returns (ContractHash[] memory) {
-        return
-            abi.decode(
-                vm.parseJsonTypeArray(
-                    vm.readFile(_path),
-                    "$",
-                    "ContractHash(string contractName,bytes32 evmDeployedBytecodeHash)"
-                ),
-                (ContractHash[])
-            );
+    /// @notice A constructor-only change: the creation code differs, the runtime code does not.
+    function test_refusesAnUndeclaredConstructorOnlyChange() public {
+        bytes32 runtimeCode = keccak256("runtime code");
+        ContractHash[] memory previous = new ContractHash[](1);
+        previous[0] = ContractHash("l1-contracts/L1Nullifier", keccak256("previous creation code"), runtimeCode);
+        ContractHash[] memory current = new ContractHash[](1);
+        current[0] = ContractHash("l1-contracts/L1Nullifier", keccak256("new creation code"), runtimeCode);
+
+        vm.expectRevert(
+            bytes(
+                "L1Nullifier changed since the previous release but the release does not declare it: add it to "
+                "`changedEcosystemImplementations()`"
+            )
+        );
+        this.requireDeclaredIfChanged(
+            "L1Nullifier",
+            previous,
+            current,
+            new string[](0),
+            "changedEcosystemImplementations()"
+        );
+
+        string[] memory declared = new string[](1);
+        declared[0] = "L1Nullifier";
+        this.requireDeclaredIfChanged("L1Nullifier", previous, current, declared, "changedEcosystemImplementations()");
     }
 
-    /// @dev A contract the previous release did not build has no live code to replace.
-    function _requireDeclaredIfChanged(
+    /// @notice Requires `_name` to be in `_declared` if its creation code changed since the previous release.
+    /// @dev A contract the previous release did not build has no live code to replace. Public so a test can expect its
+    ///      revert.
+    function requireDeclaredIfChanged(
         string memory _name,
         ContractHash[] memory _previous,
         ContractHash[] memory _current,
         string[] memory _declared,
         string memory _declaringFunction
-    ) private pure {
-        (bool built, bytes32 currentHash) = _hashOf(_current, _name);
+    ) public pure {
+        (bool built, ContractHash memory current) = _findContractHash(_current, _name);
         require(built, string.concat(_name, " is not in AllContractsHashes.json"));
-        (bool previouslyBuilt, bytes32 previousHash) = _hashOf(_previous, _name);
-        if (!previouslyBuilt || previousHash == currentHash) {
+        (bool previouslyBuilt, ContractHash memory previous) = _findContractHash(_previous, _name);
+        if (!previouslyBuilt || previous.evmBytecodeHash == current.evmBytecodeHash) {
             return;
         }
         for (uint256 i = 0; i < _declared.length; ++i) {
@@ -524,15 +534,5 @@ contract ReleaseDeclaredChangesTest is Test {
                 "`"
             )
         );
-    }
-
-    function _hashOf(ContractHash[] memory _hashes, string memory _name) private pure returns (bool, bytes32) {
-        bytes32 contractName = keccak256(bytes(string.concat("l1-contracts/", _name)));
-        for (uint256 i = 0; i < _hashes.length; ++i) {
-            if (keccak256(bytes(_hashes[i].contractName)) == contractName) {
-                return (true, _hashes[i].evmDeployedBytecodeHash);
-            }
-        }
-        return (false, bytes32(0));
     }
 }

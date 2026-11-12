@@ -35,6 +35,13 @@ import {
     BATCH_COMMIT_ENCODING_V6_FIRST_MINOR
 } from "../../../TestConstants.sol";
 
+/// @notice A contract's code hashes as `AllContractsHashes.json` records them.
+struct ContractHash {
+    string contractName;
+    bytes32 evmBytecodeHash;
+    bytes32 evmDeployedBytecodeHash;
+}
+
 /// @notice `CommitBatchInfoZKsyncOS` as commit encoding 5 (releases before v0.35) has it: without the trailing
 ///         `interopFeeUnits`.
 struct CommitBatchInfoZKsyncOSV5 {
@@ -121,16 +128,58 @@ abstract contract PreviousReleaseFixture is Test {
         release.chainTypeManager = addresses.readAddress(".ctmAddresses.chainTypeManager");
         release.zkTokenAssetId = addresses.readBytes32(".zkToken.assetId");
 
-        // Argument-less, so CREATE2 places it from the deployment's salt alone.
+        // Argument-less, so CREATE2 places it from the deployment's salt and the release's creation code alone. That
+        // code is the release's build, not this one: a later release may change the checker, and coverage builds
+        // unoptimized.
         string memory permanentValues = vm.readFile(
             string.concat(root, ANVIL_INTEROP_DIR, "/config/permanent-values.toml")
         );
-        release.eip7702Checker = Utils.canonicalCreate2Address(
+        string memory hashesPath = string.concat(
+            root,
+            ANVIL_INTEROP_DIR,
+            "/chain-states/",
+            release.stateVersion,
+            "/AllContractsHashes.json"
+        );
+        (bool built, ContractHash memory checker) = _findContractHash(
+            _readContractHashes(hashesPath),
+            "EIP7702Checker"
+        );
+        require(built, string.concat("EIP7702Checker is not in ", hashesPath));
+        release.eip7702Checker = vm.computeCreate2Address(
             vm.parseTomlBytes32(permanentValues, "$.permanent_contracts.create2_factory_salt"),
-            vm.getCode("EIP7702Checker.sol:EIP7702Checker"),
-            ""
+            checker.evmBytecodeHash,
+            Utils.DETERMINISTIC_CREATE2_ADDRESS
         );
         require(release.eip7702Checker.code.length != 0, "no EIP-7702 checker where the fixture deployed it");
+    }
+
+    /// @notice Reads an `AllContractsHashes.json`: this build's, or a previous release's, frozen next to its chain
+    ///         states by `yarn new-release`.
+    function _readContractHashes(string memory _path) internal view returns (ContractHash[] memory) {
+        return
+            abi.decode(
+                vm.parseJsonTypeArray(
+                    vm.readFile(_path),
+                    "$",
+                    "ContractHash(string contractName,bytes32 evmBytecodeHash,bytes32 evmDeployedBytecodeHash)"
+                ),
+                (ContractHash[])
+            );
+    }
+
+    /// @param _name An `l1-contracts` contract's name.
+    /// @return built Whether the build has `_name`.
+    function _findContractHash(
+        ContractHash[] memory _hashes,
+        string memory _name
+    ) internal pure returns (bool built, ContractHash memory hash) {
+        bytes32 contractName = keccak256(bytes(string.concat("l1-contracts/", _name)));
+        for (uint256 i = 0; i < _hashes.length; ++i) {
+            if (keccak256(bytes(_hashes[i].contractName)) == contractName) {
+                return (true, _hashes[i]);
+            }
+        }
     }
 
     /// @notice Gives the loaded ecosystem a production ecosystem's authority, which the anvil fixtures partly leave

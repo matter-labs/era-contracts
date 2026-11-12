@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {MultiProofTestnetVerifier} from "contracts/state-transition/verifiers/MultiProofTestnetVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {ZiskTestnetVerifier} from "contracts/state-transition/verifiers/ZiskTestnetVerifier.sol";
+import {ZiskVerifier} from "contracts/state-transition/verifiers/ZiskVerifier.sol";
+
 import {CoreUpgrade_v36} from "deploy-scripts/upgrade/v36/CoreUpgrade_v36.s.sol";
 import {CTMUpgradeForTests_v36} from "./_EcosystemUpgradeForTests_v36.sol";
 
-/// @notice A same-minor PATCH prepare: it replaces `DiamondInit` and nothing else. The release is the immutable
-///         snapshot of the intended contracts, so the new member is published as a release copying the departing one
-///         except that member — which the pipeline then upgrades to across a patch version edge.
-///         See the Patches section of {docs/registry-driven-upgrades.md}.
-/// @dev Every other release member is byte-identical, so the prepare reuses it. The patch leaves the verifier
-///      alone (the fixture's chains require their second proof system, which the verifier an upgrade prepare deploys
-///      lacks) and the genesis upgrade engine too (an edge without an L2 side must keep it).
+/// @notice A same-minor PATCH prepare: it replaces the VERIFIER and nothing else. The release is
+///         the immutable snapshot of the intended contracts, so the new verifier is published as a
+///         release copying the departing one except that member — which the pipeline then upgrades
+///         to across a patch version edge. See the Patches section of
+///         {docs/registry-driven-upgrades.md}.
+/// @dev Every other release member is byte-identical, so the prepare reuses it: the only thing this
+///      hop deploys on the CTM side is the verifier tree.
 
 /// @dev A patch has no ecosystem leg at all, so nothing is deployed here and no core transition
 ///      exists for the bundle to apply.
@@ -21,17 +26,27 @@ contract CoreUpgradeForTests_v36_1 is CoreUpgrade_v36 {
 
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgradeForTests_v36_1 is CTMUpgradeForTests_v36 {
-    /// @notice The one change of this patch: a fresh `DiamondInit`, which only chains created after it run.
-    function changedReleaseMembers() internal view virtual override returns (string[] memory names) {
-        names = new string[](1);
-        names[0] = "DiamondInit";
+    /// @notice The one change of this patch: a fresh verifier, which the release then pins and the
+    ///         upgrade engine installs on every chain from the composed proposal.
+    function deployNewCTMContracts() public virtual override {
+        super.deployNewCTMContracts();
+        _useLiveZiskVerifier();
+        deployVerifiers();
     }
 
-    /// @dev Its code is unchanged, so it is redeployed under this run's salt rather than reused.
-    function _canReuseReleaseMember(string memory _name, address _live) internal virtual override returns (bool) {
-        if (keccak256(bytes(_name)) == keccak256(bytes("DiamondInit"))) {
-            return false;
-        }
-        return super._canReuseReleaseMember(_name, _live);
+    /// @dev The fixture's chains require their second proof system, so the fresh verifier must be a
+    ///      multi-proof one like the live testnet verifier
+    ///      ({protocol-docs/interop-gating.md#second-proof-system-requirement}). An upgrade prepare
+    ///      takes no multi-proof config, so this one hands it the live ZiSK side to build over.
+    function _useLiveZiskVerifier() internal {
+        MultiProofVerifier liveMultiProof = MultiProofVerifier(
+            address(MultiProofTestnetVerifier(ctmAddresses.stateTransition.verifiers.verifier).INNER_VERIFIER())
+        );
+        ZiskVerifier liveZisk = ZiskVerifier(
+            address(ZiskTestnetVerifier(address(liveMultiProof.ZISK_RANGE_VERIFIER())).INNER_VERIFIER())
+        );
+        config.multiProof.enabled = true;
+        config.multiProof.ziskRangeVerifierAddr = address(liveZisk);
+        config.multiProof.ziskPlonkVerifierAddr = address(liveZisk.PLONK_VERIFIER());
     }
 }
