@@ -210,6 +210,8 @@ No patches. Reads on-chain state to assert:
 - The recorded `getL2SystemContractsUpgradeTxHash()` equals the hash of the upgrade transaction the
   harness relayed to L2, i.e. the per-chain data really was substituted on L1. This one is asserted during
   step 6, inside `runChainUpgradesAndRelayL2`, and only on the single-CTM path
+- ZiSK is disabled on each chain whose upgrade installed `setProofSystemStatus`, since the harness runs
+  `chain upgrade` without `--enable-zisk`. Asserted during step 6, right after the chain's Safe bundle executes
 
 ## Summary table
 
