@@ -450,7 +450,7 @@ contract CheckTransactionTest is EraMaintenanceTransactionFiltererTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        POINTED WHITELISTED HASHES
+                        WHITELISTED TX HASHES
     //////////////////////////////////////////////////////////////*/
 
     function test_allowedTxHashBypassesAllRestrictions() public {
