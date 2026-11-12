@@ -269,7 +269,7 @@ introduce placeholder lists, loops or a second CTM today solely for this extensi
   undeclared, duplicated, missing or reordered ones (`upgrade_verification/registry/declared_calls.rs`).
 - Production preparation and both Anvil pipelines: `UpgradeTestRecurring_Local.t.sol` prepares the
   infrastructure-only, chain-release, mixed and three-leg shapes and the refused ones, and runs each
-  as its ordered bundle; `yarn test:upgrade` drives the bootstrap and then recurring hops, verifying
+  as its ordered bundle; `yarn test:upgrade` drives the release's edge and then a patch hop, verifying
   each merged package, asserting that one transaction emitted every leg's domain event in order and
   checking the state each bundle left;
   `yarn test:upgrade-recurring` runs a hop over objects the harness deploys.

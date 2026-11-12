@@ -50,12 +50,11 @@ Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
 ## Preparing an upgrade
 
-`ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v35` and `CTMUpgrade_v35`
-under `l1-contracts/deploy-scripts/upgrade/v35/` (the one-time bootstrap edge onto registry-driven upgrades;
-`CTMUpgrade_v35` also deploys the `L1InteropFeeManager` proxy, see
-[the switch](../protocol-docs/interop-fee.md#the-switch)), using `upgrade-envs/v0.35.0-upgrade-system/local.toml` for a
-local upgrade. The recurring registry-driven edge, `CoreUpgrade_v36` and `CTMUpgrade_v36` under
-`l1-contracts/deploy-scripts/upgrade/v36/`, is selected with `--core-script-path` / `--ctm-script-path`.
+`ecosystem upgrade-prepare-all` defaults to the current release's scripts, `CoreUpgrade_v<minor>` and
+`CTMUpgrade_v<minor>` under `l1-contracts/deploy-scripts/upgrade/v<minor>/`, and to the release's `local.toml` for a
+local upgrade. The current release is the one `upgrade-envs/v<major>.<minor>.<patch>-<name>/` of the version in
+`configs/genesis/zksync-os/latest.json` (`current_release` in `src/common/forge/scripts/mod.rs`). Other scripts are
+selected with `--core-script-path` / `--ctm-script-path`.
 With `--env <name>` the input is `<release dir>/<name>.toml` (see [Environment inputs](#environment-inputs));
 missing inputs fail before deployment.
 
@@ -99,7 +98,7 @@ is therefore an ordinary one, never the bootstrap edge. Owner operations on its 
 `--ctm-script-path`, `--core-script-path`, and `--upgrade-input-path` are visible in `--help`.
 Historical preparations must select the matching scripts and input explicitly. The anvil upgrade test
 `l1-contracts/test/anvil-interop/run-upgrade-test.ts` passes its test subclasses of these scripts explicitly, for
-the bootstrap edge and the recurring hops after it (`run-recurring-upgrade-test.ts` drives a registry-driven hop on
+the release edge's core side and the patch hop after it (`run-recurring-upgrade-test.ts` drives a registry-driven hop on
 a fresh ecosystem's own executors without protocol-ops). See
 [the activation requirements](../protocol-docs/chain-config.md#activation).
 
@@ -132,17 +131,16 @@ replays it like any other. Verify it with `verify-package` before it is signed (
 ## Environment inputs
 
 `--env <name>` reads `upgrade-envs/permanent-values/<name>.toml` and the release input
-`<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`, `era_chain_id`
+`<release dir>/<name>.toml`. A release input holds only what is read from it: `owner_address`
 and the CREATE2 / legacy-Gov salts (`[contracts] create2_factory_salt`, `legacy_gov_salt`,
 `[create2_factory_salts]`, rotated every release because CREATE2 returns the previously deployed contract on a
 reused salt) and `redeploy_zk_governance` (whether this release replaces the PUH governance set; the deployer
 plan check refuses such a release for now, see [Deployer signing](../docs/upgrade-operations.md#deployer-signing)). The old
-protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (`current_upgrade_env_dir!` in
-`src/common/forge/scripts/mod.rs`) unless `--upgrade-env-dir` selects another (on the commands built on the
+protocol version comes from each CTM and the target from `configs/genesis/zksync-os/latest.json`. The release dir is the current release's (see
+[Preparing an upgrade](#preparing-an-upgrade)) unless `--upgrade-env-dir` selects another (on the commands built on the
 shared `--env` topology args; `ecosystem init` / `ctm init` always use the current release). It is the only release selector: `upgrade-prepare-all` rejects an `--upgrade-input-path` outside the
-selected release dir rather than mixing one release's input with another's salts. The owner, `era_chain_id`
-and CREATE2 salts come
-from that release input, and a command that needs one of them fails when the release has no input for the
+selected release dir rather than mixing one release's input with another's salts. The owner and CREATE2 salts
+come from that release input, and a command that needs one of them fails when the release has no input for the
 env: it never falls back to the deployer, local's values or random salts. `yarn new-release` creates the next
 release's inputs from the current ones with fresh salts.
 

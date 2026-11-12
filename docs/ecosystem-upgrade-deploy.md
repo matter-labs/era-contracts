@@ -1,8 +1,9 @@
 # Ecosystem upgrade: generate → deploy
 
-> **Scope.** The v0.35.0 upgrade, `upgrade-envs/v0.35.0-upgrade-system/`: the default `upgrade` of
-> the generate workflow and of `rehearse-upgrade`, and the only directory that may use
-> `prepare = "prepare-all"`. The v31 rollout (PUVT, `ecosystem verify-upgrade`,
+> **Scope.** The current release's upgrade, `upgrade-envs/<release>/`: the one
+> `v<major>.<minor>.<patch>-<name>/` of the version in `configs/genesis/zksync-os/latest.json`. It is
+> the default `upgrade` of the generate workflow and of `rehearse-upgrade`, and the only directory
+> that may use `prepare = "prepare-all"`. The v31 rollout (PUVT, `ecosystem verify-upgrade`,
 > `upgrade-envs/v0.31.0-interopB/`) is run from the `draft-v31` branch and its copy of this guide.
 
 The ecosystem upgrade is produced and shipped in **two steps**, each runnable
@@ -53,7 +54,7 @@ ecosystem contract _on the fork_ to compute deterministic CREATE2 addresses),
 replays the prepare bundles, runs `verify-bootstrap`, and emits the git-portable calldata set.
 Nothing touches real L1 — the deployer is impersonated.
 
-**Outputs** (under `l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/<env>/`):
+**Outputs** (under `l1-contracts/upgrade-envs/<release>/output/<env>/`):
 
 | Artifact                                        | Purpose                                                            |
 | ----------------------------------------------- | ------------------------------------------------------------------ |
@@ -75,7 +76,7 @@ cd protocol-ops && cargo build --release && cd ..
   --fork-url <l1-rpc> --deployer-address <deployer-eoa>
 
 # 1b) emit the sim-inputs + transaction-simulator.json
-OUT=l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/mainnet
+OUT=l1-contracts/upgrade-envs/<release>/output/mainnet
 ./protocol-ops/target/release/protocol_ops ecosystem governance-toml-to-simulator \
   --env mainnet --include-manifest "$OUT/prepare/manifest.json" \
   --camp-a-signers <deployer-eoa> --emit-sim-inputs "$OUT/sim-inputs"
@@ -84,7 +85,7 @@ OUT=l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/mainnet
 ```
 
 A zk-governance checkout (`ZK_GOVERNANCE_DIR`, `--zk-governance-commit`) is needed only by a
-release whose input declares `redeploy_zk_governance = true`; no v0.35.0 input does, and the deployer plan
+release whose input declares `redeploy_zk_governance = true`; no input of the current release does, and the deployer plan
 check refuses such a release for now ([Deployer signing](upgrade-operations.md#deployer-signing)).
 
 **In CI:** run the **`Ecosystem Upgrade Calldata: Regenerate + Verify`**
@@ -99,7 +100,7 @@ which is the standing proof that the artifact is self-sufficient.
 ### Which ecosystems this runs for
 
 `environment` is just the basename of a config pair — `permanent-values/<env>.toml`
-plus `v0.35.0-upgrade-system/<env>.toml` — and the L1 to fork is read from that env's
+plus `<release>/<env>.toml` — and the L1 to fork is read from that env's
 `l1_chain_id` (`1` → mainnet, `11155111` → Sepolia). Adding an ecosystem therefore
 needs no workflow edit: commit the config pair, add its anvil port to
 `ENV_ANVIL_PORTS` in `protocol-ops/src/commands/ecosystem/bundle.rs` if it needs its own fork. The
@@ -111,7 +112,7 @@ verification job.
 
 `adi` (single-chain ZKsync OS on L1 mainnet, owned by a legacy `Governance.sol` with a real
 security council and a three-day `minDelay()`) has a v31 config pair
-(`v0.31.0-interopB/adi.toml`) and none for v0.35.0 yet.
+(`v0.31.0-interopB/adi.toml`) and none for the current release yet.
 
 > **Already-deployed ecosystems.** Re-running the prepare against the chain tip
 > of an ecosystem whose upgrade is already live reverts (the deployer no
@@ -378,7 +379,7 @@ Variants:
 ceremony bundles stay for their multisig. Same broadcast path, and same
 idempotency, as step 2 above. `replay-bundle` writes its own state (`executed.json`
 and the receipts in `transactions.txt`) to
-`l1-contracts/upgrade-envs/v0.35.0-upgrade-system/output/<env>/replay/`, never into the
+`l1-contracts/upgrade-envs/<release>/output/<env>/replay/`, never into the
 bundle directory.
 
 Both `--rpc` modes first read `eth_chainId` and require it to equal the bundle's

@@ -121,7 +121,8 @@ use views::CommittedUpgradeView;
 /// token. The env's permanent values are also what the members' constructor arguments are held
 /// against where they come from the env ([`member_construction`]), and it selects the ZiSK
 /// backend pins that apply ([`external_backends`]). `expected_bridgehub` replaces the env's
-/// `bridgehub_proxy_addr` as the reviewed Bridgehub; a run naming neither is refused. `contract_hashes`
+/// `bridgehub_proxy_addr` as the reviewed Bridgehub; a run naming neither is refused.
+/// `expected_zk_token_asset_id` replaces the env's `zk_token_asset_id`. `contract_hashes`
 /// replaces the committed `AllContractsHashes.json` the build is held against (see the
 /// `--contract-hashes` help).
 #[allow(clippy::too_many_arguments)]
@@ -133,6 +134,7 @@ pub(crate) async fn verify(
     executor_records: &[std::path::PathBuf],
     env: Option<&str>,
     expected_bridgehub: Option<Address>,
+    expected_zk_token_asset_id: Option<B256>,
     contract_hashes: Option<&std::path::Path>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
@@ -180,7 +182,7 @@ pub(crate) async fn verify(
         RegistryPackage::Upgrade(package) => {
             // Only a transition leg installs a release whose force deployments pin the token.
             let zk_token_asset_id = if package.leg(package::LegKind::Transition).is_some() {
-                reviewed_zk_token_asset_id(env_config.as_ref())?
+                reviewed_zk_token_asset_id(expected_zk_token_asset_id, env_config.as_ref(), result)?
             } else {
                 B256::ZERO
             };
@@ -204,7 +206,11 @@ pub(crate) async fn verify(
             .await
         }
         RegistryPackage::Bootstrap(package) => {
-            let zk_token_asset_id = reviewed_zk_token_asset_id(env_config.as_ref())?;
+            let zk_token_asset_id = reviewed_zk_token_asset_id(
+                expected_zk_token_asset_id,
+                env_config.as_ref(),
+                result,
+            )?;
             let salts = merge_salts(&package.create2_salts, extra_create2_salts);
             let genesis = ReviewedGenesis {
                 genesis_root,
@@ -262,9 +268,21 @@ fn reviewed_env(
     Ok(reviewed)
 }
 
-/// The ZK token asset id the reviewed env's permanent values declare. Required on the paths that
-/// install a release, so a missing env or key stops the run before anything is verified.
-fn reviewed_zk_token_asset_id(env: Option<&EnvConfig>) -> anyhow::Result<B256> {
+/// The ZK token asset id the reviewed env's permanent values declare, or `expected` in its place.
+/// Required on the paths that install a release, so a missing env or key stops the run before
+/// anything is verified.
+fn reviewed_zk_token_asset_id(
+    expected: Option<B256>,
+    env: Option<&EnvConfig>,
+    result: &mut VerificationResult,
+) -> anyhow::Result<B256> {
+    if let Some(expected) = expected {
+        result.report_warn(&format!(
+            "the releases are held against --expected-zk-token-asset-id {expected}, not an env's \
+             `zk_token_asset_id`: this run reviews a harness L1"
+        ));
+        return Ok(expected);
+    }
     let env = env.ok_or_else(|| {
         anyhow::anyhow!(
             "this package installs a release whose force deployments pin the ZK token asset id: \
@@ -350,18 +368,30 @@ mod tests {
         assert!(merge_salts(&[], &[]).is_empty());
     }
 
-    /// The paths that install a release cannot run without the env the ZK token is read from.
+    /// The paths that install a release cannot run without the env the ZK token is read from,
+    /// unless the reviewer names the asset id in its place.
     #[test]
     fn the_reviewed_zk_token_asset_id_requires_an_env() {
-        let message = reviewed_zk_token_asset_id(None).unwrap_err().to_string();
+        let mut result = VerificationResult::default();
+        let message = reviewed_zk_token_asset_id(None, None, &mut result)
+            .unwrap_err()
+            .to_string();
         assert!(message.contains("--env"), "{message}");
 
         let stage = EnvConfig::load("stage").unwrap();
         assert_eq!(
-            reviewed_zk_token_asset_id(Some(&stage)).unwrap(),
+            reviewed_zk_token_asset_id(None, Some(&stage), &mut result).unwrap(),
             stage.require_zk_token_asset_id().unwrap()
         );
         assert!(EnvConfig::load("no-such-env").is_err());
+
+        let expected = B256::repeat_byte(0x2a);
+        assert_eq!(result.warnings, 0);
+        assert_eq!(
+            reviewed_zk_token_asset_id(Some(expected), Some(&stage), &mut result).unwrap(),
+            expected
+        );
+        assert_eq!(result.warnings, 1, "the override is reported");
     }
 
     /// Q1/Q2: the reviewed Bridgehub is `--expected-bridgehub`, else the env's; the flag wins

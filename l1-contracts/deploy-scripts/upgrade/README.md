@@ -27,14 +27,10 @@ points on an Anvil fork and turns the recorded broadcasts into Safe bundles. `ch
   else a version needs governance (or an admin) to do goes through `declareExternalAction`
   (`ExternalActionsLib`) and is listed in the output's `external_actions`.
   `DefaultChainUpgrade` is the legacy handed-cut per-chain leg the Foundry integration tests use.
-- `v36/` — the v35 -> v36 edge, the first registry-driven release and the template for the next
-  one: `CoreUpgrade_v36` replaces one ecosystem implementation (`L1MessageRoot`); `CTMUpgrade_v36`
-  overrides nothing.
-- `v35/` — the v34 -> v35 bootstrap edge: `CoreUpgrade_v35` also deploys the
-  `CoreUpgradeExecutor`; `CTMUpgrade_v35` deploys the `CTMUpgradeExecutor`, the
-  `RegistryBootstrapMigration` (naming both executors) and the `RegistryBootstrapSequence` over the
-  migration and the core transition, and declares every call of the one-time edge by reading it off
-  that sequence.
+- `v<minor>/` — the current release's edge, for the minor version of
+  `configs/genesis/zksync-os/latest.json`: `CoreUpgrade_v<minor>` and `CTMUpgrade_v<minor>` subclass
+  the default scripts and override only what the release changes. It is the template for the next
+  one.
 - `SystemContractsProcessing.s.sol` — the L2 force-deployment set shared by genesis and upgrades.
 - `EmergencyUpgradeCalldata.s.sol` and its companions — executing a prepared package as an
   emergency upgrade ("Emergency execution" below).
@@ -43,8 +39,8 @@ Other one-off scripts of shipped upgrades live on their release branches, not he
 
 ## 1. Inputs
 
-Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (see
-`upgrade-envs/v0.35.0-upgrade-system/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
+Per-environment inputs are `upgrade-envs/<version>/<env>.toml` (the current release's are in its
+`upgrade-envs/v<major>.<minor>.<patch>-<name>/`), permanent values `upgrade-envs/permanent-values/<env>.toml`.
 Keep inputs minimal — the prepare reads the departing version, the live implementations, the
 CTM's owner and the ecosystem `ProxyAdmin`'s owner from L1. One input cannot be derived and must
 be carried forward from the previous prepare's output: `[contracts] eip7702_checker`
@@ -86,9 +82,9 @@ On one anvil fork of L1, in this order:
    owner (`UpgradeFull::run_ctm_admin_steps`; see the
    [operations document](../../../docs/upgrade-operations.md#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)).
 5. On PUH-governed environments whose release input declares `redeploy_zk_governance = true`, the
-   PUH/Guardians redeploy (`zk_governance.rs`). No v35 input declares it, and the deployer plan
-   check refuses such a release until it learns the redeploy's salt and artifacts
-   ([Deployer signing](../../../docs/upgrade-operations.md#deployer-signing)).
+   PUH/Guardians redeploy (`zk_governance.rs`). `yarn new-release` drops the key, so a release declares it
+   only on purpose. The deployer plan check refuses such a release until it learns the redeploy's salt
+   and artifacts ([Deployer signing](../../../docs/upgrade-operations.md#deployer-signing)).
 6. The merge (`upgrade.rs::write_merged_ecosystem_toml`) writes `<env-out>/ecosystem.toml` with ONE
    governance bundle, `[governance_calls] calls`: the merger's own extras (PUH wiring, and while a
    CTM predates the bootstrap, the `acceptOwnership()` of that CTM or its `ValidatorTimelock` when
@@ -305,17 +301,17 @@ rollup one or the no-DA validator the chain runs today.
 ## Preparing the scripts for a new upgrade
 
 Open the release with `yarn new-release <name>` (repo root): it bumps the genesis protocol version,
-creates `upgrade-envs/v0.<minor>.0-<name>/` from the current release's inputs with fresh salts,
-moves `current_upgrade_env_dir!` and the prepare's default script paths
-(`protocol-ops/src/common/forge/scripts/mod.rs`), and generates `v<minor>/CoreUpgrade_v<minor>` and
-`CTMUpgrade_v<minor>` as plain subclasses of the default scripts unless the branch already carries
-them. The header of `scripts/new-release.ts` lists what it changes and what it leaves to you.
+creates `upgrade-envs/v0.<minor>.0-<name>/` from the current release's inputs with fresh salts, and
+generates `v<minor>/CoreUpgrade_v<minor>` and `CTMUpgrade_v<minor>` as plain subclasses of the default
+scripts unless the branch already carries them. protocol-ops' defaults and the generate workflow
+follow the genesis version, so they move with the bump. The header of `scripts/new-release.ts`
+lists what it changes and what it leaves to you.
 
-Start from `v36/`: inherit the `Default*Upgrade` bases, override `deployNew*Contracts` with the
-contracts the release changes, name every release member you replace in `changedReleaseMembers()`,
-and keep everything else derived. Declare every contract the release changes, even when only its
-constructor changed: the build has no CBOR metadata, so such a change keeps the runtime code, and only
-the declaration makes the prepare redeploy it.
+Start from the current release's `v<minor>/`: inherit the `Default*Upgrade` bases, override
+`deployNew*Contracts` with the contracts the release changes, name every release member you replace
+in `changedReleaseMembers()`, and keep everything else derived. Declare every contract the release
+changes, even when only its constructor changed: the build has no CBOR metadata, so such a change keeps
+the runtime code, and only the declaration makes the prepare redeploy it.
 
 **Declare what the upgrade is.** `DefaultCTMUpgrade.upgradeKind()` returns `ChainRelease` by
 default — the edge deploys the upgrade engine and a `CTMTransition`, and the protocol version
@@ -336,7 +332,7 @@ successful prepare from the output alone.
 
 A release whose L2 built-ins change must also author the L2
 side (`authorL2Side`: delegate/extra bytecode infos, the pinned composer and the bytecode
-artifacts needed to publish the constructed plan’s factory dependencies — `CTMUpgrade_v35` shows the shape) because the release-pair derivation puts the
+artifacts needed to publish the constructed plan’s factory dependencies) because the release-pair derivation puts the
 changed built-ins in the L2 leg. Any governance or admin call the version needs beyond the
 executor legs is a `declareExternalAction`.
 
@@ -346,20 +342,22 @@ genesis generator, so that upgraded and freshly created chains match
 
 ## Testing an upgrade end to end
 
-- `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the bootstrap edge through the real
-  prepare pipeline, in-forge, including the chain crossing via the legacy cut-taking leg.
+- `test/foundry/l1/integration/UpgradeTest_Local.t.sol` — the release's edge through the real
+  prepare pipeline, in-forge, over the previous release's frozen L1 state, including a chain crossing.
 - `test/foundry/l1/integration/UpgradeTestRecurring_Local.t.sol` — RECURRING prepares on the
   ecosystem that fixture leaves behind: the infrastructure-only, chain-release, mixed and
   three-leg shapes preparation can emit, each run as its ordered bundle, and the ones it must
   refuse (an upgrade that changes nothing, either version/kind contradiction, an orphaned
   deployment on either domain).
-- `test/anvil-interop/run-upgrade-test.ts` — the bootstrap driven end to end by
-  protocol-ops against the frozen departing-version chain states, then two registry-driven hops
-  on the same chains: a same-minor verifier patch (run with the bootstrap's L2 transaction still
-  pending, required to derive no facet cut) and the v36 minor hop (required to reuse every live
-  release member). Each hop's merged artifact is verified and asserted to carry its executor legs
-  as one contiguous run in canonical order, and one transaction must emit every leg's domain event,
-  in order.
+
+  The states, like the build, carry no CBOR metadata, and a prepare decides reuse by comparing
+  code, so these hold a release to declaring every contract whose code it changes.
+
+- `test/anvil-interop/run-upgrade-test.ts` — the release's edge driven end to end by protocol-ops
+  against the frozen departing-version chain states, then a same-minor patch on the same
+  chains (required to derive no facet cut). Each hop's merged artifact is verified and asserted to
+  carry its executor legs as one contiguous run in canonical order, and one transaction must emit
+  every leg's domain event, in order.
 - `test/anvil-interop/run-recurring-upgrade-test.ts` — the registry-driven hop with objects
   deployed by the harness itself.
 - `test/foundry/l1/unit/concrete/Upgrades/registry/` — the bundle-execution (all legs in one
