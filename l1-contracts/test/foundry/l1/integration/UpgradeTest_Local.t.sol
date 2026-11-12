@@ -21,6 +21,7 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -34,6 +35,8 @@ import {ChainRouting} from "test-utils/ChainRouting.sol";
 import {IL1GenesisUpgrade} from "contracts/upgrades/IL1GenesisUpgrade.sol";
 import {GenesisFacet, ProxyUpgradeRow} from "contracts/upgrades/registry/RegistryTypes.sol";
 import {ContractsBytecodesLib} from "../../../../deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 /// @notice The release's CTM upgrade over the previous release's L2 table, read off the live release: this fixture
 ///         is L1-only, and rebuilding the table from every L2 artifact runs out of memory here.
@@ -111,6 +114,8 @@ contract ChainUpgradeByCTMOwnerForLocalTest is DefaultChainUpgrade {
 ///      `UpgradeTestRecurring_Local.t.sol`). Heavy execution and event assertions run in `setUp -> internalTest()`
 ///      (RAM constraint).
 abstract contract UpgradeIntegrationReleaseFixture is UpgradeIntegrationTestBase, PreviousReleaseFixture {
+    using stdToml for string;
+
     /// @dev The release's own local upgrade input, which protocol-ops' default prepare reads: it names no
     ///      target version, so the edge goes to the genesis version. Moved by `yarn new-release`.
     string internal constant RELEASE_UPGRADE_INPUT = "/upgrade-envs/v0.36.0-v36/local.toml";
@@ -140,7 +145,7 @@ abstract contract UpgradeIntegrationReleaseFixture is UpgradeIntegrationTestBase
     }
 
     /// @dev The env input carries the live checker forward from the previous prepare's output.
-    function afterInitHook() internal override {
+    function afterInitHook() internal virtual override {
         ctmUpgrade.setEIP7702Checker(previousRelease.eip7702Checker);
     }
 
@@ -161,6 +166,19 @@ abstract contract UpgradeIntegrationReleaseFixture is UpgradeIntegrationTestBase
     }
 
     function setUp() public virtual {
+        _prepareEdge("local-release");
+
+        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+        bytes32 baseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(chainId);
+        _expectedBaseTokenAssetId = baseTokenAssetId;
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(baseTokenAssetId));
+
+        internalTest();
+    }
+
+    /// @dev Stands up the previous release with its settled chain and prepares the edge, writing the outputs under
+    ///      `_outputTag` so fixtures preparing different edges run in parallel.
+    function _prepareEdge(string memory _outputTag) internal {
         previousRelease = _loadPreviousRelease();
         FixtureChain memory chain = _fixtureChain(previousRelease, UPGRADED_CHAIN_ID);
         _prepareSettlement(chain);
@@ -172,17 +190,28 @@ abstract contract UpgradeIntegrationReleaseFixture is UpgradeIntegrationTestBase
         rollupDAManagerBeforeUpgrade = IAdmin(chain.diamondProxy).getRollupDAManager();
 
         ECOSYSTEM_UPGRADE_INPUT = RELEASE_UPGRADE_INPUT;
-        ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-release-core-out.toml";
-        CTM_OUTPUT = "/script-out/foundry-upgrade/local-release-ctm.toml";
-        CORE_OUTPUT = "/script-out/foundry-upgrade/local-release-core.toml";
+        ECOSYSTEM_OUTPUT = string.concat("/script-out/foundry-upgrade/", _outputTag, "-core-out.toml");
+        CTM_OUTPUT = string.concat("/script-out/foundry-upgrade/", _outputTag, "-ctm.toml");
+        CORE_OUTPUT = string.concat("/script-out/foundry-upgrade/", _outputTag, "-core.toml");
         setupUpgrade();
+    }
 
-        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
-        bytes32 baseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(chainId);
-        _expectedBaseTokenAssetId = baseTokenAssetId;
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(baseTokenAssetId));
+    /// @dev The CTM leg's CTM-domain `ProxyUpgradeTransition`, zero when the edge swaps no CTM-domain implementation.
+    function _ctmInfrastructureTransition() internal view returns (IProxyUpgradeTransition) {
+        return
+            IProxyUpgradeTransition(
+                vm.readFile(string.concat(vm.projectRoot(), CTM_OUTPUT)).readAddress(
+                    "$.registry.ctm_infrastructure_transition_addr"
+                )
+            );
+    }
 
-        internalTest();
+    /// @dev The rows the CTM-domain leg applies, none without one.
+    function _ctmInfrastructureRows() internal view returns (ProxyUpgradeRow[] memory rows) {
+        IProxyUpgradeTransition transition = _ctmInfrastructureTransition();
+        if (address(transition) != address(0)) {
+            rows = transition.rows();
+        }
     }
 }
 
@@ -230,6 +259,19 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
                 ),
                 coreTransition,
                 "the core transition re-derives from the manifest it serves"
+            );
+        }
+
+        IProxyUpgradeTransition ctmInfrastructure = _ctmInfrastructureTransition();
+        if (address(ctmInfrastructure) != address(0)) {
+            assertEq(
+                DeployScriptUtils.canonicalCreate2Address(
+                    ctmSalt,
+                    ContractsBytecodesLib.getCreationCodeEVM("ProxyUpgradeTransition"),
+                    abi.encode(ctmInfrastructure.getManifest())
+                ),
+                address(ctmInfrastructure),
+                "the CTM-domain transition re-derives from the manifest it serves"
             );
         }
     }
@@ -280,6 +322,47 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
             ProxyUpgradeRow[] memory rows = coreUpgrade.coreTransition().rows();
             for (uint256 i = 0; i < rows.length; ++i) {
                 _recordedMember(coreOutput, coreSalt, rows[i].implNew);
+            }
+        }
+
+        IProxyUpgradeTransition ctmInfrastructure = _ctmInfrastructureTransition();
+        if (address(ctmInfrastructure) != address(0)) {
+            _recordedMember(ctmOutput, ctmSalt, ctmInfrastructure.proxyUpgradeEngine());
+            ProxyUpgradeRow[] memory rows = ctmInfrastructure.rows();
+            for (uint256 i = 0; i < rows.length; ++i) {
+                (string memory name, bytes memory args) = _recordedMember(ctmOutput, ctmSalt, rows[i].implNew);
+                // The immutables code identity cannot see, held to the ones the departing implementation runs with.
+                if (keccak256(bytes(name)) == keccak256("ChainTypeManager")) {
+                    ChainTypeManager departing = ChainTypeManager(rows[i].expectedOldImpl);
+                    (
+                        address bridgehub,
+                        address bytecodesSupplier,
+                        address permissionlessValidator,
+                        address interopFeeManager
+                    ) = abi.decode(args, (address, address, address, address));
+                    assertEq(bridgehub, departing.BRIDGE_HUB(), "ChainTypeManager keeps its bridgehub");
+                    assertEq(
+                        bytecodesSupplier,
+                        departing.L1_BYTECODES_SUPPLIER(),
+                        "ChainTypeManager keeps its supplier"
+                    );
+                    assertEq(
+                        permissionlessValidator,
+                        departing.PERMISSIONLESS_VALIDATOR(),
+                        "ChainTypeManager keeps its permissionless validator"
+                    );
+                    assertEq(
+                        interopFeeManager,
+                        departing.L1_INTEROP_FEE_MANAGER(),
+                        "ChainTypeManager keeps its interop fee manager"
+                    );
+                } else if (keccak256(bytes(name)) == keccak256("MultisigCommitter")) {
+                    assertEq(
+                        abi.decode(args, (address)),
+                        address(ValidatorTimelock(rows[i].expectedOldImpl).BRIDGE_HUB()),
+                        "MultisigCommitter keeps its bridgehub"
+                    );
+                }
             }
         }
     }
@@ -374,6 +457,16 @@ contract UpgradeIntegrationTestLocal is UpgradeIntegrationReleaseFixture {
             }
         }
 
+        // Every CTM-domain implementation the CTM leg replaces is installed.
+        ProxyUpgradeRow[] memory ctmRows = _ctmInfrastructureRows();
+        for (uint256 i = 0; i < ctmRows.length; ++i) {
+            assertEq(
+                DeployScriptUtils.getImplementation(ctmRows[i].proxy),
+                ctmRows[i].implNew,
+                "CTM-domain row not installed"
+            );
+        }
+
         // The CTM serves the release's genesis engine, and a chain created after the edge geneses from the pinned
         // release at the new version: its pending L2 transaction is the one the release's engine composes for it.
         (address releaseGenesisEngine, , ) = ICTMRelease(release).genesisParams();
@@ -428,6 +521,39 @@ contract UpgradeIntegrationTestLocalCTMOwnerCrossing is UpgradeIntegrationReleas
     }
 }
 
+/// @notice The release's script prepared straight to the release's first patch, as it is for a CTM still on the
+///         previous release once the repo moves to that patch: the edge must still swap the CTM-domain
+///         implementations `CTMUpgrade_v36` deploys.
+contract UpgradeIntegrationTestLocalToReleasePatch is UpgradeIntegrationReleaseFixture {
+    function setUp() public override {
+        _prepareEdge("local-release-patch");
+    }
+
+    function afterInitHook() internal override {
+        super.afterInitHook();
+        (uint32 major, uint32 minor, ) = SemVer.unpackSemVer(SafeCast.toUint96(ctmUpgrade.getNewProtocolVersion()));
+        ctmUpgrade.setNewProtocolVersion(SemVer.packSemVer(major, minor, 1));
+    }
+
+    function test_aPatchTargetStillSwapsTheCTMDomainImplementations() public view {
+        ProxyUpgradeRow[] memory rows = _ctmInfrastructureRows();
+        address[3] memory proxies = [
+            ctmUpgrade.getAddresses().stateTransition.proxies.chainTypeManager,
+            ctmUpgrade.getAddresses().stateTransition.proxies.validatorTimelock,
+            ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier
+        ];
+        for (uint256 i = 0; i < proxies.length; ++i) {
+            bool swapped = false;
+            for (uint256 j = 0; j < rows.length; ++j) {
+                if (rows[j].proxy == proxies[i]) {
+                    swapped = true;
+                }
+            }
+            assertTrue(swapped, "the CTM-domain leg swaps the proxy");
+        }
+    }
+}
+
 /// @notice The release's own declared changes, without the harness variants the fixtures above add.
 contract CoreUpgradeDeclaredChanges is CoreUpgrade_v36 {
     function declaredChanges() external view returns (string[] memory) {
@@ -447,6 +573,7 @@ contract CTMUpgradeDeclaredChanges is CTMUpgrade_v36 {
 ///         release declares as changed. The production prepare compares live code with that build and refuses to
 ///         replace what the release does not declare; this holds every such contract to it at once, from the
 ///         previous release's `AllContractsHashes.json` (frozen next to its chain states by `yarn new-release`).
+///         A CTM-domain implementation has no reuse check, so one that changed must be one the CTM-domain leg installs.
 /// @dev It compares creation code, not runtime code: the prepare keeps a live contract whose runtime code equals the
 ///      build's, and a constructor-only change leaves the runtime code as it was, so only the declaration redeploys
 ///      it.
@@ -475,6 +602,33 @@ contract ReleaseDeclaredChangesTest is UpgradeIntegrationReleaseFixture {
         declared = new CTMUpgradeDeclaredChanges().declaredChanges();
         for (uint256 i = 0; i < checked.length; ++i) {
             requireDeclaredIfChanged(checked[i], previous, current, declared, "changedReleaseMembers()");
+        }
+
+        // Every CTM-domain implementation slot, by the build its proxy runs (the timelock's runs `MultisigCommitter`).
+        string[6] memory ctmDomain = [
+            "ChainTypeManager",
+            "MultisigCommitter",
+            "ServerNotifier",
+            "L1InteropFeeManager",
+            "PermissionlessValidator",
+            "BytecodesSupplier"
+        ];
+        declared = _ctmInfrastructureMembers();
+        for (uint256 i = 0; i < ctmDomain.length; ++i) {
+            requireDeclaredIfChanged(ctmDomain[i], previous, current, declared, "deployNewCTMContracts()");
+        }
+    }
+
+    /// @dev The contracts the CTM-domain leg installs, by their `[member_deployments]` records.
+    function _ctmInfrastructureMembers() internal view returns (string[] memory names) {
+        string memory ctmOutput = vm.readFile(string.concat(vm.projectRoot(), CTM_OUTPUT));
+        ProxyUpgradeRow[] memory rows = _ctmInfrastructureRows();
+        names = new string[](rows.length);
+        for (uint256 i = 0; i < rows.length; ++i) {
+            names[i] = stdToml.readString(
+                ctmOutput,
+                string.concat("$.member_deployments['", vm.toString(rows[i].implNew), "'].contract")
+            );
         }
     }
 

@@ -42,7 +42,8 @@ Finished, and described where it now lives:
   commit and chain entrypoint (`setNewVersionUpgrade`, `setUpgradeDiamondCut`,
   `upgradeChainFromVersion(uint256,uint256,DiamondCutData)`) and its `upgradeCutHash` /
   `protocolVersionVerifier` / `upgradeCutDataBlock` views are gone; a v36 CTM does not bring a
-  pre-v35 chain across.
+  pre-v35 chain across. `CTMUpgrade_v36` installs the trimmed `ChainTypeManager`,
+  `MultisigCommitter` (the timelock) and `ServerNotifier` through the CTM-domain infrastructure leg.
 - **The ServerNotifier is an ordinary CTM-domain row.** No prepare emits an admin call for it. The
   bootstrap's one-time handover (`serverNotifierHandoverCalls`, the `[ctm_admin_calls]` output
   section) was deleted with the edge in v36.

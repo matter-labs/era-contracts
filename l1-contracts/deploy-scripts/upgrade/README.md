@@ -246,7 +246,10 @@ upgrade resets.
 A chain below v35 cannot cross: its version has no committed transition, and v36 removed the
 cut-taking path (`ChainTypeManager.upgradeChainFromVersion(chainId, oldVersion, cut)` and the
 `ValidatorTimelock` forwarder) that brought pre-v35 chains across the v35 bootstrap edge, along with
-the `upgradeCutHash` and `protocolVersionVerifier` views a pre-v35 chain's upgrade reads.
+the `upgradeCutHash` and `protocolVersionVerifier` views a pre-v35 chain's upgrade reads. The v36
+package installs those trimmed `ChainTypeManager`, `ValidatorTimelock` (`MultisigCommitter`) and
+`ServerNotifier` implementations through its CTM-domain leg (`applyInfrastructureUpgrade`), ahead of
+the commit.
 
 **Chain admins behind an `AccessControlRestriction`.** Every crossing from v35 on calls the chain's
 two-argument `upgradeChainFromVersion(address,uint256)` (`0x03129ad9`) instead of the pre-v35
