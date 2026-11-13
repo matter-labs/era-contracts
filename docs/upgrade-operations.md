@@ -41,6 +41,47 @@ verify-bootstrap` reports the handover as its own prerequisite.
 The handover is not undone if the bootstrap is cancelled afterwards: the notifier then simply
 belongs to the CTM domain early. A recurring prepare has no admin calls.
 
+## The CTM-domain ProxyAdmin split
+
+The bootstrap hands the ecosystem `ProxyAdmin` (the Bridgehub's) to the core executor and the
+CTM-domain `ProxyAdmin` to the CTM executor, so the two must differ and every CTM-domain proxy must
+sit behind the second. CTMs deployed before the two-executor model keep the CTM, its
+`ValidatorTimelock`, `BytecodesSupplier` and `PermissionlessValidator` behind the ecosystem admin.
+
+The v35 CTM prepare splits them off (`CTMUpgrade_v35.ctmProxyAdminSplitCalls`):
+
+1. It binds the CTM-domain `ProxyAdmin`: the CTM's own admin, or, for a CTM behind the ecosystem
+   admin, a new `ProxyAdmin` it deploys through the CREATE2 factory under a salt keyed by the CTM,
+   owned by governance (the Bridgehub's owner). The CTM executor, the migration and the manifest
+   name that admin.
+2. It writes `[ctm_proxy_admin_split] calls`: one `changeProxyAdmin(proxy, ctmProxyAdmin)` on the
+   ecosystem admin per CTM-domain proxy still behind it.
+3. Governance executes those calls in an execution of its own, after the prepares and the
+   ServerNotifier handover and before the bootstrap bundle. On the emergency path they are an
+   emergency proposal of their own, ahead of the bundle's
+   ([emergency execution](../l1-contracts/deploy-scripts/upgrade/README.md#emergency-execution)).
+
+The ServerNotifier is not among them when it sits behind its own `ProxyAdmin`: that admin is the
+ChainAdmin's, so the [handover](#servernotifier-a-one-time-handover-then-an-ordinary-ctm-domain-proxy)
+moves it. A notifier behind the ecosystem admin moves with the split instead, and the handover only
+nominates the CTM executor. The prepare refuses a CTM-domain proxy behind any other admin, and
+refuses to render the calls unless governance owns both admins.
+
+The calls are rendered from live state: a rerun reuses the admin it deployed, a partial split is
+finished towards the admin the CTM already has, and a split CTM yields none. Prepares address each
+proxy through the admin they read, so no other package prepared before the split may execute after
+it. Only a bootstrap package may carry a split: the replay, the simulator, the package review and the
+emergency scripts refuse one beside a bundle that runs no `migrate()`, since only `verify-bootstrap`
+reviews it.
+
+A package is checked against the state before its split: once the split has executed,
+`verify-bootstrap`, the governance replay and the emergency dry run of the same package fail on its
+calls. Run them before the split. To re-check afterwards, rerun the prepare under the same salts and
+verify that package: its split comes out empty, and its bundle must equal the one approved.
+
+Until the bootstrap, governance owns both admins, as it owned the one before. A cancelled bootstrap
+leaves the split in place: the shape a fresh deployment has.
+
 ## Executor succession
 
 Each domain executor is bound by immutables to what it governs (`CoreUpgradeExecutor.PROXY_ADMIN`;
@@ -83,8 +124,9 @@ architecture document).
   CTM, both `ProxyAdmin`s, the ServerNotifier and the Bridgehub (whose owner can freeze the CTM's
   chains): expected only during executor succession or
   [governance self-migration](governance-self-migration.md).
-- **`AdminChanged`** on the CTM's and the ServerNotifier's proxies: expected only from the v35
-  ServerNotifier handover, which moves the notifier under the CTM-domain `ProxyAdmin`.
+- **`AdminChanged`** on the CTM-domain proxies: expected only from the v35 ServerNotifier
+  handover and the [CTM-domain ProxyAdmin split](#the-ctm-domain-proxyadmin-split), both of which
+  move proxies under the CTM-domain `ProxyAdmin`.
 
 ## Recovery
 

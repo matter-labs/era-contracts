@@ -35,6 +35,6 @@ Conventions:
 - Calldata workflows share: environment, protocol_ops_tag, l1_rpc_url
 - environment is a free string naming a permanent-values preset the image
   holds (stage, testnet, mainnet or a partner's); workflows that sign or
-  broadcast with our deployer keys take only ours (stage, testnet, mainnet)
+  broadcast with our deployer keys take only ours (stage, testnet, mainnet, zksync-os-mainnet)
 - Artifact names:
   - per-chain workflows: safe-bundles-{operation}-{chain_id}-{environment}

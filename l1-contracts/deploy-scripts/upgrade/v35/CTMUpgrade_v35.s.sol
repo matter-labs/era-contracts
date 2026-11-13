@@ -6,8 +6,10 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Strings} from "@openzeppelin/contracts-v4/utils/Strings.sol";
 
 import {Call} from "contracts/governance/Common.sol";
+import {StateTransitionContracts} from "contracts/common/StateTransitionTypes.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CTMUpgradeExecutor} from "contracts/upgrades/registry/executors/CTMUpgradeExecutor.sol";
@@ -28,7 +30,7 @@ import {ExternalActionsLib} from "../default-upgrade/ExternalActionsLib.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {UpgradeHelperLib} from "../default-upgrade/UpgradeHelperLib.sol";
 import {DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
-import {Utils} from "../../utils/Utils.sol";
+import {CTM_PROXY_ADMIN_SALT_DOMAIN, Utils} from "../../utils/Utils.sol";
 import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/UpgradeExecutorsRecord.sol";
 
 /// @notice The v35 CTM upgrade: the ONE-TIME edge into the registry-driven model (see the
@@ -41,8 +43,9 @@ import {CTMExecutorDeployment, UpgradeExecutorsRecord} from "../../utils/Upgrade
 ///         `RegistryBootstrapMigration` deployed at prepare time, and executed by its single
 ///         `migrate()` call inside the one governance bundle `RegistryBootstrapSequence` derives;
 ///         every later upgrade is applied through the bound domain executors. Before any of it, the
-///         ChainAdmin hands the ServerNotifier to the CTM domain ({serverNotifierHandoverCalls});
-///         the edge refuses to run until it has.
+///         CTM domain moves under its own ProxyAdmin ({ctmProxyAdminSplitCalls}) and the ChainAdmin
+///         hands the ServerNotifier to it ({serverNotifierHandoverCalls}); the edge refuses to run
+///         until both have.
 // solhint-disable-next-line contract-name-capwords
 contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     /// @notice The bound executor the whole CTM domain lands under. Deployed by this prepare
@@ -116,13 +119,16 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     /// @inheritdoc DefaultCTMUpgrade
     /// @dev Rendered from live state, so a half already done is not repeated: the notifier proxy
     ///      moves from its own ProxyAdmin to the CTM-domain one, then its current owner nominates the
-    ///      bound executor, whose acceptance is the first call of the bootstrap bundle.
+    ///      bound executor, whose acceptance is the first call of the bootstrap bundle. A notifier
+    ///      behind the ecosystem ProxyAdmin moves with the rest of the domain
+    ///      ({ctmProxyAdminSplitCalls}) instead.
     function serverNotifierHandoverCalls() public view override returns (Call[] memory calls) {
         address notifier = ctmAddresses.stateTransition.proxies.serverNotifier;
-        address ctmProxyAdmin = Utils.getProxyAdminAddress(ctmAddresses.stateTransition.proxies.chainTypeManager);
+        address ctmProxyAdmin = ctmAddresses.admin.transparentProxyAdmin;
         address executor = boundCTMUpgradeExecutor();
         address notifierProxyAdmin = Utils.getProxyAdminAddress(notifier);
-        bool moveAdmin = notifierProxyAdmin != ctmProxyAdmin;
+        bool moveAdmin = notifierProxyAdmin != ctmProxyAdmin &&
+            notifierProxyAdmin != coreAddresses.shared.transparentProxyAdmin;
         bool nominate = Ownable2Step(notifier).owner() != executor && Ownable2Step(notifier).pendingOwner() != executor;
         calls = new Call[]((moveAdmin ? 1 : 0) + (nominate ? 1 : 0));
         uint256 next = 0;
@@ -143,6 +149,56 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
                 value: 0,
                 data: abi.encodeCall(Ownable2Step.transferOwnership, (executor))
             });
+        }
+    }
+
+    /// @notice The governance calls that move the CTM domain off the ecosystem ProxyAdmin onto the
+    ///         bound CTM-domain one ({_bindCTMProxyAdmin}), written to `[ctm_proxy_admin_split]`
+    ///         and executed before the bootstrap bundle
+    ///         ({docs/upgrade-operations.md#the-ctm-domain-proxyadmin-split}); empty once the domain
+    ///         is split. Reverts on a domain proxy behind any other admin, except the ServerNotifier,
+    ///         which its owner hands over ({serverNotifierHandoverCalls}).
+    /// @return calls One `changeProxyAdmin` on the ecosystem ProxyAdmin per proxy still behind it.
+    function ctmProxyAdminSplitCalls() public view returns (Call[] memory calls) {
+        address ctmProxyAdmin = ctmAddresses.admin.transparentProxyAdmin;
+        require(ctmProxyAdmin != address(0), "CTM-domain ProxyAdmin not bound");
+        address ecosystemProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
+        (address[] memory proxies, string[] memory names) = _ctmDomainProxies();
+        uint256 count = 0;
+        for (uint256 i = 0; i < proxies.length; ++i) {
+            address admin = Utils.getProxyAdminAddress(proxies[i]);
+            if (admin == ecosystemProxyAdmin) {
+                ++count;
+                continue;
+            }
+            string memory found = string.concat(names[i], " is behind ", Strings.toHexString(admin));
+            require(
+                admin == ctmProxyAdmin || proxies[i] == ctmAddresses.stateTransition.proxies.serverNotifier,
+                string.concat(found, ", not the CTM-domain ProxyAdmin ", Strings.toHexString(ctmProxyAdmin))
+            );
+        }
+        calls = new Call[](count);
+        if (count == 0) {
+            return calls;
+        }
+        address governance = config.ownerAddress;
+        require(ProxyAdmin(ecosystemProxyAdmin).owner() == governance, "the ecosystem ProxyAdmin is not governance's");
+        // A CTM-domain admin already there (a partial split) may have changed hands since.
+        require(ProxyAdmin(ctmProxyAdmin).owner() == governance, "CTM-domain ProxyAdmin not owned by governance");
+        uint256 next = 0;
+        for (uint256 i = 0; i < proxies.length; ++i) {
+            if (Utils.getProxyAdminAddress(proxies[i]) != ecosystemProxyAdmin) {
+                continue;
+            }
+            calls[next] = Call({
+                target: ecosystemProxyAdmin,
+                value: 0,
+                data: abi.encodeCall(
+                    ProxyAdmin.changeProxyAdmin,
+                    (ITransparentUpgradeableProxy(payable(proxies[i])), ctmProxyAdmin)
+                )
+            });
+            ++next;
         }
     }
 
@@ -192,6 +248,8 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     }
 
     function deployNewCTMContracts() public virtual override {
+        // Before the first CTM-domain proxy this prepare deploys, which goes behind the bound admin.
+        _bindCTMProxyAdmin();
         // The new CTM implementation is constructed with the `L1InteropFeeManager` proxy, so it is
         // deployed first; see {protocol-docs/interop-fee.md#the-switch}.
         if (ctmAddresses.stateTransition.proxies.interopFeeManager == address(0)) {
@@ -223,20 +281,10 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
     function deployRegistryBootstrap() public virtual {
         address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
         require(ctmProxy != address(0), "CTM proxy is zero");
-        // The admin that ACTUALLY owns the CTM proxy (and the per-CTM proxies), read from the
-        // live EIP-1967 slot rather than any address book — the migration validates every row
-        // against it, so a stale book entry would fail loudly at the wrong time.
-        ProxyAdmin ctmProxyAdmin = ProxyAdmin(Utils.getProxyAdminAddress(ctmProxy));
-        require(address(ctmProxyAdmin) != address(0), "CTM proxy has no admin");
-        // The two-executor model hands the CTM domain's admin to the CTM executor and the
-        // ecosystem's to the ecosystem executor — a SHARED admin cannot be handed to both, and
-        // the collision would only surface as a bundle revert. ZKsyncOS CTMs (the only ones
-        // this release upgrades) are deployed with their own admin; Era CTMs on old ecosystems
-        // share the ecosystem's and would need an admin split first.
-        require(
-            address(ctmProxyAdmin) != coreAddresses.shared.transparentProxyAdmin,
-            "CTM domain shares the ecosystem ProxyAdmin; split the admin before the bootstrap"
-        );
+        ProxyAdmin ctmProxyAdmin = ProxyAdmin(ctmAddresses.admin.transparentProxyAdmin);
+        require(address(ctmProxyAdmin) != address(0), "CTM-domain ProxyAdmin not bound");
+        // Refuses a domain proxy that neither the split nor the notifier handover brings under it.
+        ctmProxyAdminSplitCalls();
 
         // Both go through the CREATE2 factory like every other prepare deployment: the Safe
         // bundle replays only factory transactions, so a plain CREATE here would leave the
@@ -287,6 +335,80 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         return super.getCreationCalldata(contractName);
     }
 
+    /// @notice Binds the CTM-domain ProxyAdmin this prepare names: the CTM proxy's own or, while the
+    ///         CTM still shares the ecosystem ProxyAdmin, a new one owned by governance.
+    function _bindCTMProxyAdmin() internal {
+        address ctmProxy = ctmAddresses.stateTransition.proxies.chainTypeManager;
+        address ctmProxyAdmin = Utils.getProxyAdminAddress(ctmProxy);
+        require(ctmProxyAdmin != address(0), "CTM proxy has no admin");
+        if (ctmProxyAdmin == coreAddresses.shared.transparentProxyAdmin) {
+            // Keyed by the CTM: the factory hands back an existing deployment at a repeated
+            // address, so two CTMs under one governance would otherwise share one admin.
+            ctmProxyAdmin = create2WithDeterministicOwner(
+                type(ProxyAdmin).creationCode,
+                getOwnerAddress(),
+                keccak256(abi.encode(CTM_PROXY_ADMIN_SALT_DOMAIN, ctmProxy))
+            );
+            notifyAboutDeployment(ctmProxyAdmin, "ProxyAdmin", "", "CTM-domain ProxyAdmin");
+        }
+        ctmAddresses.admin.transparentProxyAdmin = ctmProxyAdmin;
+    }
+
+    /// @notice The CTM domain's proxies with their names, zero entries left out, the CTM first.
+    function _ctmDomainProxies() internal view returns (address[] memory proxies, string[] memory names) {
+        StateTransitionContracts memory domain = ctmAddresses.stateTransition.proxies;
+        address[6] memory all = [
+            domain.chainTypeManager,
+            domain.validatorTimelock,
+            domain.bytecodesSupplier,
+            domain.permissionlessValidator,
+            domain.serverNotifier,
+            domain.interopFeeManager
+        ];
+        string[6] memory allNames = [
+            "ChainTypeManager",
+            "ValidatorTimelock",
+            "BytecodesSupplier",
+            "PermissionlessValidator",
+            "ServerNotifier",
+            "L1InteropFeeManager"
+        ];
+        uint256 count = 0;
+        for (uint256 i = 0; i < all.length; ++i) {
+            if (all[i] != address(0)) {
+                ++count;
+            }
+        }
+        proxies = new address[](count);
+        names = new string[](count);
+        uint256 next = 0;
+        for (uint256 i = 0; i < all.length; ++i) {
+            if (all[i] != address(0)) {
+                proxies[next] = all[i];
+                names[next] = allNames[i];
+                ++next;
+            }
+        }
+    }
+
+    /// @inheritdoc DefaultCTMUpgrade
+    function saveOutput(string memory _outputPath) internal virtual override {
+        vm.serializeAddress(
+            "ctm_proxy_admin_split",
+            "ecosystem_proxy_admin",
+            coreAddresses.shared.transparentProxyAdmin
+        );
+        vm.serializeAddress("ctm_proxy_admin_split", "ctm_proxy_admin", ctmAddresses.admin.transparentProxyAdmin);
+        vm.serializeAddress("ctm_proxy_admin_split", "governance", getOwnerAddress());
+        string memory split = vm.serializeBytes(
+            "ctm_proxy_admin_split",
+            "calls",
+            abi.encode(ctmProxyAdminSplitCalls())
+        );
+        vm.serializeString("root", "ctm_proxy_admin_split", split);
+        super.saveOutput(_outputPath);
+    }
+
     function _bootstrapManifest(
         address _ctmProxy,
         ProxyAdmin _ctmProxyAdmin
@@ -320,11 +442,6 @@ contract CTMUpgrade_v35 is DefaultCTMUpgrade {
         address timelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
         address timelockImplNew = ctmAddresses.stateTransition.implementations.validatorTimelock;
         require(timelockImplNew != address(0), "new ValidatorTimelock implementation not deployed");
-        // `migrate()` reads and swaps every row through `ctmProxyAdmin`.
-        require(
-            Utils.getProxyAdminAddress(timelockProxy) == address(_ctmProxyAdmin),
-            "ValidatorTimelock is not behind the CTM-domain ProxyAdmin"
-        );
         proxyUpgrades[uint256(CTMContract.ValidatorTimelock)] = ProxyUpgradeRow({
             proxy: timelockProxy,
             expectedOldImpl: Utils.getImplementation(timelockProxy),

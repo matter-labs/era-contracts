@@ -27,6 +27,8 @@
 //! row-carrying objects refuse a malformed row at construction too; this reports it before the
 //! vote (`protocol-docs/ecosystem-upgrade.md#where-each-check-lives`).
 
+use std::collections::BTreeMap;
+
 use alloy::primitives::Address;
 use alloy::providers::Provider;
 
@@ -278,6 +280,9 @@ pub(super) struct InventoryReview<'a> {
     /// A slot whose proxy is not yet under `domain_admin`, so its departure cannot be read through
     /// it (the bootstrap's ServerNotifier before its handover, reported by the caller).
     pub(super) departure_unreadable: Option<usize>,
+    /// Proxies whose departure is read through another admin than `domain_admin`, by proxy: the
+    /// bootstrap's CTM-domain proxies a pending ProxyAdmin split moves only right before the bundle.
+    pub(super) departure_admins: BTreeMap<Address, Address>,
     /// What the package reports for the CTM domain's singletons: the last fallbacks a new
     /// `ChainTypeManager` implementation's immutables are held against.
     pub(super) reported: ReportedSingletons,
@@ -377,7 +382,12 @@ pub(super) async fn verify_inventory<P: Provider>(
                 review.domain_admin
             ));
         } else {
-            verify_departure(provider, result, &label, row, review.domain_admin).await;
+            let admin = review
+                .departure_admins
+                .get(&row.proxy)
+                .copied()
+                .unwrap_or(review.domain_admin);
+            verify_departure(provider, result, &label, row, admin).await;
         }
 
         let identified = expect_code_identity(
@@ -1002,6 +1012,7 @@ mod tests {
                 domain_admin: DOMAIN_ADMIN,
                 anchor: Some(CTM),
                 departure_unreadable,
+                departure_admins: Default::default(),
                 reported: Default::default(),
                 reviewed_bridgehub: None,
             },
@@ -1029,6 +1040,47 @@ mod tests {
         )
         .await;
         assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// A proxy a pending split moves only right before the bundle departs through the admin it
+    /// still sits behind, never through the domain admin it is not under yet.
+    #[tokio::test]
+    async fn a_departure_is_read_through_the_admin_a_pending_split_moves_it_off() {
+        const ECOSYSTEM_ADMIN: Address = Address::repeat_byte(0xEA);
+        let l1 = super::super::keyed_l1::KeyedL1::default();
+        l1.answer(CTM, CtmView::serverNotifierAddressCall {}, NOTIFIER);
+        l1.answer(
+            ECOSYSTEM_ADMIN,
+            ProxyAdminView::getProxyImplementationCall { proxy: NOTIFIER },
+            OLD,
+        );
+        l1.code(NEW, NOTIFIER_RUNTIME);
+        let mut result = VerificationResult::default();
+        verify_inventory(
+            &l1.provider(),
+            &build(),
+            &mut result,
+            &InventoryReview {
+                inventory: Inventory::CtmDomain,
+                rows: &inventory("ServerNotifier", NOTIFIER),
+                domain_admin: DOMAIN_ADMIN,
+                anchor: Some(CTM),
+                departure_unreadable: None,
+                departure_admins: BTreeMap::from([(NOTIFIER, ECOSYSTEM_ADMIN)]),
+                reported: Default::default(),
+                reviewed_bridgehub: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            (result.errors, result.warnings),
+            (0, 0),
+            "{:?}",
+            result.error_messages
+        );
+        assert!(l1.called::<ProxyAdminView::getProxyImplementationCall>(ECOSYSTEM_ADMIN));
+        assert!(!l1.called::<ProxyAdminView::getProxyImplementationCall>(DOMAIN_ADMIN));
     }
 
     /// The slot is the CTM's notifier, the row names another proxy: the implementation would be
@@ -1097,6 +1149,7 @@ mod tests {
                 domain_admin: DOMAIN_ADMIN,
                 anchor: Some(REVIEWED_BRIDGEHUB),
                 departure_unreadable: None,
+                departure_admins: Default::default(),
                 reported: Default::default(),
                 reviewed_bridgehub: None,
             },
@@ -1218,6 +1271,7 @@ mod tests {
                 domain_admin: DOMAIN_ADMIN,
                 anchor: Some(CTM),
                 departure_unreadable: None,
+                departure_admins: Default::default(),
                 reported,
                 reviewed_bridgehub: construction.and_then(|(_, env)| env.bridgehub()),
             },
@@ -1613,6 +1667,7 @@ mod tests {
                 domain_admin: DOMAIN_ADMIN,
                 anchor: None,
                 departure_unreadable: None,
+                departure_admins: Default::default(),
                 reported: Default::default(),
                 reviewed_bridgehub: None,
             },
@@ -1681,6 +1736,7 @@ mod tests {
                         domain_admin: DOMAIN_ADMIN,
                         anchor: Some(DISCOVERED),
                         departure_unreadable: None,
+                        departure_admins: Default::default(),
                         reported: Default::default(),
                         reviewed_bridgehub: None,
                     },
@@ -1775,6 +1831,7 @@ mod tests {
                 domain_admin: DOMAIN_ADMIN,
                 anchor: Some(CTM),
                 departure_unreadable: None,
+                departure_admins: Default::default(),
                 reported: Default::default(),
                 reviewed_bridgehub: None,
             },

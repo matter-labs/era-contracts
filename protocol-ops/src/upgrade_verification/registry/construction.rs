@@ -104,6 +104,22 @@ pub(crate) const REVIEWED_PROXY: (&str, &str) = (
     "TransparentUpgradeableProxy",
 );
 
+/// The CTM-domain `ProxyAdmin` the v35 CTM prepare deploys for a CTM still behind the ecosystem
+/// one, and the `Create2AndTransfer` that creates it and hands it to governance, as `(artifact
+/// file, contract)` ([`ctm_proxy_admin_salt`]).
+pub(crate) const REVIEWED_PROXY_ADMIN: (&str, &str) = ("ProxyAdmin.sol", "ProxyAdmin");
+pub(crate) const CREATE2_AND_TRANSFER: (&str, &str) =
+    ("Create2AndTransfer.sol", "Create2AndTransfer");
+
+/// The salt `Create2AndTransfer` creates the CTM-domain `ProxyAdmin` of `ctm` under when its
+/// factory salt is `salt`: `keccak256(abi.encode(salt, keccak256(abi.encode(
+/// CTM_PROXY_ADMIN_SALT_DOMAIN, ctm))))`, as `Create2FactoryUtils.create2WithDeterministicOwner`
+/// derives it.
+pub(crate) fn ctm_proxy_admin_salt(salt: B256, ctm: Address) -> B256 {
+    let domain = keccak256((keccak256("ctm-domain-proxy-admin"), ctm).abi_encode_params());
+    keccak256((salt, domain).abi_encode_params())
+}
+
 /// One contract as the reviewed commit builds it.
 pub(crate) struct ReviewedArtifact {
     /// `<File>.sol` under `l1-contracts/out`.
@@ -178,14 +194,19 @@ const NO_ZISK_BACKEND_PINS: &str = "no ZiSK backend pins were loaded for this ru
 
 impl ReviewedBuild {
     /// Loads the artifact of every object type a registry package can name, of every member
-    /// kind its objects name ([`members::MEMBER_ARTIFACTS`]) and of [`REVIEWED_PROXY`],
-    /// cross-checking each artifact's creation code and deployed bytecode against `identity`.
+    /// kind its objects name ([`members::MEMBER_ARTIFACTS`]), of [`REVIEWED_PROXY`] and of
+    /// [`REVIEWED_PROXY_ADMIN`] with its [`CREATE2_AND_TRANSFER`], cross-checking each artifact's
+    /// creation code and deployed bytecode against `identity`.
     pub(crate) fn load(identity: CodeIdentity) -> Self {
         let mut loaded = HashMap::new();
         for (file, name) in OBJECT_ARTIFACTS
             .iter()
             .chain(members::MEMBER_ARTIFACTS)
-            .chain([&REVIEWED_PROXY])
+            .chain([
+                &REVIEWED_PROXY,
+                &REVIEWED_PROXY_ADMIN,
+                &CREATE2_AND_TRANSFER,
+            ])
         {
             loaded.insert(*name, load_one(&identity, file, name));
         }
@@ -582,6 +603,11 @@ pub(crate) mod constructor_args {
         core_transition: Address,
     ) -> Vec<u8> {
         (migration, core_transition).abi_encode_params()
+    }
+
+    /// `Create2AndTransfer(bytes bytecode, bytes32 salt, address owner)`.
+    pub(crate) fn create2_and_transfer(bytecode: &[u8], salt: B256, owner: Address) -> Vec<u8> {
+        (Bytes::copy_from_slice(bytecode), salt, owner).abi_encode_params()
     }
 }
 
@@ -1068,5 +1094,59 @@ mod tests {
         .unwrap();
         assert!(identity.creation_code_hash_of(contract).is_some());
         assert!(identity.deployed_code_hash_of(contract).is_some());
+    }
+
+    /// [`ctm_proxy_admin_salt`] is the salt the CTM prepare creates the CTM-domain `ProxyAdmin`
+    /// under, and the reviewed commit records the hashes of both contracts involved.
+    #[test]
+    fn the_ctm_proxy_admin_salt_is_the_one_the_prepare_derives() {
+        const CREATE2_FACTORY_UTILS_SOL: &str = include_str!(
+            "../../../../l1-contracts/deploy-scripts/utils/deploy/Create2FactoryUtils.s.sol"
+        );
+        const CTM_UPGRADE_SOL: &str = include_str!(
+            "../../../../l1-contracts/deploy-scripts/upgrade/v35/CTMUpgrade_v35.s.sol"
+        );
+        assert!(
+            UTILS_SOL.contains(
+                "bytes32 constant CTM_PROXY_ADMIN_SALT_DOMAIN = keccak256(\"ctm-domain-proxy-admin\");"
+            ),
+            "Utils.sol declares another CTM_PROXY_ADMIN_SALT_DOMAIN"
+        );
+        assert!(
+            CTM_UPGRADE_SOL
+                .contains("keccak256(abi.encode(CTM_PROXY_ADMIN_SALT_DOMAIN, ctmProxy))"),
+            "the CTM prepare separates the CTM-domain ProxyAdmin's salt by another domain"
+        );
+        for derivation in [
+            "type(Create2AndTransfer).creationCode",
+            "abi.encode(initCode, keccak256(abi.encode(_create2FactorySalt, _saltDomain)), owner)",
+        ] {
+            assert!(
+                CREATE2_FACTORY_UTILS_SOL.contains(derivation),
+                "create2WithDeterministicOwner no longer reads `{derivation}`"
+            );
+        }
+        let identity = CodeIdentity::from_hashes_file(
+            &crate::upgrade_verification::contract_hashes::contract_hashes_path(None),
+        )
+        .unwrap();
+        for (_, contract) in [REVIEWED_PROXY_ADMIN, CREATE2_AND_TRANSFER] {
+            assert!(identity.creation_code_hash_of(contract).is_some());
+            assert!(identity.deployed_code_hash_of(contract).is_some());
+        }
+
+        let salt = B256::repeat_byte(0x5A);
+        let ctm = Address::repeat_byte(0xC7);
+        let domain = keccak256(
+            [
+                keccak256(b"ctm-domain-proxy-admin").as_slice(),
+                B256::left_padding_from(ctm.as_slice()).as_slice(),
+            ]
+            .concat(),
+        );
+        assert_eq!(
+            ctm_proxy_admin_salt(salt, ctm),
+            keccak256([salt.as_slice(), domain.as_slice()].concat())
+        );
     }
 }

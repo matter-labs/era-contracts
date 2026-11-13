@@ -62,12 +62,13 @@ const TRANSACTIONS_LOG: &str = "transactions.txt";
 
 /// Anvil port of each env's generate fork; a replay of the same env uses port + 1, so a
 /// replay can run next to a rehearsal of the same env.
-const ENV_ANVIL_PORTS: [(&str, u16); 5] = [
+const ENV_ANVIL_PORTS: [(&str, u16); 6] = [
     ("stage", 29_545),
     ("testnet", 29_547),
     ("mainnet", 29_549),
     ("adi", 29_551),
     ("anvil-interop", 29_553),
+    ("zksync-os-mainnet", 29_555),
 ];
 const REPLAY_PORT_OFFSET: u16 = 1;
 const ANVIL_GAS_PRICE_WEI: u64 = 1_000_000_000;
@@ -1398,7 +1399,7 @@ mod tests {
     /// `[contracts]`, or a CTM array that resolves to nothing).
     #[test]
     fn every_committed_env_config_loads() {
-        for env in ["stage", "testnet", "mainnet", "adi"] {
+        for env in ["stage", "testnet", "mainnet", "adi", "zksync-os-mainnet"] {
             let cfg = match EnvConfig::load(env) {
                 Ok(cfg) => cfg,
                 // no checkout around the test binary
@@ -1629,7 +1630,7 @@ mod tests {
     /// generated from: the governance owner, every declared CREATE2 salt and the env itself.
     #[test]
     fn package_verification_takes_its_reviewer_inputs_from_the_env_config() {
-        for env in ["stage", "testnet", "mainnet"] {
+        for env in ["stage", "testnet", "mainnet", "zksync-os-mainnet"] {
             let cfg = match EnvConfig::load(env) {
                 Ok(cfg) => cfg,
                 // no checkout around the test binary

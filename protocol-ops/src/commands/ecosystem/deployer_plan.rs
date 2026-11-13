@@ -11,15 +11,17 @@
 //!   `[member_deployments]` record (creation code ++ recorded constructor arguments), an
 //!   `[upgrade_executors]` record, an object the package names (creation code ++ constructor
 //!   arguments that are exactly an ABI encoding of the constructor's parameters), the bootstrap
-//!   sequence over the package's migration and core transition, or a reviewed proxy in front of a
-//!   recorded implementation; or
+//!   sequence over the package's migration and core transition, a reviewed proxy in front of a
+//!   recorded implementation, or the `Create2AndTransfer` that creates the CTM-domain `ProxyAdmin`
+//!   a `[ctms.<key>.ctm_proxy_admin_split]` names and hands it to governance; or
 //! * it matches an entry of [`ALLOWLIST`], at a target holding that entry's role in the package
 //!   and with that entry's argument constraint.
 //!
 //! A role that belongs to one CTM is taken only from that CTM's `[ctms.<key>]` table, and the CTM
 //! must be one the env declares. The CTM's ProxyAdmin, BytecodesSupplier and ValidatorTimelock are
 //! also read from L1 ([`CtmFacts`]) before anything is signed, as is the ecosystem ProxyAdmin (the
-//! EIP-1967 admin of the env's Bridgehub), so a bundle cannot name its own.
+//! EIP-1967 admin of the env's Bridgehub), so a bundle cannot name its own. The one CTM ProxyAdmin
+//! L1 does not hold yet is the CTM-domain one the plan itself deploys for that CTM.
 //!
 //! What it does not establish: the package's other addresses and records come from the bundle.
 //! The constructor arguments, a proxy's initializer and a published bytecode are not judged here;
@@ -46,14 +48,15 @@ use crate::common::env_config::{EnvConfig, DEFAULT_UPGRADE};
 use crate::common::ethereum::get_provider;
 use crate::common::forge::scripts::member_deployments::MemberDeployments;
 use crate::common::forge::scripts::upgrade_executors::UpgradeExecutorsRecord;
+use crate::common::governance_calls::CtmProxyAdminSplit;
 use crate::common::upgrade_descriptor::{validate_upgrade_name, UpgradeDescriptor};
 use crate::common::{logger, paths};
 use crate::upgrade_verification::constants::EIP1967_PROXY_ADMIN_SLOT;
 use crate::upgrade_verification::contract_hashes::contract_hashes_path;
 use crate::upgrade_verification::paths::repo_relative_path;
 use crate::upgrade_verification::registry::construction::{
-    constructor_args, ReviewedArtifact, ReviewedBuild, DETERMINISTIC_CREATE2_FACTORY,
-    REVIEWED_PROXY,
+    constructor_args, ctm_proxy_admin_salt, ReviewedArtifact, ReviewedBuild, CREATE2_AND_TRANSFER,
+    DETERMINISTIC_CREATE2_FACTORY, REVIEWED_PROXY, REVIEWED_PROXY_ADMIN,
 };
 use crate::upgrade_verification::registry::provenance::CodeIdentity;
 use crate::upgrade_verification::registry::records;
@@ -150,7 +153,7 @@ pub(crate) enum Constraint {
     Publication,
     /// The call is a declared admin action, and the authority it hands over lands on the CTM
     /// executor this plan deploys (owned by governance) or on the ProxyAdmin that administers that
-    /// executor's CTM on L1.
+    /// executor's CTM on L1 or that the plan deploys for it.
     HandoverToPlannedExecutor,
     /// `multicall(calls, true)` whose every call sends no value and is admitted as
     /// [`Self::HandoverToPlannedExecutor`].
@@ -236,6 +239,14 @@ struct PackageObject {
     location: String,
 }
 
+/// A `[ctms.<key>.ctm_proxy_admin_split]` table and the CTM its `[ctms.<key>]` table names.
+#[derive(Debug, Clone)]
+struct PackageSplit {
+    ctm: Address,
+    split: CtmProxyAdminSplit,
+    location: String,
+}
+
 /// Where the package names a role holder, and the CTM of the `[ctms.<key>]` table that names it
 /// (`None` for a role that is not [`Role::per_ctm`]).
 #[derive(Debug, Clone)]
@@ -254,6 +265,7 @@ pub(crate) struct PackageView {
     named: BTreeSet<Address>,
     roles: BTreeMap<Role, BTreeMap<Address, Vec<Holder>>>,
     admin_actions: Vec<AdminAction>,
+    splits: Vec<PackageSplit>,
     /// Tables the check refuses outright.
     faults: Vec<String>,
     /// The Bridgehub the core prepare names, which stands in for the env's without one.
@@ -391,6 +403,24 @@ impl PackageView {
             }
             let ctm = address_at(table, &CTM_PROXY_PATH)
                 .with_context(|| format!("{source}: {}", location_of(&prefix, &CTM_PROXY_PATH)))?;
+            if let (true, Some(split)) = (is_ctm, table.get("ctm_proxy_admin_split")) {
+                let location = format!("[{prefix}ctm_proxy_admin_split]");
+                let split: CtmProxyAdminSplit = split
+                    .clone()
+                    .try_into()
+                    .with_context(|| format!("{source}: {location}"))?;
+                match ctm {
+                    Some(ctm) => view.splits.push(PackageSplit {
+                        ctm,
+                        split,
+                        location,
+                    }),
+                    None => view.faults.push(format!(
+                        "{location} splits a CTM domain, but its table names no \
+                         chain_type_manager_proxy"
+                    )),
+                }
+            }
             for (role, path) in role_paths {
                 let location = location_of(&prefix, path);
                 let Some(address) =
@@ -645,6 +675,10 @@ enum Deployed {
     Proxy {
         logic: Address,
     },
+    /// Created by a `Create2AndTransfer` that hands it to governance.
+    CtmProxyAdmin {
+        chain_type_manager: Address,
+    },
 }
 
 impl fmt::Display for Deployed {
@@ -667,6 +701,12 @@ impl fmt::Display for Deployed {
                     REVIEWED_PROXY.1
                 )
             }
+            Self::CtmProxyAdmin { chain_type_manager } => write!(
+                f,
+                "the CTM-domain {} of the CTM {chain_type_manager}, created by a {} that hands it \
+                 to governance",
+                REVIEWED_PROXY_ADMIN.1, CREATE2_AND_TRANSFER.1
+            ),
         }
     }
 }
@@ -708,6 +748,8 @@ struct PlanChecker<'a> {
     inputs: &'a ReviewedInputs,
     /// The env's CTMs, or the package's without an env.
     admitted_ctms: BTreeSet<Address>,
+    /// The CTM-domain ProxyAdmins the plan deploys, each with its CTM.
+    ctm_proxy_admins: BTreeMap<Address, Address>,
 }
 
 impl PlanChecker<'_> {
@@ -725,7 +767,7 @@ impl PlanChecker<'_> {
     }
 
     /// Holds a holder of a role L1 also fixes to what L1 says about its CTM, or about the
-    /// Bridgehub.
+    /// Bridgehub. A CTM's ProxyAdmin may also be the CTM-domain one the plan deploys for it.
     fn bound_on_l1(&self, role: Role, target: Address, holder: &Holder) -> Result<(), String> {
         if role == Role::EcosystemProxyAdmin {
             return match self.inputs.ecosystem_proxy_admin {
@@ -756,6 +798,15 @@ impl PlanChecker<'_> {
         let on_l1 = fact(self.facts_of(ctm)?);
         if on_l1 == target {
             Ok(())
+        } else if role == Role::CtmProxyAdmin {
+            if self.ctm_proxy_admins.get(&target) == Some(&ctm) {
+                Ok(())
+            } else {
+                Err(format!(
+                    "{target} is neither the {what} of the CTM {ctm} on L1, which is {on_l1}, nor \
+                     the CTM-domain ProxyAdmin this plan deploys for it"
+                ))
+            }
         } else {
             Err(format!(
                 "{target} is not the {what} of the CTM {ctm} on L1, which is {on_l1}"
@@ -900,6 +951,9 @@ impl PlanChecker<'_> {
                 }
             }
         }
+        if let Some(outcome) = self.ctm_proxy_admin(address, salt, init) {
+            return outcome;
+        }
         if let Ok(proxy) = self.build.get(REVIEWED_PROXY.1) {
             if init.starts_with(proxy.creation_code()) && self.package.named.contains(&address) {
                 return self.proxy(address, proxy, &init[proxy.creation_code().len()..]);
@@ -909,6 +963,76 @@ impl PlanChecker<'_> {
             "deploys {address} under salt {salt}: it is neither a [member_deployments] record nor an \
              executor, object or proxy the package names"
         ))
+    }
+
+    /// A `Create2AndTransfer` deployed at `address` under `salt` that creates, under
+    /// [`ctm_proxy_admin_salt`], the CTM-domain ProxyAdmin a split of an admitted CTM names, and
+    /// hands it to governance; `None` when `init` is not a `Create2AndTransfer` at all.
+    fn ctm_proxy_admin(
+        &self,
+        address: Address,
+        salt: B256,
+        init: &[u8],
+    ) -> Option<Result<(Address, Deployed), String>> {
+        let creator = self.build.get(CREATE2_AND_TRANSFER.1).ok()?;
+        if !init.starts_with(creator.creation_code()) {
+            return None;
+        }
+        let proxy_admin = match self.artifact(REVIEWED_PROXY_ADMIN.1) {
+            Ok(artifact) => artifact,
+            Err(why) => return Some(Err(why)),
+        };
+        for PackageSplit {
+            ctm,
+            split,
+            location,
+        } in &self.package.splits
+        {
+            if !self.admitted_ctms.contains(ctm) {
+                continue;
+            }
+            let inner_salt = ctm_proxy_admin_salt(salt, *ctm);
+            let args = constructor_args::create2_and_transfer(
+                proxy_admin.creation_code(),
+                inner_salt,
+                split.governance,
+            );
+            if init[creator.creation_code().len()..] != args[..] {
+                continue;
+            }
+            if split.governance != self.inputs.governance {
+                return Some(Err(format!(
+                    "deploys {address}, which creates the CTM-domain ProxyAdmin of the CTM {ctm} \
+                     ({location}) for owner {}, not for governance {}",
+                    split.governance, self.inputs.governance
+                )));
+            }
+            let created = address.create2(inner_salt, keccak256(proxy_admin.creation_code()));
+            if created != split.ctm_proxy_admin {
+                return Some(Err(format!(
+                    "deploys {address}, which creates the CTM-domain ProxyAdmin of the CTM {ctm} \
+                     at {created}, but {location} names ctm_proxy_admin {}",
+                    split.ctm_proxy_admin
+                )));
+            }
+            return Some(Ok((
+                created,
+                Deployed::CtmProxyAdmin {
+                    chain_type_manager: *ctm,
+                },
+            )));
+        }
+        Some(Err(format!(
+            "deploys {address}, a {creator_name} ({}), but it creates no CTM-domain ProxyAdmin a \
+             [ctms.<key>.ctm_proxy_admin_split] names for one of {}: its init code is not the \
+             reviewed {creator_name} over the reviewed {} ({}), that CTM's salt and the split's \
+             governance",
+            creator.artifact_file(),
+            self.admitted_ctms_label(),
+            REVIEWED_PROXY_ADMIN.1,
+            proxy_admin.artifact_file(),
+            creator_name = CREATE2_AND_TRANSFER.1,
+        )))
     }
 
     fn executor_owner(
@@ -1212,10 +1336,17 @@ impl PlanChecker<'_> {
                      executor's CTM {ctm} on L1",
                     action.label, call.proxy
                 ))
+            } else if self.ctm_proxy_admins.get(&call.newAdmin) == Some(ctm) {
+                Ok(format!(
+                    "`{}` moves {} under the CTM-domain ProxyAdmin this plan deploys for the \
+                     planned CTM executor's CTM {ctm}",
+                    action.label, call.proxy
+                ))
             } else {
                 Err(format!(
                     "`{}` moves {} under {}, which the planned CTM executor's record names, but \
-                     the CTM {ctm} is administered by {on_l1} on L1",
+                     the CTM {ctm} is administered by {on_l1} on L1 and this plan deploys no \
+                     CTM-domain ProxyAdmin there for it",
                     action.label, call.proxy, call.newAdmin
                 ))
             };
@@ -1234,12 +1365,25 @@ pub(crate) fn check_plan(
     inputs: &ReviewedInputs,
     calls: &[PlanCall],
 ) -> PlanVerdict {
-    let checker = PlanChecker {
+    let mut checker = PlanChecker {
         build,
         package,
         inputs,
         admitted_ctms: inputs.env_ctms.clone().unwrap_or_else(|| package.ctms()),
+        ctm_proxy_admins: BTreeMap::new(),
     };
+    // A proxy or a handover may name the CTM-domain ProxyAdmin ahead of its deployment.
+    let ctm_proxy_admins = calls
+        .iter()
+        .filter(|call| call.value.is_zero() && call.to == inputs.factory)
+        .filter_map(|call| match checker.deployment(call) {
+            Ok((admin, Deployed::CtmProxyAdmin { chain_type_manager })) => {
+                Some((admin, chain_type_manager))
+            }
+            _ => None,
+        })
+        .collect();
+    checker.ctm_proxy_admins = ctm_proxy_admins;
     let mut verdict = PlanVerdict {
         refused: package.faults.clone(),
         ..PlanVerdict::default()
@@ -1829,6 +1973,16 @@ mod tests {
                 REVIEWED_PROXY.0,
                 REVIEWED_PROXY.1,
                 creation(REVIEWED_PROXY.1),
+            ),
+            (
+                REVIEWED_PROXY_ADMIN.0,
+                REVIEWED_PROXY_ADMIN.1,
+                creation(REVIEWED_PROXY_ADMIN.1),
+            ),
+            (
+                CREATE2_AND_TRANSFER.0,
+                CREATE2_AND_TRANSFER.1,
+                creation(CREATE2_AND_TRANSFER.1),
             ),
         ])
         .with_constructor(
@@ -2436,7 +2590,7 @@ data = "{nominate}"
         assert!(
             verdict.refused.iter().any(|r| r.starts_with("call 1 ")
                 && r.contains(&format!(
-                    "{CTM_PROXY_ADMIN} is not the EIP-1967 admin of the CTM {CTM} on L1"
+                    "{CTM_PROXY_ADMIN} is neither the EIP-1967 admin of the CTM {CTM} on L1"
                 ))),
             "{:#?}",
             verdict.refused
@@ -2563,6 +2717,257 @@ data = "{nominate}"
             )),
             "{}",
             verdict.refused[0]
+        );
+    }
+
+    /// The `Create2AndTransfer` init code that creates the CTM-domain ProxyAdmin of `ctm` for
+    /// `owner` under [`SALT`], and where that ProxyAdmin lands.
+    fn ctm_admin_deploy(ctm: Address, owner: Address) -> (Vec<u8>, Address) {
+        let inner_salt = ctm_proxy_admin_salt(SALT, ctm);
+        let proxy_admin = creation(REVIEWED_PROXY_ADMIN.1);
+        let init = [
+            creation(CREATE2_AND_TRANSFER.1),
+            (Bytes::from(proxy_admin.clone()), inner_salt, owner).abi_encode_params(),
+        ]
+        .concat();
+        let admin = landing(SALT, &init).create2(inner_salt, keccak256(&proxy_admin));
+        (init, admin)
+    }
+
+    /// The bootstrap package of a [`CTM`] that still shares the ecosystem ProxyAdmin: its
+    /// executor, its `transparent_proxy_admin` and its split all name `admin`, which the split
+    /// hands to `owner`.
+    fn split_package(admin: Address, owner: Address) -> PackageView {
+        let executor = Executor {
+            ctm: CTM,
+            proxy_admin: admin,
+        };
+        package_from(&format!(
+            "{}
+[ctms.zksync_os.ctm_proxy_admin_split]
+             ecosystem_proxy_admin = \"{ECOSYSTEM_PROXY_ADMIN}\"
+             ctm_proxy_admin = \"{admin}\"
+             governance = \"{owner}\"
+             calls = \"0x\"
+",
+            package_toml_for(executor).replace(
+                &format!("transparent_proxy_admin = \"{CTM_PROXY_ADMIN}\""),
+                &format!("transparent_proxy_admin = \"{admin}\""),
+            )
+        ))
+    }
+
+    /// L1 while [`CTM`] shares the ecosystem ProxyAdmin.
+    fn shared_inputs() -> ReviewedInputs {
+        let mut inputs = inputs();
+        inputs.ctm_facts.insert(
+            CTM,
+            CtmFacts {
+                proxy_admin: ECOSYSTEM_PROXY_ADMIN,
+                ..live_ctm()
+            },
+        );
+        inputs
+    }
+
+    /// [`clean_plan_for`] the executor behind `admin`, deploying `init` LAST: the handover names
+    /// the CTM-domain ProxyAdmin before the plan deploys it. Governance already owns that admin,
+    /// so nothing normalizes its ownership.
+    fn split_plan(admin: Address, init: &[u8]) -> Vec<(Address, U256, Bytes)> {
+        let mut plan = clean_plan_for(Executor {
+            ctm: CTM,
+            proxy_admin: admin,
+        });
+        plan.remove(0);
+        plan.push((
+            DETERMINISTIC_CREATE2_FACTORY,
+            U256::ZERO,
+            deploy(SALT, init).1,
+        ));
+        plan
+    }
+
+    /// The CTM-domain ProxyAdmin the split names is admitted as the CTM's own: the handover and a
+    /// proxy may name it although L1 still administers the CTM through the ecosystem's.
+    #[test]
+    fn the_ctm_proxy_admin_a_split_names_is_admitted_and_held_to() {
+        let (init, admin) = ctm_admin_deploy(CTM, GOVERNANCE);
+        let verdict = check_plan(
+            &build(),
+            &split_package(admin, GOVERNANCE),
+            &shared_inputs(),
+            &calls(split_plan(admin, &init)),
+        );
+        assert!(verdict.refused.is_empty(), "{:#?}", verdict.refused);
+        assert!(verdict.admitted.last().unwrap().contains(&format!(
+            "deploys {admin}: the CTM-domain ProxyAdmin of the CTM {CTM}, created by a \
+             Create2AndTransfer that hands it to governance"
+        )));
+        assert!(verdict.admitted.iter().any(|line| line.contains(&format!(
+            "moves {NOTIFIER} under the CTM-domain ProxyAdmin this plan deploys"
+        ))));
+
+        // A proxy the package names behind it.
+        let logic = landing(SALT, &admin_init());
+        let proxy_init = [
+            creation(REVIEWED_PROXY.1),
+            (logic, admin, Bytes::new()).abi_encode_params(),
+        ]
+        .concat();
+        let toml = format!(
+            "{}
+[ctms.zksync_os.ctm_proxy_admin_split]
+             ecosystem_proxy_admin = \"{ECOSYSTEM_PROXY_ADMIN}\"
+             ctm_proxy_admin = \"{admin}\"
+governance = \"{GOVERNANCE}\"
+calls = \"0x\"
+
+             [ctms.zksync_os.proxies]
+proxy_addr = \"{}\"
+",
+            package_toml_for(Executor {
+                ctm: CTM,
+                proxy_admin: admin
+            })
+            .replace(
+                &format!("transparent_proxy_admin = \"{CTM_PROXY_ADMIN}\""),
+                &format!("transparent_proxy_admin = \"{admin}\""),
+            ),
+            landing(SALT, &proxy_init)
+        );
+        let mut plan = split_plan(admin, &init);
+        plan.insert(
+            0,
+            (
+                DETERMINISTIC_CREATE2_FACTORY,
+                U256::ZERO,
+                deploy(SALT, &proxy_init).1,
+            ),
+        );
+        let verdict = check_plan(
+            &build(),
+            &package_from(&toml),
+            &shared_inputs(),
+            &calls(plan),
+        );
+        assert!(verdict.refused.is_empty(), "{:#?}", verdict.refused);
+    }
+
+    /// Without its deployment, the split's admin is not the CTM's: L1 says the ecosystem's.
+    #[test]
+    fn an_undeployed_ctm_proxy_admin_is_not_the_ctms() {
+        let (init, admin) = ctm_admin_deploy(CTM, GOVERNANCE);
+        let mut plan = split_plan(admin, &init);
+        plan.pop();
+        let verdict = check_plan(
+            &build(),
+            &split_package(admin, GOVERNANCE),
+            &shared_inputs(),
+            &calls(plan),
+        );
+        assert_eq!(verdict.refused.len(), 1, "{:#?}", verdict.refused);
+        assert!(
+            verdict.refused[0].contains(&format!(
+                "moves {NOTIFIER} under {admin}, which the planned CTM executor's record names, \
+                 but the CTM {CTM} is administered by {ECOSYSTEM_PROXY_ADMIN} on L1 and this plan \
+                 deploys no CTM-domain ProxyAdmin there for it"
+            )),
+            "{}",
+            verdict.refused[0]
+        );
+    }
+
+    #[test]
+    fn a_ctm_proxy_admin_for_another_owner_fails() {
+        let (init, admin) = ctm_admin_deploy(CTM, STRANGER);
+        let verdict = check_plan(
+            &build(),
+            &split_package(admin, STRANGER),
+            &shared_inputs(),
+            &calls(split_plan(admin, &init)),
+        );
+        assert!(
+            verdict.refused.iter().any(|r| r.contains(&format!(
+                "creates the CTM-domain ProxyAdmin of the CTM {CTM} \
+                 ([ctms.zksync_os.ctm_proxy_admin_split]) for owner {STRANGER}, not for \
+                 governance {GOVERNANCE}"
+            ))),
+            "{:#?}",
+            verdict.refused
+        );
+        // The admin it would create is no CTM's, so the handover onto it is refused too.
+        assert!(
+            verdict
+                .refused
+                .iter()
+                .any(|r| r.contains("deploys no CTM-domain ProxyAdmin there for it")),
+            "{:#?}",
+            verdict.refused
+        );
+    }
+
+    #[test]
+    fn a_ctm_proxy_admin_landing_elsewhere_than_the_split_names_fails() {
+        let (init, admin) = ctm_admin_deploy(CTM, GOVERNANCE);
+        let named = Address::repeat_byte(0xAB);
+        let verdict = check_plan(
+            &build(),
+            &split_package(named, GOVERNANCE),
+            &shared_inputs(),
+            &calls(split_plan(named, &init)),
+        );
+        assert!(
+            verdict.refused.iter().any(|r| r.contains(&format!(
+                "creates the CTM-domain ProxyAdmin of the CTM {CTM} at {admin}, but \
+                 [ctms.zksync_os.ctm_proxy_admin_split] names ctm_proxy_admin {named}"
+            ))),
+            "{:#?}",
+            verdict.refused
+        );
+    }
+
+    /// A `Create2AndTransfer` over anything but the reviewed ProxyAdmin under the split CTM's salt
+    /// is refused, as is one for a CTM the env does not name.
+    #[test]
+    fn a_create2_and_transfer_off_the_split_fails() {
+        let (_, admin) = ctm_admin_deploy(CTM, GOVERNANCE);
+        let (other_ctm, _) = ctm_admin_deploy(STRANGER, GOVERNANCE);
+        let mut tampered = ctm_admin_deploy(CTM, GOVERNANCE).0;
+        *tampered.last_mut().unwrap() ^= 1;
+        for init in [other_ctm, tampered] {
+            let verdict = check_plan(
+                &build(),
+                &split_package(admin, GOVERNANCE),
+                &shared_inputs(),
+                &calls(split_plan(admin, &init)),
+            );
+            assert!(
+                verdict.refused.iter().any(|r| r.contains(
+                    "a Create2AndTransfer (Create2AndTransfer.sol), but it creates no CTM-domain \
+                     ProxyAdmin a [ctms.<key>.ctm_proxy_admin_split] names for one of the env's \
+                     [[ctm_contracts.ctms]]"
+                )),
+                "{:#?}",
+                verdict.refused
+            );
+        }
+
+        let (init, admin) = ctm_admin_deploy(CTM, GOVERNANCE);
+        let mut elsewhere = shared_inputs();
+        elsewhere.env_ctms = Some([STRANGER].into());
+        let verdict = check_plan(
+            &build(),
+            &split_package(admin, GOVERNANCE),
+            &elsewhere,
+            &calls(split_plan(admin, &init)),
+        );
+        assert!(
+            verdict
+                .refused
+                .iter()
+                .any(|r| r.contains("but it creates no CTM-domain ProxyAdmin")),
+            "{:#?}",
+            verdict.refused
         );
     }
 
@@ -2878,7 +3283,7 @@ data = "{nominate}"
     /// prepare drives (without one the CTM prepare draws a random salt, which the check refuses).
     #[test]
     fn every_deployed_env_declares_the_reviewed_inputs() {
-        for env in ["stage", "testnet", "mainnet"] {
+        for env in ["stage", "testnet", "mainnet", "zksync-os-mainnet"] {
             let cfg = match EnvConfig::load(env) {
                 Ok(cfg) => cfg,
                 // no checkout around the test binary
