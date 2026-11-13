@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 error AmountToKeepOnL1NotUint256();
 // 0x7a734a36
 error AssetAlreadyRegistered(bytes32 assetId);
+// 0xae410527
+error AssetBalanceNotOnL1(uint256 chainId, bytes32 assetId);
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0xffaa9b75
@@ -15,8 +17,14 @@ error BaseTokenTotalSupplyBackfillNotNeeded();
 error BaseTokenTotalSupplyBackfillRequired();
 // 0x14aecab6
 error CanNotSendInteropToL1(uint256 destinationChainId);
+// 0xe1b625d4
+error ChainAdminNotOwner(uint256 chainId, address chainAdmin);
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
+// 0x7165f465
+error ChainNotShutdown(uint256 chainId);
+// 0xa0d39c49
+error ChainValidatorNotRemoved(uint256 chainId, address validator);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0xb13a28eb
@@ -59,8 +67,12 @@ error InvalidWithdrawalChainId();
 error MissingBaseTokenAssetId();
 // 0x10c549b7
 error MustBeWithdrawalToL1(uint256 destinationChainId);
+// 0x7e862ce6
+error NoChainBalanceToSend(uint256 chainId, bytes32 assetId);
 // 0x8dfed13a
 error NotMigratedChain();
+// 0x74746b0a
+error NotShutdownChainNativeAsset(uint256 chainId, bytes32 assetId);
 // 0x4a22c4b8
 error OnlyGatewaySettlementLayer();
 // 0x0fd3385e
@@ -69,11 +81,19 @@ error OnlyWhitelistedSettlementLayer(address, address);
 error RegisterNewTokenNotAllowed();
 // 0xaad86dcd
 error SettlementFeePayerNotAgreed(address payer, uint256 chainId);
+// 0x2b6d6822
+error SettlementLayerCannotBeShutdown(uint256 chainId);
+// 0x750619e7
+error ShutdownChainNativeAssetAmountAlreadySet(uint256 chainId, bytes32 assetId);
+// 0x3da0b0be
+error ShutdownDistributorNotSet(uint256 chainId);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x34838ed2
 error TotalPreV31SupplyNotSaved(bytes32 _assetId);
 // 0x0a767367
 error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
+// 0x1406ca08
+error TransactionFiltererNotSet(uint256 chainId);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);

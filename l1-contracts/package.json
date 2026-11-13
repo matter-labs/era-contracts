@@ -58,6 +58,7 @@
   "scripts": {
     "build": "hardhat compile && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat compile ",
     "build-l1": "hardhat compile",
+    "build:shutdown-distributor": "cd vendor/zksync-lite-sunset && shasum -a 256 -c src.sha256 && forge build",
     "build:foundry": "forge build && forge build --zksync --skip '*/l1-contracts/test/*' 'L2BaseToken.sol' 'Burner.sol' && yarn copy-to-zkstack-out",
     "build:anvil-interop-dev-artifacts": "ts-node test/anvil-interop/build-dev-artifacts.ts",
     "clean": "hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean",
@@ -65,7 +66,7 @@
     "test": "yarn workspace da-contracts build && hardhat test test/unit_tests/*.spec.ts --network hardhat",
     "test:hardhat": "yarn test:hardhat:interop",
     "test:hardhat:interop": "ts-node test/anvil-interop/run-hardhat-interop-test.ts",
-    "test:foundry": "forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*' --no-match-test 'test_DefaultUpgrade_MainnetFork' --no-match-contract 'ChainRegistrarTest'",
+    "test:foundry": "yarn build:shutdown-distributor && forge test --threads 1 --ffi --match-path 'test/foundry/{l1,zksync-os}/*' --no-match-test 'test_DefaultUpgrade_MainnetFork' --no-match-contract 'ChainRegistrarTest'",
     "test:zkfoundry": "forge test --zksync --match-path 'test/foundry/l2/*' --gas-limit 20000000000 --skip 'test/foundry/l1/*' '*/L2BaseToken.sol' '*/Burner.sol' '*/L2GenesisUpgrade.t.sol' '*/V31AcrossRecoveryFork.t.sol'",
     "test:mainnet-upgrade-fork": "forge test --match-test test_DefaultUpgrade_MainnetFork --ffi --rpc-url $INFURA_MAINNET --gas-limit 2000000000",
     "test:fork": "TEST_CONTRACTS_FORK=1 yarn run hardhat test test/unit_tests/*.fork.ts --network hardhat",

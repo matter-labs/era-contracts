@@ -37,3 +37,5 @@ gas-bound-caller
 lib/*
 l2-contracts/lib
 system-contracts/lib
+# Vendored audited code, must stay byte-identical to upstream
+l1-contracts/vendor

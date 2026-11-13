@@ -34,3 +34,5 @@ l1-contracts/upgrade-envs/**/output/**/protocol-ops/**/manifest.json
 # bundles, manifests. Same reasoning as above: re-formatting breaks downstream
 # replay/diff.
 l1-contracts/test/anvil-interop/outputs/
+# Vendored audited code, must stay byte-identical to upstream
+l1-contracts/vendor

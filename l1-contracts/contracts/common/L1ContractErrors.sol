@@ -85,6 +85,8 @@ error ChainIdMismatch();
 error ChainIdNotRegistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
+// 0xcf3c13e1
+error ChainIsShutdown();
 // 0x5e361ef9
 error ChainRequiresValidatorsSignaturesForCommit();
 // 0x8746f42f

@@ -29,6 +29,24 @@ interface IL1AssetTracker {
 
     event PauseDepositsForChainRequested(uint256 indexed chainId, uint256 indexed settlementLayer);
 
+    /// @notice Emitted when the governance irreversibly shuts down a chain.
+    /// @param batchNumber The number of executed batches of the chain at shutdown, i.e. its final state.
+    event ChainShutdown(uint256 indexed chainId, uint256 batchNumber);
+
+    /// @notice Emitted when the governance sets the distributor for a shut down chain.
+    event ShutdownDistributorSet(uint256 indexed chainId, address indexed distributor);
+
+    /// @notice Emitted when the governance sets the amount of a chain-native token held on a shut down chain.
+    event ShutdownChainNativeAssetAmountSet(uint256 indexed chainId, bytes32 indexed assetId, uint256 amount);
+
+    /// @notice Emitted when the L1 funds of a shut down chain are sent to its distributor.
+    event ShutdownChainFundsSent(
+        uint256 indexed chainId,
+        bytes32 indexed assetId,
+        address indexed distributor,
+        uint256 amount
+    );
+
     function BRIDGE_HUB() external view returns (IBridgehubBase);
 
     function handleChainBalanceIncreaseOnL1(
@@ -54,4 +72,22 @@ interface IL1AssetTracker {
     function setAddresses() external;
 
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external;
+
+    function isChainShutdown(uint256 _chainId) external view returns (bool);
+
+    function shutdownDistributor(uint256 _chainId) external view returns (address);
+
+    function shutdownBatchNumber(uint256 _chainId) external view returns (uint256);
+
+    function shutdownChain(uint256 _chainId) external;
+
+    function setShutdownDistributor(uint256 _chainId, address _distributor) external;
+
+    function shutdownChainNativeAssetAmount(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    function isShutdownChainNativeAssetAmountSet(uint256 _chainId, bytes32 _assetId) external view returns (bool);
+
+    function setShutdownChainNativeAssetAmount(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
+
+    function sendShutdownChainFunds(uint256 _chainId, bytes32 _assetId) external returns (uint256 amount);
 }

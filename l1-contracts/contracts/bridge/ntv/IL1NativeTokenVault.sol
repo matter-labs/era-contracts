@@ -30,5 +30,12 @@ interface IL1NativeTokenVault is INativeTokenVaultBase, IL1AssetDeploymentTracke
 
     function l1AssetTracker() external view returns (IL1AssetTracker);
 
+    /// @notice Transfers the L1 funds of a shut down chain to its claim distributor.
+    /// @dev Only callable by the L1AssetTracker, which performs all the accounting and checks.
+    /// @param _assetId The asset to transfer.
+    /// @param _to The distributor.
+    /// @param _amount The amount to transfer.
+    function transferShutdownChainFunds(bytes32 _assetId, address _to, uint256 _amount) external;
+
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 }
