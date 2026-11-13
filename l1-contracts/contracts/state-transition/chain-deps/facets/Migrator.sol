@@ -3,7 +3,15 @@
 pragma solidity 0.8.28;
 
 import {IMigrator} from "../../chain-interfaces/IMigrator.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET} from "../../../common/Config.sol";
+import {
+    L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
+    L2DACommitmentScheme,
+    ZKChainCommitment,
+    CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+    CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
+} from "../../../common/Config.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
@@ -11,8 +19,31 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
-import {NotAZKChain, NotCompatibleWithPriorityMode, RemovingPermanentRestriction} from "../../../common/L1ContractErrors.sol";
+import {
+    AlreadyMigrated,
+    PriorityQueueNotFullyProcessed,
+    TotalPriorityTxsIsZero,
+    ContractNotDeployed,
+    DepositsAlreadyPaused,
+    DepositsNotPaused,
+    ExecutedIsNotConsistentWithVerified,
+    InvalidNumberOfBatchHashes,
+    NotAllBatchesExecuted,
+    NotChainAdmin,
+    NotEraChain,
+    NotHistoricalRoot,
+    NotL1,
+    NotMigrated,
+    OutdatedProtocolVersion,
+    ProtocolVersionNotUpToDate,
+    VerifiedIsNotConsistentWithCommitted,
+    MigrationInProgress
+} from "../../L1StateTransitionErrors.sol";
+import {
+    NotAZKChain,
+    NotCompatibleWithPriorityMode,
+    RemovingPermanentRestriction
+} from "../../../common/L1ContractErrors.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {TxStatus} from "../../../common/Messaging.sol";
@@ -71,7 +102,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     }
 
     /// @inheritdoc IMigrator
-    function pauseDepositsBeforeInitiatingMigration() external onlyAdminOrChainTypeManager onlyL1 notShutdown {
+    function pauseDepositsBeforeInitiatingMigration() external onlyAdminOrChainTypeManager onlyL1 {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }
@@ -122,7 +153,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyChainAssetHandler notShutdown returns (bytes memory chainBridgeMintData) {
+    ) external payable override onlyChainAssetHandler returns (bytes memory chainBridgeMintData) {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }

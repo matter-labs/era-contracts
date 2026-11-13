@@ -17,10 +17,14 @@ error BaseTokenTotalSupplyBackfillNotNeeded();
 error BaseTokenTotalSupplyBackfillRequired();
 // 0x14aecab6
 error CanNotSendInteropToL1(uint256 destinationChainId);
+// 0xe1b625d4
+error ChainAdminNotOwner(uint256 chainId, address chainAdmin);
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
 // 0x7165f465
 error ChainNotShutdown(uint256 chainId);
+// 0xa0d39c49
+error ChainValidatorNotRemoved(uint256 chainId, address validator);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0xb13a28eb
@@ -89,5 +93,7 @@ error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 error TotalPreV31SupplyNotSaved(bytes32 _assetId);
 // 0x0a767367
 error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
+// 0x1406ca08
+error TransactionFiltererNotSet(uint256 chainId);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);

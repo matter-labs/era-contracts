@@ -4,18 +4,64 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData, MigrationConfirmationData} from "../../common/Messaging.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GatewayToL1TokenBalanceMigrationData,
+    L1ToGatewayTokenBalanceMigrationData,
+    MigrationConfirmationData
+} from "../../common/Messaging.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {ChainIsShutdown, InvalidChainId, InvalidProof, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {IMessageRootBase, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "../../core/message-root/IMessageRoot.sol";
+import {
+    ChainIsShutdown,
+    InvalidChainId,
+    InvalidProof,
+    Unauthorized,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
+import {
+    IMessageRootBase,
+    V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
+} from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
+import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
+import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {AmountToKeepOnL1NotUint256, AssetBalanceNotOnL1, AssetIdNotRegistered, ChainNotShutdown, NoChainBalanceToSend, SettlementLayerCannotBeShutdown, NotShutdownChainNativeAsset, ShutdownChainNativeAssetAmountAlreadySet, ShutdownDistributorNotSet, AssetNotMigratedFromNTV, ChainBalanceMustBeZeroBeforeMigration, InvalidAssetMigrationNumber, InvalidChainMigrationNumber, InvalidMigrationAmount, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidVersion, InvalidWithdrawalChainId, AssetAlreadyRegistered, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
+import {
+    AmountToKeepOnL1NotUint256,
+    AssetBalanceNotOnL1,
+    AssetIdNotRegistered,
+    ChainNotShutdown,
+    NoChainBalanceToSend,
+    SettlementLayerCannotBeShutdown,
+    NotShutdownChainNativeAsset,
+    ShutdownChainNativeAssetAmountAlreadySet,
+    ShutdownDistributorNotSet,
+    AssetNotMigratedFromNTV,
+    ChainAdminNotOwner,
+    ChainBalanceMustBeZeroBeforeMigration,
+    ChainValidatorNotRemoved,
+    TransactionFiltererNotSet,
+    InvalidAssetMigrationNumber,
+    InvalidChainMigrationNumber,
+    InvalidMigrationAmount,
+    InvalidMigrationNumber,
+    InvalidSender,
+    InvalidSettlementLayer,
+    InvalidVersion,
+    InvalidWithdrawalChainId,
+    AssetAlreadyRegistered,
+    NotMigratedChain,
+    OnlyWhitelistedSettlementLayer,
+    TransientBalanceChangeAlreadySet
+} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
@@ -41,9 +87,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     mapping(uint256 chainId => mapping(bytes32 assetId => InteropL1Info info)) internal interopInfo;
 
     /// @notice Whether the chain has been irreversibly shut down.
-    /// @dev Set by the chain's diamond proxy at the moment both the chain admin and the governance approved the shutdown.
-    /// Once set, it can never be unset.
+    /// @dev Set by the governance (owner) via `shutdownChain`. Once set, it can never be unset.
     mapping(uint256 chainId => bool isShutdown) public isChainShutdown;
+
+    /// @notice The number of executed batches of a shut down chain at the moment of shutdown.
+    /// @dev The final state of the chain, i.e. the one the distributor's Merkle snapshot must be taken from,
+    /// is the state after this batch.
+    mapping(uint256 chainId => uint256 batchNumber) public shutdownBatchNumber;
 
     /// @notice The claim distributor to which the L1 funds of a shut down chain are sent.
     /// @dev Set by the governance (owner). It is expected to be the Merkle distributor used for the ZKsync Lite sunset
@@ -53,8 +103,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice The amount of a token native to a shut down chain that was still held on that chain at shutdown and
     /// can be minted on L1 for the distributor.
-    /// @dev Set once by the chain's admin (through the chain's diamond proxy). Withdrawals that were finalized before
-    /// the shutdown are already held by their owners on L1, so they must not be included. Reset to zero once sent.
+    /// @dev Set once by the governance (owner), which is the chain's admin at the moment of shutdown. Withdrawals that
+    /// were finalized before the shutdown are already held by their owners on L1, so they must not be included.
+    /// Reset to zero once sent.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 amount)) public shutdownChainNativeAssetAmount;
 
     /// @notice Whether `shutdownChainNativeAssetAmount` has been set for the asset, so it can not be set again.
@@ -342,19 +393,49 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                     Chain shutdown
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Called by the chain's diamond proxy when the chain gets irreversibly shut down.
-    /// @dev From this point on, no withdrawals or failed deposit claims can be finalized for the chain,
+    /// @notice Irreversibly shuts down a chain.
+    /// @dev Only callable by the governance (owner). No chain facets are involved: the chain is expected to have been
+    /// made inert beforehand, typically in the same governance multicall that calls this function:
+    /// 1. the chain admin has set the governance as the pending admin and the governance has accepted it,
+    ///    so the chain admin can no longer act on the chain;
+    /// 2. a transaction filterer that rejects all transactions (e.g. `DenyAllTransactionFilterer`) is installed,
+    ///    so no deposits or other L1->L2 transactions can be requested;
+    /// 3. the ValidatorTimelock has been removed from the chain's validators (`ChainTypeManager.setValidator`),
+    ///    so no batches can be committed, proven or executed.
+    /// The function checks what it can read on-chain: the admin, the timelock validators and that a filterer is set.
+    /// It can not check that the filterer rejects everything, or that the chain has no validators other than the
+    /// ValidatorTimelocks, so these have to be reviewed off-chain before the governance proposal is executed.
+    /// @dev Service transactions skip the transaction filterer, but they carry no value and, with no validators,
+    /// can never be processed.
+    /// @dev From this point on, no deposits, withdrawals or failed deposit claims can be processed for the chain,
     /// and its funds can only be sent to the shutdown distributor.
-    /// @param _chainId The id of the chain that is shut down.
-    function registerChainShutdown(uint256 _chainId) external onlyChain(_chainId) {
+    /// @param _chainId The id of the chain to shut down.
+    function shutdownChain(uint256 _chainId) external onlyOwner {
+        require(!isChainShutdown[_chainId], ChainIsShutdown());
         // Shutdown is only supported for chains that settle on L1, so that all their balances are tracked here
         // under their own `chainId`.
         require(BRIDGE_HUB.settlementLayer(_chainId) == block.chainid, InvalidSettlementLayer());
         // Settlement layers hold balances of the chains settling on top of them, shutting them down is not supported.
         require(!BRIDGE_HUB.whitelistedSettlementLayers(_chainId), SettlementLayerCannotBeShutdown(_chainId));
 
+        IGetters zkChain = IGetters(BRIDGE_HUB.getZKChain(_chainId));
+        address chainAdmin = zkChain.getAdmin();
+        require(chainAdmin == owner(), ChainAdminNotOwner(_chainId, chainAdmin));
+        require(zkChain.getTransactionFilterer() != address(0), TransactionFiltererNotSet(_chainId));
+
+        IChainTypeManager chainTypeManager = IChainTypeManager(zkChain.getChainTypeManager());
+        address validatorTimelock = chainTypeManager.validatorTimelock();
+        require(!zkChain.isValidator(validatorTimelock), ChainValidatorNotRemoved(_chainId, validatorTimelock));
+        address validatorTimelockPostV29 = chainTypeManager.validatorTimelockPostV29();
+        require(
+            !zkChain.isValidator(validatorTimelockPostV29),
+            ChainValidatorNotRemoved(_chainId, validatorTimelockPostV29)
+        );
+
+        uint256 batchNumber = zkChain.getTotalBatchesExecuted();
         isChainShutdown[_chainId] = true;
-        emit ChainShutdownRegistered(_chainId);
+        shutdownBatchNumber[_chainId] = batchNumber;
+        emit ChainShutdown(_chainId, batchNumber);
     }
 
     /// @notice Sets the claim distributor for a shut down chain.
@@ -371,16 +452,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice Sets the amount of a token native to the shut down chain that its users still held on the chain at
     /// shutdown. This amount can then be minted on L1 for the distributor by `sendShutdownChainFunds`.
-    /// @dev Called by the chain's diamond proxy on behalf of the chain admin. Can only be set once per asset.
+    /// @dev Only callable by the governance (owner), which is the chain's admin at the moment of shutdown.
+    /// Can only be set once per asset.
     /// The amount comes on top of what has already been withdrawn to L1, which its owners already hold.
     /// @param _chainId The id of the shut down chain.
     /// @param _assetId The asset native to the chain.
     /// @param _amount The amount of the asset held on the chain at shutdown.
-    function setShutdownChainNativeAssetAmount(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount
-    ) external onlyChain(_chainId) {
+    function setShutdownChainNativeAssetAmount(uint256 _chainId, bytes32 _assetId, uint256 _amount) external onlyOwner {
         require(isChainShutdown[_chainId], ChainNotShutdown(_chainId));
         require(
             NATIVE_TOKEN_VAULT.originChainId(_assetId) == _chainId,
@@ -401,7 +479,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Sends the funds of a shut down chain in `_assetId` to its distributor.
     /// @dev Permissionless: anyone can trigger it once the distributor is set.
     /// @dev For tokens not native to the chain, the whole L1 balance of the chain is sent.
-    /// For tokens native to the chain, the amount set by the chain admin via `setShutdownChainNativeAssetAmount`
+    /// For tokens native to the chain, the amount set by the governance via `setShutdownChainNativeAssetAmount`
     /// is minted on L1.
     /// @dev Accounting-wise it behaves like a withdrawal of the amount to L1.
     /// @param _chainId The id of the shut down chain.

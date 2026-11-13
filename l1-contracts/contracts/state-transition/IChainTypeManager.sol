@@ -184,10 +184,6 @@ interface IChainTypeManager {
 
     function unfreezeChain(uint256 _chainId) external;
 
-    function approveChainShutdown(uint256 _chainId) external;
-
-    function revokeChainShutdownApproval(uint256 _chainId) external;
-
     function setTokenMultiplier(uint256 _chainId, uint128 _nominator, uint128 _denominator) external;
 
     function changeFeeParams(uint256 _chainId, FeeParams calldata _newFeeParams) external;

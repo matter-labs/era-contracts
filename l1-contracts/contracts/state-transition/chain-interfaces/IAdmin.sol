@@ -88,25 +88,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @param _diamondCut The diamond cut parameters to be executed
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external;
 
-    /// @notice Approves the irreversible shutdown of the chain.
-    /// @dev Callable by the chain admin and by the ChainTypeManager (i.e. the governance via `approveChainShutdown`).
-    /// Once both parties have approved, the chain is shut down forever: no new priority operations, batches,
-    /// migrations or regular upgrades are possible, and its L1 funds can be sent to a claim distributor.
-    /// @dev Only available for chains that settle on L1.
-    function approveShutdown() external;
-
-    /// @notice Revokes the caller's (chain admin or ChainTypeManager) approval of the chain shutdown.
-    /// @dev Only possible while the shutdown is not yet active.
-    function revokeShutdownApproval() external;
-
-    /// @notice Sets the amount of a token native to this (shut down) chain that its users still held on the chain at
-    /// shutdown, so that it can be minted on L1 for the shutdown distributor.
-    /// @dev Only callable by the chain admin, once per asset and only after the shutdown. The amount must not include
-    /// withdrawals that were already finalized on L1 before the shutdown.
-    /// @param _assetId The asset native to the chain.
-    /// @param _amount The amount of the asset held on the chain at shutdown.
-    function setShutdownChainNativeAssetAmount(bytes32 _assetId, uint256 _amount) external;
-
     /// @notice Instantly pause the functionality of all freezable facets & their selectors
     /// @dev Only the governance mechanism may freeze Diamond Proxy
     function freezeDiamond() external;
@@ -178,16 +159,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice Emitted when an upgrade is executed.
     event ExecuteUpgrade(Diamond.DiamondCutData diamondCut);
-
-    /// @notice Emitted when the chain admin or the ChainTypeManager approves the chain shutdown.
-    event ShutdownApproved(address indexed approver);
-
-    /// @notice Emitted when the chain admin or the ChainTypeManager revokes its approval of the chain shutdown.
-    event ShutdownApprovalRevoked(address indexed approver);
-
-    /// @notice Emitted when the chain is irreversibly shut down.
-    /// @param lastExecutedBatch The last executed batch, i.e. the batch whose state is final.
-    event ChainShutdown(uint256 lastExecutedBatch);
 
     /// @notice Emitted when the contract is frozen.
     event Freeze();

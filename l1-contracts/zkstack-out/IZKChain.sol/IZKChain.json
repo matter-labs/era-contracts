@@ -28,13 +28,6 @@
   },
   {
     "type": "function",
-    "name": "approveShutdown",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "baseTokenGasPriceMultiplierDenominator",
     "inputs": [],
     "outputs": [
@@ -882,41 +875,6 @@
   },
   {
     "type": "function",
-    "name": "getShutdownInfo",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct ShutdownInformation",
-        "components": [
-          {
-            "name": "approvedByAdmin",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "approvedByChainTypeManager",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "activated",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "lastExecutedBatch",
-            "type": "uint64",
-            "internalType": "uint64"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getTotalBatchesCommitted",
     "inputs": [],
     "outputs": [
@@ -1114,19 +1072,6 @@
   {
     "type": "function",
     "name": "isPriorityQueueActive",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "isShutdown",
     "inputs": [],
     "outputs": [
       {
@@ -1969,13 +1914,6 @@
   },
   {
     "type": "function",
-    "name": "revokeShutdownApproval",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setDAValidatorPair",
     "inputs": [
       {
@@ -2052,24 +1990,6 @@
         "name": "_pricingMode",
         "type": "uint8",
         "internalType": "enum PubdataPricingMode"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setShutdownChainNativeAssetAmount",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -2369,19 +2289,6 @@
       },
       {
         "name": "_amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ChainShutdown",
-    "inputs": [
-      {
-        "name": "lastExecutedBatch",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -3030,32 +2937,6 @@
         "type": "uint64",
         "indexed": true,
         "internalType": "uint64"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ShutdownApprovalRevoked",
-    "inputs": [
-      {
-        "name": "approver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ShutdownApproved",
-    "inputs": [
-      {
-        "name": "approver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       }
     ],
     "anonymous": false

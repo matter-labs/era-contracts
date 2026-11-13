@@ -443,19 +443,6 @@
   },
   {
     "type": "function",
-    "name": "registerChainShutdown",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "registerLegacyToken",
     "inputs": [
       {
@@ -579,6 +566,38 @@
   },
   {
     "type": "function",
+    "name": "shutdownBatchNumber",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "shutdownChain",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "shutdownChainNativeAssetAmount",
     "inputs": [
       {
@@ -685,12 +704,18 @@
   },
   {
     "type": "event",
-    "name": "ChainShutdownRegistered",
+    "name": "ChainShutdown",
     "inputs": [
       {
         "name": "chainId",
         "type": "uint256",
         "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "batchNumber",
+        "type": "uint256",
+        "indexed": false,
         "internalType": "uint256"
       }
     ],
@@ -939,6 +964,22 @@
   },
   {
     "type": "error",
+    "name": "ChainAdminNotOwner",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "chainAdmin",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ChainBalanceMustBeZeroBeforeMigration",
     "inputs": [
       {
@@ -971,6 +1012,22 @@
         "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ChainValidatorNotRemoved",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "validator",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
@@ -1194,6 +1251,17 @@
     "type": "error",
     "name": "SlotOccupied",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TransactionFiltererNotSet",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

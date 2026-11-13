@@ -12,17 +12,43 @@ import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.
 import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
-import {BalanceChange, BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
+import {
+    BalanceChange,
+    BridgehubL2TransactionRequest,
+    L2CanonicalTransaction,
+    L2Log,
+    L2Message,
+    TxStatus,
+    WritePriorityOpParams
+} from "../../../common/Messaging.sol";
 import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET} from "../../../common/Config.sol";
+import {
+    MAX_NEW_FACTORY_DEPS,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    SERVICE_TRANSACTION_SENDER,
+    SETTLEMENT_LAYER_RELAY_SENDER,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
+} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
-import {AddressNotZero, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ValueMismatch, ZeroAddress, ChainIsShutdown} from "../../../common/L1ContractErrors.sol";
+import {
+    AddressNotZero,
+    GasPerPubdataMismatch,
+    InvalidChainId,
+    MsgValueTooLow,
+    NotAssetRouter,
+    OnlyEraSupported,
+    TooManyFactoryDeps,
+    TransactionNotAllowed,
+    ValueMismatch,
+    ZeroAddress
+} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, NotL1, NotSettlementLayer, NotZKChain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -583,9 +609,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
 
     // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash) internal {
-        // This is the single entry point for all priority operations (deposits, L1->L2 txs, service txs,
-        // txs forwarded from chains settling on top of this one), so blocking it here blocks all of them.
-        require(!s.shutdownInfo.activated, ChainIsShutdown());
         s.priorityTree.push(_canonicalTxHash);
         uint256 totalPriorityTxs = s.priorityTree.getTotalPriorityTxs();
         uint256 newRequestId = totalPriorityTxs - 1;

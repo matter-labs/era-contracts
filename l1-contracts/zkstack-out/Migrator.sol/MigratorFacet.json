@@ -300,11 +300,6 @@
   },
   {
     "type": "error",
-    "name": "ChainIsShutdown",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "ContractNotDeployed",
     "inputs": []
   },

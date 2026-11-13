@@ -11,16 +11,16 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {
+    L2TransactionRequestDirect,
+    L2TransactionRequestTwoBridgesOuter
+} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
-import {ShutdownInformation} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DenyAllTransactionFilterer} from "contracts/transactionFilterer/DenyAllTransactionFilterer.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IZkSyncLiteSunsetClaimDistributorL1} from "./utils/IZkSyncLiteSunsetClaimDistributorL1.sol";
@@ -31,11 +31,22 @@ import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {ChainIsShutdown, ChainShutdownAlreadyApproved, ChainShutdownNotApproved, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {ChainNotShutdown, NoChainBalanceToSend, NotShutdownChainNativeAsset, ShutdownChainNativeAssetAmountAlreadySet, ShutdownDistributorNotSet} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {ChainIsShutdown, TransactionNotAllowed, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    ChainAdminNotOwner,
+    ChainNotShutdown,
+    ChainValidatorNotRemoved,
+    NoChainBalanceToSend,
+    NotShutdownChainNativeAsset,
+    ShutdownChainNativeAssetAmountAlreadySet,
+    ShutdownDistributorNotSet,
+    TransactionFiltererNotSet
+} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 
-/// @notice End-to-end tests of the chain shutdown flow on L1:
-/// two-party approval -> chain is frozen forever -> its L1 funds are sent to a Merkle distributor -> users claim.
+/// @notice End-to-end tests of the chain shutdown flow on L1, which needs no changes to the chain's facets:
+/// the chain admin installs a deny-all filterer and nominates the governance as admin -> the governance accepts,
+/// removes the ValidatorTimelock and shuts the chain down in the asset tracker -> the chain's L1 funds are sent
+/// to a Merkle distributor -> users claim.
 /// @dev Uses the full L1 ecosystem deployment and real deposits through the Bridgehub, no storage overrides.
 contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant GAS_PRICE = 10_000_000;
@@ -47,7 +58,9 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     address chainAdmin;
     address ctmOwner;
     IL1AssetTracker assetTracker;
-    address assetTrackerOwner;
+    /// @dev The governance: owner of the asset tracker and, after the shutdown multicall, the chain admin.
+    address governance;
+    address validatorTimelock;
 
     TestnetERC20Token token;
     bytes32 ethAssetId;
@@ -78,7 +91,8 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             vm.prank(pendingOwner);
             Ownable2StepUpgradeable(address(assetTracker)).acceptOwnership();
         }
-        assetTrackerOwner = Ownable2StepUpgradeable(address(assetTracker)).owner();
+        governance = Ownable2StepUpgradeable(address(assetTracker)).owner();
+        validatorTimelock = addresses.chainTypeManager.validatorTimelockPostV29();
 
         token = TestnetERC20Token(tokens[0]);
         ethAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
@@ -135,11 +149,32 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(request);
     }
 
-    function _shutdown() internal {
-        vm.prank(chainAdmin);
-        IZKChain(chain).approveShutdown();
+    /// @dev What the current chain admin does before the governance proposal is executed:
+    /// installs the deny-all transaction filterer and nominates the governance as the next admin.
+    function _prepareShutdownByChainAdmin() internal {
+        address filterer = address(new DenyAllTransactionFilterer());
+        vm.startPrank(chainAdmin);
+        IZKChain(chain).setTransactionFilterer(filterer);
+        IZKChain(chain).setPendingAdmin(governance);
+        vm.stopPrank();
+    }
+
+    /// @dev The governance proposal, executed as one multicall in production:
+    /// accept the chain admin role, remove the ValidatorTimelock from the chain's validators, shut the chain down.
+    /// In this test deployment the ChainTypeManager may be owned by a different address than the asset tracker,
+    /// so each call is made by the owner of its target.
+    function _governanceShutdownMulticall() internal {
+        vm.prank(governance);
+        IZKChain(chain).acceptAdmin();
         vm.prank(ctmOwner);
-        addresses.chainTypeManager.approveChainShutdown(chainId);
+        addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
+        vm.prank(governance);
+        assetTracker.shutdownChain(chainId);
+    }
+
+    function _shutdown() internal {
+        _prepareShutdownByChainAdmin();
+        _governanceShutdownMulticall();
     }
 
     function _leaf(uint256 _index, address _claimant, address _token, uint256 _amount) internal pure returns (bytes32) {
@@ -159,13 +194,13 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             impl,
             makeAddr("distributorProxyAdmin"),
-            abi.encodeCall(IZkSyncLiteSunsetClaimDistributorL1.initialize, (_root, _windowStart, assetTrackerOwner))
+            abi.encodeCall(IZkSyncLiteSunsetClaimDistributorL1.initialize, (_root, _windowStart, governance))
         );
         return IZkSyncLiteSunsetClaimDistributorL1(address(proxy));
     }
 
     /*//////////////////////////////////////////////////////////////
-                        Two-party approval
+                            Shutdown
     //////////////////////////////////////////////////////////////*/
 
     function test_depositsAreTrackedForTheChain() public view {
@@ -173,159 +208,135 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assertEq(IAssetTrackerBase(address(assetTracker)).chainBalance(chainId, tokenAssetId), TOKEN_DEPOSIT);
     }
 
-    function test_shutdown_adminThenGovernance() public {
-        vm.expectEmit(true, false, false, false, chain);
-        emit IAdmin.ShutdownApproved(chainAdmin);
-        vm.prank(chainAdmin);
-        IZKChain(chain).approveShutdown();
-
-        // A single approval does not shut the chain down.
-        assertFalse(IZKChain(chain).isShutdown());
-        assertFalse(assetTracker.isChainShutdown(chainId));
-        ShutdownInformation memory info = IZKChain(chain).getShutdownInfo();
-        assertTrue(info.approvedByAdmin);
-        assertFalse(info.approvedByChainTypeManager);
+    function test_shutdownChain() public {
+        assertTrue(IZKChain(chain).isValidator(validatorTimelock));
+        _prepareShutdownByChainAdmin();
 
         uint256 lastExecuted = IZKChain(chain).getTotalBatchesExecuted();
-        vm.expectEmit(true, false, false, false, address(assetTracker));
-        emit IL1AssetTracker.ChainShutdownRegistered(chainId);
-        vm.expectEmit(false, false, false, true, chain);
-        emit IAdmin.ChainShutdown(lastExecuted);
+        vm.prank(governance);
+        IZKChain(chain).acceptAdmin();
         vm.prank(ctmOwner);
-        addresses.chainTypeManager.approveChainShutdown(chainId);
+        addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
 
-        assertTrue(IZKChain(chain).isShutdown());
+        vm.expectEmit(true, false, false, true, address(assetTracker));
+        emit IL1AssetTracker.ChainShutdown(chainId, lastExecuted);
+        vm.prank(governance);
+        assetTracker.shutdownChain(chainId);
+
         assertTrue(assetTracker.isChainShutdown(chainId));
-        info = IZKChain(chain).getShutdownInfo();
-        assertTrue(info.activated);
-        assertEq(info.lastExecutedBatch, lastExecuted);
-        // All non-executed batches are reverted at shutdown.
-        assertEq(IZKChain(chain).getTotalBatchesCommitted(), lastExecuted);
+        assertEq(assetTracker.shutdownBatchNumber(chainId), lastExecuted);
+        assertEq(IZKChain(chain).getAdmin(), governance);
+        assertFalse(IZKChain(chain).isValidator(validatorTimelock));
     }
 
-    function test_shutdown_governanceThenAdmin() public {
+    function test_shutdownChain_onlyOwner() public {
+        _prepareShutdownByChainAdmin();
+        vm.prank(governance);
+        IZKChain(chain).acceptAdmin();
         vm.prank(ctmOwner);
-        addresses.chainTypeManager.approveChainShutdown(chainId);
-        assertFalse(IZKChain(chain).isShutdown());
-        assertTrue(IZKChain(chain).getShutdownInfo().approvedByChainTypeManager);
+        addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
 
+        // Not even the chain admin of record can shut down a chain on its own.
         vm.prank(chainAdmin);
-        IZKChain(chain).approveShutdown();
-        assertTrue(IZKChain(chain).isShutdown());
-        assertTrue(assetTracker.isChainShutdown(chainId));
-    }
-
-    function test_approveShutdown_unauthorized() public {
-        address stranger = makeAddr("stranger");
-        vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, stranger));
-        IZKChain(chain).approveShutdown();
-
-        vm.prank(stranger);
         vm.expectRevert("Ownable: caller is not the owner");
-        addresses.chainTypeManager.approveChainShutdown(chainId);
+        assetTracker.shutdownChain(chainId);
     }
 
-    function test_approveShutdown_twiceReverts() public {
-        vm.startPrank(chainAdmin);
-        IZKChain(chain).approveShutdown();
-        vm.expectRevert(ChainShutdownAlreadyApproved.selector);
-        IZKChain(chain).approveShutdown();
-        vm.stopPrank();
-    }
-
-    function test_revokeShutdownApproval() public {
+    function test_shutdownChain_requiresGovernanceAsChainAdmin() public {
+        address filterer = address(new DenyAllTransactionFilterer());
         vm.prank(chainAdmin);
-        IZKChain(chain).approveShutdown();
-
-        vm.expectEmit(true, false, false, false, chain);
-        emit IAdmin.ShutdownApprovalRevoked(chainAdmin);
-        vm.prank(chainAdmin);
-        IZKChain(chain).revokeShutdownApproval();
-        assertFalse(IZKChain(chain).getShutdownInfo().approvedByAdmin);
-
-        // Governance approval alone now does not shut the chain down.
+        IZKChain(chain).setTransactionFilterer(filterer);
         vm.prank(ctmOwner);
-        addresses.chainTypeManager.approveChainShutdown(chainId);
-        assertFalse(IZKChain(chain).isShutdown());
+        addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
 
-        vm.prank(ctmOwner);
-        addresses.chainTypeManager.revokeChainShutdownApproval(chainId);
-        assertFalse(IZKChain(chain).getShutdownInfo().approvedByChainTypeManager);
-
-        // Revoking a non-existent approval reverts.
-        vm.prank(chainAdmin);
-        vm.expectRevert(ChainShutdownNotApproved.selector);
-        IZKChain(chain).revokeShutdownApproval();
+        // The governance has not accepted the admin role.
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(ChainAdminNotOwner.selector, chainId, chainAdmin));
+        assetTracker.shutdownChain(chainId);
     }
 
-    function test_shutdown_isIrreversible() public {
+    function test_shutdownChain_requiresTransactionFilterer() public {
+        vm.prank(chainAdmin);
+        IZKChain(chain).setPendingAdmin(governance);
+        vm.prank(governance);
+        IZKChain(chain).acceptAdmin();
+        vm.prank(ctmOwner);
+        addresses.chainTypeManager.setValidator(chainId, validatorTimelock, false);
+
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(TransactionFiltererNotSet.selector, chainId));
+        assetTracker.shutdownChain(chainId);
+    }
+
+    function test_shutdownChain_requiresValidatorTimelockRemoved() public {
+        _prepareShutdownByChainAdmin();
+        vm.prank(governance);
+        IZKChain(chain).acceptAdmin();
+
+        vm.prank(governance);
+        vm.expectRevert(abi.encodeWithSelector(ChainValidatorNotRemoved.selector, chainId, validatorTimelock));
+        assetTracker.shutdownChain(chainId);
+    }
+
+    function test_shutdownChain_twiceReverts() public {
         _shutdown();
-
-        vm.prank(chainAdmin);
+        vm.prank(governance);
         vm.expectRevert(ChainIsShutdown.selector);
-        IZKChain(chain).revokeShutdownApproval();
-
-        vm.prank(ctmOwner);
-        vm.expectRevert(ChainIsShutdown.selector);
-        addresses.chainTypeManager.revokeChainShutdownApproval(chainId);
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(ChainIsShutdown.selector);
-        IZKChain(chain).approveShutdown();
-
-        assertTrue(IZKChain(chain).isShutdown());
+        assetTracker.shutdownChain(chainId);
     }
 
     /*//////////////////////////////////////////////////////////////
                     No new operations after shutdown
     //////////////////////////////////////////////////////////////*/
 
-    function test_shutdown_blocksDeposits() public {
-        _shutdown();
-
-        vm.txGasPrice(GAS_PRICE);
-        uint256 mintValue = _baseCost();
-        vm.deal(alice, mintValue);
+    function _requestDirect(uint256 _mintValue) internal {
+        vm.deal(alice, _mintValue);
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect({
             _chainId: chainId,
-            _mintValue: mintValue,
+            _mintValue: _mintValue,
             _l2Value: 0,
             _l2GasLimit: L2_GAS_LIMIT,
             _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             _l2CallData: ""
         });
         vm.prank(alice);
-        vm.expectRevert(ChainIsShutdown.selector);
-        addresses.bridgehub.requestL2TransactionDirect{value: mintValue}(request);
+        addresses.bridgehub.requestL2TransactionDirect{value: _mintValue}(request);
     }
 
-    function test_shutdown_blocksBatchesUpgradesAndMigration() public {
-        address validator = makeAddr("validator");
-        vm.prank(ctmOwner);
-        addresses.chainTypeManager.setValidator(chainId, validator, true);
+    function test_denyAllFilterer_blocksL1ToL2Transactions() public {
+        _prepareShutdownByChainAdmin();
+        vm.txGasPrice(GAS_PRICE);
+        uint256 mintValue = _baseCost();
+        vm.expectRevert(TransactionNotAllowed.selector);
+        this.requestDirectExternal(mintValue);
+    }
 
+    function test_shutdown_blocksDeposits() public {
         _shutdown();
+        vm.txGasPrice(GAS_PRICE);
+        uint256 mintValue = _baseCost();
+        // The base token deposit reaches the asset tracker before the transaction reaches the filterer.
+        vm.expectRevert(ChainIsShutdown.selector);
+        this.requestDirectExternal(mintValue);
+    }
 
+    /// @dev External wrapper, so that `vm.expectRevert` applies to the whole request.
+    function requestDirectExternal(uint256 _mintValue) external {
+        _requestDirect(_mintValue);
+    }
+
+    function test_shutdown_blocksBatches() public {
+        _shutdown();
+        // The ValidatorTimelock is no longer a validator of the chain, so the chain rejects any batch it forwards.
         // The modifiers are checked before the calldata is decoded, so empty data is enough here.
-        vm.startPrank(validator);
-        vm.expectRevert(ChainIsShutdown.selector);
+        vm.startPrank(validatorTimelock);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validatorTimelock));
         ICommitter(chain).commitBatchesSharedBridge(chain, 1, 1, "");
-        vm.expectRevert(ChainIsShutdown.selector);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validatorTimelock));
         IExecutor(chain).proveBatchesSharedBridge(chain, 1, 1, "");
-        vm.expectRevert(ChainIsShutdown.selector);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, validatorTimelock));
         IExecutor(chain).executeBatchesSharedBridge(chain, 1, 1, "");
         vm.stopPrank();
-
-        Diamond.DiamondCutData memory emptyCut;
-        uint256 protocolVersion = IZKChain(chain).getProtocolVersion();
-        vm.prank(chainAdmin);
-        vm.expectRevert(ChainIsShutdown.selector);
-        IZKChain(chain).upgradeChainFromVersion(chain, protocolVersion, emptyCut);
-
-        vm.prank(chainAdmin);
-        vm.expectRevert(ChainIsShutdown.selector);
-        IMigrator(chain).pauseDepositsBeforeInitiatingMigration();
     }
 
     function test_shutdown_blocksWithdrawalAccounting() public {
@@ -337,12 +348,6 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         assetTracker.handleChainBalanceDecreaseOnL1(chainId, ethAssetId, 1);
     }
 
-    function test_registerChainShutdown_onlyChain() public {
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
-        assetTracker.registerChainShutdown(chainId);
-    }
-
     /*//////////////////////////////////////////////////////////////
                         Distributor management
     //////////////////////////////////////////////////////////////*/
@@ -350,7 +355,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     function test_setShutdownDistributor() public {
         address distributor = makeAddr("distributor");
 
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(ChainNotShutdown.selector, chainId));
         assetTracker.setShutdownDistributor(chainId, distributor);
 
@@ -360,13 +365,13 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.expectRevert("Ownable: caller is not the owner");
         assetTracker.setShutdownDistributor(chainId, distributor);
 
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         vm.expectRevert(ZeroAddress.selector);
         assetTracker.setShutdownDistributor(chainId, address(0));
 
         vm.expectEmit(true, true, false, false, address(assetTracker));
         emit IL1AssetTracker.ShutdownDistributorSet(chainId, distributor);
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         assetTracker.setShutdownDistributor(chainId, distributor);
         assertEq(assetTracker.shutdownDistributor(chainId), distributor);
     }
@@ -399,7 +404,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         _shutdown();
         IZkSyncLiteSunsetClaimDistributorL1 distributor = _deployDistributorForSnapshot();
 
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         assetTracker.setShutdownDistributor(chainId, address(distributor));
 
         uint256 ntvEthBefore = address(addresses.l1NativeTokenVault).balance;
@@ -515,11 +520,11 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         _shutdown();
 
-        // The chain admin declares how much of the token was still held on L2 at shutdown.
+        // The governance declares how much of the token was still held on L2 at shutdown.
         vm.expectEmit(true, true, false, true, address(assetTracker));
         emit IL1AssetTracker.ShutdownChainNativeAssetAmountSet(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
-        vm.prank(chainAdmin);
-        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        vm.prank(governance);
+        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
         assertEq(assetTracker.shutdownChainNativeAssetAmount(chainId, nativeAssetId), HELD_ON_L2_AT_SHUTDOWN);
         assertTrue(assetTracker.isShutdownChainNativeAssetAmountSet(chainId, nativeAssetId));
 
@@ -532,7 +537,7 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             merkle.getRoot(snapshotLeaves),
             block.timestamp
         );
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         assetTracker.setShutdownDistributor(chainId, address(distributor));
 
         vm.expectEmit(true, true, true, true, address(assetTracker));
@@ -556,11 +561,11 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // It can only be sent once, and the amount can not be set again.
         vm.expectRevert(abi.encodeWithSelector(NoChainBalanceToSend.selector, chainId, nativeAssetId));
         assetTracker.sendShutdownChainFunds(chainId, nativeAssetId);
-        vm.prank(chainAdmin);
+        vm.prank(governance);
         vm.expectRevert(
             abi.encodeWithSelector(ShutdownChainNativeAssetAmountAlreadySet.selector, chainId, nativeAssetId)
         );
-        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, 1);
+        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, 1);
 
         // Bob claims the token from the distributor.
         bytes32[] memory proof = merkle.getProof(snapshotLeaves, 0);
@@ -574,29 +579,24 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         bytes32 nativeAssetId = _withdrawChainNativeToken(alice, WITHDRAWN_BEFORE_SHUTDOWN);
 
         // Not shut down yet.
-        vm.prank(chainAdmin);
+        vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(ChainNotShutdown.selector, chainId));
-        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
         _shutdown();
 
-        // Only the chain admin.
-        vm.prank(ctmOwner);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, ctmOwner));
-        IZKChain(chain).setShutdownChainNativeAssetAmount(nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
-
-        // Only through the chain's diamond proxy.
+        // Only the governance, not the former chain admin.
         vm.prank(chainAdmin);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, chainAdmin));
+        vm.expectRevert("Ownable: caller is not the owner");
         assetTracker.setShutdownChainNativeAssetAmount(chainId, nativeAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
         // Only for tokens native to the chain: L1 tokens are swept from the chain's L1 balance instead.
-        vm.prank(chainAdmin);
+        vm.prank(governance);
         vm.expectRevert(abi.encodeWithSelector(NotShutdownChainNativeAsset.selector, chainId, tokenAssetId));
-        IZKChain(chain).setShutdownChainNativeAssetAmount(tokenAssetId, HELD_ON_L2_AT_SHUTDOWN);
+        assetTracker.setShutdownChainNativeAssetAmount(chainId, tokenAssetId, HELD_ON_L2_AT_SHUTDOWN);
 
         // Without a declared amount there is nothing to send for a chain-native token.
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         assetTracker.setShutdownDistributor(chainId, makeAddr("distributor"));
         vm.expectRevert(abi.encodeWithSelector(NoChainBalanceToSend.selector, chainId, nativeAssetId));
         assetTracker.sendShutdownChainFunds(chainId, nativeAssetId);
@@ -638,13 +638,13 @@ contract ChainShutdownTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         distributor.claim(0, address(0), 1 ether, proof0);
 
         // Paused by the owner.
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         distributor.pause();
         vm.prank(alice);
         vm.expectRevert("Pausable: paused");
         distributor.claim(0, address(0), 1 ether, proof0);
 
-        vm.prank(assetTrackerOwner);
+        vm.prank(governance);
         distributor.unpause();
         vm.prank(alice);
         distributor.claim(0, address(0), 1 ether, proof0);

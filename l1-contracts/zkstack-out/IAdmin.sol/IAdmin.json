@@ -28,13 +28,6 @@
   },
   {
     "type": "function",
-    "name": "approveShutdown",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "changeFeeParams",
     "inputs": [
       {
@@ -214,13 +207,6 @@
   },
   {
     "type": "function",
-    "name": "revokeShutdownApproval",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setDAValidatorPair",
     "inputs": [
       {
@@ -297,24 +283,6 @@
         "name": "_pricingMode",
         "type": "uint8",
         "internalType": "enum PubdataPricingMode"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setShutdownChainNativeAssetAmount",
-    "inputs": [
-      {
-        "name": "_assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -469,19 +437,6 @@
       },
       {
         "name": "_amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ChainShutdown",
-    "inputs": [
-      {
-        "name": "lastExecutedBatch",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -840,32 +795,6 @@
         "type": "uint8",
         "indexed": false,
         "internalType": "enum PubdataPricingMode"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ShutdownApprovalRevoked",
-    "inputs": [
-      {
-        "name": "approver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ShutdownApproved",
-    "inputs": [
-      {
-        "name": "approver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       }
     ],
     "anonymous": false

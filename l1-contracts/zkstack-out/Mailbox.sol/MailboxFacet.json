@@ -999,11 +999,6 @@
   },
   {
     "type": "error",
-    "name": "ChainIsShutdown",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "DepositsPaused",
     "inputs": []
   },
