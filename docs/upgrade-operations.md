@@ -105,6 +105,12 @@ implementation (or already runs its `implNew`) and its transition still departs 
 release and version; otherwise its leg reverts (`ProxyUpgradeRowMismatch`, or the transition's edge
 check), the whole proposal with it, and the upgrade is prepared again against the fixed state.
 
+A proxy swapped by hand through `forward` (a raw `ProxyAdmin.upgrade`, outside any transition) must
+run its implementation's reinitializer in the same call (`upgradeAndCall` with
+`initializeUpgrade()`). A later transition whose row names the same `implNew` skips that proxy as
+already applied, reinitializer included: the skip is what lets a transition be applied again, and
+it cannot tell a swap whose reinitializer ran from one whose did not.
+
 ## Migration pauses are incident control
 
 `L1ChainAssetHandler` keeps two migration pauses: the ecosystem-wide `pauseMigration` /

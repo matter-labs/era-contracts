@@ -40,6 +40,12 @@ one-way (`SecondProofSystemAlreadyRequired`) and is read with `isSecondProofSyst
   used by every upgrade whose target release ships a new verifier, a same-minor verifier patch included) reverts with
   `NotMultiProofMode` unless the new verifier reports multi-proof mode with no proof system disabled. The `AdminFacet` checks the chain's verifier the same way
   after every diamond cut, so an upgrade that sets the verifier another way can't drop it either.
+- **Releases keep the second proof system too.** The chain-side check can only refuse. Once any chain of a CTM holds
+  the requirement, every later release of that CTM must ship a multi-proof verifier, or the CTM commits an edge those
+  chains can never cross. Nothing on L1 knows about the lock, so `protocol-ops` package verification enforces it before
+  the vote: it refuses a transition whose target release's verifier is not multi-proof (`getProofMode(0)`) when the
+  departing release's is. A chain can only take the requirement on a multi-proof verifier, so keeping the proof mode
+  across every edge keeps it for every locked chain.
 
 The requirement doesn't change which proofs the chain accepts. It only takes the way back to a single proof system
 out of the chain admin's hands.

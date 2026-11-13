@@ -24,6 +24,9 @@ import {RegistryBootstrapMigration} from "./RegistryBootstrapMigration.sol";
 ///         Bootstrap section of {docs/registry-driven-upgrades.md}.
 /// @dev DESCRIBES the bundle, it never executes it: every call runs on the authority of the
 ///      governance account that sends it, and `Governance` issues ordinary calls.
+/// @dev The bundle is ONE governance proposal, executed in one transaction, and is never split:
+///      the CTM-domain `ProxyAdmin` handover is one-step and irreversible, and a migration that
+///      holds it with a `migrate()` that can no longer pass would keep it for good.
 /// @dev Everything but the two objects is derived: the manifest names the CTM, its `ProxyAdmin` and
 ///      both domain executors, and the core executor names the ecosystem `ProxyAdmin`. Derivation
 ///      is at read time, so a sequence read against a drifted ecosystem answers with the drift

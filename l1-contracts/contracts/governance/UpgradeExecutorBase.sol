@@ -7,6 +7,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "./Common.sol";
 import {IUpgradeExecutorBase} from "./IUpgradeExecutorBase.sol";
 import {RenounceOwnershipDisabled, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {ObjectAnchorLib} from "../upgrades/registry/libraries/ObjectAnchorLib.sol";
 
 /// @title UpgradeExecutorBase
 /// @author Matter Labs
@@ -35,6 +36,12 @@ abstract contract UpgradeExecutorBase is Ownable2Step, IUpgradeExecutorBase {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _calls.length; ++i) {
+            // A call with calldata to an address without code succeeds silently, so a mistyped
+            // target or a CREATE2 address never deployed would pass as an executed step. Value-only
+            // calls (to an EOA) stay allowed, as in `ProtocolUpgradeHandler._execute`.
+            if (_calls[i].data.length != 0) {
+                ObjectAnchorLib.requireCode(_calls[i].target);
+            }
             // slither-disable-next-line arbitrary-send-eth
             (bool success, bytes memory returnData) = _calls[i].target.call{value: _calls[i].value}(_calls[i].data);
             if (!success) {

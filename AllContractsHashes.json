@@ -162,7 +162,7 @@
   {
     "contractName": "l1-contracts/CTMRelease",
     "evmBytecodePath": "/l1-contracts/out/CTMRelease.sol/CTMRelease.json",
-    "evmBytecodeHash": "0x6767b846da11bc63e47b416c106122681e330591d01193b5ddfe94fc47d3f8ff",
+    "evmBytecodeHash": "0xf4e519c1115fce145dc6b9deebb50f86e5028ebcc5ce047190d8ddd2aaa0bfe9",
     "evmDeployedBytecodeHash": "0x4dee6151a12c1069c4b41c7fee51de4613ff3facfdb398a5bfe02a7ab9a41dc2",
     "evmDeployedBytecodeBlakeHash": "0x3980eca6307f88881fccce8771eebde7d3891911e11cfa410c742261bec53591",
     "evmDeployedBytecodeLength": 4832
@@ -170,10 +170,10 @@
   {
     "contractName": "l1-contracts/CTMTransition",
     "evmBytecodePath": "/l1-contracts/out/CTMTransition.sol/CTMTransition.json",
-    "evmBytecodeHash": "0x9541ad9826eb8902c2ccc1fbfb097e3c6a5d994a3680006c7da040c74d782e4c",
-    "evmDeployedBytecodeHash": "0x1899ff6171ccd6b86b89ee4659a5e3a8a1e7929017355119fb37d1c8b1714feb",
-    "evmDeployedBytecodeBlakeHash": "0x9d70535c1676288f715c5b567b31a5d50fe77561702d97ea867fa5bbec4d147b",
-    "evmDeployedBytecodeLength": 9164
+    "evmBytecodeHash": "0x666c75439fd4e00c9c3c7173e096ec93159c0e497f34b18235376269a311b66a",
+    "evmDeployedBytecodeHash": "0xb70b6456aa531adca9cd39031681aee7daf3f541eb89bd135b2d9d045e5f8bfe",
+    "evmDeployedBytecodeBlakeHash": "0x1d6d2bbafe79c9524f7bbb4eff8dcb174eea0f115ea8cb47cf0b467ba144bd7e",
+    "evmDeployedBytecodeLength": 9378
   },
   {
     "contractName": "l1-contracts/CTMUpgradeComposer",
@@ -186,10 +186,10 @@
   {
     "contractName": "l1-contracts/CTMUpgradeExecutor",
     "evmBytecodePath": "/l1-contracts/out/CTMUpgradeExecutor.sol/CTMUpgradeExecutor.json",
-    "evmBytecodeHash": "0x5396215e1836aa83502de0329cac7a9b986900107ed10a7dbe11c14749fb74fa",
-    "evmDeployedBytecodeHash": "0xe59af74b48a23695cae45df0fdec53999efa741d9382ca238e4a53a72869f5af",
-    "evmDeployedBytecodeBlakeHash": "0xe9f6ef9ba4964d97d2f9780315de5b4cd9e25f18340b660de56c8a1c67859a18",
-    "evmDeployedBytecodeLength": 10223
+    "evmBytecodeHash": "0x79284d9b97e06b0b83a166bcad0aadfeeb93019b422eae9bb3d3a04871b19037",
+    "evmDeployedBytecodeHash": "0xd2dcbce52d46a25da80231d04a5ad49f0f1702ad0705aace51f75b9f42eb4787",
+    "evmDeployedBytecodeBlakeHash": "0x9a4d69495567a98ef01691ebc64b5f2fd04a9b6689c2334bbe2343659d1cf416",
+    "evmDeployedBytecodeLength": 10734
   },
   {
     "contractName": "l1-contracts/Calldata",
@@ -258,10 +258,10 @@
   {
     "contractName": "l1-contracts/CoreUpgradeExecutor",
     "evmBytecodePath": "/l1-contracts/out/CoreUpgradeExecutor.sol/CoreUpgradeExecutor.json",
-    "evmBytecodeHash": "0x29e01156c356d79b10c57034847189267e9010b959f38855a3cc3d68aedb8d8b",
-    "evmDeployedBytecodeHash": "0x6ea927cda5cb3ca65eb7f6dfa3366a9e6b98b9e03d2d512a1e1cb0bc6e35429f",
-    "evmDeployedBytecodeBlakeHash": "0x0d03b37f4c145aa2cf3993080b036de7f9acb9e48cc6a0690a6d51d64686c799",
-    "evmDeployedBytecodeLength": 7177
+    "evmBytecodeHash": "0x8d20457c3b92bc6cafb366e634d36b5fa7cb6e9cbfc89f65740a1879376f54cd",
+    "evmDeployedBytecodeHash": "0x0941ef66f80dbeab295f8b66a8e4a0253f7fe5673ee857f89ed7e4b66ae24765",
+    "evmDeployedBytecodeBlakeHash": "0x1e4e434e9a292a984dd4207dffb9096831a22e5c84d954154ce6a1604b996d60",
+    "evmDeployedBytecodeLength": 7688
   },
   {
     "contractName": "l1-contracts/CountersUpgradeable",
@@ -298,10 +298,10 @@
   {
     "contractName": "l1-contracts/DefaultProxyUpgradeEngine",
     "evmBytecodePath": "/l1-contracts/out/DefaultProxyUpgradeEngine.sol/DefaultProxyUpgradeEngine.json",
-    "evmBytecodeHash": "0xae1919c97a4bc486db1819461c35c8d0baede63360102dcf3c2b6d3af4cb0998",
-    "evmDeployedBytecodeHash": "0x6455fc9affd4353fb5024a1c10b863f050ac3e3825af1dfd60cafb12460c181e",
-    "evmDeployedBytecodeBlakeHash": "0x6ff4848ef04500191d0bc46ce183d4e9cf7249fbbc9a16d319e51ab59c3229a4",
-    "evmDeployedBytecodeLength": 3756
+    "evmBytecodeHash": "0x4eded3ca3c5fa47f99e5f2976636671f3da8974f8ef9be60eea8a69a1abecaff",
+    "evmDeployedBytecodeHash": "0x71a631b093ec51a4355c1e21f28e1026d12794a4c37a5b3d9904b651d4985d2b",
+    "evmDeployedBytecodeBlakeHash": "0xa8ee7db728d89ff429633c4e58d45bdd57f8183512b503618dc4cfb38dff7562",
+    "evmDeployedBytecodeLength": 3992
   },
   {
     "contractName": "l1-contracts/DefaultUpgrade",

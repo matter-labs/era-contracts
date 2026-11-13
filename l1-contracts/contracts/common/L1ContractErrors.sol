@@ -388,6 +388,8 @@ error ProofTooShort();
 error ProtocolIdMismatch(uint256 expectedProtocolVersion, uint256 providedProtocolId);
 // 0x64f94ec2
 error ProtocolIdNotGreater();
+// 0x272c89a5
+error ProxyUpgradeCTMAdminIsProxyAdmin(address chainTypeManager);
 // 0x896ad688
 error ProxyUpgradeDomainMismatch(uint8 expected, uint8 actual);
 // 0x8771630a
@@ -414,6 +416,8 @@ error RegistryDuplicateFacetRow(address facet);
 error RegistryDuplicateProxyRow(address proxy);
 // 0x22345d26
 error RegistryDuplicateSelector(bytes4 selector);
+// 0x82b6bf88
+error RegistryEmptyFacetSet();
 // 0xba5f0dd8
 error RegistryEmptySelectors(address facet);
 // 0xd79000b2
@@ -428,6 +432,8 @@ error RegistryTargetHasNoCode(address target);
 error RegistryUnknownKey();
 // 0xfad1d610
 error ReleaseForceDeploymentMismatch(uint256 member);
+// 0x549a5e01
+error ReleaseL2RowHasNoSystemProxy(uint256 member);
 // 0xc99ade52
 error ReleaseProtocolVersionMismatch(uint256 protocolVersion, uint256 releaseProtocolVersion);
 // 0x667d17de

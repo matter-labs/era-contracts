@@ -45,11 +45,13 @@ import {
     RegistryDuplicateProxyRow,
     RegistrySelfEdgeProxyRow,
     RegistryDuplicateSelector,
+    RegistryEmptyFacetSet,
     RegistryEmptySelectors,
     RegistryInventoryLengthMismatch,
     RegistryMemberHasNoFixedAddress,
     RegistryTargetHasNoCode,
     ReleaseForceDeploymentMismatch,
+    ReleaseL2RowHasNoSystemProxy,
     RegistryUnknownKey,
     TransitionDeadlineBeforeUpgrade,
     TransitionDeadlineZero,
@@ -610,6 +612,44 @@ contract StorageRegistriesTest is Test {
         assertEq(_setFlags(patchTransition.releaseDiff()), 0, "a copy one version up differs nowhere else");
     }
 
+    /// @dev OZ L-01. A release built before an `L2EcosystemContract` append keeps its shorter
+    ///      table (modelled by serving `newRelease`'s table one slot short). An L1-only edge from it
+    ///      toward a release whose appended row is empty changes no member's row, so it constructs
+    ///      and its diff names no L2 table change.
+    function test_l1OnlyEdgeDepartingAPreAppendReleaseKeepsItsL2Description() public {
+        vm.mockCall(
+            address(newRelease),
+            abi.encodeCall(ICTMRelease.l2BytecodeInfos, ()),
+            abi.encode(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT - 1))
+        );
+
+        CTMTransition patchTransition = new CTMTransition(_patchManifest());
+
+        ReleaseDiff memory diff = patchTransition.releaseDiff();
+        assertFalse(diff.l2BytecodeInfos, "an empty appended row is no change");
+        assertEq(_setFlags(diff), 0, "and the version-only patch changes nothing else");
+    }
+
+    /// @dev The member-by-member comparison still sees a changed row past the shorter table: a
+    ///      filled appended row derives a deployment, which a patch cannot carry.
+    function test_revertWhen_patchFillsARowAppendedAfterItsDepartingRelease() public {
+        vm.mockCall(
+            address(newRelease),
+            abi.encodeCall(ICTMRelease.l2BytecodeInfos, ()),
+            abi.encode(new bytes[](L2_ECOSYSTEM_CONTRACT_COUNT - 1))
+        );
+        ReleaseManifest memory releaseManifest = _patchReleaseManifest();
+        releaseManifest.l2BytecodeInfos[L2_ECOSYSTEM_CONTRACT_COUNT - 1] = L2PlanFixtures.bytecodeInfo(hex"dd05");
+        L2PlanFixtures.syncForceDeployments(releaseManifest);
+        TransitionManifest memory manifest = _patchManifest();
+        manifest.newRelease = address(new CTMRelease(releaseManifest));
+        // A derived deployment needs a delegate before the edge rules are reached.
+        manifest.l2Plan = _l2Plan();
+
+        vm.expectRevert(PatchCannotCarryL2Upgrade.selector);
+        new CTMTransition(manifest);
+    }
+
     /// @dev The fixture releases differ in the admin facet alone, so the hop's diff is exactly the
     ///      facet flag — the same fact `facetCuts()` spells out in full.
     function test_releaseDiff_namesOnlyTheFacetsForTheFixtureHop() public view {
@@ -1048,7 +1088,9 @@ contract StorageRegistriesTest is Test {
         // for it is unexecutable and must refuse to derive — at transition construction, before
         // anything is committed.
         ReleaseManifest memory releaseManifest = _newReleaseManifest();
-        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.BeaconProxy)] = hex"dd03";
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.BeaconProxy)] = L2PlanFixtures.bytecodeInfo(
+            hex"dd03"
+        );
         CTMRelease rowRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _transitionManifest();
@@ -1065,7 +1107,9 @@ contract StorageRegistriesTest is Test {
     ///      table row in its slot is refused like any other bytecode-identity member.
     function test_revertWhen_transitionDerivesRowForTheDelegate() public {
         ReleaseManifest memory releaseManifest = _newReleaseManifest();
-        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2DefaultUpgrade)] = hex"dd04";
+        releaseManifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2DefaultUpgrade)] = L2PlanFixtures.bytecodeInfo(
+            hex"dd04"
+        );
         CTMRelease rowRelease = new CTMRelease(releaseManifest);
 
         TransitionManifest memory manifest = _transitionManifest();
@@ -1503,7 +1547,62 @@ contract StorageRegistriesTest is Test {
         ReleaseManifest memory manifest = _newReleaseManifest();
         manifest.genesisFacets = new GenesisFacet[](0);
 
-        vm.expectRevert(abi.encodeWithSelector(RegistryEmptySelectors.selector, address(0)));
+        vm.expectRevert(RegistryEmptyFacetSet.selector);
+        new CTMRelease(manifest);
+    }
+
+    /// @dev OZ N-08. A zero facet address can never hold code, so it is refused where the release
+    ///      is built, like the other members, rather than at its first use by `validate()`.
+    function test_revertWhen_releaseNamesAZeroFacet() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.genesisFacets[1].facet = address(0);
+
+        vm.expectRevert(ZeroAddress.selector);
+        new CTMRelease(manifest);
+    }
+
+    /// @dev OZ L-02. `L2WrappedBaseToken` sits at its fixed address as a plain implementation, not
+    ///      behind a system proxy, so a row for it would derive an L2 upgrade that reverts on every
+    ///      chain; the release refuses it at construction.
+    function test_revertWhen_releaseFillsTheWrappedBaseTokenRow() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2WrappedBaseToken)] = L2PlanFixtures.bytecodeInfo(
+            hex"dd06"
+        );
+        L2PlanFixtures.syncForceDeployments(manifest);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ReleaseL2RowHasNoSystemProxy.selector,
+                uint256(L2EcosystemContract.L2WrappedBaseToken)
+            )
+        );
+        new CTMRelease(manifest);
+    }
+
+    /// @dev OZ N-11. L2 force-deploys only canonical `BYTECODE_INFO_LENGTH` descriptors, so a table
+    ///      row with trailing bytes is refused where the release is built.
+    function test_revertWhen_releaseTableRowIsNotCanonical() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = bytes.concat(
+            L2PlanFixtures.bytecodeInfo(hex"dd07"),
+            hex"00"
+        );
+        L2PlanFixtures.syncForceDeployments(manifest);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(L2BytecodeInfoLength.selector, BYTECODE_INFO_LENGTH + 1, BYTECODE_INFO_LENGTH)
+        );
+        new CTMRelease(manifest);
+    }
+
+    /// @dev OZ N-11, the shell: every table member is deployed behind it, so it is held to the same
+    ///      length.
+    function test_revertWhen_releaseSystemProxyShellIsNotCanonical() public {
+        ReleaseManifest memory manifest = _newReleaseManifest();
+        manifest.l2SystemProxyBytecodeInfo = hex"5e11";
+
+        vm.expectRevert(abi.encodeWithSelector(L2BytecodeInfoLength.selector, 2, BYTECODE_INFO_LENGTH));
         new CTMRelease(manifest);
     }
 

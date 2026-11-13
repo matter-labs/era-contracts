@@ -71,6 +71,7 @@ use super::shell::verify_shell_kept;
 use super::views::{
     BytecodesSupplierView, CTMReleaseView, CTMTransitionView, CommittedUpgradeView, CtmView,
     Ownable2StepView, ProxyAdminView, ProxyUpgradeRow, ProxyUpgradeTransitionView,
+    VerifierProofModeView,
 };
 use super::{format_semver, render_derived_payloads};
 
@@ -850,6 +851,11 @@ pub(super) async fn verify_transition<P: Provider>(
             }
         }
     }
+    judge_proof_mode_kept(
+        result,
+        release_proof_mode(provider, manifest.fromRelease).await,
+        release_proof_mode(provider, manifest.newRelease).await,
+    );
     verify_engine_and_l2_plan(
         provider,
         build,
@@ -883,6 +889,67 @@ pub(super) async fn verify_transition<P: Provider>(
         old_version,
         new_version,
     }))
+}
+
+/// `ZKSYNC_OS_MULTI_PROOF_VERIFICATION_TYPE` (`Config.sol`): what a multi-proof verifier with no
+/// proof system disabled reports from `getProofMode(0)`.
+const MULTI_PROOF_VERIFICATION_TYPE: u64 = 5;
+
+/// The proof mode the verifier `release` names reports from `getProofMode(0)`, the read
+/// `BaseZkSyncUpgrade._setVerifier` makes on a chain that holds the second-proof requirement.
+async fn release_proof_mode<P: Provider>(provider: &P, release: Address) -> Result<U256, String> {
+    let verifier = CTMReleaseView::new(release, provider)
+        .verifier()
+        .call()
+        .await
+        .map_err(|e| format!("release {release} does not answer `verifier()` ({e})"))?;
+    VerifierProofModeView::new(verifier, provider)
+        .getProofMode(0)
+        .call()
+        .await
+        .map_err(|e| format!("verifier {verifier} does not answer `getProofMode(0)` ({e})"))
+}
+
+/// An edge must not take a multi-proof chain to a verifier without the second proof system.
+/// A chain admin can lock a chain to multi-proof (`permanentlyRequireSecondProofSystem`, which
+/// governance requires before enabling interop), only while its verifier is multi-proof, and from
+/// then on the chain refuses any other verifier on upgrade (`NotMultiProofMode`). Nothing on L1
+/// stops a release from shipping a single-proof verifier, so every chain locked on the departing
+/// release would be unable to cross the edge. The rule needs no chain scan: a chain can only
+/// hold the lock on a multi-proof verifier, so keeping the proof mode across every edge keeps it
+/// for every locked chain.
+pub(super) fn judge_proof_mode_kept(
+    result: &mut VerificationResult,
+    departing: Result<U256, String>,
+    arriving: Result<U256, String>,
+) {
+    let multi = U256::from(MULTI_PROOF_VERIFICATION_TYPE);
+    match (departing, arriving) {
+        (Ok(from), Ok(to)) if from == multi && to != multi => result.report_error(&format!(
+            "the transition moves from a multi-proof verifier to one reporting proof mode {to}: a \
+             chain that holds the second-proof requirement refuses that verifier on upgrade \
+             (`NotMultiProofMode`), so no such chain could cross this edge"
+        )),
+        (Ok(from), Ok(_)) if from == multi => result.report_ok(
+            "the transition keeps the multi-proof verification its departing release runs",
+        ),
+        (Ok(from), Ok(_)) => result.print_info(&format!(
+            "  the departing release's verifier reports proof mode {from}: no chain on it can hold \
+             the second-proof requirement"
+        )),
+        (Ok(from), Err(e)) if from == multi => result.report_error(&format!(
+            "the departing release runs multi-proof verification, but the arriving release's proof \
+             mode cannot be read: {e}. A chain that holds the second-proof requirement makes this \
+             read on upgrade, so it could not cross this edge"
+        )),
+        (Ok(_), Err(e)) => result.report_warn(&format!(
+            "the arriving release's proof mode cannot be read: {e}"
+        )),
+        (Err(e), _) => result.report_warn(&format!(
+            "the departing release's proof mode cannot be read: {e}. Whether chains that hold the \
+             second-proof requirement can cross this edge is not checked"
+        )),
+    }
 }
 
 /// A release's provenance and construction, re-derived from the manifest it serves, the members it
@@ -1450,6 +1517,63 @@ mod tests {
     const ECO_ADMIN: Address = Address::repeat_byte(0xA0);
     const PUH: Address = Address::repeat_byte(0x07);
     const STRANGER: Address = Address::repeat_byte(0x99);
+
+    fn judge_modes(
+        departing: Result<u64, &str>,
+        arriving: Result<u64, &str>,
+    ) -> VerificationResult {
+        let mut result = VerificationResult::default();
+        judge_proof_mode_kept(
+            &mut result,
+            departing.map(U256::from).map_err(str::to_string),
+            arriving.map(U256::from).map_err(str::to_string),
+        );
+        result
+    }
+
+    /// OZ L-05: a chain locked to multi-proof refuses any other verifier on upgrade, so an edge
+    /// that drops the proof mode would strand it.
+    #[test]
+    fn an_edge_from_multi_proof_to_single_proof_fails() {
+        let single = 2; // ZKSYNC_OS_PLONK_VERIFICATION_TYPE
+        let result = judge_modes(Ok(MULTI_PROOF_VERIFICATION_TYPE), Ok(single));
+        assert_eq!(result.errors, 1);
+        assert!(result.has_error("NotMultiProofMode"));
+    }
+
+    #[test]
+    fn an_edge_keeping_multi_proof_passes() {
+        let result = judge_modes(
+            Ok(MULTI_PROOF_VERIFICATION_TYPE),
+            Ok(MULTI_PROOF_VERIFICATION_TYPE),
+        );
+        assert_eq!((result.errors, result.warnings), (0, 0));
+    }
+
+    /// No chain on a single-proof release can hold the lock, so its successor is unconstrained.
+    #[test]
+    fn an_edge_from_single_proof_is_unconstrained() {
+        assert_eq!(judge_modes(Ok(2), Ok(2)).errors, 0);
+        assert_eq!(
+            judge_modes(Ok(2), Ok(MULTI_PROOF_VERIFICATION_TYPE)).errors,
+            0
+        );
+    }
+
+    /// A locked chain reads the arriving verifier's proof mode on upgrade, so an unreadable one
+    /// after a multi-proof departure fails; elsewhere it is only a warning.
+    #[test]
+    fn an_unreadable_proof_mode_fails_only_after_multi_proof() {
+        let after_multi = judge_modes(Ok(MULTI_PROOF_VERIFICATION_TYPE), Err("no getProofMode"));
+        assert_eq!(after_multi.errors, 1);
+        let after_single = judge_modes(Ok(2), Err("no getProofMode"));
+        assert_eq!((after_single.errors, after_single.warnings), (0, 1));
+        let unknown_departure = judge_modes(Err("no getProofMode"), Ok(2));
+        assert_eq!(
+            (unknown_departure.errors, unknown_departure.warnings),
+            (0, 1)
+        );
+    }
 
     fn leg_call(kind: LegKind, executor: Address, object: Address) -> GovernanceCall {
         GovernanceCall {

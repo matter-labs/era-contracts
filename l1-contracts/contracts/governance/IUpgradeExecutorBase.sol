@@ -17,6 +17,8 @@ interface IUpgradeExecutorBase {
     ///         ProxyAdmin ownership) never becomes unreachable — recovery, ownership succession
     ///         and one-off administrative actions outside the fixed entrypoints. Every call is
     ///         logged, so a bypass of the object-driven path is always visible.
-    /// @param _calls The calls to forward, executed in order; reverts on the first failure.
+    /// @param _calls The calls to forward, executed in order; reverts on the first failure, and on a
+    ///        call with calldata to a target without code (`RegistryTargetHasNoCode`), which would
+    ///        otherwise succeed silently.
     function forward(Call[] calldata _calls) external payable;
 }

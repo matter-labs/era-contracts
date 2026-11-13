@@ -35,30 +35,31 @@ contract DefaultProxyUpgradeEngine is IProxyUpgradeEngine {
         if (proxyAdminOwner != address(this)) {
             revert ProxyUpgradeEngineAuthorityMismatch(address(proxyAdmin), proxyAdminOwner);
         }
-        ProxyUpgradeRow[] memory inventory = _inventory;
-        _beforeSwaps(_context, inventory);
+        // Each call below converts the calldata `_inventory` into a fresh memory copy: one shared copy
+        // would let a hook change the rows `applyRows` applies.
+        _beforeSwaps(_context, _inventory);
         ProxyUpgradeRowLib.applyRows(
             proxyAdmin,
-            ProxyUpgradeRowLib.toRows(inventory, ProxyUpgradeRowLib.inventoryLength(_context.domain))
+            ProxyUpgradeRowLib.toRows(_inventory, ProxyUpgradeRowLib.inventoryLength(_context.domain))
         );
-        _afterSwaps(_context, inventory);
-        _checkPostconditions(_context, inventory);
+        _afterSwaps(_context, _inventory);
+        _checkPostconditions(_context, _inventory);
     }
 
     /// @notice Work that must see the departing implementations. Runs before any swap.
     /// @param _context Where the engine runs.
-    /// @param _inventory The transition's enum-indexed inventory.
+    /// @param _inventory This hook's own copy of the transition's enum-indexed inventory.
     function _beforeSwaps(ProxyUpgradeContext memory _context, ProxyUpgradeRow[] memory _inventory) internal virtual {}
 
     /// @notice The follow-up calls: cross-contract wiring once every row runs its `implNew`.
     /// @param _context Where the engine runs.
-    /// @param _inventory The transition's enum-indexed inventory.
+    /// @param _inventory This hook's own copy of the transition's enum-indexed inventory.
     function _afterSwaps(ProxyUpgradeContext memory _context, ProxyUpgradeRow[] memory _inventory) internal virtual {}
 
     /// @notice Reads back what the hooks were meant to establish and reverts unless it holds, so a
     ///         skipped or wrong follow-up fails the leg instead of completing it.
     /// @param _context Where the engine runs.
-    /// @param _inventory The transition's enum-indexed inventory.
+    /// @param _inventory This hook's own copy of the transition's enum-indexed inventory.
     function _checkPostconditions(
         ProxyUpgradeContext memory _context,
         ProxyUpgradeRow[] memory _inventory

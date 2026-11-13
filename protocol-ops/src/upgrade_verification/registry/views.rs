@@ -237,7 +237,15 @@ sol! {
         function manifestHash() external view returns (bytes32);
         function getManifest() external view returns (ReleaseManifest memory);
         function protocolVersion() external view returns (uint256);
+        function verifier() external view returns (address);
         function validate() external view;
+    }
+
+    /// The proof mode a ZKsync OS verifier reports. A chain that holds the second-proof
+    /// requirement makes this read (`getProofMode(0)`) on every verifier an upgrade installs.
+    #[sol(rpc)]
+    contract VerifierProofModeView {
+        function getProofMode(uint8 _disabledProofSystems) external view returns (uint256);
     }
 
     /// One force deployment of a composed L2 plan — `IComplexUpgrader`'s shape, mirrored so the

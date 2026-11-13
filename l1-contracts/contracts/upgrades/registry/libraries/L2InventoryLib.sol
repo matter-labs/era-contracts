@@ -41,6 +41,9 @@ library L2InventoryLib {
     ///      `AuthoredL2Plan.delegateBytecodeInfo` derives): they have no fixed address, so a release
     ///      table row for them is unexecutable — the revert surfaces at transition construction,
     ///      before anything is committed.
+    /// @dev `L2WrappedBaseToken` does have a fixed address, which the deploy tooling resolves here,
+    ///      but it holds the plain implementation rather than a system proxy, so a table row for it
+    ///      is unexecutable too; `CTMRelease`'s constructor refuses one.
     // solhint-disable-next-line code-complexity
     function fixedAddress(L2EcosystemContract _member) internal pure returns (address) {
         if (_member == L2EcosystemContract.L2Bridgehub) {

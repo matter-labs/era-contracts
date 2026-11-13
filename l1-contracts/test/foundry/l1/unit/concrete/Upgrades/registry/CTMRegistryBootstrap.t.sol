@@ -203,15 +203,17 @@ contract CTMRegistryBootstrapTest is Test {
 
     function test_l2BytecodeTableIsServed() public {
         ReleaseManifest memory manifest = _genesisManifest();
-        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = hex"beef";
-        manifest.l2SystemProxyBytecodeInfo = hex"5e11";
+        bytes memory row = L2PlanFixtures.bytecodeInfo(hex"beef");
+        bytes memory shell = L2PlanFixtures.bytecodeInfo(hex"5e11");
+        manifest.l2BytecodeInfos[uint256(L2EcosystemContract.L2Bridgehub)] = row;
+        manifest.l2SystemProxyBytecodeInfo = shell;
         L2PlanFixtures.syncForceDeployments(manifest);
         CTMRelease release = new CTMRelease(manifest);
 
         bytes[] memory rows = release.l2BytecodeInfos();
         assertEq(rows.length, L2_ECOSYSTEM_CONTRACT_COUNT, "table length");
-        assertEq(rows[uint256(L2EcosystemContract.L2Bridgehub)], hex"beef", "pinned row");
+        assertEq(rows[uint256(L2EcosystemContract.L2Bridgehub)], row, "pinned row");
         assertEq(rows[uint256(L2EcosystemContract.L2AssetRouter)].length, 0, "inert slot");
-        assertEq(release.l2SystemProxyBytecodeInfo(), hex"5e11", "the one shared shell");
+        assertEq(release.l2SystemProxyBytecodeInfo(), shell, "the one shared shell");
     }
 }
