@@ -3,8 +3,8 @@ use anyhow::Context;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-use crate::common::abi::AdminFunctionsAbi;
 use crate::common::addresses::ZERO_ADDRESS;
+use crate::common::chain_upgrade_calls;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -64,31 +64,16 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .parse::<U256>()
         .context("invalid upgrade_timestamp: expected decimal or hex uint256")?;
 
-    let admin_address =
-        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
-            .await
-            .context("resolving chain admin from L1")?;
-    // The Solidity helper executes through ChainAdmin, but broadcasts from
-    // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
-    let sender = runner
-        .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
-        .await?;
-    let sender_address = sender.address;
-
-    let forge = runner
-        .script_call(AdminFunctionsAbi::adminScheduleUpgradeCall {
-            _adminAddr: admin_address,
-            _accessControlRestriction: args.access_control_restriction,
-            _bridgehub: bridgehub,
-            _chainId: U256::from(chain_id),
-            _newProtocolVersion: new_protocol_version,
-            _timestamp: upgrade_timestamp,
-        })
-        // `--broadcast` against the anvil fork. In this mode the
-        // target RPC is the anvil fork, so "broadcast" produces no real-chain
-        // effect — it just records the tx in forge's run file so protocol-ops can
-        // extract it into the Safe bundle.
-        .with_wallet(&sender);
+    let call = chain_upgrade_calls::set_upgrade_timestamp(
+        &runner,
+        bridgehub,
+        chain_id,
+        args.access_control_restriction,
+        new_protocol_version,
+        upgrade_timestamp,
+    )
+    .await?;
+    let (admin_address, sender_address) = (call.admin, call.sender.address);
 
     logger::step(
         "Preparing set-upgrade-timestamp Safe bundle via AdminFunctions.s.sol (simulation)",
@@ -107,8 +92,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     logger::info(format!("Upgrade timestamp: {}", args.upgrade_timestamp));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
-    runner
-        .run(forge)
+    call.run(&mut runner)
         .context("Failed to prepare set-upgrade-timestamp")?;
 
     crate::common::output::write_output_if_requested(

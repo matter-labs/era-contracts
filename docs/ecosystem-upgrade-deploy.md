@@ -120,8 +120,19 @@ impersonated or the delay advanced.
 ### Forge-script upgrades
 
 An upgrade whose `upgrade-envs/<upgrade>/upgrade.toml` says `prepare = "forge-script"` runs one forge script on
-the fork and checks the result with its own `verify_fork` / `verify_chain` commands instead of PUVT. Pass
-`--upgrade <upgrade>` (in CI, `-f upgrade=<upgrade>`); the rest is as above:
+the fork and checks the result instead of PUVT: with protocol-ops' built-in checks (`builtin_checks = true`), its own
+`verify_fork` / `verify_chain` commands, or both. The built-ins need a CTM owned by a PUH. They check the publication,
+the CREATE2 provenance and a replay of the stages and of the reference chain's upgrade, with the calls
+`chain set-upgrade-timestamp` and `chain upgrade` emit. Before stage 1 the replay calls the PUH's public
+`reinforceUnfreeze()` from an arbitrary address, which unpauses migrations, and stage 1 must still pass. The replay
+fails while the reference chain has a pending L2 upgrade, and when its last execute tx isn't found in the ~50,000
+blocks before the fork block (none executed there, or an RPC error). Each `fork_tests` file then runs as `forge test`
+on the replayed fork, with `L1_RPC_URL`, `FORK_URL` (the RPC the fork was taken from, for reads at
+`FORK_BLOCK`), `FORK_BLOCK`, `UPGRADE_ENV`, `REFERENCE_CHAIN_ID`, `TEST_CHAIN_ID` and `CHECKS_DIR` (`ecosystem.toml`,
+and the input of the reference chain's last execute tx in `last_execute_input.hex`) exported. Every listed file must
+exist; each runs in the envs its `envs` lists (absent: every env) and passes when forge exits 0 and all its tests, at
+least one, passed. None may skip: leave an env out of `envs` where the file can't pass.
+Pass `--upgrade <upgrade>` (in CI, `-f upgrade=<upgrade>`); the rest is as above:
 
 ```bash
 protocol_ops ecosystem rehearse-upgrade --upgrade <upgrade> --env <env> --fork-url <l1-rpc> \
