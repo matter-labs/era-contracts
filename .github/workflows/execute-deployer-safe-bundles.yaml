@@ -18,7 +18,7 @@ on:
         description: "Target environment; its L1 selects the DEPLOYER_PRIVATE_KEY_{SEPOLIA,MAINNET} secret"
         required: true
         type: choice
-        options: [stage, testnet, mainnet]
+        options: [stage, testnet, mainnet, zksync-os-mainnet]
       protocol_ops_tag:
         description: "protocol-ops image released by build-docker.yaml: sha256:<digest>, or a tag"
         required: true

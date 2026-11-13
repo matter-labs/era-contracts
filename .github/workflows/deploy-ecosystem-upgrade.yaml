@@ -63,7 +63,7 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
+        description: "Environment = the same config-pair basename you generated with (stage, testnet, mainnet, zksync-os-mainnet). Which L1 gets broadcast to is NOT derived from this name — it comes from the bundle's own `bundle-metadata.json` `l1.chain_id`."
         required: true
         type: string
       generate_run_id:
@@ -380,7 +380,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$ENVIRONMENT" in
-            stage|testnet|mainnet) ;;
+            stage|testnet|mainnet|zksync-os-mainnet) ;;
             *) echo "::error::'$ENVIRONMENT' is not our ecosystem: its own deployer broadcasts it (docs/protocol-ops-for-partners.md)"; exit 1 ;;
           esac
           META="$DEPLOY_BUNDLE_DIR/bundle-metadata.json"
