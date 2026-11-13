@@ -88,6 +88,10 @@ interface IChainTypeManager {
     /// {protocol-docs/interop-fee.md}.
     function L1_INTEROP_FEE_MANAGER() external view returns (address);
 
+    /// @notice The CTM's admin role (`setPendingAdmin` / `acceptAdmin`), distinct from its owner.
+    /// @dev The CTM-domain executor reads it on every engine leg, so every CTM implementation keeps it.
+    function admin() external view returns (address);
+
     function setPendingAdmin(address _newPendingAdmin) external;
 
     function acceptAdmin() external;
@@ -127,6 +131,7 @@ interface IChainTypeManager {
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
+    /// @dev The CTM-domain executor reads it on every engine leg, so every CTM implementation keeps it.
     function serverNotifierAddress() external view returns (address);
 
     function validatorTimelockPostV29() external view returns (address);

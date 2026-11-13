@@ -31,7 +31,7 @@ test("verification-only mode cannot load signing keys, broadcast, or overwrite r
     "Check the deployer key against the bundle",
     "Broadcast deployer bundles to L1",
     "Initialize or restore the deployment receipt journal",
-    "Check the deployer plan against this checkout",
+    "Check the deployer plan in the bundle's image",
   ]) {
     assert.equal(steps.find((step) => step.name === name).if, "${{ !inputs.verify_only }}");
   }
@@ -48,12 +48,12 @@ test("verification-only mode cannot load signing keys, broadcast, or overwrite r
 test("each contract is verified as the broadcast lands it, and the shown sources are checked", () => {
   // The verifier follows the broadcast in the background, started before the deployer key is read.
   assert.equal(follower.run, "bash .github/scripts/deploy-ecosystem-upgrade/start-etherscan-follower.sh");
-  assert.match(followerScript, /protocol_ops ecosystem etherscan-verify/);
+  assert.match(followerScript, /protocol-ops\.sh --tag "\$BUNDLE_IMAGE" ecosystem etherscan-verify/);
   assert.match(followerScript, /--l1-rpc-url "\$L1_RPC_URL"/);
   assert.match(followerScript, /\) &\n/);
   assert.deepEqual(Object.keys(follower.env), ["ETHERSCAN_API_KEY"]);
   assert.ok(stepIndex("Select + mask the L1 RPC (L1 from the bundle)") < stepIndex(follower.name));
-  assert.ok(stepIndex("Check the deployer plan against this checkout") < stepIndex(follower.name));
+  assert.ok(stepIndex("Check the deployer plan in the bundle's image") < stepIndex(follower.name));
   assert.ok(stepIndex(follower.name) < stepIndex("Check the deployer key against the bundle"));
   // The status file appears whole: the verify step polls for it.
   assert.match(
@@ -67,96 +67,79 @@ test("each contract is verified as the broadcast lands it, and the shown sources
   assert.doesNotMatch(verification.run, /exit/);
   assert.match(
     verification.run,
-    /protocol_ops ecosystem etherscan-verify \\\n\s+--bundle "\$DEPLOY_BUNDLE_DIR" \\\n\s+"\$\{forge_script\[@\]\}"$/m
+    /protocol-ops\.sh --tag "\$BUNDLE_IMAGE" ecosystem etherscan-verify \\\n\s+--bundle "\$DEPLOY_BUNDLE_DIR" \\\n\s+"\$\{forge_script\[@\]\}"$/m
   );
   // The source check fails the run, deployment or verification-only alike.
   assert.equal(sourceCheck.if, "${{ inputs.run_verify }}");
   assert.equal(sourceCheck["continue-on-error"], undefined);
-  assert.match(sourceCheck.run, /protocol_ops ecosystem etherscan-check/);
+  assert.match(sourceCheck.run, /protocol-ops\.sh --tag "\$BUNDLE_IMAGE" ecosystem etherscan-check/);
   assert.ok(stepIndex(verification.name) < stepIndex(sourceCheck.name));
   for (const step of [follower, verification, sourceCheck]) {
     assert.doesNotMatch(scriptOf(step), /PRIVATE_KEY|PK_MAINNET|PK_SEPOLIA|upgrade-broadcast/, step.name);
   }
 });
 
-test("the deployer plan is checked against the checkout before any step reads the deployer key", () => {
-  // The plan check holds the build to AllContractsHashes.json, which a recursive checkout produces.
-  assert.equal(steps[stepIndex("Checkout the repository")].with.submodules, "recursive");
-  const check = steps[stepIndex("Check the deployer plan against this checkout")];
+test("the deployer plan is checked in the bundle's image before any step reads the deployer key", () => {
+  const check = steps[stepIndex("Check the deployer plan in the bundle's image")];
   assert.match(
     check.run,
-    /protocol_ops ecosystem check-deployer-plan \\\s+--bundle "\$DEPLOY_BUNDLE_DIR" \\\s+--l1-rpc-url "\$L1_RPC_URL"/
+    /protocol-ops\.sh --tag "\$BUNDLE_IMAGE" ecosystem check-deployer-plan \\\s+--bundle "\$DEPLOY_BUNDLE_DIR" \\\s+--l1-rpc-url "\$L1_RPC_URL"/
   );
   assert.equal(check.env, undefined);
   // It reads its L1 facts (the CTMs' ProxyAdmin, BytecodesSupplier, ...) over the RPC selected before it.
   assert.ok(
     stepIndex("Select + mask the L1 RPC (L1 from the bundle)") <
-      stepIndex("Check the deployer plan against this checkout")
-  );
-  const build = steps[stepIndex("Build contracts (for the deployer plan check and Etherscan verify)")];
-  assert.equal(build.if, "${{ inputs.run_verify || !inputs.verify_only }}");
-  assert.ok(
-    stepIndex("Build contracts (for the deployer plan check and Etherscan verify)") <
-      stepIndex("Check the deployer plan against this checkout")
+      stepIndex("Check the deployer plan in the bundle's image")
   );
   assert.ok(
     stepIndex("Check bundle provenance against the proven run") <
-      stepIndex("Check the deployer plan against this checkout")
+      stepIndex("Check the deployer plan in the bundle's image")
   );
   for (const reader of ["Check the deployer key against the bundle", "Broadcast deployer bundles to L1"]) {
-    assert.ok(stepIndex("Check the deployer plan against this checkout") < stepIndex(reader), reader);
+    assert.ok(stepIndex("Check the deployer plan in the bundle's image") < stepIndex(reader), reader);
   }
 });
 
-function runProvenance(overrides) {
-  const directory = mkdtempSync(join(tmpdir(), "provenance-test-"));
+function pullImage(revision) {
+  const directory = mkdtempSync(join(tmpdir(), "image-test-"));
   try {
+    mkdirSync(join(directory, "deploy", "inputs"), { recursive: true });
     const metadata = {
       contracts_commit: "a".repeat(40),
-      generated_by: { workflow_run: "https://github.com/o/r/actions/runs/1" },
-      env: "stage",
-      contracts_worktree_dirty: false,
+      protocol_ops_image: { digest: `ghcr.io/matter-labs/protocol-ops@sha256:${"0".repeat(64)}` },
     };
-    writeFileSync(join(directory, "bundle-metadata.json"), JSON.stringify(metadata));
-    const provenance = steps[stepIndex("Check bundle provenance against the proven run")];
-    return spawnSync("bash", ["-c", provenance.run], {
+    writeFileSync(join(directory, "deploy", "inputs", "bundle-metadata.json"), JSON.stringify(metadata));
+    const pull = steps[stepIndex("Pull the bundle's protocol-ops image")];
+    return spawnSync("bash", ["-c", `docker() { [ "$1" = pull ] || echo ${revision}; }\n` + pull.run], {
       encoding: "utf8",
-      env: {
-        ...process.env,
-        DEPLOY_BUNDLE_DIR: directory,
-        GENERATE_RUN_URL: metadata.generated_by.workflow_run,
-        GENERATE_HEAD_SHA: metadata.contracts_commit,
-        ENVIRONMENT: "stage",
-        GITHUB_SHA: metadata.contracts_commit,
-        ...overrides,
-      },
+      env: { ...process.env, RUNNER_TEMP: directory, GITHUB_ENV: join(directory, "github-env") },
     });
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
 }
 
-test("a deploy run on another commit than the generation is refused", () => {
-  assert.equal(runProvenance({}).status, 0);
-  const result = runProvenance({ GITHUB_SHA: "b".repeat(40) });
+test("a deploy runs the image and checkout of the bundle's commit, and no other", () => {
+  assert.equal(pullImage("a".repeat(40)).status, 0);
+  const result = pullImage("b".repeat(40));
   assert.equal(result.status, 1);
-  assert.match(result.stdout, /::error::bundle was generated from a{40} but this run checked out b{40}/);
+  assert.match(result.stdout, /::error::.* was built from 'b{40}', the bundle from 'a{40}'/);
+  assert.equal(steps[stepIndex("Checkout the bundle's commit")].with.ref, "${{ env.BUNDLE_COMMIT }}");
 });
 
 // `then`, if given, runs in the launch's directory once the verifier has exited.
 function runFollowerLaunch({ key, toolExit, toolDelay = 0, then }) {
   const directory = mkdtempSync(join(tmpdir(), "follower-test-"));
   try {
-    const tool = join(directory, "protocol-ops/target/release");
-    mkdirSync(tool, { recursive: true });
     writeFileSync(
-      join(tool, "protocol_ops"),
-      `#!/bin/sh\necho "protocol_ops $*"\nsleep ${toolDelay}\nexit ${toolExit}\n`,
-      { mode: 0o755 }
+      join(directory, "protocol-ops.sh"),
+      `echo "protocol-ops.sh $*"\nsleep ${toolDelay}\nexit ${toolExit}\n`
     );
     const env = {
       ...process.env,
       ETHERSCAN_API_KEY: key,
+      BUNDLE_IMAGE: "sha256:image",
+      EXTRA_MOUNTS: "/bundle:/bundle:ro",
       DEPLOY_BUNDLE_DIR: "/bundle",
       L1_RPC_URL: "http://127.0.0.1:1",
       RUNNER_TEMP: directory,
@@ -170,21 +153,18 @@ function runFollowerLaunch({ key, toolExit, toolDelay = 0, then }) {
   }
 }
 
-// The broadcast step after a launch in `directory`, with a stand-in protocol_ops that halts as
+// The broadcast step after a launch in `directory`, with a stand-in protocol-ops.sh that halts as
 // `upgrade-broadcast --halt-when` does.
 function runBroadcast(directory) {
   const broadcast = steps[stepIndex("Broadcast deployer bundles to L1")];
-  const tool = join(directory, "protocol-ops/target/release/protocol_ops");
   writeFileSync(
-    tool,
-    `#!/bin/bash
-echo "protocol_ops $*"
+    join(directory, "protocol-ops.sh"),
+    `echo "protocol-ops.sh $*"
 while [ $# -gt 0 ]; do
   if [ "$1" = --halt-when ] && [ -f "$2" ]; then echo "$2 exists: stopped before Safe tx #0"; exit 1; fi
   shift
 done
-`,
-    { mode: 0o755 }
+`
   );
   const exported = Object.fromEntries(
     readFileSync(join(directory, "env"), "utf8")
@@ -198,6 +178,7 @@ done
     env: {
       ...process.env,
       ...exported,
+      BUNDLE_IMAGE: "sha256:image",
       L1_NETWORK: "sepolia",
       PK_SEPOLIA: "0x01",
       DEPLOYER_ADDR: "0x02",
@@ -211,14 +192,23 @@ done
 }
 
 test("a follower that cannot run stops the deploy before the broadcast", () => {
-  const running = runFollowerLaunch({ key: "k", toolExit: 0 });
+  const running = runFollowerLaunch({
+    key: "k",
+    toolExit: 0,
+    then: (launch, directory) => ({ ...launch, exported: readFileSync(join(directory, "env"), "utf8") }),
+  });
   assert.equal(running.status, 0, running.stdout + running.stderr);
+  // Its directory is mounted at the same path in the image, where the broadcast's --halt-when reads it.
+  assert.match(running.exported, /^EXTRA_MOUNTS=\/bundle:\/bundle:ro (\S+\/etherscan-verify):\1$/m);
   const noKey = runFollowerLaunch({ key: "", toolExit: 0 });
   assert.equal(noKey.status, 1);
   assert.match(noKey.stdout, /::error::ETHERSCAN_API_KEY is required/);
   const failed = runFollowerLaunch({ key: "k", toolExit: 1 });
   assert.equal(failed.status, 1);
-  assert.match(failed.stdout, /protocol_ops ecosystem etherscan-verify[\s\S]*::error::The Etherscan verifier failed/);
+  assert.match(
+    failed.stdout,
+    /protocol-ops\.sh --tag sha256:image ecosystem etherscan-verify[\s\S]*::error::The Etherscan verifier failed/
+  );
 });
 
 test("a verifier that exits during the broadcast stops it before its next transaction", () => {
@@ -234,7 +224,10 @@ test("a verifier that exits during the broadcast stops it before its next transa
   });
   assert.equal(late.status, 1);
   assert.match(late.stdout, /--halt-when \S+\/etherscan-verify\/failed\n\S+\/etherscan-verify\/failed exists/);
-  assert.match(late.stdout, /protocol_ops ecosystem etherscan-verify[\s\S]*::error::The Etherscan verifier exited/);
+  assert.match(
+    late.stdout,
+    /protocol-ops\.sh --tag sha256:image ecosystem etherscan-verify[\s\S]*::error::The Etherscan verifier exited/
+  );
   // A verifier that is done (it submitted every contract) does not stop the broadcast.
   const done = runFollowerLaunch({ key: "k", toolExit: 0, then: (launch, directory) => runBroadcast(directory) });
   assert.equal(done.status, 0, done.stdout + done.stderr);
@@ -247,9 +240,7 @@ function runSourceCheck(earlierCommits, { shallow = true } = {}) {
   const directory = mkdtempSync(join(tmpdir(), "source-check-test-"));
   try {
     const bin = join(directory, "bin");
-    const tool = join(directory, "protocol-ops/target/release");
     mkdirSync(bin);
-    mkdirSync(tool, { recursive: true });
     writeFileSync(
       join(bin, "git"),
       `#!/bin/sh
@@ -261,7 +252,7 @@ esac
 `,
       { mode: 0o755 }
     );
-    writeFileSync(join(tool, "protocol_ops"), '#!/bin/sh\necho "protocol_ops $*"\n', { mode: 0o755 });
+    writeFileSync(join(directory, "protocol-ops.sh"), 'echo "mounts: $EXTRA_MOUNTS"\necho "protocol-ops.sh $*"\n');
     return spawnSync("bash", ["-c", sourceCheck.run], {
       cwd: directory,
       encoding: "utf8",
@@ -269,6 +260,9 @@ esac
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
         DEPLOY_BUNDLE_DIR: "/bundle",
+        BUNDLE_IMAGE: "sha256:image",
+        EXTRA_MOUNTS: "/bundle:/bundle:ro",
+        GITHUB_WORKSPACE: "/work",
         UPGRADE_KIND: "prepare-all",
         ETHERSCAN_EARLIER_COMMITS: earlierCommits,
       },
@@ -282,22 +276,32 @@ test("the source check accepts the earlier cuts it is given, from this checkout'
   assert.equal(sourceCheck.env.ETHERSCAN_EARLIER_COMMITS, "${{ inputs.etherscan_earlier_commits }}");
   const none = runSourceCheck("");
   assert.equal(none.status, 0, none.stderr);
-  assert.equal(none.stdout, "protocol_ops ecosystem etherscan-check --bundle /bundle\n");
+  assert.equal(
+    none.stdout,
+    "mounts: /bundle:/bundle:ro\nprotocol-ops.sh --tag sha256:image ecosystem etherscan-check --bundle /bundle\n"
+  );
   const [first, second] = ["a".repeat(40), "b".repeat(40)];
   const two = runSourceCheck(` ${first}  ${second} `);
   assert.equal(two.status, 0, two.stderr);
   assert.equal(
     two.stdout,
     `git fetch --no-tags --unshallow origin ${checkedOut}\n` +
-      `protocol_ops ecosystem etherscan-check --bundle /bundle --also-commit ${first} --also-commit ${second}\n`
+      // The image has no repository: it reads the earlier cuts from this checkout's.
+      `mounts: /bundle:/bundle:ro /work/.git:/contracts/.git:ro\n` +
+      `protocol-ops.sh --tag sha256:image ecosystem etherscan-check --bundle /bundle ` +
+      `--also-commit ${first} --also-commit ${second}\n`
   );
   const fullClone = runSourceCheck(first, { shallow: false });
   assert.equal(fullClone.status, 0, fullClone.stderr);
-  assert.equal(fullClone.stdout, `protocol_ops ecosystem etherscan-check --bundle /bundle --also-commit ${first}\n`);
+  assert.equal(
+    fullClone.stdout,
+    `mounts: /bundle:/bundle:ro /work/.git:/contracts/.git:ro\n` +
+      `protocol-ops.sh --tag sha256:image ecosystem etherscan-check --bundle /bundle --also-commit ${first}\n`
+  );
   for (const bad of ["--upload-pack=touch", "HEAD", "a".repeat(39), "A".repeat(40)]) {
     const result = runSourceCheck(`${first} ${bad}`);
     assert.equal(result.status, 1, bad);
-    assert.doesNotMatch(result.stdout, /protocol_ops/, bad);
+    assert.doesNotMatch(result.stdout, /protocol-ops\.sh/, bad);
     assert.match(result.stdout, /::error::etherscan_earlier_commits/, bad);
   }
 });

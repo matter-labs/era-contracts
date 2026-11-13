@@ -241,7 +241,8 @@ diff, never a wrong byte in offchain-authored data.
 ### Follow-up calls: the pinned upgrade engine
 
 A reinitializer reaches only its own proxy. Work BETWEEN contracts after a swap — re-pointing the
-CTM at a new contract, wiring the ServerNotifier, anything `setAddresses`-shaped — used to be a
+CTM at a new contract (not at another ServerNotifier: that is a `forward`), wiring the ServerNotifier
+it has, anything `setAddresses`-shaped — used to be a
 declared governance call, which a reviewer of contracts never sees. Every
 `ProxyUpgradeTransition` therefore pins a `proxyUpgradeEngine`, and the domain's executor applies the
 transition by DELEGATECALLING exactly `IProxyUpgradeEngine.executeUpgrade(context, inventory)` on
@@ -256,9 +257,12 @@ it (`ProxyUpgradeExecutorBase`):
 - The context is the executor's own, built from its immutables: the transition, the engine, the
   domain, the executor's `ProxyAdmin` and (CTM domain) its CTM. So the hooks act with exactly the
   executor's authority — the CTM, the CTM-domain `ProxyAdmin` and the ServerNotifier for a CTM
-  executor, the ecosystem `ProxyAdmin` for the core executor. Owner methods of governance-owned
-  ecosystem contracts (Bridgehub, AssetRouter) are not reachable and stay declared external
-  actions. Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
+  executor, the ecosystem `ProxyAdmin` for the core executor. An engine cannot call the owner methods
+  of governance-owned ecosystem contracts (Bridgehub, AssetRouter); those stay declared external
+  actions. It can still rewrite the storage of any proxy under its `ProxyAdmin` (rows, the CTM and
+  the ServerNotifier included) through `upgradeAndCall` (see the post-checks below), so that rests
+  on the engine's review.
+  Planned for a later release: their wiring setters (Bridgehub's `setAddresses*` and the
   like) also accept the owner of the contract's `ProxyAdmin`, so the core executor's engine can make
   them while governance keeps ownership. The release that ships those implementations can already
   call them in `_afterSwaps`, on the contracts its rows upgrade; a release that only wires needs a
@@ -268,18 +272,24 @@ it (`ProxyUpgradeExecutorBase`):
   read the same under the delegatecall. Only configuration an immutable cannot hold (a dynamic
   array, say) goes in the engine's own storage, read through an external call to
   `context.proxyUpgradeEngine`.
+- Before the engine runs, a CTM executor refuses a CTM whose `admin()` is the `ProxyAdmin`
+  (`ProxyUpgradeCTMAdminIsProxyAdmin`): a CTM the `ProxyAdmin` no longer administers answers
+  `getProxyAdmin` with its own `admin()`, so in that state a moved CTM would read as unmoved.
 - After the engine returns, the executor requires its `owner` and `pendingOwner` unchanged
   (`ProxyUpgradeEngineChangedExecutorOwnership`), the owner of its `ProxyAdmin` and, for a CTM executor,
-  the owner, pending owner and proxy admin of the CTM and of its ServerNotifier unchanged
-  (`ProxyUpgradeEngineMovedDomainAuthority`: a hook cannot transfer or nominate those holders through
-  their setters, nor move those proxies with `changeProxyAdmin`; a succession is a `forward`), and
-  every row at its `implNew` again, so a hook that moves a row's proxy is caught. The check compares
-  what those getters return, and rows: a hook that swaps the implementation of, or `upgradeAndCall`s
-  into, a proxy that is not a row (the CTM and the ServerNotifier included) can change what they
-  return, and that, like moving another proxy to another `ProxyAdmin` or re-pointing the CTM at
-  another ServerNotifier, is engine code the release review covers. Called directly with a real `ProxyAdmin`, an engine reverts
-  (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as the engine holds
-  no authority or storage of its own.
+  the CTM's owner, pending owner, admin, proxy admin and ServerNotifier, and that ServerNotifier's
+  owner, pending owner, proxy admin and CTM, unchanged (`ProxyUpgradeEngineMovedDomainAuthority`: a
+  hook cannot transfer those holders, nominate an owner, take the CTM's admin role, re-point the CTM
+  at another ServerNotifier or the ServerNotifier at another CTM, nor move those proxies with
+  `changeProxyAdmin`; a succession is a `forward`), and every row at its `implNew` again, so a hook
+  that moves a row's proxy is caught. The CTM's `pendingAdmin` is private, so a hook that only
+  nominates a CTM admin is not seen; today that role gates only its own succession. The check
+  compares what those getters return, and rows: a hook that swaps the implementation of, or
+  `upgradeAndCall`s into, any proxy under the `ProxyAdmin` (rows, the CTM and the ServerNotifier
+  included) can change what it returns or stores, and that, like moving another proxy to another
+  `ProxyAdmin`, is engine code the release review covers. Called directly with a real `ProxyAdmin`,
+  an engine reverts (`ProxyUpgradeEngineAuthorityMismatch`); a direct call lends nothing anyway, as
+  the engine holds no authority or storage of its own.
 - A transition can be applied again; the rows skip themselves and the hooks run again. Every hook
   is therefore source-checked like a row: skip what is at its target, act on the reviewed source
   state, revert on anything else; `_checkPostconditions` reads the result back, so a forgotten or
@@ -463,8 +473,9 @@ method the executor has no entrypoint for, through the executor's owner-gated, l
 A release's pinned upgrade engine reaches the same methods from inside `applyInfrastructureUpgrade`,
 reviewed with the release and not logged as `CallForwarded`
 ([above](#follow-up-calls-the-pinned-upgrade-engine)), so every `forward` cell below holds for it
-too, except the last row: the executor's post-check refuses an ownership move
-(`ProxyUpgradeEngineMovedDomainAuthority`).
+too, except a completed `setPendingAdmin` (the admin role changing hands), `setServerNotifier` and the
+last row: the executor's post-check refuses those (`ProxyUpgradeEngineMovedDomainAuthority`), as it
+refuses any other change of the holders it compares.
 
 | CTM owner method                                                                                                          | Through the executors                                                                                                                               | Chain side                              |
 | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
@@ -487,7 +498,16 @@ The executors hold three more authorities, reached the same way (`forward`, or t
 inside a proxy leg):
 `CTMUpgradeExecutor.forward` for the CTM-domain `ProxyAdmin` and the ServerNotifier's owner methods
 (`setUpgradePreconditionChecker`, `setChainTypeManager`), and `CoreUpgradeExecutor.forward` for the
-ecosystem `ProxyAdmin`. The `L1ChainAssetHandler` stays with its own owner.
+ecosystem `ProxyAdmin`. Inside a leg the post-check still refuses an engine's change to those
+contracts' owners or to the ServerNotifier's CTM. The `L1ChainAssetHandler` stays with its own owner.
+
+The `ValidatorTimelock` also keeps its own owner (governance): the bootstrap swaps only its
+implementation, through the CTM-domain `ProxyAdmin`, and never moves its `Ownable2Step` ownership.
+Its owner methods — `setExecutionDelay`, `setChainExecutionDelay` (the only way to lower a delay a
+chain admin raised) and the MultisigCommitter's shared-signing-set methods (`addSharedValidator`,
+`removeSharedValidator`, `setSharedSigningThreshold`, `useCustomSigningSet`) — are therefore called
+by governance directly, not through an executor. A chain admin can only raise its own chain's delay
+(`increaseChainExecutionDelay`).
 
 The `ValidatorTimelock` also keeps its own owner (governance): the bootstrap swaps only its
 implementation, through the CTM-domain `ProxyAdmin`, and never moves its `Ownable2Step` ownership.
@@ -629,7 +649,8 @@ an ADDRESS; what it runs is held to the reviewed build off chain (question 2), n
 - Authority and bindings: the executors' bound CTM, ProxyAdmin and owner, checked by value against
   the manifest before the domain is handed over.
 - Domains: each executor applies only objects of its own domain (`ProxyUpgradeDomainMismatch`),
-  through the `ProxyAdmin` it is bound to, and only for its owner.
+  through the `ProxyAdmin` it is bound to, and only for its owner. Before the pinned engine runs, a
+  CTM executor refuses a CTM whose admin is its `ProxyAdmin` (`ProxyUpgradeCTMAdminIsProxyAdmin`).
 
 **Post-state verification.** A second layer proves the upgrade LANDED, in the transaction that
 applies it:

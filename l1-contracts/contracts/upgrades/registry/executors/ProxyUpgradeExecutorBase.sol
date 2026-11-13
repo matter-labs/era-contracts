@@ -9,7 +9,9 @@ import {IProxyUpgradeTransition} from "../objects/IProxyUpgradeTransition.sol";
 import {UpgradeExecutorBase} from "../../../governance/UpgradeExecutorBase.sol";
 import {IOwnable} from "../../../common/interfaces/IOwnable.sol";
 import {IChainTypeManager} from "../../../state-transition/IChainTypeManager.sol";
+import {IServerNotifier} from "../../../governance/IServerNotifier.sol";
 import {
+    ProxyUpgradeCTMAdminIsProxyAdmin,
     ProxyUpgradeDomainMismatch,
     ProxyUpgradeEngineChangedExecutorOwnership,
     ProxyUpgradeEngineMovedDomainAuthority
@@ -31,8 +33,9 @@ import {
 ///         `IProxyUpgradeEngine.executeUpgrade` selector and arguments the executor builds itself.
 /// @dev The engine runs with the executor's authority and storage. What the executor checks after
 ///      it returns: its own ownership (owner and pending owner unchanged), the holders of the domain
-///      it lends the engine (the `ProxyAdmin`'s owner and, in a CTM domain, the owner, pending owner
-///      and proxy admin of the CTM and of its ServerNotifier unchanged; a succession is a `forward`,
+///      it lends the engine (the `ProxyAdmin`'s owner and, in a CTM domain, the CTM's owner, pending
+///      owner, admin, proxy admin and ServerNotifier, and that ServerNotifier's owner, pending owner,
+///      proxy admin and CTM, unchanged; a succession or a re-pointed ServerNotifier is a `forward`,
 ///      not a leg) and every row's proxy at its `implNew`.
 ///      Anything else the engine does is what governance reviewed when it approved the transition,
 ///      and the engine's own postconditions.
@@ -66,12 +69,15 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
             proxyAdmin: address(_proxyAdmin),
             chainTypeManager: _chainTypeManager
         });
+        // A CTM the `ProxyAdmin` no longer administers answers `getProxyAdmin` with its own `admin()`:
+        // were that the `ProxyAdmin`, a moved CTM would hash as unmoved. The hash pins `admin()`, so
+        // refusing that state before the engine runs covers the leg.
+        if (_chainTypeManager != address(0) && IChainTypeManager(_chainTypeManager).admin() == address(_proxyAdmin)) {
+            revert ProxyUpgradeCTMAdminIsProxyAdmin(_chainTypeManager);
+        }
         address ownerBefore = owner();
         address pendingOwnerBefore = pendingOwner();
-        address serverNotifier = _chainTypeManager == address(0)
-            ? address(0)
-            : IChainTypeManager(_chainTypeManager).serverNotifierAddress();
-        bytes32 domainHoldersBefore = _domainHolders(_proxyAdmin, _chainTypeManager, serverNotifier);
+        bytes32 domainHoldersBefore = _domainHolders(_proxyAdmin, _chainTypeManager);
         // slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory returnData) = manifest.proxyUpgradeEngine.delegatecall(
             abi.encodeCall(IProxyUpgradeEngine.executeUpgrade, (context, manifest.proxyUpgrades))
@@ -87,7 +93,7 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
         if (owner() != ownerBefore || pendingOwner() != pendingOwnerBefore) {
             revert ProxyUpgradeEngineChangedExecutorOwnership(manifest.proxyUpgradeEngine);
         }
-        if (_domainHolders(_proxyAdmin, _chainTypeManager, serverNotifier) != domainHoldersBefore) {
+        if (_domainHolders(_proxyAdmin, _chainTypeManager) != domainHoldersBefore) {
             revert ProxyUpgradeEngineMovedDomainAuthority(manifest.proxyUpgradeEngine);
         }
         ProxyUpgradeRow[] memory rows = ProxyUpgradeRowLib.toRows(
@@ -100,40 +106,43 @@ abstract contract ProxyUpgradeExecutorBase is UpgradeExecutorBase {
     /// @notice Who holds the domain the executor lends the engine, hashed for comparison.
     /// @param _proxyAdmin The executor's bound `ProxyAdmin`.
     /// @param _chainTypeManager The executor's bound CTM, or zero in the `Core` domain.
-    /// @param _serverNotifier The CTM's ServerNotifier as it was before the engine ran, or zero.
-    /// @return The hash of the `ProxyAdmin`'s owner and, with a CTM, the owner, pending owner and proxy
-    ///         admin of the CTM and of its ServerNotifier.
+    /// @return The hash of the `ProxyAdmin`'s owner and, with a CTM, the CTM's owner, pending owner,
+    ///         admin, proxy admin and ServerNotifier, and that ServerNotifier's owner, pending owner,
+    ///         proxy admin and CTM.
     /// @dev A proxy `_proxyAdmin` no longer administers passes `getProxyAdmin`'s `admin()` query to its
-    ///      implementation: a moved CTM answers its own `admin()` and fails the comparison, a moved
-    ///      ServerNotifier has none and reverts the leg.
-    function _domainHolders(
-        ProxyAdmin _proxyAdmin,
-        address _chainTypeManager,
-        address _serverNotifier
-    ) private view returns (bytes32) {
+    ///      implementation: a moved CTM answers its own `admin()` (the caller refuses that being the
+    ///      `ProxyAdmin`), a moved ServerNotifier has none and reverts the leg. The CTM's
+    ///      `pendingAdmin` is private, so a nomination is not compared.
+    ///      TODO(v36): make the CTM's `pendingAdmin` readable and compare it, or drop the admin role.
+    ///      Either way the CTM keeps `admin()` (returning zero once the role is gone): this reads it.
+    function _domainHolders(ProxyAdmin _proxyAdmin, address _chainTypeManager) private view returns (bytes32) {
         if (_chainTypeManager == address(0)) {
             return keccak256(abi.encode(_proxyAdmin.owner()));
         }
         IOwnable ctm = IOwnable(_chainTypeManager);
+        address serverNotifier = IChainTypeManager(_chainTypeManager).serverNotifierAddress();
         bytes32 holders = keccak256(
             abi.encode(
                 _proxyAdmin.owner(),
                 ctm.owner(),
                 ctm.pendingOwner(),
-                _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(_chainTypeManager))
+                IChainTypeManager(_chainTypeManager).admin(),
+                _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(_chainTypeManager)),
+                serverNotifier
             )
         );
-        if (_serverNotifier == address(0)) {
+        if (serverNotifier == address(0)) {
             return holders;
         }
-        IOwnable notifier = IOwnable(_serverNotifier);
+        IOwnable notifier = IOwnable(serverNotifier);
         return
             keccak256(
                 abi.encode(
                     holders,
                     notifier.owner(),
                     notifier.pendingOwner(),
-                    _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(_serverNotifier))
+                    _proxyAdmin.getProxyAdmin(ITransparentUpgradeableProxy(serverNotifier)),
+                    IServerNotifier(serverNotifier).chainTypeManager()
                 )
             );
     }

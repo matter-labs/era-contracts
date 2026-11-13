@@ -15,7 +15,10 @@ import {ProxyUpgradeContext, ProxyUpgradeRow} from "../RegistryTypes.sol";
 ///         of governance calldata. See {DefaultProxyUpgradeEngine}.
 /// @dev While delegatecalled every storage slot is the executor's: where a release engine keeps its
 ///      configuration is in "Follow-up calls: the pinned upgrade engine" in
-///      {docs/registry-driven-upgrades.md}.
+///      {docs/registry-driven-upgrades.md}. So is the boundary: the executor's post-checks refuse a
+///      hook that hands a holder of the domain away or leaves a row off its `implNew`; everything
+///      else an engine does through the `ProxyAdmin`, the storage of any proxy under it included,
+///      rests on the review of the engine's code.
 interface IProxyUpgradeEngine {
     /// @notice Applies a transition: its rows and whatever follow-up work the engine defines.
     /// @param _context Where the engine runs, built by the executor from its own bindings.

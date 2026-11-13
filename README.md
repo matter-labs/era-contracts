@@ -19,7 +19,7 @@ documentation they implement. It is consumed as a git submodule by the ZK Stack 
 | [`protocol-docs/`](./protocol-docs)                             | The protocol documentation — flows, motivations, security arguments — written once and referenced from the code                          |
 | [`docs/`](./docs)                                               | Design documents for the repository's own machinery (registry-driven upgrades, governance self-migration, AI review guides)              |
 | [`audits/`](./audits)                                           | Audit reports                                                                                                                            |
-| [`environments/`](./environments), [`configs/`](./configs)      | Per-environment addresses and genesis configuration                                                                                      |
+| [`configs/`](./configs)                                         | Genesis configuration                                                                                                                    |
 
 The repository is **ZKsync OS only**: EraVM chains cannot be created, upgraded or tested from it (the EraVM
 workspaces, the `zksolc` toolchain and the dual-VM tooling were removed). Audited legacy contracts are kept where
