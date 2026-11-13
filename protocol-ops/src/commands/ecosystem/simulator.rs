@@ -371,8 +371,8 @@ pub struct GovernanceTomlToSimulatorArgs {
     #[clap(long)]
     pub governance_toml: Option<PathBuf>,
 
-    /// Transaction-simulator network name. Defaults to `mainnet` for
-    /// `--env mainnet`, otherwise `sepolia`.
+    /// Transaction-simulator network name. Defaults to `mainnet` for an env
+    /// on L1 mainnet (`l1_chain_id = 1`), otherwise `sepolia`.
     #[clap(long)]
     pub network: Option<String>,
 
@@ -652,7 +652,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     let network = args.network.unwrap_or_else(|| {
         env_cfg
             .as_ref()
-            .filter(|cfg| cfg.env == "mainnet")
+            .filter(|cfg| cfg.l1_chain_id() == Some(1))
             .map(|_| "mainnet".to_string())
             .unwrap_or_else(|| "sepolia".to_string())
     });

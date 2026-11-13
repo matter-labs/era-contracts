@@ -95,6 +95,9 @@ pub enum VerifyUpgradeEnv {
     /// ADI: a standalone ZKsync-OS ecosystem on Ethereum mainnet (L1 chainId 1), one
     /// ZKsync-OS CTM and one chain (36900), owned by a legacy `Governance.sol`.
     Adi,
+    /// Our ZKsync-OS ecosystem on Ethereum mainnet, separate from `Mainnet` (the Era ecosystem):
+    /// one ZKsync-OS CTM, owned by a legacy `Governance.sol`.
+    ZksyncOsMainnet,
 }
 
 impl VerifyUpgradeEnv {
@@ -104,14 +107,16 @@ impl VerifyUpgradeEnv {
             Self::Testnet => "testnet",
             Self::Mainnet => "mainnet",
             Self::Adi => "adi",
+            Self::ZksyncOsMainnet => "zksync-os-mainnet",
         }
     }
 
     /// Whether to expect the real (non-testnet) verifier and governance bytecodes. True for
     /// every ecosystem that sits on L1 mainnet, which is not the same as being THE canonical
-    /// mainnet ecosystem — ADI is its own ecosystem there, with `testnet_verifier = false`.
+    /// mainnet ecosystem — ADI and ZKsync OS are their own ecosystems there, with
+    /// `testnet_verifier = false`.
     pub fn is_mainnet(self) -> bool {
-        matches!(self, Self::Mainnet | Self::Adi)
+        matches!(self, Self::Mainnet | Self::Adi | Self::ZksyncOsMainnet)
     }
 
     pub fn is_stage(self) -> bool {

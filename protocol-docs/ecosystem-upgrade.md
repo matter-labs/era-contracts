@@ -13,8 +13,8 @@ Deploying an ecosystem from scratch is covered by
 The pipeline is the same whichever organization runs the ecosystem, but today the tooling does not
 yet cover a private ecosystem end to end:
 
-- `ecosystem verify-upgrade --env` accepts only `stage`, `testnet` and `mainnet`, so the
-  verification tool cannot run for a private environment;
+- `ecosystem verify-upgrade --env` accepts only `stage`, `testnet`, `mainnet`, `adi` and
+  `zksync-os-mainnet`, so the verification tool cannot run for any other environment;
 - the `protocol_ops` commands that resolve the L1 network from its chain id (`ctm init`,
   `ecosystem init`, and `upgrade-prepare-all` without `--env`) refuse any L1 other than mainnet,
   Sepolia, Holesky or a local Anvil;
