@@ -13,15 +13,15 @@ transaction. Transactions sent on L2 and inbound interop never reach it (see
 The filterer has two modes, `ALLOW_ALL` and `WITHDRAWALS_ONLY`. `isTransactionAllowed` goes
 through the rows below in order, and the first row that matches decides.
 
-| Priority operation                                        | `ALLOW_ALL`                                                      | `WITHDRAWALS_ONLY`                                                                               |
-| --------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Its hash is whitelisted ([pointed hash](#pointed-hashes)) | passes                                                           | passes                                                                                           |
-| Its sender is [exempt](#exemptions)                       | passes                                                           | passes                                                                                           |
-| A [deposit](#deposits) by an exempt depositor             | passes                                                           | passes                                                                                           |
-| Any other deposit                                         | passes if the token amount and `mintValue` are within their caps | rejected                                                                                         |
-| Any other message of the L1 asset router                  | rejected                                                         | rejected                                                                                         |
-| A call to the L2 `ContractDeployer` or `Create2Factory`   | rejected                                                         | rejected                                                                                         |
-| Any other (generic) call                                  | passes if `mintValue` is within the base token cap               | passes if it calls a registered withdrawal function and `mintValue` is within the base token cap |
+| Priority operation                                             | `ALLOW_ALL`                                                      | `WITHDRAWALS_ONLY`                                                                               |
+| -------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Its hash is [whitelisted](#allowlisting-specific-transactions) | passes                                                           | passes                                                                                           |
+| Its sender is [exempt](#exemptions)                            | passes                                                           | passes                                                                                           |
+| A [deposit](#deposits) by an exempt depositor                  | passes                                                           | passes                                                                                           |
+| Any other deposit                                              | passes if the token amount and `mintValue` are within their caps | rejected                                                                                         |
+| Any other message of the L1 asset router                       | rejected                                                         | rejected                                                                                         |
+| A call to the L2 `ContractDeployer` or `Create2Factory`        | rejected                                                         | rejected                                                                                         |
+| Any other (generic) call                                       | passes if `mintValue` is within the base token cap               | passes if it calls a registered withdrawal function and `mintValue` is within the base token cap |
 
 - **Caps.** `depositCap` is set per asset id and applies to a single deposit. A cap of zero means
   the asset is not accepted.
@@ -69,7 +69,7 @@ before setting it. Every later change is a single owner call that emits an event
 
 ## Details
 
-### Pointed hashes
+### Allowlisting specific transactions
 
 An entry in `allowedTxHashes` whitelists one exact transaction, keyed by
 `getTxHash(sender, contractL2, l2Value, l2Calldata, refundRecipient)`.
@@ -120,11 +120,19 @@ The Era L1 asset router builds the legacy encoding for every L1-native token, in
 `L1ERC20Bridge` deposit, and the new one for the rest, such as tokens bridged back from L2. In the
 legacy encoding the trailing `data` holds token metadata, not transfer data.
 
-Once registered, a custom bridge with the same legacy ABI, such as Lido's, is capped by the asset id derived from
-its L1 token. A zero cap blocks its deposits, while its withdrawals stay reachable through
-`withdrawalFunctions`. That asset id is also the one of the token's deposits through the asset
-router, so the custom bridge and the asset router share one cap for the same L1 token. This is a
-known limitation.
+Once registered, a custom bridge with the same legacy ABI, such as Lido's, is capped by the asset id
+derived from its L1 token. A zero cap blocks its deposits, while its withdrawals stay reachable
+through `withdrawalFunctions`. That asset id is also the one of the token's deposits through the
+asset router, so the custom bridge and the asset router share one cap for the same L1 token. This
+is a known limitation.
+
+For example, Lido's wstETH bridge `0x41527b2d03844db6b0945f25702cb958b6d55989` delivers a deposit
+as `finalizeDeposit(l1Sender, l2Receiver, l1Token, amount, data)` with `l1Token` set to wstETH
+`0x7f39c581f595b53c5cb19bd0b3f8da6c935e2ca0`. The filterer derives the asset id
+`0x02d11e71607cfc979e8008cd84f86d1fd9065f8b24dd5e18216eca6e3a4f679b`, the one listed for wstETH
+under [Tokens](#tokens), which also keys wstETH deposits through the asset router. A cap of 100
+wstETH on that id therefore limits each deposit through either route to 100 wstETH, and a cap of
+zero blocks both.
 
 ### The base token cap in `WITHDRAWALS_ONLY` mode
 
@@ -145,10 +153,10 @@ lowering the base token cap to about the fee of a withdrawal.
 Funds held by an L2 contract account, such as a smart account or an L2 Safe, cannot be withdrawn
 through `withdrawalFunctions`: the withdrawal has to be a call from the account, so the L1
 transaction targets the account itself, which is not a registered withdrawal function. Such an
-account can withdraw through a pointed hash of its withdrawal transaction, if it accepts that call
-from an L1 sender (a Safe does, given its owners' signatures). Registering its execution function
-instead (for a Safe, `execTransaction` on that Safe's address) would let through any transaction
-its owners sign, not only withdrawals.
+account can withdraw through a whitelisted hash of its withdrawal transaction, if it accepts that
+call from an L1 sender (a Safe does, given its owners' signatures). Registering its execution
+function instead (for a Safe, `execTransaction` on that Safe's address) would let through any
+transaction its owners sign, not only withdrawals.
 
 ## Limits and design decisions
 
@@ -157,9 +165,11 @@ its owners sign, not only withdrawals.
 - **Inbound interop.** Anyone can call `InteropHandler.executeBundle` on L2, and a bundle can mint
   tokens and base token without a priority operation. `executeBundle` reverts while the chain
   settles on L1, as Era does.
-- **Deployments.** The sequencer cannot skip a priority operation, so the filterer rejects calls to
-  the `ContractDeployer` and the public `Create2Factory` in either mode, unless the sender is
-  exempt or the transaction has a pointed hash. This does not block every deployment:
+- **Deployments.** The filterer rejects calls to the `ContractDeployer` and the public
+  `Create2Factory` in either mode, unless the sender is exempt or the transaction's hash is
+  whitelisted. This works on any protocol version: before v34 the sequencer cannot skip a priority
+  operation, and from v34, on a chain settling on L1, it can force-fail one (the bootloader's
+  `forceFail` flag), but only once it has spotted it. This does not block every deployment:
   - in `ALLOW_ALL` mode a priority operation can still call any factory contract on L2 (on Era, for
     example, the deterministic-deployment proxy `0x4e59b44847b379578588920cA78FbF26c0B4956C` or
     CreateX `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed`);
